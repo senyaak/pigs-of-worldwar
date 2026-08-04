@@ -14,10 +14,11 @@ import { test, expect } from '@playwright/test'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
-import { GAME_DIR, TMP, launchApp } from './launch'
+import { GAME_DIR, PHASE_ENV, TMP, launchApp } from './launch'
 
-/** This phase's own .env — created by the app here, read by the warm start. */
-const ENV_FILE = path.join(TMP, 'e2e-000', '.env')
+/** The phase chain's .env — created by the app HERE, consumed by every later
+ * phase (docs/testing.md): this spec runs first and leaves a located game. */
+const ENV_FILE = PHASE_ENV
 
 test.beforeAll(() => {
   if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
@@ -57,13 +58,13 @@ test('cold start: a pasted path takes the app from welcome to the file list', as
 
     // Known files by name — the executable and a map archive every install has.
     await page.locator('#filter').fill('warhogs_.exe')
-    await expect(page.locator('.file-row')).toHaveCount(1)
+    await expect(page.locator('#file-list .file-row')).toHaveCount(1)
     await page.locator('#filter').fill('Maps/ARCHI')
     await expect(page.locator('#file-list')).toContainText('Maps/ARCHI.MAD')
 
     // All 96 map archives; a floor of 90 for the same reason as above.
     await page.locator('#filter').fill('.MAD')
-    expect(await page.locator('.file-row').count()).toBeGreaterThan(90)
+    expect(await page.locator('#file-list .file-row').count()).toBeGreaterThan(90)
 
     // The choice was saved where POW_ENV_FILE pointed.
     expect(readFileSync(ENV_FILE, 'utf8')).toContain(`GAME_DIR=${GAME_DIR}`)

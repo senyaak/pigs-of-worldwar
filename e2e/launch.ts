@@ -21,6 +21,12 @@ export const GAME_DIR = process.env.POW_GAME_DIR || path.dirname(REPO_ROOT)
 /** Scratch space for env files and fabricated installs; wiped by the specs. */
 export const TMP = path.join(REPO_ROOT, '_tmp')
 
+/**
+ * The .env the phase chain shares: phase 000 creates it by driving the UI,
+ * every later phase launches warm from it. Standalone specs bring their own.
+ */
+export const PHASE_ENV = path.join(TMP, 'phase', '.env')
+
 export interface Launched {
   app: ElectronApplication
   page: Page

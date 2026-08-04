@@ -3,6 +3,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
+import { parseArchive } from '../lib/formats/mad'
+import type { Archive } from '../lib/formats/mad'
+
 const GAME_EXE = 'warhogs_.exe'
 const ENV_KEY = 'GAME_DIR'
 // In dev this resolves to the project root. Packaged builds will need a
@@ -121,6 +124,25 @@ function registerIpc(): void {
     if (!gameDir) return []
     return walkDir(gameDir)
   })
+
+  ipcMain.handle(
+    'archive:list',
+    async (_event, relPath: string): Promise<{ ok: true; archive: Archive } | { ok: false; error: string }> => {
+      if (!gameDir) return { ok: false, error: 'Game folder is not set' }
+      const full = path.resolve(gameDir, relPath)
+      // The renderer only ever sends paths it got from game:listFiles, but an
+      // IPC boundary is still a boundary — keep reads inside the game folder.
+      if (!full.startsWith(gameDir + path.sep)) {
+        return { ok: false, error: `Path escapes the game folder: ${relPath}` }
+      }
+      try {
+        const data = await fs.readFile(full)
+        return { ok: true, archive: parseArchive(data) }
+      } catch (error) {
+        return { ok: false, error: `${relPath}: ${error instanceof Error ? error.message : String(error)}` }
+      }
+    }
+  )
 }
 
 function createWindow(): void {

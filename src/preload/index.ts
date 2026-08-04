@@ -8,5 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   ): Promise<{ ok: true; dir: string } | { ok: false; error: string }> =>
     ipcRenderer.invoke('game:setDir', dir),
   listFiles: (): Promise<{ path: string; size: number }[]> =>
-    ipcRenderer.invoke('game:listFiles')
+    ipcRenderer.invoke('game:listFiles'),
+  listArchive: (relPath: string): Promise<unknown> =>
+    ipcRenderer.invoke('archive:list', relPath)
 })

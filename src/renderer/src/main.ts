@@ -10,6 +10,14 @@ const selectBtn = document.getElementById('select-dir') as HTMLButtonElement
 const pathInput = document.getElementById('path-input') as HTMLInputElement
 const usePathBtn = document.getElementById('use-path') as HTMLButtonElement
 const pathErrorEl = document.getElementById('path-error') as HTMLParagraphElement
+const archiveViewEl = document.getElementById('archive-view') as HTMLDivElement
+const archiveTitleEl = document.getElementById('archive-title') as HTMLSpanElement
+const archiveListEl = document.getElementById('archive-list') as HTMLDivElement
+const archiveBackBtn = document.getElementById('archive-back') as HTMLButtonElement
+
+function isArchivePath(filePath: string): boolean {
+  return /\.(mad|mtd)$/i.test(filePath)
+}
 
 let allFiles: FileEntry[] = []
 
@@ -38,10 +46,47 @@ function renderFiles(): void {
     size.className = 'file-size'
     size.textContent = formatSize(file.size)
     row.append(name, size)
+    if (isArchivePath(file.path)) {
+      row.classList.add('archive')
+      row.addEventListener('click', () => void openArchive(file.path))
+    }
     fragment.append(row)
   }
   fileListEl.append(fragment)
 }
+
+async function openArchive(relPath: string): Promise<void> {
+  const result = await window.api.listArchive(relPath)
+  if (!result.ok) {
+    archiveTitleEl.textContent = result.error
+    return
+  }
+  const { kind, entries } = result.archive
+  archiveTitleEl.textContent = `${relPath} — ${entries.length} entries (${kind})`
+  archiveListEl.replaceChildren()
+  const fragment = document.createDocumentFragment()
+  for (const entry of entries) {
+    const row = document.createElement('div')
+    row.className = 'file-row'
+    const name = document.createElement('span')
+    name.textContent = entry.name
+    const size = document.createElement('span')
+    size.className = 'file-size'
+    size.textContent = formatSize(entry.size)
+    row.append(name, size)
+    fragment.append(row)
+  }
+  archiveListEl.append(fragment)
+  browserEl.classList.add('hidden')
+  fileListEl.classList.add('hidden')
+  archiveViewEl.classList.remove('hidden')
+}
+
+archiveBackBtn.addEventListener('click', () => {
+  archiveViewEl.classList.add('hidden')
+  browserEl.classList.remove('hidden')
+  fileListEl.classList.remove('hidden')
+})
 
 async function showGame(dir: string): Promise<void> {
   gamePathEl.textContent = dir
