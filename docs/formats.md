@@ -123,7 +123,7 @@ keyframes (entry length / 272 = frame count):
 
 | offset | size | type      | field |
 | ------ | ---- | --------- | ----- |
-| 0      | 2    | u16       | unknown |
+| 0      | 2    | s16       | per-frame root offset (see below) |
 | 2      | 30   | s8[10][3] | per-branch positions (10 non-leaf bones × x,y,z) |
 | 32     | 240  | f32[15][4]| per-bone rotations — see below |
 
@@ -150,6 +150,13 @@ local = Rx(-x) · Ry(-y) · Rz(-z)      applied PARENT-RELATIVE
 The model's forward axis is **+X**: the leg-swing axis is Z (run cycle,
 upper-leg L/R correlation −0.887, anti-phase), and rotating a +Y leg about Z
 swings it along X.
+
+The leading field is **signed** and traces a smooth ramp up and back down
+(`0,0,2,4,7,10,12,12,11,…,-1,-2,-5,-9,…`), never a spike — a per-frame root
+offset, not an event marker; 41 of the 93 clips use it. Worth knowing because
+it rules out an animation event channel: footstep and weapon-release timings
+have to be **derived** from the skeleton, which works cleanly
+(`pigs-disasm/anim/audio-events.md`).
 
 Playback rate is a guess (25 fps); the branch positions are small per-frame
 deltas whose exact meaning is still uninvestigated — clips play fine with
