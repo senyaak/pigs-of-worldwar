@@ -19,8 +19,8 @@ import { test, expect } from '@playwright/test'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
-import { GAME_DIR, PHASE_ENV, TMP, launchApp } from './launch'
-import type { Launched } from './launch'
+import { GAME_DIR, PHASE_ENV, TMP, launchApp } from '../launch'
+import type { Launched } from '../launch'
 
 /** The phase chain's .env — created by the app HERE, consumed by every later
  * phase (docs/testing.md): this spec runs first and leaves a located game. */

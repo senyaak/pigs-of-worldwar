@@ -16,7 +16,7 @@
 import { test, expect } from '@playwright/test'
 import { existsSync } from 'node:fs'
 
-import { PHASE_ENV, launchApp } from './launch'
+import { PHASE_ENV, launchApp } from '../launch'
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {

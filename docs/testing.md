@@ -5,23 +5,25 @@ Conventions for the Playwright end-to-end suite, borrowed from the
 
 ## Phased specs
 
-Tests live in `e2e/` at the repo root. Specs whose names start with a number —
-`000-first-run.spec.ts`, `001-….spec.ts`, … — are **phases**: they run in
-order (the suite is serial, one worker), and each phase leaves the world in
-the state the next phase starts from. A spec that creates something is written
-before the spec that uses it.
+Tests live in `e2e/` at the repo root. Each **phase is a folder** named by
+its number — `e2e/000/`, `e2e/001/`, … — holding every suite that belongs to
+that number. Phases run in order (the suite is serial, one worker), and each
+phase leaves the world in the state the next phase starts from. A spec that
+creates something is written before the spec that uses it. Within a folder,
+files run alphabetically — the suite that creates the phase's state must sort
+first (`000/foundation.spec.ts` before `000/model-viewer.spec.ts`).
 
-- `000` is the foundation, all of it: every structural thing the engine needs
-  before anything real happens — cold start with no saved state, pointing the
-  app at the game, seeing its files, opening archives, and the debug model
-  viewer that proves the format pipeline (several `000-*.spec.ts` files; they
-  are all phase zero). The app's features don't care about any of this, which
-  is exactly why it is phase zero.
-- Numbers from `001` up are engine milestones — things a player could point
-  at. `001` is reserved for the first MEANINGFUL scene; parsers rendering a
+- `000/` is the foundation, all of it: every structural thing the engine
+  needs before anything real happens — cold start with no saved state,
+  pointing the app at the game, seeing its files, opening archives, and the
+  debug model viewer that proves the format pipeline. The app's features
+  don't care about any of this, which is exactly why it is phase zero.
+- Folders from `001/` up are engine milestones — things a player could point
+  at. `001/` is reserved for the first MEANINGFUL scene; parsers rendering a
   debug pig do not count.
-- Specs without a number prefix (`cli-game-dir.spec.ts`) are standalone
-  utilities: they build their own sandbox and must not depend on any phase.
+- Specs at the `e2e/` root without a number (`cli-game-dir.spec.ts`) are
+  standalone utilities: they build their own sandbox and must not depend on
+  any phase.
 
 ## Fail fast — no waiting out timeouts
 
