@@ -19,8 +19,9 @@ first (`000/foundation.spec.ts` before `000/model-viewer.spec.ts`).
   debug model viewer that proves the format pipeline. The app's features
   don't care about any of this, which is exactly why it is phase zero.
 - Folders from `001/` up are engine milestones — things a player could point
-  at. `001/` is reserved for the first MEANINGFUL scene; parsers rendering a
-  debug pig do not count.
+  at; parsers rendering a debug pig do not count. `001/` is the game's frame:
+  the main menu wearing the original frontend art (New Game → stub until the
+  battle phases, Asset Viewer → the phase-000 browsers, Exit → quits).
 - Specs at the `e2e/` root without a number (`cli-game-dir.spec.ts`) are
   standalone utilities: they build their own sandbox and must not depend on
   any phase.

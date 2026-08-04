@@ -165,3 +165,29 @@ u32 texture index into the sibling PTG, byte 15 zero.
 
 **POG — object placement**: still to transcribe from how-doc (`Map/POG`,
 `ObjectFlag`, `ObjectItemType`, `ObjectScriptType`).
+
+## MGL — frontend images (FEBmps/FEBMP.MAD)
+
+Every `.mgl` entry is an LZ77+RLE-compressed **8-bit BMP**. No community
+documentation existed; the compression was reverse-engineered here from the
+game's own decompressor (`warhogs_.exe` @ file offset `0x97dd0`) — full
+derivation in `pigs-disasm/mgl/notes.md`. One control byte dispatches:
+
+| control     | consumed | meaning |
+| ----------- | -------- | ------- |
+| `0x00`      | 1        | end of stream |
+| `0x01-0x3f` | 1 + c    | literal run of `c` bytes |
+| `0x40-0x4f` | 1        | byte delta run: step = out[-1]−out[-2], `(c&0xf)+3` bytes |
+| `0x50-0x5f` | 1        | word delta run: step = word[-2]−word[-4], `(c&0xf)+2` words |
+| `0x60-0x6f` | 1        | repeat last byte `(c&0xf)+3` times |
+| `0x70-0x7f` | 1        | repeat last word `(c&0xf)+2` times |
+| `0x80-0xbf` | 1        | match: len 3, back `(c&0x3f)+3` |
+| `0xc0-0xdf` | 2        | match: len `((c>>2)&7)+4`, back `((c&3)<<8 | p1)+3` |
+| `0xe0-0xff` | 3        | match: len `p2+5`, back `((c&0x1f)<<8 | p1)+3` |
+
+Matches copy forward byte-by-byte, so overlapping references replicate.
+Verified: decodes `pigbkpc1.mgl` byte-identical to its uncompressed twin
+`Language/Tims/Pigbkpc1.BMP` (308178 bytes), and all 237 FEBMP.MAD entries
+decode into BMPs whose header size field equals the decoded length.
+
+`pigbkpc1.mgl` is the 640×480 main-menu background.

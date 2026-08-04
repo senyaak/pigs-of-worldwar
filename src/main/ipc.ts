@@ -2,13 +2,13 @@
 // gameDir.insideGameDir, loading via assets.ts, errors folded into
 // { ok: false } results so the renderer shows them instead of dying.
 
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import path from 'node:path'
 import { promises as fs } from 'node:fs'
 
 import { parseArchive } from '../lib/formats/mad'
 import { getGameDir, insideGameDir, setGameDir, walkDir } from './gameDir'
-import { loadClips, loadModel, loadTerrain } from './assets'
+import { loadClips, loadFrontendImage, loadModel, loadTerrain } from './assets'
 
 function fail(context: string, error: unknown): { ok: false; error: string } {
   return { ok: false, error: `${context}: ${error instanceof Error ? error.message : String(error)}` }
@@ -59,6 +59,18 @@ export function registerIpc(): void {
       return fail(relPath, error)
     }
   })
+
+  ipcMain.handle('frontend:image', async (_event, entryName: string) => {
+    const gameDir = getGameDir()
+    if (!gameDir) return { ok: false, error: 'Game folder is not set' }
+    try {
+      return { ok: true, image: await loadFrontendImage(gameDir, entryName) }
+    } catch (error) {
+      return fail(entryName, error)
+    }
+  })
+
+  ipcMain.handle('app:quit', () => app.quit())
 
   ipcMain.handle('terrain:load', async (_event, relPath: string) => {
     try {

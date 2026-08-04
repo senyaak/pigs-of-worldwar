@@ -19,7 +19,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
-import { GAME_DIR, PHASE_ENV, TMP, launchApp } from '../launch'
+import { GAME_DIR, PHASE_ENV, TMP, launchApp, openAssets } from '../launch'
 import type { Launched } from '../launch'
 
 /** The phase chain's .env — created by the app HERE, consumed by every later
@@ -51,11 +51,14 @@ test('cold start: a pasted path takes the app from welcome to the file list', as
     await expect(page.locator('#path-error')).toContainText('not-a-game')
     await expect(page.locator('#select-dir')).toBeVisible()
 
-    // The real path is accepted and the whole installation is listed.
+    // The real path is accepted; a located game lands on the main menu, and
+    // the file list lives behind its Asset Viewer entry.
     await page.locator('#path-input').fill(GAME_DIR)
     await page.locator('#use-path').click()
     await expect(page.locator('#select-dir')).toBeHidden()
+    await expect(page.locator('#menu')).toBeVisible()
     await expect(page.locator('#game-path')).toHaveText(GAME_DIR)
+    await openAssets(page)
 
     // The install holds ~2700 files; a floor of 2000 survives savegame churn.
     await expect(page.locator('#stats')).toHaveText(/^\d+ files/)
@@ -81,12 +84,14 @@ test('cold start: a pasted path takes the app from welcome to the file list', as
   }
 })
 
-test('warm start: the saved .env opens the file list with no questions', async () => {
+test('warm start: the saved .env opens the menu with no questions', async () => {
   const launched = await launchApp({ envFile: ENV_FILE })
   const { page } = launched
   try {
     await expect(page.locator('#select-dir')).toBeHidden()
+    await expect(page.locator('#menu')).toBeVisible()
     await expect(page.locator('#game-path')).toHaveText(GAME_DIR)
+    await openAssets(page)
     await expect(page.locator('#stats')).toContainText('files')
     expect(launched.errors).toEqual([])
   } finally {
@@ -97,6 +102,7 @@ test('warm start: the saved .env opens the file list with no questions', async (
 /** Warm-start into the file list and open one archive by its exact path. */
 export async function openArchive(launched: Launched, relPath: string): Promise<void> {
   const { page } = launched
+  await openAssets(page)
   await page.locator('#filter').fill(relPath)
   await expect(page.locator('#file-list .file-row')).toHaveCount(1)
   await page.locator('#file-list .file-row').click()

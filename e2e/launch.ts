@@ -48,6 +48,11 @@ export interface LaunchOptions {
  * `envFile` is required on purpose: a spec that forgets it would read and
  * clobber the developer's real .env.
  */
+/** From the main menu into the asset browsers (the debug file list). */
+export async function openAssets(page: Page): Promise<void> {
+  await page.locator('#menu-assets').click()
+}
+
 export async function launchApp(options: LaunchOptions): Promise<Launched> {
   const app = await electron.launch({
     args: ['.', ...(options.args ?? [])],

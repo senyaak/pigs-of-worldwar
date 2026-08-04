@@ -16,5 +16,8 @@ contextBridge.exposeInMainWorld('api', {
   loadClips: (relPath: string): Promise<unknown> =>
     ipcRenderer.invoke('clips:load', relPath),
   loadTerrain: (relPath: string): Promise<unknown> =>
-    ipcRenderer.invoke('terrain:load', relPath)
+    ipcRenderer.invoke('terrain:load', relPath),
+  loadFrontendImage: (entryName: string): Promise<unknown> =>
+    ipcRenderer.invoke('frontend:image', entryName),
+  quit: (): Promise<void> => ipcRenderer.invoke('app:quit')
 })

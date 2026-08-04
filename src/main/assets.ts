@@ -15,6 +15,8 @@ import { parseTim } from '../lib/formats/tim'
 import type { Tim } from '../lib/formats/tim'
 import { parseMcapClip } from '../lib/formats/mcap'
 import type { McapClip } from '../lib/formats/mcap'
+import { decodeMgl } from '../lib/formats/mgl'
+import { parseBmp } from '../lib/formats/bmp'
 import { parsePmg } from '../lib/formats/pmg'
 import type { TerrainBlock } from '../lib/formats/pmg'
 import { parsePtg } from '../lib/formats/ptg'
@@ -78,6 +80,21 @@ export async function loadModel(full: string, base: string): Promise<LoadedModel
     textures: await pairedTextures(full),
     skeleton
   }
+}
+
+export interface FrontendImage {
+  width: number
+  height: number
+  rgba: Uint8Array
+}
+
+/** A frontend image out of FEBmps/FEBMP.MAD, by entry name (MGL → BMP). */
+export async function loadFrontendImage(gameDir: string, entryName: string): Promise<FrontendImage> {
+  const madPath = path.join(gameDir, 'FEBmps', 'FEBMP.MAD')
+  const data = await fs.readFile(madPath)
+  const entry = parseArchive(data).entries.find((e) => e.name.toLowerCase() === entryName.toLowerCase())
+  if (!entry) throw new Error(`no ${entryName} in FEBMP.MAD`)
+  return parseBmp(decodeMgl(data.subarray(entry.offset, entry.offset + entry.size)))
 }
 
 export interface LoadedTerrain {

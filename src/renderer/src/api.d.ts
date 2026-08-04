@@ -99,7 +99,19 @@ export interface Api {
   loadModel(relPath: string, base: string): Promise<LoadModelResult>
   loadClips(relPath: string): Promise<LoadClipsResult>
   loadTerrain(relPath: string): Promise<LoadTerrainResult>
+  loadFrontendImage(entryName: string): Promise<FrontendImageResult>
+  quit(): Promise<void>
 }
+
+export interface FrontendImage {
+  width: number
+  height: number
+  rgba: Uint8Array
+}
+
+export type FrontendImageResult =
+  | { ok: true; image: FrontendImage }
+  | { ok: false; error: string }
 
 declare global {
   interface Window {

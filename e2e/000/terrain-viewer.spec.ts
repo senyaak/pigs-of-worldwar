@@ -10,7 +10,7 @@
 import { test, expect } from '@playwright/test'
 import { existsSync } from 'node:fs'
 
-import { PHASE_ENV, launchApp } from '../launch'
+import { PHASE_ENV, launchApp, openAssets } from '../launch'
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
@@ -22,6 +22,7 @@ test('ARCHI renders: correct counts in the stats, terrain pixels on the canvas',
   const launched = await launchApp({ envFile: PHASE_ENV })
   const { page } = launched
   try {
+    await openAssets(page)
     await page.locator('#filter').fill('Maps/ARCHI.PMG')
     await page.locator('#file-list .file-row').click()
     await expect(page.locator('#viewer')).toBeVisible()

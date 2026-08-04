@@ -3,15 +3,18 @@
 
 import { byId } from './ui/dom'
 import { initWelcome } from './ui/welcome'
+import { initMenu } from './ui/menu'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
 import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
 
-type View = 'welcome' | 'browser' | 'archive' | 'viewer'
+type View = 'welcome' | 'menu' | 'stub' | 'browser' | 'archive' | 'viewer'
 
 const panels: Record<View, HTMLElement[]> = {
   welcome: [byId('welcome')],
+  menu: [byId('menu')],
+  stub: [byId('game-stub')],
   browser: [byId('browser'), byId('file-list')],
   archive: [byId('archive-view')],
   viewer: [byId('viewer')]
@@ -55,10 +58,21 @@ const archive = initArchiveView(
 const viewer = initModelViewer(() => show(viewerOrigin))
 const terrain = initTerrainViewer()
 
+const menu = initMenu({
+  onNewGame: () => show('stub'),
+  onAssets: () => {
+    show('browser')
+    void browser.load()
+  }
+})
+byId<HTMLButtonElement>('stub-back').addEventListener('click', () => show('menu'))
+byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
+
+// A located game lands on the main menu; the asset browsers hang off it.
 async function showGame(dir: string): Promise<void> {
   byId<HTMLSpanElement>('game-path').textContent = dir
-  show('browser')
-  await browser.load()
+  show('menu')
+  await menu.load()
 }
 
 initWelcome((dir) => void showGame(dir))

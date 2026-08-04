@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { TMP, launchApp } from './launch'
+import { TMP, launchApp, openAssets } from './launch'
 
 const ROOT = path.join(TMP, 'e2e-cli')
 /** A saved .env pointing at a valid fake install — the fallback to beat. */
@@ -40,6 +40,7 @@ test('a valid --game-dir wins over the .env folder', async () => {
     args: [`--game-dir=${CLI_GAME}`]
   })
   try {
+    await openAssets(launched.page)
     await expect(launched.page.locator('#file-list')).toContainText('Maps/FROMCLI.MAD')
     expect(launched.errors).toEqual([])
   } finally {
