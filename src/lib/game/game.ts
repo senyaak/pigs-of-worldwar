@@ -32,19 +32,23 @@ export interface GameConfig {
   players: { name: string; pigNames: string[] }[]
   /** One spawn per pig, in player order then squad order. */
   spawns: PigSpawn[]
+  /** Seconds a player has per turn (the original's turn clock). */
+  turnSeconds?: number
 }
 
-/** How far one pig may walk in one turn, world units (tile = 512). */
-export const MOVE_BUDGET = 4000
+export const DEFAULT_TURN_SECONDS = 45
 
 export class Game {
   readonly players: Player[]
+  readonly turnSeconds: number
   private currentPlayerIndex = 0
   private turnNumber = 1
-  private moveLeft = MOVE_BUDGET
+  private timeLeftSeconds: number
 
   constructor(config: GameConfig) {
     if (config.players.length < 2) throw new Error('a game needs at least two players')
+    this.turnSeconds = config.turnSeconds ?? DEFAULT_TURN_SECONDS
+    this.timeLeftSeconds = this.turnSeconds
     const pigCount = config.players.reduce((sum, p) => sum + p.pigNames.length, 0)
     if (config.spawns.length !== pigCount) {
       throw new Error(`${pigCount} pigs need ${pigCount} spawns, got ${config.spawns.length}`)
@@ -82,28 +86,38 @@ export class Game {
     return player.pigs[player.activePig]
   }
 
-  /** Movement remaining for the pig currently acting. */
-  get remainingMove(): number {
-    return this.moveLeft
+  /** Seconds left on the turn clock. */
+  get timeLeft(): number {
+    return this.timeLeftSeconds
   }
 
   /**
-   * Move the acting pig to (x, z), paying `distance` from the turn's
-   * movement budget. Refused (false) when the budget cannot cover it —
-   * the caller validated the ground; this validates the rules.
+   * Advance the turn clock. Returns true exactly when this tick ran the
+   * clock out — the caller ends the turn (and owns whatever ceremony that
+   * involves).
    */
-  moveCurrentPig(x: number, z: number, distance: number, heading: number): boolean {
-    if (distance > this.moveLeft) return false
-    this.moveLeft -= distance
+  tick(deltaSeconds: number): boolean {
+    if (this.timeLeftSeconds <= 0) return false
+    this.timeLeftSeconds -= deltaSeconds
+    return this.timeLeftSeconds <= 0
+  }
+
+  /** Move the acting pig — the clock is the only movement limit, so this
+   * always succeeds; the caller validated the ground. */
+  moveCurrentPig(x: number, z: number, heading: number): void {
     const pig = this.currentPig
     pig.position = { x, z }
     pig.heading = heading
-    return true
   }
 
-  /** Involuntary displacement — sliding, knockback: no budget is paid. */
+  /** Involuntary displacement — sliding, knockback. */
   displaceCurrentPig(x: number, z: number): void {
     this.currentPig.position = { x, z }
+  }
+
+  /** Turn the acting pig on the spot. */
+  turnCurrentPig(heading: number): void {
+    this.currentPig.heading = heading
   }
 
   /** Hand over to the next player; their squad advances to its next pig. */
@@ -112,6 +126,6 @@ export class Game {
     player.activePig = (player.activePig + 1) % player.pigs.length
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length
     if (this.currentPlayerIndex === 0) this.turnNumber++
-    this.moveLeft = MOVE_BUDGET
+    this.timeLeftSeconds = this.turnSeconds
   }
 }

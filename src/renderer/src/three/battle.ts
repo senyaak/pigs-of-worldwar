@@ -26,20 +26,28 @@ export interface BattleAssets {
 export interface BattleScene {
   /** Point the camera at the active pig and park the marker over it. */
   focus(pig: Pig): void
-  /** Movement intent from the input layer: a direction in the XZ plane
-   * (game space), zero when no key is held. */
-  setIntent(x: number, z: number): void
+  /** Tank controls from the input layer: walk -1|0|1 (back/stop/forward),
+   * turn -1|0|1 (left/stop/right). */
+  setIntent(walk: number, turn: number): void
+  /** Ask the acting pig to jump (ignored mid-air, swimming or sliding). */
+  jump(): void
   dispose(): void
 }
 
-const PIG_HEADING_OFFSET = Math.PI // model faces -z in its own space
+// The model's own forward axis — chosen so a pig FACES where it walks
+// (π had them strolling sideways like crabs; π/2 had them moonwalking).
+const PIG_HEADING_OFFSET = -Math.PI / 2
 const WALK_SPEED = 900 // world units per second (tile = 512)
 const SWIM_SPEED = WALK_SPEED / 2
 const SLIDE_SPEED = 1400
+const TURN_SPEED = 2.6 // radians per second
 /** How deep a swimming pig sits below the surface (game Y-down: +down). */
 const SWIM_SINK = 110
 /** The stumble-in-place moment before a slide takes hold. */
 const SLIP_STAGGER_SECONDS = 0.45
+/** Jump ballistics, game Y-down: negative velocity is upward. */
+const JUMP_VELOCITY = -1500
+const GRAVITY = 5000
 
 export function buildBattle(
   host: SceneHost,
@@ -70,7 +78,11 @@ export function buildBattle(
     for (const pig of player.pigs) {
       const mesh = buildPig(assets.model, assets.modelTextures, assets.skeleton)
       const node = mesh.group.children[0]
-      node.position.set(pig.position.x, query.height(pig.position.x, pig.position.z), pig.position.z)
+      node.position.set(
+        pig.position.x,
+        query.height(pig.position.x, pig.position.z) - mesh.footOffset,
+        pig.position.z
+      )
       node.rotation.y = pig.heading + PIG_HEADING_OFFSET
       root.add(node)
       // T-pose at rest; the walk clip plays only while moving.
@@ -97,48 +109,111 @@ export function buildBattle(
 
   let markerBase = new THREE.Vector3()
   let time = 0
-  const intent = { x: 0, z: 0 }
+  const intent = { walk: 0, turn: 0 }
+  /** Vertical velocity while airborne (game Y-down), null on the ground. */
+  let airborne: { vy: number; vx: number; vz: number } | null = null
+  let jumpRequested = false
+  /** Stagger timer: > 0 means the pig is scrabbling in place before the
+   * slide takes hold (reset whenever it reaches holding ground). */
+  let stagger = 0
+  /** Smoothed chase-camera position (world space). */
+  const cameraPos = new THREE.Vector3()
+  let cameraSnapped = false
+
+  host.camera.near = 10
+  host.camera.far = 100_000
+  host.camera.updateProjectionMatrix()
+
+  /** Sync a pig's node to its game position: soles on the ground, sunk a
+   * little when swimming. */
+  const settle = (entry: PigEntry): void => {
+    const { x, z } = entry.pig.position
+    const sink = query.isWater(x, z) ? SWIM_SINK : 0
+    entry.node.position.set(x, query.height(x, z) + sink - entry.mesh.footOffset, z)
+  }
+
+  /**
+   * The chase camera hangs behind the pig's shoulders (world space; the
+   * root flips Y and Z out of the game's Y-down coordinates), clamped
+   * above the terrain so hills never swallow the view.
+   */
+  const desiredCamera = (pig: Pig, nodeY: number): { position: THREE.Vector3; target: THREE.Vector3 } => {
+    const target = new THREE.Vector3(pig.position.x, -nodeY + 300, -pig.position.z)
+    const behindX = pig.position.x - Math.sin(pig.heading) * 2100
+    const behindZ = pig.position.z - Math.cos(pig.heading) * 2100
+    const terrainAtCamera = -query.height(behindX, behindZ)
+    const position = new THREE.Vector3(
+      behindX,
+      Math.max(target.y + 900, terrainAtCamera + 500),
+      -behindZ
+    )
+    return { position, target }
+  }
+
+  const updateCamera = (active: PigEntry, delta: number | null): void => {
+    const { position, target } = desiredCamera(active.pig, active.node.position.y)
+    if (delta === null || !cameraSnapped) {
+      cameraPos.copy(position)
+      cameraSnapped = true
+    } else {
+      cameraPos.lerp(position, 1 - Math.exp(-6 * delta))
+    }
+    host.camera.position.copy(cameraPos)
+    host.camera.lookAt(target)
+  }
 
   const focus = (pig: Pig): void => {
     const ground = query.height(pig.position.x, pig.position.z)
     markerBase = new THREE.Vector3(pig.position.x, ground - 700, pig.position.z)
     marker.position.copy(markerBase)
-    // Camera in Y-up world: the root flips Y and Z.
-    const target = new THREE.Vector3(pig.position.x, -ground, -pig.position.z)
-    host.camera.near = 10
-    host.camera.far = 100_000
-    host.camera.updateProjectionMatrix()
-    // Keep the camera above the ground at its own position — a pig walking
-    // behind a hill must not bury the view inside the slope.
-    const camZ = target.z + 2600
-    const terrainAtCamera = -query.height(target.x, -camZ)
-    const camY = Math.max(target.y + 1500, terrainAtCamera + 600)
-    host.camera.position.set(target.x, camY, camZ)
-    host.camera.lookAt(target)
+    const active = pigMeshes.find((entry) => entry.pig === pig)
+    if (active) updateCamera(active, null)
   }
 
-  /** Sync a pig's node to its game position, sunk a little when swimming. */
-  const settle = (entry: PigEntry): void => {
-    const { x, z } = entry.pig.position
-    const sink = query.isWater(x, z) ? SWIM_SINK : 0
-    entry.node.position.set(x, query.height(x, z) + sink, z)
-  }
+  const update = (delta: number): void => {
+    // The turn clock runs regardless of what anyone does.
+    if (game.tick(delta)) {
+      game.endTurn()
+      stagger = 0
+      airborne = null
+      jumpRequested = false
+      focus(game.currentPig)
+    }
 
-  /** Stagger timer: > 0 means the pig is scrabbling in place before the
-   * slide takes hold (reset whenever it reaches holding ground). */
-  let stagger = 0
-
-  const walk = (delta: number): void => {
     const active = pigMeshes.find((entry) => entry.pig === game.currentPig)
     if (!active) return
-    // A pig that stopped being active mid-stride stops walking.
     for (const entry of pigMeshes) if (entry !== active) setWalking(entry, false)
 
     const { x: px, z: pz } = active.pig.position
-    const slip = query.slipDirection(px, pz)
-    if (slip) {
-      // Steep ground: a short scramble on the spot, then the slide — no
-      // budget is paid for going where nobody wanted to go.
+    const swimming = query.isWater(px, pz)
+    const slip = airborne === null ? query.slipDirection(px, pz) : null
+
+    // Turning on the spot works in every grounded state.
+    if (intent.turn !== 0 && airborne === null) {
+      game.turnCurrentPig(active.pig.heading + intent.turn * TURN_SPEED * delta)
+      active.node.rotation.y = active.pig.heading + PIG_HEADING_OFFSET
+    }
+
+    if (airborne) {
+      // Ballistics: gravity pulls (game Y-down: +down), momentum carries.
+      const x = px + airborne.vx * delta
+      const z = pz + airborne.vz * delta
+      const moved = query.walkable(x, z)
+      if (moved) game.moveCurrentPig(x, z, active.pig.heading)
+      const at = active.pig.position
+      airborne.vy += GRAVITY * delta
+      const y = active.node.position.y + airborne.vy * delta
+      const ground =
+        query.height(at.x, at.z) + (query.isWater(at.x, at.z) ? SWIM_SINK : 0) - active.mesh.footOffset
+      if (airborne.vy > 0 && y >= ground) {
+        airborne = null
+        settle(active)
+      } else {
+        active.node.position.set(at.x, y, at.z)
+      }
+    } else if (slip) {
+      // Steep ground: a short scramble on the spot, then the slide — going
+      // where nobody wanted to go.
       setWalking(active, true)
       stagger += delta
       if (stagger >= SLIP_STAGGER_SECONDS) {
@@ -148,39 +223,49 @@ export function buildBattle(
         if (query.walkable(x, z)) {
           game.displaceCurrentPig(x, z)
           settle(active)
-          focus(active.pig)
-          onGameChanged()
         }
       }
-      return
-    }
-    stagger = 0
+    } else {
+      stagger = 0
+      const speed = swimming ? SWIM_SPEED : WALK_SPEED
+      const forwardX = Math.sin(active.pig.heading)
+      const forwardZ = Math.cos(active.pig.heading)
 
-    const length = Math.hypot(intent.x, intent.z)
-    if (length === 0 || game.remainingMove <= 0) {
-      setWalking(active, false)
-      return
+      if (jumpRequested && !swimming) {
+        airborne = {
+          vy: JUMP_VELOCITY,
+          vx: forwardX * intent.walk * speed,
+          vz: forwardZ * intent.walk * speed
+        }
+      } else if (intent.walk !== 0) {
+        const step = speed * delta * intent.walk
+        const x = px + forwardX * step
+        const z = pz + forwardZ * step
+        if (query.walkable(x, z)) {
+          game.moveCurrentPig(x, z, active.pig.heading)
+          settle(active)
+          setWalking(active, true)
+        } else {
+          setWalking(active, false)
+        }
+      } else {
+        setWalking(active, false)
+      }
     }
-    const swimming = query.isWater(px, pz)
-    const speed = swimming ? SWIM_SPEED : WALK_SPEED
-    const step = Math.min(speed * delta, game.remainingMove)
-    const x = px + (intent.x / length) * step
-    const z = pz + (intent.z / length) * step
-    const heading = Math.atan2(intent.x, intent.z)
-    if (!query.walkable(x, z) || !game.moveCurrentPig(x, z, step, heading)) {
-      setWalking(active, false)
-      return
-    }
-    setWalking(active, true)
-    settle(active)
-    active.node.rotation.y = heading + PIG_HEADING_OFFSET
-    focus(active.pig)
+    jumpRequested = false
+
+    // Marker and camera trail the pig every frame.
+    const ground = query.height(active.pig.position.x, active.pig.position.z)
+    markerBase.set(active.pig.position.x, ground - 700, active.pig.position.z)
+    marker.position.x = markerBase.x
+    marker.position.z = markerBase.z
+    updateCamera(active, delta)
     onGameChanged()
   }
 
   const onFrame = (delta: number): void => {
     time += delta
-    walk(delta)
+    update(delta)
     for (const { player } of pigMeshes) player.update(delta)
     marker.position.y = markerBase.y - Math.sin(time * 3) * 40
   }
@@ -188,9 +273,12 @@ export function buildBattle(
 
   return {
     focus,
-    setIntent(x, z) {
-      intent.x = x
-      intent.z = z
+    setIntent(walk, turn) {
+      intent.walk = walk
+      intent.turn = turn
+    },
+    jump() {
+      jumpRequested = true
     },
     dispose() {
       host.onFrame.delete(onFrame)

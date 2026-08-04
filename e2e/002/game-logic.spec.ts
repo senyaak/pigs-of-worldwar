@@ -4,7 +4,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { Game, MOVE_BUDGET } from '../../src/lib/game/game'
+import { DEFAULT_TURN_SECONDS, Game } from '../../src/lib/game/game'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { readFileSync } from 'node:fs'
@@ -41,21 +41,26 @@ test('turns rotate players; each squad cycles through its pigs', () => {
   expect(game.currentPig.name).toBe('Fritz')
 })
 
-test('movement spends the turn budget; the next turn refills it', () => {
-  const game = new Game(config)
-  expect(game.remainingMove).toBe(MOVE_BUDGET)
+test('the turn clock ticks down, expires exactly once, and refills', () => {
+  const game = new Game({ ...config, turnSeconds: 10 })
+  expect(game.timeLeft).toBe(10)
+  expect(game.tick(4)).toBe(false)
+  expect(game.timeLeft).toBe(6)
 
-  expect(game.moveCurrentPig(100, 200, 1500, Math.PI / 2)).toBe(true)
-  expect(game.remainingMove).toBe(MOVE_BUDGET - 1500)
+  // Movement is free while the clock runs — the clock IS the limit.
+  game.moveCurrentPig(100, 200, Math.PI / 2)
   expect(game.currentPig.position).toEqual({ x: 100, z: 200 })
   expect(game.currentPig.heading).toBeCloseTo(Math.PI / 2)
+  game.turnCurrentPig(1)
+  expect(game.currentPig.heading).toBe(1)
 
-  // The budget refuses what it cannot cover — position stays put.
-  expect(game.moveCurrentPig(999, 999, MOVE_BUDGET, 0)).toBe(false)
-  expect(game.currentPig.position).toEqual({ x: 100, z: 200 })
-
+  // Expiry reports true exactly once; endTurn hands the next pig a full clock.
+  expect(game.tick(7)).toBe(true)
+  expect(game.tick(1)).toBe(false)
   game.endTurn()
-  expect(game.remainingMove).toBe(MOVE_BUDGET)
+  expect(game.timeLeft).toBe(10)
+
+  expect(new Game(config).timeLeft).toBe(DEFAULT_TURN_SECONDS)
 })
 
 test('a game refuses mismatched spawns or a lonely player', () => {

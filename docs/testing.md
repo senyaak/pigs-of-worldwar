@@ -24,8 +24,10 @@ first (`000/foundation.spec.ts` before `000/model-viewer.spec.ts`).
   Asset Viewer → the phase-000 browsers, Exit → quits). `002/` is the first
   battle slice: the Game domain model (players, squads, turn rotation —
   pinned by a pure-logic spec that runs with no Electron at all) and the
-  battle scene New Game opens: squads spawned on walkable ARCHI ground, a
-  turn HUD, End Turn rotating pigs, the camera following the active one.
+  battle scene New Game opens: squads spawned on standable CAMP ground, the
+  original's turn clock (auto end-of-turn on expiry), tank controls — W/S
+  walk, A/D turn, Space jumps ballistically — swimming and slope-sliding per
+  the tile data, and a chase camera behind the acting pig's back.
 - Specs at the `e2e/` root without a number (`cli-game-dir.spec.ts`) are
   standalone utilities: they build their own sandbox and must not depend on
   any phase.

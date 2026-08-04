@@ -15,6 +15,9 @@ export interface Pig {
   mesh: THREE.SkinnedMesh
   /** Index-addressable bones, HIR order. */
   bones: THREE.Bone[]
+  /** Bind-pose distance from the model origin (hip) down to the soles,
+   * game Y-down units — what to subtract to stand ON the ground. */
+  footOffset: number
   dispose(): void
 }
 
@@ -100,10 +103,17 @@ export function buildPig(model: Model, textures: Texture[], skeleton: Bone[]): P
   group.rotation.x = Math.PI
   group.add(mesh)
 
+  // The lowest bind-pose vertex (game Y-down: the largest Y) is the soles.
+  let footOffset = 0
+  for (let i = 1; i < model.positions.length; i += 3) {
+    if (model.positions[i] > footOffset) footOffset = model.positions[i]
+  }
+
   return {
     group,
     mesh,
     bones,
+    footOffset,
     dispose() {
       geometry.dispose()
       for (const material of materials) {

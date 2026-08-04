@@ -39,7 +39,7 @@ export function initBattle(onLeave: () => void): BattleView {
     const swimming = query?.isWater(x, z) ? ', swimming' : ''
     hudEl.textContent =
       `Turn ${game.turn} — ${game.currentPlayer.name}: ${game.currentPig.name} ` +
-      `(${game.currentPig.health} hp, move ${Math.round(game.remainingMove)}${swimming})`
+      `(${game.currentPig.health} hp, ${Math.max(0, Math.ceil(game.timeLeft))}s${swimming})`
   }
 
   const updateHud = (): void => {
@@ -53,20 +53,25 @@ export function initBattle(onLeave: () => void): BattleView {
     updateHud()
   })
 
-  // WASD / arrows drive the acting pig while the battle view is up.
+  // Tank controls, original style: W/S walk forward/back, A/D turn on the
+  // spot, Space jumps. Active only while the battle view is up.
   const battleEl = byId<HTMLDivElement>('battle')
   const held = new Set<string>()
   const pushIntent = (): void => {
-    let x = 0
-    let z = 0
-    if (held.has('KeyA') || held.has('ArrowLeft')) x -= 1
-    if (held.has('KeyD') || held.has('ArrowRight')) x += 1
-    if (held.has('KeyW') || held.has('ArrowUp')) z += 1
-    if (held.has('KeyS') || held.has('ArrowDown')) z -= 1
-    scene?.setIntent(x, z)
+    let walk = 0
+    let turn = 0
+    if (held.has('KeyW') || held.has('ArrowUp')) walk += 1
+    if (held.has('KeyS') || held.has('ArrowDown')) walk -= 1
+    if (held.has('KeyA') || held.has('ArrowLeft')) turn -= 1
+    if (held.has('KeyD') || held.has('ArrowRight')) turn += 1
+    scene?.setIntent(walk, turn)
   }
   window.addEventListener('keydown', (event) => {
     if (battleEl.classList.contains('hidden')) return
+    if (event.code === 'Space') {
+      if (!event.repeat) scene?.jump()
+      return
+    }
     held.add(event.code)
     pushIntent()
   })
