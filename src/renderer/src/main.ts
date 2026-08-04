@@ -1,4 +1,5 @@
 import type { FileEntry } from './api'
+import { showModel } from './viewer'
 
 const welcomeEl = document.getElementById('welcome') as HTMLDivElement
 const browserEl = document.getElementById('browser') as HTMLDivElement
@@ -14,6 +15,10 @@ const archiveViewEl = document.getElementById('archive-view') as HTMLDivElement
 const archiveTitleEl = document.getElementById('archive-title') as HTMLSpanElement
 const archiveListEl = document.getElementById('archive-list') as HTMLDivElement
 const archiveBackBtn = document.getElementById('archive-back') as HTMLButtonElement
+const viewerEl = document.getElementById('viewer') as HTMLDivElement
+const viewerStatsEl = document.getElementById('viewer-stats') as HTMLSpanElement
+const viewerCanvasEl = document.getElementById('viewer-canvas') as HTMLDivElement
+const viewerBackBtn = document.getElementById('viewer-back') as HTMLButtonElement
 
 function isArchivePath(filePath: string): boolean {
   return /\.(mad|mtd)$/i.test(filePath)
@@ -64,6 +69,18 @@ async function openArchive(relPath: string): Promise<void> {
   const { kind, entries } = result.archive
   archiveTitleEl.textContent = `${relPath} — ${entries.length} entries (${kind})`
   archiveListEl.replaceChildren()
+
+  // A model is a VTX/NO2/FAC triple sharing a base name — those rows open
+  // the viewer.
+  const stems = new Map<string, Set<string>>()
+  for (const entry of entries) {
+    const match = entry.name.match(/^(.*)\.(vtx|no2|fac)$/i)
+    if (!match) continue
+    const base = match[1].toLowerCase()
+    if (!stems.has(base)) stems.set(base, new Set())
+    stems.get(base)?.add(match[2].toLowerCase())
+  }
+
   const fragment = document.createDocumentFragment()
   for (const entry of entries) {
     const row = document.createElement('div')
@@ -74,6 +91,11 @@ async function openArchive(relPath: string): Promise<void> {
     size.className = 'file-size'
     size.textContent = formatSize(entry.size)
     row.append(name, size)
+    const base = entry.name.replace(/\.(vtx|no2|fac)$/i, '')
+    if (base !== entry.name && stems.get(base.toLowerCase())?.size === 3) {
+      row.classList.add('archive')
+      row.addEventListener('click', () => void openModel(relPath, base))
+    }
     fragment.append(row)
   }
   archiveListEl.append(fragment)
@@ -86,6 +108,26 @@ archiveBackBtn.addEventListener('click', () => {
   archiveViewEl.classList.add('hidden')
   browserEl.classList.remove('hidden')
   fileListEl.classList.remove('hidden')
+})
+
+async function openModel(relPath: string, base: string): Promise<void> {
+  const result = await window.api.loadModel(relPath, base)
+  if (!result.ok) {
+    viewerStatsEl.textContent = result.error
+    return
+  }
+  const { model } = result
+  archiveViewEl.classList.add('hidden')
+  viewerEl.classList.remove('hidden')
+  viewerStatsEl.textContent =
+    `${base} — ${model.triangleCount} triangles ` +
+    `(${model.sourceTriangles} + ${model.sourceQuads} quads), ${model.vertexCount} vertices`
+  showModel(viewerCanvasEl, model)
+}
+
+viewerBackBtn.addEventListener('click', () => {
+  viewerEl.classList.add('hidden')
+  archiveViewEl.classList.remove('hidden')
 })
 
 async function showGame(dir: string): Promise<void> {

@@ -4,7 +4,10 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
 import { parseArchive } from '../lib/formats/mad'
-import type { Archive } from '../lib/formats/mad'
+import type { Archive, ArchiveEntry } from '../lib/formats/mad'
+import { boneWorldOffsets, parseHir } from '../lib/formats/hir'
+import { parseModel } from '../lib/formats/model'
+import type { Model } from '../lib/formats/model'
 
 const GAME_EXE = 'warhogs_.exe'
 const ENV_KEY = 'GAME_DIR'
@@ -124,6 +127,42 @@ function registerIpc(): void {
     if (!gameDir) return []
     return walkDir(gameDir)
   })
+
+  ipcMain.handle(
+    'model:load',
+    async (
+      _event,
+      relPath: string,
+      base: string
+    ): Promise<{ ok: true; model: Model } | { ok: false; error: string }> => {
+      if (!gameDir) return { ok: false, error: 'Game folder is not set' }
+      const full = path.resolve(gameDir, relPath)
+      if (!full.startsWith(gameDir + path.sep)) {
+        return { ok: false, error: `Path escapes the game folder: ${relPath}` }
+      }
+      try {
+        const data = await fs.readFile(full)
+        const { entries } = parseArchive(data)
+        const slice = (ext: string): Uint8Array => {
+          const wanted = `${base}${ext}`.toLowerCase()
+          const entry: ArchiveEntry | undefined = entries.find((e) => e.name.toLowerCase() === wanted)
+          if (!entry) throw new Error(`no ${base}${ext} in ${relPath}`)
+          return data.subarray(entry.offset, entry.offset + entry.size)
+        }
+        // A .HIR next to the archive is the skeleton its models bind to
+        // (Chars/pig.HIR) — vertices are bone-local without it.
+        let boneOffsets: Float32Array | undefined
+        const siblings = await fs.readdir(path.dirname(full))
+        const hirName = siblings.find((name) => name.toLowerCase().endsWith('.hir'))
+        if (hirName) {
+          boneOffsets = boneWorldOffsets(parseHir(await fs.readFile(path.join(path.dirname(full), hirName))))
+        }
+        return { ok: true, model: parseModel(slice('.VTX'), slice('.NO2'), slice('.FAC'), boneOffsets) }
+      } catch (error) {
+        return { ok: false, error: `${relPath}: ${error instanceof Error ? error.message : String(error)}` }
+      }
+    }
+  )
 
   ipcMain.handle(
     'archive:list',

@@ -11,9 +11,12 @@ order (the suite is serial, one worker), and each phase leaves the world in
 the state the next phase starts from. A spec that creates something is written
 before the spec that uses it.
 
-- `000` is always the cold start: launch the app with no saved state, point it
-  at the game, verify it sees the game's files. Everything later assumes a
-  working, located installation.
+- `000` is the foundation, all of it: every structural thing the engine needs
+  before anything real happens — cold start with no saved state, pointing the
+  app at the game, seeing its files, opening archives. The app's features
+  don't care about any of this, which is exactly why it is all phase zero.
+- Numbers from `001` up are engine milestones — things a player could point
+  at. `001` is the first rendered scene.
 - Specs without a number prefix (`cli-game-dir.spec.ts`) are standalone
   utilities: they build their own sandbox and must not depend on any phase.
 

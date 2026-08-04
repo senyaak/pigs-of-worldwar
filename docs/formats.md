@@ -42,7 +42,10 @@ entries, every length divisible by 272 (the MCAP keyframe size).
 A model is three sibling entries sharing a base name: `<name>.VTX`,
 `<name>.NO2`, `<name>.FAC`. LOD suffixes: `_hi`, `_me`.
 
-**VTX — vertices**, 8 bytes each, count = length / 8:
+**VTX — vertices**, 8 bytes each, count = length / 8. Positions are
+**bone-local** (found here, not in how-doc): without adding the accumulated
+HIR bone offset for `boneIndex`, every body part piles up around the origin.
+Y points down.
 
 | offset | size | type | field |
 | ------ | ---- | ---- | ----- |
@@ -67,6 +70,9 @@ A model is three sibling entries sharing a base name: `<name>.VTX`,
   4×u16 unknown
 - u32 quad count; quads, 36 bytes each: 8×s8 UVs, 4×u16 vertex indices,
   4×u16 normal indices, u32 texture index, 4×u16 unknown (no lone u16 here)
+
+Quad corners are **strip-ordered** (PSX style, found here): ABCD splits into
+triangles ABC and BDC — splitting along AC produces crossed, spiky geometry.
 
 ## Skeleton & animation
 
