@@ -7,7 +7,9 @@ const GAME_EXE = 'warhogs_.exe'
 const ENV_KEY = 'GAME_DIR'
 // In dev this resolves to the project root. Packaged builds will need a
 // writable location instead (app.getPath('userData')) — revisit then.
-const ENV_FILE = path.join(app.getAppPath(), '.env')
+// POW_ENV_FILE redirects it entirely so tests never touch the real .env
+// (docs/testing.md, "Isolation").
+const ENV_FILE = process.env['POW_ENV_FILE'] ?? path.join(app.getAppPath(), '.env')
 
 // Directories that may live inside the game folder but are not game data
 // (this project itself, disasm notes, VCS/deps).
@@ -78,8 +80,26 @@ async function walkDir(root: string, rel = ''): Promise<FileEntry[]> {
   return entries
 }
 
+type SetDirResult = { ok: true; dir: string } | { ok: false; error: string }
+
+function setGameDir(dir: string): SetDirResult {
+  const trimmed = dir.trim()
+  if (!trimmed) return { ok: false, error: 'Path is empty' }
+  if (!existsSync(trimmed)) return { ok: false, error: `Folder does not exist: ${trimmed}` }
+  if (!isGameDir(trimmed)) {
+    return { ok: false, error: `${GAME_EXE} not found in: ${trimmed}` }
+  }
+  gameDir = path.resolve(trimmed)
+  writeEnvGameDir(gameDir)
+  return { ok: true, dir: gameDir }
+}
+
 function registerIpc(): void {
   ipcMain.handle('game:getDir', () => gameDir)
+
+  // The dialog below is a native picker no e2e test can drive — this is the
+  // test-reachable way to set the folder (docs/testing.md).
+  ipcMain.handle('game:setDir', (_event, dir: string) => setGameDir(dir))
 
   ipcMain.handle('game:selectDir', async (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
@@ -89,17 +109,12 @@ function registerIpc(): void {
       properties: ['openDirectory']
     })
     if (result.canceled || result.filePaths.length === 0) return null
-    const dir = result.filePaths[0]
-    if (!isGameDir(dir)) {
-      dialog.showErrorBox(
-        'Not a Hogs of War folder',
-        `Could not find ${GAME_EXE} in:\n${dir}`
-      )
+    const set = setGameDir(result.filePaths[0])
+    if (!set.ok) {
+      dialog.showErrorBox('Not a Hogs of War folder', set.error)
       return null
     }
-    gameDir = path.resolve(dir)
-    writeEnvGameDir(gameDir)
-    return gameDir
+    return set.dir
   })
 
   ipcMain.handle('game:listFiles', async () => {

@@ -12,9 +12,12 @@ The path to the original game is resolved in this order:
 
 1. `--game-dir=<path>` command-line argument (overrides everything)
 2. `GAME_DIR` entry in the `.env` file at the project root
-3. A folder-picker dialog on first launch (the choice is saved to `.env`)
+3. First launch: a folder-picker dialog, or a pasted path — either way the
+   choice is saved to `.env`
 
 A folder is considered valid if it contains `warhogs_.exe`.
+`POW_ENV_FILE=<path>` redirects where the `.env` is read/written (used by
+tests — see [docs/testing.md](docs/testing.md)).
 
 ## Development
 

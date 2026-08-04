@@ -7,6 +7,9 @@ const gamePathEl = document.getElementById('game-path') as HTMLSpanElement
 const statsEl = document.getElementById('stats') as HTMLSpanElement
 const filterEl = document.getElementById('filter') as HTMLInputElement
 const selectBtn = document.getElementById('select-dir') as HTMLButtonElement
+const pathInput = document.getElementById('path-input') as HTMLInputElement
+const usePathBtn = document.getElementById('use-path') as HTMLButtonElement
+const pathErrorEl = document.getElementById('path-error') as HTMLParagraphElement
 
 let allFiles: FileEntry[] = []
 
@@ -52,6 +55,21 @@ async function showGame(dir: string): Promise<void> {
 selectBtn.addEventListener('click', async () => {
   const dir = await window.api.selectGameDir()
   if (dir) await showGame(dir)
+})
+
+async function usePath(): Promise<void> {
+  const result = await window.api.setGameDir(pathInput.value)
+  if (result.ok) {
+    pathErrorEl.textContent = ''
+    await showGame(result.dir)
+  } else {
+    pathErrorEl.textContent = result.error
+  }
+}
+
+usePathBtn.addEventListener('click', usePath)
+pathInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') void usePath()
 })
 
 filterEl.addEventListener('input', renderFiles)

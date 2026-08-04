@@ -12,5 +12,5 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "tests", "electron.vite.config.ts", "playwright.config.ts"]
+  "include": ["src", "e2e", "electron.vite.config.ts", "playwright.config.ts"]
 }

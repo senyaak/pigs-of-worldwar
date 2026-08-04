@@ -63,6 +63,29 @@
       #welcome p {
         color: var(--muted);
       }
+      #welcome .or {
+        font-size: 12px;
+        margin: 18px 0 8px;
+      }
+      #path-form {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+      #path-input {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        padding: 8px 12px;
+        font-size: 13px;
+        width: 380px;
+      }
+      #path-error {
+        color: #d47b6a;
+        font-size: 13px;
+        min-height: 1em;
+      }
       button {
         background: var(--accent);
         color: #1a1d16;
@@ -131,6 +154,12 @@
       <div id="welcome">
         <p>Fan-made remake of Hogs of War.<br />Point it at your installed copy of the original game to begin.</p>
         <button id="select-dir">Select game folder</button>
+        <p class="or">— or paste the path —</p>
+        <div id="path-form">
+          <input id="path-input" type="text" placeholder="C:\...\Steam\steamapps\common\HogsofWar" />
+          <button id="use-path">Use this path</button>
+        </div>
+        <p id="path-error"></p>
       </div>
       <div id="browser" class="hidden">
         <div id="toolbar">
