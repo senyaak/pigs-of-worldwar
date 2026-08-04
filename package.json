@@ -1,0 +1,21 @@
+{
+  "name": "pigs-of-worldwar",
+  "version": "0.0.1",
+  "description": "Fan-made remake engine for Hogs of War (Electron + Three.js). Requires an owned copy of the original game — no assets are distributed.",
+  "main": "./out/main/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "electron-vite build && playwright test"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "electron": "^43.2.0",
+    "electron-vite": "^5.0.0",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pigs of Worldwar</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #1a1d16;
+        --panel: #23271d;
+        --border: #3a4030;
+        --text: #d8dcc8;
+        --muted: #8a9178;
+        --accent: #a3c458;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        color: var(--accent);
+      }
+      #game-path {
+        color: var(--muted);
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 16px 20px;
+        gap: 12px;
+      }
+      #welcome {
+        margin: auto;
+        text-align: center;
+      }
+      #welcome p {
+        color: var(--muted);
+      }
+      button {
+        background: var(--accent);
+        color: #1a1d16;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 22px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover {
+        filter: brightness(1.1);
+      }
+      #toolbar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      #filter {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        padding: 8px 12px;
+        font-size: 14px;
+        width: 320px;
+      }
+      #stats {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      #file-list {
+        flex: 1;
+        overflow: auto;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 0;
+        font-family: Consolas, monospace;
+        font-size: 13px;
+      }
+      .file-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 1px 14px;
+        white-space: nowrap;
+      }
+      .file-row:hover {
+        background: #2c3124;
+      }
+      .file-size {
+        color: var(--muted);
+        margin-left: 24px;
+      }
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Pigs of Worldwar</h1>
+      <span id="game-path"></span>
+    </header>
+    <main>
+      <div id="welcome">
+        <p>Fan-made remake of Hogs of War.<br />Point it at your installed copy of the original game to begin.</p>
+        <button id="select-dir">Select game folder</button>
+      </div>
+      <div id="browser" class="hidden">
+        <div id="toolbar">
+          <input id="filter" type="text" placeholder="Filter files…" />
+          <span id="stats"></span>
+        </div>
+      </div>
+      <div id="file-list" class="hidden"></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
