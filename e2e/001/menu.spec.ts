@@ -70,6 +70,26 @@ function processExit(launched: { app: { process(): { once(e: 'exit', cb: (code: 
   return new Promise((resolve) => launched.app.process().once('exit', resolve))
 }
 
+test('without --windowed the game takes the whole screen, borderless', async () => {
+  const launched = await launchApp({ envFile: PHASE_ENV, windowed: false })
+  try {
+    await expect(launched.page.locator('#menu')).toBeVisible()
+    const state = await launched.app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]
+      const [width, height] = window.getSize()
+      return { fullscreen: window.isFullScreen(), width, height }
+    })
+    expect(state.fullscreen, 'fullscreen flag set').toBe(true)
+    // A borderless-fullscreen window spans the display exactly.
+    const display = await launched.app.evaluate(({ screen }) => screen.getPrimaryDisplay().size)
+    expect(state.width).toBe(display.width)
+    expect(state.height).toBe(display.height)
+    expect(launched.errors).toEqual([])
+  } finally {
+    await launched.app.close()
+  }
+})
+
 test('Exit quits the app cleanly: process gone, exit code 0, no errors', async () => {
   const launched = await launchApp({ envFile: PHASE_ENV })
   const { page } = launched

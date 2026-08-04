@@ -28,6 +28,10 @@ npm run typecheck  # TypeScript check
 npm run test:e2e   # build + Playwright end-to-end tests
 ```
 
+The game launches borderless fullscreen. `--windowed` keeps a desktop
+window; `npm run dev` is windowed by default (`--fullscreen` overrides),
+and the e2e suite runs windowed so tests don't take over the screen.
+
 ## Status
 
 Early stub: the app locates the game installation and lists its files.

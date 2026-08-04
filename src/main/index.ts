@@ -8,9 +8,15 @@ import { resolveGameDir } from './gameDir'
 import { registerIpc } from './ipc'
 
 function createWindow(): void {
+  // The game runs borderless fullscreen. --windowed keeps a desktop window;
+  // dev (HMR) defaults to windowed as well, --fullscreen overrides. The e2e
+  // suite passes --windowed so a test run does not take over the screen
+  // (docs/testing.md).
+  const windowed =
+    !process.argv.includes('--fullscreen') &&
+    (process.argv.includes('--windowed') || Boolean(process.env['ELECTRON_RENDERER_URL']))
   const window = new BrowserWindow({
-    width: 1100,
-    height: 750,
+    ...(windowed ? { width: 1100, height: 750 } : { fullscreen: true, frame: false }),
     show: false,
     autoHideMenuBar: true,
     webPreferences: {

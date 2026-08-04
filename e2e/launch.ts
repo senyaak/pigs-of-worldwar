@@ -41,6 +41,11 @@ export interface LaunchOptions {
   envFile: string
   /** Extra CLI arguments, e.g. --game-dir=… */
   args?: string[]
+  /**
+   * The suite runs windowed by default so tests do not take over the
+   * screen; the one spec that checks the real fullscreen launch sets false.
+   */
+  windowed?: boolean
 }
 
 /**
@@ -55,7 +60,7 @@ export async function openAssets(page: Page): Promise<void> {
 
 export async function launchApp(options: LaunchOptions): Promise<Launched> {
   const app = await electron.launch({
-    args: ['.', ...(options.args ?? [])],
+    args: ['.', ...(options.windowed === false ? [] : ['--windowed']), ...(options.args ?? [])],
     cwd: REPO_ROOT,
     env: {
       ...process.env,
