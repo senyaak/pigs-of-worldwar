@@ -7,6 +7,7 @@
 
 import * as THREE from 'three'
 import type { TerrainBlock, TerrainTexture } from '../api'
+import { HEIGHT_SCALE } from '../../../lib/game/terrain'
 
 const TILE_STEP = 512
 const TILES = 4
@@ -108,8 +109,9 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
     ].map(([c, r]) => [
       block.x + c * TILE_STEP,
       // PMG heights are elevation (up-positive — verified: water sits at
-      // the small values); the game's Y axis points down.
-      -block.heights[r * VERTS + c],
+      // the small values); the game's Y axis points down. The doubling is
+      // the game's own: see HEIGHT_SCALE.
+      -block.heights[r * VERTS + c] * HEIGHT_SCALE,
       block.z - r * TILE_STEP
     ])
     const uv = tileUvs(tile.rotateFlip)

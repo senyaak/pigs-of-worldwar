@@ -101,22 +101,29 @@ test('water on CAMP: swimmable (walkable but wet), never standable', () => {
   }
 })
 
-test('slip tiles on CAMP slide, and the slide goes downhill', () => {
+test('a shaped wall tile on CAMP blocks part of itself, not all of it', () => {
   const { query, blocks } = campQuery()
-  const slips = tileCenters(blocks, (tile) => tile.slip !== 0)
-  expect(slips.length).toBeGreaterThan(10)
-  let sliding = 0
-  for (const at of slips) {
-    const direction = query.slipDirection(at.x, at.z)
-    if (!direction) continue // a flat slip tile holds after all
-    sliding++
-    expect(Math.hypot(direction.x, direction.z)).toBeCloseTo(1)
-    // Downhill: elevation drops (game-Y height() grows) along the slide.
-    const here = query.height(at.x, at.z)
-    const ahead = query.height(at.x + direction.x * 256, at.z + direction.z * 256)
-    expect(ahead, `downhill at ${at.x},${at.z}`).toBeGreaterThan(here)
+  const plain = tileCenters(blocks, (tile) => (tile.type & 0x80) !== 0 && (tile.slip & 0x0f) === 0)
+  const shaped = tileCenters(blocks, (tile) => (tile.type & 0x80) !== 0 && (tile.slip & 0x0f) !== 0)
+  expect(plain.length).toBeGreaterThan(10)
+  expect(shaped.length).toBeGreaterThan(10)
+
+  // Shape 0 is the whole tile: nowhere inside it is walkable.
+  const quarters = [-1, 1].flatMap((sx) => [-1, 1].map((sz) => [sx * 128, sz * 128]))
+  for (const at of plain) {
+    for (const [dx, dz] of quarters) {
+      expect(query.walkable(at.x + dx, at.z + dz), `solid at ${at.x},${at.z}`).toBe(false)
+    }
   }
-  expect(sliding, 'most slip tiles actually slope').toBeGreaterThan(slips.length * 0.8)
+
+  // Every other shape is half a tile or a diagonal, so a tile has both
+  // walkable and blocked quarters — that is the whole point of the byte.
+  let split = 0
+  for (const at of shaped) {
+    const open = quarters.filter(([dx, dz]) => query.walkable(at.x + dx, at.z + dz))
+    if (open.length > 0 && open.length < quarters.length) split++
+  }
+  expect(split, 'shaped wall tiles are part-open').toBeGreaterThan(shaped.length * 0.9)
 })
 
 test('spawns on the real CAMP (the battle map): walkable, apart, split west/east', () => {

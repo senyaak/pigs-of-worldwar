@@ -7,10 +7,62 @@ import type { PigSpawn } from './game'
 
 const BLOCK_SPAN = TILES_PER_SIDE * TILE_STEP
 
-// The tile slip byte marks sliding ground (0 holds, 1-8 are direction hints
-// per how-doc's MapTileSlip). The hints disagree with the actual slopes on
-// some CAMP tiles, so the slide direction is taken from the terrain gradient
-// instead — physics over metadata.
+/**
+ * World Y is TWICE the int16 the PMG stores. Both the exe's collision
+ * sampler and `afAdjustMapHeights` in `Data/_d3d.dll`, which builds the
+ * visible mesh, double the value on the way out
+ * (`../pigs-disasm/movement/notes.md`). Everything horizontal — the 512
+ * tile, the world limits — is already in world units.
+ */
+export const HEIGHT_SCALE = 2
+
+/** The world limit a pig's position is clamped to (exe 0x3000). */
+export const WORLD_LIMIT = 12288
+
+const clampIndex = (value: number, last: number): number => Math.max(0, Math.min(value, last))
+
+/**
+ * Which part of a WALL tile is actually solid, by the tile's second byte.
+ *
+ * how-doc calls that byte `MapTileSlip` and reads it as a slide direction.
+ * It is nothing of the kind: `Map::IsBlocked` (exe VA 0x4a7000) ignores it
+ * unless `type & 0x80`, then switches on its low nibble 0..8 to test the
+ * point against half a tile or a diagonal — the wall occupies a PART of the
+ * tile, not all of it. 98% of the bytes in the shipped maps sit on wall
+ * tiles, and the mirrored reading below puts the solid side on the raised
+ * ground for 37% more tiles than the literal one
+ * (`../pigs-disasm/movement/wall-shapes.js`); the exe measures its
+ * fractional z along +z where a PMG row advances -z, which is exactly that
+ * mirror.
+ *
+ * Coordinates are the tile's own, 0..1, tz running -z. 0 is the whole tile.
+ */
+const WALL_SHAPES: Record<number, (tx: number, tz: number) => boolean> = {
+  0: () => true,
+  1: (_tx, tz) => tz > 0.5,
+  2: (tx) => tx < 0.5,
+  3: (_tx, tz) => tz < 0.5,
+  4: (tx) => tx > 0.5,
+  5: (tx, tz) => tx + tz > 1,
+  6: (tx, tz) => tx < tz,
+  7: (tx, tz) => tx + tz < 1,
+  8: (tx, tz) => tx > tz
+}
+
+/** One half of a tile as a plane, in the tile's own (tx, tz) coordinates. */
+interface Half {
+  origin: number
+  alongX: number
+  alongZ: number
+}
+
+/** A point inside a tile, with both halves of that tile. */
+interface Patch {
+  tx: number
+  tz: number
+  near: Half
+  far: Half
+}
 
 export class TerrainQuery {
   private readonly minX: number
@@ -30,30 +82,56 @@ export class TerrainQuery {
   }
 
   /**
-   * Ground level at world (x, z) in GAME coordinates (Y down), bilinear
-   * over the vertex grid. PMG stores elevation up-positive (verified:
-   * water sits at the small values), hence the negation.
+   * Ground level at world (x, z) in GAME coordinates (Y down). PMG stores
+   * elevation up-positive (verified: water sits at the small values), hence
+   * the negation.
    */
   height(x: number, z: number): number {
     return -this.elevation(x, z)
   }
 
-  private elevation(x: number, z: number): number {
+  /**
+   * Where (x, z) falls inside its tile, with both halves of that tile as
+   * planes. Slopes are per unit of `tx` (running +x) and `tz` (running -z);
+   * `origin` is the elevation those slopes start from.
+   *
+   * The original's sampler (`Map::SampleHeight`, VA 0x4a5140) splits every
+   * tile along (col+1,row)-(col,row+1) — the same diagonal the ground mesh
+   * is built with, so the surface a pig walks on is exactly the one it is
+   * standing on visually. A bilinear patch is NOT that shape and pops along
+   * the edge.
+   */
+  private patch(x: number, z: number): Patch | null {
     const col = Math.floor((x - this.minX) / BLOCK_SPAN)
     const row = Math.floor((this.maxZ - z) / BLOCK_SPAN)
     const block = this.grid[row]?.[col]
-    if (!block) return 0
+    if (!block) return null
     // Fractional vertex coordinates inside the block (rows advance -z).
     const fx = (x - block.x) / TILE_STEP
     const fz = (block.z - z) / TILE_STEP
-    const cx = Math.min(Math.floor(fx), VERTS_PER_SIDE - 2)
-    const cz = Math.min(Math.floor(fz), VERTS_PER_SIDE - 2)
-    const tx = fx - cx
-    const tz = fz - cz
-    const h = (r: number, c: number): number => block.heights[r * VERTS_PER_SIDE + c]
-    const top = h(cz, cx) * (1 - tx) + h(cz, cx + 1) * tx
-    const bottom = h(cz + 1, cx) * (1 - tx) + h(cz + 1, cx + 1) * tx
-    return top * (1 - tz) + bottom * tz
+    // Clamped BOTH ways: a coordinate a hair the wrong side of a block
+    // boundary rounds into the neighbouring block and leaves fx/fz just
+    // outside [0, 4) — unclamped that indexes off the height grid and the
+    // ground comes back NaN.
+    const cx = clampIndex(Math.floor(fx), VERTS_PER_SIDE - 2)
+    const cz = clampIndex(Math.floor(fz), VERTS_PER_SIDE - 2)
+    const h = (r: number, c: number): number =>
+      block.heights[r * VERTS_PER_SIDE + c] * HEIGHT_SCALE
+    const half = (far: boolean): Half => {
+      const corner = far ? h(cz + 1, cx + 1) : h(cz, cx)
+      const alongX = far ? corner - h(cz + 1, cx) : h(cz, cx + 1) - corner
+      const alongZ = far ? corner - h(cz, cx + 1) : h(cz + 1, cx) - corner
+      return { origin: far ? corner - alongX - alongZ : corner, alongX, alongZ }
+    }
+    return { tx: fx - cx, tz: fz - cz, near: half(false), far: half(true) }
+  }
+
+  private elevation(x: number, z: number): number {
+    const patch = this.patch(x, z)
+    if (!patch) return 0
+    const { tx, tz } = patch
+    const half = tx + tz < 1 ? patch.near : patch.far
+    return half.origin + half.alongX * tx + half.alongZ * tz
   }
 
   private tileAt(x: number, z: number): TerrainTile | null {
@@ -61,16 +139,25 @@ export class TerrainQuery {
     const row = Math.floor((this.maxZ - z) / BLOCK_SPAN)
     const block = this.grid[row]?.[col]
     if (!block) return null
-    const tx = Math.min(Math.floor((x - block.x) / TILE_STEP), TILES_PER_SIDE - 1)
-    const tz = Math.min(Math.floor((block.z - z) / TILE_STEP), TILES_PER_SIDE - 1)
-    return block.tiles[tz * TILES_PER_SIDE + tx]
+    const tx = clampIndex(Math.floor((x - block.x) / TILE_STEP), TILES_PER_SIDE - 1)
+    const tz = clampIndex(Math.floor((block.z - z) / TILE_STEP), TILES_PER_SIDE - 1)
+    return block.tiles[tz * TILES_PER_SIDE + tx] ?? null
   }
 
-  /** May a pig BE at (x, z)? Walls (and the void) say no; water is fine —
-   * pigs swim (the caller decides what that means for speed and depth). */
+  /**
+   * May a pig BE at (x, z)? The void says no, and a wall tile says no for
+   * the PART of itself its shape byte marks solid — the original blocks
+   * half-tiles and diagonals, not whole tiles. Water is fine: pigs swim
+   * (the caller decides what that means for speed and depth).
+   */
   walkable(x: number, z: number): boolean {
     const tile = this.tileAt(x, z)
-    return tile !== null && (tile.type & TILE_WALL) === 0
+    if (tile === null) return false
+    if ((tile.type & TILE_WALL) === 0) return true
+    const shape = WALL_SHAPES[tile.slip & 0x0f]
+    if (!shape) return true
+    const patch = this.patch(x, z)
+    return patch === null ? false : !shape(patch.tx, patch.tz)
   }
 
   /** Is (x, z) water — swimming, not walking? */
@@ -79,27 +166,9 @@ export class TerrainQuery {
     return tile !== null && (tile.type & TILE_WATER) !== 0
   }
 
-  /**
-   * The downhill direction a pig slides at (x, z), or null when the ground
-   * holds — either the tile is not slippery or it is flat after all.
-   */
-  slipDirection(x: number, z: number): { x: number; z: number } | null {
-    const tile = this.tileAt(x, z)
-    if (!tile || tile.slip === 0) return null
-    // Steepest descent: game Y grows downward, so downhill is +gradient of
-    // height(). Central differences over half a tile.
-    const e = TILE_STEP / 2
-    const dx = this.height(x + e, z) - this.height(x - e, z)
-    const dz = this.height(x, z + e) - this.height(x, z - e)
-    const length = Math.hypot(dx, dz)
-    if (length < 1) return null
-    return { x: dx / length, z: dz / length }
-  }
-
   /** A comfortable place to stand: this tile and its neighbors dry and
-   * walkable, no slide, and the ground near-flat (no trench parapets). */
+   * walkable, and the ground near-flat (no trench parapets). */
   standable(x: number, z: number): boolean {
-    if (this.slipDirection(x, z) !== null) return false
     for (const [dx, dz] of [[0, 0], [-TILE_STEP, 0], [TILE_STEP, 0], [0, -TILE_STEP], [0, TILE_STEP]]) {
       if (!this.walkable(x + dx, z + dz) || this.isWater(x + dx, z + dz)) return false
     }
@@ -110,7 +179,9 @@ export class TerrainQuery {
       this.height(x - half, z + half),
       this.height(x + half, z + half)
     ]
-    return Math.max(...corners) - Math.min(...corners) < 150
+    // Flat enough that a pig will not immediately walk off it: two of
+    // `movement.ts`'s STEP_DOWN, which is where a walk turns into a fall.
+    return Math.max(...corners) - Math.min(...corners) < 64
   }
 
   /**

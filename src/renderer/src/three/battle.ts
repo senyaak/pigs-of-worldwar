@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import type { Bone, Clip, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
+import { FALL_SPEED_FACTOR, step } from '../../../lib/game/movement'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildPig } from './pig'
@@ -40,12 +41,9 @@ export interface BattleScene {
 const PIG_HEADING_OFFSET = -Math.PI / 2
 const WALK_SPEED = 900 // world units per second (tile = 512)
 const SWIM_SPEED = WALK_SPEED / 2
-const SLIDE_SPEED = 1400
 const TURN_SPEED = 2.6 // radians per second
 /** How deep a swimming pig sits below the surface (game Y-down: +down). */
 const SWIM_SINK = 110
-/** The stumble-in-place moment before a slide takes hold. */
-const SLIP_STAGGER_SECONDS = 0.45
 /** Jump ballistics, game Y-down: negative velocity is upward. */
 const JUMP_VELOCITY = -1500
 const GRAVITY = 5000
@@ -59,7 +57,8 @@ const ANIM = {
   SWIM: 5,
   JUMP_MIDDLE: 9,
   SCRAMBLE: 11,
-  IDLE: 27
+  IDLE: 27,
+  FALLING: 38
 } as const
 
 export function buildBattle(
@@ -122,12 +121,11 @@ export function buildBattle(
   let markerBase = new THREE.Vector3()
   let time = 0
   const intent = { walk: 0, turn: 0 }
-  /** Vertical velocity while airborne (game Y-down), null on the ground. */
-  let airborne: { vy: number; vx: number; vz: number } | null = null
+  /** Vertical velocity while airborne (game Y-down), null on the ground.
+   * `jumped` distinguishes a deliberate jump from walking off an edge —
+   * they use different clips. */
+  let airborne: { vy: number; vx: number; vz: number; jumped: boolean } | null = null
   let jumpRequested = false
-  /** Stagger timer: > 0 means the pig is scrabbling in place before the
-   * slide takes hold (reset whenever it reaches holding ground). */
-  let stagger = 0
   /** Smoothed chase-camera position (world space). */
   const cameraPos = new THREE.Vector3()
   let cameraSnapped = false
@@ -186,7 +184,6 @@ export function buildBattle(
     // The turn clock runs regardless of what anyone does.
     if (game.tick(delta)) {
       game.endTurn()
-      stagger = 0
       airborne = null
       jumpRequested = false
       focus(game.currentPig)
@@ -198,7 +195,6 @@ export function buildBattle(
 
     const { x: px, z: pz } = active.pig.position
     const swimming = query.isWater(px, pz)
-    const slip = airborne === null ? query.slipDirection(px, pz) : null
 
     // Turning on the spot works in every grounded state.
     if (intent.turn !== 0 && airborne === null) {
@@ -207,7 +203,7 @@ export function buildBattle(
     }
 
     if (airborne) {
-      setClip(active, ANIM.JUMP_MIDDLE)
+      setClip(active, airborne.jumped ? ANIM.JUMP_MIDDLE : ANIM.FALLING)
       // Ballistics: gravity pulls (game Y-down: +down), momentum carries.
       const x = px + airborne.vx * delta
       const z = pz + airborne.vz * delta
@@ -224,22 +220,7 @@ export function buildBattle(
       } else {
         active.node.position.set(at.x, y, at.z)
       }
-    } else if (slip) {
-      // Steep ground: a short scramble on the spot, then the slide — going
-      // where nobody wanted to go.
-      setClip(active, ANIM.SCRAMBLE)
-      stagger += delta
-      if (stagger >= SLIP_STAGGER_SECONDS) {
-        const step = SLIDE_SPEED * delta
-        const x = px + slip.x * step
-        const z = pz + slip.z * step
-        if (query.walkable(x, z)) {
-          game.displaceCurrentPig(x, z)
-          settle(active)
-        }
-      }
     } else {
-      stagger = 0
       const speed = swimming ? SWIM_SPEED : WALK_SPEED
       const forwardX = Math.sin(active.pig.heading)
       const forwardZ = Math.cos(active.pig.heading)
@@ -248,18 +229,27 @@ export function buildBattle(
         airborne = {
           vy: JUMP_VELOCITY,
           vx: forwardX * intent.walk * speed,
-          vz: forwardZ * intent.walk * speed
+          vz: forwardZ * intent.walk * speed,
+          jumped: true
         }
       } else if (intent.walk !== 0) {
-        const step = speed * delta * intent.walk
-        const x = px + forwardX * step
-        const z = pz + forwardZ * step
-        if (query.walkable(x, z)) {
-          game.moveCurrentPig(x, z, active.pig.heading)
+        // Straight ahead, as the original walks: only a wall or the world
+        // edge refuses, and a big enough drop turns the step into a fall.
+        const move = step(query, px, pz, active.pig.heading, speed * delta * intent.walk)
+        if (move.outcome === 'falling') {
+          game.moveCurrentPig(move.x, move.z, active.pig.heading)
+          airborne = {
+            vy: 0,
+            vx: forwardX * intent.walk * speed * FALL_SPEED_FACTOR,
+            vz: forwardZ * intent.walk * speed * FALL_SPEED_FACTOR,
+            jumped: false
+          }
+        } else if (move.outcome === 'moved') {
+          game.moveCurrentPig(move.x, move.z, active.pig.heading)
           settle(active)
           setClip(active, swimming ? ANIM.SWIM : intent.walk > 0 ? ANIM.RUN : ANIM.WALK_BACK)
         } else {
-          setClip(active, swimming ? ANIM.SWIM : ANIM.IDLE)
+          setClip(active, swimming ? ANIM.SWIM : ANIM.SCRAMBLE)
         }
       } else if (swimming) {
         setClip(active, ANIM.SWIM)
