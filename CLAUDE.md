@@ -106,9 +106,14 @@ npm run typecheck && npm run build && npx playwright test
 Formats, models, textures, skeleton, 93 animations and terrain all parse and
 render. The menu wears the original art. The battle scene puts two squads on
 CAMP with the original's turn clock, tank controls, jumping, swimming, and
-ground movement taken from the exe: straight lines, sub-tile walls, and a
-fall off anything more than 32 units below
-(`../pigs-disasm/movement/notes.md`, `src/lib/game/movement.ts`).
+ground movement taken from the exe: straight lines, sub-tile walls, a fall
+off anything more than 32 units below, and — for a pig that keeps shoving at
+a wall — two seconds of scrabbling, then being thrown clear of it and
+bouncing (`../pigs-disasm/movement/notes.md`, `src/lib/game/movement.ts`,
+`src/lib/game/ballistics.ts`).
+
+Not modelled from that page yet: 250 frames wedged kills the pig outright,
+and there is no damage system to kill it with.
 
 Next up is weapons — and footstep audio, whose event source is already
 settled in `../pigs-disasm/anim/audio-events.md`. Falling still uses

@@ -7,6 +7,7 @@ import type { Bone, Clip, Model, TerrainBlock, TerrainTexture, Texture } from '.
 import type { Game, Pig } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
 import { FALL_SPEED_FACTOR, step } from '../../../lib/game/movement'
+import { EJECT_LIFT, EJECT_PITCH, EJECT_SECONDS, FREE, bounceSpeed, easeBounciness } from '../../../lib/game/ballistics'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildPig } from './pig'
@@ -49,7 +50,9 @@ const JUMP_VELOCITY = -1500
 const GRAVITY = 5000
 
 /** MCAP clip indices, from the exe's own animation-name table
- * (pigs-disasm/animations/notes.md). */
+ * (pigs-disasm/animations/notes.md). A fall uses JUMP_MIDDLE, not the clip
+ * named "Flying through air/falling": `Pig::StartFalling` (0x4707f0) plays
+ * 9, and the impact handler plays BOUNCE (0x27) on the way back up. */
 const ANIM = {
   RUN: 0,
   WALK_BACK: 3,
@@ -58,7 +61,7 @@ const ANIM = {
   JUMP_MIDDLE: 9,
   SCRAMBLE: 11,
   IDLE: 27,
-  FALLING: 38
+  BOUNCE: 39
 } as const
 
 export function buildBattle(
@@ -122,10 +125,13 @@ export function buildBattle(
   let time = 0
   const intent = { walk: 0, turn: 0 }
   /** Vertical velocity while airborne (game Y-down), null on the ground.
-   * `jumped` distinguishes a deliberate jump from walking off an edge —
-   * they use different clips. */
-  let airborne: { vy: number; vx: number; vz: number; jumped: boolean } | null = null
+   * `bouncing` means the pig is riding out an impact rather than steering. */
+  let airborne: { vy: number; vx: number; vz: number; bouncing: boolean } | null = null
   let jumpRequested = false
+  /** How long the pig has been pressed into a wall, and how bouncy that has
+   * made it — the original eases both while wedged (lib/game/ballistics). */
+  let wedgedSeconds = 0
+  let bounciness = FREE
   /** Smoothed chase-camera position (world space). */
   const cameraPos = new THREE.Vector3()
   let cameraSnapped = false
@@ -186,6 +192,8 @@ export function buildBattle(
       game.endTurn()
       airborne = null
       jumpRequested = false
+      wedgedSeconds = 0
+      bounciness = FREE
       focus(game.currentPig)
     }
 
@@ -195,6 +203,7 @@ export function buildBattle(
 
     const { x: px, z: pz } = active.pig.position
     const swimming = query.isWater(px, pz)
+    let wedged = false
 
     // Turning on the spot works in every grounded state.
     if (intent.turn !== 0 && airborne === null) {
@@ -203,7 +212,7 @@ export function buildBattle(
     }
 
     if (airborne) {
-      setClip(active, airborne.jumped ? ANIM.JUMP_MIDDLE : ANIM.FALLING)
+      setClip(active, airborne.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE)
       // Ballistics: gravity pulls (game Y-down: +down), momentum carries.
       const x = px + airborne.vx * delta
       const z = pz + airborne.vz * delta
@@ -215,8 +224,16 @@ export function buildBattle(
       const ground =
         query.height(at.x, at.z) + (query.isWater(at.x, at.z) ? SWIM_SINK : 0) - active.mesh.footOffset
       if (airborne.vy > 0 && y >= ground) {
-        airborne = null
-        settle(active)
+        // Landing. Wedged pigs come down bouncier than free ones, which is
+        // what makes coming off a wall read as a bounce and not a step.
+        const back = bounceSpeed(airborne.vy, bounciness.restitution)
+        if (back > GRAVITY * delta) {
+          airborne = { ...airborne, vy: -back, bouncing: true }
+          active.node.position.set(at.x, ground, at.z)
+        } else {
+          airborne = null
+          settle(active)
+        }
       } else {
         active.node.position.set(at.x, y, at.z)
       }
@@ -230,7 +247,7 @@ export function buildBattle(
           vy: JUMP_VELOCITY,
           vx: forwardX * intent.walk * speed,
           vz: forwardZ * intent.walk * speed,
-          jumped: true
+          bouncing: false
         }
       } else if (intent.walk !== 0) {
         // Straight ahead, as the original walks: only a wall or the world
@@ -242,14 +259,29 @@ export function buildBattle(
             vy: 0,
             vx: forwardX * intent.walk * speed * FALL_SPEED_FACTOR,
             vz: forwardZ * intent.walk * speed * FALL_SPEED_FACTOR,
-            jumped: false
+            bouncing: false
           }
         } else if (move.outcome === 'moved') {
           game.moveCurrentPig(move.x, move.z, active.pig.heading)
           settle(active)
           setClip(active, swimming ? ANIM.SWIM : intent.walk > 0 ? ANIM.RUN : ANIM.WALK_BACK)
         } else {
+          // Wedged against a wall: scrabble, get slipperier and bouncier by
+          // the frame, and once the original's patience runs out, be thrown
+          // clear of it — up, back, and away from what is in the way.
           setClip(active, swimming ? ANIM.SWIM : ANIM.SCRAMBLE)
+          wedged = true
+          wedgedSeconds += delta
+          if (wedgedSeconds >= EJECT_SECONDS) {
+            airborne = {
+              vy: -Math.sin(EJECT_PITCH) * speed,
+              vx: -forwardX * intent.walk * Math.cos(EJECT_PITCH) * speed,
+              vz: -forwardZ * intent.walk * Math.cos(EJECT_PITCH) * speed,
+              bouncing: true
+            }
+            active.node.position.y -= EJECT_LIFT
+            wedgedSeconds = 0
+          }
         }
       } else if (swimming) {
         setClip(active, ANIM.SWIM)
@@ -260,6 +292,8 @@ export function buildBattle(
       }
     }
     jumpRequested = false
+    if (!wedged) wedgedSeconds = 0
+    bounciness = easeBounciness(bounciness, wedged, airborne === null, delta)
 
     // Marker and camera trail the pig every frame.
     const ground = query.height(active.pig.position.x, active.pig.position.z)
