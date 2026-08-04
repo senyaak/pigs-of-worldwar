@@ -8,6 +8,8 @@ import type { Archive, ArchiveEntry } from '../lib/formats/mad'
 import { boneWorldOffsets, parseHir } from '../lib/formats/hir'
 import { parseModel } from '../lib/formats/model'
 import type { Model } from '../lib/formats/model'
+import { parseTim } from '../lib/formats/tim'
+import type { Tim } from '../lib/formats/tim'
 
 const GAME_EXE = 'warhogs_.exe'
 const ENV_KEY = 'GAME_DIR'
@@ -134,7 +136,7 @@ function registerIpc(): void {
       _event,
       relPath: string,
       base: string
-    ): Promise<{ ok: true; model: Model } | { ok: false; error: string }> => {
+    ): Promise<{ ok: true; model: Model; textures: (Tim & { name: string })[] } | { ok: false; error: string }> => {
       if (!gameDir) return { ok: false, error: 'Game folder is not set' }
       const full = path.resolve(gameDir, relPath)
       if (!full.startsWith(gameDir + path.sep)) {
@@ -152,12 +154,32 @@ function registerIpc(): void {
         // A .HIR next to the archive is the skeleton its models bind to
         // (Chars/pig.HIR) — vertices are bone-local without it.
         let boneOffsets: Float32Array | undefined
-        const siblings = await fs.readdir(path.dirname(full))
+        const dir = path.dirname(full)
+        const siblings = await fs.readdir(dir)
         const hirName = siblings.find((name) => name.toLowerCase().endsWith('.hir'))
         if (hirName) {
-          boneOffsets = boneWorldOffsets(parseHir(await fs.readFile(path.join(path.dirname(full), hirName))))
+          boneOffsets = boneWorldOffsets(parseHir(await fs.readFile(path.join(dir, hirName))))
         }
-        return { ok: true, model: parseModel(slice('.VTX'), slice('.NO2'), slice('.FAC'), boneOffsets) }
+
+        // Face texture indices point into the paired .mtd (same base name as
+        // the .mad), in entry order. Undecodable entries become nulls so the
+        // indices keep lining up, then drop to a 1×1 placeholder.
+        const textures: (Tim & { name: string })[] = []
+        const stem = path.basename(full).replace(/\.mad$/i, '')
+        const mtdName = siblings.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.mtd`)
+        if (mtdName) {
+          const mtdData = await fs.readFile(path.join(dir, mtdName))
+          for (const entry of parseArchive(mtdData).entries) {
+            try {
+              const tim = parseTim(mtdData.subarray(entry.offset, entry.offset + entry.size))
+              textures.push({ name: entry.name, ...tim })
+            } catch {
+              textures.push({ name: entry.name, width: 1, height: 1, rgba: new Uint8Array([255, 0, 255, 255]) })
+            }
+          }
+        }
+
+        return { ok: true, model: parseModel(slice('.VTX'), slice('.NO2'), slice('.FAC'), boneOffsets), textures }
       } catch (error) {
         return { ok: false, error: `${relPath}: ${error instanceof Error ? error.message : String(error)}` }
       }

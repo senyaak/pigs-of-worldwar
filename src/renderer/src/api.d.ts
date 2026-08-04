@@ -18,17 +18,34 @@ export interface Archive {
 
 export type ListArchiveResult = { ok: true; archive: Archive } | { ok: false; error: string }
 
+export interface ModelGroup {
+  start: number
+  count: number
+  texture: number
+}
+
 export interface Model {
   positions: Float32Array
   normals: Float32Array
+  uvs: Float32Array
   boneIndices: Int16Array
+  groups: ModelGroup[]
   triangleCount: number
   sourceTriangles: number
   sourceQuads: number
   vertexCount: number
 }
 
-export type LoadModelResult = { ok: true; model: Model } | { ok: false; error: string }
+export interface Texture {
+  name: string
+  width: number
+  height: number
+  rgba: Uint8Array
+}
+
+export type LoadModelResult =
+  | { ok: true; model: Model; textures: Texture[] }
+  | { ok: false; error: string }
 
 export interface Api {
   getGameDir(): Promise<string | null>

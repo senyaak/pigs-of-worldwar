@@ -71,8 +71,37 @@ Y points down.
 - u32 quad count; quads, 36 bytes each: 8×s8 UVs, 4×u16 vertex indices,
   4×u16 normal indices, u32 texture index, 4×u16 unknown (no lone u16 here)
 
-Quad corners are **strip-ordered** (PSX style, found here): ABCD splits into
-triangles ABC and BDC — splitting along AC produces crossed, spiky geometry.
+Quad corners are **perimeter-ordered** ABCD (found here): the split must share
+the AC diagonal (ACB + ADC after the winding reverse). Face corners are stored
+reversed relative to their NO2 normals; windings agree with NO2 in the game's
+own Y-down space.
+
+Face UVs are **unsigned** bytes (how-doc says signed) — pixel coordinates into
+the referenced texture, origin top-left, V down. The face's texture index
+points into the paired `.mtd` archive (same base name as the `.mad`), in entry
+order — verified visually: pcace_hi + british.mtd produces the correctly
+dressed British ace.
+
+## Textures — TIM (inside \*.mtd)
+
+Every MTD entry is a standard PSX TIM image. All 120 entries of british.mtd
+are 4-bit CLUT mode; the decoder also handles 8-bit CLUT.
+
+| offset | size | type | field |
+| ------ | ---- | ---- | ----- |
+| 0      | 4    | u32  | magic = 0x10 |
+| 4      | 4    | u32  | flags: bits 0–2 mode (0 = 4-bit CLUT, 1 = 8-bit CLUT), bit 3 = CLUT present |
+
+CLUT block (when present): u32 block length (self-inclusive), u16 VRAM x, u16
+VRAM y, u16 colors per CLUT, u16 CLUT count, then colors as u16 **A1B5G5R5**
+(R in the low bits; value 0x0000 = fully transparent).
+
+Pixel block: u32 block length, u16 VRAM x, u16 VRAM y, u16 width in 16-bit
+units (×4 pixels in 4-bit mode, ×2 in 8-bit), u16 height, then indices packed
+low-nibble-first (4-bit). Rows run top to bottom.
+
+Nation skins: `AMERICAN.MTD`, `FRENCH.MTD`, … in `Chars/` mirror the entry
+layout of the per-nation archives, so the same model dresses per team.
 
 ## Skeleton & animation
 

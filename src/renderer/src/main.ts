@@ -116,13 +116,14 @@ async function openModel(relPath: string, base: string): Promise<void> {
     viewerStatsEl.textContent = result.error
     return
   }
-  const { model } = result
+  const { model, textures } = result
   archiveViewEl.classList.add('hidden')
   viewerEl.classList.remove('hidden')
   viewerStatsEl.textContent =
     `${base} — ${model.triangleCount} triangles ` +
-    `(${model.sourceTriangles} + ${model.sourceQuads} quads), ${model.vertexCount} vertices`
-  showModel(viewerCanvasEl, model)
+    `(${model.sourceTriangles} + ${model.sourceQuads} quads), ${model.vertexCount} vertices, ` +
+    `${textures.length} textures`
+  showModel(viewerCanvasEl, model, textures)
 }
 
 viewerBackBtn.addEventListener('click', () => {

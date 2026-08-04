@@ -13,10 +13,13 @@ before the spec that uses it.
 
 - `000` is the foundation, all of it: every structural thing the engine needs
   before anything real happens — cold start with no saved state, pointing the
-  app at the game, seeing its files, opening archives. The app's features
-  don't care about any of this, which is exactly why it is all phase zero.
+  app at the game, seeing its files, opening archives, and the debug model
+  viewer that proves the format pipeline (several `000-*.spec.ts` files; they
+  are all phase zero). The app's features don't care about any of this, which
+  is exactly why it is phase zero.
 - Numbers from `001` up are engine milestones — things a player could point
-  at. `001` is the first rendered scene.
+  at. `001` is reserved for the first MEANINGFUL scene; parsers rendering a
+  debug pig do not count.
 - Specs without a number prefix (`cli-game-dir.spec.ts`) are standalone
   utilities: they build their own sandbox and must not depend on any phase.
 
