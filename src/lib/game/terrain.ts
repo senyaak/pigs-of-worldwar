@@ -55,8 +55,24 @@ export class TerrainQuery {
     return (tile.type & (TILE_WATER | TILE_WALL)) === 0
   }
 
+  /** A comfortable place to stand: this tile and its neighbors walkable,
+   * and the ground near-flat (no trench parapets, no wall tops). */
+  standable(x: number, z: number): boolean {
+    for (const [dx, dz] of [[0, 0], [-TILE_STEP, 0], [TILE_STEP, 0], [0, -TILE_STEP], [0, TILE_STEP]]) {
+      if (!this.walkable(x + dx, z + dz)) return false
+    }
+    const half = TILE_STEP / 2
+    const corners = [
+      this.height(x - half, z - half),
+      this.height(x + half, z - half),
+      this.height(x - half, z + half),
+      this.height(x + half, z + half)
+    ]
+    return Math.max(...corners) - Math.min(...corners) < 150
+  }
+
   /**
-   * Deterministic spawn points: `count` walkable tile centers, the first
+   * Deterministic spawn points: `count` standable tile centers, the first
    * half picked from the west side of the map, the second from the east, so
    * two squads start apart. Scans on a coarse lattice from each side inward.
    */
@@ -78,7 +94,7 @@ export class TerrainQuery {
           const z = this.maxZ - margin - TILE_STEP / 2 - iz * step
           // Keep squadmates apart too.
           const tooClose = spawns.some((s) => Math.hypot(s.x - x, s.z - z) < TILE_STEP * 3)
-          if (this.walkable(x, z) && !tooClose) {
+          if (this.standable(x, z) && !tooClose) {
             spawns.push({ x, z })
             wanted--
           }

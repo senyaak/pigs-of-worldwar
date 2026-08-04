@@ -9,7 +9,9 @@ import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
 import { byId } from './dom'
 
-const MAP = 'Maps/ARCHI.PMG'
+// The training ground — the first map the original ever shows a player, and
+// the friendliest to test on: barely any water, one big usable field.
+const MAP = 'Maps/CAMP.PMG'
 const CHAR_ARCHIVE = 'Chars/british.mad'
 const SOLDIER = 'pcgru_hi'
 

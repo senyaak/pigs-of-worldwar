@@ -46,8 +46,8 @@ test('a game refuses mismatched spawns or a lonely player', () => {
   expect(() => new Game({ players: [config.players[0]], spawns: config.spawns.slice(0, 4) })).toThrow(/two players/)
 })
 
-test('spawns on the real ARCHI: walkable, apart, split west/east', () => {
-  const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'ARCHI.PMG')))
+test('spawns on the real CAMP (the battle map): walkable, apart, split west/east', () => {
+  const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG')))
   const query = new TerrainQuery(blocks)
   const spawns = query.pickSpawns(8)
   expect(spawns).toHaveLength(8)
