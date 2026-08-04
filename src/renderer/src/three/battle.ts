@@ -26,12 +26,22 @@ export interface BattleAssets {
 export interface BattleScene {
   /** Point the camera at the active pig and park the marker over it. */
   focus(pig: Pig): void
+  /** Movement intent from the input layer: a direction in the XZ plane
+   * (game space), zero when no key is held. */
+  setIntent(x: number, z: number): void
   dispose(): void
 }
 
 const PIG_HEADING_OFFSET = Math.PI // model faces -z in its own space
+const WALK_SPEED = 900 // world units per second (tile = 512)
 
-export function buildBattle(host: SceneHost, assets: BattleAssets, game: Game): BattleScene {
+export function buildBattle(
+  host: SceneHost,
+  assets: BattleAssets,
+  game: Game,
+  /** Called whenever the game state changed this frame (HUD refresh). */
+  onGameChanged: () => void
+): BattleScene {
   const query = new TerrainQuery(assets.blocks)
   const root = new THREE.Group()
   root.rotation.x = Math.PI
@@ -41,19 +51,31 @@ export function buildBattle(host: SceneHost, assets: BattleAssets, game: Game): 
   const terrainMesh = terrain.group.children[0]
   root.add(terrainMesh)
 
-  const pigMeshes: { pig: Pig; mesh: PigMesh; player: ClipPlayer }[] = []
-  const idle = assets.clips[0] ?? null
+  interface PigEntry {
+    pig: Pig
+    mesh: PigMesh
+    node: THREE.Object3D
+    player: ClipPlayer
+    walking: boolean
+  }
+  const pigMeshes: PigEntry[] = []
+  const walkClip = assets.clips[0] ?? null
   for (const player of game.players) {
     for (const pig of player.pigs) {
       const mesh = buildPig(assets.model, assets.modelTextures, assets.skeleton)
-      const inner = mesh.group.children[0]
-      inner.position.set(pig.position.x, query.height(pig.position.x, pig.position.z), pig.position.z)
-      inner.rotation.y = pig.heading + PIG_HEADING_OFFSET
-      root.add(inner)
-      const clipPlayer = createPlayer(mesh)
-      if (idle) clipPlayer.play(idle)
-      pigMeshes.push({ pig, mesh, player: clipPlayer })
+      const node = mesh.group.children[0]
+      node.position.set(pig.position.x, query.height(pig.position.x, pig.position.z), pig.position.z)
+      node.rotation.y = pig.heading + PIG_HEADING_OFFSET
+      root.add(node)
+      // T-pose at rest; the walk clip plays only while moving.
+      pigMeshes.push({ pig, mesh, node, player: createPlayer(mesh), walking: false })
     }
+  }
+
+  const setWalking = (entry: PigEntry, walking: boolean): void => {
+    if (entry.walking === walking) return
+    entry.walking = walking
+    entry.player.play(walking ? walkClip : null)
   }
 
   // The active-pig marker: a slowly bobbing cone overhead (game-space, so
@@ -69,25 +91,59 @@ export function buildBattle(host: SceneHost, assets: BattleAssets, game: Game): 
 
   let markerBase = new THREE.Vector3()
   let time = 0
+  const intent = { x: 0, z: 0 }
+
+  const focus = (pig: Pig): void => {
+    const ground = query.height(pig.position.x, pig.position.z)
+    markerBase = new THREE.Vector3(pig.position.x, ground - 700, pig.position.z)
+    marker.position.copy(markerBase)
+    // Camera in Y-up world: the root flips Y and Z.
+    const target = new THREE.Vector3(pig.position.x, -ground, -pig.position.z)
+    host.camera.near = 10
+    host.camera.far = 100_000
+    host.camera.updateProjectionMatrix()
+    host.camera.position.set(target.x, target.y + 1500, target.z + 2600)
+    host.camera.lookAt(target)
+  }
+
+  const walk = (delta: number): void => {
+    const active = pigMeshes.find((entry) => entry.pig === game.currentPig)
+    if (!active) return
+    // A pig that stopped being active mid-stride stops walking.
+    for (const entry of pigMeshes) if (entry !== active) setWalking(entry, false)
+    const length = Math.hypot(intent.x, intent.z)
+    if (length === 0 || game.remainingMove <= 0) {
+      setWalking(active, false)
+      return
+    }
+    const step = Math.min(WALK_SPEED * delta, game.remainingMove)
+    const x = active.pig.position.x + (intent.x / length) * step
+    const z = active.pig.position.z + (intent.z / length) * step
+    const heading = Math.atan2(intent.x, intent.z)
+    if (!query.walkable(x, z) || !game.moveCurrentPig(x, z, step, heading)) {
+      setWalking(active, false)
+      return
+    }
+    setWalking(active, true)
+    active.node.position.set(x, query.height(x, z), z)
+    active.node.rotation.y = heading + PIG_HEADING_OFFSET
+    focus(active.pig)
+    onGameChanged()
+  }
+
   const onFrame = (delta: number): void => {
     time += delta
+    walk(delta)
     for (const { player } of pigMeshes) player.update(delta)
     marker.position.y = markerBase.y - Math.sin(time * 3) * 40
   }
   host.onFrame.add(onFrame)
 
   return {
-    focus(pig) {
-      const ground = query.height(pig.position.x, pig.position.z)
-      markerBase = new THREE.Vector3(pig.position.x, ground - 700, pig.position.z)
-      marker.position.copy(markerBase)
-      // Camera in Y-up world: the root flips Y and Z.
-      const target = new THREE.Vector3(pig.position.x, -ground, -pig.position.z)
-      host.camera.near = 10
-      host.camera.far = 100_000
-      host.camera.updateProjectionMatrix()
-      host.camera.position.set(target.x, target.y + 1500, target.z + 2600)
-      host.camera.lookAt(target)
+    focus,
+    setIntent(x, z) {
+      intent.x = x
+      intent.z = z
     },
     dispose() {
       host.onFrame.delete(onFrame)

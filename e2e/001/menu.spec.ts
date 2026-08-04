@@ -97,7 +97,9 @@ test('Exit quits the app cleanly: process gone, exit code 0, no errors', async (
   const closed = launched.app.waitForEvent('close')
   await expect(page.locator('#menu')).toBeVisible()
   expect(launched.errors).toEqual([])
-  await page.locator('#menu-exit').click()
+  // The click quits the app; Playwright may lose the page mid-click and
+  // throw "target closed" — that IS the success case here.
+  await page.locator('#menu-exit').click().catch(() => undefined)
   await closed
   expect(await exited, 'the process terminated of its own accord').toBe(0)
 })

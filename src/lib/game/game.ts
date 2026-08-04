@@ -34,10 +34,14 @@ export interface GameConfig {
   spawns: PigSpawn[]
 }
 
+/** How far one pig may walk in one turn, world units (tile = 512). */
+export const MOVE_BUDGET = 4000
+
 export class Game {
   readonly players: Player[]
   private currentPlayerIndex = 0
   private turnNumber = 1
+  private moveLeft = MOVE_BUDGET
 
   constructor(config: GameConfig) {
     if (config.players.length < 2) throw new Error('a game needs at least two players')
@@ -78,11 +82,31 @@ export class Game {
     return player.pigs[player.activePig]
   }
 
+  /** Movement remaining for the pig currently acting. */
+  get remainingMove(): number {
+    return this.moveLeft
+  }
+
+  /**
+   * Move the acting pig to (x, z), paying `distance` from the turn's
+   * movement budget. Refused (false) when the budget cannot cover it —
+   * the caller validated the ground; this validates the rules.
+   */
+  moveCurrentPig(x: number, z: number, distance: number, heading: number): boolean {
+    if (distance > this.moveLeft) return false
+    this.moveLeft -= distance
+    const pig = this.currentPig
+    pig.position = { x, z }
+    pig.heading = heading
+    return true
+  }
+
   /** Hand over to the next player; their squad advances to its next pig. */
   endTurn(): void {
     const player = this.currentPlayer
     player.activePig = (player.activePig + 1) % player.pigs.length
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length
     if (this.currentPlayerIndex === 0) this.turnNumber++
+    this.moveLeft = MOVE_BUDGET
   }
 }

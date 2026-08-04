@@ -23,9 +23,9 @@ test('New Game: squads on the map, turns rotate, the scene draws', async () => {
     await page.locator('#menu-new-game').click()
     await expect(page.locator('#battle')).toBeVisible()
 
-    // Turn 1: first player's first pig, at full health.
+    // Turn 1: first player's first pig, full health, full movement.
     await expect(page.locator('#battle-hud')).toHaveText(
-      'Turn 1 — Tommy’s Trotters: Tommy (100 hp)'
+      'Turn 1 — Tommy’s Trotters: Tommy (100 hp, move 4000)'
     )
 
     // The battle canvas draws something that is not background.
@@ -54,14 +54,26 @@ test('New Game: squads on the map, turns rotate, the scene draws', async () => {
       })
     await expect.poll(foregroundPixels, { message: 'rendered battle pixels' }).toBeGreaterThan(20000)
 
-    // End Turn: over to the other squad, then back to squad one's SECOND pig.
+    // Walking (W held) spends the movement budget frame by frame.
+    const moveLeft = async (): Promise<number> => {
+      const text = (await page.locator('#battle-hud').textContent()) ?? ''
+      return parseInt(text.match(/move (\d+)/)?.[1] ?? '-1', 10)
+    }
+    await page.keyboard.down('w')
+    await expect.poll(moveLeft, { message: 'movement budget draining' }).toBeLessThan(3900)
+    await page.keyboard.up('w')
+    const spent = await moveLeft()
+    expect(spent).toBeGreaterThan(0)
+
+    // End Turn: over to the other squad with a fresh budget, then back to
+    // squad one's SECOND pig.
     await page.locator('#battle-end-turn').click()
     await expect(page.locator('#battle-hud')).toHaveText(
-      'Turn 1 — Kaiser’s Grunters: Hans (100 hp)'
+      'Turn 1 — Kaiser’s Grunters: Hans (100 hp, move 4000)'
     )
     await page.locator('#battle-end-turn').click()
     await expect(page.locator('#battle-hud')).toHaveText(
-      'Turn 2 — Tommy’s Trotters: Wilson (100 hp)'
+      'Turn 2 — Tommy’s Trotters: Wilson (100 hp, move 4000)'
     )
 
     // Leaving lands back on the menu; a fresh New Game starts over at turn 1.
@@ -69,7 +81,7 @@ test('New Game: squads on the map, turns rotate, the scene draws', async () => {
     await expect(page.locator('#menu')).toBeVisible()
     await page.locator('#menu-new-game').click()
     await expect(page.locator('#battle-hud')).toHaveText(
-      'Turn 1 — Tommy’s Trotters: Tommy (100 hp)'
+      'Turn 1 — Tommy’s Trotters: Tommy (100 hp, move 4000)'
     )
 
     expect(launched.errors).toEqual([])

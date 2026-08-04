@@ -32,17 +32,44 @@ export function initBattle(onLeave: () => void): BattleView {
   let game: Game | null = null
   let scene: BattleScene | null = null
 
-  const updateHud = (): void => {
+  const updateHudText = (): void => {
     if (!game) return
     hudEl.textContent =
       `Turn ${game.turn} — ${game.currentPlayer.name}: ${game.currentPig.name} ` +
-      `(${game.currentPig.health} hp)`
+      `(${game.currentPig.health} hp, move ${Math.round(game.remainingMove)})`
+  }
+
+  const updateHud = (): void => {
+    if (!game) return
+    updateHudText()
     scene?.focus(game.currentPig)
   }
 
   byId<HTMLButtonElement>('battle-end-turn').addEventListener('click', () => {
     game?.endTurn()
     updateHud()
+  })
+
+  // WASD / arrows drive the acting pig while the battle view is up.
+  const battleEl = byId<HTMLDivElement>('battle')
+  const held = new Set<string>()
+  const pushIntent = (): void => {
+    let x = 0
+    let z = 0
+    if (held.has('KeyA') || held.has('ArrowLeft')) x -= 1
+    if (held.has('KeyD') || held.has('ArrowRight')) x += 1
+    if (held.has('KeyW') || held.has('ArrowUp')) z += 1
+    if (held.has('KeyS') || held.has('ArrowDown')) z -= 1
+    scene?.setIntent(x, z)
+  }
+  window.addEventListener('keydown', (event) => {
+    if (battleEl.classList.contains('hidden')) return
+    held.add(event.code)
+    pushIntent()
+  })
+  window.addEventListener('keyup', (event) => {
+    held.delete(event.code)
+    pushIntent()
   })
 
   byId<HTMLButtonElement>('battle-leave').addEventListener('click', () => {
@@ -83,7 +110,8 @@ export function initBattle(onLeave: () => void): BattleView {
           skeleton: modelResult.skeleton,
           clips: clipsResult.ok ? clipsResult.clips : []
         },
-        game
+        game,
+        updateHudText
       )
       updateHud()
       return true

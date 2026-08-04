@@ -4,7 +4,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { Game } from '../../src/lib/game/game'
+import { Game, MOVE_BUDGET } from '../../src/lib/game/game'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { readFileSync } from 'node:fs'
@@ -39,6 +39,23 @@ test('turns rotate players; each squad cycles through its pigs', () => {
   for (let i = 0; i < 9; i++) game.endTurn()
   expect(game.currentPlayer.name).toContain('Kaiser')
   expect(game.currentPig.name).toBe('Fritz')
+})
+
+test('movement spends the turn budget; the next turn refills it', () => {
+  const game = new Game(config)
+  expect(game.remainingMove).toBe(MOVE_BUDGET)
+
+  expect(game.moveCurrentPig(100, 200, 1500, Math.PI / 2)).toBe(true)
+  expect(game.remainingMove).toBe(MOVE_BUDGET - 1500)
+  expect(game.currentPig.position).toEqual({ x: 100, z: 200 })
+  expect(game.currentPig.heading).toBeCloseTo(Math.PI / 2)
+
+  // The budget refuses what it cannot cover — position stays put.
+  expect(game.moveCurrentPig(999, 999, MOVE_BUDGET, 0)).toBe(false)
+  expect(game.currentPig.position).toEqual({ x: 100, z: 200 })
+
+  game.endTurn()
+  expect(game.remainingMove).toBe(MOVE_BUDGET)
 })
 
 test('a game refuses mismatched spawns or a lonely player', () => {
