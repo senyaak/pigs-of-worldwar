@@ -25,7 +25,7 @@ export function ensureScene(container: HTMLElement): SceneHost {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x23271d)
-  const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 10_000)
+  const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 10_000) // near/far refit per object in frameObject
   scene.add(new THREE.AmbientLight(0xffffff, 0.5))
   const sun = new THREE.DirectionalLight(0xffffff, 2)
   sun.position.set(1, 2, 3)
@@ -61,6 +61,11 @@ export function ensureScene(container: HTMLElement): SceneHost {
       const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3()).length()
       object.position.sub(center)
+      // Fit the clip planes to the object — a map is a thousand times the
+      // size of a pig, and a fixed far plane clips it into an empty screen.
+      camera.near = Math.max(size / 1000, 0.1)
+      camera.far = size * 4
+      camera.updateProjectionMatrix()
       camera.position.set(0, size * 0.25, size * 0.9)
       camera.lookAt(0, 0, 0)
     }

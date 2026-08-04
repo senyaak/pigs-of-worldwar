@@ -6,6 +6,7 @@ import { initWelcome } from './ui/welcome'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
 import { initModelViewer } from './ui/modelViewer'
+import { initTerrainViewer } from './ui/terrainViewer'
 
 type View = 'welcome' | 'browser' | 'archive' | 'viewer'
 
@@ -22,18 +23,37 @@ function show(view: View): void {
   }
 }
 
+// The viewer panel is shared by models (opened from an archive) and terrain
+// (opened from the file list) — Back returns to wherever it was opened from.
+let viewerOrigin: View = 'archive'
+
 const browser = initFileBrowser((relPath) => {
+  if (/\.pmg$/i.test(relPath)) {
+    void terrain.open(relPath).then((ok) => {
+      if (ok) {
+        viewerOrigin = 'browser'
+        show('viewer')
+      }
+    })
+    return
+  }
   void archive.open(relPath).then((ok) => ok && show('archive'))
 })
 
 const archive = initArchiveView(
   (relPath, base) => {
-    void viewer.open(relPath, base).then((ok) => ok && show('viewer'))
+    void viewer.open(relPath, base).then((ok) => {
+      if (ok) {
+        viewerOrigin = 'archive'
+        show('viewer')
+      }
+    })
   },
   () => show('browser')
 )
 
-const viewer = initModelViewer(() => show('archive'))
+const viewer = initModelViewer(() => show(viewerOrigin))
+const terrain = initTerrainViewer()
 
 async function showGame(dir: string): Promise<void> {
   byId<HTMLSpanElement>('game-path').textContent = dir

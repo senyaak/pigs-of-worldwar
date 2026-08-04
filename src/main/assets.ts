@@ -15,6 +15,9 @@ import { parseTim } from '../lib/formats/tim'
 import type { Tim } from '../lib/formats/tim'
 import { parseMcapClip } from '../lib/formats/mcap'
 import type { McapClip } from '../lib/formats/mcap'
+import { parsePmg } from '../lib/formats/pmg'
+import type { TerrainBlock } from '../lib/formats/pmg'
+import { parsePtg } from '../lib/formats/ptg'
 
 export interface LoadedModel {
   model: Model
@@ -75,6 +78,22 @@ export async function loadModel(full: string, base: string): Promise<LoadedModel
     textures: await pairedTextures(full),
     skeleton
   }
+}
+
+export interface LoadedTerrain {
+  blocks: TerrainBlock[]
+  textures: Tim[]
+}
+
+/** A map's ground: the .PMG mesh plus the sibling .PTG textures. */
+export async function loadTerrain(full: string): Promise<LoadedTerrain> {
+  const blocks = parsePmg(await fs.readFile(full))
+  const dir = path.dirname(full)
+  const stem = path.basename(full).replace(/\.pmg$/i, '')
+  const siblings = await fs.readdir(dir)
+  const ptgName = siblings.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.ptg`)
+  const textures = ptgName ? parsePtg(await fs.readFile(path.join(dir, ptgName))) : []
+  return { blocks, textures }
 }
 
 /**

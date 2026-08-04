@@ -66,6 +66,30 @@ export interface Clip {
 
 export type LoadClipsResult = { ok: true; clips: Clip[] } | { ok: false; error: string }
 
+export interface TerrainTile {
+  texture: number
+  rotateFlip: number
+  type: number
+  slip: number
+}
+
+export interface TerrainBlock {
+  x: number
+  z: number
+  heights: Int16Array
+  tiles: TerrainTile[]
+}
+
+export interface TerrainTexture {
+  width: number
+  height: number
+  rgba: Uint8Array
+}
+
+export type LoadTerrainResult =
+  | { ok: true; blocks: TerrainBlock[]; textures: TerrainTexture[] }
+  | { ok: false; error: string }
+
 export interface Api {
   getGameDir(): Promise<string | null>
   selectGameDir(): Promise<string | null>
@@ -74,6 +98,7 @@ export interface Api {
   listArchive(relPath: string): Promise<ListArchiveResult>
   loadModel(relPath: string, base: string): Promise<LoadModelResult>
   loadClips(relPath: string): Promise<LoadClipsResult>
+  loadTerrain(relPath: string): Promise<LoadTerrainResult>
 }
 
 declare global {

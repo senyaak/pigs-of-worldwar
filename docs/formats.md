@@ -140,5 +140,28 @@ fine with rotations alone, minus root motion.
 
 Per map `<NAME>`: `<NAME>.PMG` (ground mesh), `<NAME>.PTG` (ground textures),
 `<NAME>.POG` (object placement), `<NAME>.MAD` (map-specific assets).
-Structures documented in how-doc's `Map/` folder — to be transcribed here
-when terrain work starts.
+
+**PMG — ground mesh**: exactly 16×16 blocks of 368 bytes (verified:
+ARCHI.PMG is 94208 bytes). Per block:
+
+| offset | size | type      | field |
+| ------ | ---- | --------- | ----- |
+| 0      | 2    | s16       | x offset (world; steps 2048 = 4 tiles × 512) |
+| 2      | 2    | s16       | base height (how-doc: unreliable; heights are absolute anyway) |
+| 4      | 2    | s16       | z offset (rows advance −z) |
+| 6      | 2    | s16       | unknown |
+| 8      | 100  | (s16+s16)×25 | 5×5 vertex grid: height + unknown ≤255 |
+| 108    | 4    | u32       | always 0 |
+| 112    | 256  | 16 bytes × 16 | 4×4 tiles |
+
+Per tile: bytes 0–5 zero, byte 6 = type (`0x1F` mask type, `0x20` water,
+`0x40` mine, `0x80` wall), byte 7 = slip, bytes 8–9 zero, byte 10 =
+rotate/flip flags (`1` FlipX, `2` Rotate90, `4` Rotate180), bytes 11–14 =
+u32 texture index into the sibling PTG, byte 15 zero.
+
+**PTG — ground textures**: u32 count, then `count` equal-sized TIMs —
+`(fileSize − 4) / count` bytes each (verified: ARCHI.PTG = 238 × 576-byte
+32×32 4-bit TIMs).
+
+**POG — object placement**: still to transcribe from how-doc (`Map/POG`,
+`ObjectFlag`, `ObjectItemType`, `ObjectScriptType`).
