@@ -49,6 +49,18 @@ const SLIP_STAGGER_SECONDS = 0.45
 const JUMP_VELOCITY = -1500
 const GRAVITY = 5000
 
+/** MCAP clip indices, from the exe's own animation-name table
+ * (pigs-disasm/animations/notes.md). */
+const ANIM = {
+  RUN: 0,
+  WALK_BACK: 3,
+  TURN: 4,
+  SWIM: 5,
+  JUMP_MIDDLE: 9,
+  SCRAMBLE: 11,
+  IDLE: 27
+} as const
+
 export function buildBattle(
   host: SceneHost,
   assets: BattleAssets,
@@ -70,10 +82,14 @@ export function buildBattle(
     mesh: PigMesh
     node: THREE.Object3D
     player: ClipPlayer
-    walking: boolean
+    clip: number | null
   }
   const pigMeshes: PigEntry[] = []
-  const walkClip = assets.clips[0] ?? null
+  const setClip = (entry: PigEntry, index: number | null): void => {
+    if (entry.clip === index) return
+    entry.clip = index
+    entry.player.play(index === null ? null : (assets.clips[index] ?? null))
+  }
   for (const player of game.players) {
     for (const pig of player.pigs) {
       const mesh = buildPig(assets.model, assets.modelTextures, assets.skeleton)
@@ -85,15 +101,10 @@ export function buildBattle(
       )
       node.rotation.y = pig.heading + PIG_HEADING_OFFSET
       root.add(node)
-      // T-pose at rest; the walk clip plays only while moving.
-      pigMeshes.push({ pig, mesh, node, player: createPlayer(mesh), walking: false })
+      const entry: PigEntry = { pig, mesh, node, player: createPlayer(mesh), clip: null }
+      setClip(entry, ANIM.IDLE)
+      pigMeshes.push(entry)
     }
-  }
-
-  const setWalking = (entry: PigEntry, walking: boolean): void => {
-    if (entry.walking === walking) return
-    entry.walking = walking
-    entry.player.play(walking ? walkClip : null)
   }
 
   // The active-pig marker: a slowly bobbing cone overhead (game-space, so
@@ -182,7 +193,7 @@ export function buildBattle(
 
     const active = pigMeshes.find((entry) => entry.pig === game.currentPig)
     if (!active) return
-    for (const entry of pigMeshes) if (entry !== active) setWalking(entry, false)
+    for (const entry of pigMeshes) if (entry !== active) setClip(entry, ANIM.IDLE)
 
     const { x: px, z: pz } = active.pig.position
     const swimming = query.isWater(px, pz)
@@ -195,6 +206,7 @@ export function buildBattle(
     }
 
     if (airborne) {
+      setClip(active, ANIM.JUMP_MIDDLE)
       // Ballistics: gravity pulls (game Y-down: +down), momentum carries.
       const x = px + airborne.vx * delta
       const z = pz + airborne.vz * delta
@@ -214,7 +226,7 @@ export function buildBattle(
     } else if (slip) {
       // Steep ground: a short scramble on the spot, then the slide — going
       // where nobody wanted to go.
-      setWalking(active, true)
+      setClip(active, ANIM.SCRAMBLE)
       stagger += delta
       if (stagger >= SLIP_STAGGER_SECONDS) {
         const step = SLIDE_SPEED * delta
@@ -244,12 +256,16 @@ export function buildBattle(
         if (query.walkable(x, z)) {
           game.moveCurrentPig(x, z, active.pig.heading)
           settle(active)
-          setWalking(active, true)
+          setClip(active, swimming ? ANIM.SWIM : intent.walk > 0 ? ANIM.RUN : ANIM.WALK_BACK)
         } else {
-          setWalking(active, false)
+          setClip(active, swimming ? ANIM.SWIM : ANIM.IDLE)
         }
+      } else if (swimming) {
+        setClip(active, ANIM.SWIM)
+      } else if (intent.turn !== 0) {
+        setClip(active, ANIM.TURN)
       } else {
-        setWalking(active, false)
+        setClip(active, ANIM.IDLE)
       }
     }
     jumpRequested = false

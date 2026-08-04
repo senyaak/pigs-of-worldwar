@@ -136,6 +136,12 @@ plausibly). Playback rate is a guess (25 fps); the branch positions are small
 per-frame deltas whose exact meaning is still uninvestigated — clips play
 fine with rotations alone, minus root motion.
 
+**Clip indices are known** (recovered from the exe's debug-name pointer
+table — pigs-disasm/animations/notes.md): 0 run, 3 walk backwards, 4 turn on
+spot, 5 swim, 8/9/10 jump start/middle/end, 11 scramble, 27/28 idle cycles,
+38 falling, 47-49 dying, 50 drowning, 58 parachuting — 59 named of the 93
+entries in mcap.mad.
+
 ## Terrain (Maps/\*)
 
 Per map `<NAME>`: `<NAME>.PMG` (ground mesh), `<NAME>.PTG` (ground textures),
