@@ -43,9 +43,28 @@ export interface Texture {
   rgba: Uint8Array
 }
 
+export interface Bone {
+  parentIndex: number
+  x: number
+  y: number
+  z: number
+}
+
 export type LoadModelResult =
-  | { ok: true; model: Model; textures: Texture[] }
+  | { ok: true; model: Model; textures: Texture[]; skeleton: Bone[] }
   | { ok: false; error: string }
+
+export interface Clip {
+  name: string
+  frameCount: number
+  /** frameCount × 15 × 3 euler radians. */
+  rotations: Float32Array
+  /** frameCount × 10 × 3 branch-bone positions. */
+  positions: Float32Array
+  unknowns: Uint16Array
+}
+
+export type LoadClipsResult = { ok: true; clips: Clip[] } | { ok: false; error: string }
 
 export interface Api {
   getGameDir(): Promise<string | null>
@@ -54,6 +73,7 @@ export interface Api {
   listFiles(): Promise<FileEntry[]>
   listArchive(relPath: string): Promise<ListArchiveResult>
   loadModel(relPath: string, base: string): Promise<LoadModelResult>
+  loadClips(relPath: string): Promise<LoadClipsResult>
 }
 
 declare global {

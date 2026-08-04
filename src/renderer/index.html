@@ -195,6 +195,14 @@
         font-size: 13px;
         font-family: Consolas, monospace;
       }
+      #anim-select {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        padding: 6px 10px;
+        font-size: 13px;
+      }
       #viewer-canvas {
         flex: 1;
         min-height: 0;
@@ -243,6 +251,7 @@
       <div id="viewer" class="hidden">
         <div id="viewer-toolbar">
           <button id="viewer-back">&larr; Back</button>
+          <select id="anim-select"></select>
           <span id="viewer-stats"></span>
         </div>
         <div id="viewer-canvas"></div>

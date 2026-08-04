@@ -35,7 +35,7 @@ test('pcace_hi renders: correct counts in the stats, pig pixels on the canvas', 
     await page.locator('#archive-list .file-row', { hasText: 'pcace_hi.VTX' }).click()
     await expect(page.locator('#viewer')).toBeVisible()
     await expect(page.locator('#viewer-stats')).toHaveText(
-      'pcace_hi — 1316 triangles (536 + 390 quads), 658 vertices, 120 textures'
+      'pcace_hi — 1316 triangles (536 + 390 quads), 658 vertices, 120 textures, 15 bones, 93 clips'
     )
 
     // Read the WebGL canvas back and count pixels that are not background.
@@ -66,6 +66,12 @@ test('pcace_hi renders: correct counts in the stats, pig pixels on the canvas', 
         return count
       })
     await expect.poll(foregroundPixels, { message: 'rendered pig pixels' }).toBeGreaterThan(5000)
+
+    // A clip plays without killing the renderer: 94 dropdown options (T-pose
+    // + 93 MCAP clips), and the canvas still shows a pig mid-animation.
+    await expect(page.locator('#anim-select option')).toHaveCount(94)
+    await page.selectOption('#anim-select', '1')
+    await expect.poll(foregroundPixels, { message: 'animated pig pixels' }).toBeGreaterThan(5000)
 
     // Back returns to the archive, still on its entries.
     await page.locator('#viewer-back').click()

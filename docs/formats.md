@@ -125,7 +125,16 @@ keyframes (entry length / 272 = frame count):
 | ------ | ---- | --------- | ----- |
 | 0      | 2    | u16       | unknown |
 | 2      | 30   | s8[10][3] | per-branch positions (10 non-leaf bones × x,y,z) |
-| 32     | 240  | f32[15][4]| per-bone rotation quaternions (x,y,z,w) |
+| 32     | 240  | f32[15][4]| per-bone rotations — see below |
+
+how-doc calls the rotations quaternions; on real data they are **not** (found
+here): the fourth float of every bone is exactly 1.0 in every frame while the
+first three range over ±π. They are **euler angles in radians** plus a
+constant. Order XYZ applied in the game's Y-down space produces coherent
+poses (verified visually on clips #001/#005 — limbs stay attached and move
+plausibly). Playback rate is a guess (25 fps); the branch positions are small
+per-frame deltas whose exact meaning is still uninvestigated — clips play
+fine with rotations alone, minus root motion.
 
 ## Terrain (Maps/\*)
 
