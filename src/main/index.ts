@@ -8,13 +8,16 @@ import { resolveGameDir } from './gameDir'
 import { registerIpc } from './ipc'
 
 function createWindow(): void {
-  // The game runs borderless fullscreen. --windowed keeps a desktop window;
-  // dev (HMR) defaults to windowed as well, --fullscreen overrides. The e2e
-  // suite passes --windowed so a test run does not take over the screen
+  // The game runs borderless fullscreen. --windowed (or POW_WINDOWED=1, for
+  // launchers that swallow argv — electron-vite preview does) keeps a desktop
+  // window; dev (HMR) defaults to windowed too, --fullscreen overrides. The
+  // e2e suite passes --windowed so a run does not take over the screen
   // (docs/testing.md).
   const windowed =
     !process.argv.includes('--fullscreen') &&
-    (process.argv.includes('--windowed') || Boolean(process.env['ELECTRON_RENDERER_URL']))
+    (process.argv.includes('--windowed') ||
+      process.env['POW_WINDOWED'] === '1' ||
+      Boolean(process.env['ELECTRON_RENDERER_URL']))
   const window = new BrowserWindow({
     ...(windowed ? { width: 1100, height: 750 } : { fullscreen: true, frame: false }),
     show: false,

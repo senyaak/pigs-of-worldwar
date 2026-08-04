@@ -7,6 +7,7 @@ import { TerrainQuery } from '../../../lib/game/terrain'
 import { ensureScene } from '../three/scene'
 import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
+import { controller } from '../input/controller'
 import { byId } from './dom'
 
 // The training ground — the first map the original ever shows a player, and
@@ -48,39 +49,35 @@ export function initBattle(onLeave: () => void): BattleView {
     scene?.focus(game.currentPig)
   }
 
+  // The button is just another way to fire the action.
   byId<HTMLButtonElement>('battle-end-turn').addEventListener('click', () => {
-    game?.endTurn()
-    updateHud()
+    controller.press('endTurn')
   })
 
-  // Tank controls, original style: W/S walk forward/back, A/D turn on the
-  // spot, Space jumps. Active only while the battle view is up.
+  // Tank controls, original style — but the battle view never touches keys:
+  // it listens to the controller, which the keyboard AND the e2e suite drive
+  // through the same three methods (input/controller.ts).
   const battleEl = byId<HTMLDivElement>('battle')
-  const held = new Set<string>()
+  const isBattleUp = (): boolean => !battleEl.classList.contains('hidden')
+
   const pushIntent = (): void => {
-    let walk = 0
-    let turn = 0
-    if (held.has('KeyW') || held.has('ArrowUp')) walk += 1
-    if (held.has('KeyS') || held.has('ArrowDown')) walk -= 1
-    if (held.has('KeyA') || held.has('ArrowLeft')) turn -= 1
-    if (held.has('KeyD') || held.has('ArrowRight')) turn += 1
+    const walk = (controller.isDown('walkForward') ? 1 : 0) - (controller.isDown('walkBack') ? 1 : 0)
+    const turn = (controller.isDown('turnRight') ? 1 : 0) - (controller.isDown('turnLeft') ? 1 : 0)
     scene?.setIntent(walk, turn)
   }
-  window.addEventListener('keydown', (event) => {
-    if (battleEl.classList.contains('hidden')) return
-    if (event.code === 'Space') {
-      if (!event.repeat) scene?.jump()
-      return
+  controller.onChange(pushIntent)
+  controller.onAction((action) => {
+    if (!isBattleUp()) return
+    if (action === 'jump') scene?.jump()
+    if (action === 'endTurn') {
+      game?.endTurn()
+      updateHud()
     }
-    held.add(event.code)
-    pushIntent()
   })
-  window.addEventListener('keyup', (event) => {
-    held.delete(event.code)
-    pushIntent()
-  })
+  controller.bindKeyboard(isBattleUp)
 
   byId<HTMLButtonElement>('battle-leave').addEventListener('click', () => {
+    controller.releaseAll()
     scene?.dispose()
     scene = null
     game = null

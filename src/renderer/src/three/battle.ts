@@ -13,6 +13,7 @@ import type { Pig as PigMesh } from './pig'
 import { createPlayer } from './clips'
 import type { Player as ClipPlayer } from './clips'
 import type { SceneHost } from './scene'
+import { controller } from '../input/controller'
 
 export interface BattleAssets {
   blocks: TerrainBlock[]
@@ -286,6 +287,17 @@ export function buildBattle(
     marker.position.y = markerBase.y - Math.sin(time * 3) * 40
   }
   host.onFrame.add(onFrame)
+
+  // A read-only window onto the acting pig, so the e2e suite can assert on
+  // where it actually IS rather than on what the HUD says about it.
+  window.pow = {
+    ...(window.pow ?? { controller }),
+    debug: {
+      currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
+      currentHeading: () => game.currentPig.heading,
+      currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0
+    }
+  }
 
   return {
     focus,

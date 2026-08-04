@@ -9,6 +9,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync } from 'node:fs'
 
 import { PHASE_ENV, launchApp } from '../launch'
+import { debugState, hold, tap } from '../controller'
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
@@ -63,9 +64,9 @@ test('New Game: squads on the map, turns rotate, the scene draws', async () => {
     expect(before).toBeGreaterThan(40)
     await expect.poll(secondsLeft, { message: 'turn clock ticking' }).toBeLessThan(before)
 
-    // End Turn: over to the other squad with a fresh clock, then back to
-    // squad one's SECOND pig.
-    await page.locator('#battle-end-turn').click()
+    // End Turn through the controller — the same action the button and the
+    // Enter key fire.
+    await tap(page, 'endTurn')
     await expect(page.locator('#battle-hud')).toHaveText(
       /Turn 1 — Kaiser’s Grunters: Hans \(100 hp, \d+s\)/
     )
@@ -82,6 +83,39 @@ test('New Game: squads on the map, turns rotate, the scene draws', async () => {
     await expect(page.locator('#battle-hud')).toHaveText(
       /Turn 1 — Tommy’s Trotters: Tommy \(100 hp, \d+s\)/
     )
+
+    expect(launched.errors).toEqual([])
+  } finally {
+    await launched.app.close()
+  }
+})
+
+test('the controller drives the pig: walking moves it, turning aims it', async () => {
+  const launched = await launchApp({ envFile: PHASE_ENV })
+  const { page } = launched
+  try {
+    await page.locator('#menu-new-game').click()
+    await expect(page.locator('#battle')).toBeVisible()
+
+    // Walking moves the pig — position read off the scene, the ground truth
+    // the HUD only summarises.
+    const start = await debugState(page)
+    await hold(page, 'walkForward', 700)
+    const walked = await debugState(page)
+    const distance = Math.hypot(walked.x - start.x, walked.z - start.z)
+    expect(distance, 'walkForward moved the pig').toBeGreaterThan(200)
+
+    // Turning aims it.
+    await hold(page, 'turnRight', 400)
+    const turned = await debugState(page)
+    expect(Math.abs(turned.heading - walked.heading), 'turnRight rotated the pig').toBeGreaterThan(0.3)
+
+    // Jump is a one-shot: it must leave the ground. Game space is Y-down, so
+    // airborne means a SMALLER y than standing.
+    await tap(page, 'jump')
+    await page.waitForTimeout(120)
+    const airborne = await debugState(page)
+    expect(airborne.nodeY, 'jump left the ground').toBeLessThan(turned.nodeY - 50)
 
     expect(launched.errors).toEqual([])
   } finally {

@@ -19,6 +19,26 @@ A folder is considered valid if it contains `warhogs_.exe`.
 `POW_ENV_FILE=<path>` redirects where the `.env` is read/written (used by
 tests — see [docs/testing.md](docs/testing.md)).
 
+## Playing
+
+Double-click `play.bat` — it installs dependencies if needed, builds, and
+launches. Add `--windowed` to play in a desktop window instead of fullscreen.
+
+Controls (tank-style, as in the original):
+
+| key | action |
+| --- | ------ |
+| `W` / `↑` | walk forward |
+| `S` / `↓` | walk back |
+| `A` / `←` | turn left |
+| `D` / `→` | turn right |
+| `Space` | jump |
+| `Enter` | end turn |
+
+Every one of these is a named action in
+[src/renderer/src/input/controller.ts](src/renderer/src/input/controller.ts);
+keys, on-screen buttons and the e2e suite all go through it.
+
 ## Development
 
 ```bash

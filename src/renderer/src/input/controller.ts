@@ -1,0 +1,118 @@
+// The controller: the ONE way anything drives a pig.
+//
+// A keyboard press and an e2e test call the same three methods, so a test
+// exercises the real control path instead of a parallel one built for it.
+// The controller knows nothing about three.js or the game rules — it holds
+// which actions are down and tells whoever is listening.
+
+import { DEFAULT_BINDINGS, HELD_ACTIONS } from './actions'
+import type { Action } from './actions'
+
+export interface Controller {
+  /** Start holding an action (idempotent). */
+  press(action: Action): void
+  /** Stop holding an action (idempotent). */
+  release(action: Action): void
+  /** A single press-and-release, for one-shot actions like jump. */
+  tap(action: Action): void
+  /** Is this action currently held? */
+  isDown(action: Action): boolean
+  /** Release everything — used when a view closes or a turn is handed over. */
+  releaseAll(): void
+  /** Called whenever the held set changes; the scene reads intent here. */
+  onChange(listener: () => void): () => void
+  /** Called for one-shot actions (jump, endTurn). */
+  onAction(listener: (action: Action) => void): () => void
+  /** Route real keyboard events into the controller while `enabled()` is
+   * true; returns an unbind function. */
+  bindKeyboard(enabled: () => boolean): () => void
+}
+
+export function createController(): Controller {
+  const held = new Set<Action>()
+  const changeListeners = new Set<() => void>()
+  const actionListeners = new Set<(action: Action) => void>()
+
+  const changed = (): void => {
+    for (const listener of changeListeners) listener()
+  }
+  const fired = (action: Action): void => {
+    for (const listener of actionListeners) listener(action)
+  }
+
+  const controller: Controller = {
+    press(action) {
+      if (HELD_ACTIONS.includes(action)) {
+        if (held.has(action)) return
+        held.add(action)
+        changed()
+      } else {
+        fired(action)
+      }
+    },
+    release(action) {
+      if (!held.delete(action)) return
+      changed()
+    },
+    tap(action) {
+      controller.press(action)
+      controller.release(action)
+    },
+    isDown: (action) => held.has(action),
+    releaseAll() {
+      if (held.size === 0) return
+      held.clear()
+      changed()
+    },
+    onChange(listener) {
+      changeListeners.add(listener)
+      return () => changeListeners.delete(listener)
+    },
+    onAction(listener) {
+      actionListeners.add(listener)
+      return () => actionListeners.delete(listener)
+    },
+    bindKeyboard(enabled) {
+      const down = (event: KeyboardEvent): void => {
+        if (!enabled()) return
+        const action = DEFAULT_BINDINGS[event.code]
+        if (!action) return
+        event.preventDefault()
+        // Auto-repeat must not re-fire one-shot actions.
+        if (event.repeat && !HELD_ACTIONS.includes(action)) return
+        controller.press(action)
+      }
+      const up = (event: KeyboardEvent): void => {
+        const action = DEFAULT_BINDINGS[event.code]
+        if (action) controller.release(action)
+      }
+      window.addEventListener('keydown', down)
+      window.addEventListener('keyup', up)
+      return () => {
+        window.removeEventListener('keydown', down)
+        window.removeEventListener('keyup', up)
+      }
+    }
+  }
+  return controller
+}
+
+/**
+ * The controller the app runs on. Exposed on `window.pow` so the e2e suite
+ * drives the real control path (docs/testing.md) rather than synthesising
+ * key events that only look like input.
+ */
+export const controller = createController()
+
+export interface DebugHooks {
+  currentPig(): { x: number; z: number }
+  currentHeading(): number
+  currentNodeY(): number
+}
+
+declare global {
+  interface Window {
+    pow?: { controller: Controller; debug?: DebugHooks }
+  }
+}
+window.pow = { controller }

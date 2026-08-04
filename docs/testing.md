@@ -54,6 +54,28 @@ expires.**
   one appears, instead of waiting out the timeout and reporting a bare
   "timed out" (see `hudSays` in homm5-editor for the shape).
 
+## Drive the game through its controller, not through keys
+
+Player input goes through one place — `src/renderer/src/input/controller.ts`,
+which maps physical keys to named actions (`walkForward`, `turnLeft`, `jump`,
+`endTurn`, …). Specs drive **that**, via `e2e/controller.ts`:
+
+```ts
+await hold(page, 'walkForward', 700)   // press, wait, release
+await tap(page, 'endTurn')             // one-shot
+const { x, z, heading } = await debugState(page)
+```
+
+Synthesising key events instead would test a parallel path: a broken
+keybinding, a controller regression, or a view that forgot to subscribe would
+all still "pass". Going through the controller means a test fails when the
+real control path breaks. The keyboard is just one more thing that calls
+`press`/`release`, exactly like the on-screen End Turn button.
+
+`window.pow.debug` (present only while a battle scene is up) exposes where the
+acting pig actually is, so movement specs assert on the world rather than on
+the HUD's description of it.
+
 ## Native dialogs are undrivable
 
 Playwright cannot operate OS file pickers. Every flow that opens one must have
