@@ -65,12 +65,31 @@ test('the menu wears the original art and routes New Game and Assets', async () 
   }
 })
 
-test('Exit actually quits the app', async () => {
+/** Resolves with the app process's exit code once it truly terminates. */
+function processExit(launched: { app: { process(): { once(e: 'exit', cb: (code: number | null) => void): unknown } } }): Promise<number | null> {
+  return new Promise((resolve) => launched.app.process().once('exit', resolve))
+}
+
+test('Exit quits the app cleanly: process gone, exit code 0, no errors', async () => {
   const launched = await launchApp({ envFile: PHASE_ENV })
   const { page } = launched
+  const exited = processExit(launched)
   const closed = launched.app.waitForEvent('close')
   await expect(page.locator('#menu')).toBeVisible()
   expect(launched.errors).toEqual([])
   await page.locator('#menu-exit').click()
   await closed
+  expect(await exited, 'the process terminated of its own accord').toBe(0)
+})
+
+test('closing the window quits the app cleanly too', async () => {
+  const launched = await launchApp({ envFile: PHASE_ENV })
+  const { page } = launched
+  const exited = processExit(launched)
+  const closed = launched.app.waitForEvent('close')
+  await expect(page.locator('#menu')).toBeVisible()
+  expect(launched.errors).toEqual([])
+  await page.evaluate(() => window.close())
+  await closed
+  expect(await exited, 'window-all-closed shut the app down').toBe(0)
 })
