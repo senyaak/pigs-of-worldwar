@@ -8,13 +8,14 @@ import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
 import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
+import { initBattle } from './ui/battle'
 
-type View = 'welcome' | 'menu' | 'stub' | 'browser' | 'archive' | 'viewer'
+type View = 'welcome' | 'menu' | 'battle' | 'browser' | 'archive' | 'viewer'
 
 const panels: Record<View, HTMLElement[]> = {
   welcome: [byId('welcome')],
   menu: [byId('menu')],
-  stub: [byId('game-stub')],
+  battle: [byId('battle')],
   browser: [byId('browser'), byId('file-list')],
   archive: [byId('archive-view')],
   viewer: [byId('viewer')]
@@ -58,14 +59,17 @@ const archive = initArchiveView(
 const viewer = initModelViewer(() => show(viewerOrigin))
 const terrain = initTerrainViewer()
 
+const battle = initBattle(() => show('menu'))
+
 const menu = initMenu({
-  onNewGame: () => show('stub'),
+  onNewGame: () => {
+    void battle.open().then((ok) => ok && show('battle'))
+  },
   onAssets: () => {
     show('browser')
     void browser.load()
   }
 })
-byId<HTMLButtonElement>('stub-back').addEventListener('click', () => show('menu'))
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
 
 // A located game lands on the main menu; the asset browsers hang off it.

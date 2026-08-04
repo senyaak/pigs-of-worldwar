@@ -13,10 +13,11 @@ export interface SceneHost {
   frameObject(object: THREE.Object3D): void
 }
 
-let host: SceneHost | null = null
+const hosts = new WeakMap<HTMLElement, SceneHost>()
 
 export function ensureScene(container: HTMLElement): SceneHost {
-  if (host) return host
+  const existing = hosts.get(container)
+  if (existing) return existing
 
   // preserveDrawingBuffer lets tests read pixels back (docs/testing.md).
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
@@ -50,7 +51,7 @@ export function ensureScene(container: HTMLElement): SceneHost {
     camera.updateProjectionMatrix()
   }).observe(container)
 
-  host = {
+  const host: SceneHost = {
     scene,
     camera,
     onFrame,
@@ -70,5 +71,6 @@ export function ensureScene(container: HTMLElement): SceneHost {
       camera.lookAt(0, 0, 0)
     }
   }
+  hosts.set(container, host)
   return host
 }

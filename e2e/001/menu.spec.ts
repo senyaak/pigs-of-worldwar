@@ -46,11 +46,11 @@ test('the menu wears the original art and routes New Game and Assets', async () 
       })
     await expect.poll(distinctColors, { message: 'painted menu background' }).toBeGreaterThan(50)
 
-    // New Game → stub (the battle scene is a later phase) and back.
+    // New Game → the battle view (phase 002 owns its contents) and back.
     await page.locator('#menu-new-game').click()
-    await expect(page.locator('#game-stub')).toBeVisible()
+    await expect(page.locator('#battle')).toBeVisible()
     await expect(page.locator('#menu')).toBeHidden()
-    await page.locator('#stub-back').click()
+    await page.locator('#battle-leave').click()
     await expect(page.locator('#menu')).toBeVisible()
 
     // Asset Viewer → the debug browsers and back.

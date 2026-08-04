@@ -244,14 +244,36 @@
         padding: 12px 24px;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
       }
-      #game-stub {
+      #battle {
         flex: 1;
         display: flex;
         flex-direction: column;
+        min-height: 0;
+        gap: 12px;
+      }
+      #battle-toolbar {
+        display: flex;
+        gap: 12px;
         align-items: center;
-        justify-content: center;
-        gap: 16px;
-        color: var(--muted);
+      }
+      #battle-toolbar button {
+        padding: 6px 14px;
+        font-size: 13px;
+      }
+      #battle-hud {
+        color: var(--text);
+        font-size: 14px;
+        font-family: Consolas, monospace;
+      }
+      #battle-canvas {
+        flex: 1;
+        min-height: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      #battle-canvas canvas {
+        display: block;
       }
       .hidden {
         display: none !important;
@@ -289,9 +311,13 @@
           <button id="menu-exit">Exit</button>
         </div>
       </div>
-      <div id="game-stub" class="hidden">
-        <p>New Game — the battle scene arrives in a later phase.</p>
-        <button id="stub-back">&larr; Back to menu</button>
+      <div id="battle" class="hidden">
+        <div id="battle-toolbar">
+          <button id="battle-leave">&larr; Menu</button>
+          <button id="battle-end-turn">End Turn</button>
+          <span id="battle-hud"></span>
+        </div>
+        <div id="battle-canvas"></div>
       </div>
       <div id="file-list" class="hidden"></div>
       <div id="archive-view" class="hidden">

@@ -20,8 +20,12 @@ first (`000/foundation.spec.ts` before `000/model-viewer.spec.ts`).
   don't care about any of this, which is exactly why it is phase zero.
 - Folders from `001/` up are engine milestones — things a player could point
   at; parsers rendering a debug pig do not count. `001/` is the game's frame:
-  the main menu wearing the original frontend art (New Game → stub until the
-  battle phases, Asset Viewer → the phase-000 browsers, Exit → quits).
+  the main menu wearing the original frontend art (New Game → the battle,
+  Asset Viewer → the phase-000 browsers, Exit → quits). `002/` is the first
+  battle slice: the Game domain model (players, squads, turn rotation —
+  pinned by a pure-logic spec that runs with no Electron at all) and the
+  battle scene New Game opens: squads spawned on walkable ARCHI ground, a
+  turn HUD, End Turn rotating pigs, the camera following the active one.
 - Specs at the `e2e/` root without a number (`cli-game-dir.spec.ts`) are
   standalone utilities: they build their own sandbox and must not depend on
   any phase.
