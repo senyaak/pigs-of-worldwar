@@ -101,6 +101,11 @@ export class Game {
     return true
   }
 
+  /** Involuntary displacement — sliding, knockback: no budget is paid. */
+  displaceCurrentPig(x: number, z: number): void {
+    this.currentPig.position = { x, z }
+  }
+
   /** Hand over to the next player; their squad advances to its next pig. */
   endTurn(): void {
     const player = this.currentPlayer

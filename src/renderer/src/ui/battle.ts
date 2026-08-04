@@ -31,12 +31,15 @@ export function initBattle(onLeave: () => void): BattleView {
 
   let game: Game | null = null
   let scene: BattleScene | null = null
+  let query: TerrainQuery | null = null
 
   const updateHudText = (): void => {
     if (!game) return
+    const { x, z } = game.currentPig.position
+    const swimming = query?.isWater(x, z) ? ', swimming' : ''
     hudEl.textContent =
       `Turn ${game.turn} — ${game.currentPlayer.name}: ${game.currentPig.name} ` +
-      `(${game.currentPig.health} hp, move ${Math.round(game.remainingMove)})`
+      `(${game.currentPig.health} hp, move ${Math.round(game.remainingMove)}${swimming})`
   }
 
   const updateHud = (): void => {
@@ -95,7 +98,7 @@ export function initBattle(onLeave: () => void): BattleView {
         return false
       }
 
-      const query = new TerrainQuery(terrainResult.blocks)
+      query = new TerrainQuery(terrainResult.blocks)
       const pigCount = SQUADS.reduce((sum, s) => sum + s.pigNames.length, 0)
       game = new Game({ players: SQUADS, spawns: query.pickSpawns(pigCount) })
 

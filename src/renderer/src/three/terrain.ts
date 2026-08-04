@@ -107,7 +107,9 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
       [col + 1, row + 1]
     ].map(([c, r]) => [
       block.x + c * TILE_STEP,
-      block.heights[r * VERTS + c],
+      // PMG heights are elevation (up-positive — verified: water sits at
+      // the small values); the game's Y axis points down.
+      -block.heights[r * VERTS + c],
       block.z - r * TILE_STEP
     ])
     const uv = tileUvs(tile.rotateFlip)

@@ -34,6 +34,12 @@ export interface BattleScene {
 
 const PIG_HEADING_OFFSET = Math.PI // model faces -z in its own space
 const WALK_SPEED = 900 // world units per second (tile = 512)
+const SWIM_SPEED = WALK_SPEED / 2
+const SLIDE_SPEED = 1400
+/** How deep a swimming pig sits below the surface (game Y-down: +down). */
+const SWIM_SINK = 110
+/** The stumble-in-place moment before a slide takes hold. */
+const SLIP_STAGGER_SECONDS = 0.45
 
 export function buildBattle(
   host: SceneHost,
@@ -102,30 +108,71 @@ export function buildBattle(
     host.camera.near = 10
     host.camera.far = 100_000
     host.camera.updateProjectionMatrix()
-    host.camera.position.set(target.x, target.y + 1500, target.z + 2600)
+    // Keep the camera above the ground at its own position — a pig walking
+    // behind a hill must not bury the view inside the slope.
+    const camZ = target.z + 2600
+    const terrainAtCamera = -query.height(target.x, -camZ)
+    const camY = Math.max(target.y + 1500, terrainAtCamera + 600)
+    host.camera.position.set(target.x, camY, camZ)
     host.camera.lookAt(target)
   }
+
+  /** Sync a pig's node to its game position, sunk a little when swimming. */
+  const settle = (entry: PigEntry): void => {
+    const { x, z } = entry.pig.position
+    const sink = query.isWater(x, z) ? SWIM_SINK : 0
+    entry.node.position.set(x, query.height(x, z) + sink, z)
+  }
+
+  /** Stagger timer: > 0 means the pig is scrabbling in place before the
+   * slide takes hold (reset whenever it reaches holding ground). */
+  let stagger = 0
 
   const walk = (delta: number): void => {
     const active = pigMeshes.find((entry) => entry.pig === game.currentPig)
     if (!active) return
     // A pig that stopped being active mid-stride stops walking.
     for (const entry of pigMeshes) if (entry !== active) setWalking(entry, false)
+
+    const { x: px, z: pz } = active.pig.position
+    const slip = query.slipDirection(px, pz)
+    if (slip) {
+      // Steep ground: a short scramble on the spot, then the slide — no
+      // budget is paid for going where nobody wanted to go.
+      setWalking(active, true)
+      stagger += delta
+      if (stagger >= SLIP_STAGGER_SECONDS) {
+        const step = SLIDE_SPEED * delta
+        const x = px + slip.x * step
+        const z = pz + slip.z * step
+        if (query.walkable(x, z)) {
+          game.displaceCurrentPig(x, z)
+          settle(active)
+          focus(active.pig)
+          onGameChanged()
+        }
+      }
+      return
+    }
+    stagger = 0
+
     const length = Math.hypot(intent.x, intent.z)
     if (length === 0 || game.remainingMove <= 0) {
       setWalking(active, false)
       return
     }
-    const step = Math.min(WALK_SPEED * delta, game.remainingMove)
-    const x = active.pig.position.x + (intent.x / length) * step
-    const z = active.pig.position.z + (intent.z / length) * step
+    const swimming = query.isWater(px, pz)
+    const speed = swimming ? SWIM_SPEED : WALK_SPEED
+    const step = Math.min(speed * delta, game.remainingMove)
+    const x = px + (intent.x / length) * step
+    const z = pz + (intent.z / length) * step
     const heading = Math.atan2(intent.x, intent.z)
     if (!query.walkable(x, z) || !game.moveCurrentPig(x, z, step, heading)) {
       setWalking(active, false)
       return
     }
     setWalking(active, true)
-    active.node.position.set(x, query.height(x, z), z)
+    settle(active)
     active.node.rotation.y = heading + PIG_HEADING_OFFSET
     focus(active.pig)
     onGameChanged()

@@ -2,10 +2,15 @@
 // picking. Pure — works on the parsed PMG blocks (lib/formats/pmg.ts).
 
 import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP, TILE_WALL, TILE_WATER, VERTS_PER_SIDE } from '../formats/pmg'
-import type { TerrainBlock } from '../formats/pmg'
+import type { TerrainBlock, TerrainTile } from '../formats/pmg'
 import type { PigSpawn } from './game'
 
 const BLOCK_SPAN = TILES_PER_SIDE * TILE_STEP
+
+// The tile slip byte marks sliding ground (0 holds, 1-8 are direction hints
+// per how-doc's MapTileSlip). The hints disagree with the actual slopes on
+// some CAMP tiles, so the slide direction is taken from the terrain gradient
+// instead — physics over metadata.
 
 export class TerrainQuery {
   private readonly minX: number
@@ -24,8 +29,16 @@ export class TerrainQuery {
     }
   }
 
-  /** Ground height at world (x, z), bilinear over the vertex grid. */
+  /**
+   * Ground level at world (x, z) in GAME coordinates (Y down), bilinear
+   * over the vertex grid. PMG stores elevation up-positive (verified:
+   * water sits at the small values), hence the negation.
+   */
   height(x: number, z: number): number {
+    return -this.elevation(x, z)
+  }
+
+  private elevation(x: number, z: number): number {
     const col = Math.floor((x - this.minX) / BLOCK_SPAN)
     const row = Math.floor((this.maxZ - z) / BLOCK_SPAN)
     const block = this.grid[row]?.[col]
@@ -43,23 +56,52 @@ export class TerrainQuery {
     return top * (1 - tz) + bottom * tz
   }
 
-  /** Is the tile under world (x, z) ordinary ground (no water/wall)? */
-  walkable(x: number, z: number): boolean {
+  private tileAt(x: number, z: number): TerrainTile | null {
     const col = Math.floor((x - this.minX) / BLOCK_SPAN)
     const row = Math.floor((this.maxZ - z) / BLOCK_SPAN)
     const block = this.grid[row]?.[col]
-    if (!block) return false
+    if (!block) return null
     const tx = Math.min(Math.floor((x - block.x) / TILE_STEP), TILES_PER_SIDE - 1)
     const tz = Math.min(Math.floor((block.z - z) / TILE_STEP), TILES_PER_SIDE - 1)
-    const tile = block.tiles[tz * TILES_PER_SIDE + tx]
-    return (tile.type & (TILE_WATER | TILE_WALL)) === 0
+    return block.tiles[tz * TILES_PER_SIDE + tx]
   }
 
-  /** A comfortable place to stand: this tile and its neighbors walkable,
-   * and the ground near-flat (no trench parapets, no wall tops). */
+  /** May a pig BE at (x, z)? Walls (and the void) say no; water is fine —
+   * pigs swim (the caller decides what that means for speed and depth). */
+  walkable(x: number, z: number): boolean {
+    const tile = this.tileAt(x, z)
+    return tile !== null && (tile.type & TILE_WALL) === 0
+  }
+
+  /** Is (x, z) water — swimming, not walking? */
+  isWater(x: number, z: number): boolean {
+    const tile = this.tileAt(x, z)
+    return tile !== null && (tile.type & TILE_WATER) !== 0
+  }
+
+  /**
+   * The downhill direction a pig slides at (x, z), or null when the ground
+   * holds — either the tile is not slippery or it is flat after all.
+   */
+  slipDirection(x: number, z: number): { x: number; z: number } | null {
+    const tile = this.tileAt(x, z)
+    if (!tile || tile.slip === 0) return null
+    // Steepest descent: game Y grows downward, so downhill is +gradient of
+    // height(). Central differences over half a tile.
+    const e = TILE_STEP / 2
+    const dx = this.height(x + e, z) - this.height(x - e, z)
+    const dz = this.height(x, z + e) - this.height(x, z - e)
+    const length = Math.hypot(dx, dz)
+    if (length < 1) return null
+    return { x: dx / length, z: dz / length }
+  }
+
+  /** A comfortable place to stand: this tile and its neighbors dry and
+   * walkable, no slide, and the ground near-flat (no trench parapets). */
   standable(x: number, z: number): boolean {
+    if (this.slipDirection(x, z) !== null) return false
     for (const [dx, dz] of [[0, 0], [-TILE_STEP, 0], [TILE_STEP, 0], [0, -TILE_STEP], [0, TILE_STEP]]) {
-      if (!this.walkable(x + dx, z + dz)) return false
+      if (!this.walkable(x + dx, z + dz) || this.isWater(x + dx, z + dz)) return false
     }
     const half = TILE_STEP / 2
     const corners = [

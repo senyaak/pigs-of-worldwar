@@ -63,9 +63,59 @@ test('a game refuses mismatched spawns or a lonely player', () => {
   expect(() => new Game({ players: [config.players[0]], spawns: config.spawns.slice(0, 4) })).toThrow(/two players/)
 })
 
-test('spawns on the real CAMP (the battle map): walkable, apart, split west/east', () => {
+function campQuery(): { query: TerrainQuery; blocks: ReturnType<typeof parsePmg> } {
   const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG')))
-  const query = new TerrainQuery(blocks)
+  return { query: new TerrainQuery(blocks), blocks }
+}
+
+/** World centers of every tile matching `want`, straight from the data. */
+function tileCenters(
+  blocks: ReturnType<typeof parsePmg>,
+  want: (tile: { type: number; slip: number }) => boolean
+): { x: number; z: number }[] {
+  const centers: { x: number; z: number }[] = []
+  for (const block of blocks) {
+    block.tiles.forEach((tile, index) => {
+      if (!want(tile)) return
+      const col = index % 4
+      const row = Math.floor(index / 4)
+      centers.push({ x: block.x + col * 512 + 256, z: block.z - row * 512 - 256 })
+    })
+  }
+  return centers
+}
+
+test('water on CAMP: swimmable (walkable but wet), never standable', () => {
+  const { query, blocks } = campQuery()
+  const ponds = tileCenters(blocks, (tile) => (tile.type & 0x20) !== 0)
+  expect(ponds.length).toBeGreaterThan(50)
+  for (const pond of ponds) {
+    expect(query.isWater(pond.x, pond.z), `water at ${pond.x},${pond.z}`).toBe(true)
+    expect(query.walkable(pond.x, pond.z), 'pigs can swim there').toBe(true)
+    expect(query.standable(pond.x, pond.z), 'but never spawn there').toBe(false)
+  }
+})
+
+test('slip tiles on CAMP slide, and the slide goes downhill', () => {
+  const { query, blocks } = campQuery()
+  const slips = tileCenters(blocks, (tile) => tile.slip !== 0)
+  expect(slips.length).toBeGreaterThan(10)
+  let sliding = 0
+  for (const at of slips) {
+    const direction = query.slipDirection(at.x, at.z)
+    if (!direction) continue // a flat slip tile holds after all
+    sliding++
+    expect(Math.hypot(direction.x, direction.z)).toBeCloseTo(1)
+    // Downhill: elevation drops (game-Y height() grows) along the slide.
+    const here = query.height(at.x, at.z)
+    const ahead = query.height(at.x + direction.x * 256, at.z + direction.z * 256)
+    expect(ahead, `downhill at ${at.x},${at.z}`).toBeGreaterThan(here)
+  }
+  expect(sliding, 'most slip tiles actually slope').toBeGreaterThan(slips.length * 0.8)
+})
+
+test('spawns on the real CAMP (the battle map): walkable, apart, split west/east', () => {
+  const { query } = campQuery()
   const spawns = query.pickSpawns(8)
   expect(spawns).toHaveLength(8)
   for (const spawn of spawns) {

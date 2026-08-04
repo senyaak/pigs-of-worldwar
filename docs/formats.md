@@ -159,6 +159,16 @@ Per tile: bytes 0–5 zero, byte 6 = type (`0x1F` mask type, `0x20` water,
 rotate/flip flags (`1` FlipX, `2` Rotate90, `4` Rotate180), bytes 11–14 =
 u32 texture index into the sibling PTG, byte 15 zero.
 
+Vertex heights are **elevation, up-positive** (found here) — the opposite of
+the models' Y-down vertices: water tiles sit at the small values on every map
+checked (ARCHI sea ≈ 132 vs land ≈ 1337). An engine in Y-down space must
+negate them.
+
+The slip byte marks sliding ground; nonzero values are direction hints
+(how-doc's `MapTileSlip`: 1 Bottom … 8 TopRight), but on CAMP some hints
+point across or up the actual slope — deriving the slide from the terrain
+gradient matches the geometry better.
+
 **PTG — ground textures**: u32 count, then `count` equal-sized TIMs —
 `(fileSize − 4) / count` bytes each (verified: ARCHI.PTG = 238 × 576-byte
 32×32 4-bit TIMs).
