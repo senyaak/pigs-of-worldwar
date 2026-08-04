@@ -74,18 +74,24 @@ export function parseModel(
     corner++
   }
 
+  // Corner orders are empirical (docs/formats.md): faces are stored reversed
+  // relative to their NO2 normals (ACB agrees for 516/536 of pcace_hi's lone
+  // triangles), and quad corners are PERIMETER-ordered ABCD — the split must
+  // share the AC diagonal (ACB + ADC). A strip-style split shares a perimeter
+  // edge instead: the halves overlap and leave notch-shaped holes on every
+  // curved surface. Windings agree with NO2 in the game's own Y-down space;
+  // the viewer mirrors Y and reverses winding again.
   for (let i = 0; i < sourceTriangles; i++) {
     // 6 bytes of UVs, then 3 u16 vertex indices, then 3 u16 normal indices.
     const o = FAC_HEADER + 4 + i * FAC_TRI + 6
-    for (let c = 0; c < 3; c++) emit(facView.getUint16(o + c * 2, true), facView.getUint16(o + 6 + c * 2, true))
+    for (const c of [0, 2, 1]) emit(facView.getUint16(o + c * 2, true), facView.getUint16(o + 6 + c * 2, true))
   }
   for (let i = 0; i < sourceQuads; i++) {
     // 8 bytes of UVs, then 4 u16 vertex indices, then 4 u16 normal indices.
     const o = trianglesEnd + 4 + i * FAC_QUAD + 8
     const v = [0, 1, 2, 3].map((c) => facView.getUint16(o + c * 2, true))
     const n = [0, 1, 2, 3].map((c) => facView.getUint16(o + 8 + c * 2, true))
-    // PSX-style quads are strip-ordered: ABCD → triangles ABC and BDC.
-    for (const c of [0, 1, 2, 1, 3, 2]) emit(v[c], n[c])
+    for (const c of [0, 2, 1, 0, 3, 2]) emit(v[c], n[c])
   }
 
   return { positions, normals, boneIndices, triangleCount, sourceTriangles, sourceQuads, vertexCount }

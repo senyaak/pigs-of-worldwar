@@ -1,7 +1,11 @@
 // Three.js model viewer: one scene, swapped meshes.
 //
-// The game's coordinate system is PSX-era Y-down, so the mesh is flipped on Y;
-// that mirrors the winding, which is why the material renders both sides.
+// The game's coordinate system is PSX-era Y-down. The conversion to three's
+// Y-up is baked into the geometry: Y is negated on positions and normals, and
+// the triangle winding is reversed to keep faces front-facing (a mirror flips
+// handedness). Doing this with mesh.scale.y = -1 instead turns every face
+// back-facing, and the double-sided shader then re-flips the perfectly good
+// normals — which is how half the pig went dark.
 
 import * as THREE from 'three'
 import type { Model } from './api'
@@ -49,20 +53,35 @@ export function showModel(container: HTMLElement, model: Model): void {
     ;(mesh.material as THREE.Material).dispose()
   }
 
+  const cornerCount = model.positions.length / 3
+  const positions = new Float32Array(model.positions.length)
+  const normals = new Float32Array(model.normals.length)
+  const swap = [0, 2, 1]
+  for (let corner = 0; corner < cornerCount; corner++) {
+    const triangle = Math.floor(corner / 3)
+    const src = (triangle * 3 + swap[corner % 3]) * 3
+    const dst = corner * 3
+    positions[dst] = model.positions[src]
+    positions[dst + 1] = -model.positions[src + 1]
+    positions[dst + 2] = model.positions[src + 2]
+    normals[dst] = model.normals[src]
+    normals[dst + 1] = -model.normals[src + 1]
+    normals[dst + 2] = model.normals[src + 2]
+  }
+
   const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.BufferAttribute(model.positions, 3))
-  geometry.setAttribute('normal', new THREE.BufferAttribute(model.normals, 3))
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
 
   const material = new THREE.MeshStandardMaterial({ color: 0xe8a2a2, side: THREE.DoubleSide })
   mesh = new THREE.Mesh(geometry, material)
-  mesh.scale.y = -1
 
   // Center on the bounding box and back the camera off proportionally.
   geometry.computeBoundingBox()
   const box = geometry.boundingBox as THREE.Box3
   const center = box.getCenter(new THREE.Vector3())
   const size = box.getSize(new THREE.Vector3()).length()
-  mesh.position.set(-center.x, center.y, -center.z)
+  mesh.position.set(-center.x, -center.y, -center.z)
 
   if (scene && camera) {
     scene.add(mesh)
