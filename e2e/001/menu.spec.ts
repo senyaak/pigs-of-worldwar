@@ -111,7 +111,9 @@ test('closing the window quits the app cleanly too', async () => {
   const closed = launched.app.waitForEvent('close')
   await expect(page.locator('#menu')).toBeVisible()
   expect(launched.errors).toEqual([])
-  await page.evaluate(() => window.close())
+  // Same as Exit: the call tears the page down under Playwright's feet, so
+  // a "target closed" rejection here IS the success path.
+  await page.evaluate(() => window.close()).catch(() => undefined)
   await closed
   expect(await exited, 'window-all-closed shut the app down').toBe(0)
 })

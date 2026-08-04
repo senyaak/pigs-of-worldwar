@@ -130,11 +130,30 @@ keyframes (entry length / 272 = frame count):
 how-doc calls the rotations quaternions; on real data they are **not** (found
 here): the fourth float of every bone is exactly 1.0 in every frame while the
 first three range over ±π. They are **euler angles in radians** plus a
-constant. Order XYZ applied in the game's Y-down space produces coherent
-poses (verified visually on clips #001/#005 — limbs stay attached and move
-plausibly). Playback rate is a guess (25 fps); the branch positions are small
-per-frame deltas whose exact meaning is still uninvestigated — clips play
-fine with rotations alone, minus root motion.
+constant. The exact convention (solved in `pigs-disasm/anim/`, three
+independent tests on the shipped data):
+
+```
+local = Rx(-x) · Ry(-y) · Rz(-z)      applied PARENT-RELATIVE
+```
+
+- **Negated** — the game's matrices are row-major (row-vector × matrix), the
+  transpose of a column-vector engine's; for a rotation, transpose = negate.
+  Only negated do the arms hang down out of the T-pose bind instead of
+  sticking up. Legs never show it — their bind direction is already down,
+  which is how the bug hid.
+- **Parent-relative**, not absolute: in clip 4 "Turning on Spot" the hip is
+  all zeros while the limbs move, so body yaw lives on the object.
+- **XYZ order** — motion capture is smooth, and XYZ minimises frame-to-frame
+  joint travel by a wide margin (10818 vs 11977 for the runner-up).
+
+The model's forward axis is **+X**: the leg-swing axis is Z (run cycle,
+upper-leg L/R correlation −0.887, anti-phase), and rotating a +Y leg about Z
+swings it along X.
+
+Playback rate is a guess (25 fps); the branch positions are small per-frame
+deltas whose exact meaning is still uninvestigated — clips play fine with
+rotations alone, minus root motion.
 
 **Clip indices are known** (recovered from the exe's debug-name pointer
 table — pigs-disasm/animations/notes.md): 0 run, 3 walk backwards, 4 turn on

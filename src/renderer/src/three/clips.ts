@@ -13,39 +13,24 @@ import type { Pig } from './pig'
 const FPS = 25
 const BONE_COUNT = 15
 
-// The MCAP rotation convention is not fully pinned down. The three per-bone
-// floats are angles in radians, but which euler order / axis encoding, and
-// whether they are parent-relative or absolute model-space, is still under
-// investigation — the game applies them in LIMB-ALIGNED bone frames, while
-// our bones are world-axis-aligned, so no single reading here is exact yet.
-// window.__ROT_MODE__ switches interpretations for eyeballing against the
-// real game (values: xyz|zyx|yxz|xzy|yzx|zxy|axis, optional "a" prefix =
-// absolute). Default xyz. Removing this needs the game's skeletal-apply
-// routine disassembled (statically linked in warhogs_.exe's anim lib).
-type RotMode = string
-function rotMode(): RotMode {
-  return (globalThis as { __ROT_MODE__?: RotMode }).__ROT_MODE__ ?? 'xyz'
-}
-function isAbsolute(): boolean {
-  return rotMode().startsWith('a') && rotMode() !== 'axis'
-}
-function baseMode(): string {
-  const m = rotMode()
-  return m.startsWith('a') && m !== 'axis' ? m.slice(1) : m
-}
+// The MCAP rotation convention, settled by analysis of the shipped data
+// (pigs-disasm/anim/, three independent tests):
+//
+//   local = Rx(-x) · Ry(-y) · Rz(-z),  applied PARENT-RELATIVE.
+//
+// * NEGATED — the game's matrices are row-major (row-vector × matrix), the
+//   transpose of three's convention; for a rotation, transpose = negate.
+//   Only negated do the arms hang down out of the T-pose bind instead of
+//   sticking up (solve-convention.js).
+// * PARENT-RELATIVE, not absolute model space — in "Turning on Spot" the hip
+//   is all zeros while the limbs move, so the body yaw is not baked into
+//   every bone (solve-hierarchy.js).
+// * XYZ order — motion capture is smooth, and XYZ minimises frame-to-frame
+//   joint travel by a wide margin over the other five orders
+//   (solve-order.js: 10818 vs 11977 for the runner-up).
+const EULER_ORDER = 'XYZ' as const
 function decodeRotation(x: number, y: number, z: number, out: THREE.Quaternion): void {
-  const mode = baseMode()
-  if (mode === 'axis') {
-    // Rotation vector: direction = axis, length = angle (radians).
-    const angle = Math.hypot(x, y, z)
-    if (angle < 1e-6) {
-      out.set(0, 0, 0, 1)
-      return
-    }
-    out.setFromAxisAngle(new THREE.Vector3(x / angle, y / angle, z / angle), angle)
-    return
-  }
-  out.setFromEuler(new THREE.Euler(x, y, z, mode.toUpperCase() as 'XYZ'))
+  out.setFromEuler(new THREE.Euler(-x, -y, -z, EULER_ORDER))
 }
 
 export interface Player {
@@ -67,36 +52,19 @@ export function createPlayer(pig: Pig): Player {
         return
       }
       const boneCount = Math.min(BONE_COUNT, pig.bones.length)
-      const parentOf = pig.bones.map((b) => pig.bones.indexOf(b.parent as THREE.Bone))
-      const absolute = isAbsolute()
       const times = Array.from({ length: clip.frameCount }, (_, frame) => frame / FPS)
 
-      // Per bone, per frame, the LOCAL quaternion to store.
-      const local: THREE.Quaternion[][] = Array.from({ length: boneCount }, () => [])
-      const world = new THREE.Quaternion()
-      for (let frame = 0; frame < clip.frameCount; frame++) {
-        const frameWorld: THREE.Quaternion[] = []
-        for (let bone = 0; bone < boneCount; bone++) {
-          const o = (frame * BONE_COUNT + bone) * 3
-          decodeRotation(clip.rotations[o], clip.rotations[o + 1], clip.rotations[o + 2], world)
-          frameWorld[bone] = world.clone()
-          if (absolute) {
-            const parent = parentOf[bone]
-            local[bone].push(
-              parent >= 0 && parent < bone
-                ? frameWorld[parent].clone().invert().multiply(frameWorld[bone])
-                : frameWorld[bone].clone()
-            )
-          } else {
-            local[bone].push(frameWorld[bone].clone())
-          }
-        }
-      }
-
+      // Stored rotations are already parent-relative, which is exactly what
+      // three's bone hierarchy wants — no conversion needed.
       const tracks: THREE.KeyframeTrack[] = []
+      const quaternion = new THREE.Quaternion()
       for (let bone = 0; bone < boneCount; bone++) {
         const values: number[] = []
-        for (const q of local[bone]) values.push(q.x, q.y, q.z, q.w)
+        for (let frame = 0; frame < clip.frameCount; frame++) {
+          const o = (frame * BONE_COUNT + bone) * 3
+          decodeRotation(clip.rotations[o], clip.rotations[o + 1], clip.rotations[o + 2], quaternion)
+          values.push(quaternion.x, quaternion.y, quaternion.z, quaternion.w)
+        }
         // Tracks bind by the bone names pig.ts assigns (bone_0 … bone_14).
         tracks.push(
           new THREE.QuaternionKeyframeTrack(`${pig.bones[bone].name}.quaternion`, times, values)
