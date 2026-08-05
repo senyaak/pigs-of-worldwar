@@ -183,6 +183,11 @@ export function slopePull(normal: Velocity, friction: number, gravity: number, s
   // lands there comes to rest. Without this the pull is a constant that a
   // speed-proportional friction can never balance, and a landed pig creeps
   // downhill for ever — which is what it did.
+  //
+  // The angle this holds to is atan(friction): about 14 degrees on its feet,
+  // 8.5 fresh off a wall. The exe MULTIPLIES the two bodies' coefficients,
+  // and the ground's own material is not decoded — if it is not 1, both
+  // angles are shallower than this.
   if (Math.hypot(normal.x, normal.z) <= friction * Math.abs(normal.y)) {
     return { x: 0, y: 0, z: 0 }
   }

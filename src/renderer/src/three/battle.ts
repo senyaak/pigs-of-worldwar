@@ -211,7 +211,6 @@ export function buildBattle(
       game.endTurn()
       airborne = null
       jumpRequested = false
-    jumpReadyIn = Math.max(0, jumpReadyIn - delta)
       jumpReadyIn = 0
       wedgedSeconds = 0
       bounciness = FREE
@@ -304,10 +303,18 @@ export function buildBattle(
           )
           active.node.position.set(at.x, ground, at.z)
           const rebound = -hit.y
-          airborne =
-            rebound > GRAVITY * delta
-              ? { ...airborne, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true }
-              : { ...airborne, vx: hit.x, vy: 0, vz: hit.z, bouncing: true, grounded: true }
+          const carried = Math.hypot(hit.x, hit.z)
+          if (rebound > GRAVITY * delta) {
+            airborne = { ...airborne, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true }
+          } else if (carried < SLIDE_STOP) {
+            // Came down with nothing left along the ground: it landed, it did
+            // not tumble. Anything else gives every ordinary jump a little
+            // skid at the end of it.
+            airborne = null
+            settle(active)
+          } else {
+            airborne = { ...airborne, vx: hit.x, vy: 0, vz: hit.z, bouncing: true, grounded: true }
+          }
         } else {
           active.node.position.set(at.x, y, at.z)
         }
@@ -361,6 +368,7 @@ export function buildBattle(
       }
     }
     jumpRequested = false
+    jumpReadyIn = Math.max(0, jumpReadyIn - delta)
 
     // Wedged is either of two things: shoving at a wall that will not let
     // the step through, or standing inside one — the original asks
@@ -385,7 +393,7 @@ export function buildBattle(
         wedgedSeconds = 0
       }
     }
-    bounciness = easeBounciness(bounciness, wedged, airborne === null, delta)
+    bounciness = easeBounciness(bounciness, wedged, airborne === null || airborne.grounded, delta)
 
     // Marker and camera trail the pig every frame.
     const ground = query.height(active.pig.position.x, active.pig.position.z)

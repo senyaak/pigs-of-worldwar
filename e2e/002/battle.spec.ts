@@ -154,6 +154,18 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   const airborne = await debugState(page)
   expect(airborne.nodeY, 'jump left the ground').toBeLessThan(turned.nodeY - 50)
 
+  // And it recharges. The cooldown once ticked down inside the turn-change
+  // block, where the next line reset it — so a pig could jump exactly once
+  // per turn and never again.
+  await expect
+    .poll(async () => (await debugState(page)).nodeY, { message: 'back on the ground' })
+    .toBeGreaterThan(airborne.nodeY + 50)
+  await page.waitForTimeout(600)
+  const standing = await debugState(page)
+  await tap(page, 'jump')
+  await page.waitForTimeout(120)
+  expect((await debugState(page)).nodeY, 'jumped a second time').toBeLessThan(standing.nodeY - 50)
+
   expect(app.errors()).toEqual([])
 })
 
