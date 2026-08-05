@@ -29,20 +29,48 @@ const FRICTION_STEP = 0x15e / FIXED
 const RESTITUTION_STEP = 0x199 / FIXED
 
 /**
- * The GROUND's own material, which the solver multiplies the pig's by.
+ * The GROUND's material, which the solver multiplies the pig's by — and it
+ * is not one pair but one PER TERRAIN TYPE.
  *
- * The collision manager's constructor (exe 0x414f50) builds the landscape
- * body and hands it to 0x416560 — `[ecx+58h] = arg1; [ecx+5ch] = arg2`, the
- * very fields the solver reads — with 0x3e4ccccd and 0x3f333333. Plain
- * floats this time, not the pig's 1/4096 fixed point.
+ * The collision manager's constructor (exe 0x414f50) gives the landscape
+ * body 0.2 / 0.7 as a default, but the landscape collider replaces it at
+ * every contact: `0x415590` reads the tile type out of the map and calls the
+ * same setter with a pair looked up from the table at 0x4c0088, two uint16s
+ * per type scaled by 0x4bc2e0 = 1/4096. Only the first twelve entries are
+ * the table; past type 11 the bytes are something else.
  *
- * That body is `[4de9d0]+0ch`: the one `TryMove`'s dispatch compares its
- * single hit against. Which settles what that comparison means, and with it
- * the rule the whole page rests on — hitting only the landscape IS the
- * successful walk.
+ * The body carrying that material is `[4de9d0]+0ch`, the one `TryMove`'s
+ * dispatch compares its single hit against — which is how the landscape got
+ * identified in the first place.
  */
-export const GROUND_FRICTION = 0.2
-export const GROUND_RESTITUTION = 0.7
+export const TILE_MATERIALS: Bounciness[] = [
+  { friction: 1638 / FIXED, restitution: 1638 / FIXED },
+  { friction: 2048 / FIXED, restitution: 1638 / FIXED },
+  { friction: 2457 / FIXED, restitution: 1802 / FIXED },
+  { friction: 2048 / FIXED, restitution: 1802 / FIXED },
+  { friction: 3686 / FIXED, restitution: 409 / FIXED },
+  { friction: 2457 / FIXED, restitution: 1802 / FIXED },
+  { friction: 2457 / FIXED, restitution: 1802 / FIXED },
+  { friction: 2457 / FIXED, restitution: 409 / FIXED },
+  { friction: 409 / FIXED, restitution: 819 / FIXED },
+  { friction: 819 / FIXED, restitution: 819 / FIXED },
+  { friction: 2457 / FIXED, restitution: 409 / FIXED },
+  { friction: 3686 / FIXED, restitution: 409 / FIXED }
+]
+
+/** What the landscape becomes where `Map::IsBlocked` says yes (exe 0x41564c):
+ * all but frictionless, and all but perfectly elastic. This is what throws a
+ * pig back out of a wall — not a refusal, a surface. */
+export const WALL_MATERIAL: Bounciness = { friction: 0.01, restitution: 0.99 }
+
+/** The constructor's default, before any tile replaces it (exe 0x41537e). */
+export const GROUND_DEFAULT: Bounciness = { friction: 0.2, restitution: 0.7 }
+
+/** The ground a pig is standing on, by tile type and whether it is a wall. */
+export function groundMaterial(tileType: number, blocked: boolean): Bounciness {
+  if (blocked) return WALL_MATERIAL
+  return TILE_MATERIALS[tileType & 0x1f] ?? GROUND_DEFAULT
+}
 
 /** Below this bounciness a landing does not bounce at all (exe 0xcc). */
 export const RESTITUTION_MIN = 0xcc / FIXED
@@ -179,11 +207,11 @@ export interface Velocity {
  * The ground is immovable, so its own coefficients are 1 and the pig's are
  * the product.
  */
-export function bounceOff(v: Velocity, restitutionIn: number, frictionIn: number, normal: Velocity): Velocity {
+export function bounceOff(v: Velocity, pig: Bounciness, ground: Bounciness, normal: Velocity): Velocity {
   // Both coefficients are the PRODUCT of the two bodies' — `fmul [ebx+5ch]`
-  // and `fmul [ebx+58h]` at 0x40f690 — and the other body is the ground.
-  const restitution = restitutionIn * GROUND_RESTITUTION
-  const friction = frictionIn * GROUND_FRICTION
+  // and `fmul [ebx+58h]` at 0x40f690.
+  const restitution = pig.restitution * ground.restitution
+  const friction = pig.friction * ground.friction
   const vn = v.x * normal.x + v.y * normal.y + v.z * normal.z
   // Leaving the surface already: nothing to respond to.
   if (vn >= 0) return v

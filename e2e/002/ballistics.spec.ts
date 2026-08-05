@@ -18,8 +18,10 @@ import {
   FRICTION_FREE,
   FRICTION_STUCK,
   BOUNCE_CUTOFF,
-  GROUND_FRICTION,
-  GROUND_RESTITUTION,
+  GROUND_DEFAULT,
+  TILE_MATERIALS,
+  WALL_MATERIAL,
+  groundMaterial,
   bounceOff,
   bounceSpeed,
   easeBounciness,
@@ -84,7 +86,7 @@ test('a hit reflects across the normal and keeps what runs along the surface', (
   const FLAT = { x: 0, y: -1, z: 0 } // game space: up is -y
   const down = { x: 300, y: 900, z: 0 } // moving forward AND falling
 
-  const hit = bounceOff(down, RESTITUTION_STUCK, 0, FLAT)
+  const hit = bounceOff(down, { friction: 0, restitution: RESTITUTION_STUCK }, GROUND_DEFAULT, FLAT)
   // The normal part came back up — that is the bounce.
   expect(hit.y).toBeLessThan(0)
   // …and damped: a bounce is a hop, never a relaunch.
@@ -96,11 +98,11 @@ test('a hit reflects across the normal and keeps what runs along the surface', (
   expect(hit.z).toBeCloseTo(0)
 
   // Friction is what eats the tangential part, nothing else.
-  expect(bounceOff(down, RESTITUTION_STUCK, 0.25 / GROUND_FRICTION, FLAT).x).toBeCloseTo(down.x * 0.75)
+  expect(bounceOff(down, { friction: 0.25 / GROUND_DEFAULT.friction, restitution: RESTITUTION_STUCK }, GROUND_DEFAULT, FLAT).x).toBeCloseTo(down.x * 0.75)
 
   // Already leaving the surface: no response at all.
   const up = { x: 300, y: -900, z: 0 }
-  expect(bounceOff(up, RESTITUTION_STUCK, 0.25, FLAT)).toEqual(up)
+  expect(bounceOff(up, { friction: 0.25, restitution: RESTITUTION_STUCK }, GROUND_DEFAULT, FLAT)).toEqual(up)
 })
 
 test('gravity along a slope is what keeps a landed pig moving', () => {
@@ -142,21 +144,30 @@ test('the landing threshold is the exe own 25 a frame, not a number we liked', (
   const FLAT = { x: 0, y: -1, z: 0 }
   const soft = { x: 0, y: BOUNCE_CUTOFF * 0.9, z: 0 }
   const hard = { x: 0, y: BOUNCE_CUTOFF * 1.1, z: 0 }
-  expect(bounceOff(soft, RESTITUTION_STUCK, 0, FLAT).y, 'a soft landing lands').toBe(0)
-  expect(bounceOff(hard, RESTITUTION_STUCK, 0, FLAT).y, 'a hard one comes back up').toBeLessThan(0)
+  expect(bounceOff(soft, { friction: 0, restitution: RESTITUTION_STUCK }, GROUND_DEFAULT, FLAT).y, 'a soft landing lands').toBe(0)
+  expect(bounceOff(hard, { friction: 0, restitution: RESTITUTION_STUCK }, GROUND_DEFAULT, FLAT).y, 'a hard one comes back up').toBeLessThan(0)
 })
 
-test('the ground has a material too, and the solver multiplies by it', () => {
-  // 0x414f50 builds the landscape body and gives it 0.2 / 0.7 through the
-  // same setter the pig uses; 0x40f690 multiplies the pair.
-  expect(GROUND_FRICTION).toBeCloseTo(0.2)
-  expect(GROUND_RESTITUTION).toBeCloseTo(0.7)
+test('the ground brings its own material, and it depends on the terrain', () => {
+  // Twelve real entries, all of them sane fractions; past 11 the bytes at
+  // 0x4c0088 are something else and must not be read as a material.
+  expect(TILE_MATERIALS).toHaveLength(12)
+  for (const m of TILE_MATERIALS) {
+    expect(m.friction).toBeGreaterThan(0)
+    expect(m.friction).toBeLessThanOrEqual(1)
+    expect(m.restitution).toBeGreaterThan(0)
+    expect(m.restitution).toBeLessThanOrEqual(1)
+  }
+  // Type 8 is the slippery one and type 11 the grippy one — a real spread,
+  // not one number for the whole world.
+  expect(TILE_MATERIALS[8].friction).toBeLessThan(TILE_MATERIALS[11].friction)
+  expect(groundMaterial(9, false)).toEqual(TILE_MATERIALS[9])
+  // Past the table, the constructor's default rather than nonsense.
+  expect(groundMaterial(20, false)).toEqual(GROUND_DEFAULT)
 
-  const FLAT = { x: 0, y: -1, z: 0 }
-  const down = { x: 0, y: BOUNCE_CUTOFF * 4, z: 0 }
-  const back = -bounceOff(down, RESTITUTION_FREE, 0, FLAT).y
-  // The rebound is the pig's restitution AND the ground's, over the exe's 8.
-  expect(back).toBeCloseTo((down.y / 8) * RESTITUTION_FREE * GROUND_RESTITUTION)
-  // So ignoring the ground would have over-bounced by a third.
-  expect(back).toBeLessThan((down.y / 8) * RESTITUTION_FREE)
+  // Inside a wall the landscape turns almost frictionless and almost
+  // perfectly elastic. That, not a refusal, is what throws a pig back out.
+  expect(groundMaterial(0, true)).toEqual(WALL_MATERIAL)
+  expect(WALL_MATERIAL.restitution).toBeGreaterThan(0.9)
+  expect(WALL_MATERIAL.friction).toBeLessThan(0.05)
 })

@@ -208,6 +208,12 @@ export class TerrainQuery {
     return patch === null ? false : !shape(patch.tx, patch.tz)
   }
 
+  /** The tile's terrain type (its low 5 bits), which chooses the ground's
+   * physics material. -1 off the map. */
+  tileType(x: number, z: number): number {
+    return this.tileAt(x, z)?.type ?? -1
+  }
+
   /** Is (x, z) water — swimming, not walking? */
   isWater(x: number, z: number): boolean {
     const tile = this.tileAt(x, z)

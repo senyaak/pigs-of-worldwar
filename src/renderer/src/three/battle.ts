@@ -12,6 +12,7 @@ import {
   JUMP_COOLDOWN_SECONDS,
   EJECT_SECONDS,
   FREE,
+  groundMaterial,
   bounceOff,
   easeBounciness,
   slopePull
@@ -255,8 +256,8 @@ export function buildBattle(
           // speed and goes on down it.
           const hit = bounceOff(
             { x: airborne.vx, y: airborne.vy, z: airborne.vz },
-            bounciness.restitution,
-            bounciness.friction,
+            bounciness,
+            groundMaterial(query.tileType(at.x, at.z), !query.walkable(at.x, at.z)),
             query.normal(at.x, at.z)
           )
           active.node.position.set(at.x, ground, at.z)
