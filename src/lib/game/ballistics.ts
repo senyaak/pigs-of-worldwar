@@ -124,10 +124,23 @@ export function slide(speed: number, friction: number, seconds: number): number 
  * Invented: the original's own cutoff is inside 0x40f110 with the rest. */
 export const SLIDE_STOP = 40
 
-/** Below this closing speed a landing is contact, not a bounce (world
- * units/sec). Ours, like SLIDE_STOP: the original softens persisting
- * contacts instead of thresholding speed — see bounceOff. */
-export const BOUNCE_CUTOFF = 250
+/**
+ * An exe speed in ours. The original's are distances per logic frame — its
+ * own `m_nPigJumpSpeed = |nDist| * 3 / 2` is built straight out of the
+ * per-frame walking step — so a per-second figure is that over FRAME_SECONDS.
+ */
+export const fromExeSpeed = (perFrame: number): number => perFrame / FRAME_SECONDS
+
+/**
+ * Below this closing speed a landing is a landing, not a bounce.
+ *
+ * The exe's own, and not where it was first looked for: the impact handler
+ * tests it at 0x4711d8 (`cmp di,19h`) and sends anything under 25 to
+ * `0x471350` to get up, anything at or over it to the bounce at 0x471247.
+ * The solver has no such threshold — that much was true — but the caller
+ * does, and this is it.
+ */
+export const BOUNCE_CUTOFF = fromExeSpeed(0x19)
 
 export interface Velocity {
   x: number
@@ -164,13 +177,13 @@ export function bounceOff(v: Velocity, normal: Velocity, restitution: number, fr
   // next frame's gravity takes it back, and the pair never quite reaches
   // zero.
   //
-  // The original has NO such cutoff — that was worth reading the solver to
-  // find out. It kills the buzz positionally instead: every contact is born
-  // with 0.2 at +0xbc (exe 0x40f0c0, from the contact constructor), loses
-  // 0.005 a solve down to a floor of 0.02 (0x410685), and that scalar
-  // multiplies the correction vector (0x404f60). A contact that persists is
-  // pushed apart by less and less. With no positional solver here to decay,
-  // this cutoff stands in for the whole mechanism.
+  // The threshold is the exe's — see BOUNCE_CUTOFF. The SOLVER has none, and
+  // that is a separate mechanism worth keeping in mind: every contact is
+  // born with 0.2 at +0xbc (exe 0x40f0c0, from the contact constructor),
+  // loses 0.005 a solve down to 0.02 (0x410685), and that scalar scales the
+  // correction vector (0x404f60), so a contact that persists is pushed apart
+  // by less and less. That part is still not modelled here — there is no
+  // positional correction to decay.
   const e = -vn > BOUNCE_CUTOFF && restitution > RESTITUTION_MIN ? restitution : 0
   // Tangential first, then the reflected normal part on top of it. The exe's
   // `>> 3` damping rides on the normal part alone — see bounceSpeed.

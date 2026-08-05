@@ -18,6 +18,7 @@ import {
   FRICTION_FREE,
   FRICTION_STUCK,
   SLIDE_STOP,
+  BOUNCE_CUTOFF,
   bounceOff,
   bounceSpeed,
   easeBounciness,
@@ -143,4 +144,16 @@ test('friction holds a pig on gentle ground and lets go on steep', () => {
   const middling = { x: 0.2 / Math.hypot(0.2, 1), y: -1 / Math.hypot(0.2, 1), z: 0 }
   expect(slopePull(middling, FRICTION_FREE, 5000, 0.1).x).toBe(0)
   expect(slopePull(middling, FRICTION_STUCK, 5000, 0.1).x).toBeGreaterThan(0)
+})
+
+test('the landing threshold is the exe own 25 a frame, not a number we liked', () => {
+  // 0x4711d8: under 25 the impact handler gets the pig up, at or over it the
+  // bounce runs. The exe counts per logic frame; we count per second.
+  expect(BOUNCE_CUTOFF).toBeCloseTo(0x19 / FRAME_SECONDS)
+
+  const FLAT = { x: 0, y: -1, z: 0 }
+  const soft = { x: 0, y: BOUNCE_CUTOFF * 0.9, z: 0 }
+  const hard = { x: 0, y: BOUNCE_CUTOFF * 1.1, z: 0 }
+  expect(bounceOff(soft, FLAT, RESTITUTION_STUCK, 0).y, 'a soft landing lands').toBe(0)
+  expect(bounceOff(hard, FLAT, RESTITUTION_STUCK, 0).y, 'a hard one comes back up').toBeLessThan(0)
 })
