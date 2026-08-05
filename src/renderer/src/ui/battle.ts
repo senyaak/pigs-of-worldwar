@@ -28,6 +28,9 @@ export interface BattleView {
 
 export function initBattle(onLeave: () => void): BattleView {
   const hudEl = byId<HTMLSpanElement>('battle-hud')
+  // Separate from the HUD on purpose: this is for reporting a tile that
+  // looks wrong, and the HUD's text is asserted verbatim by the e2e suite.
+  const tileEl = byId<HTMLSpanElement>('battle-tile')
   const canvasHost = byId<HTMLDivElement>('battle-canvas')
 
   let game: Game | null = null
@@ -41,6 +44,10 @@ export function initBattle(onLeave: () => void): BattleView {
     hudEl.textContent =
       `Turn ${game.turn} — ${game.currentPlayer.name}: ${game.currentPig.name} ` +
       `(${game.currentPig.health} hp, ${Math.max(0, Math.ceil(game.timeLeft))}s${swimming})`
+    const tile = query?.tileAddress(x, z)
+    tileEl.textContent = tile
+      ? `tile ${tile.col},${tile.row}  tex ${tile.texture}  byte ${tile.rotateFlip}  type 0x${tile.type.toString(16)}`
+      : ''
   }
 
   const updateHud = (): void => {

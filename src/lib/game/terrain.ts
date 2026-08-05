@@ -217,6 +217,27 @@ export class TerrainQuery {
     return patch === null ? false : !shape(patch.tx, patch.tz)
   }
 
+  /**
+   * Which tile a point is on, in the map's own grid, with the two bytes that
+   * decide how its texture is laid down. For reporting a tile that looks
+   * wrong precisely enough to act on — "col 37 row 12, byte 2" says which
+   * turn is at fault where "that one over there" does not.
+   */
+  tileAddress(
+    x: number,
+    z: number
+  ): { col: number; row: number; texture: number; rotateFlip: number; type: number } | null {
+    const tile = this.tileAt(x, z)
+    if (!tile) return null
+    return {
+      col: Math.floor((x - this.minX) / TILE_STEP),
+      row: Math.floor((z - this.minZ) / TILE_STEP),
+      texture: tile.texture,
+      rotateFlip: tile.rotateFlip,
+      type: tile.type
+    }
+  }
+
   /** The tile's terrain type (its low 5 bits), which chooses the ground's
    * physics material. -1 off the map. */
   tileType(x: number, z: number): number {
