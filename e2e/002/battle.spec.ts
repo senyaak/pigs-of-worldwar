@@ -11,8 +11,7 @@ import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
 import { debugState, hold, peakNodeY, press, release, tap, warp } from '../controller'
 import { TILE_STEP, TILE_WALL, TILE_WATER, parsePmg } from '../../src/lib/formats/pmg'
-import { WORLD_LIMIT } from '../../src/lib/game/terrain'
-import { TerrainQuery } from '../../src/lib/game/terrain'
+import { TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { GAME_DIR } from '../launch'
@@ -220,6 +219,35 @@ test('shove a wall long enough and the pig is thrown off it', async ({ app }) =>
   // the round trip it takes this spec to let go of the key.)
   const landed = await debugState(page)
   expect(wall.query.walkable(...positionOf(landed)), 'not left inside the wall').toBe(true)
+
+  expect(app.errors()).toEqual([])
+})
+
+test('jumping at a wall does not climb it, hop by hop', async ({ app }) => {
+  const { page } = app
+  await page.locator('#menu-new-game').click()
+  await expect(page.locator('#battle')).toBeVisible()
+
+  // Shoving at a wall AND jumping: the reported way out of the map was to
+  // ride a jump into the cliff face, land higher up it, and go again. A
+  // pig may leave a wall it is in, never enter one — so no hop lands inside.
+  const wall = wallAboveASlope()
+  const EAST = Math.PI / 2
+  await warp(page, wall.x - 768, wall.z, EAST)
+
+  await press(page, 'walkForward')
+  try {
+    for (let hop = 0; hop < 6; hop++) {
+      await tap(page, 'jump')
+      await page.waitForTimeout(250)
+      const at = await debugState(page)
+      expect(wall.query.walkable(...positionOf(at)), `hop ${hop} ended inside the wall`).toBe(true)
+      expect(Math.abs(at.x), `hop ${hop} stayed on the map`).toBeLessThanOrEqual(WORLD_LIMIT)
+      expect(Math.abs(at.z), `hop ${hop} stayed on the map`).toBeLessThanOrEqual(WORLD_LIMIT)
+    }
+  } finally {
+    await release(page, 'walkForward')
+  }
 
   expect(app.errors()).toEqual([])
 })

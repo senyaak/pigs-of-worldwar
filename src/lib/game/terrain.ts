@@ -37,6 +37,13 @@ export const fromExeY = (units: number): number => (units * HEIGHT_SCALE) / 2
 /** The world limit a pig's position is clamped to (exe 0x3000). */
 export const WORLD_LIMIT = 12288
 
+/** (x, z) brought inside the world limits — the edge of the map holds
+ * whatever a pig is doing, walking or flying. */
+export const clampToWorld = (x: number, z: number): { x: number; z: number } => ({
+  x: Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, x)),
+  z: Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, z))
+})
+
 const clampIndex = (value: number, last: number): number => Math.max(0, Math.min(value, last))
 
 /**

@@ -33,7 +33,7 @@
 // collision path, and there are no objects in the scene yet. Their rules are
 // recorded in ../../../../pigs-disasm/movement/notes.md for when there are.
 
-import { WORLD_LIMIT, fromExeY } from './terrain'
+import { clampToWorld, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
 
 /** Drop the feet this far looking for ground before declaring a fall
@@ -70,11 +70,9 @@ export function step(
   heading: number,
   distance: number
 ): MoveResult {
-  const clamp = (v: number): number => Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, v))
   const wantX = x + Math.sin(heading) * distance
   const wantZ = z + Math.cos(heading) * distance
-  const toX = clamp(wantX)
-  const toZ = clamp(wantZ)
+  const { x: toX, z: toZ } = clampToWorld(wantX, wantZ)
   if (toX !== wantX || toZ !== wantZ) return { outcome: 'limit', x, z }
   // Game-space heights grow DOWNWARD, so a bigger height is lower ground.
   const drop = query.height(toX, toZ) - query.height(x, z)

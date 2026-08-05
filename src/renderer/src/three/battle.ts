@@ -5,7 +5,7 @@
 import * as THREE from 'three'
 import type { Bone, Clip, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
-import { TerrainQuery } from '../../../lib/game/terrain'
+import { TerrainQuery, clampToWorld } from '../../../lib/game/terrain'
 import { FALL_SPEED_FACTOR, STEP_DOWN, step } from '../../../lib/game/movement'
 import {
   EJECT_PITCH,
@@ -231,10 +231,18 @@ export function buildBattle(
       setClip(active, airborne.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE)
       // Momentum carries either way; what differs is whether the ground is
       // under the pig (sliding) or below it (falling).
-      // Walls do not gate this either — and here it is not a nicety: a pig
-      // thrown OUT of a wall starts inside one, so refusing to move it while
-      // it is in there is refusing to let it leave.
-      game.moveCurrentPig(px + airborne.vx * delta, pz + airborne.vz * delta, active.pig.heading)
+      //
+      // A wall in the air is one-way: a pig may leave one it is already in —
+      // that is the whole point of throwing it out — but may not enter one.
+      // Both halves are needed. Without the first, an ejected pig is
+      // forbidden from leaving the wall it was ejected from; without the
+      // second, jump becomes a ladder, and a pig can hop up a cliff face a
+      // bound at a time and right off the edge of the world.
+      const inWall = !query.walkable(px, pz)
+      const to = clampToWorld(px + airborne.vx * delta, pz + airborne.vz * delta)
+      if (inWall || query.walkable(to.x, to.z)) {
+        game.moveCurrentPig(to.x, to.z, active.pig.heading)
+      }
       const at = active.pig.position
       const ground =
         query.height(at.x, at.z) + (query.isWater(at.x, at.z) ? SWIM_SINK : 0) - active.mesh.footOffset
