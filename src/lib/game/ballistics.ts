@@ -125,7 +125,8 @@ export function slide(speed: number, friction: number, seconds: number): number 
 export const SLIDE_STOP = 40
 
 /** Below this closing speed a landing is contact, not a bounce (world
- * units/sec). Ours, like SLIDE_STOP — see bounceOff. */
+ * units/sec). Ours, like SLIDE_STOP: the original softens persisting
+ * contacts instead of thresholding speed — see bounceOff. */
 export const BOUNCE_CUTOFF = 250
 
 export interface Velocity {
@@ -161,9 +162,15 @@ export function bounceOff(v: Velocity, normal: Velocity, restitution: number, fr
   // Below a crawl there is no bounce left, only contact. Without this a
   // discrete step bounces a pig forever: each landing returns a little, the
   // next frame's gravity takes it back, and the pair never quite reaches
-  // zero. The original settles bodies with a countdown of its own — the
-  // scalar at +0xbc that the solver compares against 0.02 and walks down by
-  // 0.005 a step (exe 0x410685) — which is not decoded; this cutoff is ours.
+  // zero.
+  //
+  // The original has NO such cutoff — that was worth reading the solver to
+  // find out. It kills the buzz positionally instead: every contact is born
+  // with 0.2 at +0xbc (exe 0x40f0c0, from the contact constructor), loses
+  // 0.005 a solve down to a floor of 0.02 (0x410685), and that scalar
+  // multiplies the correction vector (0x404f60). A contact that persists is
+  // pushed apart by less and less. With no positional solver here to decay,
+  // this cutoff stands in for the whole mechanism.
   const e = -vn > BOUNCE_CUTOFF && restitution > RESTITUTION_MIN ? restitution : 0
   // Tangential first, then the reflected normal part on top of it. The exe's
   // `>> 3` damping rides on the normal part alone — see bounceSpeed.
