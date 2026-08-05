@@ -75,12 +75,14 @@ is solid, read by `Map::IsBlocked` and by nothing else.
 
 **The tile's rotate/flip byte is one flip bit and a 0..3 turn COUNT**, bits
 1-2, not how-doc's two independent flags, and the flip is applied BEFORE the
-turn. The four UVs are a ring round the quad; the byte mirrors slots 0↔1 and
-2↔3, then shifts. All of that is read from `_d3d.dll`. Which corner the ring
-STARTS at is not settled — neither the code nor any scoring over the shipped
-maps picks between the eight — so it is a setting: `DEFAULT_TILE_UV` in
-`lib/formats/pmg.ts`, overridable live with `powTileUv` in the console.
-Write-up: `../pigs-disasm/terrain/notes.md`.
+turn. The four UVs are a ring round the quad: the byte mirrors ring slots
+0↔1 and 2↔3, then each corner takes the slot `rot` places further round.
+Unturned, the texture lands u along +x and v along +z with v the texture
+row. Every step of that is read out of `_d3d.dll`, table included
+(`../pigs-disasm/terrain/notes.md`), and it is pinned in
+`e2e/000/terrain-viewer.spec.ts`. It briefly looked wrong and was reverted —
+on a map that was still mirrored. Do not tune it by eye, and do not make it
+a setting: the engine has one behaviour.
 
 **A tile is two triangles, not a bilinear patch**, split along
 (col+1,row)-(col,row+1) — the same diagonal the mesh uses, so collision and

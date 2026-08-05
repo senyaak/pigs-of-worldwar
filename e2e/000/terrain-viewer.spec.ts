@@ -99,47 +99,53 @@ test('ARCHI carries baked vertex shade, and neighbouring blocks agree on it', ()
   expect(seen.size).toBe((BLOCKS_PER_SIDE * (VERTS_PER_SIDE - 1) + 1) ** 2)
 })
 
-// What the tile's rotate/flip byte does is half settled. These are the half
-// that is: read out of `_d3d.dll` (../pigs-disasm/terrain/notes.md) and true
-// under EVERY one of the eight ring positions the remaining doubt is about.
-// A tile's four UVs are a RING, the byte's bits 1-2 are one 0..3 turn count
-// around it, and bit 0 mirrors — so two quarter-turns must land every corner
-// on its diagonal opposite, whichever position the ring sits in.
+// The tile's rotate/flip byte, spelled out. This table is not a preference
+// and not a fit: it is what `_d3d.dll` does to the four UVs it keeps per
+// tile, transcribed in ../pigs-disasm/terrain/notes.md. Corners are (a, b)
+// with a along +x and b along +z; V is the texture row, top-down.
 const CORNERS = [
   [0, 0],
   [1, 0],
   [0, 1],
   [1, 1]
 ]
+const EXPECTED: Record<number, number[][]> = {
+  // No byte set: the texture lands unturned. FlipX mirrors it along +x.
+  0: [[0, 0], [1, 0], [0, 1], [1, 1]],
+  1: [[1, 0], [0, 0], [1, 1], [0, 1]],
+  // Bits 1-2 are ONE 0..3 turn count, not two independent flags, and the
+  // flip is applied BEFORE the turn — both are how the old fit went wrong.
+  2: [[1, 0], [1, 1], [0, 0], [0, 1]],
+  3: [[0, 0], [0, 1], [1, 0], [1, 1]],
+  4: [[1, 1], [0, 1], [1, 0], [0, 0]],
+  5: [[0, 1], [1, 1], [0, 0], [1, 0]],
+  6: [[0, 1], [0, 0], [1, 1], [1, 0]],
+  7: [[1, 1], [1, 0], [0, 1], [0, 0]]
+}
 /** CORNERS index of the corner diagonally across the tile. */
 const OPPOSITE = [3, 2, 1, 0]
 
-test('the rotate/flip byte turns the texture the way the library turns it', () => {
-  for (let convention = 0; convention < 8; convention++) {
-    const seen = new Set<string>()
-    for (let byte = 0; byte < 8; byte++) {
-      const uvs = tileUvs(byte, CORNERS, convention)
-      // A bijection onto the texture's four corners — never a folded tile.
-      expect({ convention, byte, distinct: new Set(uvs.map(String)).size }).toEqual({
-        convention,
-        byte,
-        distinct: 4
-      })
-      seen.add(JSON.stringify(uvs))
-    }
-    // Eight bytes, eight different orientations.
-    expect({ convention, orientations: seen.size }).toEqual({ convention, orientations: 8 })
+test('the rotate/flip byte lays the texture down the way the library does', () => {
+  for (const [byte, want] of Object.entries(EXPECTED)) {
+    expect({ byte, uvs: tileUvs(Number(byte), CORNERS) }).toEqual({ byte, uvs: want })
+  }
 
-    // Bits 1-2 are ONE count, not two flags: adding 2 to it (byte | 4) is the
-    // half-turn, and a half-turn round a four-corner ring is the diagonal.
-    for (const byte of [0, 1, 2, 3]) {
-      const straight = tileUvs(byte, CORNERS, convention)
-      const halfTurned = tileUvs(byte | 4, CORNERS, convention)
-      expect({ convention, byte, uvs: JSON.stringify(halfTurned) }).toEqual({
-        convention,
-        byte,
-        uvs: JSON.stringify(OPPOSITE.map((i) => straight[i]))
-      })
-    }
+  // And the properties that table has to have, so a wrong edit shows as more
+  // than one failing row: eight distinct orientations, each a bijection onto
+  // the texture's four corners, and a half-turn — byte | 4 — landing every
+  // corner on its diagonal opposite, because the four UVs are a ring.
+  const seen = new Set<string>()
+  for (let byte = 0; byte < 8; byte++) {
+    const uvs = tileUvs(byte, CORNERS)
+    expect({ byte, distinct: new Set(uvs.map(String)).size }).toEqual({ byte, distinct: 4 })
+    seen.add(JSON.stringify(uvs))
+  }
+  expect(seen.size).toBe(8)
+  for (const byte of [0, 1, 2, 3]) {
+    const straight = tileUvs(byte, CORNERS)
+    expect({ byte, half: tileUvs(byte | 4, CORNERS) }).toEqual({
+      byte,
+      half: OPPOSITE.map((i) => straight[i])
+    })
   }
 })

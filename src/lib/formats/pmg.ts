@@ -28,11 +28,14 @@ export const ROTATE = 6
 export const ROTATE_SHIFT = 1
 
 /**
- * The tile's corners as (a, b) — a along +x, b along the PMG row — walked
- * AROUND the quad. The original keeps a tile's four UVs in that ring order
- * and does exactly two things to it: FlipX swaps slots 0↔1 and 2↔3, then
- * each corner takes the UV of the slot `rot` places further round, flip
- * first. All of that is read from the library and is not in doubt.
+ * The tile's corners as (a, b) — a along +x with the column, b along +z with
+ * the row — walked AROUND the quad. That ring is how the original keeps a
+ * tile's four UVs (`_d3d.dll` stores them u0..u3 then v0..v3 with
+ * u = min,max,max,min against v = min,min,max,max), and it is also the
+ * texture's own corner ring, because an unturned tile pairs the two off one
+ * to one: `afSetMap` puts record +65 at x+512 and record +1 at z-512, and
+ * the ground's draw loop hands UV slots 1,2,3,0 to records i+66, i+65, i,
+ * i+1 — which lands slot 0, the texture's top-left, on the tile's (0, 0).
  */
 const RING = [
   [0, 0],
@@ -42,40 +45,21 @@ const RING = [
 ]
 
 /**
- * What IS in doubt: which corner the ring starts at and which way it turns.
- * Eight possibilities, and the maps cannot choose between them — the ground
- * is mostly noise that tiles equally well any way round, and the two data
- * scores in `../pigs-disasm/terrain/` disagree with each other. So the
- * convention is a setting, `buildTerrain` reads `globalThis.powTileUv` for
- * it, and picking by eye against the original is a one-line experiment:
+ * Where each of `corners` samples the tile's texture, under its byte.
  *
- *     powTileUv = 5      // in the devtools console, then reopen the map
+ * The original does exactly two things to the ring and nothing else
+ * (`_d3d.dll` 0x10001000): FlipX swaps ring slots 0↔1 and 2↔3, then each
+ * corner takes the UV of the slot `rot` places further round. The flip runs
+ * FIRST — its block sits above the rotation's jump table and both work in
+ * place. V is the texture ROW, top-down; the page blit (0x10007210) copies
+ * the TIM straight, so the row is the row.
+ *
+ * Derivation, address by address: `../pigs-disasm/terrain/notes.md`.
  */
-const CONVENTIONS: [number, number][] = [
-  [0, 1],
-  [0, -1],
-  [1, 1],
-  [1, -1],
-  [2, 1],
-  [2, -1],
-  [3, 1],
-  [3, -1]
-]
-
-/** Current best guess. 0 is what the disassembly reads; 7 is the old fit. */
-export const DEFAULT_TILE_UV = 3
-
-/** Where each of `corners` samples the texture, under the tile's byte. */
-export function tileUvs(
-  rotateFlip: number,
-  corners: number[][],
-  convention: number = DEFAULT_TILE_UV
-): number[][] {
-  const [start, turn] = CONVENTIONS[convention] ?? CONVENTIONS[DEFAULT_TILE_UV]
-  const order = [0, 1, 2, 3].map((i) => RING[(start + i * turn + 8) % 4])
+export function tileUvs(rotateFlip: number, corners: number[][]): number[][] {
   const slots = rotateFlip & FLIP_X ? [RING[1], RING[0], RING[3], RING[2]] : RING
   const rot = (rotateFlip & ROTATE) >> ROTATE_SHIFT
-  const uvs = new Map(order.map((corner, i) => [String(corner), slots[(i + rot) % 4]]))
+  const uvs = new Map(RING.map((corner, i) => [String(corner), slots[(i + rot) % 4]]))
   return corners.map((corner) => uvs.get(String(corner)) as number[])
 }
 

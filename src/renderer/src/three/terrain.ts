@@ -14,7 +14,7 @@
 import * as THREE from 'three'
 import type { TerrainBlock, TerrainTexture } from '../api'
 import { HEIGHT_SCALE } from '../../../lib/game/terrain'
-import { DEFAULT_TILE_UV, tileUvs } from '../../../lib/formats/pmg'
+import { tileUvs } from '../../../lib/formats/pmg'
 
 const TILE_STEP = 512
 const TILES = 4
@@ -56,10 +56,6 @@ interface TileRef {
 }
 
 export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[]): Terrain {
-  // Which way the tile's texture goes on is still open (lib/formats/pmg.ts):
-  // set `powTileUv` in the console and reopen the map to try another.
-  const convention = (globalThis as { powTileUv?: number }).powTileUv ?? DEFAULT_TILE_UV
-
   // Collect every tile, then sort by texture for contiguous material groups.
   const tiles: TileRef[] = []
   for (const block of blocks) {
@@ -136,7 +132,7 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
       [col, row + 1],
       [col + 1, row + 1]
     ].map(([c, r]) => SHADE_TO_LINEAR[block.shades[r * VERTS + c]])
-    const uv = tileUvs(tile.rotateFlip, TILE_CORNERS, convention)
+    const uv = tileUvs(tile.rotateFlip, TILE_CORNERS)
     // Two triangles: ACB + BCD — counter-clockwise when seen from up
     // (-Y in the game's Y-down space), matching the models' convention.
     for (const i of [0, 2, 1, 1, 2, 3]) {
