@@ -62,6 +62,23 @@ export const debugState = (
     return { x: at.x, z: at.z, heading: pow.debug.currentHeading(), nodeY: pow.debug.currentNodeY() }
   })
 
+/** Put the acting pig somewhere specific, facing somewhere specific. Not a
+ * player move — the scene exposes it purely so a spec can set up a situation
+ * (three/battle.ts). */
+export const warp = (page: Page, x: number, z: number, heading: number): Promise<void> =>
+  page.evaluate(
+    (at) => {
+      const pow = (
+        window as unknown as {
+          pow?: { debug?: { warp(x: number, z: number, heading: number): void } }
+        }
+      ).pow
+      if (!pow?.debug) throw new Error('no battle scene is up — window.pow.debug is missing')
+      pow.debug.warp(at.x, at.z, at.heading)
+    },
+    { x, z, heading }
+  )
+
 // The renderer declares `window.pow` too (input/controller.ts). These specs
 // are compiled in the same project, so re-declaring it would clash — the
 // evaluate() callbacks above reach it through a local shape instead.

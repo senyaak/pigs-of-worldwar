@@ -94,6 +94,15 @@ output *before* the bundle runs; specs assert `expect(errors).toEqual([])`.
 A dead renderer keeps its markup, so assertions on markup alone can pass
 happily — the error array is what tells the difference.
 
+**One app for the whole run.** `e2e/app.ts` is a worker-scoped fixture: take
+`{ app }` and you get a page already back on the menu, plus `app.errors()`
+scoped to your spec. Leave the app on a screen `toMenu` can exit from. Only
+specs whose subject IS starting or stopping — cold start, warm start,
+fullscreen, Exit, closing the window, `--game-dir` — call `launchApp`
+themselves. Worker fixtures make Playwright group the specs that use them,
+so the phase order no longer holds across the whole run; nothing depends on
+it beyond `PHASE_ENV` existing, and the fixture says so if it does not.
+
 Specs run against the **real** installation, read-only, with counts asserted
 as floors where savegame churn could move them and exactly where it cannot.
 
@@ -111,9 +120,6 @@ off anything more than 32 units below, and — for a pig that keeps shoving at
 a wall — two seconds of scrabbling, then being thrown clear of it and
 bouncing (`../pigs-disasm/movement/notes.md`, `src/lib/game/movement.ts`,
 `src/lib/game/ballistics.ts`).
-
-Not modelled from that page yet: 250 frames wedged kills the pig outright,
-and there is no damage system to kill it with.
 
 Next up is weapons — and footstep audio, whose event source is already
 settled in `../pigs-disasm/anim/audio-events.md`. Falling still uses

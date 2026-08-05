@@ -15,12 +15,12 @@
 // named archive of 81 model entries, mcap.mad the game's one raw archive,
 // 93 unnamed animations.
 
-import { test, expect } from '@playwright/test'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import type { Page } from '@playwright/test'
 
 import { GAME_DIR, PHASE_ENV, TMP, launchApp, openAssets } from '../launch'
-import type { Launched } from '../launch'
+import { expect, test } from '../app'
 
 /** The phase chain's .env — created by the app HERE, consumed by every later
  * phase (docs/testing.md): this spec runs first and leaves a located game. */
@@ -99,9 +99,8 @@ test('warm start: the saved .env opens the menu with no questions', async () => 
   }
 })
 
-/** Warm-start into the file list and open one archive by its exact path. */
-export async function openArchive(launched: Launched, relPath: string): Promise<void> {
-  const { page } = launched
+/** From the menu into the file list, and open one archive by its exact path. */
+export async function openArchive(page: Page, relPath: string): Promise<void> {
   await openAssets(page)
   await page.locator('#filter').fill(relPath)
   await expect(page.locator('#file-list .file-row')).toHaveCount(1)
@@ -109,42 +108,34 @@ export async function openArchive(launched: Launched, relPath: string): Promise<
   await expect(page.locator('#archive-view')).toBeVisible()
 }
 
-test('a named archive: british.mad opens into its 81 model entries', async () => {
-  const launched = await launchApp({ envFile: ENV_FILE })
-  const { page } = launched
-  try {
-    await openArchive(launched, 'Chars/british.mad')
-    await expect(page.locator('#archive-title')).toHaveText('Chars/british.mad — 81 entries (named)')
+test('a named archive: british.mad opens into its 81 model entries', async ({ app }) => {
+  const { page } = app
+  await openArchive(page, 'Chars/british.mad')
+  await expect(page.locator('#archive-title')).toHaveText('Chars/british.mad — 81 entries (named)')
 
-    // The triples a model is made of, by name — first and last of the table.
-    await expect(page.locator('#archive-list')).toContainText('pcace_hi.VTX')
-    await expect(page.locator('#archive-list')).toContainText('pcace_hi.NO2')
-    await expect(page.locator('#archive-list')).toContainText('pcace_hi.FAC')
-    await expect(page.locator('#archive-list')).toContainText('sp_hi.FAC')
-    await expect(page.locator('#archive-list .file-row')).toHaveCount(81)
+  // The triples a model is made of, by name — first and last of the table.
+  await expect(page.locator('#archive-list')).toContainText('pcace_hi.VTX')
+  await expect(page.locator('#archive-list')).toContainText('pcace_hi.NO2')
+  await expect(page.locator('#archive-list')).toContainText('pcace_hi.FAC')
+  await expect(page.locator('#archive-list')).toContainText('sp_hi.FAC')
+  await expect(page.locator('#archive-list .file-row')).toHaveCount(81)
 
-    // Back returns to the same filtered list, still one row.
-    await page.locator('#archive-back').click()
-    await expect(page.locator('#archive-view')).toBeHidden()
-    await expect(page.locator('#file-list .file-row')).toHaveCount(1)
+  // Back returns to the same filtered list, still one row.
+  await page.locator('#archive-back').click()
+  await expect(page.locator('#archive-view')).toBeHidden()
+  await expect(page.locator('#file-list .file-row')).toHaveCount(1)
 
-    expect(launched.errors).toEqual([])
-  } finally {
-    await launched.app.close()
-  }
+
+  expect(app.errors()).toEqual([])
 })
 
-test('the raw archive: mcap.mad opens into 93 unnamed animations', async () => {
-  const launched = await launchApp({ envFile: ENV_FILE })
-  const { page } = launched
-  try {
-    await openArchive(launched, 'Chars/mcap.mad')
-    await expect(page.locator('#archive-title')).toHaveText('Chars/mcap.mad — 93 entries (raw)')
-    await expect(page.locator('#archive-list')).toContainText('#000')
-    await expect(page.locator('#archive-list')).toContainText('#092')
-    await expect(page.locator('#archive-list .file-row')).toHaveCount(93)
-    expect(launched.errors).toEqual([])
-  } finally {
-    await launched.app.close()
-  }
+test('the raw archive: mcap.mad opens into 93 unnamed animations', async ({ app }) => {
+  const { page } = app
+  await openArchive(page, 'Chars/mcap.mad')
+  await expect(page.locator('#archive-title')).toHaveText('Chars/mcap.mad — 93 entries (raw)')
+  await expect(page.locator('#archive-list')).toContainText('#000')
+  await expect(page.locator('#archive-list')).toContainText('#092')
+  await expect(page.locator('#archive-list .file-row')).toHaveCount(93)
+
+  expect(app.errors()).toEqual([])
 })

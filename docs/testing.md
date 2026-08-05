@@ -46,9 +46,25 @@ expires.**
   `console.error` output, and the main process's stdout/stderr. A dead
   renderer keeps its static markup, so assertions on markup can pass happily —
   the `errors` array is what tells the difference.
-- Every test asserts `expect(launched.errors).toEqual([])` at the end (and
-  after any step it suspects). `toEqual([])` rather than a length check, so a
-  failure prints the actual error messages.
+- Every test asserts the errors are empty at the end (and after any step it
+  suspects) — `expect(app.errors()).toEqual([])`, or `launched.errors` in the
+  specs that launch for themselves. `toEqual([])` rather than a length check,
+  so a failure prints the actual error messages.
+- **The app is launched once for the whole run.** `e2e/app.ts` is a
+  worker-scoped fixture: a spec that takes `{ app }` gets a page already back
+  on the main menu, and an `errors()` scoped to that spec rather than the
+  whole session. A spec must leave the app on a screen the fixture's `toMenu`
+  can exit from — that is the price of not restarting.
+
+  Only specs whose subject IS starting or stopping the app call `launchApp`
+  themselves: the cold start, the warm start, the fullscreen launch, Exit,
+  closing the window, and the `--game-dir` CLI. Everything else was flashing
+  a window up and killing it just to reach a menu.
+
+  Playwright groups the specs sharing a worker fixture, so they no longer run
+  strictly in phase order. Nothing depends on that beyond `PHASE_ENV` having
+  been written by the cold-start spec, and the fixture fails with that
+  sentence if it has not.
 - A genuinely long operation (unpacking, converting) may wait longer — but
   only through a helper that polls for reported errors and throws the moment
   one appears, instead of waiting out the timeout and reporting a bare

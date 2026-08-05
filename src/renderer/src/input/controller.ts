@@ -108,6 +108,9 @@ export interface DebugHooks {
   currentPig(): { x: number; z: number }
   currentHeading(): number
   currentNodeY(): number
+  /** Set the acting pig down somewhere, facing somewhere. Not a player move:
+   * it exists so a spec can stage a situation it could not walk to. */
+  warp(x: number, z: number, heading: number): void
 }
 
 declare global {

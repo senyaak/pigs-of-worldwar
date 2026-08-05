@@ -312,14 +312,27 @@ export function buildBattle(
   }
   host.onFrame.add(onFrame)
 
-  // A read-only window onto the acting pig, so the e2e suite can assert on
-  // where it actually IS rather than on what the HUD says about it.
+  // A window onto the acting pig, so the e2e suite can assert on where it
+  // actually IS rather than on what the HUD says about it. `warp` is the one
+  // write: a spec that wants a pig in front of a particular wall cannot walk
+  // it there across a whole map, and doing so through the controller would
+  // test the walk, not the wall.
   window.pow = {
     ...(window.pow ?? { controller }),
     debug: {
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
-      currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0
+      currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0,
+      warp: (x: number, z: number, heading: number) => {
+        game.moveCurrentPig(x, z, heading)
+        airborne = null
+        wedgedSeconds = 0
+        bounciness = FREE
+        const entry = pigMeshes.find((e) => e.pig === game.currentPig)
+        if (!entry) return
+        entry.node.rotation.y = heading + PIG_HEADING_OFFSET
+        settle(entry)
+      }
     }
   }
 
