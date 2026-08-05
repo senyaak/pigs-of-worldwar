@@ -188,8 +188,18 @@ ARCHI.PMG is 94208 bytes). Per block:
 
 Per tile: bytes 0–5 zero, byte 6 = type (`0x1F` mask type, `0x20` water,
 `0x40` mine, `0x80` wall), byte 7 = slip, bytes 8–9 zero, byte 10 =
-rotate/flip flags (`1` FlipX, `2` Rotate90, `4` Rotate180), bytes 11–14 =
-u32 texture index into the sibling PTG, byte 15 zero.
+rotate/flip, bytes 11–14 = u32 texture index into the sibling PTG, byte 15
+zero.
+
+**The rotate/flip byte** is bit 0 FlipX and bits 1–2 a **0..3 quarter-turn
+count** — how-doc's separate `Rotate90`/`Rotate180` flags are that number's
+two bits, which is why treating them as independent operations gets half the
+tiles wrong. The library that draws the ground keeps a tile's four UVs as a
+ring around the quad, mirrors slots 0↔1 and 2↔3 for the flip, then rotates by
+shifting which slot each corner takes — flip first. With no byte set the
+texture lands unturned: U runs +x, V is the texture ROW (top-down) along the
+PMG row direction. The full table, the addresses it was read from and the
+seam scoring that corroborates it: `../pigs-disasm/terrain/notes.md`.
 
 Vertex heights are **elevation, up-positive** (found here) — the opposite of
 the models' Y-down vertices: water tiles sit at the small values on every map

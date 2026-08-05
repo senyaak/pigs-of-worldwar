@@ -17,10 +17,45 @@ export const TILE_WATER = 0x20
 export const TILE_MINE = 0x40
 export const TILE_WALL = 0x80
 
-/** Tile.rotateFlip flags (how-doc). */
+/**
+ * Tile.rotateFlip: bit 0 mirrors the texture along +x, bits 1-2 are a 0..3
+ * quarter-turn COUNT — how-doc's separate "Rotate90" and "Rotate180" flags
+ * are that number's two bits. The flip is applied first
+ * (`../pigs-disasm/terrain/notes.md`).
+ */
 export const FLIP_X = 1
-export const ROTATE_90 = 2
-export const ROTATE_180 = 4
+export const ROTATE = 6
+export const ROTATE_SHIFT = 1
+
+/**
+ * The tile's corners as (a, b) — a along +x, b along the PMG row, which runs
+ * -z — walked AROUND the quad. The original keeps a tile's UVs in that ring
+ * order (`_d3d.dll` stores u = min,max,max,min against v = min,min,max,max),
+ * and an unturned tile pairs the two rings off one to one.
+ */
+const RING = [
+  [0, 0],
+  [1, 0],
+  [1, 1],
+  [0, 1]
+]
+
+/**
+ * Where each of `corners` samples the tile's texture, under `rotateFlip`.
+ * U runs +x and V is the texture ROW, top-down, for a tile with no byte set.
+ *
+ * The original does exactly two things to the ring, in this order (0x10001000
+ * in `_d3d.dll`: the flip block sits above the rotation's jump table). FlipX
+ * swaps ring slots 0↔1 and 2↔3, mirroring the texture along +x. Then each
+ * corner takes the UV of the slot `rot` places further round. Derivation,
+ * with the world corner each slot lands on: `../pigs-disasm/terrain/notes.md`.
+ */
+export function tileUvs(rotateFlip: number, corners: number[][]): number[][] {
+  const slots = rotateFlip & FLIP_X ? [RING[1], RING[0], RING[3], RING[2]] : RING
+  const rot = (rotateFlip & ROTATE) >> ROTATE_SHIFT
+  const uvs = new Map(RING.map((corner, i) => [String(corner), slots[(i + rot) % 4]]))
+  return corners.map((corner) => uvs.get(String(corner)) as number[])
+}
 
 export interface TerrainTile {
   /** Index into the sibling PTG's textures. */

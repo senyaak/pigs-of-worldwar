@@ -2,8 +2,9 @@
 //
 // Like pig.ts, everything stays in the game's Y-down space and the returned
 // group carries the 180° X-rotation to Y-up. Tiles are grouped by texture so
-// each of the ~240 map textures binds once. Tile UVs honor the rotate/flip
-// byte; the rotation direction is a visual best-fit (docs/formats.md).
+// each of the ~240 map textures binds once. The rotate/flip byte is applied
+// the way the original applies it — read out of the library that draws the
+// ground, not guessed (`../pigs-disasm/terrain/notes.md`).
 //
 // The ground is NOT lit by the scene. Every PMG vertex carries its own baked
 // brightness and the original just modulates the texture by it, Gouraud
@@ -14,13 +15,19 @@
 import * as THREE from 'three'
 import type { TerrainBlock, TerrainTexture } from '../api'
 import { HEIGHT_SCALE } from '../../../lib/game/terrain'
+import { tileUvs } from '../../../lib/formats/pmg'
 
 const TILE_STEP = 512
 const TILES = 4
 const VERTS = 5
-const FLIP_X = 1
-const ROTATE_90 = 2
-const ROTATE_180 = 4
+
+/** The tile's corners in the order this file builds them, as (a, b). */
+const TILE_CORNERS = [
+  [0, 0],
+  [1, 0],
+  [0, 1],
+  [1, 1]
+]
 
 /**
  * Shade byte → linear-space multiplier.
@@ -47,27 +54,6 @@ interface TileRef {
   col: number
   texture: number
   rotateFlip: number
-}
-
-/** Unit-square UV corners for a tile, transformed by the rotate/flip byte. */
-function tileUvs(rotateFlip: number): number[][] {
-  // Corners in vertex-grid order: (0,0) (1,0) (0,1) (1,1); V follows +row.
-  let corners = [
-    [0, 0],
-    [1, 0],
-    [0, 1],
-    [1, 1]
-  ]
-  const rotate = (times: number): void => {
-    for (let i = 0; i < times; i++) {
-      corners = corners.map(([u, v]) => [v, 1 - u])
-    }
-  }
-  if (rotateFlip & ROTATE_90) rotate(1)
-  if (rotateFlip & ROTATE_180) rotate(2)
-  if (rotateFlip & FLIP_X) corners = corners.map(([u, v]) => [1 - u, v])
-  // Texture rows are top-down (TIM): flip V at the end.
-  return corners.map(([u, v]) => [u, 1 - v])
 }
 
 export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[]): Terrain {
@@ -146,7 +132,7 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
       [col, row + 1],
       [col + 1, row + 1]
     ].map(([c, r]) => SHADE_TO_LINEAR[block.shades[r * VERTS + c]])
-    const uv = tileUvs(tile.rotateFlip)
+    const uv = tileUvs(tile.rotateFlip, TILE_CORNERS)
     // Two triangles: ACB + BCD — counter-clockwise when seen from up
     // (-Y in the game's Y-down space), matching the models' convention.
     for (const i of [0, 2, 1, 1, 2, 3]) {
