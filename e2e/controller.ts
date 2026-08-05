@@ -62,6 +62,35 @@ export const debugState = (
     return { x: at.x, z: at.z, heading: pow.debug.currentHeading(), nodeY: pow.debug.currentNodeY() }
   })
 
+/**
+ * Watch the acting pig for up to `ms` and return the highest it got —
+ * game space is Y-down, so the smallest nodeY — resolving the moment it
+ * passes `above`.
+ *
+ * Sampling happens IN THE PAGE, every animation frame. Polling from the test
+ * would miss it: a hop lasts a third of a second and `expect.poll` backs off
+ * to one sample a second. Resolving early matters just as much — the caller
+ * usually wants to let go of the controls while the pig is still in the air.
+ */
+export const peakNodeY = (page: Page, above: number, ms: number): Promise<number> =>
+  page.evaluate(
+    (o) => {
+      const pow = (window as unknown as { pow?: { debug?: { currentNodeY(): number } } }).pow
+      if (!pow?.debug) throw new Error('no battle scene is up — window.pow.debug is missing')
+      return new Promise<number>((resolve) => {
+        let peak = Infinity
+        const deadline = performance.now() + o.ms
+        const sample = (): void => {
+          peak = Math.min(peak, pow.debug!.currentNodeY())
+          if (peak < o.above || performance.now() >= deadline) resolve(peak)
+          else requestAnimationFrame(sample)
+        }
+        requestAnimationFrame(sample)
+      })
+    },
+    { above, ms }
+  )
+
 /** Put the acting pig somewhere specific, facing somewhere specific. Not a
  * player move — the scene exposes it purely so a spec can set up a situation
  * (three/battle.ts). */

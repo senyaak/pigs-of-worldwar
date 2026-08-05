@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
-import { debugState, hold, press, release, tap, warp } from '../controller'
+import { debugState, hold, peakNodeY, press, release, tap, warp } from '../controller'
 import { TILE_STEP, TILE_WALL, TILE_WATER, parsePmg } from '../../src/lib/formats/pmg'
 import { WORLD_LIMIT } from '../../src/lib/game/terrain'
 import { TerrainQuery } from '../../src/lib/game/terrain'
@@ -18,27 +18,38 @@ import path from 'node:path'
 import { GAME_DIR } from '../launch'
 
 /**
- * The center of a whole-tile wall on the battle map with two tiles of dry
- * open ground due west of it — read from the shipped map, so it stays true
- * if the map does. Well inside the world limit: a pig clamped at the border
- * is refused for a different reason entirely.
+ * The center of a whole-tile wall on the battle map with dry open ground due
+ * west of it — read from the shipped map, so it stays true if the map does.
+ * Well inside the world limit: a pig clamped at the border is refused for a
+ * different reason entirely.
+ *
+ * Of every such wall it takes the one with the LONGEST fall behind it. A
+ * pig thrown off a wall onto rising ground barely goes anywhere; thrown off
+ * onto a slope it bounces away down the hill, which is the behaviour worth
+ * asserting — and the one the original is recognisable by.
  */
-function wallWithOpenGroundWest(): { x: number; z: number } {
+function wallAboveASlope(): { x: number; z: number } {
   const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG')))
   const query = new TerrainQuery(blocks)
   const clear = (x: number, z: number): boolean =>
     query.walkable(x, z) && !query.isWater(x, z) && query.walkable(x, z - TILE_STEP)
+  let best: { x: number; z: number; fall: number } | null = null
   for (const block of blocks) {
     for (let tile = 0; tile < block.tiles.length; tile++) {
       const { type, slip } = block.tiles[tile]
       if ((type & TILE_WALL) === 0 || (slip & 0x0f) !== 0 || (type & TILE_WATER) !== 0) continue
       const x = block.x + (tile % 4) * TILE_STEP + TILE_STEP / 2
       const z = block.z - Math.floor(tile / 4) * TILE_STEP - TILE_STEP / 2
-      const room = Math.max(Math.abs(x), Math.abs(z)) < WORLD_LIMIT - 2 * TILE_STEP
-      if (room && clear(x - TILE_STEP, z) && clear(x - 2 * TILE_STEP, z)) return { x, z }
+      const room = Math.max(Math.abs(x), Math.abs(z)) < WORLD_LIMIT - 3 * TILE_STEP
+      if (!room || !clear(x - TILE_STEP, z) || !clear(x - 2 * TILE_STEP, z)) continue
+      if (!clear(x - 3 * TILE_STEP, z)) continue
+      // Game space is Y-down, so ground FALLING away west means height grows.
+      const fall = query.height(x - 3 * TILE_STEP, z) - query.height(x - TILE_STEP, z)
+      if (!best || fall > best.fall) best = { x, z, fall }
     }
   }
-  throw new Error('no wall with open ground west of it on CAMP')
+  if (!best) throw new Error('no wall with open ground west of it on CAMP')
+  return { x: best.x, z: best.z }
 }
 
 test.beforeAll(() => {
@@ -149,9 +160,9 @@ test('shove a wall long enough and the pig is thrown off it', async ({ app }) =>
   await page.locator('#menu-new-game').click()
   await expect(page.locator('#battle')).toBeVisible()
 
-  // Somewhere on the real battle map with open ground and then a wall: the
-  // pig starts a tile and a half west of the wall, facing straight at it.
-  const wall = wallWithOpenGroundWest()
+  // A real wall on the battle map with the ground falling away behind it:
+  // the pig starts a tile and a half west of it, facing straight at it.
+  const wall = wallAboveASlope()
   const EAST = Math.PI / 2
   await warp(page, wall.x - 768, wall.z, EAST)
   const standing = await debugState(page)
@@ -177,13 +188,11 @@ test('shove a wall long enough and the pig is thrown off it', async ({ app }) =>
     // Then, still shoving, the original's patience runs out and the pig is
     // thrown clear. Game space is Y-down, so leaving the ground is a SMALLER
     // y — the same reading the jump assertion uses.
-    await expect
-      .poll(async () => (await debugState(page)).nodeY, {
-        message: 'thrown off the wall',
-        timeout: 8000
-      })
-      .toBeLessThan(against.nodeY - 30)
+    const peak = await peakNodeY(page, against.nodeY - 30, 4000)
+    expect(peak, 'thrown off the wall').toBeLessThan(against.nodeY - 30)
   } finally {
+    // Let go while it is still in the air: a key held through the landing
+    // would just walk it back into the wall and hide where it ended up.
     await release(page, 'walkForward')
   }
 
@@ -202,9 +211,11 @@ test('shove a wall long enough and the pig is thrown off it', async ({ app }) =>
     )
     .toBe(true)
 
-  // And it is off the wall: thrown back the way it came, not through it.
+  // And it is off the wall AND down the slope: thrown back the way it came,
+  // never through it, and lower than where it was shoving.
   const landed = await debugState(page)
   expect(landed.x, 'thrown back from the wall').toBeLessThan(against.x)
+  expect(landed.nodeY, 'and ended up down the slope').toBeGreaterThan(against.nodeY)
 
   expect(app.errors()).toEqual([])
 })

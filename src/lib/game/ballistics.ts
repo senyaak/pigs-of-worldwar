@@ -11,7 +11,11 @@
 //
 // Derivation and addresses: ../../../../pigs-disasm/movement/notes.md.
 
-/** The exe keeps these as 1/4096 fixed point; here they are the fractions. */
+/**
+ * The exe keeps these as 1/4096 fixed point; here they are the fractions.
+ * The same 4096 is a FULL TURN for its angles — 0x400 is a right angle, not
+ * a straight one.
+ */
 const FIXED = 4096
 
 /** Standing on open ground (exe 0x400 / 0xa66). */
@@ -28,22 +32,28 @@ const RESTITUTION_STEP = 0x199 / FIXED
 export const RESTITUTION_MIN = 0xcc / FIXED
 
 /**
- * The original counts logic frames, not seconds. Its rate is not in the
- * disassembly; 12.5 Hz is the PlayStation-era figure that puts the 25-frame
- * eject at the two seconds the game visibly takes. Treat as calibration,
- * not as a finding.
+ * The original counts logic frames, not seconds, and its rate is NOT in the
+ * disassembly — it imports timeGetTime but reaches it the same indirect way
+ * it reaches the animation library, so no call site says how long a frame
+ * is. 30 Hz is the console-port figure and the one that matches play; this
+ * is the knob to turn if the wait feels wrong, not a finding.
  */
-export const FRAME_SECONDS = 1 / 12.5
+export const FRAME_SECONDS = 1 / 30
 /** Frames wedged in a wall before the pig is thrown out (exe `cmp eax,19h`). */
 export const EJECT_SECONDS = 25 * FRAME_SECONDS
 /** …and before it is crushed instead (exe `cmp eax,0FAh`). Not modelled yet:
  * there is no damage system to kill it with. */
 export const CRUSH_SECONDS = 250 * FRAME_SECONDS
 
-/** How far the eject lifts the pig first (exe `add eax,64h`). */
-export const EJECT_LIFT = 100
-/** The hop's angle above the horizontal (exe pitch 0x3b6 of 0x1000). */
-export const EJECT_PITCH = ((0x3b6 / FIXED) * Math.PI) / 2
+/**
+ * The hop's angle above the horizontal (exe pitch 0x3b6 of 0x1000).
+ *
+ * The exe also lifts the pig 100 units before launching (`add eax,64h`), but
+ * that is there because ITS pig is standing inside the wall geometry and has
+ * to be got out of it first. Ours is stopped against the wall, never in it,
+ * so the lift would only be free height.
+ */
+export const EJECT_PITCH = (0x3b6 / FIXED) * 2 * Math.PI
 
 export interface Bounciness {
   friction: number
@@ -73,13 +83,35 @@ export function easeBounciness(current: Bounciness, inWall: boolean, settled: bo
 
 /**
  * The upward speed a landing at `impact` bounces back with, or 0 for a
- * landing that just stops.
+ * landing that just stops: the exe's `(impact >> 3) * restitution / 4096`.
  *
- * The exe computes `(impact >> 3) * restitution / 4096`. That `>> 3` is a
- * conversion between its impact measure and its launch speed, two units
- * neither of which is ours, so only the restitution carries over — applied
- * here to our own vertical speed.
+ * That `>> 3` was at first taken for a unit conversion and dropped, on the
+ * grounds that the impact measure and the launch speed need not share units.
+ * They do: a bounce keeping 85% of its impact sent pigs flying, and pigs
+ * bounce on their behinds. It is damping, and the whole formula carries over.
  */
 export function bounceSpeed(impact: number, restitution: number): number {
-  return restitution > RESTITUTION_MIN ? impact * restitution : 0
+  return restitution > RESTITUTION_MIN ? (impact / 8) * restitution : 0
 }
+
+/**
+ * What is left of a sliding pig's speed after `seconds` of ground friction.
+ *
+ * The NUMBERS are the game's: `Pig::SetPhysicsMaterial` (exe 0x467e70)
+ * divides both by 4096 and stores them as plain floats on the body, at +0x58
+ * and +0x5c. The LAW is not. Whatever consumes them lives in the generic
+ * rigid-body solver at 0x40f110 — 5.9 KB that combines two bodies'
+ * coefficients (`fld [edi+5ch]; fmul [ebx+5ch]`) and has not been unpicked.
+ *
+ * So this reads friction as the fraction a frame takes off, which puts the
+ * two values in the right order — a pig fresh off a wall at 0.15 slides
+ * further than a normal one at 0.25 — and is otherwise a guess. Replace it
+ * when 0x40f110 gives up its integrator.
+ */
+export function slide(speed: number, friction: number, seconds: number): number {
+  return speed * Math.pow(1 - friction, seconds / FRAME_SECONDS)
+}
+
+/** Below this the slide has stopped and the pig gets up (world units/sec).
+ * Invented: the original's own cutoff is inside 0x40f110 with the rest. */
+export const SLIDE_STOP = 40

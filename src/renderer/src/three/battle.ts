@@ -6,8 +6,16 @@ import * as THREE from 'three'
 import type { Bone, Clip, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
-import { FALL_SPEED_FACTOR, step } from '../../../lib/game/movement'
-import { EJECT_LIFT, EJECT_PITCH, EJECT_SECONDS, FREE, bounceSpeed, easeBounciness } from '../../../lib/game/ballistics'
+import { FALL_SPEED_FACTOR, STEP_DOWN, step } from '../../../lib/game/movement'
+import {
+  EJECT_PITCH,
+  EJECT_SECONDS,
+  FREE,
+  SLIDE_STOP,
+  bounceSpeed,
+  easeBounciness,
+  slide
+} from '../../../lib/game/ballistics'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildPig } from './pig'
@@ -124,9 +132,16 @@ export function buildBattle(
   let markerBase = new THREE.Vector3()
   let time = 0
   const intent = { walk: 0, turn: 0 }
-  /** Vertical velocity while airborne (game Y-down), null on the ground.
-   * `bouncing` means the pig is riding out an impact rather than steering. */
-  let airborne: { vy: number; vx: number; vz: number; bouncing: boolean } | null = null
+  /** The pig's own momentum, null when it is standing and steering again.
+   * `bouncing` means it is riding out an impact rather than jumping;
+   * `grounded` means it has come down and is now sliding on its behind. */
+  let airborne: {
+    vy: number
+    vx: number
+    vz: number
+    bouncing: boolean
+    grounded: boolean
+  } | null = null
   let jumpRequested = false
   /** How long the pig has been pressed into a wall, and how bouncy that has
    * made it — the original eases both while wedged (lib/game/ballistics). */
@@ -213,29 +228,41 @@ export function buildBattle(
 
     if (airborne) {
       setClip(active, airborne.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE)
-      // Ballistics: gravity pulls (game Y-down: +down), momentum carries.
+      // Momentum carries either way; what differs is whether the ground is
+      // under the pig (sliding) or below it (falling).
       const x = px + airborne.vx * delta
       const z = pz + airborne.vz * delta
-      const moved = query.walkable(x, z)
-      if (moved) game.moveCurrentPig(x, z, active.pig.heading)
+      if (query.walkable(x, z)) game.moveCurrentPig(x, z, active.pig.heading)
       const at = active.pig.position
-      airborne.vy += GRAVITY * delta
-      const y = active.node.position.y + airborne.vy * delta
       const ground =
         query.height(at.x, at.z) + (query.isWater(at.x, at.z) ? SWIM_SINK : 0) - active.mesh.footOffset
-      if (airborne.vy > 0 && y >= ground) {
-        // Landing. Wedged pigs come down bouncier than free ones, which is
-        // what makes coming off a wall read as a bounce and not a step.
-        const back = bounceSpeed(airborne.vy, bounciness.restitution)
-        if (back > GRAVITY * delta) {
-          airborne = { ...airborne, vy: -back, bouncing: true }
-          active.node.position.set(at.x, ground, at.z)
-        } else {
-          airborne = null
-          settle(active)
-        }
+
+      if (airborne.grounded) {
+        // Down and sliding on its behind. Friction eats the speed, and a pig
+        // just prised off a wall is the slippery one — that is what the
+        // wedged friction is for, and why it carries on down the slope.
+        settle(active)
+        const carried = Math.hypot(airborne.vx, airborne.vz)
+        const left = slide(carried, bounciness.friction, delta)
+        if (left < SLIDE_STOP) airborne = null
+        else if (ground - active.node.position.y > STEP_DOWN) airborne = { ...airborne, grounded: false }
+        else airborne = { ...airborne, vx: (airborne.vx * left) / carried, vz: (airborne.vz * left) / carried }
       } else {
-        active.node.position.set(at.x, y, at.z)
+        airborne.vy += GRAVITY * delta
+        const y = active.node.position.y + airborne.vy * delta
+        if (airborne.vy > 0 && y >= ground) {
+          // Landing. Wedged pigs come down bouncier than free ones, which is
+          // what makes coming off a wall read as a bounce and not a step; when
+          // there is no bounce left, the pig slides out what it has.
+          const back = bounceSpeed(airborne.vy, bounciness.restitution)
+          active.node.position.set(at.x, ground, at.z)
+          airborne =
+            back > GRAVITY * delta
+              ? { ...airborne, vy: -back, bouncing: true }
+              : { ...airborne, vy: 0, bouncing: true, grounded: true }
+        } else {
+          active.node.position.set(at.x, y, at.z)
+        }
       }
     } else {
       const speed = swimming ? SWIM_SPEED : WALK_SPEED
@@ -247,7 +274,8 @@ export function buildBattle(
           vy: JUMP_VELOCITY,
           vx: forwardX * intent.walk * speed,
           vz: forwardZ * intent.walk * speed,
-          bouncing: false
+          bouncing: false,
+          grounded: false
         }
       } else if (intent.walk !== 0) {
         // Straight ahead, as the original walks: only a wall or the world
@@ -259,7 +287,8 @@ export function buildBattle(
             vy: 0,
             vx: forwardX * intent.walk * speed * FALL_SPEED_FACTOR,
             vz: forwardZ * intent.walk * speed * FALL_SPEED_FACTOR,
-            bouncing: false
+            bouncing: false,
+            grounded: false
           }
         } else if (move.outcome === 'moved') {
           game.moveCurrentPig(move.x, move.z, active.pig.heading)
@@ -277,9 +306,9 @@ export function buildBattle(
               vy: -Math.sin(EJECT_PITCH) * speed,
               vx: -forwardX * intent.walk * Math.cos(EJECT_PITCH) * speed,
               vz: -forwardZ * intent.walk * Math.cos(EJECT_PITCH) * speed,
-              bouncing: true
+              bouncing: true,
+              grounded: false
             }
-            active.node.position.y -= EJECT_LIFT
             wedgedSeconds = 0
           }
         }
