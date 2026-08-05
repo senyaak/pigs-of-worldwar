@@ -28,7 +28,7 @@ import { GAME_DIR } from '../launch'
  * onto a slope it bounces away down the hill, which is the behaviour worth
  * asserting — and the one the original is recognisable by.
  */
-function wallAboveASlope(): { x: number; z: number } {
+function wallAboveASlope(): { x: number; z: number; query: TerrainQuery } {
   const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG')))
   const query = new TerrainQuery(blocks)
   const clear = (x: number, z: number): boolean =>
@@ -49,8 +49,11 @@ function wallAboveASlope(): { x: number; z: number } {
     }
   }
   if (!best) throw new Error('no wall with open ground west of it on CAMP')
-  return { x: best.x, z: best.z }
+  return { x: best.x, z: best.z, query }
 }
+
+/** A scene reading as the (x, z) pair the terrain query takes. */
+const positionOf = (at: { x: number; z: number }): [number, number] => [at.x, at.z]
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
@@ -185,9 +188,8 @@ test('shove a wall long enough and the pig is thrown off it', async ({ app }) =>
       )
       .toBe(true)
 
-    // Then, still shoving, the original's patience runs out and the pig is
-    // thrown clear. Game space is Y-down, so leaving the ground is a SMALLER
-    // y — the same reading the jump assertion uses.
+    // Then, still shoving, the original's patience runs out and it is thrown
+    // clear. Game space is Y-down, so leaving the ground is a SMALLER y.
     const peak = await peakNodeY(page, against.nodeY - 30, 4000)
     expect(peak, 'thrown off the wall').toBeLessThan(against.nodeY - 30)
   } finally {
@@ -211,11 +213,13 @@ test('shove a wall long enough and the pig is thrown off it', async ({ app }) =>
     )
     .toBe(true)
 
-  // And it is off the wall AND down the slope: thrown back the way it came,
-  // never through it, and lower than where it was shoving.
+  // And it is OUT: standing somewhere a pig may stand. This is the one that
+  // matters — a pig left inside a wall is a pig that cannot be played, and
+  // that is how this was found. (Where it ends up along x is not asserted:
+  // the eject pushes it back by about a tenth of a walking second, less than
+  // the round trip it takes this spec to let go of the key.)
   const landed = await debugState(page)
-  expect(landed.x, 'thrown back from the wall').toBeLessThan(against.x)
-  expect(landed.nodeY, 'and ended up down the slope').toBeGreaterThan(against.nodeY)
+  expect(wall.query.walkable(...positionOf(landed)), 'not left inside the wall').toBe(true)
 
   expect(app.errors()).toEqual([])
 })

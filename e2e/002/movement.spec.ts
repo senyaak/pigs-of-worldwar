@@ -3,10 +3,12 @@
 // from the turn rules next door.
 //
 // The rules come from the original (pigs-disasm/movement/notes.md). The one
-// that matters most is negative: terrain height NEVER refuses a step. The
-// exe's collision dispatch treats hitting the landscape as a success and
-// pins the pig to the ground however steep it is; only walls, the world
-// edge, and nothing-under-the-feet change the outcome.
+// that matters most is negative: NOTHING about the ground refuses a step.
+// Neither height nor a wall — the exe's collision dispatch pins the pig to the
+// landscape however steep, and `TryMove` never asks whether a tile is a
+// wall. Only the world edge refuses, and only empty air under the feet
+// changes the outcome. Walking into a wall is allowed; being in one is what
+// the scene acts on, a frame later.
 
 import { test, expect } from '@playwright/test'
 
@@ -82,27 +84,41 @@ test('a drop within the step-down is just a step down', () => {
   expect(move.z).toBeCloseTo(STRIDE)
 })
 
-test('a wall stops the pig dead — it does not slide along it', () => {
-  // Shape 0: the whole tile is solid, everywhere north of z = 512.
+test('a wall refuses the step — but only after the drop is ruled out', () => {
+  // Shape 0: every tile north of z = 512 is solid all through.
   const walled = terrain(
     () => 0,
-    (_x, z) => (z >= 512 ? { type: 0x80, slip: 0 } : {})
+    (_x, z) => (z >= 1024 ? { type: 0x80, slip: 0 } : {})
   )
   const move = step(walled, 0, 400, NORTH, STRIDE)
   expect(move.outcome).toBe('blocked')
   expect(move).toMatchObject({ x: 0, z: 400 })
+
+  // Now the same wall with the ground falling away under it. A cliff lip is
+  // a wall tile too, so a pig that could not enter one could never step off
+  // a ledge — and a spawn ringed by them would never move again. The drop is
+  // asked about first, so this one goes over the edge.
+  const ledge = terrain(
+    // Steeply: a heightfield ramps over a whole tile, so a shallow step
+    // down would not clear STEP_DOWN within one stride.
+    (_x, z) => (z >= 1024 ? -40 * STEP_DOWN : 0),
+    (_x, z) => (z >= 1024 ? { type: 0x80, slip: 0 } : {})
+  )
+  expect(step(ledge, 0, 400, NORTH, STRIDE).outcome).toBe('falling')
 })
 
-test('a shaped wall blocks only its own half of the tile', () => {
+test('a shaped wall refuses only over its own half of the tile', () => {
   // Shape 3 is solid where tz < 0.5, and tz runs -z: the half of the tile
-  // furthest along +z. The tile spans z = 512..1024.
+  // furthest along +z. That tile spans z = 512..1024.
   const shaped = terrain(
     () => 0,
-    (_x, z) => (z >= 512 ? { type: 0x80, slip: 3 } : {})
+    (_x, z) => (z >= 1024 ? { type: 0x80, slip: 3 } : {})
   )
-  // Landing at z = 600 is tz = 0.83 — the open half.
+  // Landing at z = 600 is tz = 0.83 — the open half, and a step goes there.
+  expect(shaped.walkable(0, 600)).toBe(true)
   expect(step(shaped, 0, 400, NORTH, STRIDE).outcome).toBe('moved')
-  // Landing at z = 900 is tz = 0.24 — inside the solid half.
+  // Landing at z = 900 is tz = 0.24 — inside the solid half, and refused.
+  expect(shaped.walkable(0, 900)).toBe(false)
   expect(step(shaped, 0, 400, NORTH, 500).outcome).toBe('blocked')
 })
 

@@ -219,6 +219,7 @@ export function buildBattle(
     const { x: px, z: pz } = active.pig.position
     const swimming = query.isWater(px, pz)
     let wedged = false
+    let shoving = false
 
     // Turning on the spot works in every grounded state.
     if (intent.turn !== 0 && airborne === null) {
@@ -230,9 +231,10 @@ export function buildBattle(
       setClip(active, airborne.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE)
       // Momentum carries either way; what differs is whether the ground is
       // under the pig (sliding) or below it (falling).
-      const x = px + airborne.vx * delta
-      const z = pz + airborne.vz * delta
-      if (query.walkable(x, z)) game.moveCurrentPig(x, z, active.pig.heading)
+      // Walls do not gate this either — and here it is not a nicety: a pig
+      // thrown OUT of a wall starts inside one, so refusing to move it while
+      // it is in there is refusing to let it leave.
+      game.moveCurrentPig(px + airborne.vx * delta, pz + airborne.vz * delta, active.pig.heading)
       const at = active.pig.position
       const ground =
         query.height(at.x, at.z) + (query.isWater(at.x, at.z) ? SWIM_SINK : 0) - active.mesh.footOffset
@@ -278,8 +280,9 @@ export function buildBattle(
           grounded: false
         }
       } else if (intent.walk !== 0) {
-        // Straight ahead, as the original walks: only a wall or the world
-        // edge refuses, and a big enough drop turns the step into a fall.
+        // Straight ahead, as the original walks. Only the world edge refuses;
+        // a big enough drop turns the step into a fall, and a wall is
+        // something the pig walks INTO and is thrown out of below.
         const move = step(query, px, pz, active.pig.heading, speed * delta * intent.walk)
         if (move.outcome === 'falling') {
           game.moveCurrentPig(move.x, move.z, active.pig.heading)
@@ -295,22 +298,7 @@ export function buildBattle(
           settle(active)
           setClip(active, swimming ? ANIM.SWIM : intent.walk > 0 ? ANIM.RUN : ANIM.WALK_BACK)
         } else {
-          // Wedged against a wall: scrabble, get slipperier and bouncier by
-          // the frame, and once the original's patience runs out, be thrown
-          // clear of it — up, back, and away from what is in the way.
-          setClip(active, swimming ? ANIM.SWIM : ANIM.SCRAMBLE)
-          wedged = true
-          wedgedSeconds += delta
-          if (wedgedSeconds >= EJECT_SECONDS) {
-            airborne = {
-              vy: -Math.sin(EJECT_PITCH) * speed,
-              vx: -forwardX * intent.walk * Math.cos(EJECT_PITCH) * speed,
-              vz: -forwardZ * intent.walk * Math.cos(EJECT_PITCH) * speed,
-              bouncing: true,
-              grounded: false
-            }
-            wedgedSeconds = 0
-          }
+          shoving = true
         }
       } else if (swimming) {
         setClip(active, ANIM.SWIM)
@@ -321,7 +309,30 @@ export function buildBattle(
       }
     }
     jumpRequested = false
+
+    // Wedged is either of two things: shoving at a wall that will not let
+    // the step through, or standing inside one — the original asks
+    // `Map::IsBlocked` once a frame at its own feet, and a pig that landed
+    // in a wall has to get out of it too. Both end the same way.
+    const at = active.pig.position
+    wedged = airborne === null && (shoving || !query.walkable(at.x, at.z))
     if (!wedged) wedgedSeconds = 0
+    else {
+      setClip(active, ANIM.SCRAMBLE)
+      wedgedSeconds += delta
+      if (wedgedSeconds >= EJECT_SECONDS) {
+        const away = intent.walk < 0 ? 1 : -1
+        const out = Math.cos(EJECT_PITCH) * WALK_SPEED * away
+        airborne = {
+          vy: -Math.sin(EJECT_PITCH) * WALK_SPEED,
+          vx: Math.sin(active.pig.heading) * out,
+          vz: Math.cos(active.pig.heading) * out,
+          bouncing: true,
+          grounded: false
+        }
+        wedgedSeconds = 0
+      }
+    }
     bounciness = easeBounciness(bounciness, wedged, airborne === null, delta)
 
     // Marker and camera trail the pig every frame.
