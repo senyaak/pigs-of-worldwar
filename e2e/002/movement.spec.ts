@@ -34,11 +34,11 @@ function terrain(
   for (let row = 0; row < BLOCKS_PER_SIDE; row++) {
     for (let col = 0; col < BLOCKS_PER_SIDE; col++) {
       const x = -MAP_ORIGIN + col * BLOCK_SPAN
-      const z = MAP_ORIGIN - row * BLOCK_SPAN
+      const z = -MAP_ORIGIN + row * BLOCK_SPAN
       const heights = new Int16Array(VERTS_PER_SIDE * VERTS_PER_SIDE)
       for (let r = 0; r < VERTS_PER_SIDE; r++) {
         for (let c = 0; c < VERTS_PER_SIDE; c++) {
-          heights[r * VERTS_PER_SIDE + c] = shape(x + c * TILE_STEP, z - r * TILE_STEP) / HEIGHT_SCALE
+          heights[r * VERTS_PER_SIDE + c] = shape(x + c * TILE_STEP, z + r * TILE_STEP) / HEIGHT_SCALE
         }
       }
       const tiles = Array.from({ length: TILES_PER_SIDE * TILES_PER_SIDE }, (_, i) => ({
@@ -46,7 +46,7 @@ function terrain(
         rotateFlip: 0,
         type: 0,
         slip: 0,
-        ...tile(x + (i % TILES_PER_SIDE) * TILE_STEP, z - Math.floor(i / TILES_PER_SIDE) * TILE_STEP)
+        ...tile(x + (i % TILES_PER_SIDE) * TILE_STEP, z + Math.floor(i / TILES_PER_SIDE) * TILE_STEP)
       }))
       // Movement never reads the shade; unshaded keeps the fixture honest.
       const shades = new Uint8Array(VERTS_PER_SIDE * VERTS_PER_SIDE).fill(255)
@@ -92,7 +92,7 @@ test('a wall does not refuse the step — nothing about the ground does', () => 
   // 0.99 instead of stopping anyone, and the scene throws the pig back out.
   const walled = terrain(
     () => 0,
-    (_x, z) => (z >= 1024 ? { type: 0x80, slip: 0 } : {})
+    (_x, z) => (z >= 512 ? { type: 0x80, slip: 0 } : {})
   )
   const move = step(walled, 0, 400, NORTH, STRIDE)
   expect(move.outcome).toBe('moved')
@@ -104,19 +104,19 @@ test('a wall does not refuse the step — nothing about the ground does', () => 
   // than walled against: refusing here trapped pigs on top of cliffs.
   const ledge = terrain(
     (_x, z) => (z >= 1024 ? -40 * STEP_DOWN : 0),
-    (_x, z) => (z >= 1024 ? { type: 0x80, slip: 0 } : {})
+    (_x, z) => (z >= 512 ? { type: 0x80, slip: 0 } : {})
   )
   expect(step(ledge, 0, 400, NORTH, STRIDE).outcome).toBe('falling')
 })
 
 test('a shaped wall is that surface over only its own half of the tile', () => {
-  // Shape 3 is solid where tz < 0.5, and tz runs -z: the half of the tile
+  // Shape 3 is solid where tz > 0.5, and tz runs +z: the half of the tile
   // furthest along +z. That tile spans z = 512..1024.
   const shaped = terrain(
     () => 0,
-    (_x, z) => (z >= 1024 ? { type: 0x80, slip: 3 } : {})
+    (_x, z) => (z >= 512 ? { type: 0x80, slip: 3 } : {})
   )
-  // z = 600 is tz = 0.83 — the open half. z = 900 is tz = 0.24 — the solid.
+  // z = 600 is tz = 0.17 — the open half. z = 900 is tz = 0.76 — the solid.
   expect(shaped.walkable(0, 600)).toBe(true)
   expect(shaped.walkable(0, 900)).toBe(false)
   // Neither refuses the walk; the difference is the ground underfoot.

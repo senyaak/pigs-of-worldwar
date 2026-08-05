@@ -73,14 +73,14 @@ const clampIndex = (value: number, last: number): number => Math.max(0, Math.min
  */
 const WALL_SHAPES: Record<number, (tx: number, tz: number) => boolean> = {
   0: () => true,
-  1: (_tx, tz) => tz > 0.5,
+  1: (_tx, tz) => tz < 0.5,
   2: (tx) => tx < 0.5,
-  3: (_tx, tz) => tz < 0.5,
+  3: (_tx, tz) => tz > 0.5,
   4: (tx) => tx > 0.5,
-  5: (tx, tz) => tx + tz > 1,
-  6: (tx, tz) => tx < tz,
-  7: (tx, tz) => tx + tz < 1,
-  8: (tx, tz) => tx > tz
+  5: (tx, tz) => tx > tz,
+  6: (tx, tz) => tx + tz < 1,
+  7: (tx, tz) => tx < tz,
+  8: (tx, tz) => tx + tz > 1
 }
 
 /** One half of a tile as a plane, in the tile's own (tx, tz) coordinates. */
@@ -100,17 +100,17 @@ interface Patch {
 
 export class TerrainQuery {
   private readonly minX: number
-  private readonly maxZ: number
+  private readonly minZ: number
   /** Blocks indexed [row][col] on the world grid. */
   private readonly grid: TerrainBlock[][]
 
   constructor(private readonly blocks: TerrainBlock[]) {
     this.minX = Math.min(...blocks.map((b) => b.x))
-    this.maxZ = Math.max(...blocks.map((b) => b.z))
+    this.minZ = Math.min(...blocks.map((b) => b.z))
     this.grid = []
     for (const block of blocks) {
       const col = Math.round((block.x - this.minX) / BLOCK_SPAN)
-      const row = Math.round((this.maxZ - block.z) / BLOCK_SPAN)
+      const row = Math.round((block.z - this.minZ) / BLOCK_SPAN)
       ;(this.grid[row] ??= [])[col] = block
     }
   }
@@ -137,12 +137,12 @@ export class TerrainQuery {
    */
   private patch(x: number, z: number): Patch | null {
     const col = Math.floor((x - this.minX) / BLOCK_SPAN)
-    const row = Math.floor((this.maxZ - z) / BLOCK_SPAN)
+    const row = Math.floor((z - this.minZ) / BLOCK_SPAN)
     const block = this.grid[row]?.[col]
     if (!block) return null
-    // Fractional vertex coordinates inside the block (rows advance -z).
+    // Fractional vertex coordinates inside the block (rows advance +z).
     const fx = (x - block.x) / TILE_STEP
-    const fz = (block.z - z) / TILE_STEP
+    const fz = (z - block.z) / TILE_STEP
     // Clamped BOTH ways: a coordinate a hair the wrong side of a block
     // boundary rounds into the neighbouring block and leaves fx/fz just
     // outside [0, 4) — unclamped that indexes off the height grid and the
@@ -193,11 +193,11 @@ export class TerrainQuery {
 
   private tileAt(x: number, z: number): TerrainTile | null {
     const col = Math.floor((x - this.minX) / BLOCK_SPAN)
-    const row = Math.floor((this.maxZ - z) / BLOCK_SPAN)
+    const row = Math.floor((z - this.minZ) / BLOCK_SPAN)
     const block = this.grid[row]?.[col]
     if (!block) return null
     const tx = clampIndex(Math.floor((x - block.x) / TILE_STEP), TILES_PER_SIDE - 1)
-    const tz = clampIndex(Math.floor((block.z - z) / TILE_STEP), TILES_PER_SIDE - 1)
+    const tz = clampIndex(Math.floor((z - block.z) / TILE_STEP), TILES_PER_SIDE - 1)
     return block.tiles[tz * TILES_PER_SIDE + tx] ?? null
   }
 
@@ -267,7 +267,7 @@ export class TerrainQuery {
           ? this.minX + margin + TILE_STEP / 2 + ix * step
           : this.minX + span - margin - TILE_STEP / 2 - ix * step
         for (let iz = 0; iz * step < span - margin * 2 && wanted > 0; iz++) {
-          const z = this.maxZ - margin - TILE_STEP / 2 - iz * step
+          const z = this.minZ + span - margin - TILE_STEP / 2 - iz * step
           // Keep squadmates apart too.
           const tooClose = spawns.some((s) => Math.hypot(s.x - x, s.z - z) < TILE_STEP * 3)
           if (this.standable(x, z) && !tooClose) {

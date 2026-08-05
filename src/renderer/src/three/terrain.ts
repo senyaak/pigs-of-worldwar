@@ -112,7 +112,8 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
     }
     const { block, row, col } = tile
     // Tile corners from the block's 5×5 height grid; world XZ from the
-    // block offset. Rows advance -Z (block offsets step that way too).
+    // block's place in the world. Rows advance +Z, columns +X — the exe
+    // derives both from the block's index (lib/formats/pmg.ts).
     const corners = [
       [col, row],
       [col + 1, row],
@@ -124,7 +125,7 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
       // the small values); the game's Y axis points down. The doubling is
       // the game's own: see HEIGHT_SCALE.
       -block.heights[r * VERTS + c] * HEIGHT_SCALE,
-      block.z - r * TILE_STEP
+      block.z + r * TILE_STEP
     ])
     // The same 5×5 grid carries the baked brightness. Blocks agree on the
     // vertices they share, so a tile edge is a shade the neighbour repeats

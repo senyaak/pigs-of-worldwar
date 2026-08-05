@@ -60,8 +60,27 @@ texture × shade, with the shade converted to linear first; lighting those
 polygons again — especially with the per-face normals `computeVertexNormals`
 gives split vertices — is exactly the faceting it replaces.
 
+**A block's world position is its PLACE in the file, not the offsets it
+stores.** `Map::Load` (exe 0x4a5635) overwrites both with `(col - 8) * 2048`
+and `(row - 8) * 2048` before anything reads them. The x agrees with the
+stored field; the z is its opposite, because the file counts z down where
+the game counts it up. Reading the stored z put the whole map back to front
+— which is invisible in isolation, since collision and mesh were mirrored
+together, and shows up as every asymmetric texture facing the wrong way.
+Vertices run +x with the column AND **+z with the row**. This is also why
+`WALL_SHAPES` no longer needs the mirror it used to carry.
+
 **`MapTileSlip` is not slip** — it is which half or diagonal of a wall tile
 is solid, read by `Map::IsBlocked` and by nothing else.
+
+**The tile's rotate/flip byte is one flip bit and a 0..3 turn COUNT**, bits
+1-2, not how-doc's two independent flags, and the flip is applied BEFORE the
+turn. The four UVs are a ring round the quad; the byte mirrors slots 0↔1 and
+2↔3, then shifts. All of that is read from `_d3d.dll`. Which corner the ring
+STARTS at is not settled — neither the code nor any scoring over the shipped
+maps picks between the eight — so it is a setting: `DEFAULT_TILE_UV` in
+`lib/formats/pmg.ts`, overridable live with `powTileUv` in the console.
+Write-up: `../pigs-disasm/terrain/notes.md`.
 
 **A tile is two triangles, not a bilinear patch**, split along
 (col+1,row)-(col,row+1) — the same diagonal the mesh uses, so collision and

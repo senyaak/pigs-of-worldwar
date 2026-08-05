@@ -38,7 +38,7 @@ function wallAboveASlope(): { x: number; z: number; query: TerrainQuery } {
       const { type, slip } = block.tiles[tile]
       if ((type & TILE_WALL) === 0 || (slip & 0x0f) !== 0 || (type & TILE_WATER) !== 0) continue
       const x = block.x + (tile % 4) * TILE_STEP + TILE_STEP / 2
-      const z = block.z - Math.floor(tile / 4) * TILE_STEP - TILE_STEP / 2
+      const z = block.z + Math.floor(tile / 4) * TILE_STEP + TILE_STEP / 2
       const room = Math.max(Math.abs(x), Math.abs(z)) < WORLD_LIMIT - 3 * TILE_STEP
       if (!room || !clear(x - TILE_STEP, z) || !clear(x - 2 * TILE_STEP, z)) continue
       if (!clear(x - 3 * TILE_STEP, z)) continue
@@ -148,11 +148,16 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   expect(Math.abs(turned.heading - walked.heading), 'turnRight rotated the pig').toBeGreaterThan(0.3)
 
   // Jump is a one-shot: it must leave the ground. Game space is Y-down, so
-  // airborne means a SMALLER y than standing.
+  // airborne means a SMALLER y than standing. Back to the spawn first —
+  // that tile is `standable`, where 700ms of walking lands is whatever the
+  // map has there, and a pig that walked into the drink cannot jump.
+  await warp(page, start.x, start.z, turned.heading)
+  await page.waitForTimeout(120)
+  const grounded = await debugState(page)
   await tap(page, 'jump')
   await page.waitForTimeout(120)
   const airborne = await debugState(page)
-  expect(airborne.nodeY, 'jump left the ground').toBeLessThan(turned.nodeY - 50)
+  expect(airborne.nodeY, 'jump left the ground').toBeLessThan(grounded.nodeY - 50)
 
   // And it recharges. The cooldown once ticked down inside the turn-change
   // block, where the next line reset it — so a pig could jump exactly once

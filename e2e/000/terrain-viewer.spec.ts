@@ -88,7 +88,7 @@ test('ARCHI carries baked vertex shade, and neighbouring blocks agree on it', ()
   for (const block of blocks) {
     for (let row = 0; row < VERTS_PER_SIDE; row++) {
       for (let col = 0; col < VERTS_PER_SIDE; col++) {
-        const key = `${block.x + col * TILE_STEP},${block.z - row * TILE_STEP}`
+        const key = `${block.x + col * TILE_STEP},${block.z + row * TILE_STEP}`
         const shade = block.shades[row * VERTS_PER_SIDE + col]
         if (seen.has(key)) expect({ key, shade }).toEqual({ key, shade: seen.get(key) })
         seen.set(key, shade)

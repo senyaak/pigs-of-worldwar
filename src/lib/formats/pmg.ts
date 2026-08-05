@@ -88,7 +88,16 @@ export interface TerrainTile {
 }
 
 export interface TerrainBlock {
-  /** World offset of the block's first vertex. */
+  /**
+   * World position of the block's first vertex — its minimum x and minimum
+   * z corner. Derived from the block's PLACE in the file, not from the
+   * fields it stores: `Map::Load` (exe 0x4a5635) overwrites both with
+   * `(col - 8) * 2048` and `(row - 8) * 2048` before anything reads them.
+   * The x it writes agrees with the stored field. The z does not — the file
+   * counts z down where the game counts it up — so trusting the file's z
+   * puts the whole map back to front, and every asymmetric texture with it.
+   * Vertices run +x with the column AND +z with the row.
+   */
   x: number
   z: number
   /** 5×5 vertex heights, row-major. */
@@ -119,10 +128,12 @@ export function parsePmg(data: Uint8Array): TerrainBlock[] {
 
   for (let block = 0; block < BLOCKS_PER_SIDE * BLOCKS_PER_SIDE; block++) {
     const base = block * BLOCK_SIZE
-    const x = view.getInt16(base, true)
-    // +2 is a base height how-doc marks unreliable; +6 unknown. Heights are
-    // absolute, so neither is needed.
-    const z = view.getInt16(base + 4, true)
+    // The stored offsets at +0 and +4 are ignored, as the exe ignores them:
+    // the block's place in the file IS its place in the world. (+2 is a base
+    // height how-doc marks unreliable, +6 unknown; heights are absolute, so
+    // neither is needed either.)
+    const x = ((block % BLOCKS_PER_SIDE) - BLOCKS_PER_SIDE / 2) * (TILES_PER_SIDE * TILE_STEP)
+    const z = (Math.floor(block / BLOCKS_PER_SIDE) - BLOCKS_PER_SIDE / 2) * (TILES_PER_SIDE * TILE_STEP)
 
     // Four bytes per vertex: s16 height, u8 shade, one always-zero byte.
     const heights = new Int16Array(VERTS_PER_SIDE * VERTS_PER_SIDE)

@@ -84,7 +84,7 @@ function tileCenters(
       if (!want(tile)) return
       const col = index % 4
       const row = Math.floor(index / 4)
-      centers.push({ x: block.x + col * 512 + 256, z: block.z - row * 512 - 256 })
+      centers.push({ x: block.x + col * 512 + 256, z: block.z + row * 512 + 256 })
     })
   }
   return centers
