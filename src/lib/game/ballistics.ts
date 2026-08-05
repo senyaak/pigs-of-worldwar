@@ -28,6 +28,22 @@ export const RESTITUTION_STUCK = 0xd99 / FIXED
 const FRICTION_STEP = 0x15e / FIXED
 const RESTITUTION_STEP = 0x199 / FIXED
 
+/**
+ * The GROUND's own material, which the solver multiplies the pig's by.
+ *
+ * The collision manager's constructor (exe 0x414f50) builds the landscape
+ * body and hands it to 0x416560 — `[ecx+58h] = arg1; [ecx+5ch] = arg2`, the
+ * very fields the solver reads — with 0x3e4ccccd and 0x3f333333. Plain
+ * floats this time, not the pig's 1/4096 fixed point.
+ *
+ * That body is `[4de9d0]+0ch`: the one `TryMove`'s dispatch compares its
+ * single hit against. Which settles what that comparison means, and with it
+ * the rule the whole page rests on — hitting only the landscape IS the
+ * successful walk.
+ */
+export const GROUND_FRICTION = 0.2
+export const GROUND_RESTITUTION = 0.7
+
 /** Below this bounciness a landing does not bounce at all (exe 0xcc). */
 export const RESTITUTION_MIN = 0xcc / FIXED
 
@@ -163,7 +179,11 @@ export interface Velocity {
  * The ground is immovable, so its own coefficients are 1 and the pig's are
  * the product.
  */
-export function bounceOff(v: Velocity, normal: Velocity, restitution: number, friction: number): Velocity {
+export function bounceOff(v: Velocity, restitutionIn: number, frictionIn: number, normal: Velocity): Velocity {
+  // Both coefficients are the PRODUCT of the two bodies' — `fmul [ebx+5ch]`
+  // and `fmul [ebx+58h]` at 0x40f690 — and the other body is the ground.
+  const restitution = restitutionIn * GROUND_RESTITUTION
+  const friction = frictionIn * GROUND_FRICTION
   const vn = v.x * normal.x + v.y * normal.y + v.z * normal.z
   // Leaving the surface already: nothing to respond to.
   if (vn >= 0) return v

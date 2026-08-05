@@ -18,6 +18,8 @@ import {
   FRICTION_FREE,
   FRICTION_STUCK,
   BOUNCE_CUTOFF,
+  GROUND_FRICTION,
+  GROUND_RESTITUTION,
   bounceOff,
   bounceSpeed,
   easeBounciness,
@@ -82,7 +84,7 @@ test('a hit reflects across the normal and keeps what runs along the surface', (
   const FLAT = { x: 0, y: -1, z: 0 } // game space: up is -y
   const down = { x: 300, y: 900, z: 0 } // moving forward AND falling
 
-  const hit = bounceOff(down, FLAT, RESTITUTION_STUCK, 0)
+  const hit = bounceOff(down, RESTITUTION_STUCK, 0, FLAT)
   // The normal part came back up — that is the bounce.
   expect(hit.y).toBeLessThan(0)
   // …and damped: a bounce is a hop, never a relaunch.
@@ -94,11 +96,11 @@ test('a hit reflects across the normal and keeps what runs along the surface', (
   expect(hit.z).toBeCloseTo(0)
 
   // Friction is what eats the tangential part, nothing else.
-  expect(bounceOff(down, FLAT, RESTITUTION_STUCK, 0.25).x).toBeCloseTo(down.x * 0.75)
+  expect(bounceOff(down, RESTITUTION_STUCK, 0.25 / GROUND_FRICTION, FLAT).x).toBeCloseTo(down.x * 0.75)
 
   // Already leaving the surface: no response at all.
   const up = { x: 300, y: -900, z: 0 }
-  expect(bounceOff(up, FLAT, RESTITUTION_STUCK, 0.25)).toEqual(up)
+  expect(bounceOff(up, RESTITUTION_STUCK, 0.25, FLAT)).toEqual(up)
 })
 
 test('gravity along a slope is what keeps a landed pig moving', () => {
@@ -140,6 +142,21 @@ test('the landing threshold is the exe own 25 a frame, not a number we liked', (
   const FLAT = { x: 0, y: -1, z: 0 }
   const soft = { x: 0, y: BOUNCE_CUTOFF * 0.9, z: 0 }
   const hard = { x: 0, y: BOUNCE_CUTOFF * 1.1, z: 0 }
-  expect(bounceOff(soft, FLAT, RESTITUTION_STUCK, 0).y, 'a soft landing lands').toBe(0)
-  expect(bounceOff(hard, FLAT, RESTITUTION_STUCK, 0).y, 'a hard one comes back up').toBeLessThan(0)
+  expect(bounceOff(soft, RESTITUTION_STUCK, 0, FLAT).y, 'a soft landing lands').toBe(0)
+  expect(bounceOff(hard, RESTITUTION_STUCK, 0, FLAT).y, 'a hard one comes back up').toBeLessThan(0)
+})
+
+test('the ground has a material too, and the solver multiplies by it', () => {
+  // 0x414f50 builds the landscape body and gives it 0.2 / 0.7 through the
+  // same setter the pig uses; 0x40f690 multiplies the pair.
+  expect(GROUND_FRICTION).toBeCloseTo(0.2)
+  expect(GROUND_RESTITUTION).toBeCloseTo(0.7)
+
+  const FLAT = { x: 0, y: -1, z: 0 }
+  const down = { x: 0, y: BOUNCE_CUTOFF * 4, z: 0 }
+  const back = -bounceOff(down, RESTITUTION_FREE, 0, FLAT).y
+  // The rebound is the pig's restitution AND the ground's, over the exe's 8.
+  expect(back).toBeCloseTo((down.y / 8) * RESTITUTION_FREE * GROUND_RESTITUTION)
+  // So ignoring the ground would have over-bounced by a third.
+  expect(back).toBeLessThan((down.y / 8) * RESTITUTION_FREE)
 })

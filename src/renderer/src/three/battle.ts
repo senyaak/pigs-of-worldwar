@@ -255,9 +255,9 @@ export function buildBattle(
           // speed and goes on down it.
           const hit = bounceOff(
             { x: airborne.vx, y: airborne.vy, z: airborne.vz },
-            query.normal(at.x, at.z),
             bounciness.restitution,
-            bounciness.friction
+            bounciness.friction,
+            query.normal(at.x, at.z)
           )
           active.node.position.set(at.x, ground, at.z)
           // A landing is binary in the original and there is nothing in
