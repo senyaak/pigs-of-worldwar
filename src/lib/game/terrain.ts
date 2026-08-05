@@ -34,6 +34,15 @@ export const HEIGHT_SCALE = 1
  */
 export const fromExeY = (units: number): number => (units * HEIGHT_SCALE) / 2
 
+/**
+ * The terrain type a pig scrambles up. `UpdateGroundState` raises a flag
+ * when the pig stands on it (`cmp ecx,0bh; or [esi+3a4h],8`, exe 0x4700d9)
+ * and the animation picker (0x467ec0) then plays the Scramble clip instead
+ * of the run cycle. It is also the grippiest entry in the material table —
+ * friction 0.90 against 0.10 for the slipperiest.
+ */
+export const CLIMBING_TILE = 11
+
 /** The world limit a pig's position is clamped to (exe 0x3000). */
 export const WORLD_LIMIT = 12288
 

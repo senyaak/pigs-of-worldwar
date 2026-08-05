@@ -169,7 +169,7 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   expect(app.errors()).toEqual([])
 })
 
-test('shove a wall long enough and the pig is thrown off it', async ({ app }) => {
+test('walk into a wall long enough and the pig is thrown out of it', async ({ app }) => {
   const { page } = app
   await page.locator('#menu-new-game').click()
   await expect(page.locator('#battle')).toBeVisible()
@@ -179,39 +179,37 @@ test('shove a wall long enough and the pig is thrown off it', async ({ app }) =>
   const wall = wallAboveASlope()
   const EAST = Math.PI / 2
   await warp(page, wall.x - 768, wall.z, EAST)
-  const standing = await debugState(page)
 
   await press(page, 'walkForward')
-  let against = standing
+  let inside = await debugState(page)
   try {
-    // It walks east and comes to rest against the wall: two readings a beat
-    // apart that agree is the pig having nowhere left to go.
+    // Nothing refuses the step, so it walks IN — and lands on a floor with
+    // 0.99 restitution and 0.01 friction, which shakes it about.
     await expect
-      .poll(
-        async () => {
-          const before = await debugState(page)
-          await page.waitForTimeout(150)
-          const after = await debugState(page)
-          against = after
-          return after.x > standing.x + 100 && Math.abs(after.x - before.x) < 5
-        },
-        { message: 'walked up to the wall and stopped' }
-      )
+      .poll(async () => !wall.query.walkable(...positionOf(await debugState(page))), {
+        message: 'walked into the wall'
+      })
       .toBe(true)
-
-    // Then, still shoving, the original's patience runs out and it is thrown
-    // clear. Game space is Y-down, so leaving the ground is a SMALLER y.
-    const peak = await peakNodeY(page, against.nodeY - 30, 4000)
-    expect(peak, 'thrown off the wall').toBeLessThan(against.nodeY - 30)
+    inside = await debugState(page)
   } finally {
-    // Let go while it is still in the air: a key held through the landing
-    // would just walk it back into the wall and hide where it ended up.
+    // Let go before asking whether it got out: held, the key just walks it
+    // straight back in after every ejection.
     await release(page, 'walkForward')
   }
 
-  // It comes back down rather than sailing off — settled means the height
-  // stops changing, not that it matches where it took off from: the pig has
-  // moved, and the ground it lands on is its own.
+  // And it does not stay there. Which way out it takes is the terrain's
+  // business — 0.01 friction slides it off a slope, and the wedge counter
+  // throws it clear if the ground is too flat to slide on — but out it goes,
+  // and that is the property worth holding: a pig left in a wall is a pig
+  // that cannot be played.
+  await expect
+    .poll(async () => wall.query.walkable(...positionOf(await debugState(page))), {
+      message: 'came back out of the wall',
+      timeout: 8000
+    })
+    .toBe(true)
+
+  // It comes back down rather than sailing off.
   await expect
     .poll(
       async () => {
@@ -224,11 +222,8 @@ test('shove a wall long enough and the pig is thrown off it', async ({ app }) =>
     )
     .toBe(true)
 
-  // And it is OUT: standing somewhere a pig may stand. This is the one that
-  // matters — a pig left inside a wall is a pig that cannot be played, and
-  // that is how this was found. (Where it ends up along x is not asserted:
-  // the eject pushes it back by about a tenth of a walking second, less than
-  // the round trip it takes this spec to let go of the key.)
+  // And it is OUT: standing where a pig may stand. This is the one that
+  // matters — a pig left inside a wall is a pig that cannot be played.
   const landed = await debugState(page)
   expect(wall.query.walkable(...positionOf(landed)), 'not left inside the wall').toBe(true)
 

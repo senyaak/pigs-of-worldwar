@@ -5,7 +5,7 @@
 import * as THREE from 'three'
 import type { Bone, Clip, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
-import { TerrainQuery, clampToWorld } from '../../../lib/game/terrain'
+import { CLIMBING_TILE, TerrainQuery, clampToWorld } from '../../../lib/game/terrain'
 import { FALL_SPEED_FACTOR, WALK_SPEED, step } from '../../../lib/game/movement'
 import {
   EJECT_PITCH,
@@ -14,7 +14,6 @@ import {
   FREE,
   groundMaterial,
   bounceOff,
-  bounceSpeed,
   easeBounciness,
   slopePull
 } from '../../../lib/game/ballistics'
@@ -58,18 +57,30 @@ const SWIM_SINK = 110
 const JUMP_VELOCITY = -1500
 const GRAVITY = 5000
 
-/** MCAP clip indices, from the exe's own animation-name table
- * (pigs-disasm/animations/notes.md). A fall uses JUMP_MIDDLE, not the clip
- * named "Flying through air/falling": `Pig::StartFalling` (0x4707f0) plays
- * 9, and the impact handler plays BOUNCE (0x27) on the way back up. */
+/**
+ * MCAP clip indices — and WHICH the exe plays where, taken from every call
+ * site of its play function (0x471ef0) rather than from the names:
+ * `StartFalling` (0x4707f0) plays 9, the eject path (0x470c70) plays 38, and
+ * the impact handler (0x470d10) plays 39. Clip 11, "Scramble", is never
+ * played by the game at all.
+ */
 const ANIM = {
   RUN: 0,
   WALK_BACK: 3,
   TURN: 4,
   SWIM: 5,
   JUMP_MIDDLE: 9,
+  /** Trying to climb. Not chosen by a movement state at all: the exe raises
+   * a flag when the pig stands on terrain TYPE 11 (`or [esi+3a4h],8` at
+   * 0x4700de in UpdateGroundState), and the animation picker at 0x467ec0
+   * plays 11 instead of the run cycle for as long as any bit of that flag is
+   * up. Type 11 is the grippiest ground in the material table — friction
+   * 0.90, restitution 0.10 — which is exactly what you climb. */
   SCRAMBLE: 11,
   IDLE: 27,
+  /** Thrown out of a wall — what `0x470c70` plays, and the only thing that
+   * does. Ordinary falling is JUMP_MIDDLE; the impact handler plays BOUNCE. */
+  EJECTED: 38,
   BOUNCE: 39
 } as const
 
@@ -136,7 +147,7 @@ export function buildBattle(
   /** The pig's own momentum, null when it is standing and steering again.
    * `bouncing` means it is riding out an impact rather than jumping;
    * `grounded` means it has come down and is now sliding on its behind. */
-  let airborne: { vy: number; vx: number; vz: number; bouncing: boolean } | null = null
+  let airborne: { vy: number; vx: number; vz: number; bouncing: boolean; ejected?: boolean } | null = null
   let jumpRequested = false
   /** How long the pig has been pressed into a wall, and how bouncy that has
    * made it — the original eases both while wedged (lib/game/ballistics). */
@@ -154,6 +165,12 @@ export function buildBattle(
 
   /** Sync a pig's node to its game position: soles on the ground, sunk a
    * little when swimming. */
+  /** Ground velocity for a heading and a walk intent. */
+  const speedOf = (heading: number, walk: number): { x: number; z: number } => ({
+    x: Math.sin(heading) * WALK_SPEED * walk,
+    z: Math.cos(heading) * WALK_SPEED * walk
+  })
+
   const settle = (entry: PigEntry): void => {
     const { x, z } = entry.pig.position
     const sink = query.isWater(x, z) ? SWIM_SINK : 0
@@ -227,7 +244,7 @@ export function buildBattle(
     }
 
     if (airborne) {
-      setClip(active, airborne.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE)
+      setClip(active, airborne.ejected ? ANIM.EJECTED : airborne.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE)
       // Momentum carries; gravity does the rest.
       //
       // Walls do not gate flight either. What stops the jump-ladder is the
@@ -264,7 +281,13 @@ export function buildBattle(
           // which writes zero vectors — the fall state is cleared and the
           // pig stands up. So there is no slide to taper off, and no floor
           // speed to taper it to: the same 25 decides both.
-          if (-hit.y > 0) {
+          // A soft landing gets the pig up — unless it is inside a wall, and
+          // then the impact handler refuses to: `cmp di,19h` at 0x4711d8
+          // falls through to an `IsBlocked` test whose YES jumps past the
+          // stand-up and into the bounce. So a pig in a wall never lands. It
+          // stays a body on 0.01 friction and slides off, which is the whole
+          // difference between coming off a wall and stepping down it.
+          if (-hit.y > 0 || !query.walkable(at.x, at.z)) {
             airborne = { ...airborne, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true }
           } else {
             airborne = null
@@ -308,7 +331,16 @@ export function buildBattle(
         } else if (move.outcome === 'moved') {
           game.moveCurrentPig(move.x, move.z, active.pig.heading)
           settle(active)
-          setClip(active, swimming ? ANIM.SWIM : intent.walk > 0 ? ANIM.RUN : ANIM.WALK_BACK)
+          setClip(
+            active,
+            swimming
+              ? ANIM.SWIM
+              : query.tileType(move.x, move.z) === CLIMBING_TILE
+                ? ANIM.SCRAMBLE
+                : intent.walk > 0
+                  ? ANIM.RUN
+                  : ANIM.WALK_BACK
+          )
         }
       } else if (swimming) {
         setClip(active, ANIM.SWIM)
@@ -325,21 +357,19 @@ export function buildBattle(
     // once a frame at its own feet — and nothing else. There is no shoving
     // to detect, because nothing refuses the step in the first place.
     const at = active.pig.position
-    wedged = airborne === null && !query.walkable(at.x, at.z)
-    if (wedged) {
-      // The contact itself throws the pig about: a frame of gravity comes
-      // straight back off restitution 0.99, and 0.01 friction leaves nothing
-      // holding it. This is the shudder at a wall, and it is a SURFACE, not
-      // a refusal — the eject below is what finally clears it.
-      const ground = groundMaterial(query.tileType(at.x, at.z), true)
-      const back = bounceSpeed(GRAVITY * delta, bounciness.restitution * ground.restitution)
-      if (back > 0 && airborne === null) {
-        airborne = { vy: -back, vx: 0, vz: 0, bouncing: true }
-      }
+    wedged = !query.walkable(at.x, at.z)
+    if (wedged && airborne === null) {
+      // Walked in on its feet: hand it to the physics once, carrying what it
+      // was walking with. Only once — re-launching it every frame threw away
+      // the speed gravity had built and the fall came down in steps.
+      const carried = speedOf(active.pig.heading, intent.walk)
+      airborne = { vy: 0, vx: carried.x, vz: carried.z, bouncing: true }
     }
     if (!wedged) wedgedSeconds = 0
     else {
-      setClip(active, ANIM.SCRAMBLE)
+      // No clip of its own: the game has none for this. A pig being shaken
+      // by the wall keeps whatever it was playing, and only the eject below
+      // changes it — to EJECTED, which is the one thing 0x470c70 plays.
       wedgedSeconds += delta
       if (wedgedSeconds >= EJECT_SECONDS) {
         const away = intent.walk < 0 ? 1 : -1
@@ -348,7 +378,8 @@ export function buildBattle(
           vy: -Math.sin(EJECT_PITCH) * WALK_SPEED,
           vx: Math.sin(active.pig.heading) * out,
           vz: Math.cos(active.pig.heading) * out,
-          bouncing: true
+          bouncing: true,
+          ejected: true
         }
         wedgedSeconds = 0
       }
