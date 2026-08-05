@@ -12,7 +12,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { STEP_DOWN, step } from '../../src/lib/game/movement'
+import { LOOK_AHEAD, STEP_DOWN, step } from '../../src/lib/game/movement'
 import { HEIGHT_SCALE, TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
 import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP, VERTS_PER_SIDE } from '../../src/lib/formats/pmg'
 import type { TerrainBlock, TerrainTile } from '../../src/lib/formats/pmg'
@@ -127,4 +127,19 @@ test('the world limit refuses the step rather than sliding along it', () => {
   const move = step(terrain(() => 0), WORLD_LIMIT, 0, east, STRIDE)
   expect(move.outcome).toBe('limit')
   expect(move.x).toBe(WORLD_LIMIT)
+})
+
+test('an edge is seen a walking step ahead, not a frame ahead', () => {
+  // The drop starts one LOOK_AHEAD north of the pig, and is deep enough to
+  // clear STEP_DOWN over that distance but not over a tenth of it.
+  const cliff = terrain((_x, z) => (z > LOOK_AHEAD ? 0 : -20 * STEP_DOWN))
+
+  // A tiny step — one frame of a fast machine — still sees the edge coming
+  // and launches. Tie the look-ahead to the frame and this walks off the lip
+  // instead, a hair at a time, with gravity doing what the leap should.
+  expect(step(cliff, 0, LOOK_AHEAD * 1.5, NORTH, -LOOK_AHEAD / 10).outcome).toBe('falling')
+  // And a whole step sees it too — the look-ahead is a floor, not a cap.
+  expect(step(cliff, 0, LOOK_AHEAD * 1.5, NORTH, -LOOK_AHEAD).outcome).toBe('falling')
+  // Level ground a step ahead is still just a walk.
+  expect(step(terrain(() => 0), 0, 0, NORTH, LOOK_AHEAD / 10).outcome).toBe('moved')
 })

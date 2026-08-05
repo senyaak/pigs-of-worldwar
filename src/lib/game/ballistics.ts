@@ -103,26 +103,21 @@ export function bounceSpeed(impact: number, restitution: number): number {
 }
 
 /**
- * What is left of a sliding pig's speed after `seconds` of ground friction.
+ * KNOWN DIVERGENCE — contact softening.
  *
- * The NUMBERS are the game's: `Pig::SetPhysicsMaterial` (exe 0x467e70)
- * divides both by 4096 and stores them as plain floats on the body, at +0x58
- * and +0x5c. The LAW is not. Whatever consumes them lives in the generic
- * rigid-body solver at 0x40f110 — 5.9 KB that combines two bodies'
- * coefficients (`fld [edi+5ch]; fmul [ebx+5ch]`) and has not been unpicked.
+ * The original never snaps a body to the surface. It lets it penetrate and
+ * pushes it back out by a correction vector scaled by a per-contact bias:
+ * born at 0.2 (exe 0x40f0c0, called from the contact constructor at
+ * 0x40f161), losing 0.005 a solve down to a floor of 0.02 (0x410685), and
+ * applied through `vec3 * scalar` at 0x404f60. A contact that persists is
+ * separated by less and less, which is what keeps a resting body from
+ * buzzing.
  *
- * So this reads friction as the fraction a frame takes off, which puts the
- * two values in the right order — a pig fresh off a wall at 0.15 slides
- * further than a normal one at 0.25 — and is otherwise a guess. Replace it
- * when 0x40f110 gives up its integrator.
+ * Here a landing pins the pig to the ground height instead, so there is no
+ * penetration to correct and no bias to decay. Everything else on this page
+ * is the exe's; this one is not modelled at all. Doing it properly means
+ * changing how a landing resolves, not adding a constant.
  */
-export function slide(speed: number, friction: number, seconds: number): number {
-  return speed * Math.pow(1 - friction, seconds / FRAME_SECONDS)
-}
-
-/** Below this the slide has stopped and the pig gets up (world units/sec).
- * Invented: the original's own cutoff is inside 0x40f110 with the rest. */
-export const SLIDE_STOP = 40
 
 /**
  * An exe speed in ours. The original's are distances per logic frame — its

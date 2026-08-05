@@ -33,12 +33,24 @@
 // collision path, and there are no objects in the scene yet. Their rules are
 // recorded in ../../../../pigs-disasm/movement/notes.md for when there are.
 
+import { FRAME_SECONDS } from './ballistics'
 import { clampToWorld, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
 
 /** Drop the feet this far looking for ground before declaring a fall
  * (exe 0x4bd340, in its own vertical scale — see `fromExeY`). */
+/** How fast a pig walks, world units per second (a tile is 512). */
+export const WALK_SPEED = 900
+
 export const STEP_DOWN = fromExeY(32)
+
+/**
+ * How far ahead the ground is checked for an edge: one of the original's
+ * walking steps. Its `TryMove` runs once a logic frame and moves `nDist`, so
+ * the check and the step were the same distance; ours must not shrink with
+ * the frame rate.
+ */
+export const LOOK_AHEAD = WALK_SPEED * FRAME_SECONDS
 /** A fall keeps this much of the walking speed horizontally
  * (exe `|nDist| * 3 / 2`). */
 export const FALL_SPEED_FACTOR = 1.5
@@ -74,9 +86,24 @@ export function step(
   const wantZ = z + Math.cos(heading) * distance
   const { x: toX, z: toZ } = clampToWorld(wantX, wantZ)
   if (toX !== wantX || toZ !== wantZ) return { outcome: 'limit', x, z }
+
+  // The edge is looked for a FIXED distance ahead, not at wherever this
+  // frame's step happened to land. The original tests the ground one
+  // `nDist` on — one whole walking step at its own frame rate — so a pig
+  // running at a drop launches off it. Testing our own step instead makes
+  // the look-ahead a function of the frame rate: at 60 Hz it is half as far,
+  // no single step ever clears STEP_DOWN, and the pig creeps over the lip
+  // and walks down the face while gravity does the work. It should leave the
+  // ground.
+  const reach = Math.max(Math.abs(distance), LOOK_AHEAD)
+  const aheadX = x + Math.sin(heading) * Math.sign(distance) * reach
+  const aheadZ = z + Math.cos(heading) * Math.sign(distance) * reach
   // Game-space heights grow DOWNWARD, so a bigger height is lower ground.
-  const drop = query.height(toX, toZ) - query.height(x, z)
-  if (drop > STEP_DOWN && !query.isWater(toX, toZ)) return { outcome: 'falling', x: toX, z: toZ }
+  const here = query.height(x, z)
+  if (query.height(aheadX, aheadZ) - here > STEP_DOWN && !query.isWater(toX, toZ)) {
+    return { outcome: 'falling', x: toX, z: toZ }
+  }
+  const drop = query.height(toX, toZ) - here
   if (!query.walkable(toX, toZ)) return { outcome: 'blocked', x, z }
   return { outcome: 'moved', x: toX, z: toZ }
 }

@@ -17,12 +17,10 @@ import {
   RESTITUTION_STUCK,
   FRICTION_FREE,
   FRICTION_STUCK,
-  SLIDE_STOP,
   BOUNCE_CUTOFF,
   bounceOff,
   bounceSpeed,
   easeBounciness,
-  slide,
   slopePull
 } from '../../src/lib/game/ballistics'
 
@@ -71,18 +69,6 @@ test('a bounce is a hop, not a relaunch: it never returns most of the impact', (
 test('the eject waits under a second — the original waits 25 frames', () => {
   expect(EJECT_SECONDS).toBeCloseTo(25 * FRAME_SECONDS)
   expect(EJECT_SECONDS).toBeLessThan(1)
-})
-
-test('a landed pig slides on, and a pig off a wall slides furthest', () => {
-  // Friction is the fraction a frame takes off, so the wedged pig — the
-  // slippery one — keeps more of its speed at every step.
-  const free = slide(1000, FRICTION_FREE, FRAME_SECONDS)
-  const wedged = slide(1000, FRICTION_STUCK, FRAME_SECONDS)
-  expect(wedged).toBeGreaterThan(free)
-  expect(free).toBeLessThan(1000)
-
-  // Both stop: a slide is a slide, not perpetual motion.
-  expect(slide(1000, FRICTION_STUCK, 1)).toBeLessThan(SLIDE_STOP)
 })
 
 test('a jump costs a cooldown, and it is shorter than being wedged', () => {
