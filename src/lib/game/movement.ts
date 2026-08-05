@@ -19,12 +19,12 @@
 // collision path, and there are no objects in the scene yet. Their rules are
 // recorded in ../../../../pigs-disasm/movement/notes.md for when there are.
 
-import { WORLD_LIMIT } from './terrain'
+import { WORLD_LIMIT, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
 
 /** Drop the feet this far looking for ground before declaring a fall
- * (exe 0x4bd340). */
-export const STEP_DOWN = 32
+ * (exe 0x4bd340, in its own vertical scale — see `fromExeY`). */
+export const STEP_DOWN = fromExeY(32)
 /** A fall keeps this much of the walking speed horizontally
  * (exe `|nDist| * 3 / 2`). */
 export const FALL_SPEED_FACTOR = 1.5

@@ -30,12 +30,15 @@ the arms reveal a sign error**. Full derivation with three proof scripts:
 
 **The model faces +X**, hence `PIG_HEADING_OFFSET = -π/2`.
 
-**World Y is TWICE the height the PMG stores** (`HEIGHT_SCALE`). The exe's
-collision sampler and `afAdjustMapHeights` in `_d3d.dll`, which builds the
-visible mesh, both double it. Terrain rendered at 1× for several commits and
-looked plausible — a uniformly flattened world always does. Every absolute
-constant taken from the exe (the 128-unit step-up, 32-unit step-down) is in
-world units and only makes sense against doubled heights.
+**`HEIGHT_SCALE` is the one vertical knob, and it is 1 against the exe.**
+The exe doubles the PMG heights in three places — collision sampler,
+`afAdjustMapHeights` in `_d3d.dll`, the map's own bounds — and its loader
+copies them in untouched, all verified. But a doubled CAMP plays as a
+mountain range and reads as stretched next to the original, so the remaster
+renders 1×. Do not "fix" this back from the disassembly alone; the
+contradiction is written up in `../pigs-disasm/movement/notes.md` and wants
+whatever undoes the doubling to be found first. Vertical constants lifted
+from the exe go through `fromExeY`, so they follow the knob.
 
 **Terrain height never blocks a pig, and `MapTileSlip` is not slip.** Both
 were got wrong once. The exe treats hitting the landscape as a successful

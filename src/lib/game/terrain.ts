@@ -8,13 +8,31 @@ import type { PigSpawn } from './game'
 const BLOCK_SPAN = TILES_PER_SIDE * TILE_STEP
 
 /**
- * World Y is TWICE the int16 the PMG stores. Both the exe's collision
- * sampler and `afAdjustMapHeights` in `Data/_d3d.dll`, which builds the
- * visible mesh, double the value on the way out
- * (`../pigs-disasm/movement/notes.md`). Everything horizontal — the 512
- * tile, the world limits — is already in world units.
+ * How tall the world is, per unit of stored PMG height.
+ *
+ * The exe doubles: `Map::SampleHeight` ends in `shl eax,1`,
+ * `afAdjustMapHeights` in `Data/_d3d.dll` doubles again when it builds the
+ * visible mesh, the map's own bounds are stored doubled, and the PMG loader
+ * (0x4a5250) copies the int16 across untouched — so nothing halves it first.
+ * Three sites, all checked.
+ *
+ * And yet a doubled CAMP plays as a mountain range: median slope 26.6°
+ * against 14° at 1x, and it reads as stretched next to the original. The
+ * remaster's yardstick is the original's look, so 1x it is, and the exe
+ * finding stays written down in `../pigs-disasm/movement/notes.md` with the
+ * contradiction unresolved rather than quietly dropped.
+ *
+ * Everything horizontal — the 512 tile, the world limits — is unaffected.
  */
-export const HEIGHT_SCALE = 2
+export const HEIGHT_SCALE = 1
+
+/**
+ * A vertical constant lifted from the exe, in OUR world. The exe's own
+ * numbers are in its doubled space, so they follow HEIGHT_SCALE: change the
+ * scale above and step-downs, standable relief and the rest keep meaning the
+ * same thing about the same terrain.
+ */
+export const fromExeY = (units: number): number => (units * HEIGHT_SCALE) / 2
 
 /** The world limit a pig's position is clamped to (exe 0x3000). */
 export const WORLD_LIMIT = 12288
@@ -181,7 +199,7 @@ export class TerrainQuery {
     ]
     // Flat enough that a pig will not immediately walk off it: two of
     // `movement.ts`'s STEP_DOWN, which is where a walk turns into a fall.
-    return Math.max(...corners) - Math.min(...corners) < 64
+    return Math.max(...corners) - Math.min(...corners) < fromExeY(64)
   }
 
   /**
