@@ -49,6 +49,17 @@ the wedge counter ejects it. Only the world limit refuses, and only empty
 air under the feet changes the outcome. Refusing at a wall was tried here
 and it walled pigs IN on top of cliffs — a cliff lip is a wall tile too.
 
+**The ground carries its own light, and the engine must not add one.** Each
+PMG vertex stores a brightness byte (how-doc: "unknown ≤255") that the
+original modulates the tile texture by, Gouraud across the triangle — which
+is the whole reason its hills look rounded rather than faceted. It fits a
+light pointing straight up with almost no ambient (ARCHI R² 0.81), and
+neighbouring blocks store the same value on the vertices they share, so the
+gradient is continuous over the whole map. `three/terrain.ts` draws it unlit,
+texture × shade, with the shade converted to linear first; lighting those
+polygons again — especially with the per-face normals `computeVertexNormals`
+gives split vertices — is exactly the faceting it replaces.
+
 **`MapTileSlip` is not slip** — it is which half or diagonal of a wall tile
 is solid, read by `Map::IsBlocked` and by nothing else.
 

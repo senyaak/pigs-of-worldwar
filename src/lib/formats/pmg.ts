@@ -36,6 +36,18 @@ export interface TerrainBlock {
   z: number
   /** 5×5 vertex heights, row-major. */
   heights: Int16Array
+  /**
+   * 5×5 baked vertex brightness, row-major, 0..255 with 255 unshaded — the
+   * ground's lighting, and the reason the original's hills read as round.
+   *
+   * how-doc calls this "unknown ≤255". Least squares over a whole map's
+   * vertex normals says otherwise: brightness ≈ 249·n·(0,1,0) + 5 on ARCHI
+   * (R² 0.81) — a light straight overhead with next to no ambient. CAMP fits
+   * looser (R² 0.31) because there is baked shadowing on top of the slope
+   * term. Neighbouring blocks store identical values on the vertices they
+   * share (0 conflicts on every map checked), so the grid is continuous.
+   */
+  shades: Uint8Array
   /** 4×4 tiles, row-major. */
   tiles: TerrainTile[]
 }
@@ -55,9 +67,12 @@ export function parsePmg(data: Uint8Array): TerrainBlock[] {
     // absolute, so neither is needed.
     const z = view.getInt16(base + 4, true)
 
+    // Four bytes per vertex: s16 height, u8 shade, one always-zero byte.
     const heights = new Int16Array(VERTS_PER_SIDE * VERTS_PER_SIDE)
+    const shades = new Uint8Array(heights.length)
     for (let vertex = 0; vertex < heights.length; vertex++) {
       heights[vertex] = view.getInt16(base + 8 + vertex * 4, true)
+      shades[vertex] = view.getUint8(base + 8 + vertex * 4 + 2)
     }
 
     const tiles: TerrainTile[] = []
@@ -71,7 +86,7 @@ export function parsePmg(data: Uint8Array): TerrainBlock[] {
         texture: view.getUint32(o + 11, true)
       })
     }
-    blocks.push({ x, z, heights, tiles })
+    blocks.push({ x, z, heights, shades, tiles })
   }
   return blocks
 }

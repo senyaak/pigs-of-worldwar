@@ -4,6 +4,12 @@
 // group carries the 180° X-rotation to Y-up. Tiles are grouped by texture so
 // each of the ~240 map textures binds once. Tile UVs honor the rotate/flip
 // byte; the rotation direction is a visual best-fit (docs/formats.md).
+//
+// The ground is NOT lit by the scene. Every PMG vertex carries its own baked
+// brightness and the original just modulates the texture by it, Gouraud
+// across the tile — which is what makes its hills look rounded instead of
+// faceted. Lighting these polygons a second time would fight that, so the
+// material is unlit and the shade rides in as vertex colour.
 
 import * as THREE from 'three'
 import type { TerrainBlock, TerrainTexture } from '../api'
@@ -15,6 +21,18 @@ const VERTS = 5
 const FLIP_X = 1
 const ROTATE_90 = 2
 const ROTATE_180 = 4
+
+/**
+ * Shade byte → linear-space multiplier.
+ *
+ * The original scales the texel in display space; three's vertex colours are
+ * in the linear working space, so the sRGB transfer function goes in here or
+ * every slope comes out washed out (0.7 display is 0.45 linear).
+ */
+const SHADE_TO_LINEAR = Float32Array.from({ length: 256 }, (_, i) => {
+  const s = i / 255
+  return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+})
 
 export interface Terrain {
   /** Add THIS to the scene; already converted to Y-up. */
@@ -67,9 +85,14 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
 
   const positions = new Float32Array(tiles.length * 6 * 3)
   const uvs = new Float32Array(tiles.length * 6 * 2)
+  const colors = new Float32Array(tiles.length * 6 * 3)
   const geometry = new THREE.BufferGeometry()
   const materials: THREE.Material[] = []
-  const fallback = new THREE.MeshStandardMaterial({ color: 0x777777, side: THREE.DoubleSide })
+  const fallback = new THREE.MeshBasicMaterial({
+    color: 0x777777,
+    side: THREE.DoubleSide,
+    vertexColors: true
+  })
 
   let corner = 0
   let groupStart = 0
@@ -85,7 +108,7 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
       map.minFilter = THREE.LinearFilter
       map.colorSpace = THREE.SRGBColorSpace
       map.needsUpdate = true
-      materials.push(new THREE.MeshStandardMaterial({ map, side: THREE.DoubleSide }))
+      materials.push(new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide, vertexColors: true }))
     } else {
       materials.push(fallback)
     }
@@ -114,12 +137,22 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
       -block.heights[r * VERTS + c] * HEIGHT_SCALE,
       block.z - r * TILE_STEP
     ])
+    // The same 5×5 grid carries the baked brightness. Blocks agree on the
+    // vertices they share, so a tile edge is a shade the neighbour repeats
+    // and the gradient runs on across the whole map.
+    const shades = [
+      [col, row],
+      [col + 1, row],
+      [col, row + 1],
+      [col + 1, row + 1]
+    ].map(([c, r]) => SHADE_TO_LINEAR[block.shades[r * VERTS + c]])
     const uv = tileUvs(tile.rotateFlip)
     // Two triangles: ACB + BCD — counter-clockwise when seen from up
     // (-Y in the game's Y-down space), matching the models' convention.
     for (const i of [0, 2, 1, 1, 2, 3]) {
       positions.set(corners[i], corner * 3)
       uvs.set(uv[i], corner * 2)
+      colors.set([shades[i], shades[i], shades[i]], corner * 3)
       corner++
     }
   }
@@ -127,7 +160,10 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
 
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
-  geometry.computeVertexNormals()
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  // No normals: an unlit material never reads them, and the per-face ones
+  // computeVertexNormals gave these split vertices are exactly the faceting
+  // the baked shade replaces.
 
   const mesh = new THREE.Mesh(geometry, materials)
   const group = new THREE.Group()

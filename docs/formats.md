@@ -182,7 +182,7 @@ ARCHI.PMG is 94208 bytes). Per block:
 | 2      | 2    | s16       | base height (how-doc: unreliable; heights are absolute anyway) |
 | 4      | 2    | s16       | z offset (rows advance −z) |
 | 6      | 2    | s16       | unknown |
-| 8      | 100  | (s16+s16)×25 | 5×5 vertex grid: height + unknown ≤255 |
+| 8      | 100  | (s16+u8+u8)×25 | 5×5 vertex grid: height + shade + zero |
 | 108    | 4    | u32       | always 0 |
 | 112    | 256  | 16 bytes × 16 | 4×4 tiles |
 
@@ -195,6 +195,21 @@ Vertex heights are **elevation, up-positive** (found here) — the opposite of
 the models' Y-down vertices: water tiles sit at the small values on every map
 checked (ARCHI sea ≈ 132 vs land ≈ 1337). An engine in Y-down space must
 negate them.
+
+The vertex byte how-doc records as "unknown ≤255" is **baked brightness**
+(found here), and it is what makes the original's ground look rounded: the
+texture is modulated by it and interpolated across the tile, so slopes darken
+smoothly instead of breaking into facets. Fitting it against the vertex
+normals of a whole map gives a light pointing straight up and almost no
+ambient — ARCHI `shade ≈ 249·n·(0,1,0) + 5`, R² 0.81, 30% of vertices at the
+255 ceiling; CAMP fits the same light at R² 0.31 with baked shadowing on top,
+DESVAL 0.69. The high byte of the pair is zero on every map checked, and
+blocks store identical shade *and* height on the vertices they share, so the
+5×5 grids join into one continuous 65×65 grid with no seams.
+
+An engine that lights these polygons itself is drawing the shading twice, and
+per-face normals over split vertices is exactly the faceted look the baked
+shade avoids — the remake draws the ground unlit, texture × shade.
 
 The slip byte marks sliding ground; nonzero values are direction hints
 (how-doc's `MapTileSlip`: 1 Bottom … 8 TopRight), but on CAMP some hints

@@ -77,6 +77,8 @@ export interface TerrainBlock {
   x: number
   z: number
   heights: Int16Array
+  /** Baked vertex brightness, 0..255 (255 unshaded). */
+  shades: Uint8Array
   tiles: TerrainTile[]
 }
 

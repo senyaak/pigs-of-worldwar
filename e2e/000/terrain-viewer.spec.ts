@@ -7,10 +7,12 @@
 // every map is 16×16 blocks = 256, 4×4 tiles each = 4096; ARCHI.PTG holds
 // 238 textures.
 
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 
-import { PHASE_ENV, openAssets } from '../launch'
+import { GAME_DIR, PHASE_ENV, openAssets } from '../launch'
 import { expect, test } from '../app'
+import { BLOCKS_PER_SIDE, TILE_STEP, VERTS_PER_SIDE, parsePmg } from '../../src/lib/formats/pmg'
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
@@ -62,4 +64,37 @@ test('ARCHI renders: correct counts in the stats, terrain pixels on the canvas',
 
 
   expect(app.errors()).toEqual([])
+})
+
+// The ground's roundness is data, not lighting: every PMG vertex stores a
+// brightness the original modulates its texture by. Two properties make the
+// gradient continuous rather than tile-by-tile, and both are what a wrong
+// stride in the parser would break first.
+test('ARCHI carries baked vertex shade, and neighbouring blocks agree on it', () => {
+  const blocks = parsePmg(new Uint8Array(readFileSync(path.join(GAME_DIR, 'Maps', 'ARCHI.PMG'))))
+  const all = blocks.flatMap((block) => [...block.shades])
+  expect(all).toHaveLength(BLOCKS_PER_SIDE * BLOCKS_PER_SIDE * VERTS_PER_SIDE * VERTS_PER_SIDE)
+
+  // Shade, not a constant and not noise: bright almost everywhere, darker on
+  // the slopes, and never the 0 an off-by-two read would land on.
+  expect(Math.max(...all)).toBe(255)
+  expect(Math.min(...all)).toBeGreaterThan(0)
+  expect(new Set(all).size).toBeGreaterThan(50)
+  expect(all.filter((shade) => shade === 255).length / all.length).toBeGreaterThan(0.25)
+
+  // A block's outer ring of vertices is its neighbour's too, and the file
+  // stores both copies. They match — so a tile edge is never a seam.
+  const seen = new Map<string, number>()
+  for (const block of blocks) {
+    for (let row = 0; row < VERTS_PER_SIDE; row++) {
+      for (let col = 0; col < VERTS_PER_SIDE; col++) {
+        const key = `${block.x + col * TILE_STEP},${block.z - row * TILE_STEP}`
+        const shade = block.shades[row * VERTS_PER_SIDE + col]
+        if (seen.has(key)) expect({ key, shade }).toEqual({ key, shade: seen.get(key) })
+        seen.set(key, shade)
+      }
+    }
+  }
+  // 16×16 blocks of 5×5 vertices sharing their edges: a 65×65 grid.
+  expect(seen.size).toBe((BLOCKS_PER_SIDE * (VERTS_PER_SIDE - 1) + 1) ** 2)
 })

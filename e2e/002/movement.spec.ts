@@ -48,7 +48,9 @@ function terrain(
         slip: 0,
         ...tile(x + (i % TILES_PER_SIDE) * TILE_STEP, z - Math.floor(i / TILES_PER_SIDE) * TILE_STEP)
       }))
-      blocks.push({ x, z, heights, tiles })
+      // Movement never reads the shade; unshaded keeps the fixture honest.
+      const shades = new Uint8Array(VERTS_PER_SIDE * VERTS_PER_SIDE).fill(255)
+      blocks.push({ x, z, heights, shades, tiles })
     }
   }
   return new TerrainQuery(blocks)
