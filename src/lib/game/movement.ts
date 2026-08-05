@@ -12,22 +12,14 @@
 //
 //   1. clamp the candidate to the world limits — nothing left, refuse
 //   2. the ground there is more than STEP_DOWN below — walk off and fall
-//   3. it is a wall — refuse, and stay put
-//   4. otherwise walk, and take the ground height with you
+//   3. otherwise walk, and take the ground height with you
 //
-// THE ORDER OF 2 AND 3 IS THE WHOLE THING. Height never refuses a step: the
-// exe pins a pig to the landscape however steep, which is why a mountainside
-// is passable as far as the ground is concerned. What stops a pig is the
-// wall flag — not the gradient, which is why "can I climb this" does not
-// track steepness. But the lip of a cliff is a wall tile too, so asking
-// about the wall first walls a pig IN on top of one: it can neither climb
-// down nor step off, and a spawn ringed by cliff edges is a pig that never
-// moves again. Asking about the drop first lets it go over the edge.
-//
-// (`TryMove` itself never calls `Map::IsBlocked` — in the original a wall
-// stops a pig through the collision geometry that the object path tests, and
-// the tile flag is only consulted about where the pig already IS. With no
-// objects in the scene yet, the flag stands in for that geometry.)
+// NOTHING about the ground refuses a step — not its height and not the wall
+// flag. The exe pins a pig to the landscape however steep, and the wall flag
+// does not block at all: the landscape collider swaps in an almost
+// frictionless, almost perfectly elastic material and lets the physics deal
+// with it. Refusing at a wall was this remake's invention, and it walled
+// pigs IN on top of cliffs — the lip of a cliff is a wall tile too.
 //
 // Step-up and sidestep are deliberately absent: they belong to the object
 // collision path, and there are no objects in the scene yet. Their rules are
@@ -56,10 +48,8 @@ export const LOOK_AHEAD = WALK_SPEED * FRAME_SECONDS
 export const FALL_SPEED_FACTOR = 1.5
 
 export type MoveOutcome =
-  /** The world limits ate the whole step. */
+  /** The world limits ate the whole step — the only refusal there is. */
   | 'limit'
-  /** A wall stands there — the pig is where it started. */
-  | 'blocked'
   /** Walked off an edge; the caller hands over to ballistics. */
   | 'falling'
   /** Moved. */
@@ -104,6 +94,10 @@ export function step(
     return { outcome: 'falling', x: toX, z: toZ }
   }
   const drop = query.height(toX, toZ) - here
-  if (!query.walkable(toX, toZ)) return { outcome: 'blocked', x, z }
+  // No wall refusal, because the original has none. `0x415590` turns the
+  // landscape into friction 0.01 / restitution 0.99 wherever
+  // `Map::IsBlocked` says yes, and that is the whole of it: the pig walks
+  // in, an almost perfectly elastic floor throws it about, and the wedge
+  // counter ejects it. Refusing the step was this remake's own idea.
   return { outcome: 'moved', x: toX, z: toZ }
 }

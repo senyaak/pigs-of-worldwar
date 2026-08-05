@@ -235,28 +235,37 @@ test('shove a wall long enough and the pig is thrown off it', async ({ app }) =>
   expect(app.errors()).toEqual([])
 })
 
-test('jumping at a wall does not climb it, hop by hop', async ({ app }) => {
+test('a jump cannot be started from inside a wall, so it is no ladder', async ({ app }) => {
   const { page } = app
   await page.locator('#menu-new-game').click()
   await expect(page.locator('#battle')).toBeVisible()
 
-  // Shoving at a wall AND jumping: the reported way out of the map was to
-  // ride a jump into the cliff face, land higher up it, and go again. A
-  // pig may leave a wall it is in, never enter one — so no hop lands inside.
+  // Riding a jump into a cliff face, landing higher up it and going again is
+  // how a pig once climbed over everything and off the map. Walking in is
+  // allowed — the original refuses nothing about the ground — but the jump
+  // is not: "Can't jump from this tile type". So the climb ends on the first
+  // landing inside the wall.
   const wall = wallAboveASlope()
   const EAST = Math.PI / 2
   await warp(page, wall.x - 768, wall.z, EAST)
 
   await press(page, 'walkForward')
   try {
-    for (let hop = 0; hop < 6; hop++) {
-      await tap(page, 'jump')
-      await page.waitForTimeout(250)
-      const at = await debugState(page)
-      expect(wall.query.walkable(...positionOf(at)), `hop ${hop} ended inside the wall`).toBe(true)
-      expect(Math.abs(at.x), `hop ${hop} stayed on the map`).toBeLessThanOrEqual(WORLD_LIMIT)
-      expect(Math.abs(at.z), `hop ${hop} stayed on the map`).toBeLessThanOrEqual(WORLD_LIMIT)
-    }
+    await expect
+      .poll(async () => !wall.query.walkable(...positionOf(await debugState(page))), {
+        message: 'walked into the wall'
+      })
+      .toBe(true)
+
+    const inside = await debugState(page)
+    await tap(page, 'jump')
+    await page.waitForTimeout(150)
+    const after = await debugState(page)
+    // It may be shuddering on that near-elastic floor, but not JUMPING: a
+    // jump clears far more than the contact does.
+    expect(after.nodeY, 'no jump out of a wall').toBeGreaterThan(inside.nodeY - 200)
+    expect(Math.abs(after.x)).toBeLessThanOrEqual(WORLD_LIMIT)
+    expect(Math.abs(after.z)).toBeLessThanOrEqual(WORLD_LIMIT)
   } finally {
     await release(page, 'walkForward')
   }

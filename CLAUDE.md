@@ -40,14 +40,17 @@ contradiction is written up in `../pigs-disasm/movement/notes.md` and wants
 whatever undoes the doubling to be found first. Vertical constants lifted
 from the exe go through `fromExeY`, so they follow the knob.
 
-**Terrain height never blocks a pig, and `MapTileSlip` is not slip.** Both
-were got wrong once. The exe treats hitting the landscape as a successful
-move and pins the pig to the ground however steep; its step-up and sidestep
-belong to the OBJECT collision path, which the remake has no objects for
-yet. And the tile byte how-doc names `MapTileSlip` is the wall's shape —
-which half or diagonal of a `type & 0x80` tile is solid — read by
-`Map::IsBlocked` (0x4a7000) and by nothing else. A pig walks in a straight
-line; only a wall, the world edge, or empty air under its feet changes that.
+**Nothing about the ground refuses a step.** Not its height, not the wall
+flag. The exe pins a pig to the landscape however steep, and a wall is not a
+blocker at all: the landscape collider (`0x415590`) swaps the ground's
+material for friction 0.01 / restitution 0.99 wherever `Map::IsBlocked` says
+yes, and the pig is thrown about by an almost perfectly elastic floor until
+the wedge counter ejects it. Only the world limit refuses, and only empty
+air under the feet changes the outcome. Refusing at a wall was tried here
+and it walled pigs IN on top of cliffs — a cliff lip is a wall tile too.
+
+**`MapTileSlip` is not slip** — it is which half or diagonal of a wall tile
+is solid, read by `Map::IsBlocked` and by nothing else.
 
 **A tile is two triangles, not a bilinear patch**, split along
 (col+1,row)-(col,row+1) — the same diagonal the mesh uses, so collision and

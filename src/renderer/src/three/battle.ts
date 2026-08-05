@@ -14,6 +14,7 @@ import {
   FREE,
   groundMaterial,
   bounceOff,
+  bounceSpeed,
   easeBounciness,
   slopePull
 } from '../../../lib/game/ballistics'
@@ -215,8 +216,9 @@ export function buildBattle(
 
     const { x: px, z: pz } = active.pig.position
     const swimming = query.isWater(px, pz)
+    /** Standing in a wall: an almost elastic, almost frictionless floor. */
+    const inWall = !query.walkable(px, pz)
     let wedged = false
-    let shoving = false
 
     // Turning on the spot works in every grounded state.
     if (intent.turn !== 0 && airborne === null) {
@@ -228,17 +230,12 @@ export function buildBattle(
       setClip(active, airborne.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE)
       // Momentum carries; gravity does the rest.
       //
-      // A wall in the air is one-way: a pig may leave one it is already in —
-      // that is the whole point of throwing it out — but may not enter one.
-      // Both halves are needed. Without the first, an ejected pig is
-      // forbidden from leaving the wall it was ejected from; without the
-      // second, jump becomes a ladder, and a pig can hop up a cliff face a
-      // bound at a time and right off the edge of the world.
-      const inWall = !query.walkable(px, pz)
+      // Walls do not gate flight either. What stops the jump-ladder is the
+      // original's own rule: a pig standing in a wall cannot jump at all
+      // ("Can't jump from this tile type", exe 0x46b0c7), so landing inside
+      // one ends the climb rather than continuing it.
       const to = clampToWorld(px + airborne.vx * delta, pz + airborne.vz * delta)
-      if (inWall || query.walkable(to.x, to.z)) {
-        game.moveCurrentPig(to.x, to.z, active.pig.heading)
-      }
+      game.moveCurrentPig(to.x, to.z, active.pig.heading)
       const at = active.pig.position
       const ground =
         query.height(at.x, at.z) + (query.isWater(at.x, at.z) ? SWIM_SINK : 0) - active.mesh.footOffset
@@ -282,7 +279,7 @@ export function buildBattle(
       const forwardX = Math.sin(active.pig.heading)
       const forwardZ = Math.cos(active.pig.heading)
 
-      if (jumpRequested && !swimming && jumpReadyIn <= 0) {
+      if (jumpRequested && !swimming && jumpReadyIn <= 0 && !inWall) {
         // A jump is committed, not steered: the whole movement update is
         // skipped while the pig is in the air (`UpdateMovement` returns at
         // once on state 5), so it leaves the ground FORWARDS whatever the
@@ -312,8 +309,6 @@ export function buildBattle(
           game.moveCurrentPig(move.x, move.z, active.pig.heading)
           settle(active)
           setClip(active, swimming ? ANIM.SWIM : intent.walk > 0 ? ANIM.RUN : ANIM.WALK_BACK)
-        } else {
-          shoving = true
         }
       } else if (swimming) {
         setClip(active, ANIM.SWIM)
@@ -326,12 +321,22 @@ export function buildBattle(
     jumpRequested = false
     jumpReadyIn = Math.max(0, jumpReadyIn - delta)
 
-    // Wedged is either of two things: shoving at a wall that will not let
-    // the step through, or standing inside one — the original asks
-    // `Map::IsBlocked` once a frame at its own feet, and a pig that landed
-    // in a wall has to get out of it too. Both end the same way.
+    // Wedged is about where the pig IS — the original asks `Map::IsBlocked`
+    // once a frame at its own feet — and nothing else. There is no shoving
+    // to detect, because nothing refuses the step in the first place.
     const at = active.pig.position
-    wedged = airborne === null && (shoving || !query.walkable(at.x, at.z))
+    wedged = airborne === null && !query.walkable(at.x, at.z)
+    if (wedged) {
+      // The contact itself throws the pig about: a frame of gravity comes
+      // straight back off restitution 0.99, and 0.01 friction leaves nothing
+      // holding it. This is the shudder at a wall, and it is a SURFACE, not
+      // a refusal — the eject below is what finally clears it.
+      const ground = groundMaterial(query.tileType(at.x, at.z), true)
+      const back = bounceSpeed(GRAVITY * delta, bounciness.restitution * ground.restitution)
+      if (back > 0 && airborne === null) {
+        airborne = { vy: -back, vx: 0, vz: 0, bouncing: true }
+      }
+    }
     if (!wedged) wedgedSeconds = 0
     else {
       setClip(active, ANIM.SCRAMBLE)

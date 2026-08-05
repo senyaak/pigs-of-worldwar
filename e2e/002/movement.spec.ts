@@ -84,42 +84,42 @@ test('a drop within the step-down is just a step down', () => {
   expect(move.z).toBeCloseTo(STRIDE)
 })
 
-test('a wall refuses the step — but only after the drop is ruled out', () => {
-  // Shape 0: every tile north of z = 512 is solid all through.
+test('a wall does not refuse the step — nothing about the ground does', () => {
+  // Shape 0: every tile north of z = 512 is solid all through. The step goes
+  // in anyway. `0x415590` makes that ground friction 0.01 and restitution
+  // 0.99 instead of stopping anyone, and the scene throws the pig back out.
   const walled = terrain(
     () => 0,
     (_x, z) => (z >= 1024 ? { type: 0x80, slip: 0 } : {})
   )
   const move = step(walled, 0, 400, NORTH, STRIDE)
-  expect(move.outcome).toBe('blocked')
-  expect(move).toMatchObject({ x: 0, z: 400 })
+  expect(move.outcome).toBe('moved')
+  expect(move.z).toBeCloseTo(600)
+  // What the tile IS still matters — the scene reads it to pick the surface.
+  expect(walled.walkable(move.x, move.z)).toBe(false)
 
-  // Now the same wall with the ground falling away under it. A cliff lip is
-  // a wall tile too, so a pig that could not enter one could never step off
-  // a ledge — and a spawn ringed by them would never move again. The drop is
-  // asked about first, so this one goes over the edge.
+  // And the lip of a cliff, which is a wall tile too, is walked off rather
+  // than walled against: refusing here trapped pigs on top of cliffs.
   const ledge = terrain(
-    // Steeply: a heightfield ramps over a whole tile, so a shallow step
-    // down would not clear STEP_DOWN within one stride.
     (_x, z) => (z >= 1024 ? -40 * STEP_DOWN : 0),
     (_x, z) => (z >= 1024 ? { type: 0x80, slip: 0 } : {})
   )
   expect(step(ledge, 0, 400, NORTH, STRIDE).outcome).toBe('falling')
 })
 
-test('a shaped wall refuses only over its own half of the tile', () => {
+test('a shaped wall is that surface over only its own half of the tile', () => {
   // Shape 3 is solid where tz < 0.5, and tz runs -z: the half of the tile
   // furthest along +z. That tile spans z = 512..1024.
   const shaped = terrain(
     () => 0,
     (_x, z) => (z >= 1024 ? { type: 0x80, slip: 3 } : {})
   )
-  // Landing at z = 600 is tz = 0.83 — the open half, and a step goes there.
+  // z = 600 is tz = 0.83 — the open half. z = 900 is tz = 0.24 — the solid.
   expect(shaped.walkable(0, 600)).toBe(true)
-  expect(step(shaped, 0, 400, NORTH, STRIDE).outcome).toBe('moved')
-  // Landing at z = 900 is tz = 0.24 — inside the solid half, and refused.
   expect(shaped.walkable(0, 900)).toBe(false)
-  expect(step(shaped, 0, 400, NORTH, 500).outcome).toBe('blocked')
+  // Neither refuses the walk; the difference is the ground underfoot.
+  expect(step(shaped, 0, 400, NORTH, STRIDE).outcome).toBe('moved')
+  expect(step(shaped, 0, 400, NORTH, 500).outcome).toBe('moved')
 })
 
 test('the world limit refuses the step rather than sliding along it', () => {
