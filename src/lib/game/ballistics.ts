@@ -46,6 +46,14 @@ export const EJECT_SECONDS = 25 * FRAME_SECONDS
 export const CRUSH_SECONDS = 250 * FRAME_SECONDS
 
 /**
+ * A jump costs 15 frames before the next one is allowed: `TryJump` refuses
+ * under `[esi+1a4h] < 15`, and the pig update recharges that by one a frame.
+ * Spending it can go to -5 or -10 rather than 0 depending on `[esi+4ch]`,
+ * which is not decoded — so this is the SHORTEST wait the original allows.
+ */
+export const JUMP_COOLDOWN_SECONDS = 15 * FRAME_SECONDS
+
+/**
  * The hop's angle above the horizontal (exe pitch 0x3b6 of 0x1000).
  *
  * The exe also lifts the pig 100 units before launching (`add eax,64h`), but

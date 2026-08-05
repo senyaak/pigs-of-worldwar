@@ -9,6 +9,7 @@ import { test, expect } from '@playwright/test'
 
 import {
   EJECT_SECONDS,
+  JUMP_COOLDOWN_SECONDS,
   FRAME_SECONDS,
   FREE,
   RESTITUTION_FREE,
@@ -79,4 +80,11 @@ test('a landed pig slides on, and a pig off a wall slides furthest', () => {
 
   // Both stop: a slide is a slide, not perpetual motion.
   expect(slide(1000, FRICTION_STUCK, 1)).toBeLessThan(SLIDE_STOP)
+})
+
+test('a jump costs a cooldown, and it is shorter than being wedged', () => {
+  // 15 frames of recharge against the 25 a wall takes to give up on you.
+  expect(JUMP_COOLDOWN_SECONDS).toBeCloseTo(15 * FRAME_SECONDS)
+  expect(JUMP_COOLDOWN_SECONDS).toBeLessThan(EJECT_SECONDS)
+  expect(JUMP_COOLDOWN_SECONDS).toBeGreaterThan(0)
 })

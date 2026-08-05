@@ -9,6 +9,7 @@ import { TerrainQuery, clampToWorld } from '../../../lib/game/terrain'
 import { FALL_SPEED_FACTOR, STEP_DOWN, step } from '../../../lib/game/movement'
 import {
   EJECT_PITCH,
+  JUMP_COOLDOWN_SECONDS,
   EJECT_SECONDS,
   FREE,
   SLIDE_STOP,
@@ -146,6 +147,8 @@ export function buildBattle(
   /** How long the pig has been pressed into a wall, and how bouncy that has
    * made it — the original eases both while wedged (lib/game/ballistics). */
   let wedgedSeconds = 0
+  /** Seconds before the pig may jump again (exe: 15 frames of recharge). */
+  let jumpReadyIn = 0
   let bounciness = FREE
   /** Smoothed chase-camera position (world space). */
   const cameraPos = new THREE.Vector3()
@@ -207,6 +210,8 @@ export function buildBattle(
       game.endTurn()
       airborne = null
       jumpRequested = false
+    jumpReadyIn = Math.max(0, jumpReadyIn - delta)
+      jumpReadyIn = 0
       wedgedSeconds = 0
       bounciness = FREE
       focus(game.currentPig)
@@ -279,14 +284,20 @@ export function buildBattle(
       const forwardX = Math.sin(active.pig.heading)
       const forwardZ = Math.cos(active.pig.heading)
 
-      if (jumpRequested && !swimming) {
+      if (jumpRequested && !swimming && jumpReadyIn <= 0) {
+        // A jump is committed, not steered: the whole movement update is
+        // skipped while the pig is in the air (`UpdateMovement` returns at
+        // once on state 5), so it leaves the ground FORWARDS whatever the
+        // keys say and lands where that put it. And it costs a cooldown —
+        // the original will not take another for fifteen frames.
         airborne = {
           vy: JUMP_VELOCITY,
-          vx: forwardX * intent.walk * speed,
-          vz: forwardZ * intent.walk * speed,
+          vx: forwardX * speed,
+          vz: forwardZ * speed,
           bouncing: false,
           grounded: false
         }
+        jumpReadyIn = JUMP_COOLDOWN_SECONDS
       } else if (intent.walk !== 0) {
         // Straight ahead, as the original walks. Only the world edge refuses;
         // a big enough drop turns the step into a fall, and a wall is
