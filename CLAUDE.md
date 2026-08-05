@@ -70,8 +70,8 @@ gives a direction that is downhill on neither side.
 
 - `src/lib/formats/` — one pure reader per format (mad, tim, mgl, bmp, model,
   hir, mcap, pmg, ptg). No fs, no Electron, no three: they take bytes.
-- `src/lib/game/` — the rules (`Game`, `TerrainQuery`, `Mover`). Pure too, so
-  the domain specs drive them directly.
+- `src/lib/game/` — the rules (`Game`, `TerrainQuery`, `movement`,
+  `ballistics`). Pure too, so the domain specs drive them directly.
 - `src/main/` — `index.ts` lifecycle only, `gameDir.ts` locating the install,
   `assets.ts` loading through the readers, `ipc.ts` the IPC surface.
 - `src/renderer/src/` — `ui/` one module per view, `three/` scene/pig/terrain/
@@ -121,13 +121,31 @@ npm run typecheck && npm run build && npx playwright test
 Formats, models, textures, skeleton, 93 animations and terrain all parse and
 render. The menu wears the original art. The battle scene puts two squads on
 CAMP with the original's turn clock, tank controls, jumping, swimming, and
-ground movement taken from the exe: straight lines, sub-tile walls, a fall
-off anything more than 32 units below, and — for a pig that keeps shoving at
-a wall — two seconds of scrabbling, then being thrown clear of it and
-bouncing (`../pigs-disasm/movement/notes.md`, `src/lib/game/movement.ts`,
-`src/lib/game/ballistics.ts`).
+ground movement taken from the exe — see `../pigs-disasm/movement/notes.md`
+for the derivation of every constant in `src/lib/game/movement.ts` and
+`src/lib/game/ballistics.ts`.
 
-Next up is weapons — and footstep audio, whose event source is already
-settled in `../pigs-disasm/anim/audio-events.md`. Falling still uses
-hand-tuned gravity; the original's constants live behind
-`warhogs_.exe` 0x4707f0, noted but not yet dug out.
+What the exe gave up, in short: nothing about the ground refuses a step; a
+wall is a 0.01/0.99 surface that shakes a pig loose, and a pig inside one
+never lands; each terrain type carries its own friction and restitution, and
+type 11 is the one that plays the Scramble clip; a landing is binary at an
+impact of 25 a frame; a jump is committed, forward, and costs 15 frames.
+
+### Known divergences — deliberate, and each written up where it lives
+
+- **`HEIGHT_SCALE` is 1** though the exe doubles. See above.
+- **Contact softening is not modelled.** The original lets a body penetrate
+  and pushes it out by a decaying bias (0.2 → 0.02); a landing here pins to
+  the ground height, so there is nothing to decay. `BOUNCE_CUTOFF` stands in.
+- **Gravity, walk speed and turn rate are still hand-tuned.** The originals
+  are behind `warhogs_.exe` 0x4707f0 and the pig-class table the block copy
+  at 0x466de9 fills.
+
+### Threads left mid-pull
+
+- `0x406bb0`, 3280 bytes: the collision test itself. Knowing what else lives
+  in that world would settle whether objects need their own handling.
+- The flag at `+0x3a4` is a bitfield; only bit 3 (terrain type 11) is traced,
+  and six other sites write it.
+- The tile type's low 5 bits: 0x20 water, 0x80 wall and the twelve material
+  rows are known; the rest of the meanings are not.
