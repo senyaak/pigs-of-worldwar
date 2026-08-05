@@ -115,12 +115,15 @@ const EXPECTED: Record<number, number[][]> = {
   1: [[1, 0], [0, 0], [1, 1], [0, 1]],
   // Bits 1-2 are ONE 0..3 turn count, not two independent flags, and the
   // flip is applied BEFORE the turn — both are how the old fit went wrong.
-  2: [[1, 0], [1, 1], [0, 0], [0, 1]],
-  3: [[0, 0], [0, 1], [1, 0], [1, 1]],
+  // The quarter-turns run backward round the ring; the half-turn is its own
+  // opposite, so it is the anchor the other two were measured against
+  // (../pigs-disasm/terrain/turn.js, and the note on tileUvs).
+  2: [[0, 1], [0, 0], [1, 1], [1, 0]],
+  3: [[1, 1], [1, 0], [0, 1], [0, 0]],
   4: [[1, 1], [0, 1], [1, 0], [0, 0]],
   5: [[0, 1], [1, 1], [0, 0], [1, 0]],
-  6: [[0, 1], [0, 0], [1, 1], [1, 0]],
-  7: [[1, 1], [1, 0], [0, 1], [0, 0]]
+  6: [[1, 0], [1, 1], [0, 0], [0, 1]],
+  7: [[0, 0], [0, 1], [1, 0], [1, 1]]
 }
 /** CORNERS index of the corner diagonally across the tile. */
 const OPPOSITE = [3, 2, 1, 0]

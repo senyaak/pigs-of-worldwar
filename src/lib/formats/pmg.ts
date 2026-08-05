@@ -48,18 +48,28 @@ const RING = [
  * Where each of `corners` samples the tile's texture, under its byte.
  *
  * The original does exactly two things to the ring and nothing else
- * (`_d3d.dll` 0x10001000): FlipX swaps ring slots 0↔1 and 2↔3, then each
- * corner takes the UV of the slot `rot` places further round. The flip runs
- * FIRST — its block sits above the rotation's jump table and both work in
- * place. V is the texture ROW, top-down; the page blit (0x10007210) copies
- * the TIM straight, so the row is the row.
+ * (`_d3d.dll` 0x10001000): FlipX swaps ring slots 0↔1 and 2↔3, then the turn
+ * shifts which slot each corner takes. The flip runs FIRST — its block sits
+ * above the rotation's jump table and both work in place. V is the texture
+ * ROW, top-down; the page blit (0x10007210) copies the TIM straight.
+ *
+ * The shift runs BACKWARD round the ring, and that sign is the one thing
+ * here measured rather than read. 0x100010f2 reads as `slot i takes slot
+ * i+1`, and composing it forward through afSetMap and the draw loop gives
+ * the opposite of what the shipped maps show: over 883 steep tiles on eight
+ * maps, a one-sided wall texture agrees with the slope under it at -0.18 for
+ * the half-turn — which is its own opposite and so cannot be got wrong — and
+ * the quarter-turns only match that sign with the shift reversed
+ * (`../pigs-disasm/terrain/turn.js`). A reversal enters somewhere between
+ * that instruction and this function and has not been found; until it is,
+ * the maps win over my reading of them.
  *
  * Derivation, address by address: `../pigs-disasm/terrain/notes.md`.
  */
 export function tileUvs(rotateFlip: number, corners: number[][]): number[][] {
   const slots = rotateFlip & FLIP_X ? [RING[1], RING[0], RING[3], RING[2]] : RING
   const rot = (rotateFlip & ROTATE) >> ROTATE_SHIFT
-  const uvs = new Map(RING.map((corner, i) => [String(corner), slots[(i + rot) % 4]]))
+  const uvs = new Map(RING.map((corner, i) => [String(corner), slots[((i - rot) % 4 + 4) % 4]]))
   return corners.map((corner) => uvs.get(String(corner)) as number[])
 }
 
