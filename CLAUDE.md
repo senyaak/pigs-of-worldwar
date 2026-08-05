@@ -76,13 +76,19 @@ is solid, read by `Map::IsBlocked` and by nothing else.
 **The tile's rotate/flip byte is one flip bit and a 0..3 turn COUNT**, bits
 1-2, not how-doc's two independent flags, and the flip is applied BEFORE the
 turn. The four UVs are a ring round the quad: the byte mirrors ring slots
-0↔1 and 2↔3, then each corner takes the slot `rot` places further round.
-Unturned, the texture lands u along +x and v along +z with v the texture
-row. Every step of that is read out of `_d3d.dll`, table included
-(`../pigs-disasm/terrain/notes.md`), and it is pinned in
-`e2e/000/terrain-viewer.spec.ts`. It briefly looked wrong and was reverted —
-on a map that was still mirrored. Do not tune it by eye, and do not make it
-a setting: the engine has one behaviour.
+0↔1 and 2↔3, then each corner takes the slot `rot` places round. Unturned,
+the texture lands u along +x and v along +z, v being the texture row.
+
+**The turn's direction is the one thing here measured, not read.** The
+disassembly composes to a forward shift; the shipped maps say backward, and
+the half-turn settles it — it is its own opposite, so it cannot be got
+wrong, and the quarter-turns have to land on its side (883 steep tiles,
+`../pigs-disasm/terrain/turn.js`). A reversal enters somewhere between
+`0x100010f2` and our pixels and has NOT been found; everything around it
+reads clean twice over. So: the table is pinned byte by byte in
+`e2e/000/terrain-viewer.spec.ts` — do not tune it by eye, and do not make it
+a setting (tried; the engine has one behaviour) — but if the missing flip
+ever turns up, that sign is where it lands.
 
 **A tile is two triangles, not a bilinear patch**, split along
 (col+1,row)-(col,row+1) — the same diagonal the mesh uses, so collision and

@@ -178,9 +178,9 @@ ARCHI.PMG is 94208 bytes). Per block:
 
 | offset | size | type      | field |
 | ------ | ---- | --------- | ----- |
-| 0      | 2    | s16       | x offset (world; steps 2048 = 4 tiles × 512) |
+| 0      | 2    | s16       | x offset — **overwritten at load**, see below |
 | 2      | 2    | s16       | base height (how-doc: unreliable; heights are absolute anyway) |
-| 4      | 2    | s16       | z offset (rows advance −z) |
+| 4      | 2    | s16       | z offset — **overwritten, and the file's sign is the opposite** |
 | 6      | 2    | s16       | unknown |
 | 8      | 100  | (s16+u8+u8)×25 | 5×5 vertex grid: height + shade + zero |
 | 108    | 4    | u32       | always 0 |
@@ -188,8 +188,36 @@ ARCHI.PMG is 94208 bytes). Per block:
 
 Per tile: bytes 0–5 zero, byte 6 = type (`0x1F` mask type, `0x20` water,
 `0x40` mine, `0x80` wall), byte 7 = slip, bytes 8–9 zero, byte 10 =
-rotate/flip flags (`1` FlipX, `2` Rotate90, `4` Rotate180), bytes 11–14 =
-u32 texture index into the sibling PTG, byte 15 zero.
+rotate/flip, byte 11 = **u8** texture index into the sibling PTG, bytes
+12–15 zero. how-doc reads a u32 at 11–14; the exe reads bytes 10–11 as one
+u16 and unpacks `texture = word >> 8`, so the index is a single byte and the
+u32 is an accident of the zero padding.
+
+**A block's world position is its PLACE in the file, not the offsets it
+stores.** `Map::Load` (exe 0x4a5635) overwrites both before anything reads
+them: `x = (col − 8) × 2048`, `z = (row − 8) × 2048`, from `col = index % 16`
+and `row = index / 16`. The x matches the stored field; the z is its
+opposite, because the file counts z down where the game counts it up. So a
+vertex sits at `x = block.x + c × 512` and `z = block.z + r × 512`, **both
+counting up**, and the map spans the world exactly, −16384 to +16384 on each
+axis. Trusting the stored z builds the map back to front — invisible in
+isolation, because mesh and collision mirror together, and fatal to anything
+asymmetric. Pinned in `e2e/002/placement.spec.ts`.
+
+**The rotate/flip byte** is bit 0 FlipX and bits 1–2 a **0..3 quarter-turn
+count** — how-doc's separate `Rotate90`/`Rotate180` flags are that number's
+two bits, and treating them as independent operations gets a third of the
+tiles wrong. The library keeps a tile's four UVs as a ring around the quad,
+mirrors ring slots 0↔1 and 2↔3 for the flip, then turns by shifting which
+slot each corner takes — **flip first**. Unturned, the texture lands U along
++x and V along +z, V being the texture ROW, top-down.
+
+The turn's DIRECTION is the one part measured rather than read: the
+disassembly composes to a forward shift, the maps say backward, and the
+half-turn — its own opposite, so unmistakable — is what settles it. Numbers,
+addresses, and the reversal that has not been located:
+`../pigs-disasm/terrain/notes.md`. The table is pinned byte by byte in
+`e2e/000/terrain-viewer.spec.ts`.
 
 Vertex heights are **elevation, up-positive** (found here) — the opposite of
 the models' Y-down vertices: water tiles sit at the small values on every map
@@ -211,10 +239,10 @@ An engine that lights these polygons itself is drawing the shading twice, and
 per-face normals over split vertices is exactly the faceted look the baked
 shade avoids — the remake draws the ground unlit, texture × shade.
 
-The slip byte marks sliding ground; nonzero values are direction hints
-(how-doc's `MapTileSlip`: 1 Bottom … 8 TopRight), but on CAMP some hints
-point across or up the actual slope — deriving the slide from the terrain
-gradient matches the geometry better.
+The slip byte is not slip: `Map::IsBlocked` (exe 0x4a7000) reads its low
+nibble as WHICH half or diagonal of a wall tile is solid, and nothing else
+reads it at all. Its fractions run +x and +z, so the exe's shapes apply
+literally. Sliding ground is derived from the terrain gradient instead.
 
 **PTG — ground textures**: u32 count, then `count` equal-sized TIMs —
 `(fileSize − 4) / count` bytes each (verified: ARCHI.PTG = 238 × 576-byte
