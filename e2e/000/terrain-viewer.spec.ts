@@ -12,7 +12,7 @@ import path from 'node:path'
 
 import { GAME_DIR, PHASE_ENV, openAssets } from '../launch'
 import { expect, test } from '../app'
-import { BLOCKS_PER_SIDE, TILE_STEP, VERTS_PER_SIDE, parsePmg } from '../../src/lib/formats/pmg'
+import { BLOCKS_PER_SIDE, TILE_STEP, VERTS_PER_SIDE, parsePmg, tileUvs } from '../../src/lib/formats/pmg'
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
@@ -97,4 +97,49 @@ test('ARCHI carries baked vertex shade, and neighbouring blocks agree on it', ()
   }
   // 16×16 blocks of 5×5 vertices sharing their edges: a 65×65 grid.
   expect(seen.size).toBe((BLOCKS_PER_SIDE * (VERTS_PER_SIDE - 1) + 1) ** 2)
+})
+
+// What the tile's rotate/flip byte does is half settled. These are the half
+// that is: read out of `_d3d.dll` (../pigs-disasm/terrain/notes.md) and true
+// under EVERY one of the eight ring positions the remaining doubt is about.
+// A tile's four UVs are a RING, the byte's bits 1-2 are one 0..3 turn count
+// around it, and bit 0 mirrors — so two quarter-turns must land every corner
+// on its diagonal opposite, whichever position the ring sits in.
+const CORNERS = [
+  [0, 0],
+  [1, 0],
+  [0, 1],
+  [1, 1]
+]
+/** CORNERS index of the corner diagonally across the tile. */
+const OPPOSITE = [3, 2, 1, 0]
+
+test('the rotate/flip byte turns the texture the way the library turns it', () => {
+  for (let convention = 0; convention < 8; convention++) {
+    const seen = new Set<string>()
+    for (let byte = 0; byte < 8; byte++) {
+      const uvs = tileUvs(byte, CORNERS, convention)
+      // A bijection onto the texture's four corners — never a folded tile.
+      expect({ convention, byte, distinct: new Set(uvs.map(String)).size }).toEqual({
+        convention,
+        byte,
+        distinct: 4
+      })
+      seen.add(JSON.stringify(uvs))
+    }
+    // Eight bytes, eight different orientations.
+    expect({ convention, orientations: seen.size }).toEqual({ convention, orientations: 8 })
+
+    // Bits 1-2 are ONE count, not two flags: adding 2 to it (byte | 4) is the
+    // half-turn, and a half-turn round a four-corner ring is the diagonal.
+    for (const byte of [0, 1, 2, 3]) {
+      const straight = tileUvs(byte, CORNERS, convention)
+      const halfTurned = tileUvs(byte | 4, CORNERS, convention)
+      expect({ convention, byte, uvs: JSON.stringify(halfTurned) }).toEqual({
+        convention,
+        byte,
+        uvs: JSON.stringify(OPPOSITE.map((i) => straight[i]))
+      })
+    }
+  }
 })

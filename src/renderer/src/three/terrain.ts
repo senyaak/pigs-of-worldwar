@@ -14,13 +14,19 @@
 import * as THREE from 'three'
 import type { TerrainBlock, TerrainTexture } from '../api'
 import { HEIGHT_SCALE } from '../../../lib/game/terrain'
+import { DEFAULT_TILE_UV, tileUvs } from '../../../lib/formats/pmg'
 
 const TILE_STEP = 512
 const TILES = 4
 const VERTS = 5
-const FLIP_X = 1
-const ROTATE_90 = 2
-const ROTATE_180 = 4
+
+/** The tile's corners in the order this file builds them, as (a, b). */
+const TILE_CORNERS = [
+  [0, 0],
+  [1, 0],
+  [0, 1],
+  [1, 1]
+]
 
 /**
  * Shade byte → linear-space multiplier.
@@ -49,28 +55,11 @@ interface TileRef {
   rotateFlip: number
 }
 
-/** Unit-square UV corners for a tile, transformed by the rotate/flip byte. */
-function tileUvs(rotateFlip: number): number[][] {
-  // Corners in vertex-grid order: (0,0) (1,0) (0,1) (1,1); V follows +row.
-  let corners = [
-    [0, 0],
-    [1, 0],
-    [0, 1],
-    [1, 1]
-  ]
-  const rotate = (times: number): void => {
-    for (let i = 0; i < times; i++) {
-      corners = corners.map(([u, v]) => [v, 1 - u])
-    }
-  }
-  if (rotateFlip & ROTATE_90) rotate(1)
-  if (rotateFlip & ROTATE_180) rotate(2)
-  if (rotateFlip & FLIP_X) corners = corners.map(([u, v]) => [1 - u, v])
-  // Texture rows are top-down (TIM): flip V at the end.
-  return corners.map(([u, v]) => [u, 1 - v])
-}
-
 export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[]): Terrain {
+  // Which way the tile's texture goes on is still open (lib/formats/pmg.ts):
+  // set `powTileUv` in the console and reopen the map to try another.
+  const convention = (globalThis as { powTileUv?: number }).powTileUv ?? DEFAULT_TILE_UV
+
   // Collect every tile, then sort by texture for contiguous material groups.
   const tiles: TileRef[] = []
   for (const block of blocks) {
@@ -146,7 +135,7 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
       [col, row + 1],
       [col + 1, row + 1]
     ].map(([c, r]) => SHADE_TO_LINEAR[block.shades[r * VERTS + c]])
-    const uv = tileUvs(tile.rotateFlip)
+    const uv = tileUvs(tile.rotateFlip, TILE_CORNERS, convention)
     // Two triangles: ACB + BCD — counter-clockwise when seen from up
     // (-Y in the game's Y-down space), matching the models' convention.
     for (const i of [0, 2, 1, 1, 2, 3]) {
