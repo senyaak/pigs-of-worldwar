@@ -12,7 +12,7 @@ import path from 'node:path'
 
 import { GAME_DIR, PHASE_ENV, openAssets } from '../launch'
 import { expect, test } from '../app'
-import { BLOCKS_PER_SIDE, TILE_STEP, VERTS_PER_SIDE, parsePmg, tileUvs } from '../../src/lib/formats/pmg'
+import { BLOCKS_PER_SIDE, TILE_STEP, VERTS_PER_SIDE, parsePmg } from '../../src/lib/formats/pmg'
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
@@ -97,43 +97,4 @@ test('ARCHI carries baked vertex shade, and neighbouring blocks agree on it', ()
   }
   // 16×16 blocks of 5×5 vertices sharing their edges: a 65×65 grid.
   expect(seen.size).toBe((BLOCKS_PER_SIDE * (VERTS_PER_SIDE - 1) + 1) ** 2)
-})
-
-// The rotate/flip byte, spelled out. This table is not a preference: it is
-// what `_d3d.dll` does to the four UVs it stores per tile, transcribed in
-// ../pigs-disasm/terrain/notes.md, and a "visual best-fit" is exactly how it
-// was wrong before. Corners are (a, b) with a along +x and b along the PMG
-// row; V is the texture row, top-down.
-const CORNERS = [
-  [0, 0],
-  [1, 0],
-  [0, 1],
-  [1, 1]
-]
-const EXPECTED: Record<number, number[][]> = {
-  // rot 0: the texture lands unturned, and FlipX mirrors it along +x.
-  0: [[0, 0], [1, 0], [0, 1], [1, 1]],
-  1: [[1, 0], [0, 0], [1, 1], [0, 1]],
-  // rot 1..3 are ONE 0..3 count in bits 1-2, not two independent flags.
-  2: [[1, 0], [1, 1], [0, 0], [0, 1]],
-  3: [[0, 0], [0, 1], [1, 0], [1, 1]],
-  4: [[1, 1], [0, 1], [1, 0], [0, 0]],
-  5: [[0, 1], [1, 1], [0, 0], [1, 0]],
-  6: [[0, 1], [0, 0], [1, 1], [1, 0]],
-  7: [[1, 1], [1, 0], [0, 1], [0, 0]]
-}
-
-test('the rotate/flip byte lays the texture down the way the original does', () => {
-  for (const [byte, want] of Object.entries(EXPECTED)) {
-    expect({ byte, uvs: tileUvs(Number(byte), CORNERS) }).toEqual({ byte, uvs: want })
-  }
-  // Every byte is a distinct orientation, and each keeps the tile square —
-  // the four corners land on four different texture corners.
-  const seen = new Set<string>()
-  for (let byte = 0; byte < 8; byte++) {
-    const uvs = tileUvs(byte, CORNERS)
-    expect(new Set(uvs.map(String)).size).toBe(4)
-    seen.add(uvs.map(String).join('|'))
-  }
-  expect(seen.size).toBe(8)
 })

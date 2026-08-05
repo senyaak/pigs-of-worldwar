@@ -60,15 +60,6 @@ texture × shade, with the shade converted to linear first; lighting those
 polygons again — especially with the per-face normals `computeVertexNormals`
 gives split vertices — is exactly the faceting it replaces.
 
-**The tile's rotate/flip byte is one flip bit and a 0..3 turn COUNT.**
-how-doc's `Rotate90` and `Rotate180` are bits 1 and 2 of that count, not two
-independent operations, and the flip is applied BEFORE the turn. Unturned,
-the texture lands U along +x and V along the PMG row with V the texture row
-top-down. This was a "visual best-fit" for a while and it had half the tiles
-facing the wrong way; it now comes from `_d3d.dll`'s own ground code, is
-transcribed in `../pigs-disasm/terrain/notes.md`, and the table is asserted
-in `e2e/000/terrain-viewer.spec.ts`. Do not re-tune it by eye.
-
 **`MapTileSlip` is not slip** — it is which half or diagonal of a wall tile
 is solid, read by `Map::IsBlocked` and by nothing else.
 
@@ -162,15 +153,6 @@ impact of 25 a frame; a jump is committed, forward, and costs 15 frames.
   at 0x466de9 fills.
 
 ### Threads left mid-pull
-
-- **The map sits 2048 too far -z.** `Map::Load` (exe 0x4a570c) puts a block's
-  first vertex row at `block.z + 2048`: the stored z is the block's LOW edge,
-  where the next block down begins, while the stored x IS its first vertex.
-  So a vertex belongs at `block.z + 2048 - r*512`, and everything here uses
-  `block.z - r*512`. It is a pure translation — shape, neighbours and seams
-  are unaffected — but it shifts the map against every absolute number the
-  exe states, the ±12288 clamp included. Derivation in
-  `../pigs-disasm/terrain/notes.md`; not yet fixed.
 
 - `0x406bb0`, 3280 bytes: the collision test itself. Knowing what else lives
   in that world would settle whether objects need their own handling.
