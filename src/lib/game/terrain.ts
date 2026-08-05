@@ -159,6 +159,29 @@ export class TerrainQuery {
     return half.origin + half.alongX * tx + half.alongZ * tz
   }
 
+  /**
+   * The unit normal of the triangle under (x, z), in GAME space (Y down, so
+   * an upward-facing surface has a NEGATIVE y). Flat ground gives
+   * (0, -1, 0).
+   *
+   * The half a pig is standing on is a plane, so this is exact rather than a
+   * sampled gradient — which matters, because the collision response
+   * reflects velocity about it and a normal that jitters between samples
+   * makes a pig jitter with it.
+   */
+  normal(x: number, z: number): { x: number; y: number; z: number } {
+    const patch = this.patch(x, z)
+    if (!patch) return { x: 0, y: -1, z: 0 }
+    const half = patch.tx + patch.tz < 1 ? patch.near : patch.far
+    // elevation = origin + alongX·tx + alongZ·tz, and tz runs -z, so in world
+    // terms the surface rises alongX per TILE_STEP of +x and alongZ per
+    // TILE_STEP of -z. Game height is -elevation.
+    const dydx = -half.alongX / TILE_STEP
+    const dydz = half.alongZ / TILE_STEP
+    const length = Math.hypot(dydx, dydz, 1)
+    return { x: dydx / length, y: -1 / length, z: dydz / length }
+  }
+
   private tileAt(x: number, z: number): TerrainTile | null {
     const col = Math.floor((x - this.minX) / BLOCK_SPAN)
     const row = Math.floor((this.maxZ - z) / BLOCK_SPAN)

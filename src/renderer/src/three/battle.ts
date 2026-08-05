@@ -13,9 +13,10 @@ import {
   EJECT_SECONDS,
   FREE,
   SLIDE_STOP,
-  bounceSpeed,
+  bounceOff,
   easeBounciness,
-  slide
+  slide,
+  slopePull
 } from '../../../lib/game/ballistics'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
@@ -253,15 +254,37 @@ export function buildBattle(
         query.height(at.x, at.z) + (query.isWater(at.x, at.z) ? SWIM_SINK : 0) - active.mesh.footOffset
 
       if (airborne.grounded) {
-        // Down and sliding on its behind. Friction eats the speed, and a pig
-        // just prised off a wall is the slippery one — that is what the
-        // wedged friction is for, and why it carries on down the slope.
+        // Down and sliding on its behind. Gravity keeps pulling along the
+        // slope every frame — that, not the landing, is where the runaway
+        // acceleration down a hillside comes from — and friction is all that
+        // fights it. A pig just prised off a wall is the slippery one.
         settle(active)
-        const carried = Math.hypot(airborne.vx, airborne.vz)
+        const n = query.normal(at.x, at.z)
+        const pull = slopePull(n, bounciness.friction, GRAVITY, delta)
+        const carried = Math.hypot(airborne.vx + pull.x, airborne.vz + pull.z)
         const left = slide(carried, bounciness.friction, delta)
+        // Leaving the ground again takes a real edge, not just a slope. The
+        // ground under a sliding pig drops by whatever the gradient gives
+        // over the distance it covered this frame, and a slide covers far
+        // more than a walking step — so measuring that drop against
+        // STEP_DOWN, which is a WALKING threshold, threw the pig back into
+        // the air every frame and it bunny-hopped down the hill instead of
+        // sliding. Only a drop beyond what the slope itself accounts for is
+        // an edge.
+        const travelled = Math.hypot(airborne.vx + pull.x, airborne.vz + pull.z) * delta
+        const gradient = Math.hypot(n.x, n.z) / Math.max(Math.abs(n.y), 1e-6)
+        const expected = travelled * gradient
         if (left < SLIDE_STOP) airborne = null
-        else if (ground - active.node.position.y > STEP_DOWN) airborne = { ...airborne, grounded: false }
-        else airborne = { ...airborne, vx: (airborne.vx * left) / carried, vz: (airborne.vz * left) / carried }
+        else if (ground - active.node.position.y > expected + STEP_DOWN) {
+          airborne = { ...airborne, grounded: false }
+        } else {
+          const scale = carried === 0 ? 0 : left / carried
+          airborne = {
+            ...airborne,
+            vx: (airborne.vx + pull.x) * scale,
+            vz: (airborne.vz + pull.z) * scale
+          }
+        }
       } else {
         airborne.vy += GRAVITY * delta
         const y = active.node.position.y + airborne.vy * delta
@@ -269,12 +292,22 @@ export function buildBattle(
           // Landing. Wedged pigs come down bouncier than free ones, which is
           // what makes coming off a wall read as a bounce and not a step; when
           // there is no bounce left, the pig slides out what it has.
-          const back = bounceSpeed(airborne.vy, bounciness.restitution)
+          // The solver's impulse, against the surface the pig actually hit:
+          // the normal part reflects and damps, the part running along the
+          // slope carries whole. Landing on a hillside therefore keeps its
+          // speed and goes on down it.
+          const hit = bounceOff(
+            { x: airborne.vx, y: airborne.vy, z: airborne.vz },
+            query.normal(at.x, at.z),
+            bounciness.restitution,
+            bounciness.friction
+          )
           active.node.position.set(at.x, ground, at.z)
+          const rebound = -hit.y
           airborne =
-            back > GRAVITY * delta
-              ? { ...airborne, vy: -back, bouncing: true }
-              : { ...airborne, vy: 0, bouncing: true, grounded: true }
+            rebound > GRAVITY * delta
+              ? { ...airborne, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true }
+              : { ...airborne, vx: hit.x, vy: 0, vz: hit.z, bouncing: true, grounded: true }
         } else {
           active.node.position.set(at.x, y, at.z)
         }

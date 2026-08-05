@@ -123,3 +123,74 @@ export function slide(speed: number, friction: number, seconds: number): number 
 /** Below this the slide has stopped and the pig gets up (world units/sec).
  * Invented: the original's own cutoff is inside 0x40f110 with the rest. */
 export const SLIDE_STOP = 40
+
+/** Below this closing speed a landing is contact, not a bounce (world
+ * units/sec). Ours, like SLIDE_STOP — see bounceOff. */
+export const BOUNCE_CUTOFF = 250
+
+export interface Velocity {
+  x: number
+  y: number
+  z: number
+}
+
+/**
+ * Hitting a surface, by the original's own rigid-body solver (exe 0x40f110,
+ * the impulse at 0x40f690):
+ *
+ * ```
+ * e = restitutionA * restitutionB        ; the coefficients MULTIPLY
+ * mu = frictionA * frictionB
+ * j = -(1 + e) * vn                      ; vn = closing speed along the normal
+ * ```
+ *
+ * So it is NOT the old velocity plus a standard push. Split the velocity at
+ * the contact normal: the part ALONG the normal is reflected and scaled by
+ * `e` — that is the bounce — while the part ALONG THE SURFACE is kept whole
+ * and only friction eats it. Which is why a pig that lands on a slope keeps
+ * the speed it arrived with and carries on down it, and why gravity, still
+ * pulling every frame after that, makes the slide accelerate.
+ *
+ * The ground is immovable, so its own coefficients are 1 and the pig's are
+ * the product.
+ */
+export function bounceOff(v: Velocity, normal: Velocity, restitution: number, friction: number): Velocity {
+  const vn = v.x * normal.x + v.y * normal.y + v.z * normal.z
+  // Leaving the surface already: nothing to respond to.
+  if (vn >= 0) return v
+  // Below a crawl there is no bounce left, only contact. Without this a
+  // discrete step bounces a pig forever: each landing returns a little, the
+  // next frame's gravity takes it back, and the pair never quite reaches
+  // zero. The original settles bodies with a countdown of its own — the
+  // scalar at +0xbc that the solver compares against 0.02 and walks down by
+  // 0.005 a step (exe 0x410685) — which is not decoded; this cutoff is ours.
+  const e = -vn > BOUNCE_CUTOFF && restitution > RESTITUTION_MIN ? restitution : 0
+  // Tangential first, then the reflected normal part on top of it. The exe's
+  // `>> 3` damping rides on the normal part alone — see bounceSpeed.
+  const keep = Math.max(0, 1 - friction)
+  const along = (c: 'x' | 'y' | 'z'): number => (v[c] - vn * normal[c]) * keep - ((e * vn) / 8) * normal[c]
+  return { x: along('x'), y: along('y'), z: along('z') }
+}
+
+/**
+ * What gravity does to a pig already lying on a slope: the part of it that
+ * points along the surface. On the flat this is nothing, which is why a
+ * landed pig on level ground just stops.
+ */
+export function slopePull(normal: Velocity, friction: number, gravity: number, seconds: number): Velocity {
+  // Coulomb: friction holds a body still until the slope out-pulls it, so
+  // ground shallower than the coefficient gives nothing away and a pig that
+  // lands there comes to rest. Without this the pull is a constant that a
+  // speed-proportional friction can never balance, and a landed pig creeps
+  // downhill for ever — which is what it did.
+  if (Math.hypot(normal.x, normal.z) <= friction * Math.abs(normal.y)) {
+    return { x: 0, y: 0, z: 0 }
+  }
+  // Gravity is (0, +g, 0) in game space (Y down). Subtract its normal part.
+  const gn = gravity * normal.y
+  return {
+    x: -gn * normal.x * seconds,
+    y: (gravity - gn * normal.y) * seconds,
+    z: -gn * normal.z * seconds
+  }
+}

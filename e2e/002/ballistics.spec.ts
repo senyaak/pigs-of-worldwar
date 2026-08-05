@@ -18,9 +18,11 @@ import {
   FRICTION_FREE,
   FRICTION_STUCK,
   SLIDE_STOP,
+  bounceOff,
   bounceSpeed,
   easeBounciness,
-  slide
+  slide,
+  slopePull
 } from '../../src/lib/game/ballistics'
 
 test('the wedged pig is the slippery one, and the free pig the grippy one', () => {
@@ -87,4 +89,58 @@ test('a jump costs a cooldown, and it is shorter than being wedged', () => {
   expect(JUMP_COOLDOWN_SECONDS).toBeCloseTo(15 * FRAME_SECONDS)
   expect(JUMP_COOLDOWN_SECONDS).toBeLessThan(EJECT_SECONDS)
   expect(JUMP_COOLDOWN_SECONDS).toBeGreaterThan(0)
+})
+
+test('a hit reflects across the normal and keeps what runs along the surface', () => {
+  const FLAT = { x: 0, y: -1, z: 0 } // game space: up is -y
+  const down = { x: 300, y: 900, z: 0 } // moving forward AND falling
+
+  const hit = bounceOff(down, FLAT, RESTITUTION_STUCK, 0)
+  // The normal part came back up — that is the bounce.
+  expect(hit.y).toBeLessThan(0)
+  // …and damped: a bounce is a hop, never a relaunch.
+  expect(Math.abs(hit.y)).toBeLessThan(down.y)
+  // The part along the surface is untouched by the impulse. This is the
+  // whole answer to "does it add up": along the ground it carries, across
+  // the ground it reflects.
+  expect(hit.x).toBeCloseTo(down.x)
+  expect(hit.z).toBeCloseTo(0)
+
+  // Friction is what eats the tangential part, nothing else.
+  expect(bounceOff(down, FLAT, RESTITUTION_STUCK, 0.25).x).toBeCloseTo(down.x * 0.75)
+
+  // Already leaving the surface: no response at all.
+  const up = { x: 300, y: -900, z: 0 }
+  expect(bounceOff(up, FLAT, RESTITUTION_STUCK, 0.25)).toEqual(up)
+})
+
+test('gravity along a slope is what keeps a landed pig moving', () => {
+  const FLAT = { x: 0, y: -1, z: 0 }
+  // On the level there is nothing left over sideways: a pig stops.
+  const level = slopePull(FLAT, 0, 5000, 0.1)
+  expect(level.x).toBeCloseTo(0)
+  expect(level.z).toBeCloseTo(0)
+
+  // On a slope there is, and it points DOWN the slope — the +x side is the
+  // low side of this normal, so the pull is +x.
+  const tilt = Math.hypot(0.5, 1)
+  const slope = { x: 0.5 / tilt, y: -1 / tilt, z: 0 }
+  const pull = slopePull(slope, 0, 5000, 0.1)
+  expect(pull.x).toBeGreaterThan(0)
+  expect(pull.y).toBeGreaterThan(0)
+
+  // And a steeper slope pulls harder, which is the acceleration you feel.
+  const steeper = { x: 0.9 / Math.hypot(0.9, 1), y: -1 / Math.hypot(0.9, 1), z: 0 }
+  expect(slopePull(steeper, 0, 5000, 0.1).x).toBeGreaterThan(pull.x)
+})
+
+test('friction holds a pig on gentle ground and lets go on steep', () => {
+  const gentle = { x: 0.05 / Math.hypot(0.05, 1), y: -1 / Math.hypot(0.05, 1), z: 0 }
+  // Shallower than the coefficient: nothing to slide down.
+  expect(slopePull(gentle, FRICTION_FREE, 5000, 0.1)).toEqual({ x: 0, y: 0, z: 0 })
+  // Steeper than it: away it goes — and the slippery, just-off-a-wall pig
+  // lets go of ground the grippy one still holds.
+  const middling = { x: 0.2 / Math.hypot(0.2, 1), y: -1 / Math.hypot(0.2, 1), z: 0 }
+  expect(slopePull(middling, FRICTION_FREE, 5000, 0.1).x).toBe(0)
+  expect(slopePull(middling, FRICTION_STUCK, 5000, 0.1).x).toBeGreaterThan(0)
 })
