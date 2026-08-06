@@ -10,7 +10,9 @@ import { parseArchive } from '../lib/formats/mad'
 import { getGameDir, insideGameDir, setGameDir, walkDir } from './gameDir'
 import {
   loadClips,
-  loadFrontendImage,
+  loadFont,
+  loadFrontendImages,
+  loadGameText,
   loadMapObjects,
   loadModel,
   loadSound,
@@ -68,13 +70,33 @@ export function registerIpc(): void {
     }
   })
 
-  ipcMain.handle('frontend:image', async (_event, entryName: string) => {
+  ipcMain.handle('frontend:images', async (_event, entryNames: string[]) => {
     const gameDir = getGameDir()
     if (!gameDir) return { ok: false, error: 'Game folder is not set' }
     try {
-      return { ok: true, image: await loadFrontendImage(gameDir, entryName) }
+      return { ok: true, images: await loadFrontendImages(gameDir, entryNames) }
     } catch (error) {
-      return fail(entryName, error)
+      return fail(entryNames.join(', '), error)
+    }
+  })
+
+  ipcMain.handle('frontend:font', async (_event, name: string) => {
+    const gameDir = getGameDir()
+    if (!gameDir) return { ok: false, error: 'Game folder is not set' }
+    try {
+      return { ok: true, font: await loadFont(gameDir, name) }
+    } catch (error) {
+      return fail(name, error)
+    }
+  })
+
+  ipcMain.handle('text:load', async (_event, which: string) => {
+    const gameDir = getGameDir()
+    if (!gameDir) return { ok: false, error: 'Game folder is not set' }
+    try {
+      return { ok: true, strings: await loadGameText(gameDir, which) }
+    } catch (error) {
+      return fail(which, error)
     }
   })
 

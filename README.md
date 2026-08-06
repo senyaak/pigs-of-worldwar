@@ -24,7 +24,12 @@ tests — see [docs/testing.md](docs/testing.md)).
 Double-click `play.bat` — it installs dependencies if needed, builds, and
 launches. Add `--windowed` to play in a desktop window instead of fullscreen.
 
-Controls (tank-style, as in the original):
+It opens on the game's own main menu. `↑`/`↓` move the lit bar and `Enter`
+chooses it — or use the mouse, which the original has no time for. Only ONE
+PLAYER leads anywhere yet: it opens the training ground. `F1` opens the asset
+browsers, which are the remake's own debug screens.
+
+Controls in the battle (tank-style, as in the original):
 
 | key | action |
 | --- | ------ |

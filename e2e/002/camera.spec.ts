@@ -14,6 +14,7 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { press, release, warp } from '../controller'
+import { startGame } from '../menu'
 import { TILE_STEP, parsePmg } from '../../src/lib/formats/pmg'
 import { parsePtg } from '../../src/lib/formats/ptg'
 import { buildWaterMask } from '../../src/lib/game/watermask'
@@ -101,7 +102,7 @@ function shoreOnCamp(): { x: number; z: number; query: TerrainQuery } {
 
 test('the camera holds a swimming pig up by its whole sink', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const shore = shoreOnCamp()

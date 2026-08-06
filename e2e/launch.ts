@@ -8,6 +8,8 @@ import { _electron as electron } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
 import path from 'node:path'
 
+import { tap } from './controller'
+
 /** Repo root — the folder holding package.json. */
 export const REPO_ROOT = path.dirname(__dirname)
 
@@ -53,9 +55,13 @@ export interface LaunchOptions {
  * `envFile` is required on purpose: a spec that forgets it would read and
  * clobber the developer's real .env.
  */
-/** From the main menu into the asset browsers (the debug file list). */
+/**
+ * From the main menu into the asset browsers (the debug file list). The
+ * original has no such screen, so it is not a menu bar — it is the remake's
+ * own F1, and the suite reaches it the same way the key does.
+ */
 export async function openAssets(page: Page): Promise<void> {
-  await page.locator('#menu-assets').click()
+  await tap(page, 'assets')
 }
 
 export async function launchApp(options: LaunchOptions): Promise<Launched> {

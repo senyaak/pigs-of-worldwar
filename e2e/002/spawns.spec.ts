@@ -14,6 +14,7 @@ import path from 'node:path'
 
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
+import { startGame } from '../menu'
 import { existsForPlayers, parsePog } from '../../src/lib/formats/pog'
 import { MAX_TEAMS, battleSides, mapSpawns, spawnTeams } from '../../src/lib/game/spawns'
 import type { SpawnPoint } from '../../src/lib/game/spawns'
@@ -88,7 +89,7 @@ test('a marker carries the class, and the class picks the art', () => {
 
 test('the battle fields the map’s own squads, dressed by class', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // The training ground fields exactly what it carries: one side, one pig,

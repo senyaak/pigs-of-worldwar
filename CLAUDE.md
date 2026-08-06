@@ -213,8 +213,13 @@ npm run typecheck && npm run build && npx playwright test
 
 Formats, models, textures, skeleton, 93 animations, terrain, water and the
 maps' OBJECTS all parse and render — CAMP draws its 147 props, the training
-ground's dummies, crates and bridge among them. The menu wears the original
-art. Squads are fielded from the map's OWN spawn markers — position,
+ground's dummies, crates and bridge among them. **The main menu IS the
+original screen**: the backdrop and the machinery out of FEBMP.MAD, the
+letters out of the FEText glyph tables, the labels out of fetext.bin — MAIN
+MENU over ONE PLAYER, MULTI-PLAYER, OPTIONS, QUIT APPLICATION, drawn on a
+640×480 canvas that is scaled whole and unsmoothed. Only ONE PLAYER leads
+anywhere (the training ground); the two unbuilt screens wear the font's dark
+shade, the way the original greys out what cannot be chosen. Squads are fielded from the map's OWN spawn markers — position,
 facing, side and CLASS, each class dressed from its own model in
 `Chars/british.mad` — so LIBERATE puts a saboteur, a hero and three grunts
 against four spies and a gunner, exactly where the original did. The battle
@@ -307,6 +312,19 @@ would be a stand-in nobody asked for.
   the test itself, is still undecoded), so `lib/game/obstacles.ts` draws its
   own line at a box two units across — which drops grass, flowers and the
   swimming fish, each of which carries a box exactly one unit wide.
+- **The menu's LAYOUT is the remake's own.** Every piece on it is the
+  original's, and where each piece SITS is not: the exe computes its screen
+  coordinates in the frontend's draw code rather than storing them, and
+  `../pigs-disasm/frontend/notes.md` traces that chain as far as the blitter
+  (0x41AFA0, called `draw(x, y, sprite, rect)`) and stops. So `LAYOUT` in
+  `ui/menu.ts` is a reading of the art — bars clear of the machine's grille,
+  the dial in its housing — and is meant to be corrected against play.
+  `select.mgl` is left out for the same reason: its window is 116 wide where
+  a bar's face is 144, so it frames something else somewhere else.
+- **The mouse works the menu, and the original's does not.** Hovering lights
+  a bar, clicking chooses it. The original is keyboard and pad only (it even
+  ships `nomouse.com`); this is the remake's convenience, and so is F1 for
+  the asset browsers, which are not a screen the original has.
 - **A pig cannot get ONTO a bridge, and the ramp is PARKED.** The deck
   sections are boxes and the shape-kind-1 pieces are bodiless, so a pig
   walks clean through the one it should be climbing. Play says plainly that

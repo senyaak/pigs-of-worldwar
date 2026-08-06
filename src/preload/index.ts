@@ -22,7 +22,9 @@ contextBridge.exposeInMainWorld('api', {
   loadSoundBank: (relPath: string): Promise<unknown> =>
     ipcRenderer.invoke('sound:bank', relPath),
   loadSound: (relPath: string): Promise<unknown> => ipcRenderer.invoke('sound:load', relPath),
-  loadFrontendImage: (entryName: string): Promise<unknown> =>
-    ipcRenderer.invoke('frontend:image', entryName),
+  loadFrontendImages: (entryNames: string[]): Promise<unknown> =>
+    ipcRenderer.invoke('frontend:images', entryNames),
+  loadFont: (name: string): Promise<unknown> => ipcRenderer.invoke('frontend:font', name),
+  loadGameText: (which: string): Promise<unknown> => ipcRenderer.invoke('text:load', which),
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit')
 })

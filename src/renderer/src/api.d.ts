@@ -154,19 +154,47 @@ export interface Api {
   loadMapObjects(relPath: string): Promise<LoadMapObjectsResult>
   loadSoundBank(relPath: string): Promise<LoadSoundBankResult>
   loadSound(relPath: string): Promise<LoadSoundResult>
-  loadFrontendImage(entryName: string): Promise<FrontendImageResult>
+  loadFrontendImages(entryNames: string[]): Promise<FrontendImagesResult>
+  loadFont(name: string): Promise<LoadFontResult>
+  loadGameText(which: string): Promise<LoadTextResult>
   quit(): Promise<void>
 }
 
 export interface FrontendImage {
+  name: string
   width: number
   height: number
+  /** RGBA with the magenta key already transparent. */
   rgba: Uint8Array
 }
 
-export type FrontendImageResult =
-  | { ok: true; image: FrontendImage }
+export type FrontendImagesResult =
+  | { ok: true; images: FrontendImage[] }
   | { ok: false; error: string }
+
+export interface Glyph {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface GlyphTable {
+  glyphs: Glyph[]
+  origin: { x: number; y: number }
+  height: number
+  space: number
+}
+
+export interface LoadedFont {
+  name: string
+  atlas: { width: number; height: number; rgba: Uint8Array }
+  table: GlyphTable
+}
+
+export type LoadFontResult = { ok: true; font: LoadedFont } | { ok: false; error: string }
+
+export type LoadTextResult = { ok: true; strings: string[] } | { ok: false; error: string }
 
 declare global {
   interface Window {

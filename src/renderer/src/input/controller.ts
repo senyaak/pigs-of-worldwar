@@ -24,8 +24,9 @@ export interface Controller {
   /** Called for one-shot actions (jump, endTurn). */
   onAction(listener: (action: Action) => void): () => void
   /** Route real keyboard events into the controller while `enabled()` is
-   * true; returns an unbind function. */
-  bindKeyboard(enabled: () => boolean): () => void
+   * true; returns an unbind function. Each view binds the map it reads by —
+   * the same arrow keys walk a pig and move a menu bar. */
+  bindKeyboard(enabled: () => boolean, bindings?: Record<string, Action>): () => void
 }
 
 export function createController(): Controller {
@@ -72,10 +73,10 @@ export function createController(): Controller {
       actionListeners.add(listener)
       return () => actionListeners.delete(listener)
     },
-    bindKeyboard(enabled) {
+    bindKeyboard(enabled, bindings = DEFAULT_BINDINGS) {
       const down = (event: KeyboardEvent): void => {
         if (!enabled()) return
-        const action = DEFAULT_BINDINGS[event.code]
+        const action = bindings[event.code]
         if (!action) return
         event.preventDefault()
         // Auto-repeat must not re-fire one-shot actions.
@@ -83,7 +84,7 @@ export function createController(): Controller {
         controller.press(action)
       }
       const up = (event: KeyboardEvent): void => {
-        const action = DEFAULT_BINDINGS[event.code]
+        const action = bindings[event.code]
         if (action) controller.release(action)
       }
       window.addEventListener('keydown', down)
@@ -135,6 +136,10 @@ declare global {
     pow?: {
       controller: Controller
       debug?: DebugHooks
+      /** The main menu, while it is the view: which bar is lit and what the
+       * bars say. The frontend draws on a canvas, so this is how a spec
+       * reads it (docs/testing.md). */
+      menu?: { selected(): number; labels(): string[] }
       /** Console command: restart the battle on another map —
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
       swapMap?(name?: string): Promise<boolean>

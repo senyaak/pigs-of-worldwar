@@ -25,6 +25,9 @@ function show(view: View): void {
   for (const [name, elements] of Object.entries(panels)) {
     for (const element of elements) element.classList.toggle('hidden', name !== view)
   }
+  // The menu draws and listens only while it is the view.
+  if (view === 'menu') menu.enter()
+  else menu.leave()
 }
 
 // The viewer panel is shared by models (opened from an archive) and terrain
@@ -71,6 +74,10 @@ const menu = initMenu({
   }
 })
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
+
+// The menu is drawn on a canvas, so what it says and which bar is lit are
+// only readable through here (docs/testing.md).
+if (window.pow) window.pow.menu = { selected: menu.selected, labels: menu.labels }
 
 // A located game lands on the main menu; the asset browsers hang off it.
 async function showGame(dir: string): Promise<void> {

@@ -8,7 +8,18 @@
 
 import type { Page } from '@playwright/test'
 
-export type Action = 'walkForward' | 'walkBack' | 'turnLeft' | 'turnRight' | 'jump' | 'endTurn'
+export type Action =
+  | 'walkForward'
+  | 'walkBack'
+  | 'turnLeft'
+  | 'turnRight'
+  | 'jump'
+  | 'endTurn'
+  | 'menuUp'
+  | 'menuDown'
+  | 'menuSelect'
+  | 'menuBack'
+  | 'assets'
 
 const call = (page: Page, method: string, action: Action): Promise<void> =>
   page.evaluate(

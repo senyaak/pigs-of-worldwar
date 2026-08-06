@@ -20,11 +20,13 @@ first (`000/foundation.spec.ts` before `000/model-viewer.spec.ts`).
   don't care about any of this, which is exactly why it is phase zero.
 - Folders from `001/` up are engine milestones — things a player could point
   at; parsers rendering a debug pig do not count. `001/` is the game's frame:
-  the main menu wearing the original frontend art (New Game → the battle,
-  Asset Viewer → the phase-000 browsers, Exit → quits). `002/` is the first
+  the main menu, which IS the original screen — its art, its letters, its
+  four labels (ONE PLAYER → the battle, QUIT APPLICATION → quits; the
+  phase-000 browsers hang off the remake's own F1, since the original has no
+  such screen). `002/` is the first
   battle slice: the Game domain model (players, squads, turn rotation —
   pinned by a pure-logic spec that runs with no Electron at all) and the
-  battle scene New Game opens: squads spawned on standable CAMP ground, the
+  battle scene ONE PLAYER opens: squads spawned on standable CAMP ground, the
   original's turn clock (auto end-of-turn on expiry), tank controls — W/S
   walk, A/D turn, Space jumps ballistically — swimming and slope-sliding per
   the tile data, and a chase camera behind the acting pig's back.
@@ -81,6 +83,11 @@ await hold(page, 'walkForward', 700)   // press, wait, release
 await tap(page, 'endTurn')             // one-shot
 const { x, z, heading } = await debugState(page)
 ```
+
+The menu is the same story. It draws on a canvas, so there is no button to
+click: `e2e/menu.ts` moves the lit bar with `menuUp`/`menuDown`/`menuSelect`
+and reads the screen back through `window.pow.menu` — `startGame(page)` is
+what every battle spec opens with.
 
 Synthesising key events instead would test a parallel path: a broken
 keybinding, a controller regression, or a view that forgot to subscribe would

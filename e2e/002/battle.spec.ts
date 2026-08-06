@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs'
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
 import { debugState, hold, peakNodeY, press, release, tap, warp } from '../controller'
+import { startGame } from '../menu'
 import { TILE_STEP, TILE_WALL, TILE_WATER, parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
 import { readFileSync } from 'node:fs'
@@ -62,7 +63,7 @@ test.beforeAll(() => {
 
 test('New Game: squads on the map, turns rotate, the scene draws', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // Turn 1: first player's first pig, full health, the clock running.
@@ -133,7 +134,7 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   // Leaving lands back on the menu; a fresh New Game starts over at turn 1.
   await page.locator('#battle-leave').click()
   await expect(page.locator('#menu')).toBeVisible()
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle-hud')).toHaveText(
     /Turn 1 — Tommy’s Trotters: Tommy \(100 hp, \d+s\)/
   )
@@ -144,7 +145,7 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
 
 test('the controller drives the pig: walking moves it, turning aims it', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // Walking moves the pig — position read off the scene, the ground truth
@@ -189,7 +190,7 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
 
 test('walk into a wall long enough and the pig is thrown out of it', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // A real wall on the battle map with the ground falling away behind it:
@@ -250,7 +251,7 @@ test('walk into a wall long enough and the pig is thrown out of it', async ({ ap
 
 test('a jump cannot be started from inside a wall, so it is no ladder', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // Riding a jump into a cliff face, landing higher up it and going again is

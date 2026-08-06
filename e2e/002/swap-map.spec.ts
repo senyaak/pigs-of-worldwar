@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs'
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
 import { debugState, hold } from '../controller'
+import { startGame } from '../menu'
 import type { Page } from '@playwright/test'
 
 const swapMap = (page: Page, name?: string): Promise<boolean> =>
@@ -34,7 +35,7 @@ test.beforeAll(() => {
 
 test('the console swaps the map; a name that does not ship is refused', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
   expect(await mapName(page)).toBe('CAMP')
 

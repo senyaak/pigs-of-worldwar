@@ -18,6 +18,7 @@ import { GAME_DIR } from '../launch'
 import { parseSrl } from '../../src/lib/formats/srl'
 import { BATTLE_SOUNDS } from '../../src/renderer/src/audio/battle'
 import { press, release, tap, warp } from '../controller'
+import { startGame } from '../menu'
 
 const bank = (relPath: string): ReturnType<typeof parseSrl> =>
   parseSrl(readFileSync(path.join(GAME_DIR, relPath)))
@@ -65,7 +66,7 @@ test('the sound banks are numbered lists of files', () => {
 
 test('the pig is heard jumping and landing', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const heard = (): Promise<string[]> => page.evaluate(() => window.pow!.debug!.sounds())

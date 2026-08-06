@@ -346,4 +346,43 @@ Verified: decodes `pigbkpc1.mgl` byte-identical to its uncompressed twin
 `Language/Tims/Pigbkpc1.BMP` (308178 bytes), and all 237 FEBMP.MAD entries
 decode into BMPs whose header size field equals the decoded length.
 
-`pigbkpc1.mgl` is the 640×480 main-menu background.
+`pigbkpc1.mgl` is the 640×480 main-menu background; the other 236 entries are
+the machinery drawn over it — `fullmenu`, the `chose1..6` bars, `title1..6`,
+the `cog`/`cogB`/`selcog` wheels, the twelve `dial00nn` frames, `track`.
+
+**The see-through colour is magenta, and the palette entry holding it moves.**
+A sprite's transparent parts are painted 248,0,248 — the PSX's 5-bit magenta
+— at index 2 in `fullmenu`, `cog0` and `track`, at 255 in `chose1`, `title1`
+and `select`, and at five indices at once in `fullmenu`. So the test is on
+the COLOUR (`lib/formats/alpha.ts`), never on the index. `pigbkpc1` carries
+no magenta at all: the backdrop is opaque by design.
+
+## FEText — the fonts (`FEText/*.BMP` + `*.TAB`)
+
+The PC build loads `%s.BMP` and `%s.TAB` (exe 0xc0dfc/0xc0e04); the sibling
+`.tim`s are the PSX's copies and go unread. Eight fonts ship — `BIG` (32px),
+`CHARS3` (30), `BigChars` (24), `CHARS2` (16) with its lighter `chars2L` and
+darker `chars2D`, `SMALL` and `GameChars` (12). The three CHARS2 shades share
+one table.
+
+A `.tab` is **8 bytes a glyph — `u16 x, y, w, h`** — and the boxes are in PSX
+**VRAM** coordinates, so they start at (960, 90) or thereabouts. The atlas
+origin is the box of **glyph 2, the `!`**, which is what the exe reads
+(0x430dae); subtract it and the boxes tile the bitmap exactly. Glyphs 0 and 1
+are zeros, 1 being the space. Palette index 0 is the background — magenta in
+some fonts, black in others, so here the INDEX is the rule and the colour is
+not.
+
+The space's advance is not in the file; the remake uses the `0` glyph's
+width, which scales with the font.
+
+## Language/Text — the strings
+
+`fetext.bin`/`.ofs` (frontend) and `gtext.bin`/`.ofs` (in-game) are one
+shape: `.ofs` is a flat array of `u16` offsets into the `.bin`, one per
+string, and a string runs from its offset to a **NUL**. A stored byte IS the
+glyph index, so reading it back is `char = byte + 0x1F` — a space is stored
+as `0x01`. 786 strings each.
+
+fetext 8 is `MAIN MENU` and 13-16 the four bars under it; the gtext map is in
+`pigs-disasm/text/notes.md`.

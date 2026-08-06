@@ -17,6 +17,10 @@ import { parseMcapClip } from '../lib/formats/mcap'
 import type { McapClip } from '../lib/formats/mcap'
 import { decodeMgl } from '../lib/formats/mgl'
 import { parseBmp } from '../lib/formats/bmp'
+import { punchIndexZero, punchMagenta } from '../lib/formats/alpha'
+import { parseTab } from '../lib/formats/tab'
+import type { GlyphTable } from '../lib/formats/tab'
+import { parseText } from '../lib/formats/text'
 import { parsePmg } from '../lib/formats/pmg'
 import type { TerrainBlock } from '../lib/formats/pmg'
 import { parsePog } from '../lib/formats/pog'
@@ -94,18 +98,83 @@ export async function loadModel(full: string, base: string): Promise<LoadedModel
 }
 
 export interface FrontendImage {
+  /** The FEBMP.MAD entry name, without its `.mgl` extension. */
+  name: string
   width: number
   height: number
+  /** RGBA with the magenta key already punched to transparent. */
   rgba: Uint8Array
 }
 
-/** A frontend image out of FEBmps/FEBMP.MAD, by entry name (MGL → BMP). */
-export async function loadFrontendImage(gameDir: string, entryName: string): Promise<FrontendImage> {
+/**
+ * Frontend images out of FEBmps/FEBMP.MAD, by entry name (MGL → BMP), with
+ * the sprite key punched. The whole screen's art comes out of one read of
+ * the archive, so ask for every sprite at once.
+ *
+ * A name matches with or without its extension: the archive spells some
+ * entries `.mgl` and a handful `.mgl1`.
+ */
+export async function loadFrontendImages(
+  gameDir: string,
+  entryNames: string[]
+): Promise<FrontendImage[]> {
   const madPath = path.join(gameDir, 'FEBmps', 'FEBMP.MAD')
   const data = await fs.readFile(madPath)
-  const entry = parseArchive(data).entries.find((e) => e.name.toLowerCase() === entryName.toLowerCase())
-  if (!entry) throw new Error(`no ${entryName} in FEBMP.MAD`)
-  return parseBmp(decodeMgl(data.subarray(entry.offset, entry.offset + entry.size)))
+  const stem = (name: string): string => name.replace(/\.mgl1?$/i, '').toLowerCase()
+  const byName = new Map(parseArchive(data).entries.map((entry) => [stem(entry.name), entry]))
+  return entryNames.map((wanted) => {
+    const entry = byName.get(stem(wanted))
+    if (!entry) throw new Error(`no ${wanted} in FEBMP.MAD`)
+    const bmp = parseBmp(decodeMgl(data.subarray(entry.offset, entry.offset + entry.size)))
+    return { name: stem(wanted), width: bmp.width, height: bmp.height, rgba: punchMagenta(bmp) }
+  })
+}
+
+export interface LoadedFont {
+  name: string
+  atlas: { width: number; height: number; rgba: Uint8Array }
+  table: GlyphTable
+}
+
+/**
+ * A frontend font: `FEText/<name>.BMP` and its `.TAB`, which is the pair the
+ * PC build itself loads (the sibling `.tim`s are the PSX's). The atlas comes
+ * back with palette entry 0 transparent.
+ *
+ * The directory is searched case-insensitively — the install spells the same
+ * font `CHARS2.tab` and `Chars2.bmp`.
+ */
+export async function loadFont(gameDir: string, name: string): Promise<LoadedFont> {
+  const dir = path.join(gameDir, 'FEText')
+  const siblings = await fs.readdir(dir)
+  const find = (file: string): string => {
+    const found = siblings.find((sibling) => sibling.toLowerCase() === file.toLowerCase())
+    if (!found) throw new Error(`no ${file} in FEText`)
+    return path.join(dir, found)
+  }
+  // The light and dark variants have no table of their own — they are the
+  // same glyphs in another shade, so they borrow CHARS2's.
+  const tableName = /^chars2[ld]$/i.test(name) ? 'CHARS2' : name
+  const bmp = parseBmp(await fs.readFile(find(`${name}.bmp`)))
+  const table = parseTab(await fs.readFile(find(`${tableName}.tab`)))
+  return {
+    name,
+    atlas: { width: bmp.width, height: bmp.height, rgba: punchIndexZero(bmp) },
+    table
+  }
+}
+
+/** The game's strings: `fetext` for the frontend, `gtext` for the battle. */
+export async function loadGameText(gameDir: string, which: string): Promise<string[]> {
+  const dir = path.join(gameDir, 'Language', 'Text')
+  const siblings = await fs.readdir(dir)
+  const find = (ext: string): string => {
+    const wanted = `${which}.${ext}`.toLowerCase()
+    const found = siblings.find((file) => file.toLowerCase() === wanted)
+    if (!found) throw new Error(`no ${which}.${ext} in Language/Text`)
+    return path.join(dir, found)
+  }
+  return parseText(await fs.readFile(find('bin')), await fs.readFile(find('ofs')))
 }
 
 export interface LoadedTerrain {

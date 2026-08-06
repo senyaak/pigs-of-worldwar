@@ -16,6 +16,7 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { debugState, hold, warp } from '../controller'
+import { startGame } from '../menu'
 import { POG_RECORD_SIZE, modelRotationY, parsePog } from '../../src/lib/formats/pog'
 import type { MapObject } from '../../src/lib/formats/pog'
 import { parsePmg } from '../../src/lib/formats/pmg'
@@ -164,7 +165,7 @@ test('the collision box is turned the way the art is', () => {
 
 test('the battle draws the map objects where the file puts them', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const drawn = await page.evaluate(() => window.pow!.debug!.props())
@@ -185,7 +186,7 @@ test('the battle draws the map objects where the file puts them', async ({ app }
 
 test('a drawn object is also one to walk into', async ({ app }) => {
   const { page } = app
-  await page.locator('#menu-new-game').click()
+  await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // The training dummy on the green path, approached from the path's side —
