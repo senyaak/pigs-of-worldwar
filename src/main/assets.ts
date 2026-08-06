@@ -59,7 +59,8 @@ async function pairedTextures(full: string): Promise<(Tim & { name: string })[]>
         width: 1,
         height: 1,
         rgba: new Uint8Array([255, 0, 255, 255]),
-        palette: new Uint16Array()
+        palette: new Uint16Array(),
+        indices: new Uint8Array(1)
       }
     }
   })

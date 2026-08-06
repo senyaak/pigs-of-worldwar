@@ -14,7 +14,7 @@
 import * as THREE from 'three'
 import type { TerrainBlock, TerrainTexture } from '../api'
 import { HEIGHT_SCALE, openWaterMask, waterLevelGrid } from '../../../lib/game/terrain'
-import { waterColourSet } from '../../../lib/game/watermask'
+import { texelIsWater } from '../../../lib/game/watermask'
 import { tileUvs } from '../../../lib/formats/pmg'
 
 const TILE_STEP = 512
@@ -95,30 +95,29 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
     }
   }
   tiles.sort((a, b) => a.texture - b.texture)
-  // One shared verdict with the gameplay mask: the water colours are the
-  // pure-water art's texels (lib/game/watermask), and everything those
-  // colours touch — shore masking here, swimming there — agrees.
-  const waterColours = waterColourSet(blocks, textures)
+  // One shared verdict with the gameplay mask, and now the game's own: a
+  // texel is water where its palette colour carries the PSX translucency
+  // bit (lib/game/watermask). Punched here, swum there — the same texels.
   const tint = { r: 0, g: 0, b: 0, n: 0 }
-  for (const packed of waterColours) {
-    tint.r += (packed >> 16) & 0xff
-    tint.g += (packed >> 8) & 0xff
-    tint.b += packed & 0xff
-    tint.n++
+  for (const texture of textures) {
+    for (let i = 0; i < texture.indices.length; i++) {
+      if (!texelIsWater(texture, i)) continue
+      tint.r += texture.rgba[i * 4]
+      tint.g += texture.rgba[i * 4 + 1]
+      tint.b += texture.rgba[i * 4 + 2]
+      tint.n++
+    }
   }
   const waterColor =
     tint.n > 0 ? { r: tint.r / tint.n, g: tint.g / tint.n, b: tint.b / tint.n } : null
   /** The art with its watery texels punched through, or null if none are. */
   const maskedArt = (texture: TerrainTexture): Uint8Array | null => {
-    if (waterColours.size === 0) return null
     let punched = false
     const rgba = new Uint8Array(texture.rgba)
-    for (let i = 0; i < rgba.length; i += 4) {
-      if (rgba[i + 3] === 0) continue
-      if (waterColours.has((rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2])) {
-        rgba[i + 3] = 0
-        punched = true
-      }
+    for (let i = 0; i < texture.indices.length; i++) {
+      if (!texelIsWater(texture, i)) continue
+      rgba[i * 4 + 3] = 0
+      punched = true
     }
     return punched ? rgba : null
   }

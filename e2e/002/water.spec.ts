@@ -76,18 +76,17 @@ test('CAMP: the fitted level is the 128 the mapmakers authored', () => {
 
 const TRANSLUCENT = 0x8000 | 0x1234
 const OPAQUE = 0x1234
-const WATER_TEXEL = [40, 120, 110, 255]
-const SAND_TEXEL = [200, 180, 130, 255]
-
-/** A 2×2 texture: the palette decides its KIND (dll 0x10007b6c), the texels
- * only matter for the mixed one. */
-const art = (colours: number[], texels: number[][] = []): TerrainArt => ({
+/**
+ * A 2×2 texture: `colours` is the palette (the top bit is what decides), and
+ * `texels` names which palette entry each of the four wears. The palette
+ * alone gives the texture's KIND; the indices matter only where it is mixed.
+ */
+const art = (colours: number[], texels: number[] = [0, 0, 0, 0]): TerrainArt => ({
   width: 2,
   height: 2,
-  rgba: Uint8Array.from(
-    texels.length ? texels.flat() : Array.from({ length: 16 }, () => 0)
-  ),
-  palette: Uint16Array.from(colours)
+  rgba: new Uint8Array(2 * 2 * 4),
+  palette: Uint16Array.from(colours),
+  indices: Uint8Array.from(texels)
 })
 
 test('the palette says water, solid, or ask-the-texels', () => {
@@ -126,10 +125,9 @@ test('a SHORE tile is mixed art, and the waterline runs through it', () => {
     () => 0,
     (_x, z) => (z > 512 ? { type: 0x24, texture: 0 } : z > 0 ? { type: 0x24, texture: 1 } : {})
   )
-  const textures = [
-    art([TRANSLUCENT], [WATER_TEXEL, WATER_TEXEL, WATER_TEXEL, WATER_TEXEL]),
-    art([TRANSLUCENT, OPAQUE], [WATER_TEXEL, SAND_TEXEL, WATER_TEXEL, SAND_TEXEL])
-  ]
+  // The shore's low-x texels wear palette entry 0 (translucent, water) and
+  // its high-x texels entry 1 (opaque, bank).
+  const textures = [art([TRANSLUCENT]), art([TRANSLUCENT, OPAQUE], [0, 1, 0, 1])]
   expect(textureKind(textures[1].palette), 'the shore is mixed art').toBe(1)
   const query = new TerrainQuery(blocks, buildWaterMask(blocks, textures))
   expect(query.isWater(256, 1500), 'the pond swims').toBe(true)

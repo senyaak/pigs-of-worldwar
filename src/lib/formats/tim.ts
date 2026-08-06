@@ -10,12 +10,15 @@ export interface Tim {
   /** RGBA, 4 bytes per pixel, rows top to bottom as stored in the file. */
   rgba: Uint8Array
   /**
-   * The CLUT exactly as stored, one 16-bit word a colour — kept because the
-   * TOP BIT is meaning, not colour: the PSX's semi-transparency flag. The
-   * game classifies a ground texture by it (all colours translucent = water,
-   * none = solid), so the decoded rgba above cannot answer for it.
+   * The CLUT exactly as stored, one 16-bit word a colour, and the palette
+   * INDEX of every texel — kept because the top bit of a colour is meaning,
+   * not colour: the PSX's semi-transparency flag. Ground art paints water
+   * in translucent colours and land in opaque ones, and that is what the
+   * game reads to decide where a pig swims (lib/game/watermask). The
+   * decoded rgba above cannot answer for it — it drops the bit.
    */
   palette: Uint16Array
+  indices: Uint8Array
 }
 
 const MAGIC = 0x10
@@ -55,11 +58,13 @@ export function parseTim(data: Uint8Array): Tim {
   const height = view.getUint16(offset + 10, true)
   const width = mode === 0 ? width16 * 4 : width16 * 2
   const rgba = new Uint8Array(width * height * 4)
+  const indices = new Uint8Array(width * height)
   const pixels = offset + 12
   for (let i = 0; i < width * height; i++) {
     const byte = data[pixels + (mode === 0 ? i >> 1 : i)]
     const index = mode === 0 ? (i % 2 === 0 ? byte & 0xf : byte >> 4) : byte
+    indices[i] = index
     rgba.set(palette.subarray(index * 4, index * 4 + 4), i * 4)
   }
-  return { width, height, rgba, palette: clut }
+  return { width, height, rgba, palette: clut, indices }
 }

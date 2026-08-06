@@ -60,19 +60,26 @@ water bit is only a PREFILTER too — the verdict comes from the ART
 (`afIsPointWatery`), so mud banks with the bit set are LAND. See
 `../pigs-disasm/movement/notes.md`.
 
-**Water is art the artist made SEE-THROUGH, and the verdict is THREE-way.**
-`afIsPointWatery` answers off a per-TEXTURE kind the library computes at
-upload (dll 0x10007b6c) by walking the CLUT: every non-transparent colour
-carrying the PSX semi-transparency bit 0x8000 → water outright, none →
-solid outright, **a mix → ask the texels**. That third case is not a
-formality and must not be collapsed: a pond's own RIM wears mixed art, and
-treating it as solid let a pig walk out over the water as if it were a
-floor (found in play, within the hour). The remake answers mixed tiles with
-the learnt colour set, as it always did. `lib/game/watermask.ts` holds all
-three; `formats/tim.ts` keeps the raw CLUT because the decoded rgba throws
-the deciding bit away. Dead ends someone will re-derive: colours alone
-(works, but flickers mid-swim where kind 2 should have settled it) and "art
-worn by a flagged tile" (swallows the ice).
+**Water is art the artist made SEE-THROUGH — palette bit 0x8000, the PSX's
+semi-transparency flag.** A texel is water where ITS colour carries the bit,
+and `afIsPointWatery` short-cuts that with a per-TEXTURE kind the library
+computes at upload (dll 0x10007b6c): all colours translucent → water
+outright, none → solid outright, a mix → read the texels. The shipped art
+is authored to it — open water carries sixteen translucent colours, a shore
+texture splits its palette and paints the water half in the translucent ones
+— so the shoreline lives INSIDE its tile and the ice beside a pond is the
+opaque art. `lib/game/watermask.ts` is that rule and `three/terrain.ts`
+punches its shore cutouts with the same test, so what looks like water
+swims. `formats/tim.ts` keeps the raw CLUT and every texel's index for it:
+the decoded rgba drops the bit.
+
+Two dead ends someone will re-derive. Learning water COLOURS off the map
+works by accident and flickers mid-swim. Collapsing the mixed case to
+"solid" (on the grounds that its texel probe wants a zero texel, and no
+shipped art has one) turns a pond's own RIM into ground and lets a pig walk
+out over the water — found in play within the hour. The zeroes must be
+written by the surface conversion the DLL does past 0x10007f0a, unread; the
+TIM says the same thing without it.
 
 **The ground carries its own light, and the engine must not add one.** Each
 PMG vertex stores a brightness byte (how-doc: "unknown ≤255") that the
