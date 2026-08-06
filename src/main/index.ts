@@ -19,13 +19,20 @@ function createWindow(): void {
       process.env['POW_WINDOWED'] === '1' ||
       Boolean(process.env['ELECTRON_RENDERER_URL']))
 
-  // POW_NO_FOCUS: come up WITHOUT taking the foreground. The e2e suite sets
-  // it, because a run launches the app repeatedly and every launch used to
-  // steal the keyboard from whatever the developer was doing. The window
-  // still has to draw while it sits behind everything — specs read the
-  // canvas back and time the frame loop — and Chromium throttles a window it
-  // thinks nobody is looking at, so the throttle goes off with it.
+  // POW_NO_FOCUS: come up out of the way entirely. The e2e suite sets it,
+  // because a run launches the app repeatedly and every launch used to take
+  // the foreground — over a fullscreen game, in the worst case, which no
+  // amount of not-focusing fixes on its own. So the window is shown
+  // INACTIVE and parked off the desktop: it still exists and still draws,
+  // it is simply nowhere anyone is looking.
+  //
+  // It has to keep drawing — specs read the canvas back and time the frame
+  // loop — and Chromium throttles a window it believes nobody can see, so
+  // the throttle goes off with it.
   const noFocus = process.env['POW_NO_FOCUS'] === '1'
+  /** Far enough off any real desktop that no arrangement of monitors
+   * reaches it, and not so far that a window manager refuses the move. */
+  const PARKED: [number, number] = [-4000, -4000]
   const window = new BrowserWindow({
     ...(windowed ? { width: 1100, height: 750 } : { fullscreen: true, frame: false }),
     show: false,
@@ -36,7 +43,17 @@ function createWindow(): void {
     }
   })
 
-  window.on('ready-to-show', () => (noFocus ? window.showInactive() : window.show()))
+  window.on('ready-to-show', () => {
+    if (!noFocus) {
+      window.show()
+      return
+    }
+    // A fullscreen window cannot be moved off the display it fills — the one
+    // spec that checks the real fullscreen launch is the one launch that
+    // still shows up, and being about fullscreen, it has to.
+    if (windowed) window.setPosition(...PARKED)
+    window.showInactive()
+  })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     void window.loadURL(process.env['ELECTRON_RENDERER_URL'])

@@ -57,10 +57,12 @@ npm run test:e2e   # build + Playwright end-to-end tests
 The game launches borderless fullscreen. `--windowed` keeps a desktop
 window; `npm run dev` is windowed by default (`--fullscreen` overrides),
 and the e2e suite runs windowed so tests don't take over the screen. It also
-launches with `POW_NO_FOCUS=1`, which shows the window *without* taking the
-foreground — a run opens the app several times, and none of them should
-steal the keyboard from what you were doing. Background throttling goes off
-with it, since the window still has to draw while it sits behind everything.
+launches with `POW_NO_FOCUS=1`: the window comes up **inactive and parked
+off the desktop**, so a run neither steals the keyboard nor pops up over
+whatever is fullscreen. Background throttling goes off with it, since the
+window still has to draw where nobody can see it. The one exception is the
+spec that checks the real fullscreen launch — a fullscreen window cannot be
+moved off the display it fills, and that spec is about exactly that.
 
 ## Status
 

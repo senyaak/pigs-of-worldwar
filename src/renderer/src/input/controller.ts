@@ -110,6 +110,12 @@ export interface DebugHooks {
   currentNodeY(): number
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }
+  /** The squads as fielded: where each pig started, the class the map gave
+   * it, and the art it wears. */
+  squads(): {
+    name: string
+    pigs: { name: string; pigClass: number; art: string; x: number; z: number; heading: number }[]
+  }[]
   /** What the map's .POG put on the ground: how many records were drawn out
    * of how many, and where each one landed (game space, Y-down). */
   props(): {

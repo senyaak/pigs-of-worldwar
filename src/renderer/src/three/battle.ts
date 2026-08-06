@@ -21,6 +21,7 @@ import type { LocomotionState } from '../../../lib/game/locomotion'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
+import { classArt } from './soldiers'
 import { buildPig } from './pig'
 import type { Pig as PigMesh } from './pig'
 import { createPlayer } from './clips'
@@ -28,11 +29,20 @@ import type { Player as ClipPlayer } from './clips'
 import type { SceneHost } from './scene'
 import { controller } from '../input/controller'
 
+/** One dressed soldier model out of Chars/british.mad. */
+export interface SoldierArt {
+  /** Archive base name, e.g. `pcgru_hi` (three/soldiers.ts). */
+  base: string
+  model: Model
+  textures: Texture[]
+}
+
 export interface BattleAssets {
   blocks: TerrainBlock[]
   terrainTextures: TerrainTexture[]
-  model: Model
-  modelTextures: Texture[]
+  /** Every model the squads need — one per class group on the map. The
+   * first is the fallback for a class nothing loaded art for. */
+  soldiers: SoldierArt[]
   skeleton: Bone[]
   clips: Clip[]
   /** The map's .POG records and the geometry they name. Empty is fine — a
@@ -88,6 +98,9 @@ export function buildBattle(
     node: THREE.Object3D
     player: ClipPlayer
     clip: number | null
+    /** The archive base actually drawn — which is the fallback when the
+     * pig's class had no art of its own. */
+    art: string
   }
   const pigMeshes: PigEntry[] = []
   const setClip = (entry: PigEntry, index: number | null): void => {
@@ -95,9 +108,12 @@ export function buildBattle(
     entry.clip = index
     entry.player.play(index === null ? null : (assets.clips[index] ?? null))
   }
+  const artFor = (pigClass: number): SoldierArt =>
+    assets.soldiers.find((art) => art.base === classArt(pigClass)) ?? assets.soldiers[0]
   for (const player of game.players) {
     for (const pig of player.pigs) {
-      const mesh = buildPig(assets.model, assets.modelTextures, assets.skeleton)
+      const art = artFor(pig.pigClass)
+      const mesh = buildPig(art.model, art.textures, assets.skeleton)
       const node = mesh.group.children[0]
       node.position.set(
         pig.position.x,
@@ -106,7 +122,14 @@ export function buildBattle(
       )
       node.rotation.y = pig.heading + PIG_HEADING_OFFSET
       root.add(node)
-      const entry: PigEntry = { pig, mesh, node, player: createPlayer(mesh), clip: null }
+      const entry: PigEntry = {
+        pig,
+        mesh,
+        node,
+        player: createPlayer(mesh),
+        clip: null,
+        art: art.base
+      }
       setClip(entry, ANIM.IDLE)
       pigMeshes.push(entry)
     }
@@ -291,6 +314,23 @@ export function buildBattle(
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
       currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0,
+      /** The squads as they were fielded — where each pig started, what
+       * class the map called it, and which art it actually wears. */
+      squads: () =>
+        game.players.map((player) => ({
+          name: player.name,
+          pigs: player.pigs.map((pig) => {
+            const entry = pigMeshes.find((candidate) => candidate.pig === pig)
+            return {
+              name: pig.name,
+              pigClass: pig.pigClass,
+              art: entry?.art ?? '',
+              x: pig.position.x,
+              z: pig.position.z,
+              heading: pig.heading
+            }
+          })
+        })),
       /** What the map put on its ground: how many .POG records were drawn,
        * and where each one landed — the spec's only view of placement. */
       props: () => ({

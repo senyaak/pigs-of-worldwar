@@ -205,8 +205,11 @@ npm run typecheck && npm run build && npx playwright test
 Formats, models, textures, skeleton, 93 animations, terrain, water and the
 maps' OBJECTS all parse and render — CAMP draws its 147 props, the training
 ground's dummies, crates and bridge among them. The menu wears the original
-art. The battle scene puts
-two squads on CAMP (console: `pow.swapMap('ARTGUN')` — see README) with
+art. Squads are fielded from the map's OWN spawn markers — position,
+facing, side and CLASS, each class dressed from its own model in
+`Chars/british.mad` — so LIBERATE puts a saboteur, a hero and three grunts
+against four spies and a gunner, exactly where the original did. The battle
+scene puts two squads on CAMP (console: `pow.swapMap('ARTGUN')` — see README) with
 the original's turn clock, tank controls, jumping, swimming (water by the
 art's own translucency, floats at the region's surface, sunk SWIM_SINK),
 scrambling on
@@ -273,8 +276,12 @@ draws what it says.
   layer, not the visible water).
 - **Map objects are scenery.** The POG's props are drawn and nothing else:
   a pig walks through a crate, and the collision box every record carries
-  (fields 8-10) is parsed and unused. Spawns still come from
-  `TerrainQuery.pickSpawns`, not from the map's own `_ME` markers.
+  (fields 8-10) is parsed and unused.
+- **Two sides, though a map offers up to six.** The spawn markers name six
+  (FINAL uses all of them, the arenas four); the battle fields the first two
+  it finds, because there is no AI for the rest. `TerrainQuery.pickSpawns`
+  is now only the fallback for a map with fewer than two sides — which is
+  CAMP, whose single marker is the training ground's one pig.
 - **The wall envelope is an inference.** Whether wall geometry sits in the
   exe's collision world is still open (0x406bb0 undecoded); the remake
   builds the play-observed behaviour from the decoded step-up/sidestep

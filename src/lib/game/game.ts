@@ -9,7 +9,14 @@
 export interface PigSpawn {
   x: number
   z: number
+  /** Facing the map asked for; pigs start looking north without one. */
+  heading?: number
+  /** Class index — Grunt 0, Gunner 1, … The map's own spawn markers carry
+   * it (lib/game/spawns.ts); a fabricated spawn leaves it a grunt. */
+  pigClass?: number
 }
+
+export const GRUNT = 0
 
 export interface Pig {
   name: string
@@ -19,6 +26,8 @@ export interface Pig {
   position: { x: number; z: number }
   /** Facing, radians around Y in the game's own space. */
   heading: number
+  /** Class index — what the pig is, before it is anywhere. */
+  pigClass: number
 }
 
 export interface Player {
@@ -66,7 +75,8 @@ export class Game {
             index,
             health: 100,
             position: { x: at.x, z: at.z },
-            heading: 0
+            heading: at.heading ?? 0,
+            pigClass: at.pigClass ?? GRUNT
           }
         })
       }

@@ -3,8 +3,12 @@
 // debug viewers use; the rules live in lib/game.
 
 import { Game } from '../../../lib/game/game'
+import type { PigSpawn } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
 import { buildWaterMask } from '../../../lib/game/watermask'
+import { playableSides } from '../../../lib/game/spawns'
+import { artFor } from '../three/soldiers'
+import type { LoadModelResult, MapObject } from '../api'
 import { ensureScene } from '../three/scene'
 import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
@@ -18,7 +22,6 @@ import { byId } from './dom'
 // like ARTGUN or ICEFLOW.
 const DEFAULT_MAP = 'CAMP'
 const CHAR_ARCHIVE = 'Chars/british.mad'
-const SOLDIER = 'pcgru_hi'
 
 /** 'artgun', 'ARTGUN.PMG' and 'Maps/ARTGUN.PMG' all mean ARTGUN. */
 const normalizeMap = (name: string): string =>
@@ -28,14 +31,65 @@ const normalizeMap = (name: string): string =>
     .replace(/\.pmg$/i, '')
     .toUpperCase()
 
+// Enough names for the biggest side any shipped map fields; a squad takes
+// as many as it has spawn markers.
 const SQUADS = [
-  { name: 'Tommy’s Trotters', pigNames: ['Tommy', 'Wilson', 'Berry', 'Hogsworth'] },
-  { name: 'Kaiser’s Grunters', pigNames: ['Hans', 'Fritz', 'Otto', 'Schweinrich'] }
+  {
+    name: 'Tommy’s Trotters',
+    pigNames: ['Tommy', 'Wilson', 'Berry', 'Hogsworth', 'Bacon', 'Rasher', 'Chops', 'Snout']
+  },
+  {
+    name: 'Kaiser’s Grunters',
+    pigNames: ['Hans', 'Fritz', 'Otto', 'Schweinrich', 'Klaus', 'Dieter', 'Wurst', 'Speck']
+  }
 ]
+
+/** Pigs per side when the map names no sides of its own. */
+const FALLBACK_SQUAD = 4
 
 export interface BattleView {
   open(): Promise<boolean>
   close(): void
+}
+
+interface Squad {
+  name: string
+  pigNames: string[]
+  spawns: PigSpawn[]
+}
+
+/**
+ * The two squads for a map: its OWN spawn markers where it has them, and
+ * ground picked off the terrain where it does not.
+ *
+ * A skirmish arena fields four sides of five and a campaign map two, each
+ * marker naming the class that stands on it — so a squad is as big as the
+ * map says and dressed the way the map says. CAMP is the exception the
+ * fallback exists for: one marker, because it is the training ground.
+ */
+function mapSquads(objects: MapObject[], query: TerrainQuery): Squad[] {
+  const sides = playableSides(objects, SQUADS.length)
+  if (!sides) {
+    const spawns = query.pickSpawns(SQUADS.length * FALLBACK_SQUAD)
+    return SQUADS.map((squad, index) => ({
+      name: squad.name,
+      pigNames: squad.pigNames.slice(0, FALLBACK_SQUAD),
+      spawns: spawns.slice(index * FALLBACK_SQUAD, (index + 1) * FALLBACK_SQUAD)
+    }))
+  }
+  return SQUADS.map((squad, index) => {
+    const side = sides[index].slice(0, squad.pigNames.length)
+    return {
+      name: squad.name,
+      pigNames: squad.pigNames.slice(0, side.length),
+      spawns: side.map((at) => ({
+        x: at.x,
+        z: at.z,
+        heading: at.heading,
+        pigClass: at.pigClass
+      }))
+    }
+  })
 }
 
 export function initBattle(onLeave: () => void): BattleView {
@@ -107,18 +161,16 @@ export function initBattle(onLeave: () => void): BattleView {
   /** (Re)start the battle on `name` — fresh spawns, fresh turn order. A load
    * failure leaves whatever battle was running untouched. */
   const start = async (name: string): Promise<boolean> => {
-    const [terrainResult, objectsResult, modelResult, clipsResult] = await Promise.all([
+    const [terrainResult, objectsResult, clipsResult] = await Promise.all([
       window.api.loadTerrain(`Maps/${name}.PMG`),
       window.api.loadMapObjects(`Maps/${name}.POG`),
-      window.api.loadModel(CHAR_ARCHIVE, SOLDIER),
       window.api.loadClips(CHAR_ARCHIVE)
     ])
-    const failure = !terrainResult.ok ? terrainResult.error : !modelResult.ok ? modelResult.error : null
-    if (failure !== null || !terrainResult.ok || !modelResult.ok) {
+    if (!terrainResult.ok) {
       // A failed SWAP is a console conversation; a failed OPEN has no scene
       // to keep, so the HUD carries the message.
-      if (scene) console.log(`stayed on ${map}: ${failure}`)
-      else hudEl.textContent = failure ?? ''
+      if (scene) console.log(`stayed on ${map}: ${terrainResult.error}`)
+      else hudEl.textContent = terrainResult.error
       return false
     }
 
@@ -128,8 +180,28 @@ export function initBattle(onLeave: () => void): BattleView {
       terrainResult.blocks,
       buildWaterMask(terrainResult.blocks, terrainResult.textures)
     )
-    const pigCount = SQUADS.reduce((sum, s) => sum + s.pigNames.length, 0)
-    game = new Game({ players: SQUADS, spawns: query.pickSpawns(pigCount) })
+    const squads = mapSquads(objectsResult.ok ? objectsResult.objects : [], query)
+
+    // Which models to load is only known once the squads are: a map fields
+    // the classes its own markers name.
+    const bases = artFor(squads.flatMap((squad) => squad.spawns.map((at) => at.pigClass ?? 0)))
+    const loaded = await Promise.all(bases.map((base) => window.api.loadModel(CHAR_ARCHIVE, base)))
+    const missing = loaded.findIndex((result) => !result.ok)
+    if (missing >= 0) {
+      const error = (loaded[missing] as { ok: false; error: string }).error
+      if (scene) console.log(`stayed on ${map}: ${error}`)
+      else hudEl.textContent = error
+      return false
+    }
+    const soldiers = bases.map((base, index) => {
+      const result = loaded[index] as Extract<LoadModelResult, { ok: true }>
+      return { base, model: result.model, textures: result.textures }
+    })
+
+    game = new Game({
+      players: squads.map((squad) => ({ name: squad.name, pigNames: squad.pigNames })),
+      spawns: squads.flatMap((squad) => squad.spawns)
+    })
 
     scene?.dispose()
     scene = buildBattle(
@@ -137,9 +209,8 @@ export function initBattle(onLeave: () => void): BattleView {
       {
         blocks: terrainResult.blocks,
         terrainTextures: terrainResult.textures,
-        model: modelResult.model,
-        modelTextures: modelResult.textures,
-        skeleton: modelResult.skeleton,
+        soldiers,
+        skeleton: (loaded[0] as Extract<LoadModelResult, { ok: true }>).skeleton,
         clips: clipsResult.ok ? clipsResult.clips : [],
         // A map without its props is still playable ground, so a failed POG
         // is reported and stepped over rather than taking the battle down.
