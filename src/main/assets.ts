@@ -164,6 +164,41 @@ export async function loadFont(gameDir: string, name: string): Promise<LoadedFon
   }
 }
 
+export interface TimImage {
+  /** The archive entry name, lower-cased and without its `.tim`. */
+  name: string
+  width: number
+  height: number
+  /** RGBA; a TIM's colour 0 is already transparent (lib/formats/tim.ts). */
+  rgba: Uint8Array
+}
+
+/**
+ * Every TIM in one archive — `Language/Tims/dashtims.mad` is the battle's
+ * dashboard, `TBOXTIMS.MAD` the message box. One read for the lot.
+ *
+ * An entry that will not parse is dropped with a note rather than taking the
+ * archive down: the caller asks for pieces by name and says what it needs.
+ */
+export async function loadTims(full: string): Promise<TimImage[]> {
+  const data = await fs.readFile(full)
+  const images: TimImage[] = []
+  for (const entry of parseArchive(data).entries) {
+    try {
+      const tim = parseTim(data.subarray(entry.offset, entry.offset + entry.size))
+      images.push({
+        name: entry.name.replace(/\.tim$/i, '').toLowerCase(),
+        width: tim.width,
+        height: tim.height,
+        rgba: tim.rgba
+      })
+    } catch (error) {
+      console.warn(`${path.basename(full)}: ${entry.name} — ${String(error)}`)
+    }
+  }
+  return images
+}
+
 /** The game's strings: `fetext` for the frontend, `gtext` for the battle. */
 export async function loadGameText(gameDir: string, which: string): Promise<string[]> {
   const dir = path.join(gameDir, 'Language', 'Text')

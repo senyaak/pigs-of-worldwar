@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
-import { debugState, hold, peakNodeY, press, release, tap, warp } from '../controller'
+import { debugState, hold, hud, peakNodeY, press, release, tap, warp } from '../controller'
 import { startGame } from '../menu'
 import { TILE_STEP, TILE_WALL, TILE_WATER, parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
@@ -67,9 +67,9 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   await expect(page.locator('#battle')).toBeVisible()
 
   // Turn 1: first player's first pig, full health, the clock running.
-  await expect(page.locator('#battle-hud')).toHaveText(
-    /Turn 1 — Tommy’s Trotters: Tommy \(100 hp, \d+s\)/
-  )
+  await expect
+    .poll(() => hud(page))
+    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
 
   // The battle canvas draws something that is not background.
   const foregroundPixels = async (): Promise<number> =>
@@ -97,11 +97,8 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
     })
   await expect.poll(foregroundPixels, { message: 'rendered battle pixels' }).toBeGreaterThan(20000)
 
-  // The clock is real: the HUD's seconds tick down on their own.
-  const secondsLeft = async (): Promise<number> => {
-    const text = (await page.locator('#battle-hud').textContent()) ?? ''
-    return parseInt(text.match(/(\d+)s/)?.[1] ?? '-1', 10)
-  }
+  // The clock is real: the seconds tick down on their own.
+  const secondsLeft = async (): Promise<number> => (await hud(page)).seconds
   const before = await secondsLeft()
   expect(before).toBeGreaterThan(40)
   await expect.poll(secondsLeft, { message: 'turn clock ticking' }).toBeLessThan(before)
@@ -110,24 +107,26 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   // Enter key fire. CAMP is the training ground and fields ONE pig, so the
   // turn comes straight back to it, with the clock reset.
   await tap(page, 'endTurn')
-  await expect(page.locator('#battle-hud')).toHaveText(
-    /Turn 2 — Tommy’s Trotters: Tommy \(100 hp, \d+s\)/
-  )
+  await expect
+    .poll(() => hud(page))
+    .toMatchObject({ turn: 2, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
   expect(await secondsLeft()).toBeGreaterThan(40)
 
   // Two sides rotate the way two sides do — on a map that HAS two.
   expect(await page.evaluate(() => window.pow!.swapMap!('LIBERATE'))).toBe(true)
-  await expect(page.locator('#battle-hud')).toHaveText(
-    /Turn 1 — Tommy’s Trotters: Tommy \(100 hp, \d+s\)/
-  )
+  await expect
+    .poll(() => hud(page))
+    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY' })
   await tap(page, 'endTurn')
-  await expect(page.locator('#battle-hud')).toHaveText(
-    /Turn 1 — Kaiser’s Grunters: Hans \(100 hp, \d+s\)/
-  )
+  // The second side is the map's own choice: LIBERATE sets the French bit,
+  // so the enemy IS the Garlic Grunts (lib/game/teams.ts).
+  await expect
+    .poll(() => hud(page))
+    .toMatchObject({ turn: 1, side: 'GARLIC GRUNTS', pig: 'BASTILLE' })
   await page.locator('#battle-end-turn').click()
-  await expect(page.locator('#battle-hud')).toHaveText(
-    /Turn 2 — Tommy’s Trotters: Wilson \(100 hp, \d+s\)/
-  )
+  await expect
+    .poll(() => hud(page))
+    .toMatchObject({ turn: 2, side: "TOMMY'S TROTTERS", pig: 'GINGER' })
   // Back to the map the rest of the phase warps around on.
   expect(await page.evaluate(() => window.pow!.swapMap!('CAMP'))).toBe(true)
 
@@ -135,9 +134,9 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   await page.locator('#battle-leave').click()
   await expect(page.locator('#menu')).toBeVisible()
   await startGame(page)
-  await expect(page.locator('#battle-hud')).toHaveText(
-    /Turn 1 — Tommy’s Trotters: Tommy \(100 hp, \d+s\)/
-  )
+  await expect
+    .poll(() => hud(page))
+    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
 
 
   expect(app.errors()).toEqual([])

@@ -384,5 +384,25 @@ string, and a string runs from its offset to a **NUL**. A stored byte IS the
 glyph index, so reading it back is `char = byte + 0x1F` — a space is stored
 as `0x01`. 786 strings each.
 
-fetext 8 is `MAIN MENU` and 13-16 the four bars under it; the gtext map is in
-`pigs-disasm/text/notes.md`.
+fetext 8 is `MAIN MENU` and 13-16 the four bars under it. **166 onwards is
+the roster**: six blocks of ten, each a nation's name and its nine pigs —
+`TOMMY'S TROTTERS` with NOBBY, GINGER, DEN, MONTY, BASIL, PONSONBY, PERCY,
+SMITH, JONES, then GARLIC GRUNTS, UNCLE HAMS HOGS, PIGGYSTROIKA,
+SUSHI-SWINE, SOW-A-KRAUTS, and at 226 the developers' own TEAM LARD. A spawn
+marker's side bit indexes those six (`lib/game/teams.ts`). The gtext map is
+in `pigs-disasm/text/notes.md`.
+
+## The dashboard (`Language/Tims/dashtims.mad`)
+
+A plain named archive of TIMs — the battle's in-game furniture:
+
+| pieces | what it is |
+| ------ | ---------- |
+| `clock01`-`clock04`, `timer0`-`timer9` | the turn clock: two 64×28 tiles over two 64×64 ones, 128×92 assembled, with two recesses (x 38..61 and 64..87) that take a 24×25 digit each |
+| `newpow1`-`newpow7`, `powg1` | the shot's power gauge |
+| `ang1`-`ang5`, `wedge1/2`, `divide1/2`, `angpoint` | the aiming arc |
+| `sights`, `target`, `pcpie4` | the crosshair |
+| `score1/2`, `pause1`-`pause8` | the score panel and the pause spinner |
+
+`MAPICONS.MTD` holds the overview map and its markers, `TBOXTIMS.MAD` the
+message box in four tiles.

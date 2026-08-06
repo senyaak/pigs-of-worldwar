@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
-import { debugState, hold } from '../controller'
+import { debugState, hold, hud } from '../controller'
 import { startGame } from '../menu'
 import type { Page } from '@playwright/test'
 
@@ -45,9 +45,9 @@ test('the console swaps the map; a name that does not ship is refused', async ({
 
   // A fresh battle there: turn 1 again, and the pig is playable ground truth
   // — it stands somewhere real and walking moves it.
-  await expect(page.locator('#battle-hud')).toHaveText(
-    /Turn 1 — Tommy’s Trotters: Tommy \(100 hp, \d+s\)/
-  )
+  await expect
+    .poll(() => hud(page))
+    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
   const start = await debugState(page)
   await hold(page, 'walkForward', 400)
   const walked = await debugState(page)
@@ -56,7 +56,7 @@ test('the console swaps the map; a name that does not ship is refused', async ({
   // Garbage keeps the battle exactly where it was.
   expect(await swapMap(page, 'NOSUCHMAP')).toBe(false)
   expect(await mapName(page)).toBe('ARTGUN')
-  await expect(page.locator('#battle-hud')).toHaveText(/Tommy’s Trotters/)
+  expect((await hud(page)).side).toBe("TOMMY'S TROTTERS")
 
   // The bare call is the usage hint, not a swap.
   expect(await swapMap(page)).toBe(false)

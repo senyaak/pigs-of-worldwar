@@ -219,10 +219,22 @@ letters out of the FEText glyph tables, the labels out of fetext.bin — MAIN
 MENU over ONE PLAYER, MULTI-PLAYER, OPTIONS, QUIT APPLICATION, drawn on a
 640×480 canvas that is scaled whole and unsmoothed. Only ONE PLAYER leads
 anywhere (the training ground); the two unbuilt screens wear the font's dark
-shade, the way the original greys out what cannot be chosen. Squads are fielded from the map's OWN spawn markers — position,
+shade, the way the original greys out what cannot be chosen.
+
+**The battle wears the original's brass too**: the turn clock out of
+`Language/Tims/dashtims.mad` — four tiles and ten digit faces, counting the
+turn down in its two windows — over a name plate for every living pig, drawn
+in `GameChars`, the one FEText font with no frontend twin. It rides on its
+own canvas over the 3D view, at native resolution and scaled by the window's
+height against the 480 the art was drawn for.
+
+Squads are fielded from the map's OWN spawn markers — position,
 facing, side and CLASS, each class dressed from its own model in
 `Chars/british.mad` — so LIBERATE puts a saboteur, a hero and three grunts
-against four spies and a gunner, exactly where the original did. The battle
+against four spies and a gunner, exactly where the original did. The NAMES
+are the game's own six nations out of `fetext` (TOMMY'S TROTTERS with NOBBY,
+GINGER, DEN…), and which two a map fields is the map's own choice: a
+marker's side bit indexes that list, so LIBERATE's enemy is French. The battle
 scene opens on CAMP — the training ground, so ONE pig — and fields real
 squads wherever a map has two sides (console: `pow.swapMap('LIBERATE')` —
 see README) with
@@ -312,6 +324,13 @@ would be a stand-in nobody asked for.
   the test itself, is still undecoded), so `lib/game/obstacles.ts` draws its
   own line at a box two units across — which drops grass, flowers and the
   swimming fish, each of which carries a box exactly one unit wide.
+- **The dashboard shows only what the battle HAS.** `dashtims.mad` also
+  ships the power gauge (`newpow1..7`), the angle arc (`ang1..5`, `wedge`,
+  `angpoint`), the sights and the score panels; none of them are drawn,
+  because there is no weapon for them to belong to yet. Where the clock sits
+  and whether EVERY pig wears a name plate — or only the acting one — are
+  the remake's own calls, like the menu's layout, and want correcting
+  against play.
 - **The menu's LAYOUT is the remake's own.** Every piece on it is the
   original's, and where each piece SITS is not: the exe computes its screen
   coordinates in the frontend's draw code rather than storing them, and

@@ -30,6 +30,8 @@ import { buildPig } from './pig'
 import type { Pig as PigMesh } from './pig'
 import { createPlayer } from './clips'
 import type { Player as ClipPlayer } from './clips'
+import { PLATE_HEIGHT } from '../ui/hud'
+import type { PigPlate } from '../ui/hud'
 import type { SceneHost } from './scene'
 import { controller } from '../input/controller'
 
@@ -59,6 +61,9 @@ export interface BattleAssets {
 export interface BattleScene {
   /** Point the camera at the active pig and park the marker over it. */
   focus(pig: Pig): void
+  /** Where each living pig's name plate hangs, in a view this big — the
+   * camera lives here, so the HUD asks rather than guesses. */
+  plates(width: number, height: number): PigPlate[]
   /** Tank controls from the input layer: walk -1|0|1 (back/stop/forward),
    * turn -1|0|1 (left/stop/right). */
   setIntent(walk: number, turn: number): void
@@ -344,6 +349,17 @@ export function buildBattle(
     debug: {
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
+      /** Whose turn it is and how it stands. The dashboard says all of this
+       * in brass and in the game's own letters, which a spec cannot read —
+       * so the state comes from here and the pixels are asserted separately. */
+      hud: () => ({
+        turn: game.turn,
+        side: game.currentPlayer.name,
+        pig: game.currentPig.name,
+        health: game.currentPig.health,
+        seconds: Math.max(0, Math.ceil(game.timeLeft)),
+        swimming: query.isWater(game.currentPig.position.x, game.currentPig.position.z)
+      }),
       currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0,
       /** Every sound the battle has played, in order — a spec cannot
        * listen, so this is what it asserts on instead. */
@@ -393,6 +409,26 @@ export function buildBattle(
 
   return {
     focus,
+    plates(width, height) {
+      const at = new THREE.Vector3()
+      const out: PigPlate[] = []
+      for (const entry of pigMeshes) {
+        if (entry.pig.health <= 0) continue
+        entry.node.getWorldPosition(at)
+        // World space is Y-up, so the plate hangs ABOVE by adding to y.
+        at.y += PLATE_HEIGHT
+        at.project(host.camera)
+        if (at.z > 1) continue // behind the camera
+        out.push({
+          x: (at.x * 0.5 + 0.5) * width,
+          y: (-at.y * 0.5 + 0.5) * height,
+          name: entry.pig.name,
+          health: entry.pig.health,
+          acting: entry.pig === game.currentPig
+        })
+      }
+      return out
+    },
     setIntent(walk, turn) {
       intent.walk = walk
       intent.turn = turn

@@ -7,6 +7,8 @@ import type { PigSpawn } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
 import { buildWaterMask } from '../../../lib/game/watermask'
 import { battleSides } from '../../../lib/game/spawns'
+import { nations } from '../../../lib/game/teams'
+import type { Team } from '../../../lib/game/teams'
 import { artFor } from '../three/soldiers'
 import { existsForPlayers } from '../../../lib/formats/pog'
 import type { LoadModelResult, MapObject } from '../api'
@@ -14,6 +16,7 @@ import { ensureScene } from '../three/scene'
 import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
 import { controller } from '../input/controller'
+import { createHud } from './hud'
 import { byId } from './dom'
 
 // The training ground — the first map the original ever shows a player, and
@@ -32,19 +35,13 @@ const normalizeMap = (name: string): string =>
     .replace(/\.pmg$/i, '')
     .toUpperCase()
 
-// Enough names for the biggest side any shipped map fields; a squad takes
-// as many as its side has spawn markers, and no map is asked for more
-// sides than there are entries here.
-const SQUADS = [
-  {
-    name: 'Tommy’s Trotters',
-    pigNames: ['Tommy', 'Wilson', 'Berry', 'Hogsworth', 'Bacon', 'Rasher', 'Chops', 'Snout']
-  },
-  {
-    name: 'Kaiser’s Grunters',
-    pigNames: ['Hans', 'Fritz', 'Otto', 'Schweinrich', 'Klaus', 'Dieter', 'Wurst', 'Speck']
-  }
-]
+/**
+ * How many sides a battle fields. The markers name up to six (FINAL uses
+ * all of them), but there is no AI for the rest, so the first two the map
+ * carries are the ones that play — and WHICH two is the map's own business:
+ * a marker's side bit is the nation (lib/game/teams.ts).
+ */
+const SIDES_FIELDED = 2
 
 export interface BattleView {
   open(): Promise<boolean>
@@ -66,13 +63,15 @@ interface Squad {
  * the training ground is one pig — there is no filling in, and a map that
  * carries no markers cannot be played.
  */
-function mapSquads(objects: MapObject[]): Squad[] {
-  return battleSides(objects, SQUADS.length).map((side, index) => {
-    const squad = SQUADS[index]
-    const pigs = side.slice(0, squad.pigNames.length)
+function mapSquads(objects: MapObject[], teams: Team[]): Squad[] {
+  return battleSides(objects, SIDES_FIELDED).map((side, index) => {
+    // The side bit the map set IS the nation; a map with a bit no nation
+    // answers to falls back on the order it was found in.
+    const team = teams[side[0]?.team] ?? teams[index]
+    const pigs = side.slice(0, team.pigNames.length)
     return {
-      name: squad.name,
-      pigNames: squad.pigNames.slice(0, pigs.length),
+      name: team.name,
+      pigNames: team.pigNames.slice(0, pigs.length),
       spawns: pigs.map((at) => ({
         x: at.x,
         z: at.z,
@@ -84,24 +83,21 @@ function mapSquads(objects: MapObject[]): Squad[] {
 }
 
 export function initBattle(onLeave: () => void): BattleView {
-  const hudEl = byId<HTMLSpanElement>('battle-hud')
-  // Separate from the HUD on purpose: this is for reporting a tile that
-  // looks wrong, and the HUD's text is asserted verbatim by the e2e suite.
-  const tileEl = byId<HTMLSpanElement>('battle-tile')
   const canvasHost = byId<HTMLDivElement>('battle-canvas')
+  const hudCanvas = byId<HTMLCanvasElement>('battle-hud')
+  const hud = createHud(hudCanvas)
+  // Nothing to do with the dashboard: this is the debug readout for
+  // reporting a tile that looks wrong in play.
+  const tileEl = byId<HTMLSpanElement>('battle-tile')
 
   let game: Game | null = null
   let scene: BattleScene | null = null
   let query: TerrainQuery | null = null
   let map = DEFAULT_MAP
 
-  const updateHudText = (): void => {
+  const updateTileText = (): void => {
     if (!game) return
     const { x, z } = game.currentPig.position
-    const swimming = query?.isWater(x, z) ? ', swimming' : ''
-    hudEl.textContent =
-      `Turn ${game.turn} — ${game.currentPlayer.name}: ${game.currentPig.name} ` +
-      `(${game.currentPig.health} hp, ${Math.max(0, Math.ceil(game.timeLeft))}s${swimming})`
     const tile = query?.tileAddress(x, z)
     tileEl.textContent = tile
       ? `tile ${tile.col},${tile.row}  tex ${tile.texture}  byte ${tile.rotateFlip}  type 0x${tile.type.toString(16)}`
@@ -110,8 +106,19 @@ export function initBattle(onLeave: () => void): BattleView {
 
   const updateHud = (): void => {
     if (!game) return
-    updateHudText()
+    updateTileText()
     scene?.focus(game.currentPig)
+  }
+
+  // The dashboard is drawn over the 3D view, on its own canvas, for as long
+  // as the battle is the view.
+  let frame = 0
+  const paint = (): void => {
+    frame = requestAnimationFrame(paint)
+    if (!game || !scene) return
+    const width = hudCanvas.clientWidth
+    const height = hudCanvas.clientHeight
+    hud.draw({ seconds: game.timeLeft, pigs: scene.plates(width, height) })
   }
 
   // The button is just another way to fire the action.
@@ -146,24 +153,33 @@ export function initBattle(onLeave: () => void): BattleView {
     scene?.dispose()
     scene = null
     game = null
+    if (frame !== 0) cancelAnimationFrame(frame)
+    frame = 0
+    hud.clear()
     onLeave()
   })
 
   /** (Re)start the battle on `name` — fresh spawns, fresh turn order. A load
    * failure leaves whatever battle was running untouched. */
   const start = async (name: string): Promise<boolean> => {
-    const [terrainResult, objectsResult, clipsResult] = await Promise.all([
-      window.api.loadTerrain(`Maps/${name}.PMG`),
-      window.api.loadMapObjects(`Maps/${name}.POG`),
-      window.api.loadClips(CHAR_ARCHIVE)
-    ])
-    if (!terrainResult.ok) {
-      // A failed SWAP is a console conversation; a failed OPEN has no scene
-      // to keep, so the HUD carries the message.
-      if (scene) console.log(`stayed on ${map}: ${terrainResult.error}`)
-      else hudEl.textContent = terrainResult.error
+    // A battle that cannot load stays unopened and says so in the console —
+    // the same place a refused swapMap answers. The view never appears, so
+    // there is nowhere on screen to put it.
+    const refuse = (error: string): false => {
+      console.log(scene ? `stayed on ${map}: ${error}` : `could not open ${name}: ${error}`)
       return false
     }
+    const [terrainResult, objectsResult, clipsResult, textResult] = await Promise.all([
+      window.api.loadTerrain(`Maps/${name}.PMG`),
+      window.api.loadMapObjects(`Maps/${name}.POG`),
+      window.api.loadClips(CHAR_ARCHIVE),
+      window.api.loadGameText('fetext'),
+      hud.load()
+    ])
+    if (!terrainResult.ok) return refuse(terrainResult.error)
+    if (!textResult.ok) return refuse(textResult.error)
+    const teams = nations(textResult.strings)
+    if (teams.length === 0) return refuse('the install names no teams')
 
     if (!objectsResult.ok) console.log(`${name} without its objects: ${objectsResult.error}`)
 
@@ -173,32 +189,22 @@ export function initBattle(onLeave: () => void): BattleView {
     // that shows it — one-player snipers and multiplayer grunts on the very
     // same spots (lib/formats/pog.ts).
     const objects = (objectsResult.ok ? objectsResult.objects : []).filter((object) =>
-      existsForPlayers(object, SQUADS.length)
+      existsForPlayers(object, SIDES_FIELDED)
     )
 
     query = new TerrainQuery(
       terrainResult.blocks,
       buildWaterMask(terrainResult.blocks, terrainResult.textures)
     )
-    const squads = mapSquads(objects)
-    if (squads.length === 0) {
-      const error = `${name} carries no spawn markers — nothing to field`
-      if (scene) console.log(`stayed on ${map}: ${error}`)
-      else hudEl.textContent = error
-      return false
-    }
+    const squads = mapSquads(objects, teams)
+    if (squads.length === 0) return refuse(`${name} carries no spawn markers — nothing to field`)
 
     // Which models to load is only known once the squads are: a map fields
     // the classes its own markers name.
     const bases = artFor(squads.flatMap((squad) => squad.spawns.map((at) => at.pigClass ?? 0)))
     const loaded = await Promise.all(bases.map((base) => window.api.loadModel(CHAR_ARCHIVE, base)))
     const missing = loaded.findIndex((result) => !result.ok)
-    if (missing >= 0) {
-      const error = (loaded[missing] as { ok: false; error: string }).error
-      if (scene) console.log(`stayed on ${map}: ${error}`)
-      else hudEl.textContent = error
-      return false
-    }
+    if (missing >= 0) return refuse((loaded[missing] as { ok: false; error: string }).error)
     const soldiers = bases.map((base, index) => {
       const result = loaded[index] as Extract<LoadModelResult, { ok: true }>
       return { base, model: result.model, textures: result.textures }
@@ -225,10 +231,11 @@ export function initBattle(onLeave: () => void): BattleView {
         propTextures: objectsResult.ok ? objectsResult.textures : []
       },
       game,
-      updateHudText
+      updateTileText
     )
     map = name
     updateHud()
+    if (frame === 0) frame = requestAnimationFrame(paint)
     return true
   }
 
@@ -262,6 +269,9 @@ export function initBattle(onLeave: () => void): BattleView {
       scene?.dispose()
       scene = null
       game = null
+      if (frame !== 0) cancelAnimationFrame(frame)
+      frame = 0
+      hud.clear()
     }
   }
 }

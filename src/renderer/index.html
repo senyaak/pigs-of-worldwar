@@ -250,13 +250,9 @@
         font-size: 12px;
         font-family: ui-monospace, monospace;
       }
-      #battle-hud {
-        color: var(--text);
-        font-size: 14px;
-        font-family: Consolas, monospace;
-      }
       #battle-canvas {
         flex: 1;
+        position: relative;
         min-height: 0;
         border: 1px solid var(--border);
         border-radius: 6px;
@@ -264,6 +260,15 @@
       }
       #battle-canvas canvas {
         display: block;
+      }
+      /* The dashboard rides over the 3D view, and never eats a click. */
+      #battle-hud {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        image-rendering: pixelated;
       }
       .hidden {
         display: none !important;
@@ -300,10 +305,11 @@
         <div id="battle-toolbar">
           <button id="battle-leave">&larr; Menu</button>
           <button id="battle-end-turn">End Turn</button>
-          <span id="battle-hud"></span>
           <span id="battle-tile"></span>
         </div>
-        <div id="battle-canvas"></div>
+        <div id="battle-canvas">
+          <canvas id="battle-hud"></canvas>
+        </div>
       </div>
       <div id="file-list" class="hidden"></div>
       <div id="archive-view" class="hidden">

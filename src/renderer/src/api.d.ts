@@ -157,8 +157,19 @@ export interface Api {
   loadFrontendImages(entryNames: string[]): Promise<FrontendImagesResult>
   loadFont(name: string): Promise<LoadFontResult>
   loadGameText(which: string): Promise<LoadTextResult>
+  loadTims(relPath: string): Promise<LoadTimsResult>
   quit(): Promise<void>
 }
+
+/** One TIM out of an archive, ready to blit — colour 0 already transparent. */
+export interface TimImage {
+  name: string
+  width: number
+  height: number
+  rgba: Uint8Array
+}
+
+export type LoadTimsResult = { ok: true; images: TimImage[] } | { ok: false; error: string }
 
 export interface FrontendImage {
   name: string

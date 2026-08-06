@@ -73,6 +73,27 @@ export const debugState = (
     return { x: at.x, z: at.z, heading: pow.debug.currentHeading(), nodeY: pow.debug.currentNodeY() }
   })
 
+export interface HudState {
+  turn: number
+  side: string
+  pig: string
+  health: number
+  seconds: number
+  swimming: boolean
+}
+
+/**
+ * What the dashboard is saying. It says it in brass and in the game's own
+ * letters, which no assertion can read, so the STATE comes from here and the
+ * pixels are asserted separately (002/hud.spec.ts).
+ */
+export const hud = (page: Page): Promise<HudState> =>
+  page.evaluate(() => {
+    const pow = (window as unknown as { pow?: { debug?: { hud(): HudState } } }).pow
+    if (!pow?.debug) throw new Error('no battle scene is up — window.pow.debug is missing')
+    return pow.debug.hud()
+  })
+
 /**
  * Watch the acting pig for up to `ms` and return the highest it got —
  * game space is Y-down, so the smallest nodeY — resolving the moment it

@@ -109,6 +109,15 @@ export interface DebugHooks {
   currentPig(): { x: number; z: number }
   currentHeading(): number
   currentNodeY(): number
+  /** What the dashboard is saying: whose turn, which pig, how it stands. */
+  hud(): {
+    turn: number
+    side: string
+    pig: string
+    health: number
+    seconds: number
+    swimming: boolean
+  }
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }
   /** Every sound the battle has played, in order. */

@@ -4,6 +4,11 @@
 // (lib/formats/tab.ts). Nothing here scales or restyles: a glyph is blitted
 // at its own size, which is what makes a line of it look like the original's
 // rather than like a web page in a pixel typeface.
+//
+// The game's fonts have NO LOWERCASE — the slots below 'a' run into accented
+// capitals instead — which is why everything the game says is in capitals,
+// down to the names a player types. Text arriving here is drawn as it comes:
+// pass it in the case it should appear in.
 
 import type { GlyphTable } from '../api'
 

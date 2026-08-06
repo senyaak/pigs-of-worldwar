@@ -17,7 +17,8 @@ import {
   loadModel,
   loadSound,
   loadSoundBank,
-  loadTerrain
+  loadTerrain,
+  loadTims
 } from './assets'
 
 function fail(context: string, error: unknown): { ok: false; error: string } {
@@ -87,6 +88,14 @@ export function registerIpc(): void {
       return { ok: true, font: await loadFont(gameDir, name) }
     } catch (error) {
       return fail(name, error)
+    }
+  })
+
+  ipcMain.handle('tims:load', async (_event, relPath: string) => {
+    try {
+      return { ok: true, images: await loadTims(insideGameDir(relPath)) }
+    } catch (error) {
+      return fail(relPath, error)
     }
   })
 
