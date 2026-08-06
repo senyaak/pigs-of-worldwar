@@ -73,13 +73,14 @@ punches its shore cutouts with the same test, so what looks like water
 swims. `formats/tim.ts` keeps the raw CLUT and every texel's index for it:
 the decoded rgba drops the bit.
 
-Two dead ends someone will re-derive. Learning water COLOURS off the map
+The chain is decoded end to end: the CLUT is classified at upload, a MIXED
+texture then has its translucent texels punched to zero on the way to the
+surface (dll 0x10007d79), and the probe reads those holes back. Two dead
+ends someone will re-derive on the way. Learning water COLOURS off the map
 works by accident and flickers mid-swim. Collapsing the mixed case to
-"solid" (on the grounds that its texel probe wants a zero texel, and no
-shipped art has one) turns a pond's own RIM into ground and lets a pig walk
-out over the water — found in play within the hour. The zeroes must be
-written by the surface conversion the DLL does past 0x10007f0a, unread; the
-TIM says the same thing without it.
+"solid" — because the probe wants a zero texel and no shipped TIM has one —
+turns a pond's own RIM into ground and lets a pig walk out over the water;
+the zeroes are in the SURFACE, not the TIM.
 
 **The ground carries its own light, and the engine must not add one.** Each
 PMG vertex stores a brightness byte (how-doc: "unknown ≤255") that the
@@ -233,6 +234,11 @@ draws what it says.
   the input handler ramps an accumulator by 4 a frame to a cap of 32/4096 of
   a circle, so 1.473 rad/s at 30 Hz against the 2.6 here — but applying it
   has not been played yet, so `TURN_SPEED` stands until it is.
+- **Open water is punched, where the original blends it.** The library
+  punches water texels only out of MIXED art (kind 1); a kind-2 tile keeps
+  its texture and is drawn translucent over the water. `three/terrain.ts`
+  cuts every water texel out of every texture, so open water shows the flat
+  sheet colour and reads plainer than the original's. Not chased.
 - **Water renders as: flatten + mask + one plain sheet.** Per water REGION
   (flood-fill of water-flagged tiles — the exe's "Fitting water." JOINS)
   a level is fitted (mode of the region's corner heights; 128 on every
