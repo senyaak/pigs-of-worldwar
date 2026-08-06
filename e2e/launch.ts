@@ -64,7 +64,10 @@ export async function launchApp(options: LaunchOptions): Promise<Launched> {
     cwd: REPO_ROOT,
     env: {
       ...process.env,
-      POW_ENV_FILE: options.envFile
+      POW_ENV_FILE: options.envFile,
+      // Show the window without pulling the foreground off the developer —
+      // a run launches the app several times (src/main/index.ts).
+      POW_NO_FOCUS: '1'
     } as Record<string, string>
   })
   const errors: string[] = []

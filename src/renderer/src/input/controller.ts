@@ -110,6 +110,13 @@ export interface DebugHooks {
   currentNodeY(): number
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }
+  /** What the map's .POG put on the ground: how many records were drawn out
+   * of how many, and where each one landed (game space, Y-down). */
+  props(): {
+    placed: number
+    objects: number
+    at: { name: string; x: number; y: number; z: number }[]
+  }
   /** Set the acting pig down somewhere, facing somewhere. Not a player move:
    * it exists so a spec can stage a situation it could not walk to. */
   warp(x: number, z: number, heading: number): void

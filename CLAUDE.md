@@ -103,6 +103,19 @@ together, and shows up as every asymmetric texture facing the wrong way.
 Vertices run +x with the column AND **+z with the row**. This is also why
 `WALL_SHAPES` no longer needs the mirror it used to carry.
 
+**The POG counts z down too, and its yaw is NEGATED.** A map's objects are
+paired to geometry in the map's own `.MAD` **by name**, their stored z is
+the file's downward one (negate it, exactly as for a block), and their
+stored y is an ELEVATION of the model's CENTRE — so props hover their own
+half-height above the ground by design. The turn is `phi = −yaw − π/2`, and
+BOTH parts of that are measured rather than read: CAMP's bridge only forms
+one walkway with the angle negated, and its yaw-0 training dummy only faces
+the green path at `−π/2`. Two tests that look decisive are backwards —
+walls near a long prop are the ones it CROSSES, and a bridge ramp climbs
+over the ditch, so its high end is above the LOW ground. Every name that
+fails to resolve ends in `_ME`: those records are the pig SPAWN markers,
+with the class in `type`. See `../pigs-disasm/objects/notes.md`.
+
 **`MapTileSlip` is not slip** — it is which half or diagonal of a wall tile
 is solid, read by `Map::IsBlocked` and by nothing else.
 
@@ -140,7 +153,7 @@ gives a direction that is downhill on neither side.
 ## How the code is laid out
 
 - `src/lib/formats/` — one pure reader per format (mad, tim, mgl, bmp, model,
-  hir, mcap, pmg, ptg). No fs, no Electron, no three: they take bytes.
+  hir, mcap, pmg, ptg, pog). No fs, no Electron, no three: they take bytes.
 - `src/lib/game/` — the rules (`Game`, `TerrainQuery`, `movement`,
   `ballistics`). Pure too, so the domain specs drive them directly.
 - `src/main/` — `index.ts` lifecycle only, `gameDir.ts` locating the install,
@@ -189,8 +202,10 @@ npm run typecheck && npm run build && npx playwright test
 
 ## Where it stands
 
-Formats, models, textures, skeleton, 93 animations, terrain and water all
-parse and render. The menu wears the original art. The battle scene puts
+Formats, models, textures, skeleton, 93 animations, terrain, water and the
+maps' OBJECTS all parse and render — CAMP draws its 147 props, the training
+ground's dummies, crates and bridge among them. The menu wears the original
+art. The battle scene puts
 two squads on CAMP (console: `pow.swapMap('ARTGUN')` — see README) with
 the original's turn clock, tank controls, jumping, swimming (water by the
 art's own translucency, floats at the region's surface, sunk SWIM_SINK),
@@ -256,6 +271,10 @@ draws what it says.
   wrong. What those two grey TIMs and the DLL's under-landscape 49×49
   water grid are actually FOR is still open (play memory says a sink/kill
   layer, not the visible water).
+- **Map objects are scenery.** The POG's props are drawn and nothing else:
+  a pig walks through a crate, and the collision box every record carries
+  (fields 8-10) is parsed and unused. Spawns still come from
+  `TerrainQuery.pickSpawns`, not from the map's own `_ME` markers.
 - **The wall envelope is an inference.** Whether wall geometry sits in the
   exe's collision world is still open (0x406bb0 undecoded); the remake
   builds the play-observed behaviour from the decoded step-up/sidestep
@@ -273,3 +292,7 @@ draws what it says.
   and six other sites write it.
 - The tile type's low 5 bits: 0x20 water, 0x80 wall and the twelve material
   rows are known; the rest of the meanings are not.
+- POG fields 11, 12, 14-16, 28 and 29, and what the always-set low six bits
+  of the flags word (13) mean. 14-16 look like the interesting ones — they
+  are non-zero mostly on crates and spawn markers, which is where a crate's
+  contents and a spawn's team would live.

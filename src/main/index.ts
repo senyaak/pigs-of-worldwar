@@ -18,16 +18,25 @@ function createWindow(): void {
     (process.argv.includes('--windowed') ||
       process.env['POW_WINDOWED'] === '1' ||
       Boolean(process.env['ELECTRON_RENDERER_URL']))
+
+  // POW_NO_FOCUS: come up WITHOUT taking the foreground. The e2e suite sets
+  // it, because a run launches the app repeatedly and every launch used to
+  // steal the keyboard from whatever the developer was doing. The window
+  // still has to draw while it sits behind everything — specs read the
+  // canvas back and time the frame loop — and Chromium throttles a window it
+  // thinks nobody is looking at, so the throttle goes off with it.
+  const noFocus = process.env['POW_NO_FOCUS'] === '1'
   const window = new BrowserWindow({
     ...(windowed ? { width: 1100, height: 750 } : { fullscreen: true, frame: false }),
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js')
+      preload: path.join(__dirname, '../preload/index.js'),
+      ...(noFocus ? { backgroundThrottling: false } : {})
     }
   })
 
-  window.on('ready-to-show', () => window.show())
+  window.on('ready-to-show', () => (noFocus ? window.showInactive() : window.show()))
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     void window.loadURL(process.env['ELECTRON_RENDERER_URL'])

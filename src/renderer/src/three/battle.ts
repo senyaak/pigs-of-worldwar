@@ -3,7 +3,16 @@
 // works in three's Y-up world and follows the active pig.
 
 import * as THREE from 'three'
-import type { Bone, Clip, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
+import type {
+  Bone,
+  Clip,
+  MapObject,
+  MapProp,
+  Model,
+  TerrainBlock,
+  TerrainTexture,
+  Texture
+} from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
 import { buildWaterMask } from '../../../lib/game/watermask'
@@ -11,6 +20,7 @@ import { ANIM, SWIM_SINK, createLocomotion, restingY, updateLocomotion } from '.
 import type { LocomotionState } from '../../../lib/game/locomotion'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
+import { buildMapProps } from './props'
 import { buildPig } from './pig'
 import type { Pig as PigMesh } from './pig'
 import { createPlayer } from './clips'
@@ -25,6 +35,11 @@ export interface BattleAssets {
   modelTextures: Texture[]
   skeleton: Bone[]
   clips: Clip[]
+  /** The map's .POG records and the geometry they name. Empty is fine — a
+   * map whose objects failed to load still plays. */
+  objects: MapObject[]
+  props: MapProp[]
+  propTextures: Texture[]
 }
 
 export interface BattleScene {
@@ -61,6 +76,11 @@ export function buildBattle(
   // one child is the inner game-space group — ground and water together.
   const terrainMesh = terrain.group.children[0]
   root.add(terrainMesh)
+
+  // Whatever the map stands on its ground: trees, crates, bridges, and on
+  // the training map the dummies and the gate.
+  const props = buildMapProps(assets.objects, assets.props, assets.propTextures)
+  root.add(props.group)
 
   interface PigEntry {
     pig: Pig
@@ -271,6 +291,18 @@ export function buildBattle(
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
       currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0,
+      /** What the map put on its ground: how many .POG records were drawn,
+       * and where each one landed — the spec's only view of placement. */
+      props: () => ({
+        placed: props.placed,
+        objects: assets.objects.length,
+        at: props.group.children.map((mesh) => ({
+          name: mesh.name,
+          x: mesh.position.x,
+          y: mesh.position.y,
+          z: mesh.position.z
+        }))
+      }),
       /** Where the chase camera actually is, world space — the only way a
        * spec can tell "swimming" from "the view has gone under the water". */
       camera: () => ({ x: host.camera.position.x, y: host.camera.position.y, z: host.camera.position.z }),
@@ -298,6 +330,7 @@ export function buildBattle(
       host.onFrame.delete(onFrame)
       host.scene.remove(root)
       terrain.dispose()
+      props.dispose()
       for (const { mesh } of pigMeshes) mesh.dispose()
       marker.geometry.dispose()
       ;(marker.material as THREE.Material).dispose()

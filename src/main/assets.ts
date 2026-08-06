@@ -19,6 +19,8 @@ import { decodeMgl } from '../lib/formats/mgl'
 import { parseBmp } from '../lib/formats/bmp'
 import { parsePmg } from '../lib/formats/pmg'
 import type { TerrainBlock } from '../lib/formats/pmg'
+import { parsePog } from '../lib/formats/pog'
+import type { MapObject } from '../lib/formats/pog'
 import { parsePtg } from '../lib/formats/ptg'
 
 export interface LoadedModel {
@@ -118,6 +120,60 @@ export async function loadTerrain(full: string): Promise<LoadedTerrain> {
   const ptgName = siblings.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.ptg`)
   const textures = ptgName ? parsePtg(await fs.readFile(path.join(dir, ptgName))) : []
   return { blocks, textures }
+}
+
+export interface LoadedProp {
+  /** The POG name this geometry answers to. */
+  name: string
+  model: Model
+}
+
+export interface LoadedMapObjects {
+  objects: MapObject[]
+  /** One entry per distinct POG name the map's .MAD actually carries. The
+   * `*_ME` spawn markers have no geometry there and so are absent — the
+   * caller matches by name and skips what it cannot draw. */
+  props: LoadedProp[]
+  /** The map's one texture archive, shared by every prop on it. */
+  textures: (Tim & { name: string })[]
+}
+
+/**
+ * A map's placed objects: the .POG list, the geometry each record names out
+ * of the sibling .MAD, and the map's textures — parsed ONCE and shared,
+ * rather than per model as `loadModel` would.
+ *
+ * No skeleton is passed on purpose. Maps ship no .HIR, and prop vertices are
+ * already absolute; their VTX bone field carries something else (it runs
+ * 0..14 on static crates and trees alike) and adding offsets for it would
+ * scatter them.
+ */
+export async function loadMapObjects(full: string): Promise<LoadedMapObjects> {
+  const objects = parsePog(await fs.readFile(full))
+  const dir = path.dirname(full)
+  const stem = path.basename(full).replace(/\.pog$/i, '')
+  const siblings = await fs.readdir(dir)
+  const madName = siblings.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.mad`)
+  if (!madName) return { objects, props: [], textures: [] }
+
+  const madPath = path.join(dir, madName)
+  const data = await fs.readFile(madPath)
+  const { entries } = parseArchive(data)
+  const byName = new Map(entries.map((entry) => [entry.name.toLowerCase(), entry]))
+  const bytes = (name: string): Uint8Array | null => {
+    const entry = byName.get(name.toLowerCase())
+    return entry ? data.subarray(entry.offset, entry.offset + entry.size) : null
+  }
+
+  const props: LoadedProp[] = []
+  for (const name of new Set(objects.map((object) => object.name))) {
+    const vtx = bytes(`${name}.VTX`)
+    const no2 = bytes(`${name}.NO2`)
+    const fac = bytes(`${name}.FAC`)
+    if (!vtx || !no2 || !fac) continue
+    props.push({ name, model: parseModel(vtx, no2, fac) })
+  }
+  return { objects, props, textures: await pairedTextures(madPath) }
 }
 
 /**

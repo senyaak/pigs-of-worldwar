@@ -248,8 +248,49 @@ literally. Sliding ground is derived from the terrain gradient instead.
 `(fileSize − 4) / count` bytes each (verified: ARCHI.PTG = 238 × 576-byte
 32×32 4-bit TIMs).
 
-**POG — object placement**: still to transcribe from how-doc (`Map/POG`,
-`ObjectFlag`, `ObjectItemType`, `ObjectScriptType`).
+**POG — object placement**: a u16 count, `count` records of 94 bytes, then a
+u16 that is 0 (verified on all 61 shipped files; GENMUD alone trails eight
+spare bytes). No how-doc was used — the layout is what the files say, and
+`../pigs-disasm/objects/layout.js` reproduces every number below.
+
+| offset | size | field |
+| ------ | ---- | ----- |
+| 0      | 16   | model name, NUL-padded |
+| 16     | 16   | second name — "NULL" in all 6322 shipped records |
+| 32     | 62   | 31 × s16 |
+
+Fields, by index: 0-2 position, 3 the record's own 1-based place in the
+file, 4-6 pitch/yaw/roll in 4096ths of a turn, 7 object type, 8-10 collision
+box extents ÷128 **in the order (z, y, x)**, 13 a bitfield whose low six
+bits are always set, 17-24 and 30 always zero, 25-27 an unrelated second
+position that is editor scratch. 11, 12, 14-16, 28 and 29 are undecoded.
+
+A record is paired to its geometry **by name**: the base name of a
+VTX/NO2/FAC triple in the map's own `<NAME>.MAD`, textured from the sibling
+`<name>.mtd` — the character pipeline minus the skeleton. Prop vertices are
+already absolute, and the bone index their VTX carries (0..14, with no .HIR
+anywhere near the maps) means something else; adding bind offsets for it
+scatters them.
+
+5550 of 6322 records resolve that way, and every one that does not ends in
+`_ME` — those are the **pig spawn markers**, carrying the pig CLASS in
+`type` (0..16, the `gtext` class list from index 63).
+
+**Stored z counts down**, exactly as the PMG's block offsets do: of the
+eight sign-and-swap combinations, `(x, −z)` is the one that puts objects on
+the ground (mean |y − terrain| 343 against 986 for the next best). **Stored
+y is an elevation** in the PMG's own scale — against doubled heights the
+median object sits 1464 units UNDER the ground — and it is the model's
+CENTRE, not its feet, so each type sits its own constant amount above the
+terrain (TREEG 352, CRATE1 96, BRIDGE_S 0).
+
+**The yaw is negated and a quarter turn off**: `phi = −yaw − π/2`, for art
+that faces +x as the pig's does. Neither half is read from the disassembly;
+both are measured, from CAMP's bridge (whose two ramp pieces only form one
+walkway under the negation) and its training dummy (stored at yaw 0, and
+facing the green path only under `−π/2`). Full derivation, including two
+tests that look decisive and are backwards:
+`../pigs-disasm/objects/notes.md`.
 
 ## MGL — frontend images (FEBmps/FEBMP.MAD)
 

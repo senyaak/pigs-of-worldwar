@@ -8,7 +8,7 @@ import { promises as fs } from 'node:fs'
 
 import { parseArchive } from '../lib/formats/mad'
 import { getGameDir, insideGameDir, setGameDir, walkDir } from './gameDir'
-import { loadClips, loadFrontendImage, loadModel, loadTerrain } from './assets'
+import { loadClips, loadFrontendImage, loadMapObjects, loadModel, loadTerrain } from './assets'
 
 function fail(context: string, error: unknown): { ok: false; error: string } {
   return { ok: false, error: `${context}: ${error instanceof Error ? error.message : String(error)}` }
@@ -75,6 +75,14 @@ export function registerIpc(): void {
   ipcMain.handle('terrain:load', async (_event, relPath: string) => {
     try {
       return { ok: true, ...(await loadTerrain(insideGameDir(relPath))) }
+    } catch (error) {
+      return fail(relPath, error)
+    }
+  })
+
+  ipcMain.handle('mapObjects:load', async (_event, relPath: string) => {
+    try {
+      return { ok: true, ...(await loadMapObjects(insideGameDir(relPath))) }
     } catch (error) {
       return fail(relPath, error)
     }

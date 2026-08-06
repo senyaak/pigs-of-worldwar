@@ -107,8 +107,9 @@ export function initBattle(onLeave: () => void): BattleView {
   /** (Re)start the battle on `name` — fresh spawns, fresh turn order. A load
    * failure leaves whatever battle was running untouched. */
   const start = async (name: string): Promise<boolean> => {
-    const [terrainResult, modelResult, clipsResult] = await Promise.all([
+    const [terrainResult, objectsResult, modelResult, clipsResult] = await Promise.all([
       window.api.loadTerrain(`Maps/${name}.PMG`),
+      window.api.loadMapObjects(`Maps/${name}.POG`),
       window.api.loadModel(CHAR_ARCHIVE, SOLDIER),
       window.api.loadClips(CHAR_ARCHIVE)
     ])
@@ -120,6 +121,8 @@ export function initBattle(onLeave: () => void): BattleView {
       else hudEl.textContent = failure ?? ''
       return false
     }
+
+    if (!objectsResult.ok) console.log(`${name} without its objects: ${objectsResult.error}`)
 
     query = new TerrainQuery(
       terrainResult.blocks,
@@ -137,7 +140,12 @@ export function initBattle(onLeave: () => void): BattleView {
         model: modelResult.model,
         modelTextures: modelResult.textures,
         skeleton: modelResult.skeleton,
-        clips: clipsResult.ok ? clipsResult.clips : []
+        clips: clipsResult.ok ? clipsResult.clips : [],
+        // A map without its props is still playable ground, so a failed POG
+        // is reported and stepped over rather than taking the battle down.
+        objects: objectsResult.ok ? objectsResult.objects : [],
+        props: objectsResult.ok ? objectsResult.props : [],
+        propTextures: objectsResult.ok ? objectsResult.textures : []
       },
       game,
       updateHudText

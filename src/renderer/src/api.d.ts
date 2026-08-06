@@ -96,6 +96,32 @@ export type LoadTerrainResult =
   | { ok: true; blocks: TerrainBlock[]; textures: TerrainTexture[] }
   | { ok: false; error: string }
 
+export interface MapObject {
+  name: string
+  id: number
+  type: number
+  x: number
+  /** Elevation, up-positive — like the PMG's heights, and the model's
+   * ORIGIN rather than its feet (lib/formats/pog.ts). */
+  y: number
+  z: number
+  yaw: number
+  pitch: number
+  roll: number
+  box: { x: number; y: number; z: number }
+  flags: number
+  fields: Int16Array
+}
+
+export interface MapProp {
+  name: string
+  model: Model
+}
+
+export type LoadMapObjectsResult =
+  | { ok: true; objects: MapObject[]; props: MapProp[]; textures: Texture[] }
+  | { ok: false; error: string }
+
 export interface Api {
   getGameDir(): Promise<string | null>
   selectGameDir(): Promise<string | null>
@@ -105,6 +131,7 @@ export interface Api {
   loadModel(relPath: string, base: string): Promise<LoadModelResult>
   loadClips(relPath: string): Promise<LoadClipsResult>
   loadTerrain(relPath: string): Promise<LoadTerrainResult>
+  loadMapObjects(relPath: string): Promise<LoadMapObjectsResult>
   loadFrontendImage(entryName: string): Promise<FrontendImageResult>
   quit(): Promise<void>
 }
