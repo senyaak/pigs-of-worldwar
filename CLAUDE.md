@@ -356,6 +356,11 @@ would be a stand-in nobody asked for.
 
 ### Threads left mid-pull
 
+- **The menu has no entrance.** In the original the pieces DRIVE ON — the
+  bars slide in rather than being there from the first frame. Deferred on
+  purpose, along with the layout itself; whatever settles the coordinates
+  will settle where they come in from.
+
 - `0x406bb0`, 3280 bytes: the collision test itself. Knowing what else lives
   in that world would settle whether objects need their own handling.
 - The flag at `+0x3a4` is a bitfield; only bit 3 (terrain type 11) is traced,
