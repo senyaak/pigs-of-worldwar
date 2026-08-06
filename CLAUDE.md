@@ -296,10 +296,18 @@ draws what it says.
   own line at a box two units across — which drops grass, flowers and the
   swimming fish, each of which carries a box exactly one unit wide.
 - **A pig cannot get ONTO a bridge.** The deck sections are boxes and the
-  ramps are bodiless, so a pig walks through the ramp and is stopped by the
-  deck's underside — or walks under it where the ground is low enough. How
-  the original carries a pig up and over is not worked out; the step-up
-  envelope is 64 world units and a deck stands hundreds above the bank.
+  abutments are bodiless, so a pig walks through the abutment and is
+  stopped by the deck's underside — or walks under it where the ground is
+  low enough. How the original carries a pig up and over is not worked out;
+  the step-up envelope is 64 world units and a deck stands hundreds above
+  the bank.
+- **The map's SCRIPT is not run, so scripted objects are just there.** Field
+  14 is an object kind tag, and CAMP's 23s — eight dummies and the whole
+  second bridge — are the ones play remembers appearing partway through the
+  tutorial, along with the crates. The remake places everything at once, so
+  that bridge stands assembled from the first frame and reads as levitating
+  steps: flat slabs at 2208, 1984 and 1472 over four supports, which is
+  exactly what the file says and not a rendering fault.
 - **Two sides, though a map offers up to six.** The spawn markers name six
   (FINAL uses all of them, the arenas four); the battle fields the first two
   it finds, because there is no AI for the rest. There is no filling in

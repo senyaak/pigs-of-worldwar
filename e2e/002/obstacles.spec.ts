@@ -33,6 +33,16 @@ import { terrain } from './fixture'
 
 const NORTH = 0 // heading 0 is +z; forward is (sin h, cos h)
 
+/**
+ * A stored yaw that leaves a box lying along the world's own axes — the one
+ * `modelRotationY` turns to zero. Stored angles are not world angles: the
+ * art and the collider are both turned by `−yaw − π/2` (lib/formats/pog.ts),
+ * so a record at yaw 0 is already a quarter turn round.
+ */
+const UNTURNED = -Math.PI / 2
+/** A quarter turn on from `UNTURNED`, as the drawn object sees it. */
+const QUARTER = UNTURNED - Math.PI / 2
+
 /** A .POG record, with only the fields collision reads spelled out. */
 function record(over: Partial<MapObject>): MapObject {
   return {
@@ -42,7 +52,7 @@ function record(over: Partial<MapObject>): MapObject {
     x: 0,
     y: 0,
     z: 0,
-    yaw: 0,
+    yaw: UNTURNED,
     pitch: 0,
     roll: 0,
     shape: 0,
@@ -178,13 +188,13 @@ test('a box is oriented, so its long side stops a pig its short side lets by', (
     expect(state.z).toBeLessThanOrEqual(face)
     expect(state.z).toBeGreaterThan(face - stride)
   }
-  stopsAt(0, 2048 - 128 - PIG_RADIUS)
-  stopsAt(Math.PI / 2, 2048 - 1024 - PIG_RADIUS)
+  stopsAt(UNTURNED, 2048 - 128 - PIG_RADIUS)
+  stopsAt(QUARTER, 2048 - 1024 - PIG_RADIUS)
 
   // And a stop is not the end of it: the sidestep scrapes along until the
   // box runs out, and the turned one is only 256 thick — so given long
   // enough the pig walks round its end and carries on north.
-  expect(walk(Math.PI / 2, 4).z).toBeGreaterThan(2048)
+  expect(walk(QUARTER, 4).z).toBeGreaterThan(2048)
 })
 
 test('a pig is in the way of another pig', () => {

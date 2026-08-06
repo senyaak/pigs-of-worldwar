@@ -95,10 +95,14 @@ export interface MapObject {
   flags: number
   /**
    * What the record hands over, or null for something that hands over
-   * nothing. Field 14 is 19 on every record that carries anything — 409 of
-   * CRATE1's 411 and 127 of CRATE2's 129, and a handful of SIGN and
-   * PROPOINT besides. Field 15's HIGH byte is the weapon, 0xFF on the
-   * health crates, and field 16 is the count.
+   * nothing.
+   *
+   * Field 14 is a KIND tag, not a flag — the exe branches on 0, 1, 7, 13
+   * and 19 at 0x4a624a, and CAMP alone uses 0, 19, 20, 21, 22 and 23. The
+   * value 19 is the one that means "hands something over": 409 of CRATE1's
+   * 411, 127 of CRATE2's 129, and a handful of SIGN and PROPOINT besides.
+   * Field 15's HIGH byte is then the weapon, 0xFF on the health crates,
+   * and field 16 the count.
    *
    * Field 15's LOW byte is NOT padding and is not decoded: CAMP's crates
    * carry 0, 3, 4, 5, 6 and 7 in it, health crates included. Read it off
@@ -128,6 +132,24 @@ const TURN = 4096
 const CARRIES = 19
 /** The weapon byte's "no weapon, this is health" value. */
 const NO_WEAPON = 0xff
+
+/**
+ * The stored yaw as a rotation about the vertical: `−yaw − π/2`.
+ *
+ * Both halves are measured, not read — the derivation is in
+ * `../pigs-disasm/objects/notes.md`, and the short of it is CAMP's bridge
+ * (only the negated angle turns its two abutments to face each other
+ * across the span instead of away) and CAMP's yaw-0 training dummy (only
+ * `−π/2` faces it at the path it is shot from, which is the same quarter
+ * turn the pig's own art needs).
+ *
+ * EVERYTHING that turns an object goes through this: the art in
+ * `three/props.ts` and the collision box in `lib/game/obstacles.ts`. They
+ * were once two expressions of the same rule, and the box spent a while
+ * turned differently from the model it belongs to — which reads in play as
+ * an invisible wall a stride away from the gate that owns it.
+ */
+export const modelRotationY = (yaw: number): number => -yaw - Math.PI / 2
 
 const weaponOf = (packed: number): number | null => {
   const weapon = (packed >> 8) & 0xff

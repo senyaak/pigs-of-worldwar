@@ -18,7 +18,7 @@
 // a full stop either: its top is ground when it is within the envelope, and
 // a wall only above that.
 
-import { SHAPE_BOX } from '../formats/pog'
+import { SHAPE_BOX, modelRotationY } from '../formats/pog'
 import type { MapObject } from '../formats/pog'
 import { isSpawnMarker } from './spawns'
 
@@ -87,10 +87,10 @@ export interface Obstacle {
   bottom: number
   halfX: number
   halfZ: number
-  /** How the box is turned about the vertical, matching what the scene
-   * draws (three/props.ts): the model's +x points along
-   * `(cos yaw, −sin yaw)` in game (x, z). */
-  yaw: number
+  /** How the box is turned about the vertical — `modelRotationY` of the
+   * stored yaw, which is the SAME turn the art gets. The model's +x then
+   * points along `(cos turn, −sin turn)` in game (x, z). */
+  turn: number
 }
 
 /** What locomotion asks about the things in its way. */
@@ -130,7 +130,7 @@ export function obstacleOf(object: MapObject): Obstacle | null {
     bottom: centre + object.box.y / 2,
     halfX: object.box.x / 2,
     halfZ: object.box.z / 2,
-    yaw: object.yaw
+    turn: modelRotationY(object.yaw)
   }
 }
 
@@ -139,8 +139,8 @@ function penetrates(obstacle: Obstacle, x: number, z: number, radius: number): b
   const dx = x - obstacle.x
   const dz = z - obstacle.z
   // Into the box's frame: the same axes three/props.ts turns the art onto.
-  const cos = Math.cos(obstacle.yaw)
-  const sin = Math.sin(obstacle.yaw)
+  const cos = Math.cos(obstacle.turn)
+  const sin = Math.sin(obstacle.turn)
   const localX = dx * cos - dz * sin
   const localZ = dx * sin + dz * cos
   const nearX = Math.max(-obstacle.halfX, Math.min(obstacle.halfX, localX))

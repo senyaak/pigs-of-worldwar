@@ -16,11 +16,13 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { debugState, hold, warp } from '../controller'
-import { POG_RECORD_SIZE, parsePog } from '../../src/lib/formats/pog'
+import { POG_RECORD_SIZE, modelRotationY, parsePog } from '../../src/lib/formats/pog'
 import type { MapObject } from '../../src/lib/formats/pog'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
-import { propRotationY } from '../../src/renderer/src/three/props'
+import { ObstacleField, PIG_RADIUS } from '../../src/lib/game/obstacles'
+import { WALL_CLIMB } from '../../src/lib/game/locomotion'
+
 
 const mapFile = (name: string): Buffer => readFileSync(path.join(GAME_DIR, 'Maps', name))
 
@@ -87,10 +89,11 @@ test('a prop stands on the ground it was placed over', () => {
 })
 
 test('the bridge is one walkway, which is what settles the yaw', () => {
-  // Seven records in a line at z −7424: a ramp, deck sections 220 units
-  // higher, and a ramp back down. The ramp model climbs toward its own +x,
-  // so the two ramps have to point at each other — and only the negated
-  // angle does that (three/props.ts).
+  // Seven records in a line at z −7424: an abutment, deck sections 220
+  // units higher, and an abutment back down. BRIDGE_S is solid at its own
+  // −x end and thins to a deck at its +x end, so the two of them have to
+  // face each other across the span — and only the negated angle does that
+  // (lib/formats/pog.ts).
   const run = CAMP.filter((object) => object.name.startsWith('BRID'))
   expect(run.length).toBeGreaterThanOrEqual(3)
   expect(new Set(run.map((object) => object.z))).toEqual(new Set([-7424]))
@@ -99,7 +102,7 @@ test('the bridge is one walkway, which is what settles the yaw', () => {
   expect(ramps).toHaveLength(2)
   // Which way the model's +x points once placed, in game (x, z).
   const facing = (object: MapObject): { x: number; z: number } => {
-    const phi = propRotationY(object.yaw)
+    const phi = modelRotationY(object.yaw)
     return { x: Math.cos(phi), z: -Math.sin(phi) }
   }
   expect(facing(ramps[0]).x).toBeCloseTo(1, 3)
@@ -114,7 +117,7 @@ test('the training dummy faces the path it is shot from', () => {
   const dummy = CAMP.find((object) => object.name === 'DUMMY' && object.x === -4352)
   expect(dummy).toBeDefined()
   expect(dummy!.yaw).toBe(0)
-  const phi = propRotationY(dummy!.yaw)
+  const phi = modelRotationY(dummy!.yaw)
   expect(-Math.sin(phi)).toBeCloseTo(1, 3)
 
   const blocks = parsePmg(mapFile('CAMP.PMG'))
@@ -122,6 +125,41 @@ test('the training dummy faces the path it is shot from', () => {
   const texture = (x: number, z: number): number => query.tileAddress(x, z)?.texture ?? -1
   expect(texture(dummy!.x, dummy!.z + 512)).toBe(40)
   expect(texture(dummy!.x, dummy!.z - 512)).not.toBe(40)
+})
+
+test('the collision box is turned the way the art is', () => {
+  // Found in play, not in a test: a wall you cannot see, a stride away from
+  // the gate and from the barbed wire that own it. The box was being turned
+  // by the RAW yaw while the model was turned by the converted one, so
+  // every asymmetric object had its collider lying across its own art.
+  const field = new ObstacleField(CAMP)
+  const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
+  const centre = (col: number, row: number): { x: number; z: number } => ({
+    x: -16384 + col * 512 + 256,
+    z: -16384 + row * 512 + 256
+  })
+  for (const [col, row] of [
+    [13, 52],
+    [42, 51]
+  ]) {
+    const { x, z } = centre(col, row)
+    expect(field.blocks(x, z, query.height(x, z), WALL_CLIMB), `tile ${col},${row}`).toBe(false)
+  }
+
+  // The positive half: the gate is 2560 along its own +z and 384 across, so
+  // it blocks a long way down the line its art lies on and nowhere near
+  // that far across it.
+  const gate = CAMP.find((object) => object.name === 'IRONGATE')!
+  const phi = modelRotationY(gate.yaw)
+  const along = { x: Math.sin(phi), z: Math.cos(phi) }
+  const across = { x: Math.cos(phi), z: -Math.sin(phi) }
+  const at = (dir: { x: number; z: number }, distance: number): boolean => {
+    const x = gate.x + dir.x * distance
+    const z = gate.z + dir.z * distance
+    return field.blocks(x, z, query.height(x, z), WALL_CLIMB)
+  }
+  expect(at(along, 1000), 'along the gate').toBe(true)
+  expect(at(across, 1000), 'across the gate').toBe(false)
 })
 
 test('the battle draws the map objects where the file puts them', async ({ app }) => {
@@ -150,16 +188,16 @@ test('a drawn object is also one to walk into', async ({ app }) => {
   await page.locator('#menu-new-game').click()
   await expect(page.locator('#battle')).toBeVisible()
 
-  // The training dummy on the green path, approached from the path's side.
-  // Its box is 256 across and 512 deep, so a pig of radius 320 comes to a
-  // stop about 576 short of the middle of it and no nearer.
+  // The training dummy on the green path, approached from the path's side —
+  // which is the side its 256-thick face points at, so a pig of radius 320
+  // comes to a stop around 450 short of the middle of it and no nearer.
   const dummy = CAMP.find((object) => object.name === 'DUMMY' && object.x === -4352)!
   await warp(page, dummy.x, dummy.z + 1400, Math.PI)
   await hold(page, 'walkForward', 1500)
 
   const at = await debugState(page)
   const gap = Math.hypot(at.x - dummy.x, at.z - dummy.z)
-  expect(gap).toBeGreaterThan(500)
+  expect(gap).toBeGreaterThan(PIG_RADIUS + 128 - 1)
   // It really did walk — it is not simply where it was put.
   expect(gap).toBeLessThan(1200)
   expect(app.errors()).toEqual([])
