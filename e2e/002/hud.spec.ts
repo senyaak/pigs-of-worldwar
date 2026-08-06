@@ -1,10 +1,10 @@
 // PHASE 002 — the dashboard: the battle wearing the original's brass.
 //
-// `Language/Tims/dashtims.mad` is the in-game furniture the original draws
-// over the field — the turn clock in four tiles with ten digit faces, the
-// power gauge, the angle arc, the sights. The remake draws what the battle
-// HAS: the clock, and a name plate over every living pig in the game's own
-// letters (GameChars). The rest waits for a weapon to belong to.
+// What the original keeps on screen the whole time, from play: the clock
+// bottom right, the weapon and its direction top right, the map bottom left,
+// and nothing over the pigs. The clock is the only one the battle can fill
+// yet — the weapon panel has no weapon and the map is its own work — so the
+// clock is what this pins.
 //
 // The pure half pins the archive so a mis-decode is caught at the source;
 // the app half asserts the dashboard is actually painted and that it says
@@ -121,13 +121,33 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
   await expect
     .poll(async () => (await painted()).colors, { message: 'the dashboard drawn' })
     .toBeGreaterThan(20)
-  // And it is an OVERLAY: most of the view is left alone for the battle.
-  const { opaque } = await painted()
-  const area = await page.evaluate(() => {
+
+  // And it is in the bottom-right corner, where the original keeps it: every
+  // painted pixel is in that quarter and none anywhere else.
+  const corners = await page.evaluate(() => {
     const canvas = document.getElementById('battle-hud') as HTMLCanvasElement
-    return canvas.width * canvas.height
+    const context = canvas.getContext('2d')!
+    const half = { x: Math.floor(canvas.width / 2), y: Math.floor(canvas.height / 2) }
+    const opaqueIn = (x: number, y: number, w: number, h: number): number => {
+      const pixels = context.getImageData(x, y, w, h).data
+      let count = 0
+      for (let i = 3; i < pixels.length; i += 4) if (pixels[i] !== 0) count++
+      return count
+    }
+    return {
+      topLeft: opaqueIn(0, 0, half.x, half.y),
+      topRight: opaqueIn(half.x, 0, canvas.width - half.x, half.y),
+      bottomLeft: opaqueIn(0, half.y, half.x, canvas.height - half.y),
+      bottomRight: opaqueIn(half.x, half.y, canvas.width - half.x, canvas.height - half.y),
+      area: canvas.width * canvas.height
+    }
   })
-  expect(opaque).toBeLessThan(area / 4)
+  expect(corners.bottomRight).toBeGreaterThan(1000)
+  expect(corners.topLeft, 'nothing top left').toBe(0)
+  expect(corners.topRight, 'the weapon panel is empty until there is a weapon').toBe(0)
+  expect(corners.bottomLeft, 'the map is not built yet').toBe(0)
+  // An overlay, not a curtain: the battle keeps almost all of the view.
+  expect(corners.bottomRight).toBeLessThan(corners.area / 8)
 
   // What it says is what the game says, and the clock runs down.
   const before = await hud(page)

@@ -404,5 +404,9 @@ A plain named archive of TIMs — the battle's in-game furniture:
 | `sights`, `target`, `pcpie4` | the crosshair |
 | `score1/2`, `pause1`-`pause8` | the score panel and the pause spinner |
 
-`MAPICONS.MTD` holds the overview map and its markers, `TBOXTIMS.MAD` the
-message box in four tiles.
+`MAPICONS.MTD` holds the overview map (`map1`) and its markers — `iconpig`,
+`iconhart`, `iconpkup`, `iconprop`, all 10×11. `TBOXTIMS.MAD` is the
+briefing bar that slides down from the top: `npro1..4`, two brass end caps
+and the black scroll between them. `FACETIMS.MAD`, despite the name, is the
+weapon panel — `wepn01..20` at 64×64, plus `croshair`, `point01/02`,
+`arrow000` and `aburst`.

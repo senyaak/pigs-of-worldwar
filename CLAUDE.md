@@ -221,12 +221,17 @@ MENU over ONE PLAYER, MULTI-PLAYER, OPTIONS, QUIT APPLICATION, drawn on a
 anywhere (the training ground); the two unbuilt screens wear the font's dark
 shade, the way the original greys out what cannot be chosen.
 
-**The battle wears the original's brass too**: the turn clock out of
-`Language/Tims/dashtims.mad` — four tiles and ten digit faces, counting the
-turn down in its two windows — over a name plate for every living pig, drawn
-in `GameChars`, the one FEText font with no frontend twin. It rides on its
-own canvas over the 3D view, at native resolution and scaled by the window's
-height against the 480 the art was drawn for.
+**The battle wears the original's brass too.** What the original keeps on
+screen the whole time — from play, not from the disassembly — is three
+things and no more: the **clock bottom right**, the **weapon and the
+direction it points top right** (empty until a weapon is chosen), and the
+**map bottom left**. Nothing floats over the pigs. Of the three, the clock
+is the only one the battle can fill yet, and it is the real one:
+`clock01..04` out of `Language/Tims/dashtims.mad` with a `timer0..9` face in
+each of its two windows. The dashboard rides on its own canvas over the 3D
+view, at native resolution, scaled by the window's height against the 480 the
+art was drawn for, and anchored to the view's own edges — a wide window is
+wider than 640 of those units.
 
 Squads are fielded from the map's OWN spawn markers — position,
 facing, side and CLASS, each class dressed from its own model in
@@ -326,11 +331,13 @@ would be a stand-in nobody asked for.
   swimming fish, each of which carries a box exactly one unit wide.
 - **The dashboard shows only what the battle HAS.** `dashtims.mad` also
   ships the power gauge (`newpow1..7`), the angle arc (`ang1..5`, `wedge`,
-  `angpoint`), the sights and the score panels; none of them are drawn,
-  because there is no weapon for them to belong to yet. Where the clock sits
-  and whether EVERY pig wears a name plate — or only the acting one — are
-  the remake's own calls, like the menu's layout, and want correcting
-  against play.
+  `angpoint`), the sights and the score panels, and `FACETIMS.MAD` the
+  weapon icons `wepn01..20` with the crosshair and pointers; none are drawn,
+  because there is no weapon for them to belong to. The two corners they
+  belong in are known and deliberately left empty.
+- **A name plate over each pig was tried and taken out.** It read well and
+  the original does not do it — the only writing on a battle screen is the
+  clock's digits. Do not put it back without play saying so.
 - **The menu's LAYOUT is the remake's own.** Every piece on it is the
   original's, and where each piece SITS is not: the exe computes its screen
   coordinates in the frontend's draw code rather than storing them, and
@@ -375,6 +382,14 @@ would be a stand-in nobody asked for.
 
 ### Threads left mid-pull
 
+- **The rest of the battle screen, in the order play asks for it**: the
+  BRIEFING BAR that slides down from the top when the tutorial speaks
+  (`Language/Tims/TBOXTIMS.MAD` — `npro1..4`, two brass end caps and a black
+  scroll between them, drawn with the same GameChars the clock's archive
+  sits beside); the MAP bottom left (`MAPICONS.MTD`: `map1` plus the pig,
+  heart, pickup and prop markers); and the WEAPON panel top right when
+  there is a weapon. The bar belongs with the tutorial script — it is what
+  the script talks THROUGH — so it lands with it, not before.
 - **The menu has no entrance.** In the original the pieces DRIVE ON — the
   bars slide in rather than being there from the first frame. Deferred on
   purpose, along with the layout itself; whatever settles the coordinates

@@ -1,26 +1,26 @@
 // The battle's dashboard, in the game's own brass.
 //
-// `Language/Tims/dashtims.mad` is the original's in-game furniture: the turn
-// clock (a brass gauge in four tiles with two digit windows, and ten digit
-// faces `timer0..9`), the power gauge, the angle arc, the sights. Only what
-// the battle HAS is drawn — the clock and the pigs' name plates. The power
-// and angle pieces wait for a weapon to belong to; drawing them now would be
-// furniture with nothing behind it.
+// What the original keeps on screen the whole time, from play: the CLOCK
+// bottom right, the weapon and the direction it points top right, and the
+// map bottom left. Nothing else — no labels over the pigs. The clock is the
+// only one of the three the battle can fill yet: the weapon panel stays
+// empty until there is a weapon to put in it, and the map is its own piece
+// of work.
 //
-// The dashboard is authored for a 640×480 screen. It is drawn at native
-// resolution and scaled by the window's height against that 480, so the
-// brass keeps its proportions and its size relative to the view whatever the
-// window is.
+// `Language/Tims/dashtims.mad` is where the furniture lives — the clock in
+// four tiles with ten digit faces, and, unused so far, the power gauge, the
+// angle arc, the sights and the score panels.
+//
+// It is all authored for a 640×480 screen, drawn at native resolution and
+// scaled by the window's height against that 480, so the brass keeps its
+// proportions and its size relative to the view whatever the window is.
+// Anything anchored to the right or the bottom is placed against the view's
+// own edge, since a wide window is wider than 640 of these units.
 
-import { loadFont } from './font'
-import type { Font } from './font'
 import { loadTims } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
 
 const DASHBOARD = 'Language/Tims/dashtims.mad'
-/** The font the battle writes in — 12px, and the one font with no frontend
- * twin, so it is the in-game one by elimination. */
-const GAME_FONT = 'GameChars'
 /** The height the dashboard art was drawn for. */
 const AUTHORED_HEIGHT = 480
 
@@ -35,27 +35,13 @@ const CLOCK = {
   height: 92,
   /** Where the pair of digits starts inside the assembly. */
   digits: { x: 38, y: 39, step: 26 },
-  /** Where the whole thing sits, from the top-left of the view. */
-  at: { x: 16, y: 12 }
-}
-
-/** How far above a pig's own position its name plate floats, in game units. */
-const PLATE_LIFT = 900
-
-export interface PigPlate {
-  /** Screen position of the point the plate hangs over, in CSS pixels. */
-  x: number
-  y: number
-  name: string
-  health: number
-  /** The pig whose turn it is wears the plate the camera is following. */
-  acting: boolean
+  /** It hangs off the bottom-right corner of the view. */
+  margin: { right: 16, bottom: 8 }
 }
 
 export interface HudState {
   /** Seconds left in the turn; the clock shows two digits of it. */
   seconds: number
-  pigs: PigPlate[]
 }
 
 export interface Hud {
@@ -67,12 +53,8 @@ export interface Hud {
   clear(): void
 }
 
-/** How high above a pig the plate is drawn — exported for the scene. */
-export const PLATE_HEIGHT = PLATE_LIFT
-
 export function createHud(canvas: HTMLCanvasElement): Hud {
   let art: SpriteSet | null = null
-  let font: Font | null = null
   let digits: Sprite[] = []
   let loaded = false
 
@@ -91,9 +73,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     async load() {
       if (loaded) return
       try {
-        const [tims, gameFont] = await Promise.all([loadTims(DASHBOARD), loadFont(GAME_FONT)])
-        art = tims
-        font = gameFont
+        art = await loadTims(DASHBOARD)
         digits = art.frames('timer', 0, 9)
         loaded = true
       } catch (error) {
@@ -113,7 +93,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       const context = canvas.getContext('2d')
       if (!context) return
       context.clearRect(0, 0, canvas.width, canvas.height)
-      if (!art || !font) return
+      if (!art) return
       context.imageSmoothingEnabled = false
 
       const scale = canvas.height / AUTHORED_HEIGHT
@@ -127,9 +107,10 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         )
       }
 
-      // The clock, and the seconds in its two windows. Over 99 it pins at
-      // 99: the original's gauge has room for two digits and no more.
-      const { x, y } = CLOCK.at
+      // The clock, bottom right, and the seconds in its two windows. Over 99
+      // it pins at 99: the gauge has room for two digits and no more.
+      const x = canvas.width / scale - CLOCK.width - CLOCK.margin.right
+      const y = AUTHORED_HEIGHT - CLOCK.height - CLOCK.margin.bottom
       blit(art.get('clock01'), x, y)
       blit(art.get('clock02'), x + 64, y)
       blit(art.get('clock03'), x, y + 28)
@@ -137,21 +118,6 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       const shown = Math.min(99, Math.max(0, Math.ceil(state.seconds)))
       blit(digits[Math.floor(shown / 10)], x + CLOCK.digits.x, y + CLOCK.digits.y)
       blit(digits[shown % 10], x + CLOCK.digits.x + CLOCK.digits.step, y + CLOCK.digits.y)
-
-      // A name plate over each pig, in the battle's own letters. Screen
-      // positions come from the scene, which is what holds the camera.
-      for (const plate of state.pigs) {
-        const text = plate.acting ? `${plate.name} ${plate.health}` : plate.name
-        const width = font.measure(text) * scale
-        const left = Math.round(plate.x - width / 2)
-        const top = Math.round(plate.y - font.height * scale)
-        if (left + width < 0 || left > canvas.width || top < 0 || top > canvas.height) continue
-        context.save()
-        context.translate(left, top)
-        context.scale(scale, scale)
-        font.draw(context, text, 0, 0)
-        context.restore()
-      }
     }
   }
 }
