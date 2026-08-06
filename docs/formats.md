@@ -403,7 +403,7 @@ A plain named archive of TIMs — the battle's in-game furniture:
 | `wedge1`, `wedge2` | the dial's face: two 45° fans, apex at the needle's hub, mirrored into the four quadrants of a half-disc. White in the file, drawn see-through green |
 | `angpoint` | the needle, turning on that hub |
 | `divide1`, `divide2` | the STOPS: how far the needle may turn, above `divide1` and below `divide2`, and a weapon may move them — a mortar aims below the upper one |
-| `ang2`, `ang4`, `ang5` | the weapon slot beside the dial: `ang2` its top, `ang4` its bottom, `ang5` the cap on its right end. The slot is **58 tall, not 46 + 36** — the two tiles overlap by 22 rows of plain black, which is what closes their brass rim into a ring, and 58 is exactly the cap's height |
+| `ang2`, `ang4`, `ang5` | the weapon slot beside the dial: `ang2` its top, `ang4` its bottom, `ang5` the cap on its right end. the two tiles overlap by **seven** rows — of plain black, so nothing in the art shows where — and that is what closes their brass rim into a ring |
 | `newpow3`-`newpow7` | the power gauge, five tiles of a long tube; `newpow1`/`newpow2` cap its left end and `powg1` is the marker that runs along the middle three |
 | `pcpie4` | a red button that sits over the gauge's left end on some weapons — the ones you set off yourself rather than on contact |
 | `sights`, `target` | the crosshair and its backing |

@@ -64,12 +64,10 @@ const DIAL = {
   /** Where the needle turns, and where every fan has its point. */
   hub: { x: 60, y: 64 },
   arc: { top: 0, bottom: 64 },
-  /**
-   * The slot is 58 tall, not 46 + 36: its two tiles OVERLAP by 22 rows of
-   * plain black, which is how their brass rims meet and close the ring —
-   * and 58 is exactly the height of the cap that finishes it off.
-   */
-  slot: { x: 64, top: 35, bottom: 57, cap: { x: 128, y: 35 } }
+  /** The slot's two tiles overlap by seven rows — of plain black, which is
+   * why nothing in the art shows where — and that is what closes their
+   * brass rim into a ring. The cap rides with the bottom half. */
+  slot: { x: 64, top: 23, bottom: 62, cap: { x: 128, y: 28 } }
 }
 
 /** The green the dial's face is painted, and how much of the battle shows
