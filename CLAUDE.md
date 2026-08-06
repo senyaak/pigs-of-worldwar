@@ -60,18 +60,19 @@ water bit is only a PREFILTER too — the verdict comes from the ART
 (`afIsPointWatery`), so mud banks with the bit set are LAND. See
 `../pigs-disasm/movement/notes.md`.
 
-**Water is art the artist made SEE-THROUGH, and that is what tells it from
-ICE.** `afIsPointWatery` answers off a per-TEXTURE kind the library computes
-at upload (dll 0x10007b6c) by walking the CLUT: every non-transparent colour
-carrying the PSX semi-transparency bit 0x8000 makes the texture water, none
-makes it solid, a mix sends it to a texel probe that no shipped art can
-satisfy. So a frozen channel and the pond beside it are both water-flagged,
-and the ice is the opaque one — CAMP swims on textures 44/45/46 (80 tiles)
-and walks on 50, 52-57 (30 tiles). `lib/game/watermask.ts` does exactly
-this; `formats/tim.ts` keeps the raw CLUT because the decoded rgba throws
-that bit away. Two earlier readings are dead ends someone will re-derive:
-learning water COLOURS (worked by accident of the palettes, flickered) and
-keying on "art worn by a flagged tile" (swallows the ice).
+**Water is art the artist made SEE-THROUGH, and the verdict is THREE-way.**
+`afIsPointWatery` answers off a per-TEXTURE kind the library computes at
+upload (dll 0x10007b6c) by walking the CLUT: every non-transparent colour
+carrying the PSX semi-transparency bit 0x8000 → water outright, none →
+solid outright, **a mix → ask the texels**. That third case is not a
+formality and must not be collapsed: a pond's own RIM wears mixed art, and
+treating it as solid let a pig walk out over the water as if it were a
+floor (found in play, within the hour). The remake answers mixed tiles with
+the learnt colour set, as it always did. `lib/game/watermask.ts` holds all
+three; `formats/tim.ts` keeps the raw CLUT because the decoded rgba throws
+the deciding bit away. Dead ends someone will re-derive: colours alone
+(works, but flickers mid-swim where kind 2 should have settled it) and "art
+worn by a flagged tile" (swallows the ice).
 
 **The ground carries its own light, and the engine must not add one.** Each
 PMG vertex stores a brightness byte (how-doc: "unknown ≤255") that the
