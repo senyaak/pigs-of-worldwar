@@ -13,48 +13,12 @@
 import { test, expect } from '@playwright/test'
 
 import { LOOK_AHEAD, STEP_DOWN, step } from '../../src/lib/game/movement'
-import { HEIGHT_SCALE, TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
-import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP, VERTS_PER_SIDE } from '../../src/lib/formats/pmg'
-import type { TerrainBlock, TerrainTile } from '../../src/lib/formats/pmg'
+import { WORLD_LIMIT } from '../../src/lib/game/terrain'
+import type { TerrainQuery } from '../../src/lib/game/terrain'
+import { terrain } from './fixture'
 
-const BLOCK_SPAN = TILES_PER_SIDE * TILE_STEP
-const MAP_ORIGIN = (BLOCKS_PER_SIDE * BLOCK_SPAN) / 2
 const NORTH = 0 // heading 0 is +z; forward is (sin h, cos h)
 const STRIDE = 200
-
-/**
- * A whole map whose elevation (world units, up-positive) is `shape` and
- * whose tiles are `tile` — by default plain open ground.
- */
-function terrain(
-  shape: (x: number, z: number) => number,
-  tile: (x: number, z: number) => Partial<TerrainTile> = () => ({})
-): TerrainQuery {
-  const blocks: TerrainBlock[] = []
-  for (let row = 0; row < BLOCKS_PER_SIDE; row++) {
-    for (let col = 0; col < BLOCKS_PER_SIDE; col++) {
-      const x = -MAP_ORIGIN + col * BLOCK_SPAN
-      const z = -MAP_ORIGIN + row * BLOCK_SPAN
-      const heights = new Int16Array(VERTS_PER_SIDE * VERTS_PER_SIDE)
-      for (let r = 0; r < VERTS_PER_SIDE; r++) {
-        for (let c = 0; c < VERTS_PER_SIDE; c++) {
-          heights[r * VERTS_PER_SIDE + c] = shape(x + c * TILE_STEP, z + r * TILE_STEP) / HEIGHT_SCALE
-        }
-      }
-      const tiles = Array.from({ length: TILES_PER_SIDE * TILES_PER_SIDE }, (_, i) => ({
-        texture: 0,
-        rotateFlip: 0,
-        type: 0,
-        slip: 0,
-        ...tile(x + (i % TILES_PER_SIDE) * TILE_STEP, z + Math.floor(i / TILES_PER_SIDE) * TILE_STEP)
-      }))
-      // Movement never reads the shade; unshaded keeps the fixture honest.
-      const shades = new Uint8Array(VERTS_PER_SIDE * VERTS_PER_SIDE).fill(255)
-      blocks.push({ x, z, heights, shades, tiles })
-    }
-  }
-  return new TerrainQuery(blocks)
-}
 
 /** Ground that climbs `perStride` world units for every STRIDE walked north. */
 const slope = (perStride: number): TerrainQuery => terrain((_x, z) => (z * perStride) / STRIDE)

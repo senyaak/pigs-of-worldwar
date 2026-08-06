@@ -40,14 +40,25 @@ contradiction is written up in `../pigs-disasm/movement/notes.md` and wants
 whatever undoes the doubling to be found first. Vertical constants lifted
 from the exe go through `fromExeY`, so they follow the knob.
 
-**Nothing about the ground refuses a step.** Not its height, not the wall
-flag. The exe pins a pig to the landscape however steep, and a wall is not a
-blocker at all: the landscape collider (`0x415590`) swaps the ground's
-material for friction 0.01 / restitution 0.99 wherever `Map::IsBlocked` says
-yes, and the pig is thrown about by an almost perfectly elastic floor until
-the wedge counter ejects it. Only the world limit refuses, and only empty
-air under the feet changes the outcome. Refusing at a wall was tried here
-and it walled pigs IN on top of cliffs — a cliff lip is a wall tile too.
+**Terrain height never refuses a step — and a wall is not a full stop
+either.** The exe pins a pig to the landscape however steep; open ground of
+any slope is walked. A wall tile gets exactly the step-up ENVELOPE: a pig
+may be carried into blocked ground up to 128 exe units above its last free
+footing (`WALL_CLIMB`) and no further, then it sidesteps along or stalls
+while the wedge counter (25 frames) throws it out DOWNHILL — walls are not
+ladders (confirmed against play), but neither are they blockers. Refusing
+blocked tiles outright was tried and it walled pigs IN on top of cliffs — a
+cliff lip is a wall tile too; the envelope is measured from the pig's own
+footing, so the lip is always in reach from above. All of it lives in
+`lib/game/locomotion.ts`, pinned by `e2e/002/locomotion.spec.ts`.
+
+**Never compare a tile's type byte whole.** The terrain type is its LOW 5
+BITS (`and edx,1Fh`, exe 0x46fde4); the bits above are water/mine/wall
+flags. 1857 of the shipped maps' 1865 climbing tiles are 0x2b, not 0x0b —
+an unmasked `=== 11` never fires, which is how Scramble went missing. The
+water bit is only a PREFILTER too: the verdict is per-texel
+(`afIsPointWatery`), so mud banks with the bit set are LAND. See
+`../pigs-disasm/movement/notes.md`.
 
 **The ground carries its own light, and the engine must not add one.** Each
 PMG vertex stores a brightness byte (how-doc: "unknown ≤255") that the
@@ -156,30 +167,89 @@ npm run typecheck && npm run build && npx playwright test
 
 ## Where it stands
 
-Formats, models, textures, skeleton, 93 animations and terrain all parse and
-render. The menu wears the original art. The battle scene puts two squads on
-CAMP with the original's turn clock, tank controls, jumping, swimming, and
-ground movement taken from the exe — see `../pigs-disasm/movement/notes.md`
-for the derivation of every constant in `src/lib/game/movement.ts` and
-`src/lib/game/ballistics.ts`.
+Formats, models, textures, skeleton, 93 animations, terrain and water all
+parse and render. The menu wears the original art. The battle scene puts
+two squads on CAMP (console: `pow.swapMap('ARTGUN')` — see README) with
+the original's turn clock, tank controls, jumping, swimming (per-texel
+water, floats at the region's surface, sunk SWIM_SINK), scrambling on
+masked type 11, wall scrabble-and-eject, and ground movement taken from
+the exe — see `../pigs-disasm/movement/notes.md` for the derivation of
+every constant in `src/lib/game/movement.ts`, `ballistics.ts`,
+`locomotion.ts` and `watermask.ts`. The chase camera follows only what
+the player drives; flung pigs are watched from a standing camera that
+waits half a second past the landing.
 
-What the exe gave up, in short: nothing about the ground refuses a step; a
-wall is a 0.01/0.99 surface that shakes a pig loose, and a pig inside one
-never lands; each terrain type carries its own friction and restitution, and
-type 11 is the one that plays the Scramble clip; a landing is binary at an
+What the exe gave up, in short: terrain height never refuses a step; a wall
+grants only the step-up envelope, scrapes past it, and a pig inside one
+never lands — the wedge counter throws it out downhill; each terrain type
+carries its own friction and restitution, and masked type 11 is the one
+that plays the Scramble clip in every band; a landing is binary at an
 impact of 25 a frame; a jump is committed, forward, and costs 15 frames.
+The walking SPEEDS are its own too — every input asks for a flat 64 units a
+frame, `Pig::Walk` grants the class's thirteen sixteenths of it (52 for a
+grunt) and half that backwards, water caps the step at 16 — so the one
+number left standing between them and metres is `FRAME_SECONDS`.
+The acting pig's whole frame-by-frame state machine is pure
+(`lib/game/locomotion.ts`); the battle scene only feeds it intents and
+draws what it says.
 
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.
+- **The pig slides, and that stays.** The walking clips carry a body about
+  855 units a second at 25 fps; the exe walks 1560, so the feet skate about
+  2×. Driving playback off the walking speed to close that (a `gait.ts` that
+  scaled the mixer) was built and rejected on sight — the legs whirl, and
+  the run clip is not foot-locked to begin with, its two hooves disagreeing
+  by 40%. `three/clips.ts` plays everything at a flat 25;
+  `../pigs-disasm/movement/stride.js` is the measurement.
 - **Contact softening is not modelled.** The original lets a body penetrate
   and pushes it out by a decaying bias (0.2 → 0.02); a landing here pins to
   the ground height, so there is nothing to decay. `BOUNCE_CUTOFF` stands in.
-- **Gravity, walk speed and turn rate are still hand-tuned.** The originals
-  are behind `warhogs_.exe` 0x4707f0 and the pig-class table the block copy
-  at 0x466de9 fills.
+- **Gravity and turn rate are still hand-tuned.** Gravity is behind the
+  integrator at `warhogs_.exe` 0x4707f0, unread. The turn rate IS decoded —
+  the input handler ramps an accumulator by 4 a frame to a cap of 32/4096 of
+  a circle, so 1.473 rad/s at 30 Hz against the 2.6 here — but applying it
+  has not been played yet, so `TURN_SPEED` stands until it is.
+- **Water IS per-texel now — but the colour set is learnt, not decoded.**
+  `lib/game/watermask.ts` is the working `afIsPointWatery`: a point is wet
+  where the texel of the tile's art (rotate/flip applied) is a water
+  colour, sampled at the exe's own NINE probes (centre + ring of ±4 mask
+  pixels, table at dll 0x1002c6a0) so texel-sized cracks don't swallow a
+  pig. The water colours are the texels of the PURE-water textures — what
+  tiles with all eight neighbours water wear — because the whole water
+  family shares one palette per map (CAMP: fourteen colours) and any wider
+  source punches the shore too. Membership, never distance: thresholds
+  followed nothing. The renderer cuts its shore masks from the SAME set,
+  so what looks like water swims. Going PER TILE instead was built and
+  reverted: it is not what the game does.
+- **Water renders as: flatten + mask + one plain sheet.** Per water REGION
+  (flood-fill of water-flagged tiles — the exe's "Fitting water." JOINS)
+  a level is fitted (mode of the region's corner heights; 128 on every
+  shipped map's main water); render vertices below their region's level
+  are raised to it; shore art gets its water texels punched (cutout); one
+  OPAQUE sheet of the map's averaged water colour sits a hair under each
+  region's level. NO wat01/wat02 pattern on the surface — the shipped
+  game's footage shows smooth water, and every patterned attempt read
+  wrong. What those two grey TIMs and the DLL's under-landscape 49×49
+  water grid are actually FOR is still open (play memory says a sink/kill
+  layer, not the visible water).
+- **The wall envelope is an inference.** Whether wall geometry sits in the
+  exe's collision world is still open (0x406bb0 undecoded); the remake
+  builds the play-observed behaviour from the decoded step-up/sidestep
+  constants instead.
+- **The wall scrabble wears the Scramble clip.** The exe's wedge branch
+  never touches the animation — only the eject (0x470c70) does — but a pig
+  pushing at a wall visibly scrabbles in play, and clip 11 is what reads as
+  it. Deliberate, in `locomotion.ts`.
 
 ### Threads left mid-pull
+
+- What sets a texture's KIND (dry / wet / ask-the-art) in the DLL's table
+  at 0x1004cfa0, and how its texel test can fire at all when the shipped
+  ground art carries no transparent texel for the probe to find. The exe's
+  upload calls pass an index whose meaning is still ambiguous (0x4a53fe,
+  0x4a545c, the loop at 0x4a54e5).
 
 - `0x406bb0`, 3280 bytes: the collision test itself. Knowing what else lives
   in that world would settle whether objects need their own handling.

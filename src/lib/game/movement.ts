@@ -25,15 +25,58 @@
 // collision path, and there are no objects in the scene yet. Their rules are
 // recorded in ../../../../pigs-disasm/movement/notes.md for when there are.
 
-import { FRAME_SECONDS } from './ballistics'
+import { FRAME_SECONDS, fromExeSpeed } from './ballistics'
 import { clampToWorld, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
 
+/**
+ * A class's speed scale, sixteenths of the request (exe pig +0x3bc).
+ *
+ * It comes from the class table at 0x4d02e0 — 128 bytes a record,
+ * `{ hp, speed, (weapon, ammo) pairs terminated by 0/-1 }` — indexed by the
+ * pig's class at +0x19c and copied in by the constructor at 0x466ae8. A
+ * GRUNT is record 0 and carries 13; the promoted classes carry 13, 14 or 15
+ * (the heavies and the hero ranks are the 15s). The remake spawns grunts.
+ */
+export const PIG_CLASS_SPEED = 13
+
+/**
+ * What one press of forward ASKS for, in exe units a logic frame.
+ *
+ * Everything that drives a pig asks for the same fixed 64: the player's
+ * input handler (0x492bcc forward, 0x492bdf back), and every AI state that
+ * walks (0x46d478, 0x46dda6, 0x46e106). There is no analogue stick and no
+ * accelerating gait — the number below is the whole of the walking speed.
+ */
+export const WALK_REQUEST = 64
+
+/**
+ * How fast a pig walks, world units per second — the exe's, not a taste.
+ *
+ * `Pig::Walk` (0x46aa10) turns the request into the per-frame distance that
+ * `UpdateMovement` then hands to `TryMove` out of +0x33c:
+ *
+ *   nDist = request * class_speed / 16      ; 0x46ad0d
+ *   health > 3200 -> as is; > 1280 -> two thirds; below -> a third
+ *
+ * so a healthy grunt covers `64 * 13 / 16` = 52 units a frame. Health is
+ * absolute, not a fraction: a grunt starts at 6400 (the table's hp times the
+ * difficulty byte at 0x4d1008 = 2, halved), so the bands bite at half and at
+ * a fifth of its life. Nothing damages a pig here yet, so full speed it is —
+ * this is where the wounded limp goes when there is damage to feel it with.
+ */
+export const WALK_SPEED = fromExeSpeed((WALK_REQUEST * PIG_CLASS_SPEED) / 16)
+
+/**
+ * Backwards is exactly half, and it is not the class that halves it:
+ * `Pig::Walk` clamps its argument to -32 (0x46aa1a, again at 0x46aa7e)
+ * BEFORE the class scale sees it, so the -64 the player asks for arrives as
+ * -32 and a grunt backs up at 26 units a frame.
+ */
+export const WALK_BACK_SPEED = fromExeSpeed((32 * PIG_CLASS_SPEED) / 16)
+
 /** Drop the feet this far looking for ground before declaring a fall
  * (exe 0x4bd340, in its own vertical scale — see `fromExeY`). */
-/** How fast a pig walks, world units per second (a tile is 512). */
-export const WALK_SPEED = 900
-
 export const STEP_DOWN = fromExeY(32)
 
 /**

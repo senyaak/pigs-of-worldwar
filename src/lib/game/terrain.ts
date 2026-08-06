@@ -46,6 +46,11 @@ export const CLIMBING_TILE = 11
 /** The world limit a pig's position is clamped to (exe 0x3000). */
 export const WORLD_LIMIT = 12288
 
+/** The per-texel water verdict — see lib/game/watermask. */
+export interface WaterMask {
+  wet(x: number, z: number): boolean
+}
+
 /** (x, z) brought inside the world limits — the edge of the map holds
  * whatever a pig is doing, walking or flying. */
 export const clampToWorld = (x: number, z: number): { x: number; z: number } => ({
@@ -54,6 +59,170 @@ export const clampToWorld = (x: number, z: number): { x: number; z: number } => 
 })
 
 const clampIndex = (value: number, last: number): number => Math.max(0, Math.min(value, last))
+
+/**
+ * The map's water level, in elevation units (up-positive, HEIGHT_SCALE
+ * applied), or null on a dry map.
+ *
+ * The exe FITS it at load ("Setting Water Level.", 0x451c10): a binary
+ * search over the vertex grid for the height that submerges about as many
+ * tiles as carry the water flag, after which "Flattening water level: "
+ * RAISES every vertex below it to exactly it (0x451d0c) — the water surface
+ * the player sees IS the ground mesh, clamped. On every shipped map the
+ * mapmakers already authored the water area flat at one height with only
+ * scattered dips below (128 stored units on CAMP, ARCHI, BAY, ARTGUN…), so
+ * the level that search finds is simply the height most of the water-tile
+ * corners sit at — which is what is computed here, exactly and cheaply:
+ * the MODE of the water-tile corner heights, ties to the lower.
+ */
+export function fitWaterElevation(blocks: TerrainBlock[]): number | null {
+  const counts = new Map<number, number>()
+  for (const block of blocks) {
+    for (let tile = 0; tile < block.tiles.length; tile++) {
+      if ((block.tiles[tile].type & TILE_WATER) === 0) continue
+      const row = Math.floor(tile / TILES_PER_SIDE)
+      const col = tile % TILES_PER_SIDE
+      for (const [r, c] of [[row, col], [row, col + 1], [row + 1, col], [row + 1, col + 1]]) {
+        const h = block.heights[r * VERTS_PER_SIDE + c]
+        counts.set(h, (counts.get(h) ?? 0) + 1)
+      }
+    }
+  }
+  let level: number | null = null
+  let best = 0
+  for (const [h, n] of counts) {
+    if (n > best || (n === best && level !== null && h < level)) {
+      level = h
+      best = n
+    }
+  }
+  return level === null ? null : level * HEIGHT_SCALE
+}
+
+/**
+ * Is this tile OPEN WATER — not drawn as ground at all, the translucent
+ * water sheet showing in its place?
+ *
+ * The original decides by texture: the ground batcher skips every tile
+ * whose texture the load-time analysis classed fully watery (kind 2 in the
+ * table at dll 0x1004cfa0, tested at 0x10003892/0x10003b3d), and draws the
+ * animated water grid where the ground now is not. The texel analysis is
+ * not reproduced; the stand-in classes a tile open water when it CARRIES
+ * the water flag and LIES at or under the water level — which is what a
+ * fully-watery texture sits on — and never for the climbing type, whose
+ * mud banks are land whatever the flag says.
+ */
+export function isOpenWaterTile(
+  block: TerrainBlock,
+  tileIndex: number,
+  waterElevation: number | null
+): boolean {
+  if (waterElevation === null) return false
+  const tile = block.tiles[tileIndex]
+  if ((tile.type & TILE_WATER) === 0) return false
+  if ((tile.type & 0x1f) === CLIMBING_TILE) return false
+  const row = Math.floor(tileIndex / TILES_PER_SIDE)
+  const col = tileIndex % TILES_PER_SIDE
+  for (const [r, c] of [[row, col], [row, col + 1], [row + 1, col], [row + 1, col + 1]]) {
+    if (block.heights[r * VERTS_PER_SIDE + c] * HEIGHT_SCALE > waterElevation) return false
+  }
+  return true
+}
+
+/**
+ * The water level of each map cell's WATER REGION, `[row][col]` over the
+ * 64×64 tiles, in elevation units — null where there is no water region.
+ *
+ * A map's water is not one pool: CAMP keeps a raised channel a full 544
+ * units above its pond, and one global level either floods the channel's
+ * banks or drops its surface underground. The exe knows this — its
+ * "Fitting water." pass (0x451b20) flood-fills water regions and scans
+ * their JOINS — so the levels here are fitted the same way, per connected
+ * region of water-flagged tiles: each region's level is the mode of ITS
+ * corner heights, ties to the lower.
+ */
+export function waterLevelGrid(blocks: TerrainBlock[]): (number | null)[][] {
+  const side = BLOCKS_PER_SIDE * TILES_PER_SIDE
+  const minX = Math.min(...blocks.map((b) => b.x))
+  const minZ = Math.min(...blocks.map((b) => b.z))
+  const wet: boolean[][] = Array.from({ length: side }, () => Array(side).fill(false))
+  const corners: Int16Array[][] = Array.from({ length: side }, () => Array(side))
+  for (const block of blocks) {
+    const colBase = Math.round((block.x - minX) / TILE_STEP)
+    const rowBase = Math.round((block.z - minZ) / TILE_STEP)
+    for (let tile = 0; tile < block.tiles.length; tile++) {
+      const type = block.tiles[tile].type
+      if ((type & TILE_WATER) === 0 || (type & 0x1f) === CLIMBING_TILE) continue
+      const row = rowBase + Math.floor(tile / TILES_PER_SIDE)
+      const col = colBase + (tile % TILES_PER_SIDE)
+      wet[row][col] = true
+      const tr = Math.floor(tile / TILES_PER_SIDE)
+      const tc = tile % TILES_PER_SIDE
+      corners[row][col] = Int16Array.from(
+        [[tr, tc], [tr, tc + 1], [tr + 1, tc], [tr + 1, tc + 1]],
+        ([r, c]) => block.heights[r * VERTS_PER_SIDE + c]
+      )
+    }
+  }
+  const levels: (number | null)[][] = Array.from({ length: side }, () => Array(side).fill(null))
+  const seen: boolean[][] = Array.from({ length: side }, () => Array(side).fill(false))
+  for (let row = 0; row < side; row++) {
+    for (let col = 0; col < side; col++) {
+      if (!wet[row][col] || seen[row][col]) continue
+      // Flood one region (4-connected), collecting its corner histogram.
+      const cells: [number, number][] = []
+      const stack: [number, number][] = [[row, col]]
+      seen[row][col] = true
+      const counts = new Map<number, number>()
+      while (stack.length > 0) {
+        const [r, c] = stack.pop() as [number, number]
+        cells.push([r, c])
+        for (const h of corners[r][c]) counts.set(h, (counts.get(h) ?? 0) + 1)
+        for (const [nr, nc] of [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]) {
+          if (wet[nr]?.[nc] && !seen[nr]?.[nc]) {
+            seen[nr][nc] = true
+            stack.push([nr, nc])
+          }
+        }
+      }
+      let level = 0
+      let best = 0
+      for (const [h, n] of counts) {
+        if (n > best || (n === best && h < level)) {
+          level = h
+          best = n
+        }
+      }
+      for (const [r, c] of cells) levels[r][c] = level * HEIGHT_SCALE
+    }
+  }
+  return levels
+}
+
+/**
+ * Which tiles of the whole map are open water — where the animated water
+ * surface lives — as a map-grid boolean mask, `[row][col]` over the 64×64
+ * tiles, each cell judged against ITS OWN region's level. The shore is NOT
+ * excluded: the original runs its water right up to the shoreline and lets
+ * the shore tiles' art MASK it — their watery texels are see-through.
+ */
+export function openWaterMask(blocks: TerrainBlock[]): boolean[][] {
+  const levels = waterLevelGrid(blocks)
+  const side = BLOCKS_PER_SIDE * TILES_PER_SIDE
+  const open: boolean[][] = Array.from({ length: side }, () => Array(side).fill(false))
+  const minX = Math.min(...blocks.map((b) => b.x))
+  const minZ = Math.min(...blocks.map((b) => b.z))
+  for (const block of blocks) {
+    const colBase = Math.round((block.x - minX) / TILE_STEP)
+    const rowBase = Math.round((block.z - minZ) / TILE_STEP)
+    for (let tile = 0; tile < block.tiles.length; tile++) {
+      const row = rowBase + Math.floor(tile / TILES_PER_SIDE)
+      const col = colBase + (tile % TILES_PER_SIDE)
+      open[row][col] = isOpenWaterTile(block, tile, levels[row]?.[col] ?? null)
+    }
+  }
+  return open
+}
 
 /**
  * Which part of a WALL tile is actually solid, by the tile's second byte.
@@ -103,10 +272,21 @@ export class TerrainQuery {
   private readonly minZ: number
   /** Blocks indexed [row][col] on the world grid. */
   private readonly grid: TerrainBlock[][]
+  /** The fitted water level in elevation units, null on a dry map. */
+  readonly waterElevation: number | null
+  /** Per-cell region water levels (elevation units), null where dry. */
+  private readonly waterLevels: (number | null)[][]
 
-  constructor(private readonly blocks: TerrainBlock[]) {
+  constructor(
+    private readonly blocks: TerrainBlock[],
+    /** The per-texel water verdict (lib/game/watermask); without it the
+     * tile's water flag alone decides, art unseen. */
+    private readonly waterMask: WaterMask | null = null
+  ) {
     this.minX = Math.min(...blocks.map((b) => b.x))
     this.minZ = Math.min(...blocks.map((b) => b.z))
+    this.waterElevation = fitWaterElevation(blocks)
+    this.waterLevels = waterLevelGrid(blocks)
     this.grid = []
     for (const block of blocks) {
       const col = Math.round((block.x - this.minX) / BLOCK_SPAN)
@@ -122,6 +302,21 @@ export class TerrainQuery {
    */
   height(x: number, z: number): number {
     return -this.elevation(x, z)
+  }
+
+  /**
+   * The VISIBLE ground at (x, z), game Y-down: `height` with everything
+   * below the LOCAL water region's level raised to it, exactly as the exe
+   * flattens its render grid at load — each region (CAMP's raised channel
+   * against its pond) carrying its own fitted level. Collision walks
+   * `height`; what the eye and a floating pig meet is this.
+   */
+  surface(x: number, z: number): number {
+    const ground = this.height(x, z)
+    const row = Math.floor((z - this.minZ) / TILE_STEP)
+    const col = Math.floor((x - this.minX) / TILE_STEP)
+    const level = this.waterLevels[row]?.[col] ?? null
+    return level === null ? ground : Math.min(ground, -level)
   }
 
   /**
@@ -182,11 +377,18 @@ export class TerrainQuery {
     const patch = this.patch(x, z)
     if (!patch) return { x: 0, y: -1, z: 0 }
     const half = patch.tx + patch.tz < 1 ? patch.near : patch.far
-    // elevation = origin + alongX·tx + alongZ·tz, and tz runs -z, so in world
-    // terms the surface rises alongX per TILE_STEP of +x and alongZ per
-    // TILE_STEP of -z. Game height is -elevation.
+    // elevation = origin + alongX·tx + alongZ·tz, with tx running +x and tz
+    // running +z — `patch` measures both fractions the way the vertex grid
+    // grows. Game height is -elevation, so both derivatives flip sign, and
+    // the normal is (dy/dx, -1, dy/dz) normalized: it is orthogonal to both
+    // tangents and (0, -1, 0) on the flat.
+    //
+    // The z sign once trusted a comment that claimed tz ran -z; every
+    // north-facing slope then bounced as if it faced south, and `downhill`
+    // pointed UP the face — caught by the eject spec, which knows the exe
+    // throws a wedged pig down the slope, not into it.
     const dydx = -half.alongX / TILE_STEP
-    const dydz = half.alongZ / TILE_STEP
+    const dydz = -half.alongZ / TILE_STEP
     const length = Math.hypot(dydx, dydz, 1)
     return { x: dydx / length, y: -1 / length, z: dydz / length }
   }
@@ -238,16 +440,59 @@ export class TerrainQuery {
     }
   }
 
-  /** The tile's terrain type (its low 5 bits), which chooses the ground's
-   * physics material. -1 off the map. */
+  /**
+   * The tile's terrain type — its LOW 5 BITS, as the exe reads it: the
+   * scramble test masks with `and edx,1Fh` (0x46fde1) and the material
+   * lookup with `and ecx,1fh` (0x4155dc) before comparing or indexing.
+   * The bits above are flags (0x20 water, 0x40 mine, 0x80 wall), and
+   * comparing the whole byte is exactly the bug that hid Scramble: nearly
+   * every climbing tile on the shipped maps is 0x2b, not 0x0b.
+   * -1 off the map.
+   */
   tileType(x: number, z: number): number {
-    return this.tileAt(x, z)?.type ?? -1
+    const tile = this.tileAt(x, z)
+    return tile === null ? -1 : tile.type & 0x1f
   }
 
-  /** Is (x, z) water — swimming, not walking? */
+  /** Does a pig standing here scramble? Terrain type 11 under the mask —
+   * 0x0b and the far more common 0x2b alike. */
+  isClimbing(x: number, z: number): boolean {
+    return this.tileType(x, z) === CLIMBING_TILE
+  }
+
+  /**
+   * Is (x, z) water — swimming, not walking?
+   *
+   * The bit is only a PREFILTER in the original: `IsInWater` (0x4a6fa0)
+   * tests bit 5 and then asks `afIsPointWatery` (_d3d.dll 0x10010210),
+   * which answers from the ART — the texel under the point must be a
+   * water colour. That is how a pig stands on the painted dry half of a
+   * shore tile and swims one step on. With a mask attached
+   * (lib/game/watermask, learnt from the map's own pure-water art) this
+   * does the same; without one the flag decides alone. The climbing type
+   * stays out of the water wholesale either way — mud banks scramble.
+   */
   isWater(x: number, z: number): boolean {
     const tile = this.tileAt(x, z)
-    return tile !== null && (tile.type & TILE_WATER) !== 0
+    if (tile === null || (tile.type & TILE_WATER) === 0) return false
+    if ((tile.type & 0x1f) === CLIMBING_TILE) return false
+    return this.waterMask === null ? true : this.waterMask.wet(x, z)
+  }
+
+  /**
+   * The heading of steepest descent at (x, z), or null on flat ground.
+   *
+   * This is what `EjectFromWall` (0x46fbd0) launches a wedged pig along:
+   * 0x40c090 reads the tile's four corner heights (doubled, the collision
+   * scale) and the eject heading is the atan2 of that gradient — the pig is
+   * thrown off the wall DOWNHILL, not backwards. The surface normal's
+   * horizontal part points the same way (it is the direction `slopePull`
+   * pulls), so it is reused here.
+   */
+  downhill(x: number, z: number): number | null {
+    const { x: nx, z: nz } = this.normal(x, z)
+    if (Math.hypot(nx, nz) < 1e-6) return null
+    return Math.atan2(nx, nz)
   }
 
   /** A comfortable place to stand: this tile and its neighbors dry and

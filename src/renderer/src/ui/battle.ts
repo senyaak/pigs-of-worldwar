@@ -4,6 +4,7 @@
 
 import { Game } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
+import { buildWaterMask } from '../../../lib/game/watermask'
 import { ensureScene } from '../three/scene'
 import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
@@ -12,9 +13,20 @@ import { byId } from './dom'
 
 // The training ground — the first map the original ever shows a player, and
 // the friendliest to test on: barely any water, one big usable field.
-const MAP = 'Maps/CAMP.PMG'
+// `pow.swapMap('ARTGUN')` in the console restarts the battle elsewhere —
+// CAMP has no climbing ground at all, so the Scramble only shows on maps
+// like ARTGUN or ICEFLOW.
+const DEFAULT_MAP = 'CAMP'
 const CHAR_ARCHIVE = 'Chars/british.mad'
 const SOLDIER = 'pcgru_hi'
+
+/** 'artgun', 'ARTGUN.PMG' and 'Maps/ARTGUN.PMG' all mean ARTGUN. */
+const normalizeMap = (name: string): string =>
+  name
+    .trim()
+    .replace(/^maps[\\/]/i, '')
+    .replace(/\.pmg$/i, '')
+    .toUpperCase()
 
 const SQUADS = [
   { name: 'Tommy’s Trotters', pigNames: ['Tommy', 'Wilson', 'Berry', 'Hogsworth'] },
@@ -36,6 +48,7 @@ export function initBattle(onLeave: () => void): BattleView {
   let game: Game | null = null
   let scene: BattleScene | null = null
   let query: TerrainQuery | null = null
+  let map = DEFAULT_MAP
 
   const updateHudText = (): void => {
     if (!game) return
@@ -91,43 +104,75 @@ export function initBattle(onLeave: () => void): BattleView {
     onLeave()
   })
 
+  /** (Re)start the battle on `name` — fresh spawns, fresh turn order. A load
+   * failure leaves whatever battle was running untouched. */
+  const start = async (name: string): Promise<boolean> => {
+    const [terrainResult, modelResult, clipsResult] = await Promise.all([
+      window.api.loadTerrain(`Maps/${name}.PMG`),
+      window.api.loadModel(CHAR_ARCHIVE, SOLDIER),
+      window.api.loadClips(CHAR_ARCHIVE)
+    ])
+    const failure = !terrainResult.ok ? terrainResult.error : !modelResult.ok ? modelResult.error : null
+    if (failure !== null || !terrainResult.ok || !modelResult.ok) {
+      // A failed SWAP is a console conversation; a failed OPEN has no scene
+      // to keep, so the HUD carries the message.
+      if (scene) console.log(`stayed on ${map}: ${failure}`)
+      else hudEl.textContent = failure ?? ''
+      return false
+    }
+
+    query = new TerrainQuery(
+      terrainResult.blocks,
+      buildWaterMask(terrainResult.blocks, terrainResult.textures)
+    )
+    const pigCount = SQUADS.reduce((sum, s) => sum + s.pigNames.length, 0)
+    game = new Game({ players: SQUADS, spawns: query.pickSpawns(pigCount) })
+
+    scene?.dispose()
+    scene = buildBattle(
+      ensureScene(canvasHost),
+      {
+        blocks: terrainResult.blocks,
+        terrainTextures: terrainResult.textures,
+        model: modelResult.model,
+        modelTextures: modelResult.textures,
+        skeleton: modelResult.skeleton,
+        clips: clipsResult.ok ? clipsResult.clips : []
+      },
+      game,
+      updateHudText
+    )
+    map = name
+    updateHud()
+    return true
+  }
+
+  // The console IS the map selector — no UI for it, by request. `pow.swapMap()`
+  // with no argument lists what ships; with a name it restarts the battle
+  // there. The scene rebuild re-merges `pow.debug`, so the spread keeps this.
+  window.pow = {
+    ...(window.pow ?? { controller }),
+    map: () => map,
+    swapMap: async (name?: string) => {
+      if (!name) {
+        const files = await window.api.listFiles()
+        const maps = files
+          .map((f) => f.path.match(/^Maps[\\/](.+)\.PMG$/i)?.[1])
+          .filter((n): n is string => n !== undefined)
+          .sort()
+        console.log(`usage: pow.swapMap('ARTGUN') — shipping maps: ${maps.join(', ')}`)
+        return false
+      }
+      if (!scene) {
+        console.log('no battle is up — start one from the menu first')
+        return false
+      }
+      return start(normalizeMap(name))
+    }
+  }
+
   return {
-    async open() {
-      const [terrainResult, modelResult, clipsResult] = await Promise.all([
-        window.api.loadTerrain(MAP),
-        window.api.loadModel(CHAR_ARCHIVE, SOLDIER),
-        window.api.loadClips(CHAR_ARCHIVE)
-      ])
-      if (!terrainResult.ok) {
-        hudEl.textContent = terrainResult.error
-        return false
-      }
-      if (!modelResult.ok) {
-        hudEl.textContent = modelResult.error
-        return false
-      }
-
-      query = new TerrainQuery(terrainResult.blocks)
-      const pigCount = SQUADS.reduce((sum, s) => sum + s.pigNames.length, 0)
-      game = new Game({ players: SQUADS, spawns: query.pickSpawns(pigCount) })
-
-      scene?.dispose()
-      scene = buildBattle(
-        ensureScene(canvasHost),
-        {
-          blocks: terrainResult.blocks,
-          terrainTextures: terrainResult.textures,
-          model: modelResult.model,
-          modelTextures: modelResult.textures,
-          skeleton: modelResult.skeleton,
-          clips: clipsResult.ok ? clipsResult.clips : []
-        },
-        game,
-        updateHudText
-      )
-      updateHud()
-      return true
-    },
+    open: () => start(map),
     close() {
       scene?.dispose()
       scene = null

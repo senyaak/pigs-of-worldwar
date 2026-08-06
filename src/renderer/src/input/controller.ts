@@ -108,6 +108,8 @@ export interface DebugHooks {
   currentPig(): { x: number; z: number }
   currentHeading(): number
   currentNodeY(): number
+  /** Where the chase camera actually is, world space. */
+  camera(): { x: number; y: number; z: number }
   /** Set the acting pig down somewhere, facing somewhere. Not a player move:
    * it exists so a spec can stage a situation it could not walk to. */
   warp(x: number, z: number, heading: number): void
@@ -115,7 +117,15 @@ export interface DebugHooks {
 
 declare global {
   interface Window {
-    pow?: { controller: Controller; debug?: DebugHooks }
+    pow?: {
+      controller: Controller
+      debug?: DebugHooks
+      /** Console command: restart the battle on another map —
+       * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
+      swapMap?(name?: string): Promise<boolean>
+      /** Which map the battle is on. */
+      map?(): string
+    }
   }
 }
 window.pow = { controller }

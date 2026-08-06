@@ -5,18 +5,10 @@
 import * as THREE from 'three'
 import type { Bone, Clip, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
-import { CLIMBING_TILE, TerrainQuery, clampToWorld } from '../../../lib/game/terrain'
-import { FALL_SPEED_FACTOR, WALK_SPEED, step } from '../../../lib/game/movement'
-import {
-  EJECT_PITCH,
-  JUMP_COOLDOWN_SECONDS,
-  EJECT_SECONDS,
-  FREE,
-  groundMaterial,
-  bounceOff,
-  easeBounciness,
-  slopePull
-} from '../../../lib/game/ballistics'
+import { TerrainQuery } from '../../../lib/game/terrain'
+import { buildWaterMask } from '../../../lib/game/watermask'
+import { ANIM, SWIM_SINK, createLocomotion, restingY, updateLocomotion } from '../../../lib/game/locomotion'
+import type { LocomotionState } from '../../../lib/game/locomotion'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildPig } from './pig'
@@ -49,40 +41,6 @@ export interface BattleScene {
 // The model's own forward axis — chosen so a pig FACES where it walks
 // (π had them strolling sideways like crabs; π/2 had them moonwalking).
 const PIG_HEADING_OFFSET = -Math.PI / 2
-const SWIM_SPEED = WALK_SPEED / 2
-const TURN_SPEED = 2.6 // radians per second
-/** How deep a swimming pig sits below the surface (game Y-down: +down). */
-const SWIM_SINK = 110
-/** Jump ballistics, game Y-down: negative velocity is upward. */
-const JUMP_VELOCITY = -1500
-const GRAVITY = 5000
-
-/**
- * MCAP clip indices — and WHICH the exe plays where, taken from every call
- * site of its play function (0x471ef0) rather than from the names:
- * `StartFalling` (0x4707f0) plays 9, the eject path (0x470c70) plays 38, and
- * the impact handler (0x470d10) plays 39. Clip 11, "Scramble", is never
- * played by the game at all.
- */
-const ANIM = {
-  RUN: 0,
-  WALK_BACK: 3,
-  TURN: 4,
-  SWIM: 5,
-  JUMP_MIDDLE: 9,
-  /** Trying to climb. Not chosen by a movement state at all: the exe raises
-   * a flag when the pig stands on terrain TYPE 11 (`or [esi+3a4h],8` at
-   * 0x4700de in UpdateGroundState), and the animation picker at 0x467ec0
-   * plays 11 instead of the run cycle for as long as any bit of that flag is
-   * up. Type 11 is the grippiest ground in the material table — friction
-   * 0.90, restitution 0.10 — which is exactly what you climb. */
-  SCRAMBLE: 11,
-  IDLE: 27,
-  /** Thrown out of a wall — what `0x470c70` plays, and the only thing that
-   * does. Ordinary falling is JUMP_MIDDLE; the impact handler plays BOUNCE. */
-  EJECTED: 38,
-  BOUNCE: 39
-} as const
 
 export function buildBattle(
   host: SceneHost,
@@ -91,12 +49,16 @@ export function buildBattle(
   /** Called whenever the game state changed this frame (HUD refresh). */
   onGameChanged: () => void
 ): BattleScene {
-  const query = new TerrainQuery(assets.blocks)
+  // The per-texel water verdict rides on the same art the ground draws —
+  // a pig stands on the painted dry half of a shore tile and swims one
+  // step further, exactly where the water shows.
+  const query = new TerrainQuery(assets.blocks, buildWaterMask(assets.blocks, assets.terrainTextures))
   const root = new THREE.Group()
   root.rotation.x = Math.PI
 
   const terrain: Terrain = buildTerrain(assets.blocks, assets.terrainTextures)
-  // buildTerrain wraps in its own converted group; unwrap into ours.
+  // buildTerrain wraps in its own converted group; unwrap into ours. Its
+  // one child is the inner game-space group — ground and water together.
   const terrainMesh = terrain.group.children[0]
   root.add(terrainMesh)
 
@@ -144,20 +106,19 @@ export function buildBattle(
   let markerBase = new THREE.Vector3()
   let time = 0
   const intent = { walk: 0, turn: 0 }
-  /** The pig's own momentum, null when it is standing and steering again.
-   * `bouncing` means it is riding out an impact rather than jumping;
-   * `grounded` means it has come down and is now sliding on its behind. */
-  let airborne: { vy: number; vx: number; vz: number; bouncing: boolean; ejected?: boolean } | null = null
   let jumpRequested = false
-  /** How long the pig has been pressed into a wall, and how bouncy that has
-   * made it — the original eases both while wedged (lib/game/ballistics). */
-  let wedgedSeconds = 0
-  /** Seconds before the pig may jump again (exe: 15 frames of recharge). */
-  let jumpReadyIn = 0
-  let bounciness = FREE
+  /** The acting pig's frame-by-frame state — walking, wedged, airborne —
+   * lives in the pure domain (lib/game/locomotion); this scene only feeds
+   * it intents and draws what it says. Reset whenever the acting pig
+   * changes or is warped. */
+  let loco: LocomotionState = createLocomotion(query, 0, 0, 0)
   /** Smoothed chase-camera position (world space). */
   const cameraPos = new THREE.Vector3()
   let cameraSnapped = false
+  /** After a flight the camera stays put this long before gliding back
+   * behind the pig — resuming the chase the instant of landing is a jolt. */
+  const CHASE_DELAY = 0.5
+  let chaseWait = 0
 
   host.camera.near = 10
   host.camera.far = 100_000
@@ -165,28 +126,48 @@ export function buildBattle(
 
   /** Sync a pig's node to its game position: soles on the ground, sunk a
    * little when swimming. */
-  /** Ground velocity for a heading and a walk intent. */
-  const speedOf = (heading: number, walk: number): { x: number; z: number } => ({
-    x: Math.sin(heading) * WALK_SPEED * walk,
-    z: Math.cos(heading) * WALK_SPEED * walk
-  })
-
   const settle = (entry: PigEntry): void => {
     const { x, z } = entry.pig.position
-    const sink = query.isWater(x, z) ? SWIM_SINK : 0
-    entry.node.position.set(x, query.height(x, z) + sink - entry.mesh.footOffset, z)
+    entry.node.position.set(x, restingY(query, x, z) - entry.mesh.footOffset, z)
+  }
+
+  /**
+   * The height the camera frames a pig at: its node, less the sink when it
+   * is afloat.
+   *
+   * A swimming pig hangs SWIM_SINK below the water, and the moment the
+   * per-texel test concedes that a paddling pig IS swimming, it drops that
+   * whole distance in ONE frame — 280 units, on a shore whose seabed sits
+   * exactly at the water level, so nothing about the ground eases it. The
+   * camera followed the drop and lurched. Taking the same sink back off the
+   * height it frames cancels it exactly: the swap happens on the frame the
+   * pig sinks, so the two moves annihilate and the view never moves at all.
+   */
+  const framedY = (entry: PigEntry): number => {
+    const { x, z } = entry.pig.position
+    return entry.node.position.y - (query.isWater(x, z) ? SWIM_SINK : 0)
   }
 
   /**
    * The chase camera hangs behind the pig's shoulders (world space; the
    * root flips Y and Z out of the game's Y-down coordinates), clamped
    * above the terrain so hills never swallow the view.
+   *
+   * Both heights are held against the VISIBLE surface rather than the
+   * ground, so a shore whose seabed runs on under the water sheet neither
+   * drags the gaze below the waterline nor sinks the camera under it — from
+   * beneath, an opaque sheet is the whole view.
    */
   const desiredCamera = (pig: Pig, nodeY: number): { position: THREE.Vector3; target: THREE.Vector3 } => {
-    const target = new THREE.Vector3(pig.position.x, -nodeY + 300, -pig.position.z)
+    const waterline = -query.surface(pig.position.x, pig.position.z)
+    const target = new THREE.Vector3(
+      pig.position.x,
+      Math.max(-nodeY, waterline) + 300,
+      -pig.position.z
+    )
     const behindX = pig.position.x - Math.sin(pig.heading) * 2100
     const behindZ = pig.position.z - Math.cos(pig.heading) * 2100
-    const terrainAtCamera = -query.height(behindX, behindZ)
+    const terrainAtCamera = -query.surface(behindX, behindZ)
     const position = new THREE.Vector3(
       behindX,
       Math.max(target.y + 900, terrainAtCamera + 500),
@@ -196,11 +177,17 @@ export function buildBattle(
   }
 
   const updateCamera = (active: PigEntry, delta: number | null): void => {
-    const { position, target } = desiredCamera(active.pig, active.node.position.y)
+    const { position, target } = desiredCamera(active.pig, framedY(active))
     if (delta === null || !cameraSnapped) {
       cameraPos.copy(position)
       cameraSnapped = true
-    } else {
+    } else if (chaseWait <= 0) {
+      // The chase never chases a FLUNG pig: thrown, bouncing or sliding,
+      // the original's camera stands where it was and follows with its
+      // gaze alone — chasing one spun the view and drove it into the wall
+      // the pig had just been thrown off. `chaseWait` above is the whole
+      // rule: parked through involuntary flight and a beat beyond it,
+      // cleared the instant the player drives.
       cameraPos.lerp(position, 1 - Math.exp(-6 * delta))
     }
     host.camera.position.copy(cameraPos)
@@ -208,6 +195,8 @@ export function buildBattle(
   }
 
   const focus = (pig: Pig): void => {
+    loco = createLocomotion(query, pig.position.x, pig.position.z, pig.heading)
+    chaseWait = 0
     const ground = query.height(pig.position.x, pig.position.z)
     markerBase = new THREE.Vector3(pig.position.x, ground - 700, pig.position.z)
     marker.position.copy(markerBase)
@@ -219,11 +208,7 @@ export function buildBattle(
     // The turn clock runs regardless of what anyone does.
     if (game.tick(delta)) {
       game.endTurn()
-      airborne = null
       jumpRequested = false
-      jumpReadyIn = 0
-      wedgedSeconds = 0
-      bounciness = FREE
       focus(game.currentPig)
     }
 
@@ -231,164 +216,36 @@ export function buildBattle(
     if (!active) return
     for (const entry of pigMeshes) if (entry !== active) setClip(entry, ANIM.IDLE)
 
-    const { x: px, z: pz } = active.pig.position
-    const swimming = query.isWater(px, pz)
-    /** Standing in a wall: an almost elastic, almost frictionless floor. */
-    const inWall = !query.walkable(px, pz)
-    let wedged = false
-
-    // Turning on the spot works in every grounded state.
-    if (intent.turn !== 0 && airborne === null) {
-      game.turnCurrentPig(active.pig.heading + intent.turn * TURN_SPEED * delta)
-      active.node.rotation.y = active.pig.heading + PIG_HEADING_OFFSET
-    }
-
-    if (airborne) {
-      setClip(active, airborne.ejected ? ANIM.EJECTED : airborne.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE)
-      // Momentum carries; gravity does the rest.
-      //
-      // Walls do not gate flight either. What stops the jump-ladder is the
-      // original's own rule: a pig standing in a wall cannot jump at all
-      // ("Can't jump from this tile type", exe 0x46b0c7), so landing inside
-      // one ends the climb rather than continuing it.
-      const to = clampToWorld(px + airborne.vx * delta, pz + airborne.vz * delta)
-      game.moveCurrentPig(to.x, to.z, active.pig.heading)
-      const at = active.pig.position
-      const ground =
-        query.height(at.x, at.z) + (query.isWater(at.x, at.z) ? SWIM_SINK : 0) - active.mesh.footOffset
-
-      {
-        airborne.vy += GRAVITY * delta
-        const y = active.node.position.y + airborne.vy * delta
-        if (airborne.vy > 0 && y >= ground) {
-          // Landing. Wedged pigs come down bouncier than free ones, which is
-          // what makes coming off a wall read as a bounce and not a step; when
-          // there is no bounce left, the pig slides out what it has.
-          // The solver's impulse, against the surface the pig actually hit:
-          // the normal part reflects and damps, the part running along the
-          // slope carries whole. Landing on a hillside therefore keeps its
-          // speed and goes on down it.
-          const hit = bounceOff(
-            { x: airborne.vx, y: airborne.vy, z: airborne.vz },
-            bounciness,
-            groundMaterial(query.tileType(at.x, at.z), !query.walkable(at.x, at.z)),
-            query.normal(at.x, at.z)
-          )
-          active.node.position.set(at.x, ground, at.z)
-          // A landing is binary in the original and there is nothing in
-          // between: over the threshold it bounces, under it the body is
-          // STOPPED — `0x471350` hands the whole velocity to `0x4a9ee0`,
-          // which writes zero vectors — the fall state is cleared and the
-          // pig stands up. So there is no slide to taper off, and no floor
-          // speed to taper it to: the same 25 decides both.
-          // A soft landing gets the pig up — unless it is inside a wall, and
-          // then the impact handler refuses to: `cmp di,19h` at 0x4711d8
-          // falls through to an `IsBlocked` test whose YES jumps past the
-          // stand-up and into the bounce. So a pig in a wall never lands. It
-          // stays a body on 0.01 friction and slides off, which is the whole
-          // difference between coming off a wall and stepping down it.
-          if (-hit.y > 0 || !query.walkable(at.x, at.z)) {
-            airborne = { ...airborne, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true }
-          } else {
-            airborne = null
-            settle(active)
-          }
-        } else {
-          active.node.position.set(at.x, y, at.z)
-        }
-      }
-    } else {
-      const speed = swimming ? SWIM_SPEED : WALK_SPEED
-      const forwardX = Math.sin(active.pig.heading)
-      const forwardZ = Math.cos(active.pig.heading)
-
-      if (jumpRequested && !swimming && jumpReadyIn <= 0 && !inWall) {
-        // A jump is committed, not steered: the whole movement update is
-        // skipped while the pig is in the air (`UpdateMovement` returns at
-        // once on state 5), so it leaves the ground FORWARDS whatever the
-        // keys say and lands where that put it. And it costs a cooldown —
-        // the original will not take another for fifteen frames.
-        airborne = {
-          vy: JUMP_VELOCITY,
-          vx: forwardX * speed,
-          vz: forwardZ * speed,
-          bouncing: false
-        }
-        jumpReadyIn = JUMP_COOLDOWN_SECONDS
-      } else if (intent.walk !== 0) {
-        // Straight ahead, as the original walks. Only the world edge refuses;
-        // a big enough drop turns the step into a fall, and a wall is
-        // something the pig walks INTO and is thrown out of below.
-        const move = step(query, px, pz, active.pig.heading, speed * delta * intent.walk)
-        if (move.outcome === 'falling') {
-          game.moveCurrentPig(move.x, move.z, active.pig.heading)
-          airborne = {
-            vy: 0,
-            vx: forwardX * intent.walk * speed * FALL_SPEED_FACTOR,
-            vz: forwardZ * intent.walk * speed * FALL_SPEED_FACTOR,
-            bouncing: false
-          }
-        } else if (move.outcome === 'moved') {
-          game.moveCurrentPig(move.x, move.z, active.pig.heading)
-          settle(active)
-          setClip(
-            active,
-            swimming
-              ? ANIM.SWIM
-              : query.tileType(move.x, move.z) === CLIMBING_TILE
-                ? ANIM.SCRAMBLE
-                : intent.walk > 0
-                  ? ANIM.RUN
-                  : ANIM.WALK_BACK
-          )
-        }
-      } else if (swimming) {
-        setClip(active, ANIM.SWIM)
-      } else if (intent.turn !== 0) {
-        setClip(active, ANIM.TURN)
-      } else {
-        setClip(active, ANIM.IDLE)
-      }
-    }
+    // Position and facing are the game's; everything else the frame needs —
+    // height, momentum, the wedge clock, which clip to wear — lives in the
+    // locomotion state. Sync in, step one frame of the domain, sync back,
+    // and draw exactly what it says.
+    loco.x = active.pig.position.x
+    loco.z = active.pig.position.z
+    loco.heading = active.pig.heading
+    updateLocomotion(
+      loco,
+      query,
+      { walk: intent.walk, turn: intent.turn, jump: jumpRequested },
+      delta
+    )
     jumpRequested = false
-    jumpReadyIn = Math.max(0, jumpReadyIn - delta)
-
-    // Wedged is about where the pig IS — the original asks `Map::IsBlocked`
-    // once a frame at its own feet — and nothing else. There is no shoving
-    // to detect, because nothing refuses the step in the first place.
-    const at = active.pig.position
-    wedged = !query.walkable(at.x, at.z)
-    if (wedged && airborne === null) {
-      // Walked in on its feet: hand it to the physics once, carrying what it
-      // was walking with. Only once — re-launching it every frame threw away
-      // the speed gravity had built and the fall came down in steps.
-      const carried = speedOf(active.pig.heading, intent.walk)
-      airborne = { vy: 0, vx: carried.x, vz: carried.z, bouncing: true }
-    }
-    if (!wedged) wedgedSeconds = 0
-    else {
-      // No clip of its own: the game has none for this. A pig being shaken
-      // by the wall keeps whatever it was playing, and only the eject below
-      // changes it — to EJECTED, which is the one thing 0x470c70 plays.
-      wedgedSeconds += delta
-      if (wedgedSeconds >= EJECT_SECONDS) {
-        const away = intent.walk < 0 ? 1 : -1
-        const out = Math.cos(EJECT_PITCH) * WALK_SPEED * away
-        airborne = {
-          vy: -Math.sin(EJECT_PITCH) * WALK_SPEED,
-          vx: Math.sin(active.pig.heading) * out,
-          vz: Math.cos(active.pig.heading) * out,
-          bouncing: true,
-          ejected: true
-        }
-        wedgedSeconds = 0
-      }
-    }
-    bounciness = easeBounciness(bounciness, wedged, airborne === null, delta)
+    // The camera follows what the PLAYER does and stands off what happens
+    // TO the pig. Involuntary flight — bounced or thrown — parks it (and
+    // keeps it parked half a second past the landing); the player's own
+    // input clears the wait at once, because walking must never face the
+    // lens. A walk-off hop or a jump is the player driving, not flying.
+    if (loco.airborne?.bouncing || loco.airborne?.ejected) chaseWait = CHASE_DELAY
+    else if (intent.walk !== 0 || intent.turn !== 0) chaseWait = 0
+    else chaseWait = Math.max(0, chaseWait - delta)
+    game.moveCurrentPig(loco.x, loco.z, loco.heading)
+    active.node.position.set(loco.x, loco.y - active.mesh.footOffset, loco.z)
+    active.node.rotation.y = loco.heading + PIG_HEADING_OFFSET
+    setClip(active, loco.clip)
 
     // Marker and camera trail the pig every frame.
-    const ground = query.height(active.pig.position.x, active.pig.position.z)
-    markerBase.set(active.pig.position.x, ground - 700, active.pig.position.z)
+    const ground = query.height(loco.x, loco.z)
+    markerBase.set(loco.x, ground - 700, loco.z)
     marker.position.x = markerBase.x
     marker.position.z = markerBase.z
     updateCamera(active, delta)
@@ -414,11 +271,12 @@ export function buildBattle(
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
       currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0,
+      /** Where the chase camera actually is, world space — the only way a
+       * spec can tell "swimming" from "the view has gone under the water". */
+      camera: () => ({ x: host.camera.position.x, y: host.camera.position.y, z: host.camera.position.z }),
       warp: (x: number, z: number, heading: number) => {
         game.moveCurrentPig(x, z, heading)
-        airborne = null
-        wedgedSeconds = 0
-        bounciness = FREE
+        loco = createLocomotion(query, x, z, heading)
         const entry = pigMeshes.find((e) => e.pig === game.currentPig)
         if (!entry) return
         entry.node.rotation.y = heading + PIG_HEADING_OFFSET

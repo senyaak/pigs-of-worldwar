@@ -10,7 +10,18 @@ import * as THREE from 'three'
 import type { Clip } from '../api'
 import type { Pig } from './pig'
 
-const FPS = 25
+/**
+ * The rate the clips play at.
+ *
+ * It is NOT the rate they would have to play at for the hooves to stay put:
+ * the run clip's planted hoof sweeps about 38 units a frame, so at 25 it
+ * carries a body some 960 units a second while the exe walks 1560, and the
+ * pig slides by half as much again. Driving playback off the walking speed
+ * instead was tried and read plainly WRONG in play — the legs whirl. So the
+ * original slid its pigs too, and this stays a flat 25.
+ * (`../pigs-disasm/movement/stride.js` has the measurement.)
+ */
+const CLIP_FPS = 25
 const BONE_COUNT = 15
 
 // The MCAP rotation convention, settled by analysis of the shipped data
@@ -52,7 +63,7 @@ export function createPlayer(pig: Pig): Player {
         return
       }
       const boneCount = Math.min(BONE_COUNT, pig.bones.length)
-      const times = Array.from({ length: clip.frameCount }, (_, frame) => frame / FPS)
+      const times = Array.from({ length: clip.frameCount }, (_, frame) => frame / CLIP_FPS)
 
       // Stored rotations are already parent-relative, which is exactly what
       // three's bone hierarchy wants — no conversion needed.

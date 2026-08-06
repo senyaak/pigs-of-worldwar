@@ -39,6 +39,12 @@ Every one of these is a named action in
 [src/renderer/src/input/controller.ts](src/renderer/src/input/controller.ts);
 keys, on-screen buttons and the e2e suite all go through it.
 
+The battle opens on CAMP. To play another map, open the devtools console
+(`Ctrl+Shift+I`) and type `pow.swapMap('ARTGUN')` — the battle restarts
+there with fresh spawns. `pow.swapMap()` with no argument lists every map
+the installation ships. (CAMP has no climbing ground; the Scramble shows on
+maps like ARTGUN and ICEFLOW.)
+
 ## Development
 
 ```bash
