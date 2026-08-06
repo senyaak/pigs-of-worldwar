@@ -15,6 +15,7 @@ import path from 'node:path'
 
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
+import { debugState, hold, warp } from '../controller'
 import { POG_RECORD_SIZE, parsePog } from '../../src/lib/formats/pog'
 import type { MapObject } from '../../src/lib/formats/pog'
 import { parsePmg } from '../../src/lib/formats/pmg'
@@ -127,5 +128,25 @@ test('the battle draws the map objects where the file puts them', async ({ app }
   // model and the record is placed anyway.
   expect(drawn.at.filter((at) => at.x === 0 && at.z === 0)).toHaveLength(0)
 
+  expect(app.errors()).toEqual([])
+})
+
+test('a drawn object is also one to walk into', async ({ app }) => {
+  const { page } = app
+  await page.locator('#menu-new-game').click()
+  await expect(page.locator('#battle')).toBeVisible()
+
+  // The training dummy on the green path, approached from the path's side.
+  // Its box is 256 across and 512 deep, so a pig of radius 320 comes to a
+  // stop about 576 short of the middle of it and no nearer.
+  const dummy = CAMP.find((object) => object.name === 'DUMMY' && object.x === -4352)!
+  await warp(page, dummy.x, dummy.z + 1400, Math.PI)
+  await hold(page, 'walkForward', 1500)
+
+  const at = await debugState(page)
+  const gap = Math.hypot(at.x - dummy.x, at.z - dummy.z)
+  expect(gap).toBeGreaterThan(500)
+  // It really did walk — it is not simply where it was put.
+  expect(gap).toBeLessThan(1200)
   expect(app.errors()).toEqual([])
 })

@@ -222,7 +222,11 @@ waits half a second past the landing.
 
 What the exe gave up, in short: terrain height never refuses a step; a wall
 grants only the step-up envelope, scrapes past it, and a pig inside one
-never lands — the wedge counter throws it out downhill; each terrain type
+never lands — the wedge counter throws it out downhill; an OBJECT is the
+other half of that same dispatch and gets the same envelope, so a low box
+is a step onto, a tall one a wall to scrape along, and a raised one is
+walked under (`lib/game/obstacles.ts`, and a pig is 640 units on a side
+because every spawn marker says so); each terrain type
 carries its own friction and restitution, and masked type 11 is the one
 that plays the Scramble clip in every band; a landing is binary at an
 impact of 25 a frame; a jump is committed, costs 15 frames, and leaves the
@@ -274,9 +278,19 @@ draws what it says.
   wrong. What those two grey TIMs and the DLL's under-landscape 49×49
   water grid are actually FOR is still open (play memory says a sink/kill
   layer, not the visible water).
-- **Map objects are scenery.** The POG's props are drawn and nothing else:
-  a pig walks through a crate, and the collision box every record carries
-  (fields 8-10) is parsed and unused.
+- **Which objects are solid is the remake's own line.** The exe's collision
+  test (0x406bb0) is still undecoded, so what is actually IN its world is
+  unknown. `lib/game/obstacles.ts` takes everything with a box at least two
+  units across — which drops grass, flowers and the swimming fish, all of
+  which carry a box exactly one unit wide — and it lets CRATES through on
+  purpose, because the original collects one by walking into it and there
+  is no pickup yet.
+- **A bridge is a box, so it is a wall.** Collision has no ramps: a sloped
+  piece gets its bounding box like everything else, and a bridge's top is
+  well past the step-up envelope, so a pig is stopped at it rather than
+  walking over. Field 11 of the POG marks all 94 bridge and step pieces and
+  nothing else, which is where a fix starts — but what the field MEANS is
+  not settled (`../pigs-disasm/objects/notes.md`).
 - **Two sides, though a map offers up to six.** The spawn markers name six
   (FINAL uses all of them, the arenas four); the battle fields the first two
   it finds, because there is no AI for the rest. `TerrainQuery.pickSpawns`

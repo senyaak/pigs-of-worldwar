@@ -18,6 +18,7 @@ import { TerrainQuery } from '../../../lib/game/terrain'
 import { buildWaterMask } from '../../../lib/game/watermask'
 import { ANIM, SWIM_SINK, createLocomotion, restingY, updateLocomotion } from '../../../lib/game/locomotion'
 import type { LocomotionState } from '../../../lib/game/locomotion'
+import { ObstacleField, withPigs } from '../../../lib/game/obstacles'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
@@ -91,6 +92,9 @@ export function buildBattle(
   // the training map the dummies and the gate.
   const props = buildMapProps(assets.objects, assets.props, assets.propTextures)
   root.add(props.group)
+  // The same records, as things to walk into. Static for the map's life —
+  // only the pigs move, and they join per frame.
+  const obstacles = new ObstacleField(assets.objects)
 
   interface PigEntry {
     pig: Pig
@@ -266,11 +270,21 @@ export function buildBattle(
     loco.x = active.pig.position.x
     loco.z = active.pig.position.z
     loco.heading = active.pig.heading
+    // The squad is in the way too: every pig but the acting one, as the
+    // body its own spawn marker measured (lib/game/obstacles).
+    const others = pigMeshes
+      .filter((entry) => entry !== active)
+      .map((entry) => ({
+        x: entry.pig.position.x,
+        z: entry.pig.position.z,
+        y: entry.node.position.y + entry.mesh.footOffset
+      }))
     updateLocomotion(
       loco,
       query,
       { walk: intent.walk, turn: intent.turn, jump: jumpRequested },
-      delta
+      delta,
+      withPigs(obstacles, others)
     )
     jumpRequested = false
     // The camera follows what the PLAYER does and stands off what happens

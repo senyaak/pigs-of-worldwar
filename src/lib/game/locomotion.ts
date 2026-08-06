@@ -31,6 +31,8 @@ import type { Bounciness } from './ballistics'
 import { FALL_SPEED_FACTOR, WALK_BACK_SPEED, WALK_SPEED, step } from './movement'
 import { clampToWorld, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
+import { NO_OBSTACLES } from './obstacles'
+import type { Obstruction } from './obstacles'
 
 /**
  * Swimming is a CAP, not a fraction of walking: `Pig::Walk`'s water branch
@@ -212,12 +214,20 @@ export function createLocomotion(
   }
 }
 
-/** One frame. Mutates `state`; `delta` is the frame's seconds. */
+/**
+ * One frame. Mutates `state`; `delta` is the frame's seconds.
+ *
+ * `obstruction` is everything that is not the landscape — the map's objects
+ * and the other pigs. It defaults to nothing in the way, which is what the
+ * domain specs about terrain want and what a map whose objects failed to
+ * load falls back to.
+ */
 export function updateLocomotion(
   state: LocomotionState,
   query: TerrainQuery,
   intent: Intent,
-  delta: number
+  delta: number,
+  obstruction: Obstruction = NO_OBSTACLES
 ): void {
   // Turning on the spot works in every grounded state; the air steers
   // nothing (`UpdateMovement` returns at once on state 5).
@@ -226,9 +236,9 @@ export function updateLocomotion(
   }
 
   if (state.airborne) {
-    fly(state, query, delta)
+    fly(state, query, obstruction, delta)
   } else {
-    ground(state, query, intent, delta)
+    ground(state, query, obstruction, intent, delta)
   }
 
   state.jumpReadyIn = Math.max(0, state.jumpReadyIn - delta)
@@ -246,7 +256,12 @@ export function updateLocomotion(
 }
 
 /** Momentum carries; gravity does the rest. */
-function fly(state: LocomotionState, query: TerrainQuery, delta: number): void {
+function fly(
+  state: LocomotionState,
+  query: TerrainQuery,
+  obstruction: Obstruction,
+  delta: number
+): void {
   const a = state.airborne as Airborne
   state.clip = a.ejected ? ANIM.EJECTED : a.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE
   // The jump's forward half, three frames in.
@@ -271,7 +286,11 @@ function fly(state: LocomotionState, query: TerrainQuery, delta: number): void {
   a.vx *= bleed
   a.vz *= bleed
   const y = state.y + a.vy * delta
-  const floor = restingY(query, state.x, state.z)
+  // A roof to land on: the highest object top still BELOW the falling pig.
+  // `standOn`'s reach is what makes it that — nothing above the feet counts.
+  const ground = restingY(query, state.x, state.z)
+  const roof = obstruction.standOn(state.x, state.z, state.y, 0)
+  const floor = roof !== null && roof < ground ? roof : ground
   if (!(a.vy > 0 && y >= floor)) {
     state.y = y
     return
@@ -305,10 +324,13 @@ function fly(state: LocomotionState, query: TerrainQuery, delta: number): void {
 function ground(
   state: LocomotionState,
   query: TerrainQuery,
+  obstruction: Obstruction,
   intent: Intent,
   delta: number
 ): void {
   const swimming = query.isWater(state.x, state.z)
+  /** The footing every reach is measured from — where the feet are NOW. */
+  const footY = state.y
   // Backwards is half as fast on land and the same in water, because the
   // exe's clamp lands differently either side of it: -32 scaled by the class
   // is 26 walking, and the water cap of 16 swallows both directions.
@@ -356,12 +378,12 @@ function ground(
     }
     if (move.outcome === 'moved') {
       let pressing = false
-      if (inReach(state, query, move.x, move.z)) {
+      if (inReach(state, query, obstruction, footY, move.x, move.z)) {
         state.x = move.x
         state.z = move.z
         state.sidestep = 0
       } else {
-        sidestep(state, query, speed * delta * intent.walk, delta)
+        sidestep(state, query, obstruction, footY, speed * delta * intent.walk, delta)
         pressing = true
       }
       state.clip = swimming ? ANIM.SWIM : intent.walk > 0 ? ANIM.RUN : ANIM.WALK_BACK
@@ -379,7 +401,12 @@ function ground(
   } else {
     state.clip = swimming ? ANIM.SWIM : intent.turn !== 0 ? ANIM.TURN : ANIM.IDLE
   }
+  // The ground, or an object's top where one is close enough under the pig
+  // to be stepped onto — the same envelope that decides whether the object
+  // was a step or a wall in the first place.
   state.y = restingY(query, state.x, state.z)
+  const on = obstruction.standOn(state.x, state.z, footY, WALL_CLIMB)
+  if (on !== null && on < state.y) state.y = on
   // The step-up allowance is measured from the last footing on OPEN ground;
   // inside a wall the reference stays frozen, which is what caps the climb.
   if (query.walkable(state.x, state.z)) state.freeY = query.height(state.x, state.z)
@@ -394,8 +421,21 @@ function ground(
  * height refuses (`TryMove`'s landscape hit is the successful walk). Blocked
  * ground may only within the step-up envelope: no higher than WALL_CLIMB
  * above the last free footing. That is the wall refusing to be a ladder.
+ *
+ * An OBJECT is the other half of the same dispatch, and the reading that
+ * terrain never refuses is the reading that objects do. It gets the same
+ * envelope measured from the pig's own feet: a low box is a step onto, a
+ * tall one is a wall, and a raised one is walked under.
  */
-function inReach(state: LocomotionState, query: TerrainQuery, x: number, z: number): boolean {
+function inReach(
+  state: LocomotionState,
+  query: TerrainQuery,
+  obstruction: Obstruction,
+  footY: number,
+  x: number,
+  z: number
+): boolean {
+  if (obstruction.blocks(x, z, footY, WALL_CLIMB)) return false
   if (query.walkable(x, z)) return true
   // Game space is Y-down: higher ground is a SMALLER height value.
   return state.freeY - query.height(x, z) <= WALL_CLIMB
@@ -406,14 +446,21 @@ function inReach(state: LocomotionState, query: TerrainQuery, x: number, z: numb
  * probe both right angles at twice the step, scrape 8 units a frame along
  * whichever is clear, and remember the side so the pig does not dither.
  */
-function sidestep(state: LocomotionState, query: TerrainQuery, dist: number, delta: number): void {
+function sidestep(
+  state: LocomotionState,
+  query: TerrainQuery,
+  obstruction: Obstruction,
+  footY: number,
+  dist: number,
+  delta: number
+): void {
   const sides = state.sidestep !== 0 ? [state.sidestep, -state.sidestep] : [1, -1]
   for (const side of sides) {
     const angle = state.heading + (side * Math.PI) / 2
     const reach = 2 * Math.abs(dist)
-    if (!inReach(state, query, state.x + Math.sin(angle) * reach, state.z + Math.cos(angle) * reach)) {
-      continue
-    }
+    const probeX = state.x + Math.sin(angle) * reach
+    const probeZ = state.z + Math.cos(angle) * reach
+    if (!inReach(state, query, obstruction, footY, probeX, probeZ)) continue
     const scrape = SIDESTEP_SPEED * delta
     const to = clampToWorld(state.x + Math.sin(angle) * scrape, state.z + Math.cos(angle) * scrape)
     state.x = to.x
