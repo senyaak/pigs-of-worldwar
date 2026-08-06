@@ -70,7 +70,7 @@ export const LAYOUT = {
     /** Where the needle turns, and where every fan has its point. */
     hub: { x: 60, y: 64 },
     arc: { top: 0, bottom: 64 },
-    slot: { x: 64, top: 23, bottom: 62, cap: { x: 128, y: 28 } },
+    slot: { x: 64, top: 22, bottom: 64, cap: { x: 128, y: 31 } },
     green: [104, 168, 72] as [number, number, number],
     /** How much of the battle shows through that green. */
     alpha: 0.5
