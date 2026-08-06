@@ -56,9 +56,22 @@ footing, so the lip is always in reach from above. All of it lives in
 BITS (`and edx,1Fh`, exe 0x46fde4); the bits above are water/mine/wall
 flags. 1857 of the shipped maps' 1865 climbing tiles are 0x2b, not 0x0b —
 an unmasked `=== 11` never fires, which is how Scramble went missing. The
-water bit is only a PREFILTER too: the verdict is per-texel
+water bit is only a PREFILTER too — the verdict comes from the ART
 (`afIsPointWatery`), so mud banks with the bit set are LAND. See
 `../pigs-disasm/movement/notes.md`.
+
+**Water is art the artist made SEE-THROUGH, and that is what tells it from
+ICE.** `afIsPointWatery` answers off a per-TEXTURE kind the library computes
+at upload (dll 0x10007b6c) by walking the CLUT: every non-transparent colour
+carrying the PSX semi-transparency bit 0x8000 makes the texture water, none
+makes it solid, a mix sends it to a texel probe that no shipped art can
+satisfy. So a frozen channel and the pond beside it are both water-flagged,
+and the ice is the opaque one — CAMP swims on textures 44/45/46 (80 tiles)
+and walks on 50, 52-57 (30 tiles). `lib/game/watermask.ts` does exactly
+this; `formats/tim.ts` keeps the raw CLUT because the decoded rgba throws
+that bit away. Two earlier readings are dead ends someone will re-derive:
+learning water COLOURS (worked by accident of the palettes, flickered) and
+keying on "art worn by a flagged tile" (swallows the ice).
 
 **The ground carries its own light, and the engine must not add one.** Each
 PMG vertex stores a brightness byte (how-doc: "unknown ≤255") that the
@@ -170,8 +183,9 @@ npm run typecheck && npm run build && npx playwright test
 Formats, models, textures, skeleton, 93 animations, terrain and water all
 parse and render. The menu wears the original art. The battle scene puts
 two squads on CAMP (console: `pow.swapMap('ARTGUN')` — see README) with
-the original's turn clock, tank controls, jumping, swimming (per-texel
-water, floats at the region's surface, sunk SWIM_SINK), scrambling on
+the original's turn clock, tank controls, jumping, swimming (water by the
+art's own translucency, floats at the region's surface, sunk SWIM_SINK),
+scrambling on
 masked type 11, wall scrabble-and-eject, and ground movement taken from
 the exe — see `../pigs-disasm/movement/notes.md` for the derivation of
 every constant in `src/lib/game/movement.ts`, `ballistics.ts`,
@@ -211,18 +225,6 @@ draws what it says.
   the input handler ramps an accumulator by 4 a frame to a cap of 32/4096 of
   a circle, so 1.473 rad/s at 30 Hz against the 2.6 here — but applying it
   has not been played yet, so `TURN_SPEED` stands until it is.
-- **Water IS per-texel now — but the colour set is learnt, not decoded.**
-  `lib/game/watermask.ts` is the working `afIsPointWatery`: a point is wet
-  where the texel of the tile's art (rotate/flip applied) is a water
-  colour, sampled at the exe's own NINE probes (centre + ring of ±4 mask
-  pixels, table at dll 0x1002c6a0) so texel-sized cracks don't swallow a
-  pig. The water colours are the texels of the PURE-water textures — what
-  tiles with all eight neighbours water wear — because the whole water
-  family shares one palette per map (CAMP: fourteen colours) and any wider
-  source punches the shore too. Membership, never distance: thresholds
-  followed nothing. The renderer cuts its shore masks from the SAME set,
-  so what looks like water swims. Going PER TILE instead was built and
-  reverted: it is not what the game does.
 - **Water renders as: flatten + mask + one plain sheet.** Per water REGION
   (flood-fill of water-flagged tiles — the exe's "Fitting water." JOINS)
   a level is fitted (mode of the region's corner heights; 128 on every
@@ -244,12 +246,6 @@ draws what it says.
   it. Deliberate, in `locomotion.ts`.
 
 ### Threads left mid-pull
-
-- What sets a texture's KIND (dry / wet / ask-the-art) in the DLL's table
-  at 0x1004cfa0, and how its texel test can fire at all when the shipped
-  ground art carries no transparent texel for the probe to find. The exe's
-  upload calls pass an index whose meaning is still ambiguous (0x4a53fe,
-  0x4a545c, the loop at 0x4a54e5).
 
 - `0x406bb0`, 3280 bytes: the collision test itself. Knowing what else lives
   in that world would settle whether objects need their own handling.

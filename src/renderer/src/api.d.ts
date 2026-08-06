@@ -86,6 +86,8 @@ export interface TerrainTexture {
   width: number
   height: number
   rgba: Uint8Array
+  /** The raw CLUT — its top bit is what says water (lib/game/watermask). */
+  palette: Uint16Array
 }
 
 export type LoadTerrainResult =

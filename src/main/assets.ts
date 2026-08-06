@@ -54,7 +54,13 @@ async function pairedTextures(full: string): Promise<(Tim & { name: string })[]>
     try {
       return { name: entry.name, ...parseTim(mtdData.subarray(entry.offset, entry.offset + entry.size)) }
     } catch {
-      return { name: entry.name, width: 1, height: 1, rgba: new Uint8Array([255, 0, 255, 255]) }
+      return {
+        name: entry.name,
+        width: 1,
+        height: 1,
+        rgba: new Uint8Array([255, 0, 255, 255]),
+        palette: new Uint16Array()
+      }
     }
   })
 }

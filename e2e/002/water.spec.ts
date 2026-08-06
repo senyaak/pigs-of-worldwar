@@ -29,7 +29,9 @@ import { ANIM, SWIM_SINK, createLocomotion, updateLocomotion } from '../../src/l
 import { FRAME_SECONDS } from '../../src/lib/game/ballistics'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import type { TerrainBlock } from '../../src/lib/formats/pmg'
-import { buildWaterMask } from '../../src/lib/game/watermask'
+import { parsePtg } from '../../src/lib/formats/ptg'
+import { buildWaterMask, textureKind } from '../../src/lib/game/watermask'
+import type { TerrainArt } from '../../src/lib/game/watermask'
 import { terrain, terrainBlocks } from './fixture'
 
 /** A lake at elevation 200 whose seabed dips to 40 in a hole around x≈0,
@@ -72,75 +74,81 @@ test('CAMP: the fitted level is the 128 the mapmakers authored', () => {
   expect(fitWaterElevation(blocks)).toBe(128 * HEIGHT_SCALE)
 })
 
-test('the water is per TEXEL: a pig stands on the dry half of a shore tile', () => {
-  // The afIsPointWatery reading: the tile flag is a prefilter, the texel
-  // decides. Two 2×2 textures: pure water (all one colour) and a shore
-  // whose low-x half is that water colour and high-x half is sand. The
-  // shore tile wears the flag, but only its water half swims.
-  const WATER = [40, 120, 110, 255]
-  const SAND = [200, 180, 130, 255]
-  const texture = (texels: number[][]): { width: number; height: number; rgba: Uint8Array } => ({
-    width: 2,
-    height: 2,
-    rgba: Uint8Array.from(texels.flat())
-  })
-  const art = [
-    texture([WATER, WATER, WATER, WATER]),
-    texture([WATER, SAND, WATER, SAND])
-  ]
-  // Water body at z > 0 wearing texture 0; one shore row at its edge
-  // wearing texture 1 (water side toward the body).
+/** A 2×2 texture with the palette that decides it: `stp` marks the PSX
+ * semi-transparency bit the library classifies on (dll 0x10007b6c). */
+const art = (colours: number[]): TerrainArt => ({
+  width: 2,
+  height: 2,
+  rgba: new Uint8Array(2 * 2 * 4),
+  palette: Uint16Array.from(colours)
+})
+const TRANSLUCENT = 0x8000 | 0x1234
+const OPAQUE = 0x1234
+
+test('ice and water share a frozen body: the palette tells them apart', () => {
+  // The whole rule. Both rows carry the water flag — a frozen channel and
+  // the pond beside it — and only the translucent art swims. That is the
+  // library's own classification, not ours: every non-transparent colour
+  // carrying 0x8000 makes a texture kind 2, and afIsPointWatery answers off
+  // the kind without reading a texel.
   const blocks = terrainBlocks(
     () => 0,
     (_x, z) => (z > 512 ? { type: 0x24, texture: 0 } : z > 0 ? { type: 0x24, texture: 1 } : {})
   )
-  const query = new TerrainQuery(blocks, buildWaterMask(blocks, art))
-  expect(query.isWater(256, 1500), 'open water swims').toBe(true)
-  // Tiles key off their origin corner, so the shore row spans z 512..1024:
-  // its low-x texel half is water, high-x is sand — the point over sand
-  // STANDS even though the tile is flagged.
-  expect(query.isWater(100, 768), 'the painted water half swims').toBe(true)
-  expect(query.isWater(400, 768), 'the painted sand half stands').toBe(false)
-  // Dry land is dry regardless.
-  expect(query.isWater(256, -500)).toBe(false)
+  const textures = [art([TRANSLUCENT, TRANSLUCENT]), art([OPAQUE, OPAQUE])]
+  const query = new TerrainQuery(blocks, buildWaterMask(blocks, textures))
+  expect(query.isWater(256, 1500), 'the pond swims').toBe(true)
+  // Tiles key off their origin corner, so the ice row spans z 512..1024 —
+  // and is walked on end to end, flag or no flag.
+  expect(query.isWater(100, 768), 'the ice holds at one end').toBe(false)
+  expect(query.isWater(400, 768), 'and at the other').toBe(false)
+  expect(query.isWater(256, -500), 'dry land is dry').toBe(false)
 })
 
-test('a micro-crack of water does not swallow a pig — nine probes must agree', () => {
-  // The original's afIsPointWatery samples the centre AND a ring of eight
-  // (dll 0x1002c6a0, ±4 mask pixels = ±64 world units); a single watery
-  // texel in dry art fails the ring, so the pig keeps standing. One water
-  // texel in a 32×32 sand texture is a 16-unit crack.
-  const WATER = [40, 120, 110, 255]
-  const SAND = [200, 180, 130, 255]
-  const crack = {
-    width: 32,
-    height: 32,
-    rgba: Uint8Array.from(
-      Array.from({ length: 32 * 32 }, (_, i) => (i === 16 * 32 + 16 ? WATER : SAND)).flat()
-    )
-  }
-  const pure = {
-    width: 2,
-    height: 2,
-    rgba: Uint8Array.from([WATER, WATER, WATER, WATER].flat())
-  }
-  // A water body wearing the pure art (to teach the colour set), plus one
-  // flagged tile wearing the cracked sand far away from it.
+test('a mixed palette is solid too — the texel path cannot fire on this art', () => {
+  // Kind 1 asks the texels, and a texel is only watery when it reads ZERO,
+  // which needs a 0x0000 palette entry. No shipped ground texture has one
+  // (pigs-disasm/terrain/watery.js), and the upload even lifts
+  // non-transparent black off zero (0x100078a5). So a mixed palette walks.
   const blocks = terrainBlocks(
     () => 0,
-    (_x, z) => (z > 4000 ? { type: 0x24, texture: 0 } : z > 3500 && z < 4000 ? {} : {})
+    (_x, z) => (z > 512 ? { type: 0x24, texture: 0 } : z > 0 ? { type: 0x24, texture: 1 } : {})
   )
-  // Wear the crack on one dry-side tile by hand: tile at origin (0, 0).
+  const textures = [art([TRANSLUCENT]), art([TRANSLUCENT, OPAQUE])]
+  const query = new TerrainQuery(blocks, buildWaterMask(blocks, textures))
+  expect(textureKind(textures[1].palette), 'mixed').toBe(1)
+  expect(query.isWater(256, 768), 'and solid underfoot').toBe(false)
+  // The transparent entry votes for nothing: art that is otherwise all
+  // translucent is still water.
+  expect(textureKind(Uint16Array.from([0, TRANSLUCENT]))).toBe(2)
+  expect(textureKind(Uint16Array.from([0, OPAQUE]))).toBe(0)
+})
+
+test('CAMP: the pond swims and the frozen channel beside it does not', () => {
+  // The shipped map, against the counts in pigs-disasm/terrain/watery.js:
+  // 80 flagged tiles wear kind-2 art (44, 45, 46) and 30 wear kind 1.
+  const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG')))
+  const textures = parsePtg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PTG')))
+  const swims = new Set(
+    textures.flatMap((t, i) => (textureKind(t.palette) === 2 ? [i] : []))
+  )
+  expect([...swims].sort((a, b) => a - b)).toEqual([44, 45, 46])
+
+  const mask = buildWaterMask(blocks, textures)
+  expect(mask, 'CAMP has water').not.toBeNull()
+  let wet = 0
+  let walked = 0
   for (const block of blocks) {
-    if (block.x === 0 && block.z === 0) {
-      block.tiles[0] = { ...block.tiles[0], type: 0x24, texture: 1 }
+    for (let tile = 0; tile < block.tiles.length; tile++) {
+      if ((block.tiles[tile].type & 0x20) === 0) continue
+      const x = block.x + (tile % 4) * 512 + 256
+      const z = block.z + Math.floor(tile / 4) * 512 + 256
+      if (mask!.wet(x, z)) wet++
+      else walked++
     }
   }
-  const query = new TerrainQuery(blocks, buildWaterMask(blocks, [pure, crack]))
-  // Standing on the crack texel's centre: the ring lands on sand — stands.
-  expect(query.isWater(16 * 16 + 8, 16 * 16 + 8)).toBe(false)
-  // The real water body still swims.
-  expect(query.isWater(256, 5000)).toBe(true)
+  expect(wet, 'tiles a pig swims in').toBe(80)
+  expect(walked, 'flagged tiles it walks on — the ice').toBe(30)
 })
 
 test('each water region gets ITS OWN level — a raised pool is not underground', () => {

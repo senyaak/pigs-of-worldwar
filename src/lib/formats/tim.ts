@@ -9,6 +9,13 @@ export interface Tim {
   height: number
   /** RGBA, 4 bytes per pixel, rows top to bottom as stored in the file. */
   rgba: Uint8Array
+  /**
+   * The CLUT exactly as stored, one 16-bit word a colour — kept because the
+   * TOP BIT is meaning, not colour: the PSX's semi-transparency flag. The
+   * game classifies a ground texture by it (all colours translucent = water,
+   * none = solid), so the decoded rgba above cannot answer for it.
+   */
+  palette: Uint16Array
 }
 
 const MAGIC = 0x10
@@ -27,8 +34,10 @@ export function parseTim(data: Uint8Array): Tim {
   const clutLength = view.getUint32(offset, true)
   const clutColors = view.getUint16(offset + 8, true)
   const palette = new Uint8Array(clutColors * 4)
+  const clut = new Uint16Array(clutColors)
   for (let i = 0; i < clutColors; i++) {
     const color = view.getUint16(offset + 12 + i * 2, true)
+    clut[i] = color
     // A1B5G5R5; pure zero is fully transparent.
     const r = color & 0x1f
     const g = (color >> 5) & 0x1f
@@ -52,5 +61,5 @@ export function parseTim(data: Uint8Array): Tim {
     const index = mode === 0 ? (i % 2 === 0 ? byte & 0xf : byte >> 4) : byte
     rgba.set(palette.subarray(index * 4, index * 4 + 4), i * 4)
   }
-  return { width, height, rgba }
+  return { width, height, rgba, palette: clut }
 }

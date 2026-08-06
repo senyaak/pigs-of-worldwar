@@ -1,24 +1,39 @@
-// The per-texel water mask — the domain side of `afIsPointWatery`
-// (_d3d.dll 0x10010210): the water flag on a tile is only a PREFILTER, the
-// verdict comes from the ART — a point is in the water where the texel
-// under it is a water colour, so a pig stands on the painted dry half of a
-// shore tile and swims one step further on. Pure: blocks and decoded
-// texture pixels in, a lookup out.
+// The water mask — the domain side of `afIsPointWatery` (_d3d.dll
+// 0x10010210), which the exe reaches through `Map::IsInWater` (0x4a6fa0)
+// once the tile's water flag has passed. The flag is only a PREFILTER; the
+// verdict comes from the ART. Pure: blocks and decoded textures in, a
+// lookup out.
 //
-// What counts as a water colour is learnt from the map itself, the same
-// way the renderer cuts its shore masks: the textures the deep interior
-// wears (every one of the eight neighbours water too) are pure water, and
-// their texel colours are the set. One shared palette family per map
-// (CAMP: fourteen colours across the whole pond) is why membership works
-// and thresholds do not — see ../../../pigs-disasm/movement/notes.md.
+// **Water is art the artist made SEE-THROUGH.** Before uploading a ground
+// texture the library walks its CLUT once (0x10007b6c) and classifies the
+// whole palette by the PSX semi-transparency bit, 0x8000, ignoring the
+// transparent 0x0000 entry:
+//
+//   every colour translucent -> kind 2  water, and no texel is ever read
+//   no colour translucent    -> kind 0  solid
+//   a mix                    -> kind 1  read the texels
+//
+// and `afIsPointWatery` answers straight off that kind. Its texel path —
+// nine probes, each a raw 16-bit sample, watery only where ALL NINE ARE
+// ZERO — survives for kind 1, but zero can only come from a 0x0000 palette
+// entry (the upload lifts non-transparent black off zero on purpose,
+// 0x100078a5) and no shipped ground texture has one. So kind 1 is solid in
+// practice, and the whole rule is:
+//
+//   swim  <=>  water flag  AND  the tile's texture is kind 2
+//
+// per tile. THAT is what separates ICE from water: a frozen channel and the
+// pond beside it are both water-flagged, and the ice is opaque art you walk
+// on while the pond is translucent art you swim in. On CAMP the pond wears
+// textures 44/45/46 (kind 2, 80 tiles) and the channel 50/52-57 (kind 1, 30
+// tiles); every shipped map rings a handful of translucent water textures
+// with opaque ones, which is also why no island is smaller than a tile.
+//
+// The colour set below no longer decides anything — the renderer still cuts
+// its shore masks with it. Derivation and per-map counts:
+// ../../../pigs-disasm/movement/notes.md, ../../../pigs-disasm/terrain/watery.js.
 
-import {
-  BLOCKS_PER_SIDE,
-  TILES_PER_SIDE,
-  TILE_STEP,
-  TILE_WATER,
-  tileUvs
-} from '../formats/pmg'
+import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP, TILE_WATER } from '../formats/pmg'
 import type { TerrainBlock } from '../formats/pmg'
 import { CLIMBING_TILE } from './terrain'
 import type { WaterMask } from './terrain'
@@ -28,22 +43,32 @@ export interface TerrainArt {
   width: number
   height: number
   rgba: Uint8Array
+  /** The raw CLUT: the top bit of each word is the verdict. */
+  palette: Uint16Array
 }
 
+/** Water, solid, or "read the texels" — the library's own classification of
+ * a palette (dll 0x10007b6c). The transparent entry votes for nothing. */
+export function textureKind(palette: Uint16Array): 0 | 1 | 2 {
+  let translucent = false
+  let solid = false
+  for (const colour of palette) {
+    if (colour === 0) continue
+    if ((colour & 0x8000) !== 0) translucent = true
+    else solid = true
+  }
+  return solid ? (translucent ? 1 : 0) : 2
+}
+
+/** The kind that swims. */
+export const WATER_KIND = 2
+
 const SIDE = BLOCKS_PER_SIDE * TILES_PER_SIDE
-/** The tile's corners in (a, b) ring order, as the renderer builds them. */
-const TILE_CORNERS = [
-  [0, 0],
-  [1, 0],
-  [0, 1],
-  [1, 1]
-]
 
 const packColour = (r: number, g: number, b: number): number => (r << 16) | (g << 8) | b
 
 interface Cell {
   texture: number
-  rotateFlip: number
   water: boolean
 }
 
@@ -51,7 +76,7 @@ function cellGrid(blocks: TerrainBlock[]): { cells: Cell[][]; minX: number; minZ
   const minX = Math.min(...blocks.map((b) => b.x))
   const minZ = Math.min(...blocks.map((b) => b.z))
   const cells: Cell[][] = Array.from({ length: SIDE }, () =>
-    Array.from({ length: SIDE }, () => ({ texture: -1, rotateFlip: 0, water: false }))
+    Array.from({ length: SIDE }, () => ({ texture: -1, water: false }))
   )
   for (const block of blocks) {
     const colBase = Math.round((block.x - minX) / TILE_STEP)
@@ -60,7 +85,6 @@ function cellGrid(blocks: TerrainBlock[]): { cells: Cell[][]; minX: number; minZ
       const t = block.tiles[tile]
       cells[rowBase + Math.floor(tile / TILES_PER_SIDE)][colBase + (tile % TILES_PER_SIDE)] = {
         texture: t.texture,
-        rotateFlip: t.rotateFlip,
         water: (t.type & TILE_WATER) !== 0 && (t.type & 0x1f) !== CLIMBING_TILE
       }
     }
@@ -108,63 +132,28 @@ export function waterColourSet(blocks: TerrainBlock[], textures: TerrainArt[]): 
 }
 
 /**
- * The pig's FOOTPRINT, not a point: the original's `afIsPointWatery`
- * probes NINE spots — the centre and a ring — from its offset table at
- * dll 0x1002c6a0, in mask pixels of 512/32 = 16 world units, and only if
- * every one is water does the point count as wet. That is what keeps a
- * pig from plunging into a single watery texel crack.
- */
-const PROBES = [
-  [0, 0],
-  [0, -4],
-  [3, -3],
-  [4, 0],
-  [3, 3],
-  [0, 4],
-  [-3, 3],
-  [-4, 0],
-  [-3, -3]
-].map(([dx, dz]) => [dx * (TILE_STEP / 32), dz * (TILE_STEP / 32)])
-
-/**
- * Build the mask, or null when the map has no water art to learn from.
- * `wet(x, z)` answers for a world point; callers gate it behind the tile's
- * own water flag (TerrainQuery.isWater does).
+ * Build the mask, or null when the map has no water art at all. `wet(x, z)`
+ * answers for a world point; callers gate it behind the tile's own water
+ * flag too (TerrainQuery.isWater does).
+ *
+ * There is no probing here, and the original's nine offsets are not missing
+ * so much as unreachable: they are all clamped inside the tile's OWN cell
+ * (dll 0x100103aa), so against a verdict that cannot vary within a tile
+ * every one of them lands on the same answer.
  */
 export function buildWaterMask(blocks: TerrainBlock[], textures: TerrainArt[]): WaterMask | null {
-  const colours = waterColourSet(blocks, textures)
-  if (colours.size === 0) return null
+  const kinds = textures.map((art) => textureKind(art.palette))
+  if (!kinds.includes(WATER_KIND)) return null
   const { cells, minX, minZ } = cellGrid(blocks)
-  // One texel, through the tile's rotate/flip the same way the renderer
-  // lays the texture down: the corner ring's UVs are an affine map, so
-  // interpolating them lands the world point on the very texel drawn there.
-  const texelWet = (cell: Cell, art: TerrainArt, tx: number, tz: number): boolean => {
-    const [uv00, uv10, uv01] = tileUvs(cell.rotateFlip, TILE_CORNERS)
-    const u = uv00[0] + (uv10[0] - uv00[0]) * tx + (uv01[0] - uv00[0]) * tz
-    const v = uv00[1] + (uv10[1] - uv00[1]) * tx + (uv01[1] - uv00[1]) * tz
-    const texX = Math.max(0, Math.min(art.width - 1, Math.floor(u * art.width)))
-    const texY = Math.max(0, Math.min(art.height - 1, Math.floor(v * art.height)))
-    const i = (texY * art.width + texX) * 4
-    if (art.rgba[i + 3] === 0) return true
-    return colours.has(packColour(art.rgba[i], art.rgba[i + 1], art.rgba[i + 2]))
-  }
   return {
     wet(x: number, z: number): boolean {
       const row = Math.floor((z - minZ) / TILE_STEP)
       const col = Math.floor((x - minX) / TILE_STEP)
       const cell = cells[row]?.[col]
-      if (!cell) return false
-      if (!cell.water) return false
-      const art = textures[cell.texture]
-      if (!art) return true
-      // All nine probes, clamped to the tile's own box as the original
-      // clamps to its mask cell.
-      for (const [dx, dz] of PROBES) {
-        const tx = Math.max(0, Math.min(0.999, (x + dx - minX) / TILE_STEP - col))
-        const tz = Math.max(0, Math.min(0.999, (z + dz - minZ) / TILE_STEP - row))
-        if (!texelWet(cell, art, tx, tz)) return false
-      }
-      return true
+      if (!cell || !cell.water) return false
+      // An unknown texture is water: the flag already said so, and a map
+      // whose art failed to load should not turn its lake into a floor.
+      return (kinds[cell.texture] ?? WATER_KIND) === WATER_KIND
     }
   }
 }
