@@ -34,59 +34,60 @@ const PLATE_FONT = 'BIG'
 const AUTHORED_HEIGHT = 480
 
 /**
- * The clock: `clock01|clock02` over `clock03|clock04`, and the two digit
- * windows inside the lower half. The window positions are measured off the
- * assembled art (the dark recesses run x 38..61 and 64..87, and a digit tile
- * is 24 wide), not guessed.
- */
-const CLOCK = {
-  width: 128,
-  height: 92,
-  digits: { x: 38, y: 39, step: 26 },
-  margin: { right: 16, bottom: 8 }
-}
-
-/**
- * The angle dial and the weapon slot, one widget in the top-right corner —
- * the pieces named by play, not by the archive's order:
+ * Every number the dashboard is placed by, in one object — and a LIVE one:
+ * `pow.hud.layout` in the devtools console is this, so a piece can be nudged
+ * a pixel at a time against the real screen instead of through a rebuild.
+ * `pow.hud.print()` writes it back out to paste in here.
  *
- * - the DIAL is `ang1` over `ang3`, a beaded arc with the needle's spindle
- *   down its right edge, and `angpoint` the needle turning on it;
- * - its FACE is `wedge1` and `wedge2`, two 45° fans that mirror into the
- *   four quadrants of a half-disc — white in the file, painted a
- *   see-through green;
- * - the SLOT is `ang2` over `ang4` with `ang5` capping its right end.
+ * All of it is in the 640×480 units the art was drawn in.
+ *
+ * - CLOCK: `clock01|clock02` over `clock03|clock04`, and the two digit
+ *   windows inside the lower half — those positions are measured off the
+ *   assembled art (the dark recesses run x 38..61 and 64..87, a digit tile
+ *   being 24 wide), not guessed.
+ * - DIAL: `ang1` over `ang3` is the beaded arc with the needle's spindle
+ *   down its right edge and `angpoint` turning on it; the face is `wedge1`
+ *   and `wedge2`, two 45° fans mirrored into a half-disc, white in the file
+ *   and painted a see-through green; the slot is `ang2` over `ang4` — they
+ *   OVERLAP by seven rows of plain black, which is what closes their rim
+ *   into a ring — with `ang5` capping its right end.
+ * - PLATE: the name over a pig, the health under it beside a heart. The
+ *   heart is a 10×11 map marker standing next to letters 32 tall, so it is
+ *   drawn at twice its size; it and the fans ship WHITE for the game to
+ *   paint, and both colours here are matched to play rather than measured.
  */
-const DIAL = {
-  width: 152,
-  height: 121,
-  margin: { right: 12, top: 12 },
-  /** Where the needle turns, and where every fan has its point. */
-  hub: { x: 60, y: 64 },
-  arc: { top: 0, bottom: 64 },
-  /** The slot's two tiles overlap by seven rows — of plain black, which is
-   * why nothing in the art shows where — and that is what closes their
-   * brass rim into a ring. The cap rides with the bottom half. */
-  slot: { x: 64, top: 23, bottom: 62, cap: { x: 128, y: 28 } }
+export const LAYOUT = {
+  clock: {
+    width: 128,
+    height: 92,
+    digits: { x: 38, y: 39, step: 26 },
+    margin: { right: 16, bottom: 8 }
+  },
+  dial: {
+    width: 152,
+    height: 121,
+    margin: { right: 12, top: 12 },
+    /** Where the needle turns, and where every fan has its point. */
+    hub: { x: 60, y: 64 },
+    arc: { top: 0, bottom: 64 },
+    slot: { x: 64, top: 23, bottom: 62, cap: { x: 128, y: 28 } },
+    green: [104, 168, 72] as [number, number, number],
+    /** How much of the battle shows through that green. */
+    alpha: 0.5
+  },
+  plate: {
+    /** Seconds a pig must have stood still before its name comes back. */
+    delay: 2,
+    /** Between the name and the health line under it. */
+    gap: 2,
+    /** How far the name floats over the pig's own position, in GAME units. */
+    lift: 900,
+    heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
+  }
 }
 
-/** The green the dial's face is painted, and how much of the battle shows
- * through it. The fans ship WHITE, like the map's markers, so the colour is
- * the game's to choose — this one is matched to play. */
-const DIAL_GREEN: [number, number, number] = [104, 168, 72]
-const DIAL_ALPHA = 0.5
-/** The heart beside a pig's health, painted the same way. */
-const HEART_PINK: [number, number, number] = [248, 64, 152]
-/** The map's heart is a 10×11 marker; over a pig it stands beside letters
- * twice that tall, and is drawn twice the size to match them. */
-const HEART_SCALE = 2
-
-/** How long a pig must have stood still before its name comes back. */
-export const PLATE_DELAY = 2
-/** The gap between a pig's name and the health line under it. */
-const PLATE_GAP = 2
-/** How far the name floats over the pig's own position, in game units. */
-export const PLATE_HEIGHT = 900
+/** What the specs wait for; the console tweaks `LAYOUT.plate.delay`. */
+export const PLATE_DELAY = LAYOUT.plate.delay
 
 export interface PigPlate {
   /** Screen position of the point the name hangs over, in CSS pixels. */
@@ -114,13 +115,52 @@ export interface Hud {
   clear(): void
 }
 
+/**
+ * The console IS the layout editor — there is no UI for it, the same way
+ * `pow.swapMap` is how a map is changed:
+ *
+ *     pow.hud.layout.dial.slot.bottom -= 1   // nudge, watch, repeat
+ *     pow.hud.layout.dial.green = [90, 150, 60]
+ *     pow.hud.print()                        // paste that back into hud.ts
+ *
+ * Every number is in the 640×480 units the art was drawn in, so what is
+ * printed is what the source says, whatever the window size.
+ */
+function offerLayout(): void {
+  // `window.pow` is the controller module's, made when it loads; this only
+  // hangs the layout off it, so nothing here touches `window` until a HUD is
+  // actually built (the pure specs import this file under node).
+  if (!window.pow) return
+  window.pow.hud = {
+    layout: LAYOUT,
+    print() {
+      console.log(JSON.stringify(LAYOUT, null, 2))
+      return LAYOUT
+    }
+  }
+}
+
 export function createHud(canvas: HTMLCanvasElement): Hud {
+  offerLayout()
   let art: SpriteSet | null = null
   let font: Font | null = null
   let digits: Sprite[] = []
   let fans: Sprite[] = []
   let heart: Sprite | null = null
   let loaded = false
+  /** Which colours the tints were baked with, so a console change to them
+   * repaints instead of being quietly ignored. */
+  let painted = ''
+  let white: { fans: Sprite[]; heart: Sprite } | null = null
+
+  const repaint = async (): Promise<void> => {
+    if (!white) return
+    const wanted = JSON.stringify([LAYOUT.dial.green, LAYOUT.plate.heart.colour])
+    if (wanted === painted) return
+    painted = wanted
+    fans = await Promise.all(white.fans.map((wedge) => tinted(wedge, LAYOUT.dial.green)))
+    heart = await tinted(white.heart, LAYOUT.plate.heart.colour)
+  }
 
   const resize = (): boolean => {
     const width = Math.round(canvas.clientWidth)
@@ -145,10 +185,11 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         art = dashboard
         font = big
         digits = art.frames('timer', 0, 9)
-        fans = await Promise.all(
-          ['wedge1', 'wedge2'].map((name) => tinted(dashboard.get(name), DIAL_GREEN))
-        )
-        heart = await tinted(markers.get('iconhart'), HEART_PINK)
+        white = {
+          fans: [dashboard.get('wedge1'), dashboard.get('wedge2')],
+          heart: markers.get('iconhart')
+        }
+        await repaint()
         loaded = true
       } catch (error) {
         // A stripped install has no dashboard. Warn rather than error: the
@@ -169,6 +210,10 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       context.clearRect(0, 0, canvas.width, canvas.height)
       if (!art || !font || !heart || fans.length === 0) return
       context.imageSmoothingEnabled = false
+      // A console change to either painted colour lands on the next frame.
+      void repaint()
+
+      const { clock: CLOCK, dial: DIAL, plate: PLATE } = LAYOUT
 
       const scale = canvas.height / AUTHORED_HEIGHT
       const viewWidth = canvas.width / scale
@@ -204,7 +249,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       context.save()
       context.scale(scale, scale)
       context.translate(dialX + DIAL.hub.x, dialY + DIAL.hub.y)
-      context.globalAlpha = DIAL_ALPHA
+      context.globalAlpha = DIAL.alpha
       for (const half of [1, -1]) {
         context.save()
         context.scale(1, half)
@@ -224,21 +269,24 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       // A pig's name, and its health beside a heart under it — once it has
       // stood still long enough. Drawn in the widget's own units, with the
       // scene's screen positions brought back into them.
-      if (state.still < PLATE_DELAY) return
+      if (state.still < PLATE.delay) return
       const line = font.height
       const gap = font.measure(' ')
       context.save()
       context.scale(scale, scale)
-      const heartSize = { width: heart.width * HEART_SCALE, height: heart.height * HEART_SCALE }
+      const heartSize = {
+        width: heart.width * PLATE.heart.scale,
+        height: heart.height * PLATE.heart.scale
+      }
       for (const plate of state.pigs) {
         const at = { x: plate.x / scale, y: plate.y / scale }
         const health = String(plate.health)
         const healthWidth = heartSize.width + gap + font.measure(health)
-        const top = at.y - line * 2 - PLATE_GAP
+        const top = at.y - line * 2 - PLATE.gap
         if (top < 0 || at.y > canvas.height / scale) continue
         font.draw(context, plate.name, Math.round(at.x - font.measure(plate.name) / 2), Math.round(top))
         const healthLeft = Math.round(at.x - healthWidth / 2)
-        const healthTop = Math.round(top + line + PLATE_GAP)
+        const healthTop = Math.round(top + line + PLATE.gap)
         context.drawImage(
           heart.image,
           healthLeft,

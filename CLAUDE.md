@@ -246,6 +246,13 @@ resolution, scaled by the window's height against the 480 the art was drawn
 for, and anchored to the view's own edges — a wide window is wider than 640
 of those units.
 
+**Every number it is placed by is one live object, `LAYOUT` in `ui/hud.ts`,
+and the console is its editor**: `pow.hud.layout.dial.slot.bottom -= 1`
+nudges a piece against the real screen and `pow.hud.print()` writes the lot
+back out to paste in. Placing this art is eyework — it took four rounds of
+"almost, seven pixels up" to seat the weapon slot — so do that in the
+console and commit the result, rather than rebuilding per pixel.
+
 Squads are fielded from the map's OWN spawn markers — position,
 facing, side and CLASS, each class dressed from its own model in
 `Chars/british.mad` — so LIBERATE puts a saboteur, a hero and three grunts

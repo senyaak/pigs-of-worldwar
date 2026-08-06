@@ -44,6 +44,16 @@ Every one of these is a named action in
 [src/renderer/src/input/controller.ts](src/renderer/src/input/controller.ts);
 keys, on-screen buttons and the e2e suite all go through it.
 
+The dashboard's layout can be nudged live from the devtools console
+(`Ctrl+Shift+I`) — every number is in the 640×480 units the art was drawn
+in, so what you print is what the source says:
+
+```js
+pow.hud.layout.dial.slot.bottom -= 1      // move a piece, watch, repeat
+pow.hud.layout.dial.green = [90, 150, 60] // repaints on the next frame
+pow.hud.print()                           // paste that into ui/hud.ts
+```
+
 The battle opens on CAMP. To play another map, open the devtools console
 (`Ctrl+Shift+I`) and type `pow.swapMap('ARTGUN')` — the battle restarts
 there with fresh spawns. `pow.swapMap()` with no argument lists every map

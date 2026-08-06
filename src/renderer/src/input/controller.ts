@@ -150,6 +150,9 @@ declare global {
        * bars say. The frontend draws on a canvas, so this is how a spec
        * reads it (docs/testing.md). */
       menu?: { selected(): number; labels(): string[] }
+      /** The dashboard's layout, live: nudge a piece in the console and
+       * `print()` it back out to paste into ui/hud.ts. */
+      hud?: { layout: unknown; print(): unknown }
       /** Console command: restart the battle on another map —
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
       swapMap?(name?: string): Promise<boolean>

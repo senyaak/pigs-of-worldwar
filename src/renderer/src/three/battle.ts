@@ -30,7 +30,7 @@ import { buildPig } from './pig'
 import type { Pig as PigMesh } from './pig'
 import { createPlayer } from './clips'
 import type { Player as ClipPlayer } from './clips'
-import { PLATE_HEIGHT } from '../ui/hud'
+import { LAYOUT as HUD } from '../ui/hud'
 import type { PigPlate } from '../ui/hud'
 import type { SceneHost } from './scene'
 import { controller } from '../input/controller'
@@ -435,7 +435,7 @@ export function buildBattle(
         if (entry.pig.health <= 0) continue
         entry.node.getWorldPosition(at)
         // World space is Y-up, so the plate hangs above by ADDING to y.
-        at.y += PLATE_HEIGHT
+        at.y += HUD.plate.lift
         at.project(host.camera)
         if (at.z > 1) continue // behind the camera
         out.push({
