@@ -40,13 +40,62 @@ import type { TerrainQuery } from './terrain'
  * agreeing — the same per-texel verdict the rest of the water reads.
  */
 export const SWIM_SPEED = fromExeSpeed(16)
-export const TURN_SPEED = 2.6 // radians per second
+/**
+ * Turning, radians a second. The input handler ramps an accumulator at
+ * pig+0x304 by 4 a frame up to a cap of 0x20 (0x4929de sets the step,
+ * 0x492bf5 the cap) and `Pig::Turn` (0x46af30) scales it by nothing, so the
+ * top rate is 32/4096 of a circle a logic frame — 84 degrees a second. The
+ * ramp itself is not modelled: eight frames to reach the cap is a tenth of
+ * a second, and holding a key past that is the whole of turning.
+ */
+export const TURN_SPEED = ((0x20 / 4096) * 2 * Math.PI) / FRAME_SECONDS
 /** How deep a swimming pig sits below the surface (game Y-down: +down) —
  * deep enough that only the head and shoulders clear the water. */
 export const SWIM_SINK = 280
-/** Jump ballistics, game Y-down: negative velocity is upward. */
-export const JUMP_VELOCITY = -1500
-export const GRAVITY = 5000
+
+/**
+ * FALLING — and the original's pull is a terminal velocity, not a constant.
+ *
+ * A falling pig is a body in the engine's own physics world: `StartFalling`
+ * (0x4707f0) sets the launch velocity and hands it over, and the integrator
+ * (0x410de0) does `v -= v/128; a = F/m; p += v; v += a` once a logic frame.
+ * The world builds three force generators (0x414f50) and `0x4aa0d0` picks by
+ * type — and `Pig` is type 0x1357, which gets the SECOND: `(target - v)/32`
+ * a frame towards 320 down, not the flat 10 the other bodies get.
+ *
+ * At rest the two agree exactly — 320/32 is 10 a frame squared either way,
+ * so the first tenth of a second of every fall is the same. What the pig's
+ * one adds is a cap, and the same 32-frame bleed on the HORIZONTAL, which is
+ * why a pig thrown off a cliff stops travelling long before it lands.
+ */
+export const TERMINAL_FALL = fromExeSpeed(320)
+/** The falling force's time constant, and the integrator's own drag. */
+export const FALL_TAU = 32 * FRAME_SECONDS
+export const DRAG_TAU = 128 * FRAME_SECONDS
+/** The pull from rest, which is what a plain gravity would have been. */
+export const GRAVITY = TERMINAL_FALL / FALL_TAU
+
+/**
+ * JUMPING, game Y-down: negative velocity is upward.
+ *
+ * `TryJump` only raises an intent bit; the launch is in the walking
+ * dispatcher (0x46c199), and it is VERTICAL — pitch 0x400 of 0x1000, at
+ * `|nDist|/2 + 0x30` a frame. So a standing hop leaves at 48 and a running
+ * one at 74, and neither carries any forward speed out of the ground.
+ *
+ * Forward is a SECOND impulse: three frames into the fall the pig update
+ * adds 0x30 a frame along the facing (0x46e943). That delay is what gives
+ * the original's jump its shape — up first, then out.
+ *
+ * Not modelled: the standing hop's wind-up. The exe plays clip 8 and only
+ * calls `StartFalling` when that clip runs out (0x46e8e2), so its standing
+ * jump begins a few frames late; ours leaves at once.
+ */
+export const JUMP_SPEED = fromExeSpeed(0x30)
+export const JUMP_PUSH = fromExeSpeed(0x30)
+export const JUMP_PUSH_DELAY = 3 * FRAME_SECONDS
+/** The launch, for a pig whose walking step this frame is `stride`. */
+export const jumpVelocity = (stride: number): number => -(JUMP_SPEED + Math.abs(stride) / 2)
 /** The eject's launch speed: the exe's 0x20 per logic frame. */
 export const EJECT_SPEED = fromExeSpeed(0x20)
 /**
@@ -92,6 +141,10 @@ export interface Airborne {
   vz: number
   /** Riding out an impact rather than jumping. */
   bouncing: boolean
+  /** Seconds until the jump's forward impulse, or null when there is none
+   * left to spend. Only a jump sets it; a fall off a ledge keeps its walking
+   * speed instead and an eject was already launched outward. */
+  pushIn: number | null
   /** Thrown out of a wall — wears the EJECTED clip until it lands. */
   ejected?: boolean
 }
@@ -196,10 +249,27 @@ export function updateLocomotion(
 function fly(state: LocomotionState, query: TerrainQuery, delta: number): void {
   const a = state.airborne as Airborne
   state.clip = a.ejected ? ANIM.EJECTED : a.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE
+  // The jump's forward half, three frames in.
+  if (a.pushIn !== null) {
+    a.pushIn -= delta
+    // Half a step of slack: the delay is a whole number of frames, and
+    // subtracting one of them three times does not land on zero.
+    if (a.pushIn < delta / 2) {
+      a.vx += Math.sin(state.heading) * JUMP_PUSH
+      a.vz += Math.cos(state.heading) * JUMP_PUSH
+      a.pushIn = null
+    }
+  }
   const to = clampToWorld(state.x + a.vx * delta, state.z + a.vz * delta)
   state.x = to.x
   state.z = to.z
-  a.vy += GRAVITY * delta
+  // Towards the terminal velocity rather than away from rest, with the
+  // integrator's own drag on top — and the horizontal bleeds by the same
+  // two, because the force's target has no sideways component.
+  a.vy += ((TERMINAL_FALL - a.vy) / FALL_TAU - a.vy / DRAG_TAU) * delta
+  const bleed = Math.max(0, 1 - delta * (1 / FALL_TAU + 1 / DRAG_TAU))
+  a.vx *= bleed
+  a.vz *= bleed
   const y = state.y + a.vy * delta
   const floor = restingY(query, state.x, state.z)
   if (!(a.vy > 0 && y >= floor)) {
@@ -252,12 +322,13 @@ function ground(
     // refuses it from inside a wall — the jump-ladder up a cliff face is
     // the original's own rule, not an invention. And it costs a cooldown.
     state.airborne = {
-      vy: JUMP_VELOCITY,
-      // Forwards at the WALKING speed whichever key is held: the hop is
-      // committed, and the exe's backward clamp never reaches it.
-      vx: forwardX * WALK_SPEED,
-      vz: forwardZ * WALK_SPEED,
-      bouncing: false
+      // Straight up, faster the faster the pig was going — and forwards
+      // only once JUMP_PUSH_DELAY is up.
+      vy: jumpVelocity(intent.walk === 0 ? 0 : speed),
+      vx: 0,
+      vz: 0,
+      bouncing: false,
+      pushIn: JUMP_PUSH_DELAY
     }
     state.jumpReadyIn = JUMP_COOLDOWN_SECONDS
     state.clip = ANIM.JUMP_MIDDLE
@@ -277,7 +348,8 @@ function ground(
         vy: 0,
         vx: forwardX * intent.walk * speed * FALL_SPEED_FACTOR,
         vz: forwardZ * intent.walk * speed * FALL_SPEED_FACTOR,
-        bouncing: false
+        bouncing: false,
+        pushIn: null
       }
       state.clip = ANIM.JUMP_MIDDLE
       return
@@ -363,6 +435,7 @@ function eject(state: LocomotionState, query: TerrainQuery): void {
     vz: Math.cos(state.heading) * out,
     vy: -Math.sin(EJECT_PITCH) * EJECT_SPEED,
     bouncing: true,
+    pushIn: null,
     ejected: true
   }
   state.clip = ANIM.EJECTED

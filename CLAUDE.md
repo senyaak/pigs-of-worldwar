@@ -207,7 +207,12 @@ grants only the step-up envelope, scrapes past it, and a pig inside one
 never lands — the wedge counter throws it out downhill; each terrain type
 carries its own friction and restitution, and masked type 11 is the one
 that plays the Scramble clip in every band; a landing is binary at an
-impact of 25 a frame; a jump is committed, forward, and costs 15 frames.
+impact of 25 a frame; a jump is committed, costs 15 frames, and leaves the
+ground STRAIGHT UP — the forward half is a separate impulse three frames
+later. Falling is not a constant pull either: a pig is body type 0x1357,
+which the engine gives a `(320 - v)/32` force a frame, so it starts at the
+same 10 a frame squared a plain gravity would and then caps — and the same
+32 frames bleed its horizontal away.
 The walking SPEEDS are its own too — every input asks for a flat 64 units a
 frame, `Pig::Walk` grants the class's thirteen sixteenths of it (52 for a
 grunt) and half that backwards, water caps the step at 16 — so the one
@@ -229,11 +234,12 @@ draws what it says.
 - **Contact softening is not modelled.** The original lets a body penetrate
   and pushes it out by a decaying bias (0.2 → 0.02); a landing here pins to
   the ground height, so there is nothing to decay. `BOUNCE_CUTOFF` stands in.
-- **Gravity and turn rate are still hand-tuned.** Gravity is behind the
-  integrator at `warhogs_.exe` 0x4707f0, unread. The turn rate IS decoded —
-  the input handler ramps an accumulator by 4 a frame to a cap of 32/4096 of
-  a circle, so 1.473 rad/s at 30 Hz against the 2.6 here — but applying it
-  has not been played yet, so `TURN_SPEED` stands until it is.
+- **The turn ramp is not modelled.** The original accelerates a turn over
+  eight frames to the 32/4096-of-a-circle cap that `TURN_SPEED` now is;
+  here the cap applies from the first frame. A tenth of a second.
+- **The jump's wind-up is not modelled.** The exe's standing hop plays clip
+  8 and only launches when that clip runs out (0x46e8e2); ours leaves the
+  ground on the frame the key is pressed.
 - **Open water is punched, where the original blends it.** The library
   punches water texels only out of MIXED art (kind 1); a kind-2 tile keeps
   its texture and is drawn translucent over the water. `three/terrain.ts`

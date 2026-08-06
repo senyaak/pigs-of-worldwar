@@ -24,7 +24,10 @@ import { test, expect } from '@playwright/test'
 import {
   ANIM,
   EJECT_SPEED,
-  JUMP_VELOCITY,
+  GRAVITY,
+  JUMP_PUSH,
+  JUMP_PUSH_DELAY,
+  JUMP_SPEED,
   SWIM_SINK,
   SWIM_SPEED,
   WALL_CLIMB,
@@ -174,7 +177,7 @@ test('a landing inside a wall never rests — the pig stays a body until it is o
   // counter eventually throws the pig — a pig left in a wall is unplayable.
   const allWall = terrain(() => 0, () => ({ type: 0x80, slip: 0 }))
   const s = createLocomotion(allWall, 0, 0, NORTH)
-  s.airborne = { vx: 0, vy: 2000, vz: 0, bouncing: false }
+  s.airborne = { vx: 0, vy: 2000, vz: 0, bouncing: false, pushIn: null }
   s.y = allWall.height(0, 0) - 800
   let ejected = false
   const frames = Math.round(3 / FRAME_SECONDS)
@@ -193,15 +196,26 @@ test('wedged, the pig grows bouncier; free, it recovers only on landing', () => 
   expect(s.bounciness.restitution).toBeGreaterThan(RESTITUTION_FREE)
 })
 
-test('a jump is committed, forward, and cooled down', () => {
+test('a jump leaves straight UP, and pushes forward three frames later', () => {
+  // The exe's launch (0x46c199) is pitch 0x400 — vertical, at |nDist|/2 +
+  // 0x30 — and the forward half is a separate impulse the pig update adds on
+  // the third frame of the fall (0x46e943). Standing still, that is 48 up
+  // and then 48 out; running, 74 up and the same 48 out.
   const flat = terrain(() => 0)
   const s = createLocomotion(flat, 0, 0, NORTH)
   updateLocomotion(s, flat, { walk: 0, turn: 0, jump: true }, FRAME_SECONDS)
   expect(s.airborne).not.toBeNull()
-  expect(s.airborne!.vy).toBe(JUMP_VELOCITY)
-  expect(s.airborne!.vz).toBeCloseTo(WALK_SPEED)
+  expect(s.airborne!.vy).toBeCloseTo(-JUMP_SPEED)
+  expect(s.airborne!.vz, 'no forward speed out of the ground').toBe(0)
   expect(s.clip).toBe(ANIM.JUMP_MIDDLE)
   expect(s.jumpReadyIn).toBeGreaterThan(0)
+
+  // Two more frames and it is still going straight up; the third pushes.
+  run(s, flat, {}, JUMP_PUSH_DELAY - FRAME_SECONDS)
+  expect(s.airborne!.vz).toBe(0)
+  run(s, flat, {}, FRAME_SECONDS)
+  expect(s.airborne!.vz, 'the delayed push, less one frame of bleed').toBeGreaterThan(JUMP_PUSH * 0.9)
+  expect(s.airborne!.vz).toBeLessThanOrEqual(JUMP_PUSH)
 
   // Landing comes back to rest on open ground, and the cooldown gates the
   // next hop: not before it has run out, then freely.
@@ -214,6 +228,49 @@ test('a jump is committed, forward, and cooled down', () => {
   run(s, flat, {}, 1)
   updateLocomotion(s, flat, { walk: 0, turn: 0, jump: true }, FRAME_SECONDS)
   expect(s.airborne, 'recharged').not.toBeNull()
+})
+
+test('a running jump leaves faster, by half its walking step', () => {
+  const flat = terrain(() => 0)
+  const s = createLocomotion(flat, 0, 0, NORTH)
+  updateLocomotion(s, flat, { walk: 1, turn: 0, jump: true }, FRAME_SECONDS)
+  expect(s.airborne!.vy).toBeCloseTo(-(JUMP_SPEED + WALK_SPEED / 2))
+  const back = createLocomotion(flat, 0, 0, NORTH)
+  updateLocomotion(back, flat, { walk: -1, turn: 0, jump: true }, FRAME_SECONDS)
+  expect(back.airborne!.vy).toBeCloseTo(-(JUMP_SPEED + WALK_BACK_SPEED / 2))
+})
+
+test('falling pulls at GRAVITY from rest and stops accelerating at the cap', () => {
+  // The pig's force generator is `(320 - v)/32` a frame, not a constant: at
+  // rest that is exactly the flat gravity every other body gets, and far
+  // enough down it is nothing at all.
+  // Game space is Y-down, so a long fall means starting far ABOVE flat
+  // ground: a smaller y.
+  const flat = terrain(() => 0)
+  const s = createLocomotion(flat, 0, 0, NORTH)
+  s.y = -400_000
+  s.airborne = { vx: 0, vy: 0, vz: 0, bouncing: false, pushIn: null }
+  updateLocomotion(s, flat, { walk: 0, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(s.airborne!.vy, 'the first frame is plain gravity').toBeCloseTo(GRAVITY * FRAME_SECONDS)
+  run(s, flat, {}, 10)
+  const terminal = s.airborne!.vy
+  expect(terminal, 'well short of a constant pull for ten seconds').toBeLessThan(GRAVITY * 2)
+  run(s, flat, {}, 5)
+  expect(s.airborne!.vy, 'settled').toBeCloseTo(terminal, -1)
+  expect(s.airborne, 'still falling').not.toBeNull()
+})
+
+test('the horizontal bleeds while the fall does not', () => {
+  // The force's target has no sideways part, so the same 32 frames that cap
+  // the fall drag the travel to nothing — a pig thrown off a cliff stops
+  // going anywhere long before it lands.
+  const flat = terrain(() => 0)
+  const s = createLocomotion(flat, 0, 0, NORTH)
+  s.y = -400_000
+  s.airborne = { vx: 0, vy: 0, vz: 3000, bouncing: false, pushIn: null }
+  run(s, flat, {}, 1)
+  expect(s.airborne!.vz).toBeLessThan(3000 * 0.5)
+  expect(s.airborne!.vz).toBeGreaterThan(0)
 })
 
 test('no jump out of a wall — the ladder is closed', () => {
