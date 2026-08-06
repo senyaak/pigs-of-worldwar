@@ -129,6 +129,19 @@ export type LoadMapObjectsResult =
   | { ok: true; objects: MapObject[]; props: MapProp[]; textures: Texture[] }
   | { ok: false; error: string }
 
+export interface SoundEntry {
+  id: number
+  path: string
+  /** Base name, upper-cased: `FT_GRASS`. */
+  name: string
+}
+
+export type LoadSoundBankResult =
+  | { ok: true; bank: { name: string; entries: SoundEntry[] } }
+  | { ok: false; error: string }
+
+export type LoadSoundResult = { ok: true; data: Uint8Array } | { ok: false; error: string }
+
 export interface Api {
   getGameDir(): Promise<string | null>
   selectGameDir(): Promise<string | null>
@@ -139,6 +152,8 @@ export interface Api {
   loadClips(relPath: string): Promise<LoadClipsResult>
   loadTerrain(relPath: string): Promise<LoadTerrainResult>
   loadMapObjects(relPath: string): Promise<LoadMapObjectsResult>
+  loadSoundBank(relPath: string): Promise<LoadSoundBankResult>
+  loadSound(relPath: string): Promise<LoadSoundResult>
   loadFrontendImage(entryName: string): Promise<FrontendImageResult>
   quit(): Promise<void>
 }

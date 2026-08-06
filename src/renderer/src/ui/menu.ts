@@ -3,6 +3,14 @@
 // New Game, Asset Viewer (the debug browsers), Exit.
 
 import { byId } from './dom'
+import { SILENT, loadBank } from '../audio/bank'
+import type { Bank } from '../audio/bank'
+
+/** The frontend's own bank — 27 sounds, the menu's clicks among them. */
+const FRONTEND_SOUNDS = 'FESounds/Fesounds.srl'
+/** What a menu button says when pressed. Chosen by name out of that bank;
+ * which index the original uses where is not decoded. */
+const CLICK = 'CLICK5'
 
 export interface Menu {
   /** Decode and paint the background; safe to call once per session. */
@@ -14,14 +22,20 @@ export function initMenu(handlers: {
   onAssets: () => void
 }): Menu {
   const canvas = byId<HTMLCanvasElement>('menu-bg')
-  byId<HTMLButtonElement>('menu-new-game').addEventListener('click', handlers.onNewGame)
-  byId<HTMLButtonElement>('menu-assets').addEventListener('click', handlers.onAssets)
-  byId<HTMLButtonElement>('menu-exit').addEventListener('click', () => void window.api.quit())
+  let bank: Bank = SILENT
+  const press = (run: () => void) => (): void => {
+    bank.play(CLICK)
+    run()
+  }
+  byId<HTMLButtonElement>('menu-new-game').addEventListener('click', press(handlers.onNewGame))
+  byId<HTMLButtonElement>('menu-assets').addEventListener('click', press(handlers.onAssets))
+  byId<HTMLButtonElement>('menu-exit').addEventListener('click', press(() => void window.api.quit()))
 
   let loaded = false
   return {
     async load() {
       if (loaded) return
+      bank = await loadBank(FRONTEND_SOUNDS)
       const result = await window.api.loadFrontendImage('pigbkpc1.mgl')
       if (!result.ok) {
         // A missing FEBMP.MAD (stripped/fake install) is not fatal — the

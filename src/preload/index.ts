@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('terrain:load', relPath),
   loadMapObjects: (relPath: string): Promise<unknown> =>
     ipcRenderer.invoke('mapObjects:load', relPath),
+  loadSoundBank: (relPath: string): Promise<unknown> =>
+    ipcRenderer.invoke('sound:bank', relPath),
+  loadSound: (relPath: string): Promise<unknown> => ipcRenderer.invoke('sound:load', relPath),
   loadFrontendImage: (entryName: string): Promise<unknown> =>
     ipcRenderer.invoke('frontend:image', entryName),
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit')

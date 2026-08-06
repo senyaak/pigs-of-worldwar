@@ -22,6 +22,8 @@ import type { TerrainBlock } from '../lib/formats/pmg'
 import { parsePog } from '../lib/formats/pog'
 import type { MapObject } from '../lib/formats/pog'
 import { parsePtg } from '../lib/formats/ptg'
+import { parseSrl } from '../lib/formats/srl'
+import type { SoundBank } from '../lib/formats/srl'
 
 export interface LoadedModel {
   model: Model
@@ -120,6 +122,22 @@ export async function loadTerrain(full: string): Promise<LoadedTerrain> {
   const ptgName = siblings.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.ptg`)
   const textures = ptgName ? parsePtg(await fs.readFile(path.join(dir, ptgName))) : []
   return { blocks, textures }
+}
+
+/** A sound bank (`Audio/sfxday.srl`, `FESounds/Fesounds.srl`). */
+export async function loadSoundBank(full: string): Promise<SoundBank> {
+  return parseSrl(await fs.readFile(full))
+}
+
+/**
+ * One sound file, as bytes for the renderer to decode.
+ *
+ * Everything the game ships is plain RIFF — 16-bit PCM mono at 22050 for
+ * the effects and speech, Ogg Vorbis for the music — so nothing here needs
+ * a decoder of our own; Chromium has both.
+ */
+export async function loadSound(full: string): Promise<Uint8Array> {
+  return fs.readFile(full)
 }
 
 export interface LoadedProp {

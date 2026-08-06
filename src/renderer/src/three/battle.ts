@@ -23,6 +23,9 @@ import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
 import { classArt } from './soldiers'
+import { SILENT, loadBank } from '../audio/bank'
+import { createBattleSounds } from '../audio/battle'
+import type { Bank } from '../audio/bank'
 import { buildPig } from './pig'
 import type { Pig as PigMesh } from './pig'
 import { createPlayer } from './clips'
@@ -68,6 +71,9 @@ export interface BattleScene {
 // (π had them strolling sideways like crabs; π/2 had them moonwalking).
 const PIG_HEADING_OFFSET = -Math.PI / 2
 
+/** The battle's sound bank — 99 numbered effects (lib/formats/srl.ts). */
+const GAME_SOUNDS = 'Audio/sfxday.srl'
+
 export function buildBattle(
   host: SceneHost,
   assets: BattleAssets,
@@ -95,6 +101,15 @@ export function buildBattle(
   // The same records, as things to walk into. Static for the map's life —
   // only the pigs move, and they join per frame.
   const obstacles = new ObstacleField(assets.objects)
+
+  // The battle's own sound bank, loaded beside the scene: silence until it
+  // arrives, and silence for good if the install has no Audio folder.
+  let bank: Bank = SILENT
+  let sounds = createBattleSounds(bank)
+  void loadBank(GAME_SOUNDS).then((loaded) => {
+    bank = loaded
+    sounds = createBattleSounds(bank)
+  })
 
   interface PigEntry {
     pig: Pig
@@ -243,6 +258,7 @@ export function buildBattle(
 
   const focus = (pig: Pig): void => {
     loco = createLocomotion(query, pig.position.x, pig.position.z, pig.heading)
+    sounds.reset()
     chaseWait = 0
     const ground = query.height(pig.position.x, pig.position.z)
     markerBase = new THREE.Vector3(pig.position.x, ground - 700, pig.position.z)
@@ -295,6 +311,7 @@ export function buildBattle(
     if (loco.airborne?.bouncing || loco.airborne?.ejected) chaseWait = CHASE_DELAY
     else if (intent.walk !== 0 || intent.turn !== 0) chaseWait = 0
     else chaseWait = Math.max(0, chaseWait - delta)
+    sounds.follow(loco, query.isWater(loco.x, loco.z))
     game.moveCurrentPig(loco.x, loco.z, loco.heading)
     active.node.position.set(loco.x, loco.y - active.mesh.footOffset, loco.z)
     active.node.rotation.y = loco.heading + PIG_HEADING_OFFSET
@@ -328,6 +345,9 @@ export function buildBattle(
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
       currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0,
+      /** Every sound the battle has played, in order — a spec cannot
+       * listen, so this is what it asserts on instead. */
+      sounds: () => bank.played(),
       /** The squads as they were fielded — where each pig started, what
        * class the map called it, and which art it actually wears. */
       squads: () =>
@@ -385,6 +405,7 @@ export function buildBattle(
       host.scene.remove(root)
       terrain.dispose()
       props.dispose()
+      bank.dispose()
       for (const { mesh } of pigMeshes) mesh.dispose()
       marker.geometry.dispose()
       ;(marker.material as THREE.Material).dispose()

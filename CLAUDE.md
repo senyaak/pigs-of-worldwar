@@ -160,13 +160,15 @@ gives a direction that is downhill on neither side.
 ## How the code is laid out
 
 - `src/lib/formats/` — one pure reader per format (mad, tim, mgl, bmp, model,
-  hir, mcap, pmg, ptg, pog). No fs, no Electron, no three: they take bytes.
+  hir, mcap, pmg, ptg, pog, srl). No fs, no Electron, no three: they take
+  bytes.
 - `src/lib/game/` — the rules (`Game`, `TerrainQuery`, `movement`,
   `ballistics`). Pure too, so the domain specs drive them directly.
 - `src/main/` — `index.ts` lifecycle only, `gameDir.ts` locating the install,
   `assets.ts` loading through the readers, `ipc.ts` the IPC surface.
 - `src/renderer/src/` — `ui/` one module per view, `three/` scene/pig/terrain/
-  battle/clips, `input/` the controller. `main.ts` is composition only.
+  battle/clips/props, `audio/` the sound banks, `input/` the controller.
+  `main.ts` is composition only.
 
 Keep modules small and single-purpose; that split was an explicit request.
 
@@ -252,6 +254,16 @@ The acting pig's whole frame-by-frame state machine is pure
 (`lib/game/locomotion.ts`); the battle scene only feeds it intents and
 draws what it says.
 
+**Sound is played by NAME out of the game's own bank.** `Audio/sfxday.srl`
+is a numbered list of 99 files and `FESounds/Fesounds.srl` 27 more, both
+plain text (docs/formats.md). The exe names a sound by INDEX, so anything
+decoded later drops straight in — but WHICH sound belongs to which moment is
+NOT decoded for the pig noises, and `audio/battle.ts` picks by name and says
+so. Correct those in play; the spec pins the plumbing, not the choice.
+Footsteps are deliberately not wired: they want the hoof-contact frames
+`../pigs-disasm/anim/audio-events.md` derives, and a footstep on a timer
+would be a stand-in nobody asked for.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.
@@ -295,12 +307,14 @@ draws what it says.
   the test itself, is still undecoded), so `lib/game/obstacles.ts` draws its
   own line at a box two units across — which drops grass, flowers and the
   swimming fish, each of which carries a box exactly one unit wide.
-- **A pig cannot get ONTO a bridge.** The deck sections are boxes and the
-  abutments are bodiless, so a pig walks through the abutment and is
-  stopped by the deck's underside — or walks under it where the ground is
-  low enough. How the original carries a pig up and over is not worked out;
-  the step-up envelope is 64 world units and a deck stands hundreds above
-  the bank.
+- **A pig cannot get ONTO a bridge, and the ramp is PARKED.** The deck
+  sections are boxes and the shape-kind-1 pieces are bodiless, so a pig
+  walks clean through the one it should be climbing. Play says plainly that
+  it IS a ramp you walk up — and that it only appears partway through the
+  tutorial, which is the same script the tagged records belong to. So the
+  two questions are one question, and it is deliberately left until the
+  tutorial's intro reaches that ramp: whatever raises it is what will say
+  how it is walked. Do not "fix" the collision for it before then.
 - **The map's SCRIPT is not run, so scripted objects are just there.** Field
   14 is an object kind tag, and CAMP's 23s — eight dummies and the whole
   second bridge — are the ones play remembers appearing partway through the

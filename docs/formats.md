@@ -292,6 +292,36 @@ facing the green path only under `−π/2`). Full derivation, including two
 tests that look decisive and are backwards:
 `../pigs-disasm/objects/notes.md`.
 
+## SRL — sound banks (Audio/, FESounds/)
+
+The one shipped format that is not binary: plain CRLF text, a four-line
+header then two lines per entry.
+
+```
+099            entry count
+000
+000
+AUDIO\SFXDAY   the bank's own name
+0              entry id …
+AUDIO\AMB_1D.wav       … and its file
+1
+AUDIO\AMB_2D.wav
+…
+```
+
+Three ship: `Audio/sfxday.srl` and `Audio/sfxnight.srl` — 99 entries and
+byte-identical, so the PC release has no separate night bank — and
+`FESounds/Fesounds.srl` with 27 for the frontend. It matters because the exe
+names a sound by NUMBER: this is what turns a decoded index into a file.
+
+The files themselves need no reader. Effects and speech are RIFF, 16-bit PCM
+mono at 22050; the music in `MUSIC/` is Ogg Vorbis. Chromium decodes both.
+
+The thirteen footsteps sit at ids 14-26, one per surface material (GRASS,
+ICE, LAVA, METAL, MUD, QUAG, ROCK, SAND, SNOW, STONE, SWIM, WATER, WOOD).
+WHICH terrain type picks which is not decoded — see
+`../pigs-disasm/anim/audio-events.md`.
+
 ## MGL — frontend images (FEBmps/FEBMP.MAD)
 
 Every `.mgl` entry is an LZ77+RLE-compressed **8-bit BMP**. No community

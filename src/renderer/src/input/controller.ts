@@ -110,6 +110,8 @@ export interface DebugHooks {
   currentNodeY(): number
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }
+  /** Every sound the battle has played, in order. */
+  sounds(): string[]
   /** The squads as fielded: where each pig started, the class the map gave
    * it, and the art it wears. */
   squads(): {
