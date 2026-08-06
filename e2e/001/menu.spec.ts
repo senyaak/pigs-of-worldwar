@@ -17,7 +17,7 @@ import { existsSync } from 'node:fs'
 import { PHASE_ENV, launchApp, openAssets } from '../launch'
 import { expect, test } from '../app'
 import { tap } from '../controller'
-import { choose, labels, selection, startGame } from '../menu'
+import { choose, labels, nudge, selection, startGame } from '../menu'
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
@@ -56,15 +56,22 @@ test('the menu is the original screen, in the original letters', async ({ app })
   expect(app.errors()).toEqual([])
 })
 
-test('the lit bar moves with the controller, and wraps', async ({ app }) => {
+test('the lit bar moves one at a time, and wraps', async ({ app }) => {
   const { page } = app
   expect(await selection(page)).toBe(0)
+
+  // The machine will not move again while a bar is still turning, so a
+  // second press on its heels does nothing — held keys and a mouse dragged
+  // down the column both step one bar at a time.
   await tap(page, 'menuDown')
-  expect(await selection(page)).toBe(1)
-  await tap(page, 'menuUp')
-  await tap(page, 'menuUp')
+  await tap(page, 'menuDown')
+  expect(await selection(page), 'the second press came too soon').toBe(1)
+
+  // Once it settles it takes the next one, and off the top it wraps round.
+  await nudge(page, 'menuUp')
+  await nudge(page, 'menuUp')
   expect(await selection(page), 'up from the top wraps to the bottom').toBe(3)
-  await tap(page, 'menuDown')
+  await nudge(page, 'menuDown')
   expect(await selection(page)).toBe(0)
   expect(app.errors()).toEqual([])
 })

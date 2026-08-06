@@ -64,8 +64,14 @@ const LAYOUT = {
   dial: { x: 56, y: 330 }
 }
 
-/** How long a bar takes to flip over when the selection reaches it. */
-const FLIP_SECONDS = 0.25
+/**
+ * How long a bar takes to flip over when the selection reaches it — and, the
+ * same number, how soon the next bar may be reached. The machine is not
+ * instant: a held key or a mouse dragged down the column steps one bar at a
+ * time, and the click has room to be heard instead of being cut off by the
+ * next one.
+ */
+const FLIP_SECONDS = 0.3
 /** The machine idles at this many frames a second. */
 const COG_FPS = 12
 
@@ -123,12 +129,17 @@ export function initMenu(handlers: { onNewGame: () => void; onAssets: () => void
   let visible = false
   let flipUntil = 0
   let started = 0
+  /** The bar the mouse is over, taken up as soon as the machine will move. */
+  let hovered = -1
 
-  const move = (by: number): void => {
+  /** Move one bar, unless the last one is still turning. */
+  const step = (by: number): void => {
+    const now = performance.now()
+    if (now < flipUntil) return
     const next = (selection + by + items.length) % items.length
     if (next === selection) return
     selection = next
-    flipUntil = performance.now() + FLIP_SECONDS * 1000
+    flipUntil = now + FLIP_SECONDS * 1000
     bank.play(CLICK)
   }
 
@@ -141,8 +152,8 @@ export function initMenu(handlers: { onNewGame: () => void; onAssets: () => void
 
   controller.onAction((action) => {
     if (!visible) return
-    if (action === 'menuUp') move(-1)
-    else if (action === 'menuDown') move(1)
+    if (action === 'menuUp') step(-1)
+    else if (action === 'menuDown') step(1)
     else if (action === 'menuSelect') choose()
     else if (action === 'assets') handlers.onAssets()
   })
@@ -166,9 +177,14 @@ export function initMenu(handlers: { onNewGame: () => void; onAssets: () => void
     }
     return -1
   }
+  // Where the pointer rests is remembered rather than acted on: the machine
+  // works its way there a bar at a time, so dragging down the column reads
+  // as four turns of the cog and not as one jump.
   canvas.addEventListener('mousemove', (event) => {
-    const bar = barUnder(event)
-    if (bar >= 0 && bar !== selection) move(bar - selection)
+    hovered = barUnder(event)
+  })
+  canvas.addEventListener('mouseleave', () => {
+    hovered = -1
   })
   canvas.addEventListener('click', (event) => {
     if (barUnder(event) === selection) choose()
@@ -243,6 +259,10 @@ export function initMenu(handlers: { onNewGame: () => void; onAssets: () => void
     frame = requestAnimationFrame(tick)
     if (now - painted < FRAME_MS) return
     painted = now
+    if (hovered >= 0) {
+      if (hovered === selection) hovered = -1
+      else step(hovered > selection ? 1 : -1)
+    }
     draw(now)
   }
   const run = (on: boolean): void => {

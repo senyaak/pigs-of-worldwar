@@ -29,14 +29,35 @@ export const labels = (page: Page): Promise<string[]> =>
     return pow.menu.labels()
   })
 
+/**
+ * One bar up or down. The machine refuses to move again while a bar is still
+ * turning, so this presses until the press takes — the same thing a player's
+ * finger does, and it fails fast if the bar never moves.
+ */
+export async function nudge(page: Page, action: 'menuUp' | 'menuDown'): Promise<void> {
+  const from = await selection(page)
+  await page.waitForFunction(
+    (o) => {
+      const pow = (window as unknown as {
+        pow?: { menu?: MenuHooks; controller: { tap(a: string): void } }
+      }).pow
+      if (!pow?.menu) throw new Error('the menu is not up — window.pow.menu is missing')
+      if (pow.menu.selected() !== o.from) return true
+      pow.controller.tap(o.action)
+      return false
+    },
+    { action, from },
+    { polling: 50 }
+  )
+}
+
 /** Light the bar with this label, then choose it. */
 export async function choose(page: Page, label: string): Promise<void> {
   const bars = await labels(page)
   const wanted = bars.indexOf(label)
   if (wanted < 0) throw new Error(`no menu bar says ${label} — the menu has ${bars.join(', ')}`)
-  const at = await selection(page)
-  for (let step = 0; step < Math.abs(wanted - at); step++) {
-    await tap(page, wanted > at ? 'menuDown' : 'menuUp')
+  for (let at = await selection(page); at !== wanted; at = await selection(page)) {
+    await nudge(page, wanted > at ? 'menuDown' : 'menuUp')
   }
   await tap(page, 'menuSelect')
 }
