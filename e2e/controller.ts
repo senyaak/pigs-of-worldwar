@@ -80,6 +80,8 @@ export interface HudState {
   health: number
   seconds: number
   swimming: boolean
+  /** Seconds the acting pig has stood still: what the name plates wait for. */
+  still: number
 }
 
 /**

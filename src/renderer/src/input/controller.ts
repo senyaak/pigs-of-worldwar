@@ -117,6 +117,7 @@ export interface DebugHooks {
     health: number
     seconds: number
     swimming: boolean
+    still: number
   }
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }

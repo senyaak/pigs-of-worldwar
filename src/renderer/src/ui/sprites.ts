@@ -59,6 +59,26 @@ export async function spriteSet(images: RawImage[]): Promise<SpriteSet> {
   }
 }
 
+/**
+ * The same sprite in a colour. Several pieces ship WHITE so the game can
+ * paint them — the map markers, the angle fan — so this multiplies through,
+ * keeping the shading and the alpha.
+ */
+export async function tinted(sprite: Sprite, colour: [number, number, number]): Promise<Sprite> {
+  const canvas = new OffscreenCanvas(sprite.width, sprite.height)
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('no 2d context to tint with')
+  context.drawImage(sprite.image, 0, 0)
+  const pixels = context.getImageData(0, 0, sprite.width, sprite.height)
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    for (let channel = 0; channel < 3; channel++) {
+      pixels.data[i + channel] = (pixels.data[i + channel] * colour[channel]) / 255
+    }
+  }
+  context.putImageData(pixels, 0, 0)
+  return { ...sprite, image: await createImageBitmap(canvas) }
+}
+
 /** Load the named FEBMP entries. Rejects if the archive has none of a name. */
 export async function loadSprites(names: string[]): Promise<SpriteSet> {
   const result = await window.api.loadFrontendImages(names)

@@ -222,16 +222,26 @@ anywhere (the training ground); the two unbuilt screens wear the font's dark
 shade, the way the original greys out what cannot be chosen.
 
 **The battle wears the original's brass too.** What the original keeps on
-screen the whole time — from play, not from the disassembly — is three
-things and no more: the **clock bottom right**, the **weapon and the
-direction it points top right** (empty until a weapon is chosen), and the
-**map bottom left**. Nothing floats over the pigs. Of the three, the clock
-is the only one the battle can fill yet, and it is the real one:
-`clock01..04` out of `Language/Tims/dashtims.mad` with a `timer0..9` face in
-each of its two windows. The dashboard rides on its own canvas over the 3D
-view, at native resolution, scaled by the window's height against the 480 the
-art was drawn for, and anchored to the view's own edges — a wide window is
-wider than 640 of those units.
+screen — from play, not from the disassembly:
+
+- the **clock**, bottom right: `clock01..04` out of
+  `Language/Tims/dashtims.mad` with a `timer0..9` face in each of its two
+  windows;
+- the **angle dial and the weapon slot** as ONE widget, top right, always
+  there: `ang3` over `ang1` is the beaded arc with the needle's spindle down
+  its right edge, `angpoint` the needle, `ang5`/`ang2`/`ang4` the slot — and
+  the slot stays empty until a weapon is chosen;
+- the **map**, bottom left (not built);
+- over each pig, its **name and its health beside a heart**, in the BIG
+  letters, which hide the moment the player moves and come back after two
+  seconds' rest — the heart is `iconhart` out of `MAPICONS.MTD`, which ships
+  its markers WHITE for the game to paint;
+- the **power gauge**, only when the weapon in hand asks for one.
+
+The dashboard rides on its own canvas over the 3D view, at native
+resolution, scaled by the window's height against the 480 the art was drawn
+for, and anchored to the view's own edges — a wide window is wider than 640
+of those units.
 
 Squads are fielded from the map's OWN spawn markers — position,
 facing, side and CLASS, each class dressed from its own model in
@@ -329,15 +339,17 @@ would be a stand-in nobody asked for.
   the test itself, is still undecoded), so `lib/game/obstacles.ts` draws its
   own line at a box two units across — which drops grass, flowers and the
   swimming fish, each of which carries a box exactly one unit wide.
-- **The dashboard shows only what the battle HAS.** `dashtims.mad` also
-  ships the power gauge (`newpow1..7`), the angle arc (`ang1..5`, `wedge`,
-  `angpoint`), the sights and the score panels, and `FACETIMS.MAD` the
-  weapon icons `wepn01..20` with the crosshair and pointers; none are drawn,
-  because there is no weapon for them to belong to. The two corners they
-  belong in are known and deliberately left empty.
-- **A name plate over each pig was tried and taken out.** It read well and
-  the original does not do it — the only writing on a battle screen is the
-  clock's digits. Do not put it back without play saying so.
+- **Three numbers on the dashboard are the remake's own**, and each says so
+  where it lives: the GREEN the dial's face is filled in (the archive ships
+  the beaded RIM and no disc behind it, so the face is a filled ellipse
+  matched to play), the PINK the heart is painted (its art is white), and
+  the heart's ×2 (the map's marker is 10×11 and stands beside letters 32
+  tall). Correct them against play.
+- **The power gauge and the weapon icons wait for a weapon.**
+  `newpow1..7` and `powg1` are the gauge — which the original shows only
+  when the weapon in hand needs one — and `FACETIMS.MAD`, despite the name,
+  holds `wepn01..20` with the crosshair and pointers. The slot they go in
+  is drawn and deliberately empty.
 - **The menu's LAYOUT is the remake's own.** Every piece on it is the
   original's, and where each piece SITS is not: the exe computes its screen
   coordinates in the frontend's draw code rather than storing them, and

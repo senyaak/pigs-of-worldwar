@@ -16,13 +16,14 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { startGame } from '../menu'
-import { hud, tap } from '../controller'
+import { hud, press, release, tap } from '../controller'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseTim } from '../../src/lib/formats/tim'
 import { parseTab } from '../../src/lib/formats/tab'
 import { parseBmp } from '../../src/lib/formats/bmp'
 import { parseText } from '../../src/lib/formats/text'
 import { nations } from '../../src/lib/game/teams'
+import { PLATE_DELAY } from '../../src/renderer/src/ui/hud'
 import { MAX_TEAMS } from '../../src/lib/game/spawns'
 
 const DASH = path.join(GAME_DIR, 'Language', 'Tims', 'dashtims.mad')
@@ -122,8 +123,8 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
     .poll(async () => (await painted()).colors, { message: 'the dashboard drawn' })
     .toBeGreaterThan(20)
 
-  // And it is in the bottom-right corner, where the original keeps it: every
-  // painted pixel is in that quarter and none anywhere else.
+  // The corners the original uses: the clock bottom right, the dial and its
+  // weapon slot top right, and nothing bottom left, where the map will go.
   const corners = await page.evaluate(() => {
     const canvas = document.getElementById('battle-hud') as HTMLCanvasElement
     const context = canvas.getContext('2d')!
@@ -135,19 +136,17 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
       return count
     }
     return {
-      topLeft: opaqueIn(0, 0, half.x, half.y),
       topRight: opaqueIn(half.x, 0, canvas.width - half.x, half.y),
       bottomLeft: opaqueIn(0, half.y, half.x, canvas.height - half.y),
       bottomRight: opaqueIn(half.x, half.y, canvas.width - half.x, canvas.height - half.y),
       area: canvas.width * canvas.height
     }
   })
-  expect(corners.bottomRight).toBeGreaterThan(1000)
-  expect(corners.topLeft, 'nothing top left').toBe(0)
-  expect(corners.topRight, 'the weapon panel is empty until there is a weapon').toBe(0)
+  expect(corners.bottomRight, 'the clock').toBeGreaterThan(1000)
+  expect(corners.topRight, 'the angle dial and the weapon slot').toBeGreaterThan(1000)
   expect(corners.bottomLeft, 'the map is not built yet').toBe(0)
   // An overlay, not a curtain: the battle keeps almost all of the view.
-  expect(corners.bottomRight).toBeLessThan(corners.area / 8)
+  expect(corners.bottomRight + corners.topRight).toBeLessThan(corners.area / 4)
 
   // What it says is what the game says, and the clock runs down.
   const before = await hud(page)
@@ -160,6 +159,47 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
   // Ending the turn winds it back up.
   await tap(page, 'endTurn')
   await expect.poll(async () => (await hud(page)).seconds).toBeGreaterThan(40)
+
+  expect(app.errors()).toEqual([])
+})
+
+test('a pig wears its name while it rests, and drops it while it walks', async ({ app }) => {
+  const { page } = app
+  await startGame(page)
+  await expect(page.locator('#battle')).toBeVisible()
+
+  // Everything painted, in pixels. The clock and the dial never change size
+  // — a digit tile is opaque whichever digit it shows — so anything that
+  // moves this number is the name plate coming and going.
+  const painted = (): Promise<number> =>
+    page.evaluate(() => {
+      const canvas = document.getElementById('battle-hud') as HTMLCanvasElement
+      const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
+      let count = 0
+      for (let i = 3; i < pixels.length; i += 4) if (pixels[i] !== 0) count++
+      return count
+    })
+
+  // A name in the big letters is worth thousands of pixels; the clock's
+  // digits differ by a handful as they tick, so the two never blur.
+  const NAME = 1000
+  const still = async (): Promise<number> => (await hud(page)).still
+
+  await press(page, 'walkForward')
+  await expect.poll(still, { message: 'walking resets the rest' }).toBe(0)
+  const walking = await painted()
+  await release(page, 'walkForward')
+
+  // It comes back once the pig has stood still for a moment.
+  await expect.poll(still, { message: 'the pig settles' }).toBeGreaterThan(PLATE_DELAY)
+  const resting = await painted()
+  expect(resting - walking, 'the name is up while it rests').toBeGreaterThan(NAME)
+
+  // And goes again the moment it is driven.
+  await press(page, 'walkForward')
+  await expect.poll(still).toBe(0)
+  expect(Math.abs((await painted()) - walking), 'and drops on the move').toBeLessThan(NAME)
+  await release(page, 'walkForward')
 
   expect(app.errors()).toEqual([])
 })

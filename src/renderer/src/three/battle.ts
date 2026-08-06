@@ -30,6 +30,8 @@ import { buildPig } from './pig'
 import type { Pig as PigMesh } from './pig'
 import { createPlayer } from './clips'
 import type { Player as ClipPlayer } from './clips'
+import { PLATE_HEIGHT } from '../ui/hud'
+import type { PigPlate } from '../ui/hud'
 import type { SceneHost } from './scene'
 import { controller } from '../input/controller'
 
@@ -59,6 +61,11 @@ export interface BattleAssets {
 export interface BattleScene {
   /** Point the camera at the active pig and park the marker over it. */
   focus(pig: Pig): void
+  /** Where each living pig's name hangs, in a view this big — the camera
+   * lives here, so the dashboard asks rather than guesses. */
+  plates(width: number, height: number): PigPlate[]
+  /** Seconds the acting pig has stood still: the names come back with it. */
+  still(): number
   /** Tank controls from the input layer: walk -1|0|1 (back/stop/forward),
    * turn -1|0|1 (left/stop/right). */
   setIntent(walk: number, turn: number): void
@@ -167,6 +174,9 @@ export function buildBattle(
 
   let markerBase = new THREE.Vector3()
   let time = 0
+  /** Seconds the acting pig has stood still, and where it stood. */
+  let still = 0
+  let stillAt = { x: 0, z: 0, heading: 0 }
   const intent = { walk: 0, turn: 0 }
   let jumpRequested = false
   /** The acting pig's frame-by-frame state — walking, wedged, airborne —
@@ -317,6 +327,17 @@ export function buildBattle(
     active.node.rotation.y = loco.heading + PIG_HEADING_OFFSET
     setClip(active, loco.clip)
 
+    // How long the pig has done nothing: what brings its name plate back.
+    // Being driven, being in the air or being pushed all count as moving.
+    const busy =
+      intent.walk !== 0 ||
+      intent.turn !== 0 ||
+      loco.airborne !== null ||
+      Math.hypot(loco.x - stillAt.x, loco.z - stillAt.z) > 1 ||
+      Math.abs(loco.heading - stillAt.heading) > 1e-3
+    still = busy ? 0 : still + delta
+    stillAt = { x: loco.x, z: loco.z, heading: loco.heading }
+
     // Marker and camera trail the pig every frame.
     const ground = query.height(loco.x, loco.z)
     markerBase.set(loco.x, ground - 700, loco.z)
@@ -353,7 +374,10 @@ export function buildBattle(
         pig: game.currentPig.name,
         health: game.currentPig.health,
         seconds: Math.max(0, Math.ceil(game.timeLeft)),
-        swimming: query.isWater(game.currentPig.position.x, game.currentPig.position.z)
+        swimming: query.isWater(game.currentPig.position.x, game.currentPig.position.z),
+        /** Seconds the acting pig has stood still — what the name plates
+         * wait for, and the only way a spec can tell why they are up. */
+        still
       }),
       currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0,
       /** Every sound the battle has played, in order — a spec cannot
@@ -404,6 +428,26 @@ export function buildBattle(
 
   return {
     focus,
+    plates(width, height) {
+      const at = new THREE.Vector3()
+      const out: PigPlate[] = []
+      for (const entry of pigMeshes) {
+        if (entry.pig.health <= 0) continue
+        entry.node.getWorldPosition(at)
+        // World space is Y-up, so the plate hangs above by ADDING to y.
+        at.y += PLATE_HEIGHT
+        at.project(host.camera)
+        if (at.z > 1) continue // behind the camera
+        out.push({
+          x: (at.x * 0.5 + 0.5) * width,
+          y: (-at.y * 0.5 + 0.5) * height,
+          name: entry.pig.name,
+          health: entry.pig.health
+        })
+      }
+      return out
+    },
+    still: () => still,
     setIntent(walk, turn) {
       intent.walk = walk
       intent.turn = turn

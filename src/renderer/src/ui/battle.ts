@@ -115,8 +115,12 @@ export function initBattle(onLeave: () => void): BattleView {
   let frame = 0
   const paint = (): void => {
     frame = requestAnimationFrame(paint)
-    if (!game) return
-    hud.draw({ seconds: game.timeLeft })
+    if (!game || !scene) return
+    hud.draw({
+      seconds: game.timeLeft,
+      pigs: scene.plates(hudCanvas.clientWidth, hudCanvas.clientHeight),
+      still: scene.still()
+    })
   }
 
   // The button is just another way to fire the action.
