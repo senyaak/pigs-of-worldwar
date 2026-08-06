@@ -228,9 +228,12 @@ screen — from play, not from the disassembly:
   `Language/Tims/dashtims.mad` with a `timer0..9` face in each of its two
   windows;
 - the **angle dial and the weapon slot** as ONE widget, top right, always
-  there: `ang3` over `ang1` is the beaded arc with the needle's spindle down
-  its right edge, `angpoint` the needle, `ang5`/`ang2`/`ang4` the slot — and
-  the slot stays empty until a weapon is chosen;
+  there: `ang1` over `ang3` is the beaded arc with the needle's spindle down
+  its right edge, `wedge1`/`wedge2` its see-through green face, `angpoint`
+  the needle, and `ang2`/`ang4`/`ang5` the slot beside it — empty until a
+  weapon is chosen. Which piece is which is play's answer, not the
+  archive's; the whole map is in docs/formats.md, `divide1`/`divide2` (the
+  needle's stops, which a weapon may move) and the power gauge among them;
 - the **map**, bottom left (not built);
 - over each pig, its **name and its health beside a heart**, in the BIG
   letters, which hide the moment the player moves and come back after two

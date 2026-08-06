@@ -47,26 +47,31 @@ const CLOCK = {
 }
 
 /**
- * The angle dial and the weapon slot, one widget in the top-right corner.
- * `ang3` over `ang1` is the beaded arc with the needle's spindle down its
- * right edge; `ang5` caps the slot that `ang2` over `ang4` makes; `angpoint`
- * is the needle, drawn pointing left from the spindle.
+ * The angle dial and the weapon slot, one widget in the top-right corner —
+ * the pieces named by play, not by the archive's order:
+ *
+ * - the DIAL is `ang1` over `ang3`, a beaded arc with the needle's spindle
+ *   down its right edge, and `angpoint` the needle turning on it;
+ * - its FACE is `wedge1` and `wedge2`, two 45° fans that mirror into the
+ *   four quadrants of a half-disc — white in the file, painted a
+ *   see-through green;
+ * - the SLOT is `ang2` over `ang4` with `ang5` capping its right end.
  */
 const DIAL = {
   width: 152,
   height: 121,
   margin: { right: 12, top: 12 },
-  /** Where the needle turns, inside the widget. */
-  hub: { x: 64, y: 60 },
-  /** How far the beaded rim stands off the hub — it is an ellipse, wider
-   * than it is tall, measured off the assembled arc. */
-  radius: { x: 60, y: 56 },
-  slot: { x: 88, top: 19, bottom: 65, cap: { x: 64, y: 31 } }
+  /** Where the needle turns, and where every fan has its point. */
+  hub: { x: 60, y: 64 },
+  arc: { top: 0, bottom: 64 },
+  slot: { x: 64, top: 23, bottom: 69, cap: { x: 128, y: 35 } }
 }
 
-/** The green the dial's face is filled in — matched to play, not measured
- * off any file: the archive ships the RIM and no disc behind it. */
+/** The green the dial's face is painted, and how much of the battle shows
+ * through it. The fans ship WHITE, like the map's markers, so the colour is
+ * the game's to choose — this one is matched to play. */
 const DIAL_GREEN: [number, number, number] = [104, 168, 72]
+const DIAL_ALPHA = 0.5
 /** The heart beside a pig's health, painted the same way. */
 const HEART_PINK: [number, number, number] = [248, 64, 152]
 /** The map's heart is a 10×11 marker; over a pig it stands beside letters
@@ -110,6 +115,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
   let art: SpriteSet | null = null
   let font: Font | null = null
   let digits: Sprite[] = []
+  let fans: Sprite[] = []
   let heart: Sprite | null = null
   let loaded = false
 
@@ -136,6 +142,9 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         art = dashboard
         font = big
         digits = art.frames('timer', 0, 9)
+        fans = await Promise.all(
+          ['wedge1', 'wedge2'].map((name) => tinted(dashboard.get(name), DIAL_GREEN))
+        )
         heart = await tinted(markers.get('iconhart'), HEART_PINK)
         loaded = true
       } catch (error) {
@@ -155,7 +164,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       const context = canvas.getContext('2d')
       if (!context) return
       context.clearRect(0, 0, canvas.width, canvas.height)
-      if (!art || !font || !heart) return
+      if (!art || !font || !heart || fans.length === 0) return
       context.imageSmoothingEnabled = false
 
       const scale = canvas.height / AUTHORED_HEIGHT
@@ -186,29 +195,26 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       // there is a weapon to put in it.
       const dialX = viewWidth - DIAL.width - DIAL.margin.right
       const dialY = DIAL.margin.top
-      // The dial's face is filled, not blitted: the beaded arc is a rim with
-      // nothing behind it, and the archive ships no disc to put there.
+
+      // The face first, under the rim: each fan has its point at the hub and
+      // opens left, and the pair is mirrored to fill the lower half too.
       context.save()
       context.scale(scale, scale)
-      context.beginPath()
-      context.ellipse(
-        dialX + DIAL.hub.x,
-        dialY + DIAL.hub.y,
-        DIAL.radius.x,
-        DIAL.radius.y,
-        0,
-        Math.PI / 2,
-        -Math.PI / 2
-      )
-      context.closePath()
-      context.fillStyle = `rgb(${DIAL_GREEN.join(',')})`
-      context.fill()
+      context.translate(dialX + DIAL.hub.x, dialY + DIAL.hub.y)
+      context.globalAlpha = DIAL_ALPHA
+      for (const half of [1, -1]) {
+        context.save()
+        context.scale(1, half)
+        for (const wedge of fans) context.drawImage(wedge.image, -wedge.width, -wedge.height)
+        context.restore()
+      }
       context.restore()
-      blit(art.get('ang3'), dialX, dialY)
-      blit(art.get('ang1'), dialX, dialY + 57)
-      blit(art.get('ang5'), dialX + DIAL.slot.cap.x, dialY + DIAL.slot.cap.y)
+
+      blit(art.get('ang1'), dialX, dialY + DIAL.arc.top)
+      blit(art.get('ang3'), dialX, dialY + DIAL.arc.bottom)
       blit(art.get('ang2'), dialX + DIAL.slot.x, dialY + DIAL.slot.top)
       blit(art.get('ang4'), dialX + DIAL.slot.x, dialY + DIAL.slot.bottom)
+      blit(art.get('ang5'), dialX + DIAL.slot.cap.x, dialY + DIAL.slot.cap.y)
       const needle = art.get('angpoint')
       blit(needle, dialX + DIAL.hub.x - needle.width, dialY + DIAL.hub.y - needle.height / 2)
 

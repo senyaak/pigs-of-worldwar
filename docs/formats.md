@@ -399,10 +399,18 @@ A plain named archive of TIMs — the battle's in-game furniture:
 | pieces | what it is |
 | ------ | ---------- |
 | `clock01`-`clock04`, `timer0`-`timer9` | the turn clock: two 64×28 tiles over two 64×64 ones, 128×92 assembled, with two recesses (x 38..61 and 64..87) that take a 24×25 digit each |
-| `newpow1`-`newpow7`, `powg1` | the shot's power gauge |
-| `ang1`-`ang5`, `wedge1/2`, `divide1/2`, `angpoint` | the aiming arc |
-| `sights`, `target`, `pcpie4` | the crosshair |
-| `score1/2`, `pause1`-`pause8` | the score panel and the pause spinner |
+| `ang1`, `ang3` | the angle dial's beaded arc — `ang1` the TOP half, `ang3` the bottom, with the needle's spindle down the right edge of both |
+| `wedge1`, `wedge2` | the dial's face: two 45° fans, apex at the needle's hub, mirrored into the four quadrants of a half-disc. White in the file, drawn see-through green |
+| `angpoint` | the needle, turning on that hub |
+| `divide1`, `divide2` | the STOPS: how far the needle may turn, above `divide1` and below `divide2`, and a weapon may move them — a mortar aims below the upper one |
+| `ang2`, `ang4`, `ang5` | the weapon slot beside the dial: `ang2` its top, `ang4` its bottom, `ang5` the cap on its right end |
+| `newpow3`-`newpow7` | the power gauge, five tiles of a long tube; `newpow1`/`newpow2` cap its left end and `powg1` is the marker that runs along the middle three |
+| `pcpie4` | a red button that sits over the gauge's left end on some weapons — the ones you set off yourself rather than on contact |
+| `sights`, `target` | the crosshair and its backing |
+| `score1/2`, `pause1`-`pause8`, `timlit` | the score panel, the pause spinner, and a lamp whose use is not known |
+
+The assembly and every one of those meanings comes from PLAY, piece by
+piece; the archive's order says none of it.
 
 `MAPICONS.MTD` holds the overview map (`map1`) and its markers — `iconpig`,
 `iconhart`, `iconpkup`, `iconprop`, all 10×11. `TBOXTIMS.MAD` is the
