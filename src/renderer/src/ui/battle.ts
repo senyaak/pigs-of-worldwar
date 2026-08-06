@@ -1,13 +1,14 @@
-// The battle view (phase 002): New Game lands here — ARCHI with two squads,
-// a turn HUD and an End Turn button. Assets come through the same IPCs the
-// debug viewers use; the rules live in lib/game.
+// The battle view (phase 002): New Game lands here, on the map's OWN
+// squads — a turn HUD and an End Turn button over them. Assets come through
+// the same IPCs the debug viewers use; the rules live in lib/game.
 
 import { Game } from '../../../lib/game/game'
 import type { PigSpawn } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
 import { buildWaterMask } from '../../../lib/game/watermask'
-import { playableSides } from '../../../lib/game/spawns'
+import { battleSides } from '../../../lib/game/spawns'
 import { artFor } from '../three/soldiers'
+import { existsForPlayers } from '../../../lib/formats/pog'
 import type { LoadModelResult, MapObject } from '../api'
 import { ensureScene } from '../three/scene'
 import { buildBattle } from '../three/battle'
@@ -32,7 +33,8 @@ const normalizeMap = (name: string): string =>
     .toUpperCase()
 
 // Enough names for the biggest side any shipped map fields; a squad takes
-// as many as it has spawn markers.
+// as many as its side has spawn markers, and no map is asked for more
+// sides than there are entries here.
 const SQUADS = [
   {
     name: 'Tommy’s Trotters',
@@ -43,9 +45,6 @@ const SQUADS = [
     pigNames: ['Hans', 'Fritz', 'Otto', 'Schweinrich', 'Klaus', 'Dieter', 'Wurst', 'Speck']
   }
 ]
-
-/** Pigs per side when the map names no sides of its own. */
-const FALLBACK_SQUAD = 4
 
 export interface BattleView {
   open(): Promise<boolean>
@@ -59,30 +58,22 @@ interface Squad {
 }
 
 /**
- * The two squads for a map: its OWN spawn markers where it has them, and
- * ground picked off the terrain where it does not.
+ * The squads for a map, and ONLY what the map has: one side per set of
+ * spawn markers, each pig standing on the marker that named its class.
  *
- * A skirmish arena fields four sides of five and a campaign map two, each
- * marker naming the class that stands on it — so a squad is as big as the
- * map says and dressed the way the map says. CAMP is the exception the
- * fallback exists for: one marker, because it is the training ground.
+ * A skirmish arena fields four sides of five and a campaign map two, of
+ * which the first two are taken. CAMP fields one side of one pig, because
+ * the training ground is one pig — there is no filling in, and a map that
+ * carries no markers cannot be played.
  */
-function mapSquads(objects: MapObject[], query: TerrainQuery): Squad[] {
-  const sides = playableSides(objects, SQUADS.length)
-  if (!sides) {
-    const spawns = query.pickSpawns(SQUADS.length * FALLBACK_SQUAD)
-    return SQUADS.map((squad, index) => ({
-      name: squad.name,
-      pigNames: squad.pigNames.slice(0, FALLBACK_SQUAD),
-      spawns: spawns.slice(index * FALLBACK_SQUAD, (index + 1) * FALLBACK_SQUAD)
-    }))
-  }
-  return SQUADS.map((squad, index) => {
-    const side = sides[index].slice(0, squad.pigNames.length)
+function mapSquads(objects: MapObject[]): Squad[] {
+  return battleSides(objects, SQUADS.length).map((side, index) => {
+    const squad = SQUADS[index]
+    const pigs = side.slice(0, squad.pigNames.length)
     return {
       name: squad.name,
-      pigNames: squad.pigNames.slice(0, side.length),
-      spawns: side.map((at) => ({
+      pigNames: squad.pigNames.slice(0, pigs.length),
+      spawns: pigs.map((at) => ({
         x: at.x,
         z: at.z,
         heading: at.heading,
@@ -176,11 +167,26 @@ export function initBattle(onLeave: () => void): BattleView {
 
     if (!objectsResult.ok) console.log(`${name} without its objects: ${objectsResult.error}`)
 
+    // A map does not place the same things in every game: the low byte of a
+    // record's flags says which player counts it exists in, and the battle
+    // fields as many sides as there are squads to name. BOOM is the map
+    // that shows it — one-player snipers and multiplayer grunts on the very
+    // same spots (lib/formats/pog.ts).
+    const objects = (objectsResult.ok ? objectsResult.objects : []).filter((object) =>
+      existsForPlayers(object, SQUADS.length)
+    )
+
     query = new TerrainQuery(
       terrainResult.blocks,
       buildWaterMask(terrainResult.blocks, terrainResult.textures)
     )
-    const squads = mapSquads(objectsResult.ok ? objectsResult.objects : [], query)
+    const squads = mapSquads(objects)
+    if (squads.length === 0) {
+      const error = `${name} carries no spawn markers — nothing to field`
+      if (scene) console.log(`stayed on ${map}: ${error}`)
+      else hudEl.textContent = error
+      return false
+    }
 
     // Which models to load is only known once the squads are: a map fields
     // the classes its own markers name.
@@ -214,7 +220,7 @@ export function initBattle(onLeave: () => void): BattleView {
         clips: clipsResult.ok ? clipsResult.clips : [],
         // A map without its props is still playable ground, so a failed POG
         // is reported and stepped over rather than taking the battle down.
-        objects: objectsResult.ok ? objectsResult.objects : [],
+        objects,
         props: objectsResult.ok ? objectsResult.props : [],
         propTextures: objectsResult.ok ? objectsResult.textures : []
       },

@@ -103,6 +103,13 @@ together, and shows up as every asymmetric texture facing the wrong way.
 Vertices run +x with the column AND **+z with the row**. This is also why
 `WALL_SHAPES` no longer needs the mirror it used to carry.
 
+**A map does not place the same things in every game.** The low byte of a
+record's flags word is which player counts it exists in — the loader drops
+it otherwise (exe 0x4a58cb) — and BOOM is what that is for: one side reads
+as ten pigs until the byte splits them into the campaign's five snipers and
+the skirmish's five grunts, standing on the same five spots. The battle
+filters by its own number of sides before anything else looks at the list.
+
 **The POG counts z down too, and its yaw is NEGATED.** A map's objects are
 paired to geometry in the map's own `.MAD` **by name**, their stored z is
 the file's downward one (negate it, exactly as for a block), and their
@@ -209,7 +216,9 @@ art. Squads are fielded from the map's OWN spawn markers — position,
 facing, side and CLASS, each class dressed from its own model in
 `Chars/british.mad` — so LIBERATE puts a saboteur, a hero and three grunts
 against four spies and a gunner, exactly where the original did. The battle
-scene puts two squads on CAMP (console: `pow.swapMap('ARTGUN')` — see README) with
+scene opens on CAMP — the training ground, so ONE pig — and fields real
+squads wherever a map has two sides (console: `pow.swapMap('LIBERATE')` —
+see README) with
 the original's turn clock, tank controls, jumping, swimming (water by the
 art's own translucency, floats at the region's surface, sunk SWIM_SINK),
 scrambling on
@@ -278,24 +287,24 @@ draws what it says.
   wrong. What those two grey TIMs and the DLL's under-landscape 49×49
   water grid are actually FOR is still open (play memory says a sink/kill
   layer, not the visible water).
-- **Which objects are solid is the remake's own line.** The exe's collision
-  test (0x406bb0) is still undecoded, so what is actually IN its world is
-  unknown. `lib/game/obstacles.ts` takes everything with a box at least two
-  units across — which drops grass, flowers and the swimming fish, all of
-  which carry a box exactly one unit wide — and it lets CRATES through on
-  purpose, because the original collects one by walking into it and there
-  is no pickup yet.
-- **A bridge is a box, so it is a wall.** Collision has no ramps: a sloped
-  piece gets its bounding box like everything else, and a bridge's top is
-  well past the step-up envelope, so a pig is stopped at it rather than
-  walking over. Field 11 of the POG marks all 94 bridge and step pieces and
-  nothing else, which is where a fix starts — but what the field MEANS is
-  not settled (`../pigs-disasm/objects/notes.md`).
+- **One line about solidity is still the remake's own.** The record says
+  most of it — field 11 picks the collision shape and only kind 0 is a box,
+  so every bridge and step piece is bodiless in the original too, and a
+  crate is a pickup exactly when it carries something. What the data does
+  NOT say is whether grass belongs in the collision world at all (0x406bb0,
+  the test itself, is still undecoded), so `lib/game/obstacles.ts` draws its
+  own line at a box two units across — which drops grass, flowers and the
+  swimming fish, each of which carries a box exactly one unit wide.
+- **A pig cannot get ONTO a bridge.** The deck sections are boxes and the
+  ramps are bodiless, so a pig walks through the ramp and is stopped by the
+  deck's underside — or walks under it where the ground is low enough. How
+  the original carries a pig up and over is not worked out; the step-up
+  envelope is 64 world units and a deck stands hundreds above the bank.
 - **Two sides, though a map offers up to six.** The spawn markers name six
   (FINAL uses all of them, the arenas four); the battle fields the first two
-  it finds, because there is no AI for the rest. `TerrainQuery.pickSpawns`
-  is now only the fallback for a map with fewer than two sides — which is
-  CAMP, whose single marker is the training ground's one pig.
+  it finds, because there is no AI for the rest. There is no filling in
+  either way: CAMP fields ONE side of ONE pig, because that is what the
+  training ground carries, and a map with no markers refuses to open.
 - **The wall envelope is an inference.** Whether wall geometry sits in the
   exe's collision world is still open (0x406bb0 undecoded); the remake
   builds the play-observed behaviour from the decoded step-up/sidestep

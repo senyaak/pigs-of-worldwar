@@ -45,8 +45,10 @@ function record(over: Partial<MapObject>): MapObject {
     yaw: 0,
     pitch: 0,
     roll: 0,
+    shape: 0,
     box: { x: 512, y: 512, z: 512 },
     flags: 0x13f,
+    contents: null,
     fields: new Int16Array(31),
     ...over
   }
@@ -81,10 +83,21 @@ test('what counts as solid at all', () => {
   // an eighth of the pig's own width, and scenery to walk through.
   expect(isSolid(record({ box: { x: 128, y: 256, z: 128 } }))).toBe(false)
   expect(MIN_SOLID).toBe(256)
-  // A crate is collected by walking into it, so it cannot be a blocker.
-  expect(isSolid(record({ type: 67, box: { x: 384, y: 384, z: 512 } }))).toBe(false)
+  // A crate with something in it is collected by walking into it, so it
+  // cannot be a blocker — and an EMPTY one is scenery, which is the whole
+  // difference between the crates that are picked up and the ones that are
+  // not. All 11 CRATE4s carry nothing.
+  const crate = { type: 67, box: { x: 384, y: 384, z: 512 } }
+  expect(isSolid(record({ ...crate, contents: { weapon: 51, amount: 1 } }))).toBe(false)
+  expect(isSolid(record({ ...crate, contents: { weapon: null, amount: 50 } }))).toBe(false)
+  expect(isSolid(record({ ...crate, contents: null }))).toBe(true)
   // A spawn marker is a pig, not scenery.
   expect(isSolid(record({ name: 'GR_ME', box: { x: 640, y: 640, z: 640 } }))).toBe(false)
+  // And the exe's own first word on it: shape kind 1 builds no collider at
+  // all, which is what every bridge and step piece carries.
+  expect(isSolid(record({ name: 'BRIDGE_S', shape: 1, box: { x: 1024, y: 1024, z: 1024 } }))).toBe(
+    false
+  )
 })
 
 test('a tall object refuses the step, and the pig scrapes along it', () => {

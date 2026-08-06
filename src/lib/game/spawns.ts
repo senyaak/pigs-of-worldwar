@@ -78,17 +78,16 @@ export function mapSpawns(objects: MapObject[]): SpawnPoint[] {
  * empty, and the caller falls back to picking ground itself.
  */
 /**
- * The sides a battle can actually be fielded from — the first `sides` of
- * them, each with at least two markers — or null when the map does not
- * offer that, and the caller has to find its own ground.
+ * The sides to field, at most `most` of them: whatever the map has, in bit
+ * order, and nothing else. A map with no markers comes back empty and is
+ * not a map anything can be played on.
  *
- * The training ground is the reason for the second condition: CAMP carries
- * exactly ONE marker, because it is a tutorial and not a battle. Forcing a
- * two-squad game out of it would be inventing spawns the map never had.
+ * There is no filling in. CAMP fields ONE side of ONE pig because that is
+ * what the training ground is, and a fabricated opponent would be a lie
+ * about the map.
  */
-export function playableSides(objects: MapObject[], sides = 2): SpawnPoint[][] | null {
-  const teams = spawnTeams(objects).filter((team) => team.length >= 2)
-  return teams.length >= sides ? teams.slice(0, sides) : null
+export function battleSides(objects: MapObject[], most: number): SpawnPoint[][] {
+  return spawnTeams(objects).slice(0, most)
 }
 
 export function spawnTeams(objects: MapObject[]): SpawnPoint[][] {

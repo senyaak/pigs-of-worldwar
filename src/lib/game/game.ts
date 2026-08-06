@@ -55,7 +55,9 @@ export class Game {
   private timeLeftSeconds: number
 
   constructor(config: GameConfig) {
-    if (config.players.length < 2) throw new Error('a game needs at least two players')
+    // One is allowed: the training ground fields a single pig, and the turn
+    // rotation over one player is simply that pig, turn after turn.
+    if (config.players.length < 1) throw new Error('a game needs a player')
     this.turnSeconds = config.turnSeconds ?? DEFAULT_TURN_SECONDS
     this.timeLeftSeconds = this.turnSeconds
     const pigCount = config.players.reduce((sum, p) => sum + p.pigNames.length, 0)

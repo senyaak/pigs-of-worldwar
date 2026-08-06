@@ -18,7 +18,9 @@ import { TILE_STEP, parsePmg } from '../../src/lib/formats/pmg'
 import { parsePtg } from '../../src/lib/formats/ptg'
 import { buildWaterMask } from '../../src/lib/game/watermask'
 import { TerrainQuery } from '../../src/lib/game/terrain'
-import { SWIM_SINK } from '../../src/lib/game/locomotion'
+import { parsePog } from '../../src/lib/formats/pog'
+import { ObstacleField } from '../../src/lib/game/obstacles'
+import { SWIM_SINK, WALL_CLIMB } from '../../src/lib/game/locomotion'
 
 /**
  * How far the camera holds itself ABOVE the acting pig, once it has stopped
@@ -58,25 +60,43 @@ const lowestCamera = (page: import('@playwright/test').Page, ms: number): Promis
   }, ms)
 
 /**
- * Dry, walkable ground on CAMP with SWIMMABLE water straight north of it.
+ * Dry, walkable ground on CAMP with SWIMMABLE water straight north of it —
+ * and nothing in the way of walking there.
  *
  * The mask matters here: half the map's water-flagged tiles are the frozen
  * channel, walked on rather than swum in (lib/game/watermask), so a shore
  * picked off the flag alone can march a pig clean across the ice without
  * ever floating.
+ *
+ * So do the map's OBJECTS. The first shore this used to find sits under the
+ * training ground's bridge, whose deck hangs 416 units over ground a pig is
+ * 640 tall on: the pig walked north, met the underside and stopped one step
+ * short of the water. That is the collision working, not failing — this
+ * spec is about the camera, so it picks a shore with an open walk.
  */
 function shoreOnCamp(): { x: number; z: number; query: TerrainQuery } {
   const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG')))
   const textures = parsePtg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PTG')))
   const query = new TerrainQuery(blocks, buildWaterMask(blocks, textures))
+  const objects = new ObstacleField(parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG'))))
+  /** Every step of the walk in, with room for the pig's own width. */
+  const openNorth = (x: number, z: number): boolean => {
+    for (let step = 0; step <= 6; step++) {
+      const at = z + step * TILE_STEP
+      const footY = query.height(x, at)
+      if (objects.blocks(x, at, footY, WALL_CLIMB)) return false
+    }
+    return true
+  }
   for (let x = -14000; x < 14000; x += TILE_STEP) {
     for (let z = -14000; z < 14000; z += TILE_STEP) {
       if (query.isWater(x, z) || !query.walkable(x, z)) continue
       if (!query.isWater(x, z + 3 * TILE_STEP) || !query.isWater(x, z + 5 * TILE_STEP)) continue
+      if (!openNorth(x, z)) continue
       return { x, z, query }
     }
   }
-  throw new Error('no shore with swimmable water north of it on CAMP')
+  throw new Error('no unobstructed shore with swimmable water north of it on CAMP')
 }
 
 test('the camera holds a swimming pig up by its whole sink', async ({ app }) => {

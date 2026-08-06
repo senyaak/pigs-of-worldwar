@@ -108,8 +108,15 @@ export interface MapObject {
   yaw: number
   pitch: number
   roll: number
+  /** Collision shape kind: 0 a box, 1 no collider (every bridge and step
+   * piece) — see lib/formats/pog.ts. */
+  shape: number
   box: { x: number; y: number; z: number }
   flags: number
+  /** What the record hands over when collected — a weapon and a count, or
+   * a health pack (weapon null). Null when it carries nothing, which is
+   * what tells a crate to collect from a crate to walk round. */
+  contents: { weapon: number | null; amount: number } | null
   fields: Int16Array
 }
 

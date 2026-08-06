@@ -47,6 +47,20 @@ test('CAMP.POG: the record layout, and z the other way up', () => {
   // Stored z is +(-5888): the file counts z DOWN where the game counts up.
   expect(CAMP[0].fields[2]).toBe(-5888)
 
+  // A crate says what is in it: a weapon and a count, or a health pack —
+  // the health ones storing −256 where the weapon goes. That is also what
+  // separates a crate to collect from a crate to walk round.
+  const crates = CAMP.filter((object) => object.name.startsWith('CRATE'))
+  expect(crates.length).toBeGreaterThan(0)
+  expect(crates.every((crate) => crate.contents !== null)).toBe(true)
+  const health = crates.filter((crate) => crate.contents?.weapon === null)
+  expect(health.length).toBeGreaterThan(0)
+  expect(health.every((crate) => crate.contents!.amount > 0)).toBe(true)
+  // The rest name a weapon out of the game's own list, and how many.
+  const armed = crates.filter((crate) => crate.contents?.weapon !== null)
+  expect(armed.length).toBeGreaterThan(0)
+  expect(armed.every((crate) => crate.contents!.weapon! > 0 && crate.contents!.amount > 0)).toBe(true)
+
   // `_ME` records are spawn markers, not props: they carry a pig CLASS in
   // `type` and have no model in the map's archive.
   const markers = CAMP.filter((object) => object.name.endsWith('_ME'))

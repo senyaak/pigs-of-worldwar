@@ -18,6 +18,7 @@
 // a full stop either: its top is ground when it is within the envelope, and
 // a wall only above that.
 
+import { SHAPE_BOX } from '../formats/pog'
 import type { MapObject } from '../formats/pog'
 import { isSpawnMarker } from './spawns'
 
@@ -34,12 +35,20 @@ export const PIG_HEIGHT = 5 * 128
 const BOX_UNIT = 128
 
 /**
- * The crates. In the original a pig COLLECTS one by walking into it, so a
- * crate cannot be a blocker; there is no pickup yet, and until there is,
- * walking through is much closer than walking around. Types 67, 68 and 388
- * are CRATE1, CRATE2 and CRATE4 — the only crate models any map places.
+ * The crate models: CRATE1, CRATE2, CRATE4.
+ *
+ * A crate is only a PICKUP when it actually carries something, and that is
+ * the difference between the crates a pig collects and the ones it walks
+ * round. All 11 CRATE4s carry nothing, and so do two CRATE1s and two
+ * CRATE2s out of the 540 — those are scenery, and solid. The rest hand over
+ * a weapon or a health pack, so they cannot be blockers: in the original a
+ * pig collects one by walking INTO it.
  */
-export const PICKUP_TYPES = new Set([67, 68, 388])
+export const CRATE_TYPES = new Set([67, 68, 388])
+
+/** A crate with something in it — walk into it, do not walk round it. */
+export const isPickup = (object: MapObject): boolean =>
+  CRATE_TYPES.has(object.type) && object.contents !== null
 
 /**
  * The smallest box that is allowed to stop a pig, per horizontal side.
@@ -53,10 +62,19 @@ export const PICKUP_TYPES = new Set([67, 68, 388])
  */
 export const MIN_SOLID = 2 * BOX_UNIT
 
-/** Whether a record is something a pig can run into at all. */
+/**
+ * Whether a record is something a pig can run into at all.
+ *
+ * The first test is the exe's own: field 11 picks the collision shape, and
+ * only kind 0 builds a box. Kind 1 sets the body's mass properties and no
+ * collider — and the 94 records carrying it are every bridge and step piece
+ * on every map, which is exactly why the original lets a pig over a bridge
+ * instead of walling it off.
+ */
 export function isSolid(object: MapObject): boolean {
+  if (object.shape !== SHAPE_BOX) return false
   if (isSpawnMarker(object)) return false
-  if (PICKUP_TYPES.has(object.type)) return false
+  if (isPickup(object)) return false
   return object.box.x >= MIN_SOLID && object.box.z >= MIN_SOLID && object.box.y > 0
 }
 

@@ -106,16 +106,29 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   await expect.poll(secondsLeft, { message: 'turn clock ticking' }).toBeLessThan(before)
 
   // End Turn through the controller — the same action the button and the
-  // Enter key fire.
+  // Enter key fire. CAMP is the training ground and fields ONE pig, so the
+  // turn comes straight back to it, with the clock reset.
+  await tap(page, 'endTurn')
+  await expect(page.locator('#battle-hud')).toHaveText(
+    /Turn 2 — Tommy’s Trotters: Tommy \(100 hp, \d+s\)/
+  )
+  expect(await secondsLeft()).toBeGreaterThan(40)
+
+  // Two sides rotate the way two sides do — on a map that HAS two.
+  expect(await page.evaluate(() => window.pow!.swapMap!('LIBERATE'))).toBe(true)
+  await expect(page.locator('#battle-hud')).toHaveText(
+    /Turn 1 — Tommy’s Trotters: Tommy \(100 hp, \d+s\)/
+  )
   await tap(page, 'endTurn')
   await expect(page.locator('#battle-hud')).toHaveText(
     /Turn 1 — Kaiser’s Grunters: Hans \(100 hp, \d+s\)/
   )
-  expect(await secondsLeft()).toBeGreaterThan(40)
   await page.locator('#battle-end-turn').click()
   await expect(page.locator('#battle-hud')).toHaveText(
     /Turn 2 — Tommy’s Trotters: Wilson \(100 hp, \d+s\)/
   )
+  // Back to the map the rest of the phase warps around on.
+  expect(await page.evaluate(() => window.pow!.swapMap!('CAMP'))).toBe(true)
 
   // Leaving lands back on the menu; a fresh New Game starts over at turn 1.
   await page.locator('#battle-leave').click()

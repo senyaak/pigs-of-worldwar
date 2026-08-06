@@ -14,8 +14,9 @@ import path from 'node:path'
 
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
-import { parsePog } from '../../src/lib/formats/pog'
-import { MAX_TEAMS, mapSpawns, playableSides, spawnTeams } from '../../src/lib/game/spawns'
+import { existsForPlayers, parsePog } from '../../src/lib/formats/pog'
+import { MAX_TEAMS, battleSides, mapSpawns, spawnTeams } from '../../src/lib/game/spawns'
+import type { SpawnPoint } from '../../src/lib/game/spawns'
 import { classArt } from '../../src/renderer/src/three/soldiers'
 
 const pog = (name: string): ReturnType<typeof parsePog> =>
@@ -31,15 +32,36 @@ test('the sides are one bit each, and every map partitions along them', () => {
   expect(spawnTeams(pog('FINAL')).length).toBe(MAX_TEAMS)
 
   // The training ground carries exactly one marker, because it is a
-  // tutorial and not a battle. Nothing may fabricate a second side from it.
+  // tutorial and not a battle — and that ONE side is what it fields.
   expect(mapSpawns(pog('CAMP'))).toHaveLength(1)
-  expect(playableSides(pog('CAMP'))).toBeNull()
+  expect(battleSides(pog('CAMP'), 2).map((side) => side.length)).toEqual([1])
+})
+
+test('a map does not field the same squad in every game', () => {
+  // BOOM stacks two sets of markers on one side — and the low byte of the
+  // flags is what tells them apart. Read whole, side 2 looks like ten pigs.
+  expect(spawnTeams(pog('BOOM')).map((side) => side.length)).toEqual([5, 10, 5, 5])
+
+  // The loader's own test sorts them out, and what falls out is the
+  // campaign against the skirmish: ONE player gets two sides, a squad
+  // against five snipers; two or more get the arena's four sides of five
+  // grunts. The snipers and the grunts stand on the very same spots.
+  const forPlayers = (players: number): SpawnPoint[][] =>
+    spawnTeams(pog('BOOM').filter((object) => existsForPlayers(object, players)))
+  expect(forPlayers(1).map((side) => side.length)).toEqual([5, 5])
+  expect(forPlayers(1)[1].map((at) => at.marker)).toEqual(Array(5).fill('SN_ME'))
+  for (const players of [2, 3, 4]) {
+    expect(forPlayers(players).map((side) => side.length)).toEqual([5, 5, 5, 5])
+    expect(forPlayers(players)[1].map((at) => at.marker)).toEqual(Array(5).fill('GR_ME'))
+  }
+  // The same five spots, in whatever order the file lists them.
+  const spots = (side: SpawnPoint[]): string[] =>
+    side.map((at) => `${at.x},${at.z}`).sort()
+  expect(spots(forPlayers(1)[1])).toEqual(spots(forPlayers(2)[1]))
 })
 
 test('a marker carries the class, and the class picks the art', () => {
-  const sides = playableSides(pog('LIBERATE'))
-  expect(sides).not.toBeNull()
-  const [first, second] = sides!
+  const [first, second] = battleSides(pog('LIBERATE'), 2)
 
   // Names and classes agree, marker by marker — the class list from gtext
   // index 63: Grunt 0, Sapper 5, Sniper 9, Spy 10, Hero 14.
@@ -69,11 +91,17 @@ test('the battle fields the map’s own squads, dressed by class', async ({ app 
   await page.locator('#menu-new-game').click()
   await expect(page.locator('#battle')).toBeVisible()
 
-  // CAMP has no second side, so it keeps the fabricated squads — the
-  // fallback, and the reason it has to exist.
+  // The training ground fields exactly what it carries: one side, one pig,
+  // standing on its own marker. Nothing is invented to face it.
   const onCamp = await page.evaluate(() => window.pow!.debug!.squads())
-  expect(onCamp.map((squad) => squad.pigs.length)).toEqual([4, 4])
-  expect(onCamp[0].pigs.every((pig) => pig.art === 'pcgru_hi')).toBe(true)
+  expect(onCamp.map((squad) => squad.pigs.length)).toEqual([1])
+  const trainee = mapSpawns(pog('CAMP'))[0]
+  expect(onCamp[0].pigs[0]).toMatchObject({
+    art: 'pcgru_hi',
+    pigClass: trainee.pigClass,
+    x: trainee.x,
+    z: trainee.z
+  })
 
   expect(await page.evaluate(() => window.pow!.swapMap!('LIBERATE'))).toBe(true)
   const squads = await page.evaluate(() => window.pow!.debug!.squads())
@@ -87,7 +115,7 @@ test('the battle fields the map’s own squads, dressed by class', async ({ app 
   ])
 
   // Every pig stands on the marker that named it — position and facing.
-  const sides = playableSides(pog('LIBERATE'))!
+  const sides = battleSides(pog('LIBERATE'), 2)
   for (const [index, squad] of squads.entries()) {
     expect(squad.pigs.map((pig) => [pig.x, pig.z])).toEqual(
       sides[index].map((at) => [at.x, at.z])
