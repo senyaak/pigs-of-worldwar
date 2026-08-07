@@ -413,6 +413,33 @@ when nobody is standing still, so sharing that delay would hide every one.
 How it MOVES is not decoded — the rise and the fade are the remake's own, and
 so is reading 0x3e8 as milliseconds rather than the clock's hundredths.
 
+**And a blow throws RINGS — the effect system is decoded and its first piece
+is built.** The original has ONE effect class (vtable 0x4bd370, 0xE4 bytes,
+body type 0x135E) and every effect in the game is an id into it. `Init`
+(0x487ca0) switches the id into a parameter ROW — **143 signed bytes per kind
+at 0x4d61e8**, scaled per index by 0x4d6c88 — and the row is twelve timed
+STAGES, each of which spawns a CHILD effect of its own on one named frame of
+the parent's life. For all five hand-to-hand weapons every live stage spawns
+the same child, id 0x18: a **ring**, thirty-two quads in the XZ plane, outer
+radius `[+0x86]` and inner `[+0x86] − [+0x8C]`, each with its own growth (and
+the sword's with a second difference, so its rings SLOW). The colour is 5
+bits a channel out of the row and is divided by the ring's own age, so a hit
+is a white flash that collapses into the table's dark blue-purple over about
+half a second — which is what play remembers as black smoke. The bayonet
+throws two rings, the sword three, the cattle prod three and a particle
+burst (not built — the particle half is undecoded past its 40-byte record).
+`lib/game/effects.ts` is the rules, `three/effects.ts` the geometry,
+`../pigs-disasm/effects/notes.md` the read.
+
+One number in it is the remake's own and says so: a ring's SIZE rides
+`MODEL_SCALE`. The exe computes the radius in world units, but in a world
+whose pigs are twice the size of these, so an unscaled band would read as
+twice the blow. Same argument as the chase camera's distances — a rig around
+a BODY halves with the body, and the terrain does not. A spec cannot see a
+transparent quad, so `pow.debug.effects()` counts the live rings, and
+`e2e/002/strike.spec.ts` reads a high-water mark the PAGE keeps once a frame:
+polling from the test misses a half-second window outright.
+
 **Health is POINTS, the maximum is the CLASS's, and it is not 100.** The
 constructor reads it out of a 128-byte record per class at 0x4d02e0 — the
 same record whose `+0x04` is the thirteen `Pig::Walk` grants — so a grunt has
@@ -628,21 +655,10 @@ would be a stand-in nobody asked for.
 
 ### Threads left mid-pull
 
-**The next two jobs, in this order, and where each one starts.** Both came
-out of play on 2026-08-07 and both are named below as well; this is the
-shortcut.
+**The next job, and where it starts.** The effect system was the other one
+and it is built (see below); this is what is left of that pair.
 
-1. **The EFFECT system — there is none at all.** Play says a struck body
-   makes black smoke ("помойму чёрный дым" — the colour is the user's guess,
-   not read). The way in is `0x487ad0(x, y, id, life, …)`, the spawner: the
-   floating damage number is already decoded as its id **0x35** with life
-   **0x3e8** (`three/damageNumbers.ts`), so one call site is understood and
-   the rest of the table is one read away. The melee's own ids are per weapon
-   — **0x36** bayonet, 0x37 trotters and knife, 0x38 sword, 0x39 prod —
-   pushed through `0x487620` at 0x47619e..0x47627e
-   (`../pigs-disasm/weapons/melee.md`). Do this one FIRST: every weapon still
-   to come wants it, and it is bounded.
-2. **The map SCRIPT.** Three separate things now wait on it and they are one
+1. **The map SCRIPT.** Three separate things now wait on it and they are one
    job: the crate that drops in BY PARACHUTE when the first dummy goes down,
    the tutorial's second bridge, and which dummy `[0x537df0]` has live. Play
    is explicit about the first ("когда убиваешь первый — падает ящик на

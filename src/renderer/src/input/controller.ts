@@ -133,6 +133,8 @@ export interface DebugHooks {
   /** What the last hand-to-hand strike measured — the blade's three points
    * and how near every other pig came, per axis (three/swing.ts). */
   strike(): unknown
+  /** How many effect rings a blow has in the air (three/effects.ts). */
+  effects(): number
   /** Every pig's health, in turn order. */
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */

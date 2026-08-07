@@ -43,6 +43,10 @@ export interface DebugParts {
    * other pig came, per axis (three/swing.ts). A miss has four ways of being
    * true and this is the only way to tell them apart. */
   strike: () => unknown
+  /** How many effect rings are alive. They are a colour on a transparent
+   * quad, so a screenshot cannot tell one from the sky — this is the only
+   * way a spec can say a hit threw one (three/effects.ts). */
+  effects: () => number
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -85,6 +89,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
        * `gap.x`/`gap.z` against 170, `gap.y` against 360, `degrees` against
        * 67.5. Whichever is over is the reason nothing was hit. */
       strike: () => parts.strike(),
+      /** How many rings a blow has in the air — two or three per hit, for
+       * about half a second (lib/game/effects.ts). */
+      effects: () => parts.effects(),
       /** Every pig's health, side by side — what a bayonet is measured by. */
       health: () =>
         game.players.flatMap((player) =>

@@ -38,6 +38,7 @@ import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import { createSwings } from './swing'
 import { createDamageNumbers } from './damageNumbers'
+import { createEffects } from './effects'
 import type { FloatingNumber } from './damageNumbers'
 import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
@@ -248,6 +249,9 @@ export function buildBattle(
   /** The damage that floats off whatever was just hit — the original's own
    * effect, showing points (three/damageNumbers.ts). */
   const numbers = createDamageNumbers()
+  /** The rings a blow throws — the original's effect system, of which the
+   * hand-to-hand hit is the first piece built (three/effects.ts). */
+  const effects = createEffects(root)
   /** What a bayonet does when the fire key goes down. It reads BONES, so it
    * needs the squad and the root they hang in; the rules are pure next door
    * (lib/game/melee.ts). The aim angle is deliberately NOT among them. */
@@ -261,6 +265,7 @@ export function buildBattle(
     // the only one that is not a pig (lib/game/targets.ts).
     targets: targetsOf(assets.objects),
     numbers,
+    effects,
     onBroken: (target) => {
       props.take(target.id)
       obstacles.remove(target.id)
@@ -481,6 +486,7 @@ export function buildBattle(
     time += delta
     update(delta)
     numbers.update(delta)
+    effects.update(delta)
     squad.update(delta)
     marker.bob(time)
   }
@@ -499,9 +505,11 @@ export function buildBattle(
     strings: () => assets.strings,
     swinging: () => swings.running(),
     strike: () => swings.lastStrike(),
+    effects: () => effects.live(),
     warp: (x, z, heading) => {
       game.moveCurrentPig(x, z, heading)
       swings.reset()
+      effects.clear()
       loco = createLocomotion(query, x, z, heading)
       const soldier = squad.of(game.currentPig)
       if (!soldier) return
@@ -539,6 +547,7 @@ export function buildBattle(
       props.dispose()
       dropIn.dispose()
       marker.dispose()
+      effects.dispose()
       weapons.dispose()
       squad.dispose()
       bank.dispose()

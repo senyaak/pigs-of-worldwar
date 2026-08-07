@@ -20,6 +20,7 @@ import { ANIM } from '../../../lib/game/locomotion'
 import { reached } from '../../../lib/game/targets'
 import type { Target } from '../../../lib/game/targets'
 import type { DamageNumbers } from './damageNumbers'
+import type { Effects } from './effects'
 import { clipSeconds } from './clips'
 import type { Soldier, Squad } from './squad'
 import { BATTLE_SOUNDS } from '../audio/battle'
@@ -91,6 +92,8 @@ export interface SwingParts {
   /** Put the damage up over whatever was hit — the original does, and in
    * POINTS (three/damageNumbers.ts). */
   numbers: DamageNumbers
+  /** …and throw the weapon's own rings off it (three/effects.ts). */
+  effects: Effects
 }
 
 export function createSwings(parts: SwingParts): Swings {
@@ -169,6 +172,12 @@ export function createSwings(parts: SwingParts): Swings {
       // makes the noise and lays the body down.
       const outcome = hurt(target.pig, weapon.damage, parts.training)
       parts.numbers.show(body, weapon.damage)
+      // The exe throws the weapon's own effect on every body it catches
+      // (0x476187, inside the same loop). WHERE exactly is not pinned — it
+      // spawns off a point 0x44e8e0 writes into a stack local, which has not
+      // been read — so this puts it on the body, which is where the damage
+      // number goes too.
+      parts.effects.hit(skill, body)
       parts.bank().play(BATTLE_SOUNDS[weapon.impact])
       if (outcome === 'died' || outcome === 'gibbed') target.playOnce(ANIM.DYING)
     }
@@ -187,6 +196,7 @@ export function createSwings(parts: SwingParts): Swings {
       // One point, so anything at all flattens it (lib/game/targets.ts).
       hurt(dummy, weapon.damage, false)
       parts.numbers.show(dummy, weapon.damage)
+      parts.effects.hit(skill, dummy)
       parts.bank().play(BATTLE_SOUNDS[weapon.impact])
       if (isDead(dummy)) {
         standing.splice(i, 1)
