@@ -323,9 +323,14 @@ export function buildBattle(
   let time = 0
   /** Scratch for the scope's eye, so a camera placement allocates nothing. */
   const eyeAt = new THREE.Vector3()
+  /** `[0x4bd6c8]` — how far toward the hand the camera's HEIGHT moves in one
+   * engine frame (0x4a3072). A third, and no more. */
+  const EYE_LAG = 0.333
   /** The eye as of the last ENGINE frame, and which frame that was. */
   let heldEye = { x: 0, y: 0, z: 0 }
   let eyeFrame = -1
+  /** Whether there is a previous height for the lag below to come from. */
+  let settled = false
   /** Seconds the acting pig has stood still, and where it stood. */
   let still = 0
   let stillAt = { x: 0, z: 0, heading: 0 }
@@ -478,6 +483,8 @@ export function buildBattle(
     // holding does not.
     const frame = Math.floor(time / FRAME_SECONDS)
     if (frame === eyeFrame) return heldEye
+    // A gap means the sights were down in between; start the lag afresh.
+    if (frame > eyeFrame + 1) settled = false
     eyeFrame = frame
     const bone = soldier.mesh.bones[SCOPE_BONE] ?? soldier.mesh.bones[0]
     // The mixer wrote this frame's rotations; three folds them into the world
@@ -491,11 +498,26 @@ export function buildBattle(
     // cannot steer the bullet (lib/game/wobble.ts). Across is perpendicular
     // to the pig's facing; up is up, which in this space is a SMALLER y.
     const side = soldier.pig.heading + Math.PI / 2
+    const wantX = eyeAt.x + Math.sin(side) * wobbleAcross(wobble) * MODEL_SCALE
+    const wantY = eyeAt.y - wobbleUp(wobble) * MODEL_SCALE
+    const wantZ = eyeAt.z + Math.cos(side) * wobbleAcross(wobble) * MODEL_SCALE
+    // …and the HEIGHT LAGS. The exe does not put the camera at the hand's y —
+    // it moves a THIRD of the way there each frame and no further:
+    //
+    //   4a304e  eax = boneY - cameraY
+    //   4a3072  ...times the double at 0x4bd6c8, which is 0.333
+    //   4a3082  bp += that
+    //
+    // x and z are taken outright. So the picture snaps sideways with the hand
+    // and drags vertically behind it, which is a good deal less steady than
+    // either axis is on its own. `eyeFrame < 0` is the first frame of a
+    // sighting, where there is nothing to lag from.
     heldEye = {
-      x: eyeAt.x + Math.sin(side) * wobbleAcross(wobble) * MODEL_SCALE,
-      y: eyeAt.y - wobbleUp(wobble) * MODEL_SCALE,
-      z: eyeAt.z + Math.cos(side) * wobbleAcross(wobble) * MODEL_SCALE
+      x: wantX,
+      y: settled ? heldEye.y + (wantY - heldEye.y) * EYE_LAG : wantY,
+      z: wantZ
     }
+    settled = true
     return heldEye
   }
 
@@ -662,9 +684,12 @@ export function buildBattle(
       if (firing?.phase === 'flight' && shots.live() === 0) firing = null
       // ONE THING AT A TIME. The script's next step waits for the thing that
       // triggered it to finish coming apart — play's rule for the whole
-      // game, "ждёшь конца одной анимации и включаешь другую" — so the crate
-      // only starts falling once the smoke off the dummy is gone.
-      if (pending && effects.smoke() === 0) {
+      // game, "ждёшь конца одной анимации и включаешь другую".
+      //
+      // `busy()`, not `smoke() === 0`: the break effect's burst does not fire
+      // until its third frame, so counting puffs said "finished" on the very
+      // frame the dummy broke and the crate started down through the smoke.
+      if (pending && !effects.busy()) {
         advanceScript(pending.id, pending.y)
         pending = null
       }

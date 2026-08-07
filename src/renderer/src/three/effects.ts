@@ -69,6 +69,16 @@ export interface Effects {
   live(): number
   /** …and how many puffs of smoke. */
   smoke(): number
+  /**
+   * Whether ANY effect is still running.
+   *
+   * Not the same as "there is smoke on screen": the break effect's burst does
+   * not fire until its third frame (`BREAK_EFFECT`, stage `at: 3`), so a
+   * count of puffs is zero for the first fifth of a second and reads as
+   * finished before it has begun. Whatever waits for a thing to come apart
+   * has to wait on THIS (three/battle.ts).
+   */
+  busy(): boolean
   /** Drop the lot: a new battle, or a warp. */
   clear(): void
   dispose(): void
@@ -238,6 +248,7 @@ export function createEffects(root: THREE.Object3D): Effects {
     },
     live: () => live.reduce((n, effect) => n + effect.rings.length, 0),
     smoke: () => live.reduce((n, effect) => n + effect.smoke.length, 0),
+    busy: () => live.length > 0,
     clear() {
       live.length = 0
       redraw()

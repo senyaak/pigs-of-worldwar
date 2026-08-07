@@ -812,6 +812,19 @@ identical to each other. The remake had matched them by hand and called that
 its own choice; it is the original's, and `SIGHT_RAMP`/`SIGHT_TOP` in
 `lib/game/aim.ts` now say so.
 
+**The scope camera's HEIGHT lags the hand by a third a frame** — read off the
+rifle cam's short branch instruction by instruction (0x4a304e, scaled by the
+double at 0x4bd6c8 = 0.333). X and Z come off the bone outright; the y is
+nudged a third of the way and no further. So the picture snaps sideways and
+drags vertically, and the two axes are never in step. `three/battle.ts`,
+`EYE_LAG`. Closest thing to the tremor found so far.
+
+**The crate waited on the wrong thing.** The gate was `effects.smoke() === 0`,
+and the break effect's burst does not fire until its THIRD frame — so the
+count was zero on the frame the dummy broke and the parachute started down
+through the smoke anyway. `effects.busy()` is the whole effect, stages
+included.
+
 **There is no dedicated scope tremor, and `fire.md` now lists every place it
 is not** so the search is not run a fifth time: `Pig::Aim`, the shot's angle
 read, both branches of the rifle cam, `Camera::Shake` (0x4a0520 — its single
