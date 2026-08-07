@@ -65,9 +65,9 @@ sampled along its own length off the hand bone. Ten health off a pig it
 catches, once per swing, and only what is in front of it inside 67.5°. Walking
 is refused for the length of it, as the original refuses it, and the camera
 swings round to the pig's side and closes in — the original has a camera mode
-for exactly this and uses it for nothing else. `Q`/`E` tilt the blade and the
-strike follows, which the original does not do (it will not let a bayonet tilt
-at all) and which is here by request. Guns and grenades
+for exactly this and uses it for nothing else. The aim angle plays no part:
+the strike comes off the hand, and the original's does the same. Guns and
+grenades
 still do nothing — the power gauge and the projectile are the next piece.
 CAMP fields one pig, so try it on a map with two sides:
 `pow.swapMap('LIBERATE')`.

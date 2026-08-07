@@ -627,14 +627,15 @@ would be a stand-in nobody asked for.
   found that ends the mode in the exe. On a HIT the original moves again, to
   mode 2 aimed at the victim (0x4760ab) — not done.
 
-  **The blade follows the AIM, and that is the remake's own, twice over.**
-  0x46a891 pins the bayonet's angle to zero and the strike never reads
-  `[pig+0x304]` — in the original a bayonet is level whatever the player does.
-  Here it swings about the hand with the angle (`tiltStrike`), by request, and
-  it is the other half of letting those two aim at all. It only DECIDES
-  anything at a steep angle: `STRIKE_RISE` is 360 against a pig 320 tall, so
-  a body within a body-height is caught either way. The swing CLIP does not
-  tilt with it — that is the thing to look at if it reads wrong.
+  **The AIM ANGLE has no part in the strike, and that is SETTLED — do not
+  re-add it.** `Pig::HandToHandStrike` never reads `[pig+0x304]`, and for the
+  only two melee weapons that could carry an angle 0x46a891 pins it to zero,
+  so a bayonet strikes level however the player has pointed it. Steering the
+  blade with the aim was built once, on the reading that the remake lets those
+  two aim and so ought to honour it, and taken straight back out: **the exe
+  not reading a value is not an ambiguity to fill in, it IS the behaviour.**
+  (It would also have decided almost nothing — `STRIKE_RISE` is 360 against a
+  pig 320 tall, so a body within a body-height is caught either way.)
 
   Three things in it are decoded and deliberately NOT applied: the KNOCKBACK
   (75 for a bayonet, at 45° up along the bearing — only the acting pig has a
@@ -655,9 +656,10 @@ would be a stand-in nobody asked for.
   like everything else, by request — the bayonet is the training ground's
   first weapon and tilting it is the whole of what a player does with it
   until firing exists. One `if` in `clampAim` restores it. **The swing did
-  not change that**: the melee strike is built off the HAND BONE and never
-  reads the aim angle, so pointing a bayonet up is cosmetic either way. Still
-  the user's call.
+  not change that**: the strike is built off the HAND BONE and never reads
+  the angle, so tilting a bayonet is cosmetic — it moves the held pose and
+  nothing else. Whether to pin it now that the bayonet DOES something is the
+  user's call and has not been asked.
 
   **The aiming pose is a SECOND animation channel, not a clip.** A pig has
   two of them — `Pig::SetAnim` (0x471ef0) writes one block of fields and

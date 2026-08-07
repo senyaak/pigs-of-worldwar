@@ -239,15 +239,8 @@ export function buildBattle(
   let aim = createAim(null)
   /** What a bayonet does when the fire key goes down. It reads BONES, so it
    * needs the squad and the root they hang in; the rules are pure next door
-   * (lib/game/melee.ts). The aim goes in because the blade swings with it,
-   * which is the remake's own addition and says so where it lives. */
-  const swings = createSwings({
-    squad,
-    clips: assets.clips,
-    bank: () => bank,
-    root,
-    aim: () => aim.angle
-  })
+   * (lib/game/melee.ts). The aim angle is deliberately NOT among them. */
+  const swings = createSwings({ squad, clips: assets.clips, bank: () => bank, root })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
    * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig
    * reaches for the rifle and then has it. */

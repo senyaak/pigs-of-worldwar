@@ -12,16 +12,8 @@
 
 import * as THREE from 'three'
 import type { Clip } from '../api'
-import {
-  advanceSwing,
-  beginSwing,
-  meleeOf,
-  strikeOffsets,
-  struck,
-  tiltStrike
-} from '../../../lib/game/melee'
+import { advanceSwing, beginSwing, meleeOf, strikeOffsets, struck } from '../../../lib/game/melee'
 import type { Point, SwingState } from '../../../lib/game/melee'
-import { aimRadians } from '../../../lib/game/aim'
 import { amountOf, spend } from '../../../lib/game/inventory'
 import { clipSeconds } from './clips'
 import type { Soldier, Squad } from './squad'
@@ -57,9 +49,6 @@ export interface SwingParts {
   bank: () => Bank
   /** The battle's game-space root — what a bone's world point converts into. */
   root: THREE.Object3D
-  /** Where the acting pig is pointing, in the game's own angle units — the
-   * blade swings with it (`tiltStrike`, and it is the remake's own). */
-  aim: () => number
 }
 
 export function createSwings(parts: SwingParts): Swings {
@@ -79,16 +68,16 @@ export function createSwings(parts: SwingParts): Swings {
     // The mixer wrote this frame's rotations; three would not fold them into
     // the world matrices until it drew, and the strike happens first.
     bone.updateMatrixWorld(true)
-    const sampled = strikeOffsets(weapon).map((offset) => {
+    // The bone carries the whole of it: where the pig stands, which way it
+    // faces, and what this frame of the swing has done to its arm. The aim
+    // angle is NOT in it, and that is the exe's behaviour, not a gap
+    // (lib/game/melee.ts).
+    return strikeOffsets(weapon).map((offset) => {
       at.set(offset.x, offset.y, offset.z)
       bone.localToWorld(at)
       parts.root.worldToLocal(at)
       return { x: at.x, y: at.y, z: at.z }
     })
-    // The last offset is (0,0,0), so the last point IS the hand — the hinge
-    // the aim tilts the blade about.
-    const hand = sampled[sampled.length - 1]
-    return tiltStrike(sampled, hand, soldier.pig.heading, aimRadians(parts.aim()))
   }
 
   /** Resolve the blade against everyone standing about, once. */

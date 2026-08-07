@@ -120,57 +120,13 @@ export function strikeOffsets(weapon: MeleeWeapon): Point[] {
   ]
 }
 
-/**
- * Point the blade where the player aimed it.
- *
- * **This is the remake's own, and the exe says the opposite twice over.**
- * 0x46a891 pins 3 BAYONET and 5 CATTLE PROD to an angle of zero, so in the
- * original those two cannot be tilted at all; and `Pig::HandToHandStrike`
- * builds its points off the hand bone and never reads `[pig+0x304]`, so even
- * a weapon that could be tilted would strike the same place. The remake lets
- * them aim (`clampAim`, by request) and this is the other half of that: what
- * you point at is what you hit.
- *
- * The blade swings about the pig's own lateral axis, through the HAND — the
- * arm is the hinge — so a bayonet held 45° up reaches over a crate rather
- * than through it. Forward is `(sin h, cos h)`, up is −y (the game's space is
- * Y-down), and `aim` is radians, positive up.
- *
- * Two things follow, and both are worth knowing before tuning this.
- *
- * It only DECIDES anything at a steep angle. `STRIKE_RISE` is the exe's 360
- * against a pig 320 tall, so anything within a body height of the level blade
- * is caught whether or not you aimed at it; the tilt earns its keep on a body
- * on a ledge, or below one. Pinned in `e2e/002/melee.spec.ts`.
- *
- * And the swing ANIMATION does not tilt with it: clip 22 is the original's
- * and has one height. So a steeply aimed strike reaches where the art does
- * not quite show — the place to fix that, if play says it reads wrong, is
- * here rather than in the clip.
- */
-export function tiltStrike(points: Point[], hand: Point, heading: number, aim: number): Point[] {
-  if (aim === 0) return points
-  // The axis is the pig's right: forward turned a quarter about the vertical.
-  const kx = Math.cos(heading)
-  const kz = -Math.sin(heading)
-  const cos = Math.cos(aim)
-  const sin = Math.sin(aim)
-  return points.map((point) => {
-    const x = point.x - hand.x
-    const y = point.y - hand.y
-    const z = point.z - hand.z
-    // Rodrigues about the unit axis (kx, 0, kz).
-    const crossX = -kz * y
-    const crossY = kz * x - kx * z
-    const crossZ = kx * y
-    const dot = kx * x + kz * z
-    return {
-      x: hand.x + x * cos + crossX * sin + kx * dot * (1 - cos),
-      y: hand.y + y * cos + crossY * sin,
-      z: hand.z + z * cos + crossZ * sin + kz * dot * (1 - cos)
-    }
-  })
-}
+// **The AIM ANGLE has no part in any of this, and that is settled.** The
+// strike is the hand BONE and three offsets from it; `Pig::HandToHandStrike`
+// never reads `[pig+0x304]`, and for the only two melee weapons that could
+// carry an angle 0x46a891 pins it to zero anyway. So a bayonet strikes level
+// however the player has pointed it. Steering the blade with the aim was
+// built and taken straight back out: the exe not reading a value is not an
+// ambiguity to fill in, it IS the behaviour.
 
 /** How far to either side of a sample point a body counts as struck (0xaa). */
 export const STRIKE_SPREAD = 170
