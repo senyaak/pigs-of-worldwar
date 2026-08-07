@@ -41,6 +41,38 @@ export interface RingStage {
   lift: number
 }
 
+/**
+ * A BURST of particles — the row's stage K, spawner 0x48c860.
+ *
+ * None of the hand-to-hand rows but the cattle prod's has one; what does is
+ * the effect a thing throws when it BREAKS, and it is the smoke play asks
+ * for.
+ */
+export interface BurstStage {
+  /** The frame it goes off on. */
+  at: number
+  /** How many. It is `param(base + 0)`, written to `[0x537dec]` so that the
+   * child effect — id 0x1a, the one id whose particle count comes out of a
+   * global — sizes its own array by it (0x48c8b4). */
+  count: number
+  /** Five bits each again, out of `param(base+6..8)` shifted together. */
+  colour: [number, number, number]
+  /** How fast a particle leaves, and how much it RISES a frame — the engine
+   * subtracts this from the y velocity every frame (0x48a73e) and y is DOWN,
+   * so the byte the code calls gravity is buoyancy. And how much of its life
+   * goes by a frame, 0..100 as everywhere else.
+   *
+   * **Which of the row's trailing numbers is which is NOT pinned.** The burst
+   * hands eleven parameters to 0x486b30 and the argument order did not come
+   * out of the read cleanly; what IS certain is the count, the colour, and
+   * the three FIELDS these land in (`[+0x18]` the age step, `[+0x1c]` the
+   * jitter, `[+0x1d]` the rise). The row's own three are 10, 15 and 8 and
+   * these are that set, assigned to fit — correct them against play. */
+  speed: number
+  rise: number
+  step: number
+}
+
 /** What one weapon's hit looks like. */
 export interface HitEffect {
   /** The effect id the exe spawns (0x476187's own jump table). */
@@ -48,6 +80,7 @@ export interface HitEffect {
   /** The parameter row that id resolves to, through `0x48ccc0`. */
   kind: number
   rings: RingStage[]
+  bursts?: BurstStage[]
 }
 
 const ring = (
@@ -117,6 +150,38 @@ const HITS: Record<number, HitEffect> = {
 export const hitEffectOf = (skill: number | null): HitEffect | null =>
   skill === null ? null : (HITS[skill] ?? null)
 
+/**
+ * What something throws when it BREAKS — a dummy going down, and by the look
+ * of the handler anything else that comes apart.
+ *
+ * The break handler (0x48d750, whose last act is to run the object's script
+ * command) spawns effect **0x3e** at a point jittered ±32 about the object,
+ * with two other ids for two special cases it does not take: 0x4b for record
+ * type 0x1f, and 6 where `[+0xb3]` is set. 0x3e resolves to parameter row
+ * **0** (0x488f80 → `0x48ccc0(0)`).
+ *
+ * Row 0 has **no rings at all** — stages F, G and H are off, which is why a
+ * hit and a breaking look nothing alike. What it has is stage K, the burst,
+ * and four stages through two spawners this read did not open (0x48bff0 twice
+ * and 0x48c160 twice). So the smoke is here and there is more of row 0 than
+ * this. The colour is the exact default the particle setter compares against,
+ * 0x4210 — sixteen of thirty-one on every channel, a mid grey.
+ */
+export const BREAK_EFFECT: HitEffect = {
+  id: 0x3e,
+  kind: 0,
+  rings: [],
+  bursts: [{ at: 3, count: 6, colour: [16, 16, 16], speed: 10, rise: 8, step: 10 }]
+}
+
+/** How far round the burst fans its particles: the same 1638.4-per-turn unit
+ * the ring is drawn in, stepped `0x648 / count` a particle (0x48cb0b). */
+const BURST_SPREAD = 0x648 / 1638.4
+
+/** The jitter on each one's bearing: `rand() % 30` of that same turn
+ * (0x48c983). */
+const BURST_WOBBLE = 30 / 1638.4
+
 /** How many segments a ring is drawn in — `[ring+0x84]`, set by effect 0x18's
  * own constructor arm (0x488dff). */
 export const RING_SEGMENTS = 32
@@ -153,6 +218,24 @@ export interface Ring {
   colour: [number, number, number]
 }
 
+/**
+ * One of a burst's particles. The 40-byte record is decoded off the engine's
+ * own per-frame loop (0x48a6ab): a position, a velocity added to it every
+ * frame, an age 0..100 that steps and dies at 100, and the byte at `+0x1d`
+ * taken off the y velocity — which in a Y-DOWN world is a rise, not a fall.
+ */
+export interface Particle {
+  x: number
+  y: number
+  z: number
+  dx: number
+  dy: number
+  dz: number
+  age: number
+  step: number
+  rise: number
+}
+
 /** An effect in flight: the stages it has still to let go, and what it has. */
 export interface Effect {
   /** Whole frames since it was spawned — what a stage's `at` is compared to. */
@@ -161,18 +244,31 @@ export interface Effect {
    * even though the renderer's step is seconds. */
   carry: number
   pending: RingStage[]
+  waiting: BurstStage[]
   rings: Ring[]
+  smoke: Particle[]
   at: { x: number; y: number; z: number }
 }
 
 /** Spawn one at a point in game space. */
 export function beginEffect(effect: HitEffect, at: { x: number; y: number; z: number }): Effect {
-  return { frame: 0, carry: 0, pending: [...effect.rings], rings: [], at: { ...at } }
+  return {
+    frame: 0,
+    carry: 0,
+    pending: [...effect.rings],
+    waiting: [...(effect.bursts ?? [])],
+    rings: [],
+    smoke: [],
+    at: { ...at }
+  }
 }
 
 /** Whether anything is left of it. */
 export const spent = (effect: Effect): boolean =>
-  effect.pending.length === 0 && effect.rings.length === 0
+  effect.pending.length === 0 &&
+  effect.waiting.length === 0 &&
+  effect.rings.length === 0 &&
+  effect.smoke.length === 0
 
 /**
  * Step it. The engine counts FRAMES, so `delta` is converted and whole frames
@@ -205,6 +301,29 @@ export function advanceEffect(effect: Effect, delta: number): void {
         colour: stage.colour
       })
     }
+    for (let i = effect.waiting.length - 1; i >= 0; i--) {
+      const stage = effect.waiting[i]
+      if (stage.at !== effect.frame) continue
+      effect.waiting.splice(i, 1)
+      for (let n = 0; n < stage.count; n++) {
+        // Fanned round the horizontal, each one a random nudge off its share
+        // — the exe steps a whole 0x648 per particle and divides by the
+        // count, so the fan closes on a circle however many there are.
+        const turn = (n * BURST_SPREAD) / stage.count + Math.random() * BURST_WOBBLE
+        const angle = turn * 2 * Math.PI
+        effect.smoke.push({
+          x: effect.at.x,
+          y: effect.at.y,
+          z: effect.at.z,
+          dx: Math.cos(angle) * stage.speed * 3,
+          dy: 0,
+          dz: Math.sin(angle) * stage.speed * 3,
+          age: 0,
+          step: stage.step,
+          rise: stage.rise
+        })
+      }
+    }
     // 0x48a840, in its own order: the age first, then the width, then the
     // radius, and the growth last off its own second difference.
     for (const one of effect.rings) {
@@ -214,6 +333,16 @@ export function advanceEffect(effect: Effect, delta: number): void {
       one.growth += one.drift
     }
     effect.rings = effect.rings.filter((one) => one.age < RING_DEAD)
+    // …and the particles, in the engine's order: the rise off the y velocity
+    // first, then the whole velocity added on (0x48a73e..0x48a774).
+    for (const one of effect.smoke) {
+      one.dy -= one.rise
+      one.x += one.dx
+      one.y += one.dy
+      one.z += one.dz
+      one.age += one.step
+    }
+    effect.smoke = effect.smoke.filter((one) => one.age < RING_DEAD)
   }
 }
 

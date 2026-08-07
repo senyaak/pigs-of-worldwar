@@ -47,6 +47,8 @@ export interface DebugParts {
    * quad, so a screenshot cannot tell one from the sky — this is the only
    * way a spec can say a hit threw one (three/effects.ts). */
   effects: () => number
+  /** …and how many puffs of smoke: a thing BREAKING throws those instead. */
+  smoke: () => number
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -92,6 +94,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** How many rings a blow has in the air — two or three per hit, for
        * about half a second (lib/game/effects.ts). */
       effects: () => parts.effects(),
+      /** How many puffs of smoke are up — six per thing broken, for about
+       * two thirds of a second (lib/game/effects.ts). */
+      smoke: () => parts.smoke(),
       /** Every pig's health, side by side — what a bayonet is measured by. */
       health: () =>
         game.players.flatMap((player) =>

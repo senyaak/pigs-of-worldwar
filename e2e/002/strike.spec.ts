@@ -30,6 +30,7 @@ interface Debug {
   swinging(): boolean
   strike(): unknown
   effects(): number
+  smoke(): number
   props(): { at: { name: string; x: number; z: number }[] }
 }
 
@@ -70,17 +71,28 @@ const look = (
  */
 const watchEffects = (page: Page): Promise<void> =>
   page.evaluate(() => {
-    const w = window as unknown as { pow: { debug: Debug }; __rings?: number }
-    w.__rings = 0
+    const w = window as unknown as {
+      pow: { debug: Debug }
+      __peak?: { rings: number; smoke: number }
+    }
+    w.__peak = { rings: 0, smoke: 0 }
     const tick = (): void => {
-      w.__rings = Math.max(w.__rings ?? 0, w.pow.debug.effects())
+      const peak = w.__peak!
+      peak.rings = Math.max(peak.rings, w.pow.debug.effects())
+      peak.smoke = Math.max(peak.smoke, w.pow.debug.smoke())
       requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
   })
 
-const peakEffects = (page: Page): Promise<number> =>
-  page.evaluate(() => (window as unknown as { __rings?: number }).__rings ?? 0)
+const peakEffects = (page: Page): Promise<{ rings: number; smoke: number }> =>
+  page.evaluate(
+    () =>
+      (window as unknown as { __peak?: { rings: number; smoke: number } }).__peak ?? {
+        rings: 0,
+        smoke: 0
+      }
+  )
 
 const push = (page: Page, action: string): Promise<void> =>
   page.evaluate((a) => {
@@ -120,11 +132,13 @@ test('a bayonet swung at a dummy knocks it down', async ({ app }) => {
   await expect.poll(async () => (await look(page)).swinging, { timeout: 3000 }).toBe(true)
   await expect.poll(async () => (await look(page)).swinging, { timeout: 8000 }).toBe(false)
 
-  // The hit throws the bayonet's own rings, and they are the only thing on
-  // screen that says the effect system ran at all — a band of colour on a
-  // transparent quad is not something a screenshot can be asserted on. The
-  // bayonet's row carries exactly two (lib/game/effects.ts).
-  expect(await peakEffects(page), 'the hit threw no rings').toBe(2)
+  // Two effects, and they are separate things: the HIT throws the bayonet's
+  // own two rings, and the dummy BREAKING throws six puffs of smoke off its
+  // own handler. Neither is something a screenshot can be asserted on — both
+  // are colour on a transparent quad — so the page keeps the counts.
+  const peak = await peakEffects(page)
+  expect(peak.rings, 'the hit threw no rings').toBe(2)
+  expect(peak.smoke, 'the dummy came apart without smoke').toBe(6)
 
   // …and if it did not land, say WHY rather than just failing.
   const after = await look(page)

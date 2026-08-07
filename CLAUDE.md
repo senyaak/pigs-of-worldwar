@@ -431,14 +431,37 @@ burst (not built — the particle half is undecoded past its 40-byte record).
 `lib/game/effects.ts` is the rules, `three/effects.ts` the geometry,
 `../pigs-disasm/effects/notes.md` the read.
 
-One number in it is the remake's own and says so: a ring's SIZE rides
+**A thing BREAKING is a different effect, and that one IS the smoke.** Play
+said so — "там ещё чёрный дым в игре при уничтожении чего либо" — and the
+binary agrees: the object's own break handler (0x48d750, whose last act is to
+run its map-script command) spawns effect **0x3e** at a point jittered ±32
+about it, which resolves to parameter row **0**, and row 0 has no rings in it
+at all. What it has is the BURST: **six particles**, colour 0x4210 — sixteen
+of thirty-one on every channel, the exact default the particle setter
+compares against — fanned round the horizontal and RISING, because the byte
+the engine subtracts from the y velocity is buoyancy in a Y-down world. So a
+hit makes rings and a breaking makes smoke, and they are not the same code
+path. `onBroken` in `three/battle.ts` is the hook, the same way the exe hangs
+it on the object rather than on the blow.
+
+Row 0 also enables four stages through two spawners the read did not open
+(0x48bff0 twice, 0x48c160 twice), so there is MORE to a breaking than the six
+puffs. And three of the burst's numbers — the age step, the jitter and the
+rise — are assigned to fit rather than pinned: the argument order into
+0x486b30 did not come out of the read cleanly. `lib/game/effects.ts` says so
+at the field. Correct them against play.
+
+Two numbers in it are the remake's own and say so: a ring's SIZE rides
 `MODEL_SCALE`. The exe computes the radius in world units, but in a world
 whose pigs are twice the size of these, so an unscaled band would read as
 twice the blow. Same argument as the chase camera's distances — a rig around
-a BODY halves with the body, and the terrain does not. A spec cannot see a
-transparent quad, so `pow.debug.effects()` counts the live rings, and
-`e2e/002/strike.spec.ts` reads a high-water mark the PAGE keeps once a frame:
-polling from the test misses a half-second window outright.
+a BODY halves with the body, and the terrain does not. The other is how big a
+puff of SMOKE is drawn and what it is drawn with — a soft blob on a canvas —
+since the half of the system that draws a particle (0x48a570) is not read at
+all. A spec cannot see a transparent quad, so `pow.debug.effects()` counts the
+live rings and `pow.debug.smoke()` the puffs, and `e2e/002/strike.spec.ts`
+reads a high-water mark the PAGE keeps once a frame: polling from the test
+misses a half-second window outright.
 
 **Health is POINTS, the maximum is the CLASS's, and it is not 100.** The
 constructor reads it out of a 128-byte record per class at 0x4d02e0 — the

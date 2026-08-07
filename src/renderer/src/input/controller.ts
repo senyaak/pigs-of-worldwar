@@ -135,6 +135,8 @@ export interface DebugHooks {
   strike(): unknown
   /** How many effect rings a blow has in the air (three/effects.ts). */
   effects(): number
+  /** How many puffs of smoke a breaking has in the air (three/effects.ts). */
+  smoke(): number
   /** Every pig's health, in turn order. */
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */

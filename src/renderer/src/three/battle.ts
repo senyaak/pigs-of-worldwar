@@ -267,6 +267,10 @@ export function buildBattle(
     numbers,
     effects,
     onBroken: (target) => {
+      // The exe throws this off the object's own BREAK handler (0x48d750),
+      // not off the blow — a different effect from the hit, and the one play
+      // remembers as smoke.
+      effects.broke(target)
       props.take(target.id)
       obstacles.remove(target.id)
     }
@@ -506,6 +510,7 @@ export function buildBattle(
     swinging: () => swings.running(),
     strike: () => swings.lastStrike(),
     effects: () => effects.live(),
+    smoke: () => effects.smoke(),
     warp: (x, z, heading) => {
       game.moveCurrentPig(x, z, heading)
       swings.reset()

@@ -8,6 +8,7 @@ import { test, expect } from '@playwright/test'
 
 import { FRAME_SECONDS } from '../../src/lib/game/ballistics'
 import {
+  BREAK_EFFECT,
   RING_DEAD,
   advanceEffect,
   beginEffect,
@@ -104,6 +105,41 @@ test('an effect is spent once its last ring has gone', () => {
   expect(spent(effect)).toBe(false)
   frames(effect, 30)
   expect(effect.rings).toHaveLength(0)
+  expect(spent(effect)).toBe(true)
+})
+
+test('a thing BREAKING makes smoke and not one ring', () => {
+  // Row 0 is a different animal from the hand-to-hand rows: stages F, G and H
+  // are all off, and what it has is the burst.
+  expect(BREAK_EFFECT.rings).toHaveLength(0)
+  const effect = beginEffect(BREAK_EFFECT, { x: 0, y: -100, z: 0 })
+  frames(effect, 2)
+  expect(effect.smoke).toHaveLength(0)
+  frames(effect, 1) // the burst is on frame 3
+  expect(effect.smoke).toHaveLength(6)
+})
+
+test('the smoke RISES — the byte the engine calls gravity is buoyancy', () => {
+  // y is DOWN in this space, and the engine SUBTRACTS the byte from the y
+  // velocity every frame, so a puff climbs and climbs faster.
+  const effect = beginEffect(BREAK_EFFECT, { x: 0, y: 0, z: 0 })
+  frames(effect, 3)
+  const puff = effect.smoke[0]
+  expect(puff.y).toBeLessThan(0)
+  const firstStep = puff.y
+  frames(effect, 1)
+  expect(puff.y - firstStep).toBeLessThan(firstStep)
+  // …and outward at the same time: it left along its own bearing.
+  expect(Math.hypot(puff.x, puff.z)).toBeGreaterThan(0)
+})
+
+test('the smoke goes out, and the effect with it', () => {
+  const effect = beginEffect(BREAK_EFFECT, { x: 0, y: 0, z: 0 })
+  frames(effect, 3)
+  expect(spent(effect)).toBe(false)
+  // A step of 10 is ten frames of life, counted from the frame it appeared.
+  frames(effect, 10)
+  expect(effect.smoke).toHaveLength(0)
   expect(spent(effect)).toBe(true)
 })
 
