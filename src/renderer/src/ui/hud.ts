@@ -84,8 +84,10 @@ export const LAYOUT = {
       /** The ring's inside, where the chosen skill's icon goes. Measured off
        * the assembled art: `ang2` and `ang4` are 64 wide from x 64, `ang5`
        * caps the right at x 128 and is 24 more, and the pair runs y 22..100.
-       * The icon is centred in it, and one of the menu's own 56×34 ones. */
-      icon: { x: 64, y: 22, width: 88, height: 78 }
+       * The icon is centred in it, and one of the menu's own 56×34 ones —
+       * with the box pulled 7 left of the arithmetic, which is where it sits
+       * against the art in play. */
+      icon: { x: 57, y: 22, width: 88, height: 78 }
     },
     green: [104, 168, 72] as [number, number, number],
     /** How much of the battle shows through that green. */
