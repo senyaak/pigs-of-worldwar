@@ -22,6 +22,7 @@
 // since a wide window is wider than 640 of these units.
 
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import { aimRadians } from '../../../lib/game/aim'
 import { loadFont } from './font'
 import type { Font } from './font'
 import { loadTims, tinted } from './sprites'
@@ -118,6 +119,10 @@ export interface HudState {
   still: number
   /** `gtext`, for naming the skill under the menu's cursor. */
   strings: string[]
+  /** Where the weapon in hand points, in the game's own angle units, or null
+   * when nothing that aims is out — the needle rests level then
+   * (lib/game/aim.ts). */
+  aim: number | null
   /** The level's opening card — "TRAINING MISSION: BOOT CAMP" — while the
    * squad is still in the air, and null once it is down (ui/titleCard.ts). */
   title: string | null
@@ -317,8 +322,16 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       blit(art.get('ang2'), dialX + DIAL.slot.x, dialY + DIAL.slot.top)
       blit(art.get('ang4'), dialX + DIAL.slot.x, dialY + DIAL.slot.bottom)
       blit(art.get('ang5'), dialX + DIAL.slot.cap.x, dialY + DIAL.slot.cap.y)
+      // The needle turns on the hub, and it is the aim angle it shows: the
+      // arc is a half-disc and the angle's own limit is ±1023 of 4096, which
+      // is the same ±90° (lib/game/aim.ts).
       const needle = art.get('angpoint')
-      blit(needle, dialX + DIAL.hub.x - needle.width, dialY + DIAL.hub.y - needle.height / 2)
+      context.save()
+      context.scale(scale, scale)
+      context.translate(dialX + DIAL.hub.x, dialY + DIAL.hub.y)
+      context.rotate(aimRadians(state.aim ?? 0))
+      context.drawImage(needle.image, -needle.width, -needle.height / 2)
+      context.restore()
 
       // The skill menu goes over the brass, since it is a MODE rather than
       // another gauge: while it is up the pig cannot be driven.

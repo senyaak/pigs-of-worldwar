@@ -39,13 +39,21 @@ Controls in the battle (tank-style, as in the original):
 | `D` / `→` | turn right |
 | `Space` | jump — and, in the skill menu, take what is under the cursor |
 | `R` | open the skill menu (the original's own key is Return) |
+| `Q` / `E` | aim up / down (the original's are Page Up and Page Down) |
 | `Enter` | end turn |
 
 Walk into a crate to collect it: what is inside goes into the pig's
 inventory — fifteen slots, as in the original, and everything is unlimited on
 the training ground — or straight into its health. `R` opens the menu over
 what it is carrying; the same walk/turn keys move the cursor while it is up,
-and the pig stands still. Nothing fires yet.
+and the pig stands still.
+
+`Space` in that menu takes the skill in hand: the pig reaches for it, comes
+up holding its model out of `Chars/WEAPONS.MAD`, and stands in the weapon's
+own aiming pose. `Q` and `E` point it, ±90° and accelerating while held, and
+the brass dial top right shows where. A rifle comes up level and a grenade
+already lobbing at 45°, which is the weapon's own record talking. Nothing
+fires yet.
 
 Every one of these is a named action in
 [src/renderer/src/input/controller.ts](src/renderer/src/input/controller.ts);
@@ -90,8 +98,8 @@ moved off the display it fills, and that spec is about exactly that.
 
 A battle you can walk around: the map's own terrain, props and squads, the
 turn clock, the parachute drop the level opens with, the training ground's
-crates and the instructor talking you through them, and the skill menu over
-what a pig is carrying.
+crates and the instructor talking you through them, the skill menu over what
+a pig is carrying, and the weapon it takes out of it — held, posed and
+aimed.
 
-Next up: the fight itself — choosing a skill actually doing something, the
-weapon panel, aiming and damage.
+Next up: firing one. The power gauge, the shot itself and damage.

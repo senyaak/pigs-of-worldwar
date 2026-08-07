@@ -32,8 +32,9 @@ export interface Pig {
    * picked up (lib/game/inventory.ts). A pig starts with nothing — every
    * shipped map hands out its weapons in crates. */
   carrying: Slot[]
-  /** The skill chosen out of the menu, or null for empty hands. Nothing
-   * fires it yet — it is what the weapon panel will show. */
+  /** The skill chosen out of the menu, or null for empty hands. The pig
+   * takes its model in hand and aims it (lib/game/weapons.ts, aim.ts);
+   * nothing FIRES it yet. */
   holding: number | null
   position: { x: number; z: number }
   /** Facing, radians around Y in the game's own space. */

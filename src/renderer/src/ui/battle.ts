@@ -211,6 +211,7 @@ export function initBattle(onLeave: () => void): BattleView {
       pigs: scene.plates(hudCanvas.clientWidth, hudCanvas.clientHeight),
       still: scene.still(),
       strings: battleText,
+      aim: scene.aim(),
       // The card is up for exactly as long as anyone is still in the air.
       title: scene.dropping() ? title : null
     })
@@ -235,6 +236,7 @@ export function initBattle(onLeave: () => void): BattleView {
   const pushIntent = (): void => {
     const walk = (controller.isDown('walkForward') ? 1 : 0) - (controller.isDown('walkBack') ? 1 : 0)
     const turn = (controller.isDown('turnRight') ? 1 : 0) - (controller.isDown('turnLeft') ? 1 : 0)
+    const aim = (controller.isDown('aimUp') ? 1 : 0) - (controller.isDown('aimDown') ? 1 : 0)
     // The menu is a MODE, as it is in the exe: while it is up the pig stands
     // still and the keys move the cursor instead.
     if (hud.skills.open()) {
@@ -242,10 +244,12 @@ export function initBattle(onLeave: () => void): BattleView {
       if (turn !== 0 && steered.turn === 0) hud.skills.move(turn, 0)
       steered = { walk, turn }
       scene?.setIntent(0, 0)
+      scene?.setAim(0)
       return
     }
     steered = { walk: 0, turn: 0 }
     scene?.setIntent(walk, turn)
+    scene?.setAim(aim)
   }
   controller.onChange(pushIntent)
   controller.onAction((action) => {
@@ -259,9 +263,10 @@ export function initBattle(onLeave: () => void): BattleView {
       return
     }
     if (hud.skills.open()) {
-      // In the menu, the jump key is the SELECT key: it takes the skill
-      // under the cursor in hand and puts the menu away. Nothing fires it
-      // yet — that is the weapon panel's half of the job.
+      // In the menu, the jump key is the SELECT key — SPACE, as in the
+      // original: it takes the skill under the cursor in hand and puts the
+      // menu away. The pig then reaches for it and holds it (three/battle).
+      // Nothing FIRES it yet.
       if (action === 'jump' && game) {
         game.currentPig.holding = hud.skills.chosen()
         hud.skills.close()

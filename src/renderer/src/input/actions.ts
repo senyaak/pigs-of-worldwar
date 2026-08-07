@@ -7,6 +7,8 @@ export const ACTIONS = [
   'turnLeft',
   'turnRight',
   'jump',
+  'aimUp',
+  'aimDown',
   'endTurn',
   'menuUp',
   'menuDown',
@@ -19,7 +21,14 @@ export const ACTIONS = [
 export type Action = (typeof ACTIONS)[number]
 
 /** Actions that do something while HELD, as opposed to on each press. */
-export const HELD_ACTIONS: readonly Action[] = ['walkForward', 'walkBack', 'turnLeft', 'turnRight']
+export const HELD_ACTIONS: readonly Action[] = [
+  'walkForward',
+  'walkBack',
+  'turnLeft',
+  'turnRight',
+  'aimUp',
+  'aimDown'
+]
 
 /** Physical keys → actions, in the battle. Several keys may share one. */
 export const DEFAULT_BINDINGS: Record<string, Action> = {
@@ -36,6 +45,11 @@ export const DEFAULT_BINDINGS: Record<string, Action> = {
   // about it says so — but RETURN ends the turn here, so the menu is on R
   // and the tutorial's wording is the one thing that disagrees.
   KeyR: 'skills',
+  // The original aims with PAGE UP and PAGE DOWN — a pair of keys nowhere
+  // near the walking hand. Q and E sit beside W and are held the same way
+  // the exe holds its own: they ramp (lib/game/aim.ts).
+  KeyQ: 'aimUp',
+  KeyE: 'aimDown',
   Enter: 'endTurn'
 }
 

@@ -21,6 +21,8 @@ import type { Pickup } from '../../../lib/game/pickups'
 import { amountOf, give } from '../../../lib/game/inventory'
 import type { GiveResult } from '../../../lib/game/inventory'
 import { isTrainingGround } from '../../../lib/game/tutorial'
+import { aimPhase, createAim, scrubsPose, updateAim } from '../../../lib/game/aim'
+import { weaponModelName, weaponOf } from '../../../lib/game/weapons'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
@@ -29,7 +31,9 @@ import type { Soldier, SoldierArt } from './squad'
 import { createChase } from './chase'
 import { createDropIn } from './dropIn'
 import { buildMarker } from './marker'
+import { createHeldWeapons } from './heldWeapon'
 import { exposeBattleDebug } from './debug'
+import { clipSeconds } from './clips'
 import { SILENT, loadBank } from '../audio/bank'
 import { BATTLE_SOUNDS, createBattleSounds } from '../audio/battle'
 import type { Bank } from '../audio/bank'
@@ -91,6 +95,11 @@ export interface BattleScene {
   setIntent(walk: number, turn: number): void
   /** Ask the acting pig to jump (ignored mid-air, swimming or sliding). */
   jump(): void
+  /** Point the weapon in hand: -1 down, 0 nothing held, +1 up. */
+  setAim(direction: number): void
+  /** Where the weapon in hand points, in the game's own angle units, or null
+   * when the pig is holding nothing that aims (lib/game/aim.ts). */
+  aim(): number | null
   /** Play one of the battle's own effects by name — what the dashboard uses
    * for the noises that belong to the game rather than to a pig. */
   sound(name: string): void
@@ -210,6 +219,19 @@ export function buildBattle(
   let stillAt = { x: 0, z: 0, heading: 0 }
   const intent = { walk: 0, turn: 0 }
   let jumpRequested = false
+  /** Which way the aim keys are pushing: -1 down, 0 nothing, +1 up. */
+  let aimIntent = 0
+  /** The weapons in hand, one mesh per pig that has one out. */
+  const weapons = createHeldWeapons()
+  /** What the acting pig had chosen last frame — a change is what brings a
+   * weapon out. */
+  let holding: number | null = null
+  /** Where it points (lib/game/aim.ts). */
+  let aim = createAim(null)
+  /** Seconds left of the getting-it-out clip. The exe puts the model in the
+   * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig
+   * reaches for the rifle and then has it. */
+  let readying = 0
   /** The acting pig's frame-by-frame state — walking, wedged, airborne —
    * lives in the pure domain (lib/game/locomotion); this scene only feeds
    * it intents and draws what it says. Reset whenever the acting pig
@@ -230,6 +252,9 @@ export function buildBattle(
 
   const focus = (pig: Pig): void => {
     loco = createLocomotion(query, pig.position.x, pig.position.z, pig.heading)
+    holding = pig.holding
+    aim = createAim(pig.holding)
+    readying = 0
     sounds.reset()
     chase.reset()
     marker.moveTo(pig.position.x, query.height(pig.position.x, pig.position.z), pig.position.z)
@@ -267,7 +292,9 @@ export function buildBattle(
     // until the beat is out, and any input ends it — and is then acted on in
     // this same frame, so nothing a player does is ever swallowed.
     if (game.starting) {
-      if (intent.walk !== 0 || intent.turn !== 0 || jumpRequested) game.beginTurn()
+      if (intent.walk !== 0 || intent.turn !== 0 || aimIntent !== 0 || jumpRequested) {
+        game.beginTurn()
+      }
       else {
         active.setClip(ANIM.IDLE)
         watch(active, delta)
@@ -304,11 +331,45 @@ export function buildBattle(
     active.place(loco.x, loco.y, loco.z, loco.heading)
     // Walking INTO a crate is how one is collected; there is no button.
     collect(active.pig)
+
+    // The weapon in hand, and where it points. Choosing one out of the menu
+    // is what starts it: the exe plays the getting-it-out clip and only puts
+    // the model in the hand once that has run (`Pig::ReadyWeapon` 0x469090,
+    // and the store at 0x4702c3 — lib/game/weapons.ts).
+    const weapon = weaponOf(active.pig.holding)
+    if (active.pig.holding !== holding) {
+      holding = active.pig.holding
+      // A weapon comes up pointing where its own record says: a rifle level,
+      // a grenade already lobbing at 45°.
+      aim = createAim(holding)
+      readying = weapon.readyClip > 0 ? clipSeconds(assets.clips[weapon.readyClip]) : 0
+      if (readying > 0) active.playOnce(weapon.readyClip)
+    }
+    readying = Math.max(0, readying - delta)
+    updateAim(aim, holding, weapon.aims ? aimIntent : 0, delta)
+    for (const soldier of squad.members) {
+      const reaching = soldier === active && readying > 0
+      weapons.show(soldier.mesh, reaching ? null : weaponModelName(soldier.pig.holding))
+    }
+
     // A committed clip — the jump's crouch, a landing's get-up — is started
     // once and left to play out; anything else is simply worn. The domain
     // says which is which and when a commitment ends, so this only has to
     // avoid restarting the one already running.
-    if (loco.commit) {
+    //
+    // A pig standing with a weapon out wears neither: it holds the weapon's
+    // aiming clip at the one frame its angle points at. That the pose is a
+    // FROZEN clip rather than an animation is the original's own
+    // (three/clips.ts); that it gives way the moment the pig walks is this
+    // remake's, since the exe's aiming mode is not decoded far enough to say
+    // what it allows.
+    const posing =
+      !loco.commit && loco.airborne === null && intent.walk === 0 && scrubsPose(holding)
+    if (readying > 0) {
+      // The getting-it-out clip has the pig to itself until it is done.
+    } else if (posing) {
+      active.pose(weapon.aimClip, aimPhase(aim.angle))
+    } else if (loco.commit) {
       if (!active.animating()) active.playOnce(loco.clip)
     } else {
       active.setClip(loco.clip)
@@ -371,6 +432,10 @@ export function buildBattle(
     jump() {
       jumpRequested = true
     },
+    setAim(direction) {
+      aimIntent = direction
+    },
+    aim: () => (scrubsPose(holding) ? aim.angle : null),
     sound(name) {
       bank.play(name)
     },
@@ -381,6 +446,7 @@ export function buildBattle(
       props.dispose()
       dropIn.dispose()
       marker.dispose()
+      weapons.dispose()
       squad.dispose()
       bank.dispose()
     }

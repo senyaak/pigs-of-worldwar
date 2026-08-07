@@ -577,15 +577,33 @@ would be a stand-in nobody asked for.
   collision world until the two halves are reconciled (collect off the
   step's target, or a shove that resolves) — `lib/game/obstacles.ts` says so
   where it drops them.
-- **A pig carries skills, can choose one, and cannot FIRE it.** Crates are
-  collected by walking into them (`three/battle.ts` → `lib/game/pickups.ts`),
-  the contents go into fifteen slots with the exe's own stacking rules
-  (`lib/game/inventory.ts`), and `R` opens the game's own menu over them —
-  `MENUTIMS.MAD`'s frame with an icon per skill and `SELECT.BMP` over the
-  cursor, driving in from the right with `S_OPEN` behind it
-  (`ui/skillMenu.ts`). Choosing one sets `pig.holding` and NOTHING reads it:
-  there is no weapon panel, no aiming and no damage. That is the next piece
-  of work, and it is the whole fight.
+- **A pig carries skills, takes one in hand, aims it, and cannot FIRE it.**
+  Crates are collected by walking into them (`three/battle.ts` →
+  `lib/game/pickups.ts`), the contents go into fifteen slots with the exe's
+  own stacking rules (`lib/game/inventory.ts`), and `R` opens the game's own
+  menu over them — `MENUTIMS.MAD`'s frame with an icon per skill and
+  `SELECT.BMP` over the cursor, driving in from the right with `S_OPEN`
+  behind it (`ui/skillMenu.ts`). `Space` there sets `pig.holding`, and from
+  that the scene plays the weapon's getting-it-out clip, hangs its model on
+  the pig's forearm bone and holds its aiming pose at the angle `Q`/`E`
+  drive (`lib/game/weapons.ts`, `lib/game/aim.ts`, `three/heldWeapon.ts`).
+  What is still missing is the shot: the power gauge, the projectile and
+  damage. `pigs-disasm/weapons/notes.md` has where to start —
+  `[game+0x4e4]` charges 0x50 a frame to 0xfff, and 0x47a2b6 onwards is a
+  per-weapon fire dispatcher nobody has read.
+
+  **The bayonet's pin is decoded and deliberately not applied.** 0x46a891
+  forces the aim angle to zero for skills 3 BAYONET and 5 CATTLE PROD, so in
+  the original those two cannot be aimed at all. The remake lets them aim
+  like everything else, by request — the bayonet is the training ground's
+  first weapon and tilting it is the whole of what a player does with it
+  until firing exists. One `if` in `clampAim` restores it.
+
+  Two more things there are the remake's own: which BONE a weapon hangs off
+  (the models carry one — `WE_RIF` and `WE_KNIFE` are wholly on bone 7, the
+  right forearm — but nothing was read that says the engine uses it), and
+  that the aiming pose gives way the moment the pig walks, since the exe's
+  aiming MODE is not decoded far enough to say what it allows.
 
   Three things in the menu are the remake's own and want play against them:
   where it sits and how it arrives (the exe computes its coordinates rather
@@ -612,7 +630,9 @@ would be a stand-in nobody asked for.
   FITS the window is held for, which reads faster than a line can be read.
 - **The rest of the battle screen, in the order play asks for it**: the MAP
   bottom left (`MAPICONS.MTD`: `map1` plus the pig, heart, pickup and prop
-  markers); and the WEAPON panel top right when there is a weapon.
+  markers); and the weapon SLOT beside the dial, which is drawn and stays
+  empty — the needle beside it now turns with the aim angle, but nothing
+  puts the chosen skill's icon in the slot.
 - **The menu has no entrance.** In the original the pieces DRIVE ON — the
   bars slide in rather than being there from the first frame. Deferred on
   purpose, along with the layout itself; whatever settles the coordinates

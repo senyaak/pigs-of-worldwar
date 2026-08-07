@@ -69,6 +69,17 @@ export interface Player {
    * it reads as a bounce.
    */
   playOnce(clip: Clip | null): void
+  /**
+   * Hold a clip at one point of it, `phase` running 0..1 from its first frame
+   * to its last. Nothing advances afterwards — call it again to move.
+   *
+   * This is how the original aims. The aiming clips are not animations
+   * anybody plays: `Pig::ChangeAimAngle` hands one to 0x471f50 with a fixed
+   * cursor worked out from the angle, so the clip is a sweep from full up to
+   * full down and the angle is a cursor into it
+   * (../../../pigs-disasm/weapons/notes.md).
+   */
+  pose(clip: Clip | null, phase: number): void
   /** Whether a `playOnce` is still running. False for a looping clip. */
   running(): boolean
   /** Advance time; call once per frame. */
@@ -120,9 +131,33 @@ export function createPlayer(pig: Pig): Player {
     action.play()
   }
 
+  // Scratch for `pose`, which runs every frame and allocates nothing.
+  const a = new THREE.Quaternion()
+  const b = new THREE.Quaternion()
+
   return {
     play: (clip) => start(clip, false),
     playOnce: (clip) => start(clip, true),
+    pose(clip, phase) {
+      if (!clip || clip.frameCount === 0) return
+      // A held pose is not a playing one: whatever the mixer was doing has to
+      // stop, or it would write the bones back on the next update.
+      mixer?.stopAllAction()
+      mixer = null
+      left = 0
+      const at = Math.max(0, Math.min(1, phase)) * (clip.frameCount - 1)
+      const first = Math.floor(at)
+      const second = Math.min(clip.frameCount - 1, first + 1)
+      const between = at - first
+      const boneCount = Math.min(BONE_COUNT, pig.bones.length)
+      for (let bone = 0; bone < boneCount; bone++) {
+        const one = (first * BONE_COUNT + bone) * 3
+        const two = (second * BONE_COUNT + bone) * 3
+        decodeRotation(clip.rotations[one], clip.rotations[one + 1], clip.rotations[one + 2], a)
+        decodeRotation(clip.rotations[two], clip.rotations[two + 1], clip.rotations[two + 2], b)
+        pig.bones[bone].quaternion.copy(a).slerp(b, between)
+      }
+    },
     running: () => left > 0,
     update(delta) {
       mixer?.update(delta)
