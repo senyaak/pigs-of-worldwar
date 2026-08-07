@@ -23,7 +23,7 @@ import type { GiveResult } from '../../../lib/game/inventory'
 import { isTrainingGround } from '../../../lib/game/tutorial'
 import { heal, isDead } from '../../../lib/game/health'
 import { targetsOf } from '../../../lib/game/targets'
-import { aimPhase, createAim, scrubsPose, updateAim } from '../../../lib/game/aim'
+import { aimPhase, aimRadians, createAim, scrubsPose, updateAim } from '../../../lib/game/aim'
 import { weaponModelName, weaponOf } from '../../../lib/game/weapons'
 import { meleeOf } from '../../../lib/game/melee'
 import { buildTerrain } from './terrain'
@@ -377,9 +377,20 @@ export function buildBattle(
           // picks mode 0x0E by WEAPON (0x492dfa) and gates it on the same test
           // the melee camera is gated on, which is false through a swing.
           soldier === squad.of(game.currentPig) && sighting && isGun(holding)
-          ? 'rifle'
+          ? 'scope'
           : 'chase'
-    chase.follow(soldier.pig, soldier.node.position.y, dropIn.riseOver(soldier), delta, view)
+    chase.follow(
+      soldier.pig,
+      soldier.node.position.y,
+      dropIn.riseOver(soldier),
+      delta,
+      view,
+      aimRadians(aim.angle)
+    )
+    // The pig's own body is IN the way of its own eye. Hide the acting model
+    // while the scope is up — every other pig stays, because those are what
+    // is being aimed at.
+    soldier.node.visible = view !== 'scope'
   }
 
   const focus = (pig: Pig): void => {

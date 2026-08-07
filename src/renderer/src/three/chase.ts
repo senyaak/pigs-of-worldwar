@@ -78,6 +78,22 @@ const MELEE_CLOSE = 1700 / 3072
  */
 const RIFLE_CLOSE = 2048 / 3072
 
+/**
+ * The SCOPE: the view down the weapon, from the pig's own eye.
+ *
+ * **This one is play's, not the exe's.** The mode table's rifle cam is a
+ * shoulder rig at a distance of 2048, and play says the aim view is FIRST
+ * PERSON with a scope ring round it — so the ring, the black beyond it and
+ * this camera are what the original does and the table is describing
+ * something else (or the handler overrides it, which was not traced).
+ *
+ * The eye sits at three quarters of a pig's height, and the camera is pushed
+ * a little along the aim so the pig's own snout is not in the frame — the
+ * acting model is hidden anyway, but the weapon in its hands is not.
+ */
+const EYE_HEIGHT = 240 * MODEL_SCALE
+const EYE_FORWARD = 200 * MODEL_SCALE
+
 /** Which way the rig is pointing at the pig from. */
 export type View =
   /** Over the shoulder — the ordinary battle camera. */
@@ -88,6 +104,8 @@ export type View =
   | 'melee'
   /** Straight behind and closer: sighting a gun. */
   | 'rifle'
+  /** Down the barrel: first person, looking where the weapon points. */
+  | 'scope'
 
 export interface Chase {
   /**
@@ -95,7 +113,16 @@ export interface Chase {
    * `delta` null snaps rather than glides — a new acting pig, not a frame.
    * `rise` is anything hanging ABOVE the pig that has to stay in shot.
    */
-  follow(pig: Pig, nodeY: number, rise: number, delta: number | null, view: View): void
+  follow(
+    pig: Pig,
+    nodeY: number,
+    rise: number,
+    delta: number | null,
+    view: View,
+    /** Where the weapon points, radians, positive UP. Only the scope reads
+     * it (lib/game/aim.ts). */
+    aim?: number
+  ): void
   /**
    * The chase's own wait, once a frame: parked through involuntary flight and
    * a beat beyond it, cleared the instant the player drives.
@@ -154,8 +181,27 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
     pig: Pig,
     nodeY: number,
     rise: number,
-    view: View
+    view: View,
+    aim: number
   ): { position: THREE.Vector3; target: THREE.Vector3 } => {
+    if (view === 'scope') {
+      // Game space is Y-DOWN and the rig is Y-up, hence the negations. The
+      // eye looks along the pig's own heading, pitched by the aim.
+      const eyeY = -framedY(pig, nodeY) + EYE_HEIGHT
+      const ahead = Math.cos(aim)
+      const position = new THREE.Vector3(
+        pig.position.x + Math.sin(pig.heading) * EYE_FORWARD * ahead,
+        eyeY + Math.sin(aim) * EYE_FORWARD,
+        -(pig.position.z + Math.cos(pig.heading) * EYE_FORWARD * ahead)
+      )
+      const reach = 4096
+      const target = new THREE.Vector3(
+        position.x + Math.sin(pig.heading) * reach * ahead,
+        position.y + Math.sin(aim) * reach,
+        position.z - Math.cos(pig.heading) * reach * ahead
+      )
+      return { position, target }
+    }
     const face = view === 'face'
     const waterline = -query.surface(pig.position.x, pig.position.z)
     // Looking a pig in the face means looking at the PIG: the canopy over it
@@ -192,9 +238,11 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
   }
 
   return {
-    follow(pig, nodeY, rise, delta, view) {
-      const { position, target } = want(pig, nodeY, rise, view)
-      if (delta === null || !snapped) {
+    follow(pig, nodeY, rise, delta, view, aim = 0) {
+      const { position, target } = want(pig, nodeY, rise, view, aim)
+      // The scope SNAPS. Easing a first-person view is motion sickness: the
+      // whole point of it is that the barrel and the frame are the same thing.
+      if (delta === null || !snapped || view === 'scope') {
         at.copy(position)
         snapped = true
       } else if (wait <= 0) {
