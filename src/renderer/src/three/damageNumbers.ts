@@ -45,6 +45,9 @@ export interface DamageNumbers {
   update(delta: number): void
   /** Where each one is on a view this big, oldest first. */
   project(camera: THREE.Camera, root: THREE.Object3D, width: number, height: number): FloatingNumber[]
+  /** How many are still floating — "the last damage" as something the beat
+   * after a blow can wait on (lib/game/aftermath.ts). */
+  live(): number
   /** Drop the lot — a new battle. */
   clear(): void
 }
@@ -81,6 +84,7 @@ export function createDamageNumbers(): DamageNumbers {
       }
       return out
     },
+    live: () => live.length,
     clear() {
       live = []
     }

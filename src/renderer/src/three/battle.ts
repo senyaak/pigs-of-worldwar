@@ -58,10 +58,9 @@ import { advanceFiring, beginFiring } from '../../../lib/game/shot'
 import type { Firing } from '../../../lib/game/shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from '../../../lib/game/aftermath'
 import type { Aftermath } from '../../../lib/game/aftermath'
-import { createWobble, updateWobble, wobbleAcross, wobbleUp } from '../../../lib/game/wobble'
+import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../../../lib/game/zoom'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
-import { MODEL_SCALE } from '../../../lib/game/scale'
 import { createShots } from './shots'
 import { createPigVoice } from '../audio/pigVoice'
 import type { FloatingNumber } from './damageNumbers'
@@ -202,7 +201,12 @@ export function buildBattle(
   const script = createScript(assets.objects)
   /** Crates that come down under a canopy, because the script says they are
    * pickups and the placer drops those from 0xC00 up (three/airDrop.ts). */
-  const airDrops = createAirDrops(props, assets.canopy, (id) => obstacles.restore(id))
+  const airDrops = createAirDrops(
+    props,
+    assets.canopy,
+    (id) => obstacles.restore(id),
+    () => bank
+  )
   for (const id of script.waiting()) {
     props.show(id, false)
     // Off the map means off it entirely: an invisible dummy is not something
@@ -497,10 +501,6 @@ export function buildBattle(
     // the exe's own drift is the hand moving, so it shifts the picture and
     // cannot steer the bullet (lib/game/wobble.ts). Across is perpendicular
     // to the pig's facing; up is up, which in this space is a SMALLER y.
-    const side = soldier.pig.heading + Math.PI / 2
-    const wantX = eyeAt.x + Math.sin(side) * wobbleAcross(wobble) * MODEL_SCALE
-    const wantY = eyeAt.y - wobbleUp(wobble) * MODEL_SCALE
-    const wantZ = eyeAt.z + Math.cos(side) * wobbleAcross(wobble) * MODEL_SCALE
     // …and the HEIGHT LAGS. The exe does not put the camera at the hand's y —
     // it moves a THIRD of the way there each frame and no further:
     //
@@ -513,9 +513,9 @@ export function buildBattle(
     // either axis is on its own. `eyeFrame < 0` is the first frame of a
     // sighting, where there is nothing to lag from.
     heldEye = {
-      x: wantX,
-      y: settled ? heldEye.y + (wantY - heldEye.y) * EYE_LAG : wantY,
-      z: wantZ
+      x: eyeAt.x,
+      y: settled ? heldEye.y + (eyeAt.y - heldEye.y) * EYE_LAG : eyeAt.y,
+      z: eyeAt.z
     }
     settled = true
     return heldEye
@@ -556,8 +556,11 @@ export function buildBattle(
       dropIn.riseOver(soldier),
       delta,
       view,
-      aimRadians(aim.angle),
-      0,
+      // The VIEW jitters; the shot does not. The exe feeds the aim camera the
+      // analogue axes, and a resting stick is never quite zero
+      // (lib/game/wobble.ts). The bullet still leaves along `[pig+0x304]`.
+      aimRadians(aim.angle + wobblePitch(wobble)),
+      aimRadians(wobbleYaw(wobble)),
       view === 'scope' ? scopeEye(soldier) : null
     )
     // The pig's own body is IN the way of its own eye. Hide the acting model
@@ -693,13 +696,18 @@ export function buildBattle(
         advanceScript(pending.id, pending.y)
         pending = null
       }
-      if (
-        advanceAftermath(
-          aftermath,
-          delta,
-          pending !== null || airDrops.falling() > 0 || shots.live() > 0
-        )
-      ) {
+      // Everything play named that this scene can answer for: a projectile
+      // still in the air, damage still landing, a body still coming apart,
+      // a crate still under its canopy. A pig swimming for the shore is on
+      // the list too and is not modelled — nothing knocks one into the water
+      // yet.
+      const settling =
+        pending !== null ||
+        effects.busy() ||
+        shots.live() > 0 ||
+        numbers.live() > 0 ||
+        airDrops.falling() > 0
+      if (advanceAftermath(aftermath, delta, settling)) {
         aftermath = null
         chase.reset()
       } else {

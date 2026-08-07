@@ -33,17 +33,32 @@ import { FRAME_SECONDS } from './ballistics'
 export const SETTLE_FRAMES = 15
 export const SETTLE = SETTLE_FRAMES * FRAME_SECONDS
 
+/**
+ * …and a CEILING on the whole thing, which is play's and not the exe's.
+ *
+ * "надо думаю ждать 2-3 секунды пока завершится всё" — and it is the crate
+ * that overruns: the break effect runs about a second, the canopy takes two
+ * and a half more from 0xC00 up, and a second of quiet on top makes four and
+ * a half. So the hold lets go after three seconds whatever is still going on;
+ * a crate that has not landed keeps coming down behind the ordinary camera,
+ * which it can, because nothing about a descent needs to be watched.
+ */
+export const AFTERMATH_MAX = 3
+
 export interface Aftermath {
   /** What the camera is on: where the thing fell, or the crate coming down to
    * replace it. Game space, Y-down. */
   at: { x: number; y: number; z: number }
   /** Seconds of quiet still owed. */
   quiet: number
+  /** Seconds this hold has run in total, against `AFTERMATH_MAX`. */
+  spent: number
 }
 
 export const beginAftermath = (at: { x: number; y: number; z: number }): Aftermath => ({
   at: { x: at.x, y: at.y, z: at.z },
-  quiet: SETTLE
+  quiet: SETTLE,
+  spent: 0
 })
 
 /** Look somewhere else — a crate takes the camera off the thing it replaces. */
@@ -57,10 +72,16 @@ export function watchAftermath(
 }
 
 /**
- * One frame. `busy` is anything the exe's own list would object to — a bullet
- * still up, a crate still under its canopy. True when the wait is over.
+ * One frame. `busy` is anything the exe's own list would object to, and play
+ * named the set: a projectile still in the air, damage still landing, a pig
+ * still swimming for the shore, a body still coming apart. Whatever the
+ * scene can answer for goes in there. True when the wait is over — either
+ * because everything settled and the quiet ran out, or because
+ * `AFTERMATH_MAX` did.
  */
 export function advanceAftermath(aftermath: Aftermath, delta: number, busy: boolean): boolean {
+  aftermath.spent += delta
+  if (aftermath.spent >= AFTERMATH_MAX) return true
   if (busy) {
     aftermath.quiet = SETTLE
     return false

@@ -32,70 +32,54 @@
 //
 // ## What this file is
 //
-// **The remake's own, and it borrows that last shape.** Play: "дрожание
-// совсем не то — щас плавает, а в оригинале прям дрожит." A sine floats; a
-// random walk with a fresh step every frame does not.
+// **A stick that never sits at zero.** Four passes looked for a tremor and
+// there is no dedicated one — but `0x495690`, the aim view's own handler,
+// ends by feeding the camera six signed bytes unpacked out of `[game+0x444]`
+// and `[game+0x44C]`, halved, on every frame no direction is held:
 //
-// **It moves the EYE, not the aim.** That is not a style choice — it is what
-// the binary does. The shot reads `[pig+0x304]` exactly and the rifle cam is
-// a POSITION on the hand, so in the original a tremor shifts the picture and
-// cannot steer the bullet. An angular jitter does both, swings the whole
-// world, and gets worse the further you look; at four times magnification it
-// is unusable. Play's second verdict — "дрож камеры всё ещё фу" — was that
-// one. So these are OFFSETS, in model units, across and up from wherever the
-// hand has the camera.
+// ```
+// 495699  (s8)[game+0x444]        /2        -> vtable +0x20
+// 4956af  (s8)([game+0x444] >> 8) /2, neg   -> vtable +0x1C
+// 4956c0  (s8)([game+0x444] >>16) /2        -> vtable +0x0C
+// 4956cd  (s8)([game+0x444] >>24) /2, neg   -> vtable +0x04
+// ```
 //
-// Set `SCALE` to zero and the scope still breathes on the hand's own 32 units
-// a breath; it just does not tremble on top.
+// Those are the ANALOGUE STICK axes. On the machine this game was made for
+// the sights are wired straight to a stick, and a resting stick reads a few
+// units either way and a different few every frame. That is a small, FAST,
+// ANGULAR tremor — nothing like a hand's slow sway, and nothing like a sine.
+// On a keyboard those bytes are zero and the sights are dead still, which is
+// what the remake had.
+//
+// So: an independent sample every engine frame, a couple of units of 4096,
+// on the two axes the sights have. **The angles, not the eye** — that is
+// where the exe puts it, and it is small enough not to steer a bullet
+// noticeably (the shot still reads the clean angle; only the view moves).
+//
+// `AMPLITUDE` is the knob. Zero it and the scope is dead still again.
 
-/** `8 + (rand() & 7)`: the step, straight off 0x49e07f. */
-const STEP_BASE = 8
-const STEP_SPREAD = 8
-/** `±0x80`: where it turns round, off 0x49e06c. */
-const LIMIT = 0x80
 /**
- * How much of it the sights get, as MODEL UNITS per unit of walk. EYEWORK: at
- * 0.25 the eye wanders ±32 units, which doubles the hand's own breath and is
- * about a tenth of a pig's width.
+ * How far the resting stick reads, in 4096ths, after the handler's halving.
+ * A byte axis is ±127 and a stick at rest sits in the low single figures;
+ * four units is about a third of a degree. EYEWORK.
  */
-const SCALE = 0.25
+const AMPLITUDE = 4
 
 export interface Wobble {
-  /** The two accumulators, `[obj+0x12A]` and `[obj+0x12C]`. */
-  up: number
-  across: number
-  /** Which way each is walking, `[obj+0x12E]` and `[obj+0x12F]`. */
-  upRising: boolean
-  acrossRising: boolean
-  /** Frames owed. The walk steps ONCE A FRAME at the engine's fifteen, and
-   * that is the whole point — stepping it per rendered frame at sixty would
-   * smooth it back into a float. */
+  /** The current sample on each axis, held for one engine frame. */
+  pitch: number
+  yaw: number
+  /** Frames owed. A new sample lands once an engine frame at fifteen a
+   * second — resampling per rendered frame at sixty would turn it into a
+   * blur, and holding it longer would turn it into a wobble. */
   owed: number
 }
 
-export const createWobble = (): Wobble => ({
-  up: 0,
-  across: 0,
-  upRising: true,
-  acrossRising: false,
-  owed: 0
-})
-
-/** One axis, one frame: step, and turn round at the stop. */
-function walk(value: number, up: boolean, random: () => number): { value: number; up: boolean } {
-  const step = STEP_BASE + Math.floor(random() * STEP_SPREAD)
-  const moved = up ? value + step : value - step
-  if (up && moved > LIMIT) return { value: moved, up: false }
-  if (!up && moved < -LIMIT) return { value: moved, up: true }
-  return { value: moved, up }
-}
+export const createWobble = (): Wobble => ({ pitch: 0, yaw: 0, owed: 0 })
 
 /**
- * Advance the tremor. `frames` is engine frames, not rendered ones — whole
- * steps only, so the jitter lands at fifteen a second however fast the screen
- * runs.
- *
- * `random` is injectable so a spec can pin the walk.
+ * Advance the tremor. `frames` is engine frames, not rendered ones.
+ * `random` is injectable so a spec can pin it.
  */
 export function updateWobble(
   wobble: Wobble,
@@ -104,25 +88,21 @@ export function updateWobble(
   random: () => number = Math.random
 ): void {
   if (!sighting) {
-    wobble.up = 0
-    wobble.across = 0
+    wobble.pitch = 0
+    wobble.yaw = 0
     wobble.owed = 0
     return
   }
   wobble.owed += frames
-  while (wobble.owed >= 1) {
-    wobble.owed -= 1
-    const u = walk(wobble.up, wobble.upRising, random)
-    wobble.up = u.value
-    wobble.upRising = u.up
-    const a = walk(wobble.across, wobble.acrossRising, random)
-    wobble.across = a.value
-    wobble.acrossRising = a.up
-  }
+  if (wobble.owed < 1) return
+  wobble.owed = wobble.owed % 1
+  wobble.pitch = (random() * 2 - 1) * AMPLITUDE
+  wobble.yaw = (random() * 2 - 1) * AMPLITUDE
 }
 
-/** How far the eye has wandered UP of where the hand put it, model units. */
-export const wobbleUp = (wobble: Wobble): number => wobble.up * SCALE
+/** How far off the pitch is this frame, in aim units. View only. */
+export const wobblePitch = (wobble: Wobble): number => wobble.pitch
 
-/** …and ACROSS, to the pig's right. Neither steers the barrel. */
-export const wobbleAcross = (wobble: Wobble): number => wobble.across * SCALE
+/** …and the yaw. The pig's own heading does not follow it: the model stands
+ * where it stands and only the sights move. */
+export const wobbleYaw = (wobble: Wobble): number => wobble.yaw

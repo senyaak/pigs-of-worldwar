@@ -834,6 +834,42 @@ the view manager's constructor seeding, `0x44E620` (polar to cartesian off the
 sin/cos tables), `0x46a960` (returns the aim angle), and the camera's own
 yaw/pitch accessors.
 
+### The beat has a ceiling, the crate has a voice, 2026-08-07
+
+**The hold now ends after three seconds whatever is going on.** Play: "надо
+думаю ждать 2-3 секунды пока завершится всё", and "без ящика гуд — с ящиком
+плохо". The crate was the overrun: the break effect runs about a second, the
+canopy takes two and a half more from 0xC00 up, and the exe's second of quiet
+on top made four and a half. `AFTERMATH_MAX = 3` in `lib/game/aftermath.ts`
+caps it; a crate still in the air keeps coming down behind the ordinary
+camera, which costs nothing.
+
+The busy list is play's, as far as this scene can answer it: a projectile in
+the air, damage still floating, a body still coming apart, a canopy still up.
+**A pig swimming for the shore is on their list and is NOT modelled** —
+nothing knocks one into the water yet; when it does, it goes in there.
+
+**The crate's canopy had no sound.** `BATTLE_SOUNDS.chute` was decoded far
+enough to name and then only ever played by the level's opening drop
+(`three/dropIn.ts`); `three/airDrop.ts` was silent. It plays now, and `land`
+on touchdown.
+
+**The reticle is the PC's.** Play thought it wrong and it is not: dumped all
+46 entries of `Language/Tims/dashtims.mad` for them to look at, and the answer
+came back "на пс1 была другая, но похоже для пк поменяли". `sights` + `target`
+stay. The other archives under `Language/Tims` were not dumped.
+
+**The tremor, fifth pass: a STICK THAT NEVER SITS AT ZERO.** The aim view's
+own handler ends by unpacking six signed bytes out of `[game+0x444]` and
+`[game+0x44C]`, halving them and feeding them to the camera on every frame no
+direction is held (0x495699 onwards) — the analogue axes. On the machine this
+was made for the sights are wired to a stick, and a resting stick reads a few
+units either way and a *different* few every frame: a small, fast, ANGULAR
+jitter. On a keyboard those bytes are zero, which is why the remake's sights
+were dead still and every invented substitute felt wrong. `lib/game/wobble.ts`
+is now an independent sample per engine frame, ±4 of 4096, on the angles.
+`AMPLITUDE` is the knob.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.

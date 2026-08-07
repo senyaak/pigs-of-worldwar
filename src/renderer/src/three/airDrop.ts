@@ -19,6 +19,8 @@ import type { Model, Texture } from '../api'
 import { buildCanopies } from './parachute'
 import type { Canopies } from './parachute'
 import type { MapProps } from './props'
+import { BATTLE_SOUNDS } from '../audio/battle'
+import type { Bank } from '../audio/bank'
 
 export interface AirDrops {
   /**
@@ -57,7 +59,10 @@ interface Falling {
 export function createAirDrops(
   props: MapProps,
   canopy: { model: Model; textures: Texture[] } | null,
-  onLanded: (id: number) => void
+  onLanded: (id: number) => void,
+  /** Asked for rather than held, like everywhere else the bank is used: it
+   * loads beside the scene. */
+  bank: () => Bank
 ): AirDrops {
   // A map with no `WE_PARA` in its install still drops the crate; it simply
   // has nothing to hang over it. Same call the drop-in makes.
@@ -77,6 +82,10 @@ export function createAirDrops(
         ground,
         canopy: canopies && mesh ? canopies.open(mesh) : null
       })
+      // A canopy opening has a noise and nothing was making it — the bank's
+      // `chute` was decoded far enough to name and then never played
+      // (audio/battle.ts).
+      bank().play(BATTLE_SOUNDS.chute)
     },
     update(delta) {
       for (let i = live.length - 1; i >= 0; i--) {
@@ -86,6 +95,7 @@ export function createAirDrops(
         if (!one.drop.landed) continue
         if (one.canopy && canopies) canopies.cut(one.canopy)
         live.splice(i, 1)
+        bank().play(BATTLE_SOUNDS.land)
         onLanded(one.id)
       }
     },
