@@ -26,26 +26,26 @@ const BONE_COUNT = 15
 
 /**
  * Which bones the weapon channel takes, and which it leaves to whatever is
- * playing underneath: the hip, the spine, the head and both arms — never the
- * legs.
+ * playing underneath: the two ARMS, and nothing else.
  *
- * WHICH bones is the remake's own; the SHAPE is not. The engine holds the two
- * channels as key-frame LISTS of six entries each and counts the leading
+ * WHICH branches is the remake's own; the SHAPE is not. The engine holds the
+ * two channels as key-frame LISTS of six entries each and counts the leading
  * non-null ones (0x440edf); six is exactly the skeleton's branch count — hip,
  * spine+head, each arm, each leg (docs/formats.md) — so the split is per
  * branch. The mask itself is inside `wh32lib.dll`'s `afGetKeyFrameList` and
  * has not been read.
  *
- * **The HIP has to be in it**, and the data says so out loud. In the aiming
- * pose the hip carries a yaw of 0.58 rad where an idle's is flat, and the
- * head carries −0.68 against it: the body turns a third of a right angle into
- * a rifle stance and the head turns back out of it, netting a pig that looks
- * where it points. Leave the hip out and only the counter-turn survives — the
- * pig aims straight ahead with its head cranked 39° to the side. The legs
- * still animate underneath, since they hang off the hip and only inherit its
- * turn.
+ * The head is the one that had to be settled in play, and the aiming clip
+ * explains why it is touchy: its hip carries a yaw of 0.58 rad where an
+ * idle's is flat and its head carries −0.68 back against it, so the pose is a
+ * bladed rifle stance with the head turned out of it — three numbers that
+ * only add up to "looking where you point" if you take all three. Taking the
+ * spine and head WITHOUT the hip leaves the counter-turn bare and the pig
+ * stares 39° off. Taking the hip as well was tried next and reads worse still
+ * — it swings the legs with it, since they hang off it. So the arms alone,
+ * and the pig keeps its own head.
  */
-const OVERLAY_BONES = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+const OVERLAY_BONES = [3, 4, 5, 6, 7, 8]
 
 // The MCAP rotation convention, settled by analysis of the shipped data
 // (pigs-disasm/anim/, three independent tests):
