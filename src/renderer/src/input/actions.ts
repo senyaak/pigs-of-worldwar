@@ -7,6 +7,7 @@ export const ACTIONS = [
   'turnLeft',
   'turnRight',
   'jump',
+  'fire',
   'aimUp',
   'aimDown',
   'endTurn',
@@ -50,6 +51,11 @@ export const DEFAULT_BINDINGS: Record<string, Action> = {
   // the exe holds its own: they ramp (lib/game/aim.ts).
   KeyQ: 'aimUp',
   KeyE: 'aimDown',
+  // The original fires with the SELECT button, bit 0x20 of its mask — the
+  // very same button that takes a skill out of the menu (exe 0x493796). That
+  // bit is SPACE here, and space already jumps, so firing gets a key of its
+  // own rather than a pig that cannot hop while it is armed.
+  KeyF: 'fire',
   Enter: 'endTurn'
 }
 

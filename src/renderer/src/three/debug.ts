@@ -36,6 +36,9 @@ export interface DebugParts {
   /** `gtext`, for naming what a pig is carrying. Empty on an install with
    * no strings, which is not a reason for the battle to refuse to run. */
   strings: () => string[]
+  /** Whether a hand-to-hand swing is under way, wind-up included — a spec
+   * cannot see the clip, and this is what says the pig is committed. */
+  swinging: () => boolean
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -71,6 +74,14 @@ export function exposeBattleDebug(parts: DebugParts): void {
         })),
       /** The skill chosen out of the menu, or null for empty hands. */
       holding: () => game.currentPig.holding,
+      /** Whether the acting pig is mid-swing: the ten-frame wind-up and the
+       * attack clip together (lib/game/melee.ts). */
+      swinging: () => parts.swinging(),
+      /** Every pig's health, side by side — what a bayonet is measured by. */
+      health: () =>
+        game.players.flatMap((player) =>
+          player.pigs.map((pig) => ({ name: pig.name, health: pig.health }))
+        ),
       /** The level's opening drop: who is still arriving and how far up they
        * are. `running` false is what says the battle has begun. */
       dropIn: () => dropIn.state(),

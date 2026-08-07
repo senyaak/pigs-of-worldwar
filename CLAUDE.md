@@ -263,6 +263,7 @@ and `../pigs-disasm/parachute/notes.md`.
   name plates), `chase.ts` the camera — the only thing in the battle that
   works in three's Y-up world — `dropIn.ts` the level's opening parachute
   phase, `parachute.ts` the canopy art, `marker.ts` the pointer overhead,
+  `swing.ts` the hand-to-hand strike — the one piece that has to read a BONE —
   `debug.ts` the `window.pow.debug` surface the e2e suite looks through, and
   `terrain.ts`/`props.ts`/`pig.ts`/`clips.ts`/`modelMesh.ts` as before.
 
@@ -577,7 +578,8 @@ would be a stand-in nobody asked for.
   collision world until the two halves are reconciled (collect off the
   step's target, or a shove that resolves) — `lib/game/obstacles.ts` says so
   where it drops them.
-- **A pig carries skills, takes one in hand, aims it, and cannot FIRE it.**
+- **A pig carries skills, takes one in hand, aims it, and SWINGS it — but
+  only the five that swing.**
   Crates are collected by walking into them (`three/battle.ts` →
   `lib/game/pickups.ts`), the contents go into fifteen slots with the exe's
   own stacking rules (`lib/game/inventory.ts`), and `R` opens the game's own
@@ -587,17 +589,54 @@ would be a stand-in nobody asked for.
   that the scene plays the weapon's getting-it-out clip, hangs its model on
   the pig's forearm bone and holds its aiming pose at the angle `Q`/`E`
   drive (`lib/game/weapons.ts`, `lib/game/aim.ts`, `three/heldWeapon.ts`).
-  What is still missing is the shot: the power gauge, the projectile and
-  damage. `pigs-disasm/weapons/notes.md` has where to start —
-  `[game+0x4e4]` charges 0x50 a frame to 0xfff, and 0x47a2b6 onwards is a
-  per-weapon fire dispatcher nobody has read.
+  `F` uses it, and the five hand-to-hand skills — 1 TROTTER, 2 KNIFE,
+  3 BAYONET, 4 SWORD, 5 CATTLE PROD — are the ones that answer, because the
+  original resolves those by CONTACT and the rest by a projectile that is
+  still unbuilt.
+
+  **The swing is four ANIMATION EVENTS, not a timer**, and that is the whole
+  shape of it. Fire writes a ten-frame fuse (`Pig::Fire` 0x469360); the fuse
+  runs out and `Pig::Attack` (0x469610) puts the record's own clip on the
+  PRIMARY channel and clears the weapon one — 22 for the bayonet, "Bayonet",
+  so a swing is whole-body and the aiming pose comes off for it. That clip
+  carries four key-frame events at phases 1243/1356/1469/1582, frames 11 to 14
+  of 36, and each one calls `Pig::HandToHandStrike` (0x475a00). Walking is
+  refused from the button down to the clip's end and turning for the clip
+  (0x46afd5, 0x46af43); the round is spent as the clip goes on, and a pig out
+  of them puts the weapon away. `lib/game/melee.ts` is the rules,
+  `three/swing.ts` the blade, `../pigs-disasm/weapons/melee.md` the read.
+
+  A strike is THREE points off bone 5, the hand — the weapon's row of the
+  table at 0x4d0ee0 in full, halved, and the bone itself — tested per AXIS
+  against 170/360/170 and then against a 67.5° cone off the attacker's facing.
+  **Whether that offset is model units or world units is the one judgement in
+  it**: the exe builds the point off a pose matrix whose scale is not read,
+  and taken as world units a bayonet would reach one and a half pigs past a
+  blade drawn half that long. So it rides the bone through the mesh's own
+  `MODEL_SCALE` and lands where the art is. Written up in `lib/game/melee.ts`.
+
+  Three things in it are decoded and deliberately NOT applied: the KNOCKBACK
+  (75 for a bayonet, at 45° up along the bearing — only the acting pig has a
+  locomotion state, so there is nothing to push), the BATTLE CRY `Pig::Fire`
+  plays out of the squad's own rotating counter, and the TRAINING DUMMY, which
+  takes the identical box test on CAMP (0x4762e0) and would want a prop that
+  can be damaged. CAMP fields ONE pig, so a swing has nothing to hit there —
+  `pow.swapMap('LIBERATE')`.
+
+  What is still missing is the other kind of shot: the power gauge, the
+  projectile and its damage. `[game+0x4e4]` charges 0x50 a frame to 0xfff and
+  0x47a2b6 onwards is the per-weapon dispatcher, of which only the melee arm
+  (0x469415) has been read.
 
   **The bayonet's pin is decoded and deliberately not applied.** 0x46a891
   forces the aim angle to zero for skills 3 BAYONET and 5 CATTLE PROD, so in
   the original those two cannot be aimed at all. The remake lets them aim
   like everything else, by request — the bayonet is the training ground's
   first weapon and tilting it is the whole of what a player does with it
-  until firing exists. One `if` in `clampAim` restores it.
+  until firing exists. One `if` in `clampAim` restores it. **The swing did
+  not change that**: the melee strike is built off the HAND BONE and never
+  reads the aim angle, so pointing a bayonet up is cosmetic either way. Still
+  the user's call.
 
   **The aiming pose is a SECOND animation channel, not a clip.** A pig has
   two of them — `Pig::SetAnim` (0x471ef0) writes one block of fields and

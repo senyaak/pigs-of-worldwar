@@ -40,6 +40,7 @@ Controls in the battle (tank-style, as in the original):
 | `Space` | jump — and, in the skill menu, take what is under the cursor |
 | `R` | open the skill menu (the original's own key is Return) |
 | `Q` / `E` | aim up / down (the original's are Page Up and Page Down) |
+| `F` | use what is in hand (the original fires with the select button) |
 | `Enter` | end turn |
 
 Walk into a crate to collect it: what is inside goes into the pig's
@@ -54,7 +55,18 @@ own aiming pose — which is a second animation channel over the walking one,
 so it can carry a rifle at a run. `Q` and `E` point it, ±90° and accelerating
 while held; the brass dial top right turns with the angle and its slot shows
 what is in hand. A rifle comes up level and a grenade already lobbing at 45°,
-which is the weapon's own record talking. Nothing fires yet.
+which is the weapon's own record talking.
+
+`F` uses it, and so far five skills answer: the ones the original resolves by
+CONTACT rather than by a projectile — the trotters, the knife, the **bayonet**,
+the sword and the cattle prod. The pig winds up for ten frames, swings the
+whole-body clip its record names, and the blade is live for four frames of it,
+sampled along its own length off the hand bone. Ten health off a pig it
+catches, once per swing, and only what is in front of it inside 67.5°. Walking
+is refused for the length of it, as the original refuses it. Guns and grenades
+still do nothing — the power gauge and the projectile are the next piece.
+CAMP fields one pig, so try it on a map with two sides:
+`pow.swapMap('LIBERATE')`.
 
 Every one of these is a named action in
 [src/renderer/src/input/controller.ts](src/renderer/src/input/controller.ts);
@@ -100,7 +112,9 @@ moved off the display it fills, and that spec is about exactly that.
 A battle you can walk around: the map's own terrain, props and squads, the
 turn clock, the parachute drop the level opens with, the training ground's
 crates and the instructor talking you through them, the skill menu over what
-a pig is carrying, and the weapon it takes out of it — held, posed and
-aimed.
+a pig is carrying, the weapon it takes out of it — held, posed and aimed —
+and the first attack: a bayonet you can swing at another pig for real damage.
 
-Next up: firing one. The power gauge, the shot itself and damage.
+Next up: the weapons that fire. The power gauge, the projectile, and the
+knockback a hit carries, which is decoded and waits on a struck pig having a
+locomotion state of its own.

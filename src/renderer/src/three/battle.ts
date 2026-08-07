@@ -23,6 +23,7 @@ import type { GiveResult } from '../../../lib/game/inventory'
 import { isTrainingGround } from '../../../lib/game/tutorial'
 import { aimPhase, createAim, scrubsPose, updateAim } from '../../../lib/game/aim'
 import { weaponModelName, weaponOf } from '../../../lib/game/weapons'
+import { meleeOf } from '../../../lib/game/melee'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
@@ -32,6 +33,7 @@ import { createChase } from './chase'
 import { createDropIn } from './dropIn'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
+import { createSwings } from './swing'
 import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
 import { SILENT, loadBank } from '../audio/bank'
@@ -95,6 +97,10 @@ export interface BattleScene {
   setIntent(walk: number, turn: number): void
   /** Ask the acting pig to jump (ignored mid-air, swimming or sliding). */
   jump(): void
+  /** Ask it to use what it is holding. Only the five hand-to-hand skills
+   * answer so far — a bayonet swings, a rifle does nothing
+   * (lib/game/melee.ts). */
+  fire(): void
   /** Point the weapon in hand: -1 down, 0 nothing held, +1 up. */
   setAim(direction: number): void
   /** Where the weapon in hand points, in the game's own angle units, or null
@@ -207,6 +213,9 @@ export function buildBattle(
   const dropIn = createDropIn(squad, query, assets.canopy, () => bank)
   const marker = buildMarker(root)
   const chase = createChase(host.camera, query)
+  // What a bayonet does when the fire key goes down. It reads bones, so it
+  // needs the squad and the root they hang in; the rules are pure next door.
+  const swings = createSwings({ squad, clips: assets.clips, bank: () => bank, root })
 
   host.scene.add(root)
   host.camera.near = 10
@@ -219,6 +228,8 @@ export function buildBattle(
   let stillAt = { x: 0, z: 0, heading: 0 }
   const intent = { walk: 0, turn: 0 }
   let jumpRequested = false
+  /** Whether the fire key went down since the last frame. */
+  let fireRequested = false
   /** Which way the aim keys are pushing: -1 down, 0 nothing, +1 up. */
   let aimIntent = 0
   /** The weapons in hand, one mesh per pig that has one out. */
@@ -255,6 +266,7 @@ export function buildBattle(
     holding = pig.holding
     aim = createAim(pig.holding)
     readying = 0
+    swings.reset()
     sounds.reset()
     chase.reset()
     marker.moveTo(pig.position.x, query.height(pig.position.x, pig.position.z), pig.position.z)
@@ -270,6 +282,7 @@ export function buildBattle(
     // for the first frame of the turn.
     if (dropIn.update(delta, jumpRequested)) {
       jumpRequested = false
+      fireRequested = false
       const arriving = squad.of(game.currentPig)
       if (arriving) watch(arriving, delta)
       onGameChanged()
@@ -282,6 +295,7 @@ export function buildBattle(
     if (game.tick(delta)) {
       game.endTurn()
       jumpRequested = false
+      fireRequested = false
       focus(game.currentPig)
     }
 
@@ -292,7 +306,7 @@ export function buildBattle(
     // until the beat is out, and any input ends it — and is then acted on in
     // this same frame, so nothing a player does is ever swallowed.
     if (game.starting) {
-      if (intent.walk !== 0 || intent.turn !== 0 || aimIntent !== 0 || jumpRequested) {
+      if (intent.walk !== 0 || intent.turn !== 0 || aimIntent !== 0 || jumpRequested || fireRequested) {
         game.beginTurn()
       }
       else {
@@ -314,13 +328,25 @@ export function buildBattle(
     // height, momentum, the wedge clock, which clip to wear — lives in the
     // locomotion state. Sync in, step one frame of the domain, sync back,
     // and draw exactly what it says.
+    // Fire is what starts a swing, and only the acting pig's own weapon
+    // answers. A press while one is already running is dropped, which is the
+    // exe's fire gate (0x467a10 refuses on the same two flags).
+    if (fireRequested) swings.begin(active)
+    fireRequested = false
+    // A swinging pig cannot be driven: the exe's walk refuses from the moment
+    // the button goes down until the clip is spent (0x46afd5 tests both the
+    // pending flag and the animation one) and its turn refuses for the clip
+    // alone (0x46af43).
+    const walking = swings.running() ? 0 : intent.walk
+    const turning = swings.swinging() ? 0 : intent.turn
+
     loco.x = active.pig.position.x
     loco.z = active.pig.position.z
     loco.heading = active.pig.heading
     updateLocomotion(
       loco,
       query,
-      { walk: intent.walk, turn: intent.turn, jump: jumpRequested },
+      { walk: walking, turn: turning, jump: jumpRequested },
       delta,
       // The squad is in the way too: every pig but the acting one, as the
       // body its own spawn marker measured (lib/game/obstacles).
@@ -337,6 +363,12 @@ export function buildBattle(
     active.place(loco.x, loco.y, loco.z, loco.heading)
     // Walking INTO a crate is how one is collected; there is no button.
     collect(active.pig)
+
+    // The swing, after the pig has been placed: the blade's own points come
+    // off the HAND bone, so where the pig is standing has to be settled first
+    // (three/swing.ts). It may put the weapon away on the way out — the last
+    // bayonet — which the block below then picks up.
+    swings.update(delta, active)
 
     // The weapon in hand, and where it points. Choosing one out of the menu
     // is what starts it: the exe plays the getting-it-out clip and only puts
@@ -365,6 +397,10 @@ export function buildBattle(
     // commitment of the same kind, and holds the pig until it is done.
     if (readying > 0) {
       // The getting-it-out clip has the pig to itself.
+    } else if (swings.swinging()) {
+      // …and so does the swing. `Pig::Attack` puts its clip on the PRIMARY
+      // channel and clears the weapon one (0x46971a), so a bayonet is a
+      // whole-body animation for as long as it lasts.
     } else if (loco.commit) {
       if (!active.animating()) active.playOnce(loco.clip)
     } else {
@@ -377,7 +413,8 @@ export function buildBattle(
     // with a weapon look like its own animation without there being one
     // (three/clips.ts). It lands seamlessly because the getting-it-out clip
     // ends on exactly the frame a level angle asks for.
-    const holdingUp = readying === 0 && loco.airborne === null && scrubsPose(holding)
+    const holdingUp =
+      readying === 0 && !swings.swinging() && loco.airborne === null && scrubsPose(holding)
     active.overlay(holdingUp ? weapon.aimClip : -1, aimPhase(aim.angle))
 
     // How long the pig has done nothing: what brings its name plate back.
@@ -416,8 +453,10 @@ export function buildBattle(
     bank: () => bank,
     still: () => still,
     strings: () => assets.strings,
+    swinging: () => swings.running(),
     warp: (x, z, heading) => {
       game.moveCurrentPig(x, z, heading)
+      swings.reset()
       loco = createLocomotion(query, x, z, heading)
       const soldier = squad.of(game.currentPig)
       if (!soldier) return
@@ -436,6 +475,9 @@ export function buildBattle(
     },
     jump() {
       jumpRequested = true
+    },
+    fire() {
+      fireRequested = true
     },
     setAim(direction) {
       aimIntent = direction

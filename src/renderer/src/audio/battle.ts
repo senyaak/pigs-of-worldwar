@@ -39,6 +39,19 @@ export const BATTLE_SOUNDS = {
    * of interface noises, and the exe's menu mode is not decoded far enough
    * to say which index it asks for. */
   menuOpen: 'S_OPEN',
+  /**
+   * A hand-to-hand swing, and what it lands with. All four are DECODED:
+   * `Pig::HandToHandStrike` plays 0x21 as the blade goes live (event id 61,
+   * 0x474c89) and the weapon's own impact index when it connects (0x476712) —
+   * 0x20 for the knife, the bayonet and the cattle prod, 0x22 for the sword,
+   * 0x51 for bare trotters and boots. Indices 33, 32, 34 and 81 of
+   * `Audio/sfxday.srl` are I_SWMISS, I_STAB, I_SWORD and P_PUNCH: the whoosh
+   * and the three ways of connecting (../pigs-disasm/weapons/melee.md).
+   */
+  whoosh: 'I_SWMISS',
+  stab: 'I_STAB',
+  sword: 'I_SWORD',
+  punch: 'P_PUNCH',
   /** A canopy opening over the level's drop-in. The bank carries P_CHUTE and
    * P_CHUTE1 and the exe's own choice is NOT decoded — `StartParachuting`
    * pushes 0x35 to an effect spawner, which is 53 and so is P_CHUTE, but the

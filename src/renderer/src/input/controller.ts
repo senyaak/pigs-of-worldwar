@@ -127,6 +127,11 @@ export interface DebugHooks {
   carrying(): { skill: number; name: string; amount: number }[]
   /** The skill in hand, chosen out of the menu, or null. */
   holding(): number | null
+  /** Whether the acting pig is mid-swing — the ten-frame wind-up and the
+   * attack clip together (lib/game/melee.ts). */
+  swinging(): boolean
+  /** Every pig's health, in turn order. */
+  health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }
   /** Every sound the battle has played, in order. */

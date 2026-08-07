@@ -275,6 +275,9 @@ export function initBattle(onLeave: () => void): BattleView {
       return
     }
     if (action === 'jump') scene?.jump()
+    // F uses what is in hand. Only the five hand-to-hand skills answer so
+    // far: a bayonet swings, a rifle waits for the shot to be built.
+    if (action === 'fire') scene?.fire()
     if (action === 'endTurn') {
       game?.endTurn()
       updateHud()
