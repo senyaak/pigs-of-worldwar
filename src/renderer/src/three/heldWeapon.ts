@@ -33,9 +33,14 @@
 // one, against 76 and 168 unmirrored, on hands 203 apart holding a rifle 581
 // long. Both hands stay on the weapon.
 //
-// Mirroring negates z on the positions AND the normals and pairs each bone
-// with its opposite number, so the shape and its lighting both come out
-// right; nothing carries a negative scale.
+// Mirroring negates z on the positions AND the normals, and then the mesh is
+// placed by MIRRORING ITS WHOLE TRANSFORM every frame rather than by hanging
+// it off the opposite arm. Hanging it there was tried and it arrives upside
+// down, because the two arms do not hold a rifle symmetrically: the rotation
+// that would fix it is about 93° — the roll that reads as upside down — and
+// it drifts 31 to 48 degrees across the aim sweep, so no fixed correction
+// exists. Reflecting the transform is exact at every frame instead, and
+// carries no negative scale, since the two flips cancel.
 //
 // A weapon whose model the archive does not carry — the rocket, the guided
 // missile, the grenade launcher all ask for entries past its end — simply
@@ -63,17 +68,14 @@ export interface HeldWeapons {
    * a hand that changed its mind in the meantime is left alone.
    */
   show(pig: PigMesh, name: string | null): void
+  /** Carry every held weapon to where its arm has moved. Once a frame, after
+   * the animation has been applied. */
+  update(): void
   dispose(): void
 }
 
-/**
- * Each bone paired with its opposite number. The skeleton's sides run along
- * Z — 3..5 and 6..8 the two arms, 9..11 and 12..14 the two legs, near-exact
- * mirrors of each other (bone 4 at z +199 against bone 7 at z −193) — so
- * mirroring a model means both flipping its z and swapping the bone it hangs
- * off. Hip, spine and head are their own opposites.
- */
-const MIRROR_BONE = [0, 1, 2, 6, 7, 8, 3, 4, 5, 12, 13, 14, 9, 10, 11]
+/** The body's midline: the skeleton's sides run along Z, not X. */
+const FLIP = new THREE.Matrix4().makeScale(1, 1, -1)
 
 /** Flip a model's geometry across the body's midline, normals included. */
 function mirrorZ(geometry: THREE.BufferGeometry): void {
@@ -118,7 +120,10 @@ export function createHeldWeapons(): HeldWeapons {
   const loading = new Set<string>()
   /** What each pig should be holding, and what it actually is. */
   const wanted = new Map<PigMesh, string | null>()
-  const held = new Map<PigMesh, { name: string; mesh: THREE.Mesh }>()
+  const held = new Map<
+    PigMesh,
+    { name: string; mesh: THREE.Mesh; bone: number; shift: THREE.Matrix4 }
+  >()
 
   const build = (model: Model, textures: Texture[]): Art => {
     const geometry = buildModelGeometry(model, textures)
@@ -126,9 +131,13 @@ export function createHeldWeapons(): HeldWeapons {
     return {
       geometry,
       materials: buildTextureMaterials(model, textures),
-      bone: MIRROR_BONE[mainBone(model)] ?? 0
+      bone: mainBone(model)
     }
   }
+
+  // Scratch for `update`, which runs every frame for every armed pig.
+  const arm = new THREE.Matrix4()
+  const inverse = new THREE.Matrix4()
 
   /** Bring one pig's hand up to date with what was asked of it. */
   const apply = (pig: PigMesh): void => {
@@ -162,9 +171,29 @@ export function createHeldWeapons(): HeldWeapons {
 
     const mesh = new THREE.Mesh(ready.geometry, ready.materials)
     mesh.name = name
-    mesh.position.copy(bindOffset(pig.bones, ready.bone)).negate()
-    ;(pig.bones[ready.bone] ?? pig.bones[0]).add(mesh)
-    held.set(pig, { name, mesh })
+    // Placed by hand every frame, off the arm it belongs to (`update`).
+    mesh.matrixAutoUpdate = false
+    // The bone's bind offset, mirrored — what turns a mirrored bind-pose
+    // position back into a bone-local one.
+    const at = bindOffset(pig.bones, ready.bone)
+    const shift = new THREE.Matrix4().makeTranslation(-at.x, -at.y, at.z)
+    pig.mesh.add(mesh)
+    held.set(pig, { name, mesh, bone: ready.bone, shift })
+    carry(pig)
+  }
+
+  /** One pig's weapon, put where the mirror image of its arm is now. */
+  const carry = (pig: PigMesh): void => {
+    const entry = held.get(pig)
+    if (!entry) return
+    const bone = pig.bones[entry.bone] ?? pig.bones[0]
+    // The arm has to be current: this runs after the animation wrote it.
+    bone.updateWorldMatrix(true, false)
+    inverse.copy(pig.mesh.matrixWorld).invert()
+    arm.multiplyMatrices(inverse, bone.matrixWorld)
+    // FLIP · arm · FLIP · shift — the arm's own transform, reflected.
+    entry.mesh.matrix.copy(arm).premultiply(FLIP).multiply(FLIP).multiply(entry.shift)
+    entry.mesh.matrixWorldNeedsUpdate = true
   }
 
   return {
@@ -172,6 +201,9 @@ export function createHeldWeapons(): HeldWeapons {
       if ((wanted.get(pig) ?? null) === name) return
       wanted.set(pig, name)
       apply(pig)
+    },
+    update() {
+      for (const pig of held.keys()) carry(pig)
     },
     dispose() {
       for (const { mesh } of held.values()) mesh.removeFromParent()
