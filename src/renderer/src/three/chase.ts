@@ -29,14 +29,46 @@ const CLEARANCE = 500 * MODEL_SCALE
  */
 const FACE_LIFT = 150 * MODEL_SCALE
 
+/**
+ * The MELEE view: the shoulder rig swung round and pulled in, which is what
+ * the original does and the only thing it uses its camera mode 19 for.
+ *
+ * Both numbers are the exe's. `Pig::Fire` calls `0x49f740(0x13, 0)` on the
+ * five hand-to-hand skills and nothing else ever asks for that mode
+ * (`../pigs-disasm/weapons/melee.md`); the mode's own handler is 0x4a4940,
+ * and with the flag 0 it takes the branch at 0x4a4bb5, which puts the camera
+ * at `pigYaw − 0x264` — 612 of 4096, **53.8° round from straight behind**,
+ * the ordinary chase being at the pig's own yaw with no offset at all
+ * (mode 0, 0x4a0ee0). The distance comes out of the per-mode table at
+ * 0x4d9528, six bytes a row: **1700** against the chase's 3072, so it also
+ * comes in to a little over half.
+ *
+ * A ratio rather than the number itself, because the rig's own distances are
+ * the remake's (see `want`) — what is faithful is the SWING and the
+ * PROPORTION. The mode's second column, 924 against the chase's 768, is not
+ * applied: its handler never reads that column.
+ *
+ * The side is the exe's sign and worth a look in play — it is one minus.
+ */
+const MELEE_TURN = (612 / 4096) * 2 * Math.PI
+const MELEE_CLOSE = 1700 / 3072
+
+/** Which way the rig is pointing at the pig from. */
+export type View =
+  /** Over the shoulder — the ordinary battle camera. */
+  | 'chase'
+  /** In front, face on: what a pig under a canopy is watched from. */
+  | 'face'
+  /** Round to the side and close in: a hand-to-hand swing. */
+  | 'melee'
+
 export interface Chase {
   /**
    * Point at a pig standing at `nodeY` (game space, the model's origin).
    * `delta` null snaps rather than glides — a new acting pig, not a frame.
    * `rise` is anything hanging ABOVE the pig that has to stay in shot.
-   * `face` swaps the shoulder view for the drop-in one, in front of the pig.
    */
-  follow(pig: Pig, nodeY: number, rise: number, delta: number | null, face: boolean): void
+  follow(pig: Pig, nodeY: number, rise: number, delta: number | null, view: View): void
   /**
    * The chase's own wait, once a frame: parked through involuntary flight and
    * a beat beyond it, cleared the instant the player drives.
@@ -95,8 +127,9 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
     pig: Pig,
     nodeY: number,
     rise: number,
-    face: boolean
+    view: View
   ): { position: THREE.Vector3; target: THREE.Vector3 } => {
+    const face = view === 'face'
     const waterline = -query.surface(pig.position.x, pig.position.z)
     // Looking a pig in the face means looking at the PIG: the canopy over it
     // is out of frame on purpose, so `rise` is ignored on this side.
@@ -110,10 +143,12 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
     // rig is built round a pig, so anything three times its height (a
     // canopy) needs the frame saying so rather than being cropped off.
     const back = face ? BACK : BACK + rise / (2 * Math.tan((camera.fov * Math.PI) / 360))
-    // Behind the shoulders normally; ahead of the snout on the way down.
-    const reach = face ? -back : back
-    const behindX = pig.position.x - Math.sin(pig.heading) * reach
-    const behindZ = pig.position.z - Math.cos(pig.heading) * reach
+    // Behind the shoulders normally; ahead of the snout on the way down; and
+    // round to one side, close in, for a swing.
+    const reach = face ? -back : view === 'melee' ? back * MELEE_CLOSE : back
+    const from = view === 'melee' ? pig.heading - MELEE_TURN : pig.heading
+    const behindX = pig.position.x - Math.sin(from) * reach
+    const behindZ = pig.position.z - Math.cos(from) * reach
     const terrainAtCamera = -query.surface(behindX, behindZ)
     const position = new THREE.Vector3(
       behindX,
@@ -124,8 +159,8 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
   }
 
   return {
-    follow(pig, nodeY, rise, delta, face) {
-      const { position, target } = want(pig, nodeY, rise, face)
+    follow(pig, nodeY, rise, delta, view) {
+      const { position, target } = want(pig, nodeY, rise, view)
       if (delta === null || !snapped) {
         at.copy(position)
         snapped = true

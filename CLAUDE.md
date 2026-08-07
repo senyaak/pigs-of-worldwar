@@ -615,6 +615,27 @@ would be a stand-in nobody asked for.
   blade drawn half that long. So it rides the bone through the mesh's own
   `MODEL_SCALE` and lands where the art is. Written up in `lib/game/melee.ts`.
 
+  **A swing has its own CAMERA, and it is the exe's.** `Pig::Fire` calls
+  `0x49f740(0x13, 0)` and mode 19 is asked for by that one site out of 82 —
+  its handler (0x4a4940, flag-0 branch) stands the camera at `pigYaw − 612` of
+  4096, **53.8° round from straight behind**, where the ordinary chase (mode
+  0) adds no offset at all, and at distance **1700** out of the per-mode table
+  at 0x4d9528 against the chase's 3072. `three/chase.ts` carries both as
+  `MELEE_TURN` and `MELEE_CLOSE` — the swing and the PROPORTION, since the
+  rig's own distances are the remake's. The remake holds it for the length of
+  the swing and then glides back, which is its own bracket: nothing has been
+  found that ends the mode in the exe. On a HIT the original moves again, to
+  mode 2 aimed at the victim (0x4760ab) — not done.
+
+  **The blade follows the AIM, and that is the remake's own, twice over.**
+  0x46a891 pins the bayonet's angle to zero and the strike never reads
+  `[pig+0x304]` — in the original a bayonet is level whatever the player does.
+  Here it swings about the hand with the angle (`tiltStrike`), by request, and
+  it is the other half of letting those two aim at all. It only DECIDES
+  anything at a steep angle: `STRIKE_RISE` is 360 against a pig 320 tall, so
+  a body within a body-height is caught either way. The swing CLIP does not
+  tilt with it — that is the thing to look at if it reads wrong.
+
   Three things in it are decoded and deliberately NOT applied: the KNOCKBACK
   (75 for a bayonet, at 45° up along the bearing — only the acting pig has a
   locomotion state, so there is nothing to push), the BATTLE CRY `Pig::Fire`

@@ -12,8 +12,16 @@
 
 import * as THREE from 'three'
 import type { Clip } from '../api'
-import { advanceSwing, beginSwing, meleeOf, strikeOffsets, struck } from '../../../lib/game/melee'
-import type { SwingState } from '../../../lib/game/melee'
+import {
+  advanceSwing,
+  beginSwing,
+  meleeOf,
+  strikeOffsets,
+  struck,
+  tiltStrike
+} from '../../../lib/game/melee'
+import type { Point, SwingState } from '../../../lib/game/melee'
+import { aimRadians } from '../../../lib/game/aim'
 import { amountOf, spend } from '../../../lib/game/inventory'
 import { clipSeconds } from './clips'
 import type { Soldier, Squad } from './squad'
@@ -49,6 +57,9 @@ export interface SwingParts {
   bank: () => Bank
   /** The battle's game-space root — what a bone's world point converts into. */
   root: THREE.Object3D
+  /** Where the acting pig is pointing, in the game's own angle units — the
+   * blade swings with it (`tiltStrike`, and it is the remake's own). */
+  aim: () => number
 }
 
 export function createSwings(parts: SwingParts): Swings {
@@ -61,26 +72,30 @@ export function createSwings(parts: SwingParts): Swings {
   const at = new THREE.Vector3()
 
   /** The three points the blade is sampled at, in game space. */
-  const points = (soldier: Soldier, skill: number): { x: number; y: number; z: number }[] => {
+  const points = (soldier: Soldier, skill: number): Point[] => {
     const weapon = meleeOf(skill)
     if (!weapon) return []
     const bone = soldier.mesh.bones[HAND] ?? soldier.mesh.bones[0]
     // The mixer wrote this frame's rotations; three would not fold them into
     // the world matrices until it drew, and the strike happens first.
     bone.updateMatrixWorld(true)
-    return strikeOffsets(weapon).map((offset) => {
+    const sampled = strikeOffsets(weapon).map((offset) => {
       at.set(offset.x, offset.y, offset.z)
       bone.localToWorld(at)
       parts.root.worldToLocal(at)
       return { x: at.x, y: at.y, z: at.z }
     })
+    // The last offset is (0,0,0), so the last point IS the hand — the hinge
+    // the aim tilts the blade about.
+    const hand = sampled[sampled.length - 1]
+    return tiltStrike(sampled, hand, soldier.pig.heading, aimRadians(parts.aim()))
   }
 
   /** Resolve the blade against everyone standing about, once. */
   const strike = (attacker: Soldier, skill: number): void => {
     const weapon = meleeOf(skill)
     if (!weapon) return
-    const sampled = points(attacker, skill)
+    const blade = points(attacker, skill)
     const from = {
       x: attacker.pig.position.x,
       z: attacker.pig.position.z,
@@ -96,7 +111,7 @@ export function createSwings(parts: SwingParts): Swings {
         y: target.node.position.y,
         z: target.pig.position.z
       }
-      if (!struck(sampled, from, body)) continue
+      if (!struck(blade, from, body)) continue
       already.add(target)
       target.pig.health = Math.max(0, target.pig.health - weapon.damage)
       parts.bank().play(BATTLE_SOUNDS[weapon.impact])

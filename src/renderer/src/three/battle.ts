@@ -30,6 +30,7 @@ import { buildMapProps } from './props'
 import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
 import { createChase } from './chase'
+import type { View } from './chase'
 import { createDropIn } from './dropIn'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
@@ -213,9 +214,6 @@ export function buildBattle(
   const dropIn = createDropIn(squad, query, assets.canopy, () => bank)
   const marker = buildMarker(root)
   const chase = createChase(host.camera, query)
-  // What a bayonet does when the fire key goes down. It reads bones, so it
-  // needs the squad and the root they hang in; the rules are pure next door.
-  const swings = createSwings({ squad, clips: assets.clips, bank: () => bank, root })
 
   host.scene.add(root)
   host.camera.near = 10
@@ -239,6 +237,17 @@ export function buildBattle(
   let holding: number | null = null
   /** Where it points (lib/game/aim.ts). */
   let aim = createAim(null)
+  /** What a bayonet does when the fire key goes down. It reads BONES, so it
+   * needs the squad and the root they hang in; the rules are pure next door
+   * (lib/game/melee.ts). The aim goes in because the blade swings with it,
+   * which is the remake's own addition and says so where it lives. */
+  const swings = createSwings({
+    squad,
+    clips: assets.clips,
+    bank: () => bank,
+    root,
+    aim: () => aim.angle
+  })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
    * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig
    * reaches for the rifle and then has it. */
@@ -249,16 +258,19 @@ export function buildBattle(
    * changes or is warped. */
   let loco: LocomotionState = createLocomotion(query, 0, 0, 0)
 
-  /** Camera and marker onto a pig, wherever it happens to be standing — or
-   * hanging: a pig still on its canopy is watched from the front, face on. */
+  /**
+   * Camera and marker onto a pig, wherever it happens to be standing — or
+   * hanging: a pig still on its canopy is watched from the front, face on,
+   * and one mid-swing from the side, which is the original's own camera mode
+   * for a hand-to-hand attack and the only thing that uses it (three/chase).
+   */
   const watch = (soldier: Soldier, delta: number | null): void => {
-    chase.follow(
-      soldier.pig,
-      soldier.node.position.y,
-      dropIn.riseOver(soldier),
-      delta,
-      dropIn.underCanopy(soldier)
-    )
+    const view: View = dropIn.underCanopy(soldier)
+      ? 'face'
+      : soldier === squad.of(game.currentPig) && swings.running()
+        ? 'melee'
+        : 'chase'
+    chase.follow(soldier.pig, soldier.node.position.y, dropIn.riseOver(soldier), delta, view)
   }
 
   const focus = (pig: Pig): void => {
