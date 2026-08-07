@@ -633,9 +633,9 @@ would be a stand-in nobody asked for.
   tutorial's intro reaches that ramp: whatever raises it is what will say
   how it is walked. Do not "fix" the collision for it before then.
 - **The map's SCRIPT is not run, so scripted objects are just there.** Field
-  14 is an object kind tag, and CAMP's 23s — eight dummies and the whole
-  second bridge — are the ones play remembers appearing partway through the
-  tutorial, along with the crates. The remake places everything at once, so
+  14 is the script OPCODE — decoded since, see the thread below — and CAMP's
+  23s (eight dummies and the whole second bridge) are records the original
+  starts ABSENT and places later. The remake places everything at once, so
   that bridge stands assembled from the first frame and reads as levitating
   steps: flat slabs at 2208, 1984 and 1472 over four supports, which is
   exactly what the file says and not a rendering fault.
@@ -658,15 +658,34 @@ would be a stand-in nobody asked for.
 **The next job, and where it starts.** The effect system was the other one
 and it is built (see below); this is what is left of that pair.
 
-1. **The map SCRIPT.** Three separate things now wait on it and they are one
-   job: the crate that drops in BY PARACHUTE when the first dummy goes down,
-   the tutorial's second bridge, and which dummy `[0x537df0]` has live. Play
-   is explicit about the first ("когда убиваешь первый — падает ящик на
-   парашутике с винтовкой") and the tutorial's own step list agrees — a step
-   ends on killing the dummy, collecting the crate, or reaching somewhere
-   (`lib/game/tutorial.ts`). The records are tagged already: field 14 = 23,
-   paired off by field 15 (`../pigs-disasm/objects/notes.md`). What is NOT
-   found is the code that runs it.
+1. **The map SCRIPT — FOUND, and not yet built.** Three things wait on it and
+   they are one mechanism: the crate that drops in when the training ground's
+   first dummy goes down, the tutorial's second bridge, and why most of CAMP's
+   dummies are not the one being struck at.
+
+   There is no script file and no interpreter loop. **Every POG record may
+   carry one COMMAND, and field 14 is its opcode** — the loader builds it out
+   of fields 14, 15, 16, 25 and 27 (0x4a6287) and hangs it on the object at
+   `+0x48`. It runs when the object is FINISHED: a dummy breaking (0x48d972,
+   the last thing its death handler does) or a crate being collected
+   (0x464633). So the script is a chain of "and then", one link per object,
+   and `Object::RunScript` is **0x4aa170** — twenty-three opcodes, byte map at
+   0x4aa814 into a jump table at 0x4aa7f8, and a command's position is a TILE
+   column and row (`<<9`, less 0x3f00) rather than the world coordinates a
+   record stores.
+
+   Two lines are the whole of the "scripted objects are just there"
+   divergence: field 14 of **21 or 23** clears `[obj+0x30]` and sets the
+   body's no-draw bit (0x4a62f2), so those records START ABSENT. Field 14 of
+   **19** — which `formats/pog.ts` already calls CARRIES, a crate — gets a
+   command ONLY on the training ground, and there it becomes opcode 21 with
+   field 15's low byte as its operand.
+
+   What is left to read before it can be built: `0x4a7130`, which turns those
+   fields into the command record (and so says whether a remake needs anything
+   beyond the POG); the bodies of the tutorial's own arms 0x4aa619 and
+   0x4aa6e7; and the site that PLACES an object that started absent. All of it
+   is `../pigs-disasm/script/notes.md`.
 
 Two smaller ones noted in play and not acted on: **a dying pig should come
 apart and leave its boots** (the exe already splits the two deaths and so
