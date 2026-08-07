@@ -140,14 +140,17 @@ test('a bayonet swung at a dummy knocks it down', async ({ app }) => {
   expect(peak.rings, 'the hit threw no rings').toBe(2)
   expect(peak.smoke, 'the dummy came apart without smoke').toBe(6)
 
-  // …and the pig still HAS the bayonet. On the training ground every skill
-  // arrives unlimited, and the exe's ammo pass checks that −1 FIRST — it
-  // skips the rounds-in-hand counter as well as the slot (0x469790), so
-  // `[pig+0x2f8]` never reaches zero and `ReadyWeapon(0)` never fires. Losing
-  // it after one swing was reported from play.
-  const after2 = await look(page)
-  expect(after2.carrying, 'the bayonet went away after one swing').toContain(BAYONET)
-  expect(after2.holding, 'the bayonet was put away after one swing').toBe(BAYONET)
+  // …and the bayonet is GONE, which play said before the binary did. Not
+  // because it ran out — the ammo pass checks the slot's −1 first and skips
+  // the rounds-in-hand counter with it (0x469790), so on the training ground
+  // nothing ever runs down. The SCRIPT takes it: breaking this dummy places
+  // the next things, and both placement arms call `Pig::ClearInventory` on
+  // the acting pig (0x468f50). A tutorial step hands you one weapon and takes
+  // it back when the step is done.
+  await expect
+    .poll(async () => (await look(page)).carrying, { timeout: 5000 })
+    .not.toContain(BAYONET)
+  expect((await look(page)).holding, 'the script left a weapon in its hands').toBeNull()
   // …and the map's SCRIPT ran: this dummy signals label 2, and a crate of
   // rifles waits on it. A crate is a pickup, so the placer drops it in from
   // 0xC00 up rather than switching it on (lib/game/script.ts).

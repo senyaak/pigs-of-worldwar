@@ -18,7 +18,7 @@ import type { LocomotionState } from '../../../lib/game/locomotion'
 import { ObstacleField, withPigs } from '../../../lib/game/obstacles'
 import { pickupsOf, reached, worthOf } from '../../../lib/game/pickups'
 import type { Pickup } from '../../../lib/game/pickups'
-import { amountOf, give } from '../../../lib/game/inventory'
+import { amountOf, clearSlots, give } from '../../../lib/game/inventory'
 import type { GiveResult } from '../../../lib/game/inventory'
 import { isTrainingGround } from '../../../lib/game/tutorial'
 import { heal, isDead } from '../../../lib/game/health'
@@ -197,15 +197,29 @@ export function buildBattle(
    * canopy drop from rather than the crate's own ground (0x4aa755).
    */
   const advanceScript = (id: number, fromY: number): void => {
-    for (const placed of script.finish(id)) {
-      if (placed.parachute) {
+    const placed = script.finish(id)
+    // Placing ANYTHING takes everything off the acting pig: the exe calls
+    // `Pig::ClearInventory` (0x468f50) inside both placement arms, on the pig
+    // whose turn it is. That is why the bayonet goes missing the moment the
+    // first dummy falls — the step is over, and the script hands the pig its
+    // next weapon instead (lib/game/inventory.ts).
+    //
+    // Clearing what it HOLDS is the remake's own line: the exe leaves
+    // `[pig+0x2f4]` pointing at a weapon the pig no longer owns, and here the
+    // model in its hands hangs off exactly that.
+    if (placed.length > 0) {
+      clearSlots(game.currentPig.carrying)
+      game.currentPig.holding = null
+    }
+    for (const one of placed) {
+      if (one.parachute) {
         // The collision world waits for the landing; a crate still in the air
         // is not standing anywhere.
-        airDrops.send(placed.id, fromY)
+        airDrops.send(one.id, fromY)
         continue
       }
-      props.show(placed.id, true)
-      obstacles.restore(placed.id)
+      props.show(one.id, true)
+      obstacles.restore(one.id)
     }
   }
 

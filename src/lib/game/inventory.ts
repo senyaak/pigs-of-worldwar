@@ -73,6 +73,24 @@ export function amountOf(slots: Slot[], skill: number): number {
   return slots.find((slot) => slot.skill === skill)?.amount ?? 0
 }
 
+/**
+ * Take EVERYTHING off a pig — `Pig::ClearInventory`, 0x468f50.
+ *
+ * It walks all fifteen slots (12 bytes each from `[pig+0x234]`: the skill,
+ * the amount, a byte) zeroing every one, then zeroes the count at
+ * `[pig+0x2e8]`. Nothing partial about it.
+ *
+ * **The map SCRIPT calls it, on the acting pig, every time it places
+ * something** (0x4aa6cb and 0x4aa7c5, inside both placement arms). That is
+ * the shape of the tutorial: a step hands you one weapon, you use it on what
+ * the step is about, and completing it takes the lot away and puts the next
+ * crate on the ground. So the bayonet going missing after the first dummy is
+ * not a weapon running out — it is the script clearing the pig.
+ */
+export function clearSlots(slots: Slot[]): void {
+  slots.length = 0
+}
+
 /** Spend one of `skill`. Unlimited slots never run down; a slot that hits
  * zero is dropped, which is what leaves the pig with nothing to select. */
 export function spend(slots: Slot[], skill: number): boolean {
