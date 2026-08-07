@@ -680,12 +680,38 @@ the second is measured from the world settling, not from the blow.
 пробел нажать") and `airDrop.ts` says so at the method — a pig cuts its own
 with the same key, and nothing in the exe has been read either way.
 
-The WOBBLE got a second pass and a bigger number — a degree was invisible, it
-is now about two and a half up and three across. Still entirely the remake's:
-`fire.md` now carries the negative result, because three places could have
-held a drift and none does (`Pig::Aim` clamps and returns with no RNG, the
-shot reads the angle exactly, and the rifle cam's table row is picked by a
-constant).
+### The scope is bolted to the HAND, 2026-08-07
+
+Play pushed back on the wobble — "если не нашёл, так надо лучше искать" — and
+they were right. The earlier negative result was right about the ANGLE and
+wrong about the question.
+
+`0x4a2e30`, the rifle cam, never reads its row of the mode table. It takes
+row 14 of the offset table at 0x4d0ee0 — **(44, 32, 230)**, the pistol's own
+muzzle point — and puts it through **bone 5** with `0x440fb0`, the same
+bone-to-world call the shot and the bayonet use. `[cam+0x60]` is zero for this
+mode so there is no smoothing: the camera is where the hand is, this frame.
+That also settles what the mode table could not — **the aim view IS first
+person**, and its 2048 is simply not read.
+
+So `three/chase.ts` mounts the scope there (`SCOPE_MOUNT`, `SCOPE_BONE`) and
+the battle hands it the posed world point. The wobble comes free: measured off
+the shipped `mcap.mad`, with the guns' aim pose held on the arm and the idle
+clip underneath, that mount travels ~32 model units across, 26 up and 13
+forward every 2.4-second breath. The DIRECTION is still built from the pig's
+heading and the aim angle, as the exe builds it, so a breathing hand shifts
+the view without steering it.
+
+`lib/game/wobble.ts` survives as a declared EXAGGERATION on top — a degree of
+breath is not what play wants to feel — now about four degrees up and five
+across. Zero both amplitudes and the scope still breathes, just quietly.
+
+**Sideways now moves at the same rate as up and down.** That is the remake's
+choice and `rampedStep` in `lib/game/aim.ts` says so: the pad gives the aim a
+ramp to 0x20 a frame (0x492bf5) and the turn a flat 0x40 the instant the key
+goes down (0x492bb8), so in the exe left/right is twice as fast AND instant.
+Only the aim view is changed; a pig turning on its feet turns as it always
+did.
 
 Left open on this whole thread, and all of it flagged where it lives: a gun's
 DAMAGE (`SHOT_DAMAGE = 20` is invented), the sniper's magnification, where a

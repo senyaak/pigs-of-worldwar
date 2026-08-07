@@ -24,7 +24,14 @@ import { isTrainingGround } from '../../../lib/game/tutorial'
 import { heal, isDead } from '../../../lib/game/health'
 import { targetsOf } from '../../../lib/game/targets'
 import type { Target } from '../../../lib/game/targets'
-import { aimPhase, aimRadians, createAim, scrubsPose, updateAim } from '../../../lib/game/aim'
+import {
+  aimPhase,
+  aimRadians,
+  createAim,
+  rampedStep,
+  scrubsPose,
+  updateAim
+} from '../../../lib/game/aim'
 import { weaponModelName, weaponOf } from '../../../lib/game/weapons'
 import { meleeOf } from '../../../lib/game/melee'
 import { buildTerrain } from './terrain'
@@ -32,7 +39,7 @@ import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
 import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
-import { createChase } from './chase'
+import { SCOPE_BONE, SCOPE_MOUNT, createChase } from './chase'
 import type { View } from './chase'
 import { createDropIn } from './dropIn'
 import { buildMarker } from './marker'
@@ -307,6 +314,8 @@ export function buildBattle(
   host.camera.updateProjectionMatrix()
 
   let time = 0
+  /** Scratch for the scope's eye, so a camera placement allocates nothing. */
+  const eyeAt = new THREE.Vector3()
   /** Seconds the acting pig has stood still, and where it stood. */
   let still = 0
   let stillAt = { x: 0, z: 0, heading: 0 }
@@ -325,6 +334,9 @@ export function buildBattle(
   let holding: number | null = null
   /** Where it points (lib/game/aim.ts). */
   let aim = createAim(null)
+  /** The sideways ramp the scope borrows off the aim, so left and right move
+   * at the rate up and down do (lib/game/aim.ts). */
+  const scopeTurn = { rate: 0 }
   /** The damage that floats off whatever was just hit — the original's own
    * effect, showing points (three/damageNumbers.ts). */
   const numbers = createDamageNumbers()
@@ -421,6 +433,22 @@ export function buildBattle(
    * exact, and the wobble is the remake's (lib/game/wobble.ts). */
   const aimedAngle = (): number => aim.angle + wobblePitch(wobble)
 
+  /**
+   * Where the scope looks FROM: `SCOPE_MOUNT` in the hand bone's space, in
+   * game space. The exe's rifle cam is bolted there (0x4a2ec0) and that is
+   * where its wobble comes from — the hand rides a breathing chest.
+   */
+  const scopeEye = (soldier: Soldier): { x: number; y: number; z: number } => {
+    const bone = soldier.mesh.bones[SCOPE_BONE] ?? soldier.mesh.bones[0]
+    // The mixer wrote this frame's rotations; three folds them into the world
+    // matrices at draw time and the camera is placed first.
+    bone.updateMatrixWorld(true)
+    eyeAt.set(SCOPE_MOUNT.x, SCOPE_MOUNT.y, SCOPE_MOUNT.z)
+    bone.localToWorld(eyeAt)
+    root.worldToLocal(eyeAt)
+    return { x: eyeAt.x, y: eyeAt.y, z: eyeAt.z }
+  }
+
   const watch = (soldier: Soldier, delta: number | null): void => {
     // A bullet in the air takes the camera off the pig altogether: the shot's
     // own tail hands the camera the projectile and asks for mode 1
@@ -457,7 +485,8 @@ export function buildBattle(
       delta,
       view,
       aimRadians(aimedAngle()),
-      aimRadians(wobbleYaw(wobble))
+      aimRadians(wobbleYaw(wobble)),
+      view === 'scope' ? scopeEye(soldier) : null
     )
     // The pig's own body is IN the way of its own eye. Hide the acting model
     // while the scope is up — every other pig stays, because those are what
@@ -612,13 +641,22 @@ export function buildBattle(
     const walking = swings.running() || firing ? 0 : intent.walk
     const turning = swings.swinging() || firing ? 0 : intent.turn
 
+    // Down the sights the two axes move together. The pad gives the turn a
+    // flat 0x40 the moment the key goes down and the aim a ramp to 0x20, so
+    // sideways is twice as fast and instant — which reads wrong in a scope.
+    // Play asked for them matched, and matching them means running the turn
+    // through the aim's own ramp (lib/game/aim.ts).
+    const scoping = sighting && isGun(holding) && !firing
+    const swung = scoping ? rampedStep(scopeTurn, turning, delta) : 0
+    if (!scoping) scopeTurn.rate = 0
+
     loco.x = active.pig.position.x
     loco.z = active.pig.position.z
-    loco.heading = active.pig.heading
+    loco.heading = active.pig.heading + aimRadians(swung)
     updateLocomotion(
       loco,
       query,
-      { walk: walking, turn: turning, jump: jumpRequested },
+      { walk: walking, turn: scoping ? 0 : turning, jump: jumpRequested },
       delta,
       // The squad is in the way too: every pig but the acting one, as the
       // body its own spawn marker measured (lib/game/obstacles).

@@ -30,6 +30,37 @@ export const AIM_RAMP = 2
 export const AIM_TOP = 32
 
 /**
+ * The same ramp, for anything else that wants to move at the aim's rate.
+ *
+ * The pad handler treats the two axes quite differently: the aim keys build
+ * `[game+0x304]` up by 2 a frame to a cap of 0x20 (0x492bf5), while the TURN
+ * keys push a flat 0x40 the instant they go down and never accumulate
+ * (0x492bb8). So sideways is twice as fast as up-and-down AND instant, which
+ * is exactly what a scope feels wrong doing.
+ *
+ * **Matching them is the remake's choice, not the exe's.** Play asked for it:
+ * "в стороны надо скорость передвижения камеры уменьшить — чтобы в верх в низ
+ * лево право одинаково быстро ездило в прицеле". Only the aim view is
+ * changed; a pig turning on its feet still turns at the flat rate it always
+ * did.
+ *
+ * Returns how many angle units this frame is worth, and advances the ramp.
+ */
+export function rampedStep(
+  ramp: { rate: number },
+  direction: number,
+  deltaSeconds: number
+): number {
+  if (direction === 0) {
+    ramp.rate = 0
+    return 0
+  }
+  const frames = deltaSeconds / FRAME_SECONDS
+  ramp.rate = Math.min(AIM_TOP, (ramp.rate === 0 ? AIM_RAMP : ramp.rate) + AIM_RAMP * frames)
+  return direction * ramp.rate * frames
+}
+
+/**
  * Where a weapon comes up pointing (`Pig::ReadyWeapon`, 0x46912c).
  *
  * Guns come up LEVEL and everything else at 45°, already lobbing — which is
@@ -118,14 +149,9 @@ export function updateAim(
   direction: number,
   deltaSeconds: number
 ): void {
-  if (direction === 0) {
-    // Letting go drops the accumulator, so the next press starts slow again.
-    aim.rate = 0
-    return
-  }
-  const frames = deltaSeconds / FRAME_SECONDS
-  // A fresh press is worth the step itself, not nothing — the exe writes the
-  // step into the accumulator on the frame the key goes down.
-  aim.rate = Math.min(AIM_TOP, (aim.rate === 0 ? AIM_RAMP : aim.rate) + AIM_RAMP * frames)
-  aim.angle = clampAim(skill, aim.angle + direction * aim.rate * frames)
+  // Letting go drops the accumulator, so the next press starts slow again; a
+  // fresh press is worth the step itself, not nothing, because the exe writes
+  // the step into the accumulator on the frame the key goes down. Both live
+  // in `rampedStep`, which the scope's sideways turn borrows.
+  aim.angle = clampAim(skill, aim.angle + rampedStep(aim, direction, deltaSeconds))
 }

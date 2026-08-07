@@ -1,19 +1,26 @@
 // The sights will not hold still.
 //
-// **All of this is the remake's own, and it was looked for properly.** Three
-// places could hold it and none does:
+// **The original's wobble was found, and it is not an angle.** Searching for
+// a drift term was the wrong search: nothing adds one. `Pig::Aim` (0x46a7f0)
+// takes the input, clamps to ±0x3FF and returns, with no call to the RNG on
+// the path, and the shot reads `[pig+0x304]` exactly (0x47a2b6).
 //
-// - `Pig::Aim` (0x46a7f0) adds the player's input to `[pig+0x304]`, clamps it
-//   to ±0x3FF and stops. No drift term, no call to the RNG.
-// - the shot reads `[pig+0x304]` exactly (0x47a2b6) — nothing is added on the
-//   way out of the barrel either;
-// - the rifle cam (0x4a2e30) builds its position off bone 5 and a row of the
-//   table at 0x4d0ee0, and the row is picked by `[0x4d0fa4]` — a CONSTANT,
-//   the only reference to that address in the whole image, so the offset does
-//   not cycle.
+// What moves is the CAMERA, because it is bolted to the pig's hand. The rifle
+// cam (0x4a2e30) does not build a position out of the mode table at all — it
+// takes row 14 of the offset table at 0x4d0ee0, `(44, 32, 230)`, and puts it
+// through bone 5 with the very call the muzzle uses (0x4a2ec0). The hand
+// rides the chest and the chest breathes: measured over clip 27 (IDLE, 36
+// frames) with the aim pose held on the arm, that mount point travels about
+// **32 model units across, 26 up and 13 forward** every breath.
 //
-// Play says the scope breathes, so it breathes here. This file is where to
-// come when the real thing turns up.
+// The remake mounts the camera there (`three/chase.ts`, `SCOPE_MOUNT`), so
+// that part is the original's and needs no help.
+//
+// **What is left in this file is the remake's own EXAGGERATION**, and it is
+// here because play asked twice for a bigger drift than the breath alone
+// gives — thirty-two units of sway is under a degree at the range a dummy
+// stands. Turn it off by setting both amplitudes to zero and the scope still
+// breathes; it just breathes as quietly as the original.
 //
 // It is a BREATH, not noise: two slow sines at periods that do not divide each
 // other, so the drift never settles into a visible loop and never jumps. And
@@ -24,17 +31,21 @@
 // Angles are the engine's 4096-to-the-turn units, like every other angle.
 
 /**
- * How far off it drifts, in 4096ths: about two and a half degrees up and down
- * and three across.
+ * How far the exaggeration drifts, in 4096ths: about four degrees up and down
+ * and five across. Pure EYEWORK, and the third pass — a degree was invisible
+ * and two and a half was still not what play wanted.
  *
- * Pure EYEWORK, and the second pass at it — the first was a degree apiece and
- * play could not see it. At the dummy-yard range of 1200 units this puts the
- * muzzle some fifty to seventy units off centre, which is a fifth of a pig
- * and still an easy shot.
+ * At the dummy yard's 1200 units that is some ninety to a hundred and twenty
+ * off centre, a third of a pig, so it is felt without making the shot a
+ * lottery.
  */
-const PITCH = 28
-const YAW = 36
-/** Seconds a cycle. Deliberately not a ratio of small whole numbers. */
+const PITCH = 45
+const YAW = 56
+/**
+ * Seconds a cycle. Deliberately not a ratio of small whole numbers, and
+ * deliberately not the breath's own 2.4 s (clip 27 at 15 Hz) — two periods
+ * that close would beat against each other and pulse.
+ */
 const PITCH_PERIOD = 2.7
 const YAW_PERIOD = 3.9
 

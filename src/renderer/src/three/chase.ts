@@ -79,20 +79,40 @@ const MELEE_CLOSE = 1700 / 3072
 const RIFLE_CLOSE = 2048 / 3072
 
 /**
- * The SCOPE: the view down the weapon, from the pig's own eye.
+ * The SCOPE: the view down the weapon, and it is BOLTED TO THE HAND.
  *
- * **This one is play's, not the exe's.** The mode table's rifle cam is a
- * shoulder rig at a distance of 2048, and play says the aim view is FIRST
- * PERSON with a scope ring round it — so the ring, the black beyond it and
- * this camera are what the original does and the table is describing
- * something else (or the handler overrides it, which was not traced).
+ * The mode's own handler was read properly the second time round and it
+ * settles the argument the table could not. 0x4a2e30 does not build a
+ * position from the mode table's 2048 at all — it takes a fixed point in
+ * BONE 5's space and turns it into a world point with the very call the
+ * muzzle and the bayonet use:
  *
- * The eye sits at three quarters of a pig's height, and the camera is pushed
- * a little along the aim so the pig's own snout is not in the frame — the
- * acting model is hidden anyway, but the weapon in its hands is not.
+ * ```
+ * 4a2e72  eax = [0x4d0fa4]                 ; = 14, a constant
+ * 4a2e86  dx  = [eax*8 + 0x4d0ee0]         ; 44
+ * 4a2e8d  ax  = [eax*8 + 0x4d0ee2]         ; 230   (y is pushed as 0... see below)
+ * 4a2ec0  0x440fb0(5, x, y, z, &out)       ; the HAND
+ * ```
+ *
+ * and row 14 of that table is **(44, 32, 230)** — the PISTOL's muzzle offset,
+ * used as the camera mount for every gun. `[cam+0x60]` is 0 for this mode
+ * (`0x49f740(0x0E, 0)`), which takes the short branch at 0x4a303a: no
+ * smoothing, the camera is where the hand is, this frame.
+ *
+ * So the aim view IS first person, play was right, and the mode table's
+ * distance column is simply not what this handler reads.
+ *
+ * **And this is where the wobble comes from.** The camera rides the hand, the
+ * hand rides the chest, and the chest breathes: with the aim pose held on the
+ * arm and clip 27 (IDLE, 36 frames) under it, this mount point travels about
+ * 32 model units across, 26 up and 13 forward over one breath. Nothing in the
+ * binary drifts the aim ANGLE — the remake looked and wrote up the negative
+ * result — because it does not need to. `lib/game/wobble.ts` is what the
+ * remake adds ON TOP, and says so.
  */
-const EYE_HEIGHT = 240 * MODEL_SCALE
-const EYE_FORWARD = 200 * MODEL_SCALE
+export const SCOPE_MOUNT = { x: 44, y: 32, z: 230 }
+/** The bone it hangs off. The same one a barrel and a blade do. */
+export const SCOPE_BONE = 5
 
 /** Which way the rig is pointing at the pig from. */
 export type View =
@@ -125,7 +145,11 @@ export interface Chase {
     /** How far the sights have drifted off the pig's own facing, radians.
      * Only the scope reads it, and only the sights move — the model stands
      * where it stands (lib/game/wobble.ts). */
-    yaw?: number
+    yaw?: number,
+    /** Where the scope's eye is: the world point the pig's HAND bone puts
+     * `SCOPE_MOUNT` at, handed in because only the scene can pose a
+     * skeleton. Game space, Y-down. Ignored by every other view. */
+    eye?: { x: number; y: number; z: number } | null
   ): void
   /**
    * Ride a bullet.
@@ -201,20 +225,18 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
     rise: number,
     view: View,
     aim: number,
-    yaw: number
+    yaw: number,
+    eye: { x: number; y: number; z: number } | null
   ): { position: THREE.Vector3; target: THREE.Vector3 } => {
-    if (view === 'scope') {
-      // Game space is Y-DOWN and the rig is Y-up, hence the negations. The
-      // eye looks along the pig's own heading, pitched by the aim and drifted
-      // by the wobble.
+    if (view === 'scope' && eye) {
+      // Game space is Y-DOWN and the rig is Y-up, hence the negations. WHERE
+      // the camera is comes off the hand bone; where it LOOKS does not — the
+      // exe builds the direction from the pig's own yaw and the aim angle
+      // (0x4a310c onwards), so a breathing hand shifts the view without
+      // steering it.
       const facing = pig.heading + yaw
-      const eyeY = -framedY(pig, nodeY) + EYE_HEIGHT
+      const position = new THREE.Vector3(eye.x, -eye.y, -eye.z)
       const ahead = Math.cos(aim)
-      const position = new THREE.Vector3(
-        pig.position.x + Math.sin(facing) * EYE_FORWARD * ahead,
-        eyeY + Math.sin(aim) * EYE_FORWARD,
-        -(pig.position.z + Math.cos(facing) * EYE_FORWARD * ahead)
-      )
       const reach = 4096
       const target = new THREE.Vector3(
         position.x + Math.sin(facing) * reach * ahead,
@@ -259,8 +281,8 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
   }
 
   return {
-    follow(pig, nodeY, rise, delta, view, aim = 0, yaw = 0) {
-      const { position, target } = want(pig, nodeY, rise, view, aim, yaw)
+    follow(pig, nodeY, rise, delta, view, aim = 0, yaw = 0, eye = null) {
+      const { position, target } = want(pig, nodeY, rise, view, aim, yaw, eye)
       // The scope SNAPS. Easing a first-person view is motion sickness: the
       // whole point of it is that the barrel and the frame are the same thing.
       if (delta === null || !snapped || view === 'scope') {
