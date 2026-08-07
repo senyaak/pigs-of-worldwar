@@ -17,7 +17,7 @@ import path from 'node:path'
 
 import { GAME_DIR, PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
-import { debugState, hud, landed } from '../controller'
+import { debugState, hud, landed, peakNodeY, tap } from '../controller'
 import { choose } from '../menu'
 import { parsePog, parachutesIn } from '../../src/lib/formats/pog'
 import { mapSpawns, spawnTeams } from '../../src/lib/game/spawns'
@@ -27,6 +27,7 @@ import {
   DROP_HEIGHT,
   DROP_SPREAD,
   createDrop,
+  cutChute,
   updateDrop
 } from '../../src/lib/game/parachute'
 import { DRAG_TAU } from '../../src/lib/game/locomotion'
@@ -99,6 +100,36 @@ test('the descent settles at the parachute force, not the falling one', () => {
   expect(createDrop(0, 1).y).toBeCloseTo(-DROP_HEIGHT - DROP_SPREAD)
 })
 
+test('cutting the canopy hands the pig back to gravity', () => {
+  const settled = CHUTE_TERMINAL / (1 + CHUTE_TAU / DRAG_TAU)
+  const run = (cutAfter: number | null): { frames: number; fastest: number } => {
+    const drop = createDrop(0, 0)
+    let frames = 0
+    let fastest = 0
+    while (!drop.landed && frames < 60 * 60) {
+      if (cutAfter !== null && frames === cutAfter) cutChute(drop)
+      updateDrop(drop, 0, 1 / 60)
+      fastest = Math.max(fastest, drop.vy)
+      frames++
+    }
+    expect(drop.landed).toBe(true)
+    return { frames, fastest }
+  }
+
+  // Cut at once and the drop is a fall: the canopy's terminal is no ceiling
+  // any more, and the whole thing is over in a fraction of the time.
+  const whole = run(null)
+  const cut = run(0)
+  expect(cut.fastest).toBeGreaterThan(settled)
+  expect(cut.frames).toBeLessThan(whole.frames / 2)
+
+  // Cut halfway and it lands somewhere between the two — the swap is a
+  // change of force on a body already moving, not a restart.
+  const late = run(Math.floor(whole.frames / 2))
+  expect(late.frames).toBeGreaterThan(cut.frames)
+  expect(late.frames).toBeLessThan(whole.frames)
+})
+
 test('the battle opens with the pig in the air and does not begin until it lands', async ({
   app
 }) => {
@@ -131,9 +162,43 @@ test('the battle opens with the pig in the air and does not begin until it lands
   const ground = (await debugState(page)).nodeY
   expect(opened).toBeLessThan(ground - DROP_HEIGHT / 2)
 
+  // And it STAYS down. A pig that arrives by parachute does not rebound off
+  // the ground — the exe holds its landing clip for a single frame before
+  // the idle picker takes it, so the crouch-and-spring is never seen. Y-down,
+  // so anything above the resting height is a SMALLER number.
+  expect(ground - (await peakNodeY(page, -1e9, 600))).toBeLessThan(1)
+
   // The clock did not run while nobody was on the ground — the turn starts
   // when the squad does.
   expect((await hud(page)).seconds).toBeGreaterThan(44)
+
+  expect(app.errors()).toEqual([])
+})
+
+test('the jump key cuts the canopy away and drops the pig the rest', async ({ app }) => {
+  const { page } = app
+  await choose(page, 'ONE PLAYER')
+  await expect(page.locator('#battle')).toBeVisible()
+
+  const aloft = (): Promise<{ y: number; canopy: boolean } | undefined> =>
+    page.evaluate(() => window.pow!.debug!.dropIn().pigs[0])
+
+  const under = await aloft()
+  expect(under?.canopy).toBe(true)
+
+  await tap(page, 'jump')
+  await expect
+    .poll(async () => (await aloft())?.canopy ?? false, { message: 'the canopy to go' })
+    .toBe(false)
+  // Still up there, and now falling rather than floating.
+  const falling = await aloft()
+  expect(falling).toBeDefined()
+
+  await landed(page)
+  expect(await page.evaluate(() => window.pow!.debug!.dropIn().running)).toBe(false)
+  // It still arrived on its own marker, cut chute or not.
+  const ground = (await debugState(page)).nodeY
+  expect(ground - (await peakNodeY(page, -1e9, 400))).toBeLessThan(1)
 
   expect(app.errors()).toEqual([])
 })

@@ -143,10 +143,8 @@ export const ANIM = {
   WALK_BACK: 3,
   TURN: 4,
   SWIM: 5,
+  /** Falling, and what a cut parachute wears too (exe 0x4678f0). */
   JUMP_MIDDLE: 9,
-  /** Coming down off a flight and standing up — what the parachute landing
-   * (0x4717d0) and the ordinary one (0x470910) both play, once. */
-  LAND: 10,
   /** Trying to climb. Not a movement state: `UpdateGroundState` raises a
    * flag whenever the pig stands on terrain type 11 under the low-5-bit
    * mask (`and edx,1Fh; cmp ecx,0Bh`, exe 0x46fde1/0x470082), and the

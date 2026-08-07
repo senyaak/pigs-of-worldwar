@@ -356,10 +356,21 @@ arrives by parachute, and on a campaign map that is the player's side of
 five while the enemy is already standing there. Those pigs start
 `fromExeY(3072)` above their own marker with a `WE_PARA` canopy over them
 and come down at the parachute force's terminal — about five seconds — with
-the turn clock and the controls stopped, because the original's parachute
-branch advances the clip and returns. `lib/game/parachute.ts` is the
-descent, `three/parachute.ts` the canopy, and the whole derivation is
-`../pigs-disasm/parachute/notes.md`. The chase camera leaves room for the
+the turn clock and walking stopped, because the original's parachute branch
+advances the clip and returns. The ONE key it answers is JUMP, which cuts
+every canopy at once and hands the squad back to gravity (the exe's handler
+walks the whole pig list). `lib/game/parachute.ts` is the descent,
+`three/parachute.ts` the canopy, and the whole derivation is
+`../pigs-disasm/parachute/notes.md`.
+
+**A pig that lands under a canopy does NOT rebound**, and the reason is a
+number that reads like something else: `Pig::SetAnim`'s third argument is a
+duration in FRAMES (`pig+0x364`, counted down at 0x46e2cb, then the per-class
+idle sequence at 0x4d7320 takes over). The parachute landing passes 1, so
+its "Jumping - End" clip is held for a single frame and the crouch never
+plays. Reading that 1 as "play the clip once through" put an 11-frame
+crouch-and-spring on every touchdown, which is exactly the bounce play says
+is not there. `e2e/002/parachute.spec.ts` pins it. The chase camera leaves room for the
 canopy while one is up (`desiredCamera`'s `rise`); without that the canopy
 sits off the top of the frame, which is how it looked the first time. Every
 e2e entry into a battle waits it out through `landed()` — a spec that drives

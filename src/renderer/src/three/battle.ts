@@ -110,7 +110,7 @@ export function buildBattle(
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
-  const dropIn = createDropIn(squad, query, assets.clips, assets.canopy, () => bank)
+  const dropIn = createDropIn(squad, query, assets.canopy, () => bank)
   const marker = buildMarker(root)
   const chase = createChase(host.camera, query)
 
@@ -146,9 +146,13 @@ export function buildBattle(
   }
 
   const update = (delta: number): void => {
-    // The level's opening drop stops everything: no turn clock, no input,
-    // because the original's parachute branch does nothing else either.
-    if (dropIn.update(delta)) {
+    // The level's opening drop stops everything else: no turn clock, no
+    // walking, because the original's parachute branch does nothing else
+    // either. The ONE thing it does answer is the jump key, which cuts the
+    // canopies away — so `jumpRequested` is spent here rather than saved up
+    // for the first frame of the turn.
+    if (dropIn.update(delta, jumpRequested)) {
+      jumpRequested = false
       const arriving = squad.of(game.currentPig)
       if (arriving) watch(arriving, delta)
       onGameChanged()

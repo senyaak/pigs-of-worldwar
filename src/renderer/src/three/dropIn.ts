@@ -13,14 +13,13 @@
 // about standing and walking should carry a nullable canopy around forever.
 
 import type * as THREE from 'three'
-import type { Clip, Model, Texture } from '../api'
+import type { Model, Texture } from '../api'
 import { ANIM, restingY } from '../../../lib/game/locomotion'
-import { createDrop, updateDrop } from '../../../lib/game/parachute'
+import { createDrop, cutChute, updateDrop } from '../../../lib/game/parachute'
 import type { DropState } from '../../../lib/game/parachute'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import type { Bank } from '../audio/bank'
 import { BATTLE_SOUNDS } from '../audio/battle'
-import { clipSeconds } from './clips'
 import { buildCanopies } from './parachute'
 import type { Canopies } from './parachute'
 import type { Soldier, Squad } from './squad'
@@ -33,9 +32,14 @@ export interface DropInState {
 }
 
 export interface DropIn {
-  /** One frame. Returns whether the phase is still going — while it is, the
-   * battle does nothing else. */
-  update(delta: number): boolean
+  /**
+   * One frame. Returns whether the phase is still going — while it is, the
+   * battle does nothing else.
+   *
+   * `cut` is the player asking for the canopy to go: the whole squad's, at
+   * once, which is what the exe's own button does.
+   */
+  update(delta: number, cut: boolean): boolean
   /** How much hangs above this soldier that the camera must clear. */
   riseOver(soldier: Soldier): number
   state(): DropInState
@@ -61,7 +65,6 @@ const NOBODY: DropIn = {
 export function createDropIn(
   squad: Squad,
   query: TerrainQuery,
-  clips: Clip[],
   canopy: { model: Model; textures: Texture[] } | null,
   /** The bank, asked for each time: it loads beside the scene and the first
    * frames of a battle are silent. */
@@ -71,15 +74,11 @@ export function createDropIn(
   if (!canopy || arriving.length === 0) return NOBODY
 
   const canopies: Canopies = buildCanopies(canopy.model, canopy.textures)
-  /** How long the landing clip runs — what a play-once costs in seconds. */
-  const landSeconds = clipSeconds(clips[ANIM.LAND])
 
   interface Arrival {
     soldier: Soldier
     drop: DropState
     canopy: THREE.Mesh | null
-    /** Seconds of the landing clip left to play. */
-    landIn: number
     done: boolean
   }
 
@@ -90,35 +89,50 @@ export function createDropIn(
     const drop = createDrop(restingY(query, x, z), Math.random())
     soldier.place(x, drop.y, z, soldier.pig.heading)
     soldier.setClip(ANIM.PARACHUTE)
-    return { soldier, drop, canopy: canopies.open(soldier.node), landIn: 0, done: false }
+    return { soldier, drop, canopy: canopies.open(soldier.node), done: false }
   })
+
+  /** Take a canopy away, whether the player cut it or the ground did. */
+  const furl = (arrival: Arrival): void => {
+    if (arrival.canopy) canopies.cut(arrival.canopy)
+    arrival.canopy = null
+  }
 
   /** Whether the canopies have been heard opening yet. */
   let heard = false
 
   return {
-    update(delta) {
+    update(delta, cut) {
+      if (cut) {
+        // One press takes the WHOLE squad's, which is what the exe's own
+        // button does — its handler walks the pig list (0x490c20).
+        for (const arrival of arrivals) {
+          if (arrival.done || !arrival.drop.chute) continue
+          cutChute(arrival.drop)
+          furl(arrival)
+          // What 0x4678f0 plays: the flying clip, and it keeps it until
+          // something stops the fall.
+          arrival.soldier.setClip(ANIM.JUMP_MIDDLE)
+        }
+      }
       let busy = false
       for (const arrival of arrivals) {
         if (arrival.done) continue
         busy = true
         const { x, z } = arrival.soldier.pig.position
-        if (!arrival.drop.landed) {
-          updateDrop(arrival.drop, restingY(query, x, z), delta)
-          arrival.soldier.place(x, arrival.drop.y, z, arrival.soldier.pig.heading)
-          if (!arrival.drop.landed) continue
-          // Touchdown: the canopy is cut and the pig gets to its feet, which
-          // is `SetAnim(0x0a, …, 1, …)` — clip 10, once (exe 0x4717f5).
-          if (arrival.canopy) canopies.cut(arrival.canopy)
-          arrival.canopy = null
-          arrival.landIn = landSeconds
-          arrival.soldier.setClip(ANIM.LAND)
-          bank().play(BATTLE_SOUNDS.land)
-          continue
-        }
-        arrival.landIn -= delta
-        if (arrival.landIn > 0) continue
+        updateDrop(arrival.drop, restingY(query, x, z), delta)
+        arrival.soldier.place(x, arrival.drop.y, z, arrival.soldier.pig.heading)
+        if (!arrival.drop.landed) continue
+        // Touchdown, and the pig simply STANDS. The exe sets the landing
+        // clip here — `SetAnim(0x0a, 0, 1, 1)` at 0x4717f5 — but that third
+        // argument is a duration in FRAMES (`pig+0x364`, counted down at
+        // 0x46e2cb), so clip 10 is held for exactly one before the idle
+        // picker takes it back. Holding it for its own eleven frames instead
+        // is a crouch-and-spring the original never shows, and play says so
+        // plainly: there is no rebound off the ground.
+        furl(arrival)
         arrival.soldier.setClip(ANIM.IDLE)
+        bank().play(BATTLE_SOUNDS.land)
         arrival.done = true
       }
       // The bank arrives a beat after the scene does, so the canopies cannot

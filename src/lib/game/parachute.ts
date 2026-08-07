@@ -16,7 +16,7 @@
 // ../../../pigs-disasm/parachute/notes.md
 
 import { FRAME_SECONDS, fromExeSpeed } from './ballistics'
-import { DRAG_TAU } from './locomotion'
+import { DRAG_TAU, FALL_TAU, TERMINAL_FALL } from './locomotion'
 import { fromExeY } from './terrain'
 
 /**
@@ -58,6 +58,8 @@ export interface DropState {
   y: number
   /** Downward speed, units a second. `StartParachuting` zeroes it. */
   vy: number
+  /** Still under the canopy. False once the player has cut it — see `cut`. */
+  chute: boolean
   landed: boolean
 }
 
@@ -67,17 +69,40 @@ export interface DropState {
  * from one height and the scene can stagger it.
  */
 export function createDrop(groundY: number, roll: number): DropState {
-  return { y: groundY - DROP_HEIGHT - roll * DROP_SPREAD, vy: 0, landed: false }
+  return { y: groundY - DROP_HEIGHT - roll * DROP_SPREAD, vy: 0, chute: true, landed: false }
+}
+
+/**
+ * Cut the canopy away and fall the rest.
+ *
+ * The original's own impatience button: 0x4678f0 puts the FALLING force back
+ * on the body, takes the parachute one off, empties the held-model slot and
+ * plays the flying clip — and the two sites that call it (0x490c20 and
+ * 0x491160, one per intro camera) walk the whole pig list, so one press
+ * drops the squad together rather than one pig at a time. It does NOT clear
+ * the parachuting flag, so the touchdown is still the parachute's.
+ *
+ * Which button the exe reads is bit 0x20 of a pad word (`[+0x440]` down,
+ * `[+0x448]` down last frame — a fresh press), and which physical button
+ * that bit is has not been decoded. Play says the jump key.
+ */
+export function cutChute(drop: DropState): void {
+  drop.chute = false
 }
 
 /**
  * One frame of descent. The integrator is the one `locomotion.fly` uses —
  * the force toward the terminal velocity, plus the engine's own `v -= v/128`
- * drag — with the parachute's constants instead of the fall's.
+ * drag — with the parachute's constants while the canopy is up and the
+ * fall's own once it is cut. Swapping the constants IS what the exe does:
+ * the two are force generators on the same body, and starting or cutting a
+ * chute adds one and removes the other.
  */
 export function updateDrop(drop: DropState, groundY: number, delta: number): void {
   if (drop.landed) return
-  drop.vy += ((CHUTE_TERMINAL - drop.vy) / CHUTE_TAU - drop.vy / DRAG_TAU) * delta
+  const terminal = drop.chute ? CHUTE_TERMINAL : TERMINAL_FALL
+  const tau = drop.chute ? CHUTE_TAU : FALL_TAU
+  drop.vy += ((terminal - drop.vy) / tau - drop.vy / DRAG_TAU) * delta
   drop.y += drop.vy * delta
   if (drop.y < groundY) return
   // Hitting the landscape is the whole of the landing — there is no bounce
