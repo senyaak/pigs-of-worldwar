@@ -22,6 +22,7 @@ import { amountOf, give } from '../../../lib/game/inventory'
 import type { GiveResult } from '../../../lib/game/inventory'
 import { isTrainingGround } from '../../../lib/game/tutorial'
 import { heal, isDead } from '../../../lib/game/health'
+import { targetsOf } from '../../../lib/game/targets'
 import { aimPhase, createAim, scrubsPose, updateAim } from '../../../lib/game/aim'
 import { weaponModelName, weaponOf } from '../../../lib/game/weapons'
 import { meleeOf } from '../../../lib/game/melee'
@@ -247,7 +248,14 @@ export function buildBattle(
     clips: assets.clips,
     bank: () => bank,
     root,
-    training
+    training,
+    // The training ground's dummies are the other thing a swing can hit, and
+    // the only one that is not a pig (lib/game/targets.ts).
+    targets: targetsOf(assets.objects),
+    onBroken: (target) => {
+      props.take(target.id)
+      obstacles.remove(target.id)
+    }
   })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
    * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig

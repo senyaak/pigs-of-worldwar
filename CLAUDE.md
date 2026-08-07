@@ -386,6 +386,13 @@ walks the whole pig list). `lib/game/parachute.ts` is the descent,
 `three/parachute.ts` the canopy, and the whole derivation is
 `../pigs-disasm/parachute/notes.md`.
 
+**A miss is measured, not guessed at.** `pow.debug.strike()` gives the last
+swing's three blade points and, per pig and per dummy, the nearest approach on
+each axis — `gap.x`/`gap.z` against 170, `gap.y` against 360, `degrees`
+against 67.5. A strike has four separate ways of failing and no way to tell
+them apart by eye, and this exists because "урон не проходит" arrived with no
+way to answer it. Reach for it before touching the geometry.
+
 **Health is POINTS, the maximum is the CLASS's, and it is not 100.** The
 constructor reads it out of a 128-byte record per class at 0x4d02e0 — the
 same record whose `+0x04` is the thirteen `Pig::Walk` grants — so a grunt has
@@ -679,17 +686,27 @@ would be a stand-in nobody asked for.
   `Pig::Fire` plays out of the squad's own rotating counter. CAMP fields ONE
   pig, so a swing has nothing to hit there — `pow.swapMap('LIBERATE')`.
 
-  **The training DUMMY is a real target in the exe and is not built here yet,
-  and the reason is not the damage.** It is its own class (vtable 0x4bd238),
-  thirty points, hurt through the same `[vtbl+0x34]` for ten — three bayonet
-  hits — and it dies by the pig's own rule. What is missing is WHICH dummy:
-  0x4762e0 does not walk a list, it takes the single object at `[0x537df0]`
-  and checks `[+0x84]` is 0x43/0x44/0x45/0x4b. CAMP carries eight, so seven
-  of them are not the live one at any moment, and what moves that pointer is
-  the map SCRIPT — the same script that raises the tutorial's second bridge
-  and is not decoded. Making all eight damageable is the obvious remake
-  answer and it is a decision, not a transcription; it belongs with the
-  script, next to the bridge.
+  **The training DUMMY is a target, and it has ONE point.** Its class is
+  vtable **0x4bd440** (constructor 0x48d020, list head `[0x537df0]`), it
+  answers the same `[vtbl+0x34]` a pig does, and its health comes from the
+  table at 0x4d6d18 by record type: every type the strike answers to —
+  0x43/0x44/0x45/0x4b — is 128 of the engine's 128ths, **one whole point**, so
+  anything at all flattens it. `lib/game/targets.ts` matches them by MODEL
+  NAME and CAMP carries eleven.
+
+  Getting there cost a wrong turn worth not repeating: the class was first
+  guessed at 0x4bd238 from the melee's `[+0x84]` field test — thirty points,
+  three hits — and play said one ("манекены 1 очко") before the binary did.
+  An object identified by a field test is a guess until the code that WRITES
+  the list pointer is found. Same lesson as the weapon's bone field.
+
+  **All eleven are live, and THAT is the remake's own.** 0x4762e0 does not
+  walk a list; it takes the single object at `[0x537df0]`, so most of CAMP's
+  are not the one being struck at any moment, and what moves that pointer is
+  the map SCRIPT. Play also says knocking the first one down drops a crate in
+  BY PARACHUTE, and the tutorial's step list agrees — a step ends on "killing
+  the dummy, picking up the crate, or reaching somewhere". That drop is the
+  same script that raises the second bridge, and it is not built.
 
   What is still missing is the other kind of shot: the power gauge, the
   projectile and its damage. `[game+0x4e4]` charges 0x50 a frame to 0xfff and

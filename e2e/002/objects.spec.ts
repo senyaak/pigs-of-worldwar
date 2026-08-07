@@ -23,6 +23,9 @@ import { parsePmg } from '../../src/lib/formats/pmg'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
 import { ObstacleField, PIG_RADIUS } from '../../src/lib/game/obstacles'
 import { WALL_CLIMB } from '../../src/lib/game/locomotion'
+import { DUMMY_HEALTH, targetsOf } from '../../src/lib/game/targets'
+import { hurt, isDead } from '../../src/lib/game/health'
+import { meleeOf } from '../../src/lib/game/melee'
 
 
 const mapFile = (name: string): Buffer => readFileSync(path.join(GAME_DIR, 'Maps', name))
@@ -70,6 +73,22 @@ test('CAMP.POG: the record layout, and z exactly as stored', () => {
   const markers = CAMP.filter((object) => object.name.endsWith('_ME'))
   expect(markers).toHaveLength(1)
   expect(markers[0].type).toBe(0)
+})
+
+test('every dummy CAMP carries is a target, and one point flattens it', () => {
+  const targets = targetsOf(CAMP)
+  // The same eleven the record layout above counts, by name.
+  expect(targets).toHaveLength(11)
+  expect(targets.every((target) => target.health === DUMMY_HEALTH)).toBe(true)
+  expect(DUMMY_HEALTH).toBe(1)
+  // Anything that swings at all is enough: the weakest of the five carries
+  // ten (lib/game/melee.ts), and a dummy has one.
+  const target = targets[0]
+  expect(hurt(target, meleeOf(3)!.damage, false)).toBe('died')
+  expect(isDead(target)).toBe(true)
+  // Every target keeps its record's id, which is how the broken one is taken
+  // off the map and out of the collision world.
+  expect(new Set(targets.map((each) => each.id)).size).toBe(targets.length)
 })
 
 test('a prop stands on the ground it was placed over', () => {

@@ -64,7 +64,9 @@ whole-body clip its record names, and the blade is live for four frames of it,
 sampled along its own length off the hand bone. Ten health off a pig it
 catches — five swings put a grunt down, because health is the pig's CLASS's
 and a grunt has fifty, not a hundred. Once per swing, and only what is in
-front of it inside 67.5°. Walking
+front of it inside 67.5°. The training ground's **dummies** are targets too,
+and they carry exactly one point, so any swing at all knocks one down — hit
+one and it goes off the map. Walking
 is refused for the length of it, as the original refuses it, and the camera
 swings round to the pig's side and closes in — the original has a camera mode
 for exactly this and uses it for nothing else. The aim angle plays no part:

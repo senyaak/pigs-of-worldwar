@@ -17,6 +17,8 @@ import type { Point, StrikeGap, SwingState } from '../../../lib/game/melee'
 import { amountOf, spend } from '../../../lib/game/inventory'
 import { hurt, isDead } from '../../../lib/game/health'
 import { ANIM } from '../../../lib/game/locomotion'
+import { reached } from '../../../lib/game/targets'
+import type { Target } from '../../../lib/game/targets'
 import { clipSeconds } from './clips'
 import type { Soldier, Squad } from './squad'
 import { BATTLE_SOUNDS } from '../audio/battle'
@@ -44,6 +46,9 @@ export interface StrikeReport {
     degrees: number
     hit: boolean
   }[]
+  /** Every dummy still standing, measured the same way. Empty on a map that
+   * carries none, which is every map but the training ground. */
+  dummies: { id: number; gap: StrikeGap; hit: boolean }[]
 }
 
 export interface Swings {
@@ -74,9 +79,14 @@ export interface SwingParts {
   bank: () => Bank
   /** The battle's game-space root — what a bone's world point converts into. */
   root: THREE.Object3D
-  /** Whether this is the training ground, where a pig cannot be killed — the
-   * exe floors it at one point (lib/game/health.ts). */
+  /** Whether this is the training ground, where a PIG cannot be killed — the
+   * exe floors it at one point (lib/game/health.ts). A dummy has no such
+   * mercy: 0x48d990 has no training test in it at all. */
   training: boolean
+  /** The map's dummies, as things to knock down (lib/game/targets.ts). */
+  targets: Target[]
+  /** Take a broken one off the map and out of the collision world. */
+  onBroken: (target: Target) => void
 }
 
 export function createSwings(parts: SwingParts): Swings {
@@ -87,6 +97,9 @@ export function createSwings(parts: SwingParts): Swings {
   let already = new Set<Soldier>()
   /** The last strike's measurements, for `pow.debug.strike()`. */
   let report: StrikeReport | null = null
+  /** The dummies not yet knocked down. Spliced rather than flagged, the same
+   * way a collected crate leaves the pickup list. */
+  const standing: Target[] = [...parts.targets]
 
   const at = new THREE.Vector3()
 
@@ -120,7 +133,12 @@ export function createSwings(parts: SwingParts): Swings {
       z: attacker.pig.position.z,
       heading: attacker.pig.heading
     }
-    report = { blade, attacker: { name: attacker.pig.name, ...from }, candidates: [] }
+    report = {
+      blade,
+      attacker: { name: attacker.pig.name, ...from },
+      candidates: [],
+      dummies: []
+    }
     for (const target of parts.squad.members) {
       if (target === attacker) continue
       // A pig's body sits at the model's origin — the hip — which is exactly
@@ -148,6 +166,26 @@ export function createSwings(parts: SwingParts): Swings {
       const outcome = hurt(target.pig, weapon.damage, parts.training)
       parts.bank().play(BATTLE_SOUNDS[weapon.impact])
       if (outcome === 'died' || outcome === 'gibbed') target.playOnce(ANIM.DYING)
+    }
+
+    // …and the dummies, through the identical test. The exe runs it as a
+    // second pass over its own scenery after the pigs (0x4762e0), and gives
+    // the target the same impact noise.
+    for (let i = standing.length - 1; i >= 0; i--) {
+      const dummy = standing[i]
+      report.dummies.push({
+        id: dummy.id,
+        gap: strikeGap(blade, from, dummy),
+        hit: reached(blade, from, dummy)
+      })
+      if (!reached(blade, from, dummy)) continue
+      // One point, so anything at all flattens it (lib/game/targets.ts).
+      hurt(dummy, weapon.damage, false)
+      parts.bank().play(BATTLE_SOUNDS[weapon.impact])
+      if (isDead(dummy)) {
+        standing.splice(i, 1)
+        parts.onBroken(dummy)
+      }
     }
   }
 
