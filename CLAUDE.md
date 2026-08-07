@@ -607,13 +607,17 @@ would be a stand-in nobody asked for.
   run with the weapon channel over its arms. `three/clips.ts` does that with
   a bone overlay applied AFTER the mixer.
 
-  Two things there are the remake's own: which BONE a weapon hangs off (the
-  models carry one — `WE_RIF` and `WE_KNIFE` are wholly on bone 7, the right
-  forearm — but nothing was read that says the engine uses it), and which
-  bones the overlay takes (spine, head, both arms). The SHAPE of the second
-  is decoded: both channels hold six-entry key-frame lists and six is the
-  skeleton's branch count, so the split is per branch — but the mask itself
-  is inside `wh32lib.dll`'s `afGetKeyFrameList` and is not in the MCAP data.
+  Two things there are the remake's own: WHERE a weapon hangs, and which
+  bones the overlay takes (spine, head, both arms). The first is play's word
+  against the file's — the models' VTX bone field is not an attachment (24 of
+  29 put everything on bone 0 and `WE_TELR` splits across two), they only
+  agree on reaching along −Z, and play says the pig holds it in the other
+  hand, so `three/heldWeapon.ts` mirrors them across z. `Chars/PROPOINT.MAD`
+  is where the real attachment points probably live and nothing in the exe
+  has been traced to it. The SHAPE of the second is decoded: both channels
+  hold six-entry key-frame lists and six is the skeleton's branch count, so
+  the split is per branch — but the mask itself is inside `wh32lib.dll`'s
+  `afGetKeyFrameList` and is not in the MCAP data.
 
   Three things in the menu are the remake's own and want play against them:
   where it sits and how it arrives (the exe computes its coordinates rather
