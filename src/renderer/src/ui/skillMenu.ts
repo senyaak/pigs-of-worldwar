@@ -78,6 +78,12 @@ export interface SkillMenu {
   move(dx: number, dy: number): void
   /** The skill under the cursor, or null when the menu is down. */
   chosen(): number | null
+  /**
+   * A skill's icon out of the menu's own art, for anything else that wants
+   * to show one — the dashboard's weapon slot does. Null before the archive
+   * has decoded, for a skill with no art, and for `null` itself.
+   */
+  icon(skill: number | null): Sprite | null
   /** Draw it, in the 640×480 units the rest of the dashboard uses. */
   draw(context: CanvasRenderingContext2D, viewWidth: number, strings: string[]): void
 }
@@ -151,6 +157,8 @@ export function createSkillMenu(): SkillMenu {
     },
 
     chosen: () => (up && slots.length > 0 ? slots[cursor].skill : null),
+
+    icon: (skill) => (art && skill !== null ? iconFor(art, skill) : null),
 
     draw(context, viewWidth, strings) {
       if (!up || !art || !font) return

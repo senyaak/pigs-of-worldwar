@@ -76,7 +76,17 @@ export const LAYOUT = {
     /** Where the needle turns, and where every fan has its point. */
     hub: { x: 60, y: 64 },
     arc: { top: 0, bottom: 64 },
-    slot: { x: 64, top: 22, bottom: 64, cap: { x: 128, y: 31 } },
+    slot: {
+      x: 64,
+      top: 22,
+      bottom: 64,
+      cap: { x: 128, y: 31 },
+      /** The ring's inside, where the chosen skill's icon goes. Measured off
+       * the assembled art: `ang2` and `ang4` are 64 wide from x 64, `ang5`
+       * caps the right at x 128 and is 24 more, and the pair runs y 22..100.
+       * The icon is centred in it, and one of the menu's own 56×34 ones. */
+      icon: { x: 64, y: 22, width: 88, height: 78 }
+    },
     green: [104, 168, 72] as [number, number, number],
     /** How much of the battle shows through that green. */
     alpha: 0.5
@@ -123,6 +133,9 @@ export interface HudState {
    * when nothing that aims is out — the needle rests level then
    * (lib/game/aim.ts). */
   aim: number | null
+  /** The skill the acting pig has in hand, whose icon fills the slot beside
+   * the dial. Null leaves the slot empty. */
+  holding: number | null
   /** The level's opening card — "TRAINING MISSION: BOOT CAMP" — while the
    * squad is still in the air, and null once it is down (ui/titleCard.ts). */
   title: string | null
@@ -322,6 +335,18 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       blit(art.get('ang2'), dialX + DIAL.slot.x, dialY + DIAL.slot.top)
       blit(art.get('ang4'), dialX + DIAL.slot.x, dialY + DIAL.slot.bottom)
       blit(art.get('ang5'), dialX + DIAL.slot.cap.x, dialY + DIAL.slot.cap.y)
+
+      // What is in hand, in the ring beside the needle — the same icon the
+      // skill menu shows, out of the same archive (ui/skillMenu.ts).
+      const carried = skills.icon(state.holding)
+      if (carried) {
+        const box = DIAL.slot.icon
+        blit(
+          carried,
+          dialX + box.x + (box.width - carried.width) / 2,
+          dialY + box.y + (box.height - carried.height) / 2
+        )
+      }
       // The needle turns on the hub, and it is the aim angle it shows: the
       // arc is a half-disc and the angle's own limit is ±1023 of 4096, which
       // is the same ±90° (lib/game/aim.ts).
