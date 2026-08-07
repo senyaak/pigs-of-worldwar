@@ -363,20 +363,29 @@ walks the whole pig list). `lib/game/parachute.ts` is the descent,
 `three/parachute.ts` the canopy, and the whole derivation is
 `../pigs-disasm/parachute/notes.md`.
 
-**Some clips are EVENTS, not states — `PLAYED_ONCE` in `locomotion.ts`.**
+**Some clips are EVENTS, not states — `state.commit` in `locomotion.ts`.**
 `Pig::SetAnim`'s third argument is a repeat count, and the exe only
-decrements it where the clip's own cursor wraps (0x46e27f..0x46e2cb) — so a
-count of 1 means "play it through once", and two places are gated on the
-clip finishing rather than on a timer: the jump does not leave the ground
-until the wind-up is done (0x46e8e2), and every landing wears the get-up
-(0x470944, and the parachute's 0x4717f5 asks for the same). `three/clips.ts`
-plays those with `LoopOnce` and CLAMPS the last frame; `Soldier.setClip` is
-inert while one runs, so a caller that picks a clip every frame cannot cut a
-get-up in half.
+decrements it where the clip's own cursor wraps (0x46e27f..0x46e2cb), so a
+count of 1 means "play it through once". Two clips are asked for that way:
+the jump's crouch (the launch waits for it, 0x46e8e2) and a landing's get-up
+(0x470944, and the parachute's 0x4717f5). `three/clips.ts` plays those with
+`LoopOnce` and CLAMPS the last frame.
 
-Faking that with a timer over a looping player is what put a
-crouch-and-snap on the first parachute landings — it read as a bounce off
-the ground, and it was the fake, not the clip. Do not reintroduce it. The chase camera leaves room for the
+**And BOTH belong to a pig that is not being driven.** The crouch is the
+standing hop's: the dispatcher branches on this frame's walking step
+(0x46c220) and a pig moving forward goes straight to `StartFalling` — a
+run-up never crouches, and backing away does. The get-up is the same rule
+from the other end: nothing guards it, but the animation picker (0x467ec0)
+asks for a movement clip whenever the pig has speed, and that request resets
+the cursor outright (0x472320), while at a standstill it asks for nothing.
+So land running and there is no get-up. The domain owns both — it says WHICH
+clip and whether it is committed; `Soldier.setClip` cancels a one-shot the
+moment a different clip is asked for, exactly as 0x472320 does.
+
+Two ways this has already gone wrong, so do not repeat either: faking a
+one-shot with a timer over a looping player (it put a crouch-and-snap on
+every parachute landing and read as a bounce), and giving the crouch to
+every jump instead of the standing one. The chase camera leaves room for the
 canopy while one is up (`desiredCamera`'s `rise`); without that the canopy
 sits off the top of the frame, which is how it looked the first time. Every
 e2e entry into a battle waits it out through `landed()` — a spec that drives

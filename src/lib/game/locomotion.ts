@@ -90,12 +90,17 @@ export const GRAVITY = TERMINAL_FALL / FALL_TAU
  * adds 0x30 a frame along the facing (0x46e943). That delay is what gives
  * the original's jump its shape — up first, then out.
  *
- * The wind-up IS modelled, and it is the clip's own length. `TryJump` sets
- * clip 8 with a repeat count of 1 (0x46c254) and the update calls
- * `StartFalling` on the frame that count runs out (0x46e8e2) — so the pig
- * crouches for exactly one pass of the clip and then leaves. The count is
- * LOOPS, not frames: the exe only decrements it where the clip's own cursor
- * wraps (0x46e27f..0x46e2cb).
+ * **The wind-up belongs to a STANDING jump only.** The dispatcher branches on
+ * the walking step it was handed (0x46c220): a pig with `nDist > 0` — moving
+ * FORWARD — goes straight to `StartFalling` and is in the air on that frame,
+ * and everything else (still, or backing away, so `nDist <= 0`) gets clip 8
+ * with a repeat count of 1 and leaves when it runs out (0x46e8e2). So a
+ * run-up does not crouch; a hop from standing does. The count is LOOPS, not
+ * frames: the exe only decrements it where the clip's own cursor wraps
+ * (0x46e27f..0x46e2cb).
+ *
+ * One more gate is not decoded: bit 0x10 of the intent byte at `pig+0x318`
+ * also forces the crouch, whatever the step (0x46c224).
  *
  * **The launch rides `JUMP_RISE`, and that is the remake's own.** The exe's
  * 0x30 puts the apex at 62 world units standing and 131 running, and those
@@ -124,6 +129,19 @@ export const JUMP_PUSH_DELAY = 3 * FRAME_SECONDS
  */
 export const JUMP_WINDUP_FRAMES = 14
 export const JUMP_WINDUP = JUMP_WINDUP_FRAMES / 25
+/**
+ * How long the get-up holds after a landing: one pass of clip 10, 11 frames.
+ *
+ * And it is CANCELLED the moment the pig is driven, which is the other half
+ * of the same rule. `Pig::Land` sets the clip and nothing guards it; the
+ * animation picker (0x467ec0) simply asks for a movement clip whenever the
+ * pig has speed, and the request resets the cursor outright (0x472320 zeroes
+ * `pig+0x360` and `pig+0x368`). At a standstill the picker asks for nothing
+ * — it returns early on a zero band — so the get-up plays out. Land running
+ * and the run cycle replaces it on the very next frame.
+ */
+export const GET_UP_FRAMES = 11
+export const GET_UP = GET_UP_FRAMES / 25
 /** The launch, for a pig whose walking step this frame is `stride`. */
 export const jumpVelocity = (stride: number): number =>
   -(JUMP_SPEED + (Math.abs(stride) / 2) * JUMP_RISE)
@@ -184,18 +202,6 @@ export const ANIM = {
   PARACHUTE: 82
 } as const
 
-/**
- * The clips the original COMMITS to — the ones it asks for with a repeat
- * count of 1 rather than forever, so they play through once and hand the pig
- * back rather than cycling.
- *
- * A renderer has to know the difference: everything else here is a state the
- * pig is in for as long as it is in it, and these two are events. Faking one
- * with a timer over a looping player is what put a crouch-and-snap on every
- * landing — see `three/clips.ts`.
- */
-export const PLAYED_ONCE: ReadonlySet<number> = new Set([ANIM.JUMP_START, ANIM.LAND])
-
 export interface Airborne {
   vx: number
   vy: number
@@ -247,6 +253,14 @@ export interface LocomotionState {
   /** The walking step the wind-up was entered on: the launch is faster the
    * faster the pig was going, and by then it is no longer moving. */
   windUpStride: number
+  /** Seconds left of the landing's get-up. Driving cancels it outright. */
+  getUp: number
+  /**
+   * Whether `clip` is an EVENT rather than a state — the wind-up or the
+   * get-up — so a renderer plays it through once instead of looping it.
+   * Everything else here is a state the pig is in for as long as it is in it.
+   */
+  commit: boolean
   /** Eases toward slippery-and-bouncy while wedged (lib/game/ballistics). */
   bounciness: Bounciness
   /** Which clip this frame wants on the pig. */
@@ -280,6 +294,8 @@ export function createLocomotion(
     jumpReadyIn: 0,
     windUp: 0,
     windUpStride: 0,
+    getUp: 0,
+    commit: false,
     bounciness: FREE,
     clip: ANIM.IDLE
   }
@@ -336,6 +352,8 @@ function fly(
 ): void {
   const a = state.airborne as Airborne
   state.clip = a.ejected ? ANIM.EJECTED : a.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE
+  // Flight clips cycle; only the landing below commits to one.
+  state.commit = false
   // The jump's forward half, three frames in.
   if (a.pushIn !== null) {
     a.pushIn -= delta
@@ -389,11 +407,13 @@ function fly(
     state.airborne = { ...a, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true }
   } else {
     state.airborne = null
-    // Down for good, so the pig gets up: clip 10, once, which is what the
-    // landing handler asks for (0x470944) whatever the fall was. Held for
-    // this one frame — the renderer commits to it and ignores whatever the
-    // walking picks next until it has played out.
+    // Down for good, so the pig gets up: clip 10, which is what the landing
+    // handler asks for (0x470944) whatever the fall was. It runs down in
+    // `ground` and any input throws it away, so a pig that lands running
+    // never shows it.
+    state.getUp = GET_UP
     state.clip = ANIM.LAND
+    state.commit = true
   }
 }
 
@@ -410,8 +430,10 @@ function ground(
   if (state.windUp > 0) {
     state.windUp -= delta
     state.clip = ANIM.JUMP_START
+    state.commit = true
     if (state.windUp > 0) return
     state.windUp = 0
+    state.commit = false
     state.airborne = {
       // Straight up, faster the faster the pig was going — and forwards
       // only once JUMP_PUSH_DELAY is up.
@@ -425,6 +447,15 @@ function ground(
     state.clip = ANIM.JUMP_MIDDLE
     return
   }
+
+  // The get-up runs down while the pig is left alone and is thrown away the
+  // moment it is driven — the picker's clip request simply overwrites the
+  // landing's (0x472320), and at a standstill there is no request to make.
+  if (state.getUp > 0) {
+    state.getUp =
+      intent.walk !== 0 || intent.turn !== 0 ? 0 : Math.max(0, state.getUp - delta)
+  }
+  state.commit = state.getUp > 0
 
   const swimming = query.isWater(state.x, state.z)
   /** The footing every reach is measured from — where the feet are NOW. */
@@ -442,12 +473,27 @@ function ground(
     // refuses it from inside a wall — the jump-ladder up a cliff face is
     // the original's own rule, not an invention. And it costs a cooldown.
     //
-    // What it does NOT do is leave at once: `TryJump` only starts the crouch
-    // (clip 8, one pass), and the launch happens above when that runs out.
-    // The stride is taken NOW because the pig will be standing still by then.
-    state.windUp = JUMP_WINDUP
+    // A pig with forward speed leaves on THIS frame; anything else — standing
+    // or backing away — crouches through clip 8 first and launches when it
+    // runs out (the branch at 0x46c220). The stride is taken now either way,
+    // because after a crouch the pig is no longer moving.
     state.windUpStride = intent.walk === 0 ? 0 : speed
+    if (intent.walk > 0) {
+      state.airborne = {
+        vy: jumpVelocity(state.windUpStride),
+        vx: 0,
+        vz: 0,
+        bouncing: false,
+        pushIn: JUMP_PUSH_DELAY
+      }
+      state.jumpReadyIn = JUMP_COOLDOWN_SECONDS
+      state.clip = ANIM.JUMP_MIDDLE
+      state.commit = false
+      return
+    }
+    state.windUp = JUMP_WINDUP
     state.clip = ANIM.JUMP_START
+    state.commit = true
     return
   }
 
@@ -508,6 +554,11 @@ function ground(
   // Scramble is the GROUND, not a movement state: the flag the exe raises
   // on masked type 11 makes the picker play clip 11 in every band.
   if (!swimming && query.isClimbing(state.x, state.z)) state.clip = ANIM.SCRAMBLE
+
+  // The get-up outlasts whatever standing about would have picked — and it
+  // only ever gets this far because nothing is driving the pig, which is the
+  // one case where the original's picker asks for no clip at all.
+  if (state.getUp > 0) state.clip = ANIM.LAND
 }
 
 /**

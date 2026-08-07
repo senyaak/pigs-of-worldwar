@@ -13,7 +13,7 @@ import type { Bone, Clip, MapObject, MapProp, Model, TerrainBlock, TerrainTextur
 import type { Game, Pig } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
 import { buildWaterMask } from '../../../lib/game/watermask'
-import { ANIM, PLAYED_ONCE, createLocomotion, updateLocomotion } from '../../../lib/game/locomotion'
+import { ANIM, createLocomotion, updateLocomotion } from '../../../lib/game/locomotion'
 import type { LocomotionState } from '../../../lib/game/locomotion'
 import { ObstacleField, withPigs } from '../../../lib/game/obstacles'
 import { buildTerrain } from './terrain'
@@ -195,10 +195,11 @@ export function buildBattle(
     sounds.follow(loco, query.isWater(loco.x, loco.z))
     game.moveCurrentPig(loco.x, loco.z, loco.heading)
     active.place(loco.x, loco.y, loco.z, loco.heading)
-    // A committed clip is started once and then left alone; a state clip is
-    // simply worn. `setClip` is inert while a one-shot runs, so the walking's
-    // own choice waits its turn rather than cutting a get-up in half.
-    if (PLAYED_ONCE.has(loco.clip)) {
+    // A committed clip — the jump's crouch, a landing's get-up — is started
+    // once and left to play out; anything else is simply worn. The domain
+    // says which is which and when a commitment ends, so this only has to
+    // avoid restarting the one already running.
+    if (loco.commit) {
       if (!active.animating()) active.playOnce(loco.clip)
     } else {
       active.setClip(loco.clip)

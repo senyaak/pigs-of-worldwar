@@ -46,10 +46,10 @@ export interface Soldier {
   readonly art: string
   /**
    * Wear a looping clip, or the bind pose. Repeating the one already on is
-   * free — and so is asking while a COMMITTED animation is running: a
-   * one-shot owns the pig until it is done, which is the original's own
-   * model (a clip holds until its repeat count is spent) and is what keeps a
-   * caller that picks a clip every frame from cutting a get-up in half.
+   * free, and asking for a different one CANCELS a committed animation —
+   * which is the original's own model: a movement clip request resets the
+   * cursor outright (0x472320), so landing on the run replaces the get-up on
+   * the next frame. Who decides is the domain, not this.
    */
   setClip(index: number | null): void
   /** Commit to a clip played through once, holding its last frame. */
@@ -115,7 +115,7 @@ export function fieldSquad(
       node,
       art: art.base,
       setClip(index) {
-        if (clip === index || player.running()) return
+        if (clip === index) return
         clip = index
         player.play(index === null ? null : (assets.clips[index] ?? null))
       },

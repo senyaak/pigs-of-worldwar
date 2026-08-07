@@ -30,6 +30,7 @@ import {
   JUMP_RISE,
   JUMP_SPEED,
   JUMP_WINDUP,
+  GET_UP,
   SWIM_SINK,
   SWIM_SPEED,
   WALL_CLIMB,
@@ -256,21 +257,72 @@ test('a jump crouches first, then leaves straight UP and pushes forward', () => 
   expect(s.airborne, 'and left the ground').not.toBeNull()
 })
 
+test('a RUN-UP does not crouch — it leaves on the frame it is asked', () => {
+  // The dispatcher branches on the step it was handed (0x46c220): forward
+  // motion goes straight to StartFalling, everything else crouches. So the
+  // crouch is the standing hop's, and a run-up has none.
+  const flat = terrain(() => 0)
+  const s = createLocomotion(flat, 0, 0, NORTH)
+  updateLocomotion(s, flat, { walk: 1, turn: 0, jump: true }, FRAME_SECONDS)
+  expect(s.airborne, 'in the air at once').not.toBeNull()
+  expect(s.windUp).toBe(0)
+  expect(s.clip).toBe(ANIM.JUMP_MIDDLE)
+
+  // Backing away is `nDist <= 0` like standing, so it crouches.
+  const back = createLocomotion(flat, 0, 0, NORTH)
+  updateLocomotion(back, flat, { walk: -1, turn: 0, jump: true }, FRAME_SECONDS)
+  expect(back.airborne).toBeNull()
+  expect(back.windUp).toBeGreaterThan(0)
+})
+
 test('a running jump leaves faster, by half its walking step', () => {
-  // The stride is taken when the key is pressed, not when the pig leaves:
-  // by then it has been crouched and still for the whole wind-up, so a
-  // launch read off the speed at that moment would always be the standing
-  // one. Letting go mid-crouch therefore changes nothing.
+  // The stride is taken when the key is pressed. It only MATTERS for the
+  // crouching kinds, where by launch time the pig has been standing still
+  // for the whole wind-up — a launch read off the speed at that moment would
+  // always be the standing one.
   const leap = (walk: number): LocomotionState => {
     const flat = terrain(() => 0)
     const s = createLocomotion(flat, 0, 0, NORTH)
     updateLocomotion(s, flat, { walk, turn: 0, jump: true }, FRAME_SECONDS)
-    run(s, flat, {}, JUMP_WINDUP + FRAME_SECONDS, (t) => t.airborne !== null)
+    // A run-up is already off the ground; only the crouching kinds need the
+    // wind-up riding out, and a frame of flight would bend the launch speed.
+    if (!s.airborne) run(s, flat, {}, JUMP_WINDUP + FRAME_SECONDS, (t) => t.airborne !== null)
     return s
   }
   expect(leap(1).airborne!.vy).toBeCloseTo(-(JUMP_SPEED + (WALK_SPEED / 2) * JUMP_RISE))
   expect(leap(-1).airborne!.vy).toBeCloseTo(-(JUMP_SPEED + (WALK_BACK_SPEED / 2) * JUMP_RISE))
   expect(leap(0).airborne!.vy).toBeCloseTo(-JUMP_SPEED)
+})
+
+test('the get-up plays out when a pig is left alone, and not when it is driven', () => {
+  const flat = terrain(() => 0)
+  const land = (): LocomotionState => {
+    const s = createLocomotion(flat, 0, 0, NORTH)
+    updateLocomotion(s, flat, { walk: 0, turn: 0, jump: true }, FRAME_SECONDS)
+    run(s, flat, {}, 3, (t) => t.airborne === null && t.getUp > 0)
+    expect(s.airborne, 'down').toBeNull()
+    return s
+  }
+
+  // Left alone it holds for one pass of the clip, and it is a COMMITTED one:
+  // the renderer plays it through rather than looping it.
+  const still = land()
+  expect(still.clip).toBe(ANIM.LAND)
+  expect(still.commit).toBe(true)
+  run(still, flat, {}, GET_UP - 2 * FRAME_SECONDS)
+  expect(still.clip, 'still getting up').toBe(ANIM.LAND)
+  run(still, flat, {}, 2 * FRAME_SECONDS + FRAME_SECONDS)
+  expect(still.getUp).toBe(0)
+  expect(still.clip, 'and then it is just standing').toBe(ANIM.IDLE)
+  expect(still.commit).toBe(false)
+
+  // Driven, it is gone on the very next frame — the picker's clip request
+  // overwrites the landing's outright (0x472320).
+  const driven = land()
+  updateLocomotion(driven, flat, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(driven.getUp).toBe(0)
+  expect(driven.clip).toBe(ANIM.RUN)
+  expect(driven.commit).toBe(false)
 })
 
 test('falling pulls at GRAVITY from rest and stops accelerating at the cap', () => {
