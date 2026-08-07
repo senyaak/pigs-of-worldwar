@@ -319,6 +319,9 @@ export function buildBattle(
   let time = 0
   /** Scratch for the scope's eye, so a camera placement allocates nothing. */
   const eyeAt = new THREE.Vector3()
+  /** The eye as of the last ENGINE frame, and which frame that was. */
+  let heldEye = { x: 0, y: 0, z: 0 }
+  let eyeFrame = -1
   /** Seconds the acting pig has stood still, and where it stood. */
   let still = 0
   let stillAt = { x: 0, z: 0, heading: 0 }
@@ -449,6 +452,15 @@ export function buildBattle(
    * where its wobble comes from — the hand rides a breathing chest.
    */
   const scopeEye = (soldier: Soldier): { x: number; y: number; z: number } => {
+    // ONCE AN ENGINE FRAME, and held in between. The exe places this camera
+    // once per game frame at fifteen a second; sampling an interpolated
+    // skeleton at sixty turns the same breath into a glide, which is exactly
+    // what play saw — "щас плавает, а в оригинале прям дрожит". The pose
+    // itself still interpolates, so the pig moves smoothly and the view it is
+    // holding does not.
+    const frame = Math.floor(time / FRAME_SECONDS)
+    if (frame === eyeFrame) return heldEye
+    eyeFrame = frame
     const bone = soldier.mesh.bones[SCOPE_BONE] ?? soldier.mesh.bones[0]
     // The mixer wrote this frame's rotations; three folds them into the world
     // matrices at draw time and the camera is placed first.
@@ -456,7 +468,8 @@ export function buildBattle(
     eyeAt.set(SCOPE_MOUNT.x, SCOPE_MOUNT.y, SCOPE_MOUNT.z)
     bone.localToWorld(eyeAt)
     root.worldToLocal(eyeAt)
-    return { x: eyeAt.x, y: eyeAt.y, z: eyeAt.z }
+    heldEye = { x: eyeAt.x, y: eyeAt.y, z: eyeAt.z }
+    return heldEye
   }
 
   const watch = (soldier: Soldier, delta: number | null): void => {

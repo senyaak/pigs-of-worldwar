@@ -713,6 +713,15 @@ Play: "дрожание совсем не то — щас плавает, а в 
 автоматом увеличивается до предела." All three are done and two of them are
 decoded outright.
 
+**The eye is SAMPLED ONCE AN ENGINE FRAME**, and that turned out to matter
+more than the tremor did. Measured in play, the scope camera moved on 267 of
+289 rendered frames — the mount is on a bone the mixer interpolates, so the
+breath glided however the drift was shaped. Holding the eye between engine
+frames (`three/battle.ts`, `scopeEye`) inverts it: 259 of 290 frames now hold
+perfectly still and the rest jump, biggest step 2.16 against a mean of 0.13.
+The exe places this camera once a game frame; sampling an interpolated
+skeleton at sixty was the bug.
+
 **The tremor is a RANDOM WALK, not a sine.** A sine floats, which is exactly
 what play saw. The engine's own held tremor is at 0x49e030 — the game puts it
 on a body standing on terrain type 4 or 11 — and it is two axes bouncing
