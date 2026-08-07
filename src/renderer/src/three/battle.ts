@@ -55,9 +55,10 @@ import { advanceFiring, beginFiring } from '../../../lib/game/shot'
 import type { Firing } from '../../../lib/game/shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from '../../../lib/game/aftermath'
 import type { Aftermath } from '../../../lib/game/aftermath'
-import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
+import { createWobble, updateWobble, wobbleAcross, wobbleUp } from '../../../lib/game/wobble'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../../../lib/game/zoom'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
+import { MODEL_SCALE } from '../../../lib/game/scale'
 import { createShots } from './shots'
 import { createPigVoice } from '../audio/pigVoice'
 import type { FloatingNumber } from './damageNumbers'
@@ -363,6 +364,18 @@ export function buildBattle(
   /** The beat after a kill: the clock stops, the camera stays on the spot —
    * or on the crate coming down to replace it (lib/game/aftermath.ts). */
   let aftermath: Aftermath | null = null
+  /** A script step owed to something that has broken, and not run until it
+   * has finished breaking. One animation at a time. */
+  let pending: { id: number; y: number } | null = null
+  /**
+   * Whether the aim view has been REFUSED until the key is let go.
+   *
+   * Firing drops the sights, and they must not come back while G is still
+   * down — the exe holds mode 0x0E on the pad bit but gates it on
+   * `Pig::MayAct` (0x492df1), which is false from the press until the attack,
+   * and by then the whole shot sequence owns the view.
+   */
+  let sightingRefused = false
   /** The pigs' own barks. The gun arm of `Pig::Fire` says one every shot,
    * walking twelve lines in rotation (audio/pigVoice.ts). */
   const voice = createPigVoice()
@@ -390,8 +403,10 @@ export function buildBattle(
     // frames of quiet have gone by (lib/game/aftermath.ts).
     aftermath = beginAftermath(target)
     // …and its own command, which is the last thing the exe's break handler
-    // does (0x48d972). This is what drops the next crate in.
-    advanceScript(target.id, target.y)
+    // does (0x48d972). This is what drops the next crate in — but NOT YET.
+    // One thing at a time: the dummy has to finish coming apart before the
+    // crate starts coming down, which is how the whole game is paced.
+    pending = { id: target.id, y: target.y }
   }
   /** What a bayonet does when the fire key goes down. It reads BONES, so it
    * needs the squad and the root they hang in; the rules are pure next door
@@ -444,7 +459,7 @@ export function buildBattle(
   /** Where the sights are actually pointing: the player's angle plus the
    * drift. The stored angle stays the player's — the exe's `[pig+0x304]` is
    * exact, and the wobble is the remake's (lib/game/wobble.ts). */
-  const aimedAngle = (): number => aim.angle + wobblePitch(wobble)
+  const aimedAngle = (): number => aim.angle
 
   /**
    * Where the scope looks FROM: `SCOPE_MOUNT` in the hand bone's space, in
@@ -468,7 +483,16 @@ export function buildBattle(
     eyeAt.set(SCOPE_MOUNT.x, SCOPE_MOUNT.y, SCOPE_MOUNT.z)
     bone.localToWorld(eyeAt)
     root.worldToLocal(eyeAt)
-    heldEye = { x: eyeAt.x, y: eyeAt.y, z: eyeAt.z }
+    // …and the tremor rides ON TOP of it, as a place rather than an angle:
+    // the exe's own drift is the hand moving, so it shifts the picture and
+    // cannot steer the bullet (lib/game/wobble.ts). Across is perpendicular
+    // to the pig's facing; up is up, which in this space is a SMALLER y.
+    const side = soldier.pig.heading + Math.PI / 2
+    heldEye = {
+      x: eyeAt.x + Math.sin(side) * wobbleAcross(wobble) * MODEL_SCALE,
+      y: eyeAt.y - wobbleUp(wobble) * MODEL_SCALE,
+      z: eyeAt.z + Math.cos(side) * wobbleAcross(wobble) * MODEL_SCALE
+    }
     return heldEye
   }
 
@@ -507,8 +531,8 @@ export function buildBattle(
       dropIn.riseOver(soldier),
       delta,
       view,
-      aimRadians(aimedAngle()),
-      aimRadians(wobbleYaw(wobble)),
+      aimRadians(aim.angle),
+      0,
       view === 'scope' ? scopeEye(soldier) : null
     )
     // The pig's own body is IN the way of its own eye. Hide the acting model
@@ -522,6 +546,10 @@ export function buildBattle(
     holding = pig.holding
     aim = createAim(pig.holding)
     readying = 0
+    firing = null
+    aftermath = null
+    pending = null
+    sightingRefused = false
     swings.reset()
     sounds.reset()
     chase.reset()
@@ -562,7 +590,12 @@ export function buildBattle(
     // stopped being driveable — `Pig::MayAct` refuses on `[pig+0x230]`
     // (0x467a10) — and the clock does not run the player out of time while
     // the camera is away watching a bullet.
-    if (!firing && !aftermath && (game.tick(delta) || isDead(game.currentPig))) {
+    // The clock stops for the whole of a blow: from the moment the button
+    // goes down, through the swing or the flight, and on through the beat
+    // that shows what it did. Play's rule, and the exe's own gate agrees —
+    // `Pig::MayAct` is false for all of it.
+    const blowInProgress = firing !== null || aftermath !== null || swings.running()
+    if (!blowInProgress && (game.tick(delta) || isDead(game.currentPig))) {
       game.endTurn()
       jumpRequested = false
       fireRequested = false
@@ -624,7 +657,21 @@ export function buildBattle(
       numbers.update(delta)
       // The shot that caused all this ends here rather than a frame late.
       if (firing?.phase === 'flight' && shots.live() === 0) firing = null
-      if (advanceAftermath(aftermath, delta, airDrops.falling() > 0 || shots.live() > 0)) {
+      // ONE THING AT A TIME. The script's next step waits for the thing that
+      // triggered it to finish coming apart — play's rule for the whole
+      // game, "ждёшь конца одной анимации и включаешь другую" — so the crate
+      // only starts falling once the smoke off the dummy is gone.
+      if (pending && effects.smoke() === 0) {
+        advanceScript(pending.id, pending.y)
+        pending = null
+      }
+      if (
+        advanceAftermath(
+          aftermath,
+          delta,
+          pending !== null || airDrops.falling() > 0 || shots.live() > 0
+        )
+      ) {
         aftermath = null
         chase.reset()
       } else {
@@ -648,8 +695,11 @@ export function buildBattle(
         if (!firing) {
           firing = beginFiring()
           // Out of the sights the moment the trigger goes: the exe's aim
-          // camera is held on the very test that has just gone false.
+          // camera is held on the very test that has just gone false. And it
+          // stays out until G is actually let go — holding it through the
+          // shot must not snap the scope back over the flight.
           sighting = false
+          sightingRefused = true
           // …and the pig says something. Twelve lines in rotation, per squad
           // (audio/pigVoice.ts).
           voice.fire(game.players.indexOf(game.currentPlayer))
@@ -661,6 +711,11 @@ export function buildBattle(
     // the button goes down until the clip is spent (0x46afd5 tests both the
     // pending flag and the animation one) and its turn refuses for the clip
     // alone (0x46af43). A firing one cannot either, and on the same gate.
+    // Nothing else is driveable down the sights either — the aim view has the
+    // pad, so the jump key is not a jump while it is held. The remake's
+    // reading: the exe routes the whole of input through a different branch
+    // while the aim bit is down (0x4928dc), and no jump is reachable from it.
+    if (sighting) jumpRequested = false
     const walking = swings.running() || firing ? 0 : intent.walk
     const turning = swings.swinging() || firing ? 0 : intent.turn
 
@@ -744,7 +799,14 @@ export function buildBattle(
     // …and the closer it is zoomed the finer the aim moves, which is the
     // sniper's whole feel: `step = ((0x1000 - zoom) * step) >> 12`, floored
     // at the base step (0x495e08).
-    updateAim(aim, holding, weapon.aims ? aimIntent : 0, delta, (step) =>
+    // …and NOTHING moves the sights once the trigger is down. `Pig::Aim`
+    // (0x46a7f0) calls `Pig::MayAct` before it does anything and bails when
+    // it is false, and it is false from the press until the attack
+    // (`[pig+0x230]`). Without this the shot leaves along wherever the sights
+    // had drifted to by the end of the ten-frame fuse rather than where they
+    // were aimed — play: "будто секунду в сторону движения прицела продолжал
+    // двигаться".
+    updateAim(aim, holding, firing ? 0 : weapon.aims ? aimIntent : 0, delta, (step) =>
       zoomsIn(holding) ? zoomedStep(zoom, step, AIM_RAMP) : step
     )
     // The sights drift while they are up and are steady the moment they are
@@ -875,7 +937,9 @@ export function buildBattle(
       aimIntent = direction
     },
     setSighting(held) {
-      sighting = held
+      // Letting go always clears the refusal; holding it down never lifts it.
+      if (!held) sightingRefused = false
+      sighting = held && !sightingRefused
     },
     scoped: () => sighting && isGun(holding) && !dropIn.running(),
     aim: () => (scrubsPose(holding) ? aim.angle : null),

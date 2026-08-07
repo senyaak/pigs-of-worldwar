@@ -762,6 +762,52 @@ no-gauge weapon's charge becomes 0xFFF, what bit 0 of a body's `+0x44` means
 at 0x47a24b, the melee's own battle cry — the same `0x43af70` call, not yet
 wired to a swing — and which mode number the wait above actually is.
 
+### One thing at a time, and the sights hold still, 2026-08-07
+
+Play's list after watching it run, and what each turned out to be.
+
+**The next animation waits for the last one.** "всегда так — ждёшь конца одной
+анимации и включаешь другую." Breaking a dummy no longer runs its script
+step on the spot: `onBroken` parks it as `pending` and the aftermath only runs
+it once the smoke off the dummy is gone (`effects.smoke() === 0`), so the
+crate starts down after the dummy has finished coming apart rather than
+through it.
+
+**The clock stops for the whole blow**, from the button going down to the end
+of showing what it did — a swing, a shot, and the beat after either. One
+predicate, `blowInProgress`, and the exe's own gate agrees: `Pig::MayAct` is
+false for all of it.
+
+**The sights do not come back on their own.** Firing drops them, and they stay
+dropped until G is actually released — `sightingRefused`. Holding the key
+through a shot used to snap the scope back over the flight.
+
+**Nothing moves the sights once the trigger is down**, and this one is
+decoded: `Pig::Aim` (0x46a7f0) calls `Pig::MayAct` before it does anything and
+bails when it is false, which it is from the press until the attack
+(`[pig+0x230]`). Without it the bullet left along wherever the sights had
+drifted to by the end of the ten-frame fuse — play: "будто секунду в сторону
+движения прицела продолжал двигаться".
+
+**No jumping down the sights.** The remake's reading: the exe routes input
+through a different branch entirely while the aim bit is held (0x4928dc) and
+no jump is reachable from it.
+
+**The tremor moves the EYE, not the aim** — third pass, and this one is the
+binary's shape rather than a guess. The shot reads `[pig+0x304]` exactly and
+the rifle cam is a POSITION on the hand, so in the original a tremor shifts
+the picture and *cannot* steer the bullet. An angular jitter does both, swings
+the whole world, and gets worse the further you look; at four times
+magnification it is unusable. That was "дрож камеры всё ещё фу".
+`lib/game/wobble.ts` now returns offsets in model units, across and up from
+wherever the hand has the camera.
+
+Searched for a dedicated scope tremor and there is none: `Pig::Aim`, the
+shot's angle read, the whole of the rifle cam handler, the camera's own
+`[cam+0xB8]` shake (a decaying blast), the view manager's RNG (constructor
+seeding), the zoomed-view input handler, and `0x46a960` (which just returns
+the aim angle). Written up in `../pigs-disasm/weapons/fire.md`.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.

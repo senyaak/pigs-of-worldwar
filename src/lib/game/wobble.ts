@@ -34,15 +34,19 @@
 //
 // **The remake's own, and it borrows that last shape.** Play: "дрожание
 // совсем не то — щас плавает, а в оригинале прям дрожит." A sine floats; a
-// random walk with a fresh step every frame does not. So the sights get the
-// engine's own tremor, at the engine's own numbers, on the two axes the
-// sights have — scaled down, because ±0x80 is eleven degrees and that is a
-// body slipping on ice rather than a pig holding its breath.
+// random walk with a fresh step every frame does not.
 //
-// Set `SCALE` to zero and the scope still breathes; it just breathes as
-// quietly as the original's hand does.
+// **It moves the EYE, not the aim.** That is not a style choice — it is what
+// the binary does. The shot reads `[pig+0x304]` exactly and the rifle cam is
+// a POSITION on the hand, so in the original a tremor shifts the picture and
+// cannot steer the bullet. An angular jitter does both, swings the whole
+// world, and gets worse the further you look; at four times magnification it
+// is unusable. Play's second verdict — "дрож камеры всё ещё фу" — was that
+// one. So these are OFFSETS, in model units, across and up from wherever the
+// hand has the camera.
 //
-// Angles are the engine's 4096-to-the-turn units, like every other angle.
+// Set `SCALE` to zero and the scope still breathes on the hand's own 32 units
+// a breath; it just does not tremble on top.
 
 /** `8 + (rand() & 7)`: the step, straight off 0x49e07f. */
 const STEP_BASE = 8
@@ -50,18 +54,19 @@ const STEP_SPREAD = 8
 /** `±0x80`: where it turns round, off 0x49e06c. */
 const LIMIT = 0x80
 /**
- * How much of it the sights get. EYEWORK: the walk's own ±128 is 11°, which
- * is a body sliding down a slope; a quarter of it reads as a held rifle.
+ * How much of it the sights get, as MODEL UNITS per unit of walk. EYEWORK: at
+ * 0.25 the eye wanders ±32 units, which doubles the hand's own breath and is
+ * about a tenth of a pig's width.
  */
 const SCALE = 0.25
 
 export interface Wobble {
   /** The two accumulators, `[obj+0x12A]` and `[obj+0x12C]`. */
-  pitch: number
-  yaw: number
+  up: number
+  across: number
   /** Which way each is walking, `[obj+0x12E]` and `[obj+0x12F]`. */
-  pitchUp: boolean
-  yawUp: boolean
+  upRising: boolean
+  acrossRising: boolean
   /** Frames owed. The walk steps ONCE A FRAME at the engine's fifteen, and
    * that is the whole point — stepping it per rendered frame at sixty would
    * smooth it back into a float. */
@@ -69,10 +74,10 @@ export interface Wobble {
 }
 
 export const createWobble = (): Wobble => ({
-  pitch: 0,
-  yaw: 0,
-  pitchUp: true,
-  yawUp: false,
+  up: 0,
+  across: 0,
+  upRising: true,
+  acrossRising: false,
   owed: 0
 })
 
@@ -99,26 +104,25 @@ export function updateWobble(
   random: () => number = Math.random
 ): void {
   if (!sighting) {
-    wobble.pitch = 0
-    wobble.yaw = 0
+    wobble.up = 0
+    wobble.across = 0
     wobble.owed = 0
     return
   }
   wobble.owed += frames
   while (wobble.owed >= 1) {
     wobble.owed -= 1
-    const p = walk(wobble.pitch, wobble.pitchUp, random)
-    wobble.pitch = p.value
-    wobble.pitchUp = p.up
-    const y = walk(wobble.yaw, wobble.yawUp, random)
-    wobble.yaw = y.value
-    wobble.yawUp = y.up
+    const u = walk(wobble.up, wobble.upRising, random)
+    wobble.up = u.value
+    wobble.upRising = u.up
+    const a = walk(wobble.across, wobble.acrossRising, random)
+    wobble.across = a.value
+    wobble.acrossRising = a.up
   }
 }
 
-/** How far off the pitch is right now, in aim units. */
-export const wobblePitch = (wobble: Wobble): number => wobble.pitch * SCALE
+/** How far the eye has wandered UP of where the hand put it, model units. */
+export const wobbleUp = (wobble: Wobble): number => wobble.up * SCALE
 
-/** …and the yaw, which the pig's own heading does not follow: the model
- * stands where it stands and only the sights move. */
-export const wobbleYaw = (wobble: Wobble): number => wobble.yaw * SCALE
+/** …and ACROSS, to the pig's right. Neither steers the barrel. */
+export const wobbleAcross = (wobble: Wobble): number => wobble.across * SCALE
