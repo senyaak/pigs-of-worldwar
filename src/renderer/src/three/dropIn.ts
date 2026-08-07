@@ -123,15 +123,13 @@ export function createDropIn(
         updateDrop(arrival.drop, restingY(query, x, z), delta)
         arrival.soldier.place(x, arrival.drop.y, z, arrival.soldier.pig.heading)
         if (!arrival.drop.landed) continue
-        // Touchdown, and the pig simply STANDS. The exe sets the landing
-        // clip here — `SetAnim(0x0a, 0, 1, 1)` at 0x4717f5 — but that third
-        // argument is a duration in FRAMES (`pig+0x364`, counted down at
-        // 0x46e2cb), so clip 10 is held for exactly one before the idle
-        // picker takes it back. Holding it for its own eleven frames instead
-        // is a crouch-and-spring the original never shows, and play says so
-        // plainly: there is no rebound off the ground.
+        // Touchdown: the canopy goes and the pig gets up, which is
+        // `SetAnim(0x0a, 0, 1, 1)` at 0x4717f5 — clip 10, ONCE. The phase is
+        // over for this pig the moment it is down; the get-up plays on over
+        // the start of the turn, exactly as a committed clip does anywhere
+        // else, because the renderer will not let the walking cut it short.
         furl(arrival)
-        arrival.soldier.setClip(ANIM.IDLE)
+        arrival.soldier.playOnce(ANIM.LAND)
         bank().play(BATTLE_SOUNDS.land)
         arrival.done = true
       }

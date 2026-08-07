@@ -171,9 +171,14 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   await page.waitForTimeout(120)
   const grounded = await debugState(page)
   await tap(page, 'jump')
-  await page.waitForTimeout(120)
-  const airborne = await debugState(page)
-  expect(airborne.nodeY, 'jump left the ground').toBeLessThan(grounded.nodeY - 20) // the hop's apex is 35 units now (JUMP_RISE)
+  // Not on the next frame: the pig crouches for one pass of the wind-up clip
+  // and leaves the ground when that finishes (lib/game/locomotion). So watch
+  // for the apex rather than sampling at a fixed moment — game space is
+  // Y-down, so airborne is a SMALLER y than standing, and the hop clears
+  // about 35 units (JUMP_RISE).
+  const apex = await peakNodeY(page, grounded.nodeY - 20, 2000)
+  expect(apex, 'jump left the ground').toBeLessThan(grounded.nodeY - 20)
+  const airborne = { nodeY: apex }
 
   // And it recharges. The cooldown once ticked down inside the turn-change
   // block, where the next line reset it — so a pig could jump exactly once
@@ -184,8 +189,9 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   await page.waitForTimeout(600)
   const standing = await debugState(page)
   await tap(page, 'jump')
-  await page.waitForTimeout(120)
-  expect((await debugState(page)).nodeY, 'jumped a second time').toBeLessThan(standing.nodeY - 20)
+  expect(await peakNodeY(page, standing.nodeY - 20, 2000), 'jumped a second time').toBeLessThan(
+    standing.nodeY - 20
+  )
 
   expect(app.errors()).toEqual([])
 })

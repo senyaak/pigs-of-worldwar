@@ -44,8 +44,18 @@ export interface Soldier {
   /** The archive base actually drawn, which is the fallback when the pig's
    * class had no art of its own. */
   readonly art: string
-  /** Wear a clip, or the bind pose. Repeating the one already on is free. */
+  /**
+   * Wear a looping clip, or the bind pose. Repeating the one already on is
+   * free — and so is asking while a COMMITTED animation is running: a
+   * one-shot owns the pig until it is done, which is the original's own
+   * model (a clip holds until its repeat count is spent) and is what keeps a
+   * caller that picks a clip every frame from cutting a get-up in half.
+   */
   setClip(index: number | null): void
+  /** Commit to a clip played through once, holding its last frame. */
+  playOnce(index: number): void
+  /** Whether a committed animation is still running. */
+  animating(): boolean
   /** Put it where the game says it is: soles on the ground, sunk a little
    * when swimming. */
   settle(): void
@@ -105,10 +115,15 @@ export function fieldSquad(
       node,
       art: art.base,
       setClip(index) {
-        if (clip === index) return
+        if (clip === index || player.running()) return
         clip = index
         player.play(index === null ? null : (assets.clips[index] ?? null))
       },
+      playOnce(index) {
+        clip = index
+        player.playOnce(assets.clips[index] ?? null)
+      },
+      animating: () => player.running(),
       settle() {
         const { x, z } = pig.position
         node.position.set(x, restingY(query, x, z) - mesh.footOffset, z)

@@ -29,6 +29,7 @@ import {
   JUMP_PUSH_DELAY,
   JUMP_RISE,
   JUMP_SPEED,
+  JUMP_WINDUP,
   SWIM_SINK,
   SWIM_SPEED,
   WALL_CLIMB,
@@ -197,14 +198,29 @@ test('wedged, the pig grows bouncier; free, it recovers only on landing', () => 
   expect(s.bounciness.restitution).toBeGreaterThan(RESTITUTION_FREE)
 })
 
-test('a jump leaves straight UP, and pushes forward three frames later', () => {
+test('a jump crouches first, then leaves straight UP and pushes forward', () => {
   // The exe's launch (0x46c199) is pitch 0x400 — vertical, at |nDist|/2 +
   // 0x30 — and the forward half is a separate impulse the pig update adds on
   // the third frame of the fall (0x46e943). Standing still, that is 48 up
   // and then 48 out; running, 74 up and the same 48 out.
+  //
+  // But NOT on the frame the key is pressed. `TryJump` only starts the
+  // wind-up clip, and the launch happens when its one pass runs out
+  // (0x46e8e2 calls StartFalling) — so the crouch comes first and the pig
+  // goes nowhere during it.
   const flat = terrain(() => 0)
   const s = createLocomotion(flat, 0, 0, NORTH)
   updateLocomotion(s, flat, { walk: 0, turn: 0, jump: true }, FRAME_SECONDS)
+  expect(s.airborne, 'the crouch comes first').toBeNull()
+  expect(s.clip).toBe(ANIM.JUMP_START)
+  expect(s.windUp).toBeGreaterThan(0)
+  // Committed: driving through the wind-up moves and turns nothing.
+  run(s, flat, { walk: 1, turn: 1 }, JUMP_WINDUP - 3 * FRAME_SECONDS)
+  expect(s.airborne, 'still crouched').toBeNull()
+  expect(s.z, 'the crouch goes nowhere').toBe(0)
+  expect(s.heading, 'and turns nowhere').toBe(NORTH)
+
+  run(s, flat, {}, JUMP_WINDUP, (t) => t.airborne !== null)
   expect(s.airborne).not.toBeNull()
   expect(s.airborne!.vy).toBeCloseTo(-JUMP_SPEED)
   expect(s.airborne!.vz, 'no forward speed out of the ground').toBe(0)
@@ -222,23 +238,39 @@ test('a jump leaves straight UP, and pushes forward three frames later', () => {
   // next hop: not before it has run out, then freely.
   run(s, flat, {}, 3, (t) => t.airborne === null)
   expect(s.airborne).toBeNull()
+  // And it gets UP: the landing hands over the clip the exe asks for there,
+  // once (0x470944).
+  expect(s.clip).toBe(ANIM.LAND)
+
+  // The cooldown gates the next hop. With the wind-up in the way a refused
+  // jump and an accepted one both leave `airborne` null on the frame the key
+  // is pressed, so what separates them is whether the crouch STARTED.
   if (s.jumpReadyIn > 0) {
     updateLocomotion(s, flat, { walk: 0, turn: 0, jump: true }, FRAME_SECONDS)
-    expect(s.airborne, 'refused while recharging').toBeNull()
+    expect(s.windUp, 'refused while recharging').toBe(0)
   }
   run(s, flat, {}, 1)
   updateLocomotion(s, flat, { walk: 0, turn: 0, jump: true }, FRAME_SECONDS)
-  expect(s.airborne, 'recharged').not.toBeNull()
+  expect(s.windUp, 'recharged').toBeGreaterThan(0)
+  run(s, flat, {}, JUMP_WINDUP + FRAME_SECONDS, (t) => t.airborne !== null)
+  expect(s.airborne, 'and left the ground').not.toBeNull()
 })
 
 test('a running jump leaves faster, by half its walking step', () => {
-  const flat = terrain(() => 0)
-  const s = createLocomotion(flat, 0, 0, NORTH)
-  updateLocomotion(s, flat, { walk: 1, turn: 0, jump: true }, FRAME_SECONDS)
-  expect(s.airborne!.vy).toBeCloseTo(-(JUMP_SPEED + (WALK_SPEED / 2) * JUMP_RISE))
-  const back = createLocomotion(flat, 0, 0, NORTH)
-  updateLocomotion(back, flat, { walk: -1, turn: 0, jump: true }, FRAME_SECONDS)
-  expect(back.airborne!.vy).toBeCloseTo(-(JUMP_SPEED + (WALK_BACK_SPEED / 2) * JUMP_RISE))
+  // The stride is taken when the key is pressed, not when the pig leaves:
+  // by then it has been crouched and still for the whole wind-up, so a
+  // launch read off the speed at that moment would always be the standing
+  // one. Letting go mid-crouch therefore changes nothing.
+  const leap = (walk: number): LocomotionState => {
+    const flat = terrain(() => 0)
+    const s = createLocomotion(flat, 0, 0, NORTH)
+    updateLocomotion(s, flat, { walk, turn: 0, jump: true }, FRAME_SECONDS)
+    run(s, flat, {}, JUMP_WINDUP + FRAME_SECONDS, (t) => t.airborne !== null)
+    return s
+  }
+  expect(leap(1).airborne!.vy).toBeCloseTo(-(JUMP_SPEED + (WALK_SPEED / 2) * JUMP_RISE))
+  expect(leap(-1).airborne!.vy).toBeCloseTo(-(JUMP_SPEED + (WALK_BACK_SPEED / 2) * JUMP_RISE))
+  expect(leap(0).airborne!.vy).toBeCloseTo(-JUMP_SPEED)
 })
 
 test('falling pulls at GRAVITY from rest and stops accelerating at the cap', () => {

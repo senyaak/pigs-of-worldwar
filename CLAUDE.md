@@ -363,14 +363,20 @@ walks the whole pig list). `lib/game/parachute.ts` is the descent,
 `three/parachute.ts` the canopy, and the whole derivation is
 `../pigs-disasm/parachute/notes.md`.
 
-**A pig that lands under a canopy does NOT rebound**, and the reason is a
-number that reads like something else: `Pig::SetAnim`'s third argument is a
-duration in FRAMES (`pig+0x364`, counted down at 0x46e2cb, then the per-class
-idle sequence at 0x4d7320 takes over). The parachute landing passes 1, so
-its "Jumping - End" clip is held for a single frame and the crouch never
-plays. Reading that 1 as "play the clip once through" put an 11-frame
-crouch-and-spring on every touchdown, which is exactly the bounce play says
-is not there. `e2e/002/parachute.spec.ts` pins it. The chase camera leaves room for the
+**Some clips are EVENTS, not states — `PLAYED_ONCE` in `locomotion.ts`.**
+`Pig::SetAnim`'s third argument is a repeat count, and the exe only
+decrements it where the clip's own cursor wraps (0x46e27f..0x46e2cb) — so a
+count of 1 means "play it through once", and two places are gated on the
+clip finishing rather than on a timer: the jump does not leave the ground
+until the wind-up is done (0x46e8e2), and every landing wears the get-up
+(0x470944, and the parachute's 0x4717f5 asks for the same). `three/clips.ts`
+plays those with `LoopOnce` and CLAMPS the last frame; `Soldier.setClip` is
+inert while one runs, so a caller that picks a clip every frame cannot cut a
+get-up in half.
+
+Faking that with a timer over a looping player is what put a
+crouch-and-snap on the first parachute landings — it read as a bounce off
+the ground, and it was the fake, not the clip. Do not reintroduce it. The chase camera leaves room for the
 canopy while one is up (`desiredCamera`'s `rise`); without that the canopy
 sits off the top of the frame, which is how it looked the first time. Every
 e2e entry into a battle waits it out through `landed()` — a spec that drives
@@ -445,9 +451,13 @@ would be a stand-in nobody asked for.
 - **The turn ramp is not modelled.** The original accelerates a turn over
   eight frames to the 32/4096-of-a-circle cap that `TURN_SPEED` now is;
   here the cap applies from the first frame. A tenth of a second.
-- **The jump's wind-up is not modelled.** The exe's standing hop plays clip
-  8 and only launches when that clip runs out (0x46e8e2); ours leaves the
-  ground on the frame the key is pressed.
+- **The idle CYCLE is not modelled** — a standing pig loops clip 27 and
+  nothing else. The 80-byte table at 0x4d7300 that a spent repeat count
+  steps into turned out to be per-WEAPON, not per-pig: record 1 and 2 play
+  "Sword / Knife", 22 plays "Using Grenade", and record 0 (no weapon) is
+  empty, which is why an unarmed pig falls straight through it. So it lands
+  with the weapons, not before. What a pig does while it stands about — the
+  "Choosing idle anim from scratch" string — is still undecoded.
 - **Open water is punched, where the original blends it.** The library
   punches water texels only out of MIXED art (kind 1); a kind-2 tile keeps
   its texture and is drawn translucent over the water. `three/terrain.ts`
