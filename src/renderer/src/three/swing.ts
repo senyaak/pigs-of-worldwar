@@ -15,6 +15,8 @@ import type { Clip } from '../api'
 import { advanceSwing, beginSwing, meleeOf, strikeOffsets, struck } from '../../../lib/game/melee'
 import type { Point, SwingState } from '../../../lib/game/melee'
 import { amountOf, spend } from '../../../lib/game/inventory'
+import { hurt, isDead } from '../../../lib/game/health'
+import { ANIM } from '../../../lib/game/locomotion'
 import { clipSeconds } from './clips'
 import type { Soldier, Squad } from './squad'
 import { BATTLE_SOUNDS } from '../audio/battle'
@@ -49,6 +51,9 @@ export interface SwingParts {
   bank: () => Bank
   /** The battle's game-space root — what a bone's world point converts into. */
   root: THREE.Object3D
+  /** Whether this is the training ground, where a pig cannot be killed — the
+   * exe floors it at one point (lib/game/health.ts). */
+  training: boolean
 }
 
 export function createSwings(parts: SwingParts): Swings {
@@ -92,7 +97,9 @@ export function createSwings(parts: SwingParts): Swings {
     }
     for (const target of parts.squad.members) {
       if (target === attacker || already.has(target)) continue
-      if (target.pig.health <= 0) continue
+      // A body already down is not struck again: the exe's first test in
+      // `Pig::TakeDamage` is the dead state (0x467ac9).
+      if (isDead(target.pig)) continue
       // A pig's body sits at the model's origin — the hip — which is exactly
       // the position the exe compares (three/squad.ts places it there).
       const body = {
@@ -102,8 +109,11 @@ export function createSwings(parts: SwingParts): Swings {
       }
       if (!struck(blade, from, body)) continue
       already.add(target)
-      target.pig.health = Math.max(0, target.pig.health - weapon.damage)
+      // The domain owns what a hit costs and whether it kills; this only
+      // makes the noise and lays the body down.
+      const outcome = hurt(target.pig, weapon.damage, parts.training)
       parts.bank().play(BATTLE_SOUNDS[weapon.impact])
+      if (outcome === 'died' || outcome === 'gibbed') target.playOnce(ANIM.DYING)
     }
   }
 

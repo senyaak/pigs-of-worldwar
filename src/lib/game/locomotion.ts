@@ -198,6 +198,10 @@ export const ANIM = {
    * does. Ordinary falling is JUMP_MIDDLE; the impact handler plays BOUNCE. */
   EJECTED: 38,
   BOUNCE: 39,
+  /** Falling over dead. The exe has three (47, 48, 49 — "Dying #1..#3") and
+   * picks between them in 0x47d080, which is not decoded; the remake plays
+   * the first and says so (lib/game/health.ts). */
+  DYING: 47,
   /** Hanging under a canopy — the level's opening drop (lib/game/parachute). */
   PARACHUTE: 82
 } as const

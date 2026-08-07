@@ -16,11 +16,12 @@ import { buildWaterMask } from '../../../lib/game/watermask'
 import { ANIM, createLocomotion, updateLocomotion } from '../../../lib/game/locomotion'
 import type { LocomotionState } from '../../../lib/game/locomotion'
 import { ObstacleField, withPigs } from '../../../lib/game/obstacles'
-import { FULL_HEALTH, pickupsOf, reached, worthOf } from '../../../lib/game/pickups'
+import { pickupsOf, reached, worthOf } from '../../../lib/game/pickups'
 import type { Pickup } from '../../../lib/game/pickups'
 import { amountOf, give } from '../../../lib/game/inventory'
 import type { GiveResult } from '../../../lib/game/inventory'
 import { isTrainingGround } from '../../../lib/game/tutorial'
+import { heal, isDead } from '../../../lib/game/health'
 import { aimPhase, createAim, scrubsPose, updateAim } from '../../../lib/game/aim'
 import { weaponModelName, weaponOf } from '../../../lib/game/weapons'
 import { meleeOf } from '../../../lib/game/melee'
@@ -171,7 +172,8 @@ export function buildBattle(
       let result: GiveResult = 'taken'
       let given = worth
       if (pickup.skill === null) {
-        pig.health = Math.min(FULL_HEALTH, pig.health + worth)
+        // No ceiling: the original's heal adds and stops (lib/game/health.ts).
+        heal(pig, worth)
         given = pig.health
       } else {
         result = give(pig.carrying, pickup.skill, worth)
@@ -240,7 +242,13 @@ export function buildBattle(
   /** What a bayonet does when the fire key goes down. It reads BONES, so it
    * needs the squad and the root they hang in; the rules are pure next door
    * (lib/game/melee.ts). The aim angle is deliberately NOT among them. */
-  const swings = createSwings({ squad, clips: assets.clips, bank: () => bank, root })
+  const swings = createSwings({
+    squad,
+    clips: assets.clips,
+    bank: () => bank,
+    root,
+    training
+  })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
    * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig
    * reaches for the rifle and then has it. */
@@ -294,10 +302,19 @@ export function buildBattle(
       return
     }
 
+    // Nobody left standing: the battle stops where it is rather than handing
+    // a turn to a squad that cannot take one (lib/game/game.ts).
+    if (game.over) {
+      onGameChanged()
+      return
+    }
+
     // The turn clock runs regardless of what anyone does — except that it
     // does not start at once: `tick` burns the beat at the top of the turn
-    // first (lib/game/game.ts).
-    if (game.tick(delta)) {
+    // first (lib/game/game.ts). A pig that FELL this turn ends it the same
+    // way the clock does — the exe hands the turn on from inside the damage
+    // itself when the acting pig is the one that died (0x467d4f).
+    if (game.tick(delta) || isDead(game.currentPig)) {
       game.endTurn()
       jumpRequested = false
       fireRequested = false
@@ -324,6 +341,10 @@ export function buildBattle(
     }
     for (const soldier of squad.members) {
       if (soldier === active) continue
+      // A body that has fallen stays fallen: its dying clip was played once
+      // and clamped, and standing it back up is exactly what this loop would
+      // otherwise do every frame (three/swing.ts plays it).
+      if (isDead(soldier.pig)) continue
       soldier.setClip(ANIM.IDLE)
       // Only the pig being driven holds its weapon up; the rest stand.
       soldier.overlay(-1, 0)

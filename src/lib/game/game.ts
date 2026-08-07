@@ -7,6 +7,7 @@
 // the next pig of that squad is the one that acts.
 
 import type { Slot } from './inventory'
+import { isDead, maxHealthFor } from './health'
 
 export interface PigSpawn {
   x: number
@@ -27,6 +28,12 @@ export interface Pig {
   name: string
   /** Index into the player's squad. */
   index: number
+  /**
+   * Points, and its CLASS says how many it started with — a grunt fifty, a
+   * heavy a hundred and twenty (lib/game/health.ts). At or below zero the pig
+   * is dead; nothing here caps it above, because the original's heal does
+   * not either.
+   */
   health: number
   /** What it is carrying: up to fifteen skills, in the order they were
    * picked up (lib/game/inventory.ts). A pig starts with nothing — every
@@ -117,15 +124,16 @@ export class Game {
         activePig: 0,
         pigs: player.pigNames.map((name, index) => {
           const at = config.spawns[spawn++]
+          const pigClass = at.pigClass ?? GRUNT
           return {
             name,
             index,
-            health: 100,
+            health: maxHealthFor(pigClass),
             carrying: [],
             holding: null,
             position: { x: at.x, z: at.z },
             heading: at.heading ?? 0,
-            pigClass: at.pigClass ?? GRUNT,
+            pigClass,
             parachutes: at.parachutes ?? false
           }
         })
@@ -200,12 +208,55 @@ export class Game {
     this.currentPig.heading = heading
   }
 
-  /** Hand over to the next player; their squad advances to its next pig. */
+  /** Whether this side still has anyone standing. */
+  private standing(player: Player): boolean {
+    return player.pigs.some((pig) => !isDead(pig))
+  }
+
+  /** The next pig of a squad still standing after `from`, or −1 for a side
+   * that has been wiped out. A squad of one answers with the same pig. */
+  private nextStanding(player: Player, from: number): number {
+    for (let step = 1; step <= player.pigs.length; step++) {
+      const at = (from + step) % player.pigs.length
+      if (!isDead(player.pigs[at])) return at
+    }
+    return -1
+  }
+
+  /** Whether anyone at all is left to play. */
+  get over(): boolean {
+    return !this.players.some((player) => this.standing(player))
+  }
+
+  /**
+   * Hand over to the next player; their squad advances to its next pig.
+   *
+   * The DEAD are stepped over on both counts — a fallen pig never comes up
+   * again, and a side with none left is passed by rather than handed a turn
+   * it cannot take. A battle with nobody standing leaves everything where it
+   * is: `over` is what says so.
+   */
   endTurn(): void {
+    if (this.over) return
     const player = this.currentPlayer
-    player.activePig = (player.activePig + 1) % player.pigs.length
-    this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length
-    if (this.currentPlayerIndex === 0) this.turnNumber++
+    const nextPig = this.nextStanding(player, player.activePig)
+    if (nextPig >= 0) player.activePig = nextPig
+    for (let step = 1; step <= this.players.length; step++) {
+      const at = (this.currentPlayerIndex + step) % this.players.length
+      const next = this.players[at]
+      if (!this.standing(next)) continue
+      // The pig THIS side left off on may have fallen since — it advances
+      // when its own turn ends, so a squad coming back up can be pointing at
+      // a body. Step it on before handing anything over.
+      if (isDead(next.pigs[next.activePig])) {
+        next.activePig = this.nextStanding(next, next.activePig)
+      }
+      // Coming back round to a side we have already had is a new turn — the
+      // same rule as before, only now a wiped-out side does not get one.
+      if (at <= this.currentPlayerIndex) this.turnNumber++
+      this.currentPlayerIndex = at
+      break
+    }
     this.timeLeftSeconds = this.turnSeconds
     this.startingFor = TURN_START_SECONDS
   }

@@ -29,8 +29,10 @@ import { UNLIMITED } from './inventory'
 /** What the training ground hands over for a health crate. */
 export const TRAINING_HEALTH = 50
 
-/** The most health a pig can be topped up to. */
-export const FULL_HEALTH = 100
+// There is no ceiling to top a pig up TO: `Pig::Heal` (0x467fd0) adds and
+// stops, and nothing in it looks at the maximum the constructor worked out.
+// A 50-point crate on a 50-point grunt leaves it at a hundred and the
+// original allows it (lib/game/health.ts).
 
 export interface Pickup {
   /** The POG record's own 1-based id — what identifies its art. */

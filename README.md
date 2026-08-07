@@ -62,7 +62,9 @@ CONTACT rather than by a projectile — the trotters, the knife, the **bayonet**
 the sword and the cattle prod. The pig winds up for ten frames, swings the
 whole-body clip its record names, and the blade is live for four frames of it,
 sampled along its own length off the hand bone. Ten health off a pig it
-catches, once per swing, and only what is in front of it inside 67.5°. Walking
+catches — five swings put a grunt down, because health is the pig's CLASS's
+and a grunt has fifty, not a hundred. Once per swing, and only what is in
+front of it inside 67.5°. Walking
 is refused for the length of it, as the original refuses it, and the camera
 swings round to the pig's side and closes in — the original has a camera mode
 for exactly this and uses it for nothing else. The aim angle plays no part:
@@ -117,8 +119,11 @@ A battle you can walk around: the map's own terrain, props and squads, the
 turn clock, the parachute drop the level opens with, the training ground's
 crates and the instructor talking you through them, the skill menu over what
 a pig is carrying, the weapon it takes out of it — held, posed and aimed —
-and the first attack: a bayonet you can swing at another pig for real damage.
+and the first attack: a bayonet you can swing at another pig for real damage,
+with the original's own health behind it. A pig has its class's points, a
+fallen one stays down and is stepped over by the turn order, and nothing can
+die on the training ground because the original will not let it.
 
-Next up: the weapons that fire. The power gauge, the projectile, and the
-knockback a hit carries, which is decoded and waits on a struck pig having a
-locomotion state of its own.
+Next up: the weapons that fire — the power gauge and the projectile — and the
+training ground's dummies, which are a real target in the original and wait
+on the map script that says which one is live.

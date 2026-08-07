@@ -386,6 +386,38 @@ walks the whole pig list). `lib/game/parachute.ts` is the descent,
 `three/parachute.ts` the canopy, and the whole derivation is
 `../pigs-disasm/parachute/notes.md`.
 
+**Health is POINTS, the maximum is the CLASS's, and it is not 100.** The
+constructor reads it out of a 128-byte record per class at 0x4d02e0 — the
+same record whose `+0x04` is the thirteen `Pig::Walk` grants — so a grunt has
+**fifty**, a heavy 120, class 4 has 130. The engine counts 128ths of a point
+and every amount arrives shifted left seven; nothing ever produces a
+fractional point, so `lib/game/health.ts` counts POINTS and the exe's
+thresholds come out exact: death at `<= 0x7f` is "under one whole point",
+which over whole points is `<= 0`. Three more rules, all decoded and all
+applied: **the training ground floors a pig at one point** (0x467c85 — CAMP
+cannot kill, the same flag that makes its skills unlimited), **sixty points
+past dead is a different, messier death** (`GIB_BELOW`, strictly below), and
+**healing has NO ceiling** — `Pig::Heal` adds and stops, so a 50-point crate
+on a 50-point grunt leaves it at ninety and the original allows it. The
+`FULL_HEALTH = 100` clamp that used to live in `pickups.ts` was both numbers
+wrong and is gone. `../pigs-disasm/damage/notes.md`.
+
+Finding the pig's vtable is the fiddly step and worth not redoing: it is
+**0x4bd298** (`+0x34` TakeDamage 0x467ac0, `+0x38` Heal 0x467fd0), and the
+pig links itself into the list at 0x51ee18 on `+0x168`. The class at 0x4bd238
+looks like it — health at the same `+0x4c`, constructor in the same 0x464xxx
+block — and is NOT: it chains through `+0x7c` off 0x51ed90, its heal is a
+`ret 4` stub, and it is the TRAINING DUMMY.
+
+**A fallen pig is stepped over, and by two rules.** `Game.endTurn` advances
+past the dead in its own squad AND past a side with nobody left — including
+the incoming side's own `activePig`, which advances only when its turn ends
+and so can be pointing at a body by the time it comes round again (that one
+cost a failing spec). The acting pig dying ends the turn on the spot, which
+is what the exe does from inside the damage itself (0x467d4f). `game.over`
+says nobody is left. The battle skips a corpse in the idle loop, or it would
+stand it back up every frame.
+
 **Some clips are EVENTS, not states — `state.commit` in `locomotion.ts`.**
 `Pig::SetAnim`'s third argument is a repeat count, and the exe only
 decrements it where the clip's own cursor wraps (0x46e27f..0x46e2cb), so a
@@ -641,13 +673,23 @@ would be a stand-in nobody asked for.
   (It would also have decided almost nothing — `STRIKE_RISE` is 360 against a
   pig 320 tall, so a body within a body-height is caught either way.)
 
-  Three things in it are decoded and deliberately NOT applied: the KNOCKBACK
+  Two things in it are decoded and deliberately NOT applied: the KNOCKBACK
   (75 for a bayonet, at 45° up along the bearing — only the acting pig has a
-  locomotion state, so there is nothing to push), the BATTLE CRY `Pig::Fire`
-  plays out of the squad's own rotating counter, and the TRAINING DUMMY, which
-  takes the identical box test on CAMP (0x4762e0) and would want a prop that
-  can be damaged. CAMP fields ONE pig, so a swing has nothing to hit there —
-  `pow.swapMap('LIBERATE')`.
+  locomotion state, so there is nothing to push) and the BATTLE CRY
+  `Pig::Fire` plays out of the squad's own rotating counter. CAMP fields ONE
+  pig, so a swing has nothing to hit there — `pow.swapMap('LIBERATE')`.
+
+  **The training DUMMY is a real target in the exe and is not built here yet,
+  and the reason is not the damage.** It is its own class (vtable 0x4bd238),
+  thirty points, hurt through the same `[vtbl+0x34]` for ten — three bayonet
+  hits — and it dies by the pig's own rule. What is missing is WHICH dummy:
+  0x4762e0 does not walk a list, it takes the single object at `[0x537df0]`
+  and checks `[+0x84]` is 0x43/0x44/0x45/0x4b. CAMP carries eight, so seven
+  of them are not the live one at any moment, and what moves that pointer is
+  the map SCRIPT — the same script that raises the tutorial's second bridge
+  and is not decoded. Making all eight damageable is the obvious remake
+  answer and it is a decision, not a transcription; it belongs with the
+  script, next to the bridge.
 
   What is still missing is the other kind of shot: the power gauge, the
   projectile and its damage. `[game+0x4e4]` charges 0x50 a frame to 0xfff and
