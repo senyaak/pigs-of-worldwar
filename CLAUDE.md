@@ -600,15 +600,40 @@ The acting pig's whole frame-by-frame state machine is pure
 (`lib/game/locomotion.ts`); the battle scene only feeds it intents and
 draws what it says.
 
-**The sound table is picked BY EAR, from the console.** `pow.sfx` is the same
-shape as `pow.hud`: `list()` the bank with indices, `play()` one, `now()` the
-current moment→sound table, `set('jump', 'P_EXERT')` to rebind it live and
-hear it, `print()` to paste the result back into `audio/battle.ts`
-(`audio/console.ts`, README). It exists because play's verdict on the movement
-sounds was "щас прям они не очень" and a name pick off 99 file names cannot be
-corrected any other way — a sound has to be heard in the moment it belongs to.
-`BATTLE_SOUNDS` is deliberately not `as const` so a rebind takes on the next
-event.
+**A sound is a CUE — index, VOLUME and PITCH — and the pig's own moments are
+decoded.** `Sound::Play` is 0x43A9D0, one call with 222 sites, and its first
+three arguments are `(index, volume, pitch)` with 100 nominal on both scales.
+The order is pinned twice over: argument two never exceeds 100 anywhere in the
+binary while argument three reaches 140, and the jump asks for
+`90 + (rand() & 15)` on the third — a spread straddling nominal is a pitch
+jitter and nothing else. `../pigs-disasm/anim/audio-events.md` has the full
+table and `anim/sounds.js` is the tool (wrapper → index, then annotate any
+disassembly with it).
+
+Three results are worth stating because they are counter-intuitive, and two of
+them were what play heard as wrong:
+
+- **the landing is index 30, `I_PICKUP`**, at volume 40 pitch 150 — `Pig::Land`
+  (0x470910, identified by its get-up `SetAnim(10)`) plays it, and so does the
+  parachute's landing at a wide random pitch. The `I_` family is IMPACTS
+  (I_METAL, I_SPLASH, I_STAB), so the name is about what is hit;
+- **`P_LAND1` is the impact that HURTS** — its wrapper calls the body's own
+  `TakeDamage` right after playing it. Nothing in the remake plays it, because
+  fall damage is not modelled;
+- **the slip is `P_SLIP` gated on `Map::IsBlocked`** at the pig's feet plus an
+  arrival under 50 (0x471045) — the wall-eject moment, which is what play
+  called "соскальзывание".
+
+The jump is **P_SNORT1**, volume 60, pitch 90 + rand(0..15) — play named the
+file and the exe confirmed it.
+
+**What is still a name pick is picked BY EAR, from the console.** `pow.sfx` is
+the same shape as `pow.hud`: `list()` the bank with indices, `play()` one,
+`now()` the table, `set('splash', 'I_SPLASH', {pitch: 120})` to rebind live and
+hear it, `print()` to paste back into `audio/battle.ts` (`audio/console.ts`,
+README). A name pick cannot be corrected off 99 file names — the sound has to
+be heard where it belongs. `BATTLE_SOUNDS` is deliberately mutable so a rebind
+takes on the next event.
 
 **Sound is played by NAME out of the game's own bank.** `Audio/sfxday.srl`
 is a numbered list of 99 files and `FESounds/Fesounds.srl` 27 more, both

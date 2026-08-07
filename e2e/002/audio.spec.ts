@@ -53,7 +53,7 @@ test('the sound banks are numbered lists of files', () => {
 
   // Everything the battle asks for by name is really in there.
   const names = new Set(battle.entries.map((entry) => entry.name))
-  for (const sound of Object.values(BATTLE_SOUNDS)) expect(names.has(sound), sound).toBe(true)
+  for (const cue of Object.values(BATTLE_SOUNDS)) expect(names.has(cue.sound), cue.sound).toBe(true)
 
   // The night bank ships too and is the same list — the PC release has no
   // separate night set, whatever the two file names promise.
@@ -84,7 +84,7 @@ test('the pig is heard jumping and landing', async ({ app }) => {
   await tap(page, 'jump')
   await expect
     .poll(async () => (await heard()).slice(beforeJump), { message: 'the jump and the landing' })
-    .toEqual([BATTLE_SOUNDS.jump, BATTLE_SOUNDS.land])
+    .toEqual([BATTLE_SOUNDS.jump.sound, BATTLE_SOUNDS.land.sound])
 
   // And walking on flat dry ground says nothing — footsteps are not wired
   // yet, and nothing else may fire on every frame.

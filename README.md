@@ -91,17 +91,17 @@ pow.hud.layout.dial.green = [90, 150, 60] // repaints on the next frame
 pow.hud.print()                           // paste that into ui/hud.ts
 ```
 
-The battle's sounds work the same way. Which sound belongs to which moment
-is mostly a guess off the bank's own file names — the original refers to a
-sound by number and only a few of those call sites have been read — so they
-are meant to be picked by ear, in the moment they belong to:
+The battle's sounds work the same way. Each moment carries a sound, a volume
+and a pitch — the original's own three numbers, 100 being nominal on the last
+two. Several are read straight out of the game; the rest are guesses off the
+bank's file names, and those are meant to be picked by ear:
 
 ```js
-pow.sfx.list('P_')             // the bank, with indices; no filter lists all
-pow.sfx.play('P_LAND1')        // hear one, by name or by index
-pow.sfx.now()                  // which sound each moment uses right now
-pow.sfx.set('jump', 'P_EXERT') // rebind it live, and hear it
-pow.sfx.print()                // paste that into audio/battle.ts
+pow.sfx.list('P_')                             // the bank, with indices
+pow.sfx.play('P_SLIP')                         // hear one, by name or index
+pow.sfx.now()                                  // every moment's current cue
+pow.sfx.set('splash', 'I_SPLASH', {pitch: 120}) // rebind live, and hear it
+pow.sfx.print()                                // paste into audio/battle.ts
 ```
 
 The battle opens on CAMP. To play another map, open the devtools console

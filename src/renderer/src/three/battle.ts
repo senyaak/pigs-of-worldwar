@@ -67,7 +67,7 @@ import type { FloatingNumber } from './damageNumbers'
 import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
 import { SILENT, loadBank } from '../audio/bank'
-import { BATTLE_SOUNDS, createBattleSounds } from '../audio/battle'
+import { BATTLE_SOUNDS, createBattleSounds, playCue } from '../audio/battle'
 import { createSoundConsole } from '../audio/console'
 import type { Bank } from '../audio/bank'
 import type { PigPlate } from '../ui/hud'
@@ -290,7 +290,7 @@ export function buildBattle(
         if (result === 'full') {
           if (!refused.has(pickup.id)) {
             refused.add(pickup.id)
-            bank.play(BATTLE_SOUNDS.tooMany)
+            playCue(bank, BATTLE_SOUNDS.tooMany)
             onCollected({ skill: pickup.skill, amount: pickup.amount, given: 0, result, pig })
           }
           continue
@@ -300,7 +300,7 @@ export function buildBattle(
       pickups.splice(i, 1)
       // The pig cheers: the exe plays 0x5E at its own position the moment
       // the skill is in (audio/battle.ts).
-      bank.play(BATTLE_SOUNDS.pickup)
+      playCue(bank, BATTLE_SOUNDS.pickup)
       props.take(pickup.id)
       // It was something to push against a frame ago; leaving it in the
       // collision world would leave an invisible crate behind.

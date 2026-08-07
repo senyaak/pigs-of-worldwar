@@ -28,7 +28,7 @@ import type { Obstruction } from '../../../lib/game/obstacles'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import type { DamageNumbers } from './damageNumbers'
 import type { Soldier, Squad } from './squad'
-import { BATTLE_SOUNDS } from '../audio/battle'
+import { BATTLE_SOUNDS, playCue } from '../audio/battle'
 import type { Bank } from '../audio/bank'
 
 /** The bone a barrel hangs off — the hand, as everything else does. */
@@ -203,7 +203,7 @@ export function createShots(parts: ShotParts): Shots {
       )
       if (!shot) return false
       live.push(shot)
-      parts.bank().play(BATTLE_SOUNDS[BARREL_SOUND[skill] ?? 'rifle'])
+      playCue(parts.bank(), BATTLE_SOUNDS[BARREL_SOUND[skill] ?? 'rifle'])
       return true
     },
     update(delta) {

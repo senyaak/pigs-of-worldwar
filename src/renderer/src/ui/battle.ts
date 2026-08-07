@@ -269,7 +269,7 @@ export function initBattle(onLeave: () => void): BattleView {
       // R opens what the pig is carrying — plus what it can always do — and
       // closes it again. It drives in from the right, with a noise.
       if (game && hud.skills.toggle(game.currentPig.carrying)) {
-        scene?.sound(BATTLE_SOUNDS.menuOpen)
+        scene?.sound(BATTLE_SOUNDS.menuOpen.sound)
       }
       return
     }

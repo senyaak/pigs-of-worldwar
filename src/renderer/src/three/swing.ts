@@ -23,7 +23,7 @@ import type { DamageNumbers } from './damageNumbers'
 import type { Effects } from './effects'
 import { clipSeconds } from './clips'
 import type { Soldier, Squad } from './squad'
-import { BATTLE_SOUNDS } from '../audio/battle'
+import { BATTLE_SOUNDS, playCue } from '../audio/battle'
 import type { Bank } from '../audio/bank'
 
 /** The bone the blade hangs off: the hand (exe 0x475a26, dll 0x1000dbd1). */
@@ -183,7 +183,7 @@ export function createSwings(parts: SwingParts): Swings {
       // been read — so this puts it on the body, which is where the damage
       // number goes too.
       parts.effects.hit(skill, body)
-      parts.bank().play(BATTLE_SOUNDS[weapon.impact])
+      playCue(parts.bank(), BATTLE_SOUNDS[weapon.impact])
       if (outcome === 'died' || outcome === 'gibbed') target.playOnce(ANIM.DYING)
     }
 
@@ -203,7 +203,7 @@ export function createSwings(parts: SwingParts): Swings {
       hurt(dummy, weapon.damage, false)
       parts.numbers.show(dummy, weapon.damage)
       parts.effects.hit(skill, dummy)
-      parts.bank().play(BATTLE_SOUNDS[weapon.impact])
+      playCue(parts.bank(), BATTLE_SOUNDS[weapon.impact])
       if (isDead(dummy)) {
         standing.splice(i, 1)
         parts.onBroken(dummy)
@@ -240,7 +240,7 @@ export function createSwings(parts: SwingParts): Swings {
           already = new Set()
           active.playOnce(swing.clip)
         } else if (event === 'whoosh') {
-          parts.bank().play(BATTLE_SOUNDS.whoosh)
+          playCue(parts.bank(), BATTLE_SOUNDS.whoosh)
         } else if (event === 'strike') {
           strike(active, skill)
         } else if (event === 'release') {

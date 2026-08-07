@@ -19,7 +19,7 @@ import type { Model, Texture } from '../api'
 import { buildCanopies } from './parachute'
 import type { Canopies } from './parachute'
 import type { MapProps } from './props'
-import { BATTLE_SOUNDS } from '../audio/battle'
+import { BATTLE_SOUNDS, playCue } from '../audio/battle'
 import type { Bank } from '../audio/bank'
 
 export interface AirDrops {
@@ -94,21 +94,21 @@ export function createAirDrops(
       // The aeroplane first, then the canopy a beat later. Neither was making
       // any noise at all: the bank's `chute` had been decoded far enough to
       // name and then never played (audio/battle.ts).
-      bank().play(BATTLE_SOUNDS.plane)
+      playCue(bank(), BATTLE_SOUNDS.plane)
     },
     update(delta) {
       for (let i = live.length - 1; i >= 0; i--) {
         const one = live[i]
         if (one.chuteIn > 0) {
           one.chuteIn -= delta
-          if (one.chuteIn <= 0) bank().play(BATTLE_SOUNDS.chute)
+          if (one.chuteIn <= 0) playCue(bank(), BATTLE_SOUNDS.chute)
         }
         updateDrop(one.drop, one.ground, delta)
         props.raise(one.id, one.drop.y)
         if (!one.drop.landed) continue
         if (one.canopy && canopies) canopies.cut(one.canopy)
         live.splice(i, 1)
-        bank().play(BATTLE_SOUNDS.land)
+        playCue(bank(), BATTLE_SOUNDS.land)
         const mesh = props.meshOf(one.id)
         onLanded(one.id, {
           x: mesh?.position.x ?? 0,

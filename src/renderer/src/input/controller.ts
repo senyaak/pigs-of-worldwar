@@ -204,9 +204,13 @@ declare global {
       sfx?: {
         list(filter?: string): { index: number; name: string }[]
         play(which: string | number): string | null
-        now(): Record<string, string>
-        set(moment: string, name: string | number): string | null
-        print(): Record<string, string>
+        now(): Record<string, unknown>
+        set(
+          moment: string,
+          name: string | number,
+          mix?: { volume?: number; pitch?: number; jitter?: number }
+        ): string | null
+        print(): Record<string, unknown>
       }
       /** Console command: restart the battle on another map —
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */

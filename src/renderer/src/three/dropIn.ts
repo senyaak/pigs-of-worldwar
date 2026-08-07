@@ -19,7 +19,7 @@ import { createDrop, cutChute, updateDrop } from '../../../lib/game/parachute'
 import type { DropState } from '../../../lib/game/parachute'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import type { Bank } from '../audio/bank'
-import { BATTLE_SOUNDS } from '../audio/battle'
+import { BATTLE_SOUNDS, playCue } from '../audio/battle'
 import { buildCanopies } from './parachute'
 import type { Canopies } from './parachute'
 import type { Soldier, Squad } from './squad'
@@ -137,14 +137,14 @@ export function createDropIn(
         // else, because the renderer will not let the walking cut it short.
         furl(arrival)
         arrival.soldier.playOnce(ANIM.LAND)
-        bank().play(BATTLE_SOUNDS.land)
+        playCue(bank(), BATTLE_SOUNDS.land)
         arrival.done = true
       }
       // The bank arrives a beat after the scene does, so the canopies cannot
       // simply be heard opening on frame one — the first frame it CAN be is
       // the one this fires on, and only while there is still someone up.
-      if (busy && !heard && bank().has(BATTLE_SOUNDS.chute)) {
-        bank().play(BATTLE_SOUNDS.chute)
+      if (busy && !heard && bank().has(BATTLE_SOUNDS.chute.sound)) {
+        playCue(bank(), BATTLE_SOUNDS.chute)
         heard = true
       }
       return busy
