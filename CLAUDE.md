@@ -610,6 +610,55 @@ Footsteps are deliberately not wired: they want the hoof-contact frames
 `../pigs-disasm/anim/audio-events.md` derives, and a footstep on a timer
 would be a stand-in nobody asked for.
 
+### The SHOT is half built — six things play named, 2026-08-07
+
+Aiming and firing landed in this order: the projectile's rules
+(`lib/game/projectile.ts`), the aim view on a HELD G, the scope overlay, the
+bullet and its hit (`three/shots.ts`). Play then named six things wrong with
+it, and this is the list. **Do them in this order** — the first two are small
+and visible, the third is the big one and the rest hang off it.
+
+1. **The scope's outline has GAPS.** The four mirrored `sights` quadrants do
+   not meet: there is a seam between every pair (`ui/hud.ts`, the `scope`
+   block). Rounding at the joins, most likely — they are drawn at `half`
+   into a `2*half` box with no overlap, and the surround fill starts exactly
+   at the box edge. Overlap them a pixel and start the fill a pixel inside.
+
+2. **There is no BULLET.** `three/shots.ts` draws a `THREE.Line` streak of
+   0.02 s of travel — ninety units, one pixel wide, invisible. The original
+   gives a projectile a real body (type 0x135D) and the shot's arms set its
+   draw bit (0x47a24b), so it has a MODEL. Find which, or give it a sprite.
+
+3. **Firing is a whole SEQUENCE, and none of it is built.** Play: you leave
+   the aim view, the pig says a line, THEN the shot goes, the camera flies
+   after the projectile, and for all of it the player has no control and the
+   turn clock does not run. Most of that is already decoded and simply not
+   wired: `Pig::Fire`'s projectile arm asks for camera **mode 4** and plays
+   the battle cry through `0x43af70` off the squad record's own rotating
+   0..11 counter (0x46946d — the same shout the melee arm makes, also not
+   built); the ten-frame fuse is the same one the swing uses; and after the
+   shot 0x47a3d1 calls `0x49ec20(projectile)` then `0x49f740(mode, 0)` so the
+   camera FOLLOWS it. `[game+0x318]` is raised while something is happening
+   and is the obvious "do not hand the turn on" flag. See
+   `../pigs-disasm/weapons/fire.md`.
+
+4. **Fire is spammable — it is a machine gun.** `shots.fire` has no gate at
+   all. The exe's is `0x467a10`, the same test the melee camera and the swing
+   are gated on, and it is false while an attack is pending or running. The
+   swing already refuses (`swings.begin` returns false while one runs); the
+   shot must too, and item 3's sequence is what it should be waiting on.
+
+5. **The aim should WOBBLE.** Not decoded at all — nothing has been looked
+   at for it. Play says the sights drift while you hold them.
+
+6. **Killing the two near dummies does not drop the SNIPER rifle.** Record #9
+   is a crate carrying skill 11 waiting on label 3, and records #7 and #10 are
+   the two dummies that signal 3 (`../pigs-disasm/script/notes.md`). One
+   suspect is already visible in the code: **`swing.ts` and `shots.ts` keep
+   SEPARATE `standing` lists**, both seeded from `targetsOf`, so a dummy shot
+   dead is still on the blade's list and one killed twice runs `advanceScript`
+   twice. That wants one list shared by both before anything else is blamed.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.
@@ -709,8 +758,9 @@ would be a stand-in nobody asked for.
 
 ### Threads left mid-pull
 
-**The next job, and where it starts.** The effect system was the other one
-and it is built (see below); this is what is left of that pair.
+**The next job is the SHOT's six open items** — the numbered list under "The
+SHOT is half built" above. Everything below this line is older and none of it
+blocks that.
 
 1. **The map SCRIPT — decoded and BUILT.** See below; what is left of it is a
    short list at the end of `../pigs-disasm/script/notes.md`, and none of it
