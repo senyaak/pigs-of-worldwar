@@ -41,6 +41,27 @@ const WEAPON_ARCHIVE = 'Chars/WEAPONS.MAD'
 /** The bone a held weapon hangs off: the hand (exe 0x440d55, dll 0x1000dbd1). */
 const HAND = 5
 
+/**
+ * …and a half turn about the model's own vertical, which the weapons are
+ * authored needing. Not a nudge — a measurement. `WE_RIF` hung on bone 5 with
+ * no turn puts its barrel at yaw −177.6° with the aim level: pointing exactly
+ * backwards, and level, which is a reversal and nothing else. Turned, the
+ * barrel tracks the aim through the whole sweep:
+ *
+ * | aim | yaw off forward | pitch |
+ * | --- | --------------- | ----- |
+ * | 45° up | −3.5° | +53.8° |
+ * | level | −2.3° | +9.0° |
+ * | 45° down | −2.7° | −36.0° |
+ *
+ * — within three degrees of straight ahead, with the pitch following the
+ * angle. (At the very ends the barrel is near vertical and its yaw stops
+ * meaning anything, which is the only place the numbers wander.) Where the
+ * original applies the turn is not traced: the objects it draws come out of a
+ * table at 0x51bc04, built at load, and nothing has been read that fills it.
+ */
+const TURNED = Math.PI
+
 interface Art {
   geometry: THREE.BufferGeometry
   materials: THREE.Material[]
@@ -144,9 +165,10 @@ export function createHeldWeapons(): HeldWeapons {
     }
 
     // Straight onto the hand bone, at its origin: the engine hands the bone's
-    // whole matrix over and adds nothing to it.
+    // whole matrix over and adds nothing to it — except the half turn.
     const mesh = new THREE.Mesh(ready.geometry, ready.materials)
     mesh.name = name
+    mesh.rotation.y = TURNED
     ;(pig.bones[HAND] ?? pig.bones[0]).add(mesh)
     held.set(pig, { name, mesh })
   }
