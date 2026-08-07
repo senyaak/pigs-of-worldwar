@@ -25,27 +25,39 @@ const CLIP_FPS = 25
 const BONE_COUNT = 15
 
 /**
- * Which bones the weapon channel takes, and which it leaves to whatever is
- * playing underneath: the two ARMS, and nothing else.
+ * Which bones the weapon channel takes: **0..8**, the hip up through both
+ * arms, leaving 9..14 — the legs — to whatever is playing underneath.
  *
- * WHICH branches is the remake's own; the SHAPE is not. The engine holds the
- * two channels as key-frame LISTS of six entries each and counts the leading
- * non-null ones (0x440edf); six is exactly the skeleton's branch count — hip,
- * spine+head, each arm, each leg (docs/formats.md) — so the split is per
- * branch. The mask itself is inside `wh32lib.dll`'s `afGetKeyFrameList` and
- * has not been read.
+ * Not a judgement call. `Data/_d3d.dll` builds the pose at 0x10012050 and the
+ * split is two hard-coded loop counts: nine bones from the weapon channel
+ * starting at keyframe offset +0x20, then six from the primary starting at
+ * +0xb0. A keyframe is 2 + 30 + 15×16 bytes, so rotations start at +0x20 and
+ * +0xb0 is 0x20 + 9×0x10 — bone 0 and bone 9 exactly, 9 + 6 = 15. When the
+ * weapon channel's clip is −1 both halves read the primary, which is the
+ * unarmed case.
  *
- * The head is the one that had to be settled in play, and the aiming clip
- * explains why it is touchy: its hip carries a yaw of 0.58 rad where an
- * idle's is flat and its head carries −0.68 back against it, so the pose is a
- * bladed rifle stance with the head turned out of it — three numbers that
- * only add up to "looking where you point" if you take all three. Taking the
- * spine and head WITHOUT the hip leaves the counter-turn bare and the pig
- * stares 39° off. Taking the hip as well was tried next and reads worse still
- * — it swings the legs with it, since they hang off it. So the arms alone,
- * and the pig keeps its own head.
+ * The hip has to be in it, and the aiming clip shows why: its hip carries a
+ * yaw of 0.58 rad where an idle's is flat and its head carries −0.68 back
+ * against it — a bladed rifle stance with the head turned out of it, three
+ * numbers that only add up to "looking where you point" if you take all
+ * three. Take spine and head without the hip and the counter-turn is bare:
+ * the pig stares 39° off.
  */
-const OVERLAY_BONES = [3, 4, 5, 6, 7, 8]
+const OVERLAY_BONES = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+/**
+ * The weapon channel is MIRRORED, because the weapon it belongs to is: the
+ * models are all authored on one side and play says the original holds them
+ * on the other, so `three/heldWeapon.ts` flips them across the body's midline
+ * — and the stance has to go with the rifle or the pig blades one way while
+ * the weapon points the other.
+ *
+ * Mirroring across the Z plane sends each arm to its opposite number and
+ * takes a stored triple (x, y, z) to (−x, −y, z): the sides' rotations are
+ * `M·R·M` with `M = diag(1, 1, −1)`, which flips the sense of the X and Y
+ * turns and leaves Z alone.
+ */
+const MIRROR = [0, 1, 2, 6, 7, 8, 3, 4, 5, 12, 13, 14, 9, 10, 11]
 
 // The MCAP rotation convention, settled by analysis of the shipped data
 // (pigs-disasm/anim/, three independent tests):
@@ -176,10 +188,12 @@ export function createPlayer(pig: Pig): Player {
     const between = at - first
     for (const bone of OVERLAY_BONES) {
       if (bone >= pig.bones.length) continue
-      const one = (first * BONE_COUNT + bone) * 3
-      const two = (second * BONE_COUNT + bone) * 3
-      decodeRotation(clip.rotations[one], clip.rotations[one + 1], clip.rotations[one + 2], a)
-      decodeRotation(clip.rotations[two], clip.rotations[two + 1], clip.rotations[two + 2], b)
+      // The pose is read off the bone's mirror image and flipped to match.
+      const source = MIRROR[bone]
+      const one = (first * BONE_COUNT + source) * 3
+      const two = (second * BONE_COUNT + source) * 3
+      decodeRotation(-clip.rotations[one], -clip.rotations[one + 1], clip.rotations[one + 2], a)
+      decodeRotation(-clip.rotations[two], -clip.rotations[two + 1], clip.rotations[two + 2], b)
       pig.bones[bone].quaternion.copy(a).slerp(b, between)
     }
   }
