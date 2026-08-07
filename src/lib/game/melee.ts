@@ -146,27 +146,55 @@ function turnBetween(a: number, b: number): number {
 }
 
 /**
- * Whether a body at `target` is caught by a swing sampled at `points`.
+ * How near a body came, per axis: the SMALLEST distance to any of the blade's
+ * sample points, and how far round it stands from the attacker's facing.
  *
  * The axis tests are INDEPENDENT, exactly as 0x475c45..0x475e69 has them: x
  * against any of the three points, then y against any, then z against any. It
  * is the union's bounding box rather than a box round one point, and that is
- * the original's own sloppiness rather than a simplification here.
+ * the original's own sloppiness rather than a simplification here. Split out
+ * from the verdict so a miss can be READ rather than guessed at — the battle
+ * hands the numbers to `pow.debug.strike()`.
  */
+export interface StrikeGap {
+  x: number
+  y: number
+  z: number
+  /** Radians off the attacker's facing, always positive. */
+  off: number
+}
+
+export function strikeGap(
+  points: Point[],
+  attacker: { x: number; z: number; heading: number },
+  target: Point
+): StrikeGap {
+  const nearest = (pick: (p: Point) => number, of: number): number =>
+    points.length === 0
+      ? Infinity
+      : Math.min(...points.map((point) => Math.abs(of - pick(point))))
+  // Forward is (sin h, cos h), the same as every step the pig takes
+  // (lib/game/movement.ts).
+  const bearing = Math.atan2(target.x - attacker.x, target.z - attacker.z)
+  return {
+    x: nearest((p) => p.x, target.x),
+    y: nearest((p) => p.y, target.y),
+    z: nearest((p) => p.z, target.z),
+    off: Math.abs(turnBetween(bearing, attacker.heading))
+  }
+}
+
+/** Whether that gap is a hit. */
+export const caught = (gap: StrikeGap): boolean =>
+  gap.x < STRIKE_SPREAD && gap.y < STRIKE_RISE && gap.z < STRIKE_SPREAD && gap.off <= STRIKE_ARC
+
+/** Whether a body at `target` is caught by a swing sampled at `points`. */
 export function struck(
   points: Point[],
   attacker: { x: number; z: number; heading: number },
   target: Point
 ): boolean {
-  const near = (pick: (p: Point) => number, of: number, within: number): boolean =>
-    points.some((point) => Math.abs(of - pick(point)) < within)
-  if (!near((p) => p.x, target.x, STRIKE_SPREAD)) return false
-  if (!near((p) => p.y, target.y, STRIKE_RISE)) return false
-  if (!near((p) => p.z, target.z, STRIKE_SPREAD)) return false
-  // …and the target has to be in front. Forward is (sin h, cos h), the same
-  // as every step the pig takes (lib/game/movement.ts).
-  const bearing = Math.atan2(target.x - attacker.x, target.z - attacker.z)
-  return Math.abs(turnBetween(bearing, attacker.heading)) <= STRIKE_ARC
+  return caught(strikeGap(points, attacker, target))
 }
 
 /** What a frame of the swing asks the scene to do. */

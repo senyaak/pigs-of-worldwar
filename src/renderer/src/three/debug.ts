@@ -39,6 +39,10 @@ export interface DebugParts {
   /** Whether a hand-to-hand swing is under way, wind-up included — a spec
    * cannot see the clip, and this is what says the pig is committed. */
   swinging: () => boolean
+  /** What the last strike measured: where the blade was and how near every
+   * other pig came, per axis (three/swing.ts). A miss has four ways of being
+   * true and this is the only way to tell them apart. */
+  strike: () => unknown
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -77,6 +81,10 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** Whether the acting pig is mid-swing: the ten-frame wind-up and the
        * attack clip together (lib/game/melee.ts). */
       swinging: () => parts.swinging(),
+      /** Where the blade was on the last strike, and how near everyone came:
+       * `gap.x`/`gap.z` against 170, `gap.y` against 360, `degrees` against
+       * 67.5. Whichever is over is the reason nothing was hit. */
+      strike: () => parts.strike(),
       /** Every pig's health, side by side — what a bayonet is measured by. */
       health: () =>
         game.players.flatMap((player) =>

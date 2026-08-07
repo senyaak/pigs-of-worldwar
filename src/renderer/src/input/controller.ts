@@ -130,6 +130,9 @@ export interface DebugHooks {
   /** Whether the acting pig is mid-swing — the ten-frame wind-up and the
    * attack clip together (lib/game/melee.ts). */
   swinging(): boolean
+  /** What the last hand-to-hand strike measured — the blade's three points
+   * and how near every other pig came, per axis (three/swing.ts). */
+  strike(): unknown
   /** Every pig's health, in turn order. */
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */

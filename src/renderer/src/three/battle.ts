@@ -480,6 +480,7 @@ export function buildBattle(
     still: () => still,
     strings: () => assets.strings,
     swinging: () => swings.running(),
+    strike: () => swings.lastStrike(),
     warp: (x, z, heading) => {
       game.moveCurrentPig(x, z, heading)
       swings.reset()

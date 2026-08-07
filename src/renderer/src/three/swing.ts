@@ -12,8 +12,8 @@
 
 import * as THREE from 'three'
 import type { Clip } from '../api'
-import { advanceSwing, beginSwing, meleeOf, strikeOffsets, struck } from '../../../lib/game/melee'
-import type { Point, SwingState } from '../../../lib/game/melee'
+import { advanceSwing, beginSwing, caught, meleeOf, strikeGap, strikeOffsets } from '../../../lib/game/melee'
+import type { Point, StrikeGap, SwingState } from '../../../lib/game/melee'
 import { amountOf, spend } from '../../../lib/game/inventory'
 import { hurt, isDead } from '../../../lib/game/health'
 import { ANIM } from '../../../lib/game/locomotion'
@@ -24,6 +24,27 @@ import type { Bank } from '../audio/bank'
 
 /** The bone the blade hangs off: the hand (exe 0x475a26, dll 0x1000dbd1). */
 const HAND = 5
+
+/**
+ * What the last strike actually measured — the ONE thing a miss cannot be
+ * diagnosed without. The blade is three points off a bone that is halfway
+ * through an animation, so "it did not hit" has four separate ways of being
+ * true and no way to tell them apart by eye.
+ */
+export interface StrikeReport {
+  /** The blade's sample points, game space: tip, middle, hand. */
+  blade: Point[]
+  attacker: { name: string; x: number; z: number; heading: number }
+  /** Every other pig, whether or not it was caught. */
+  candidates: {
+    name: string
+    /** Nearest approach per axis, against STRIKE_SPREAD / STRIKE_RISE. */
+    gap: StrikeGap
+    /** How far round the target stands, in degrees — against 67.5. */
+    degrees: number
+    hit: boolean
+  }[]
+}
 
 export interface Swings {
   /**
@@ -40,6 +61,8 @@ export interface Swings {
   swinging(): boolean
   /** One frame of it. */
   update(delta: number, active: Soldier): void
+  /** What the last strike measured, or null before there has been one. */
+  lastStrike(): StrikeReport | null
   /** Forget any swing — a new turn, or a warp. */
   reset(): void
 }
@@ -62,6 +85,8 @@ export function createSwings(parts: SwingParts): Swings {
    * struck pig and clears it on every pig at the last strike (event id 70),
    * so one swing lands on a body once however many frames it sweeps over it. */
   let already = new Set<Soldier>()
+  /** The last strike's measurements, for `pow.debug.strike()`. */
+  let report: StrikeReport | null = null
 
   const at = new THREE.Vector3()
 
@@ -95,11 +120,9 @@ export function createSwings(parts: SwingParts): Swings {
       z: attacker.pig.position.z,
       heading: attacker.pig.heading
     }
+    report = { blade, attacker: { name: attacker.pig.name, ...from }, candidates: [] }
     for (const target of parts.squad.members) {
-      if (target === attacker || already.has(target)) continue
-      // A body already down is not struck again: the exe's first test in
-      // `Pig::TakeDamage` is the dead state (0x467ac9).
-      if (isDead(target.pig)) continue
+      if (target === attacker) continue
       // A pig's body sits at the model's origin — the hip — which is exactly
       // the position the exe compares (three/squad.ts places it there).
       const body = {
@@ -107,7 +130,18 @@ export function createSwings(parts: SwingParts): Swings {
         y: target.node.position.y,
         z: target.pig.position.z
       }
-      if (!struck(blade, from, body)) continue
+      const gap = strikeGap(blade, from, body)
+      // A body already down is not struck again, nor one this swing has
+      // caught already — the exe's first test in `Pig::TakeDamage` is the
+      // dead state (0x467ac9) and `[pig+0x1b0]` is the once-per-swing guard.
+      const hit = caught(gap) && !already.has(target) && !isDead(target.pig)
+      report.candidates.push({
+        name: target.pig.name,
+        gap,
+        degrees: (gap.off * 180) / Math.PI,
+        hit
+      })
+      if (!hit) continue
       already.add(target)
       // The domain owns what a hit costs and whether it kills; this only
       // makes the noise and lays the body down.
@@ -128,6 +162,7 @@ export function createSwings(parts: SwingParts): Swings {
     },
     running: () => state !== null,
     swinging: () => state !== null && state.waiting <= 0,
+    lastStrike: () => report,
     reset() {
       state = null
       already = new Set()
