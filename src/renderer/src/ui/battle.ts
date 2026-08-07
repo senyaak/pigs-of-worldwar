@@ -214,6 +214,7 @@ export function initBattle(onLeave: () => void): BattleView {
       strings: battleText,
       aim: scene.aim(),
       holding: game.currentPig.holding,
+      scope: scene.scoped(),
       // The card is up for exactly as long as anyone is still in the air.
       title: scene.dropping() ? title : null
     })

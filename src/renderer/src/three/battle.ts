@@ -120,6 +120,9 @@ export interface BattleScene {
    * for exactly as long as its pad bit is down and puts the remembered mode
    * back the frame it goes up (three/chase.ts). */
   setSighting(held: boolean): void
+  /** Whether the view is actually down the barrel — held AND holding a gun,
+   * which is what the scope's ring is drawn over (ui/hud.ts). */
+  scoped(): boolean
   /** Where the weapon in hand points, in the game's own angle units, or null
    * when the pig is holding nothing that aims (lib/game/aim.ts). */
   aim(): number | null
@@ -647,6 +650,7 @@ export function buildBattle(
     setSighting(held) {
       sighting = held
     },
+    scoped: () => sighting && isGun(holding) && !dropIn.running(),
     aim: () => (scrubsPose(holding) ? aim.angle : null),
     sound(name) {
       bank.play(name)

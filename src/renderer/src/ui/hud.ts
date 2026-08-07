@@ -94,6 +94,20 @@ export const LAYOUT = {
     /** How much of the battle shows through that green. */
     alpha: 0.5
   },
+  /**
+   * The scope the aim view looks through. Both numbers are EYEWORK, like the
+   * rest of this object — nudge them in the console against the real screen
+   * and `pow.hud.print()` the result back out.
+   *
+   * `surround` is not eyework: rgb(8,8,8) is the colour of the `sights`
+   * quadrant's own outer corner, read out of the TIM, so the fill beyond the
+   * four pieces matches the art exactly rather than nearly.
+   */
+  scope: {
+    /** How wide the hole is, of the authored 480-tall view. */
+    size: 400,
+    surround: 'rgb(8,8,8)'
+  },
   plate: {
     /** Seconds a pig must have stood still before its name comes back. */
     delay: 2,
@@ -133,6 +147,9 @@ export interface HudState {
   numbers: FloatingNumber[]
   /** How long the acting pig has stood still. */
   still: number
+  /** Whether the aim view is up: the scope's ring, its black surround and
+   * its mark go over the whole screen while it is (three/chase.ts). */
+  scope: boolean
   /** `gtext`, for naming the skill under the menu's cursor. */
   strings: string[]
   /** Where the weapon in hand points, in the game's own angle units, or null
@@ -286,7 +303,47 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       // A console change to either painted colour lands on the next frame.
       void repaint()
 
-      const { clock: CLOCK, dial: DIAL, plate: PLATE } = LAYOUT
+      const { clock: CLOCK, dial: DIAL, plate: PLATE, scope: SCOPE } = LAYOUT
+
+      // THE SCOPE, under everything else on the dashboard — the clock and the
+      // dial sit on top of it, as they do in the original.
+      //
+      // `sights` is ONE QUADRANT: 32x32, its outer corner solid rgb(8,8,8)
+      // and its inside transparent (sampled out of the TIM itself), so four
+      // mirrored copies cut a round hole and the rest of the screen is the
+      // same near-black. `target` is the mark in the middle. Which piece is
+      // which is PLAY's — the archive says nothing about it.
+      if (state.scope) {
+        const half = SCOPE.size / 2
+        const cx = viewWidth / 2
+        const cy = AUTHORED_HEIGHT / 2
+        context.save()
+        context.scale(scale, scale)
+        const corner = art.get('sights')
+        for (const [sx, sy] of [
+          [-1, -1],
+          [1, -1],
+          [-1, 1],
+          [1, 1]
+        ]) {
+          context.save()
+          context.translate(cx, cy)
+          context.scale(sx, sy)
+          // Each copy is drawn into its own quadrant with the art's outer
+          // corner AT the outer corner, so the arc meets its neighbours.
+          context.drawImage(corner.image, -half, -half, half, half)
+          context.restore()
+        }
+        // …and everything past the four of them is that same near-black.
+        context.fillStyle = SCOPE.surround
+        context.fillRect(0, 0, viewWidth, cy - half)
+        context.fillRect(0, cy + half, viewWidth, AUTHORED_HEIGHT - (cy + half))
+        context.fillRect(0, cy - half, cx - half, SCOPE.size)
+        context.fillRect(cx + half, cy - half, viewWidth - (cx + half), SCOPE.size)
+        const mark = art.get('target')
+        context.drawImage(mark.image, cx - mark.width / 2, cy - mark.height / 2)
+        context.restore()
+      }
 
       // The level's opening card, in the same units as everything else here.
       if (state.title) {

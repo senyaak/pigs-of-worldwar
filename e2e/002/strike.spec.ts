@@ -139,6 +139,15 @@ test('a bayonet swung at a dummy knocks it down', async ({ app }) => {
   const peak = await peakEffects(page)
   expect(peak.rings, 'the hit threw no rings').toBe(2)
   expect(peak.smoke, 'the dummy came apart without smoke').toBe(6)
+
+  // …and the pig still HAS the bayonet. On the training ground every skill
+  // arrives unlimited, and the exe's ammo pass checks that −1 FIRST — it
+  // skips the rounds-in-hand counter as well as the slot (0x469790), so
+  // `[pig+0x2f8]` never reaches zero and `ReadyWeapon(0)` never fires. Losing
+  // it after one swing was reported from play.
+  const after2 = await look(page)
+  expect(after2.carrying, 'the bayonet went away after one swing').toContain(BAYONET)
+  expect(after2.holding, 'the bayonet was put away after one swing').toBe(BAYONET)
   // …and the map's SCRIPT ran: this dummy signals label 2, and a crate of
   // rifles waits on it. A crate is a pickup, so the placer drops it in from
   // 0xC00 up rather than switching it on (lib/game/script.ts).
