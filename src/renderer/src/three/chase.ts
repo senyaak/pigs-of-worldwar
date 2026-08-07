@@ -48,7 +48,15 @@ const FACE_LIFT = 150 * MODEL_SCALE
  * PROPORTION. The mode's second column, 924 against the chase's 768, is not
  * applied: its handler never reads that column.
  *
- * The side is the exe's sign and worth a look in play — it is one minus.
+ * **The SIDE is play's, and it is the opposite of the exe's sign.** Read
+ * literally the subtraction sends the camera round to the pig's left; the
+ * original swings RIGHT ("камера в другую сторону уезжает — не вправо, а
+ * влево"), so the turn is added here. The magnitude is still 612 and still
+ * the exe's. Which of the several places between that yaw and these pixels
+ * flips it is not found — a yaw sign is exactly the sort of thing the
+ * un-mirroring of the map (`parsePmg`, and the marker's own half turn in
+ * `spawns.ts`) moves — so this is measured, not derived, like the tile
+ * table's turn direction and the weapon's half turn before it.
  */
 const MELEE_TURN = (612 / 4096) * 2 * Math.PI
 const MELEE_CLOSE = 1700 / 3072
@@ -146,7 +154,7 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
     // Behind the shoulders normally; ahead of the snout on the way down; and
     // round to one side, close in, for a swing.
     const reach = face ? -back : view === 'melee' ? back * MELEE_CLOSE : back
-    const from = view === 'melee' ? pig.heading - MELEE_TURN : pig.heading
+    const from = view === 'melee' ? pig.heading + MELEE_TURN : pig.heading
     const behindX = pig.position.x - Math.sin(from) * reach
     const behindZ = pig.position.z - Math.cos(from) * reach
     const terrainAtCamera = -query.surface(behindX, behindZ)

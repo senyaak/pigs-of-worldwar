@@ -622,10 +622,14 @@ would be a stand-in nobody asked for.
   0) adds no offset at all, and at distance **1700** out of the per-mode table
   at 0x4d9528 against the chase's 3072. `three/chase.ts` carries both as
   `MELEE_TURN` and `MELEE_CLOSE` — the swing and the PROPORTION, since the
-  rig's own distances are the remake's. The remake holds it for the length of
-  the swing and then glides back, which is its own bracket: nothing has been
-  found that ends the mode in the exe. On a HIT the original moves again, to
-  mode 2 aimed at the victim (0x4760ab) — not done.
+  rig's own distances are the remake's. **The SIDE is play's and it is the
+  exe's sign REVERSED**: read literally the camera goes round to the pig's
+  left and the original goes right, so the turn is added. Same shape as the
+  tile table's turn direction — a yaw sign that flips somewhere between the
+  exe and our pixels and has not been found. The remake holds the view for
+  the length of the swing and then glides back, which is its own bracket:
+  nothing has been found that ends the mode in the exe. On a HIT the original
+  moves again, to mode 2 aimed at the victim (0x4760ab) — not done.
 
   **The AIM ANGLE has no part in the strike, and that is SETTLED — do not
   re-add it.** `Pig::HandToHandStrike` never reads `[pig+0x304]`, and for the
