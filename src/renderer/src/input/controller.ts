@@ -198,6 +198,16 @@ declare global {
       /** The dashboard's layout, live: nudge a piece in the console and
        * `print()` it back out to paste into ui/hud.ts. */
       hud?: { layout: unknown; print(): unknown }
+      /** The battle's sounds, live: list the bank, hear one, rebind a moment
+       * to it and `print()` the table back out (audio/console.ts). Most of
+       * that table is a name pick and only play can settle it. */
+      sfx?: {
+        list(filter?: string): { index: number; name: string }[]
+        play(which: string | number): string | null
+        now(): Record<string, string>
+        set(moment: string, name: string | number): string | null
+        print(): Record<string, string>
+      }
       /** Console command: restart the battle on another map —
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
       swapMap?(name?: string): Promise<boolean>

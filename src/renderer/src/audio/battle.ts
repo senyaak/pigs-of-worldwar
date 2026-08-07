@@ -14,8 +14,16 @@
 import type { LocomotionState } from '../../../lib/game/locomotion'
 import type { Bank } from './bank'
 
-/** The moments this module has a sound for. */
-export const BATTLE_SOUNDS = {
+/**
+ * The moments this module has a sound for.
+ *
+ * Deliberately NOT `as const`: half of these are name picks waiting on play,
+ * and `pow.sfx` rebinds them live in the console so a candidate can be heard
+ * in the moment it belongs to rather than guessed at from a file name
+ * (audio/console.ts). Every read goes through this object, so a rebind takes
+ * effect on the next event.
+ */
+export const BATTLE_SOUNDS: Record<string, string> = {
   /** Leaving the ground under the player's own power. */
   jump: 'P_EXERT',
   /** Coming to rest after any flight. */
@@ -76,7 +84,7 @@ export const BATTLE_SOUNDS = {
    * has been traced starting this one.
    */
   plane: 'BG_PLANE'
-} as const
+}
 
 export interface BattleSounds {
   /** Call once per frame with the acting pig's state. */

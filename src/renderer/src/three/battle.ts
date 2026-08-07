@@ -68,6 +68,7 @@ import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
 import { SILENT, loadBank } from '../audio/bank'
 import { BATTLE_SOUNDS, createBattleSounds } from '../audio/battle'
+import { createSoundConsole } from '../audio/console'
 import type { Bank } from '../audio/bank'
 import type { PigPlate } from '../ui/hud'
 import type { SceneHost } from './scene'
@@ -204,7 +205,15 @@ export function buildBattle(
   const airDrops = createAirDrops(
     props,
     assets.canopy,
-    (id) => obstacles.restore(id),
+    (id, at) => {
+      obstacles.restore(id)
+      // A crate arriving kicks something up. Play named it — "там ещё эффект
+      // от падения" — and this is the remake's own: nothing has been read
+      // that spawns an effect for a placed object, so it borrows the BREAK
+      // burst (effect 0x3e, six rising puffs and no rings), which is what the
+      // engine already has for a thing meeting the ground hard.
+      effects.broke(at)
+    },
     () => bank
   )
   for (const id of script.waiting()) {
@@ -311,6 +320,9 @@ export function buildBattle(
     bank = loaded
     sounds = createBattleSounds(bank)
   })
+  // …and the console gets at it, because half the table is a name pick that
+  // only play can settle: `pow.sfx.list()`, `pow.sfx.set('jump', …)`.
+  if (window.pow) window.pow.sfx = createSoundConsole(() => bank)
 
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
   // The level opens with whoever the map's markers say drops in. Built after

@@ -65,7 +65,9 @@ interface Falling {
 export function createAirDrops(
   props: MapProps,
   canopy: { model: Model; textures: Texture[] } | null,
-  onLanded: (id: number) => void,
+  /** Touchdown: the id that has arrived and WHERE, because a crate hitting
+   * the ground throws something up and the caller needs the spot for it. */
+  onLanded: (id: number, at: { x: number; y: number; z: number }) => void,
   /** Asked for rather than held, like everywhere else the bank is used: it
    * loads beside the scene. */
   bank: () => Bank
@@ -107,7 +109,12 @@ export function createAirDrops(
         if (one.canopy && canopies) canopies.cut(one.canopy)
         live.splice(i, 1)
         bank().play(BATTLE_SOUNDS.land)
-        onLanded(one.id)
+        const mesh = props.meshOf(one.id)
+        onLanded(one.id, {
+          x: mesh?.position.x ?? 0,
+          y: one.ground,
+          z: mesh?.position.z ?? 0
+        })
       }
     },
     falling: () => live.length,

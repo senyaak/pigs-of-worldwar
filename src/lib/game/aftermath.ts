@@ -27,30 +27,19 @@
 //
 // Pure, in seconds. What counts as busy is the scene's to say.
 
-import { FRAME_SECONDS } from './ballistics'
-
-/** `0x415420(15)` — the quiet the game wants before it hands the turn back. */
-export const SETTLE_FRAMES = 15
-export const SETTLE = SETTLE_FRAMES * FRAME_SECONDS
-
 /**
- * …and a CEILING on the whole thing, which is play's and not the exe's.
+ * `0x415420(15)` — the quiet the game wants before it hands the turn back,
+ * and it is half a second rather than the one this file used to compute.
  *
- * "надо думаю ждать 2-3 секунды пока завершится всё" — and it is the crate
- * that overruns: the break effect runs about a second, the canopy takes two
- * and a half more from 0xC00 up, and a second of quiet on top makes four and
- * a half. So the hold lets go after three seconds whatever is still going on;
- *
- * The ceiling is on the WHOLE hold, and the blow's own animation is inside
- * it — a bayonet strikes on frame 11 of 36 and has most of a second left to
- * run, which the crate then starts down after. So the crate gets roughly the
- * last two seconds and the camera comes off it just before it lands. That is
- * the trade play asked for: finishing one animation before starting the next
- * matters more than watching the second one land.
- * a crate that has not landed keeps coming down behind the ordinary camera,
- * which it can, because nothing about a descent needs to be watched.
+ * The frame count is the exe's. The SECONDS are not: `FRAME_SECONDS` here is
+ * 1/15, deliberately stretched from the engine's own rate so that the walking
+ * speeds read right against half-scale models (CLAUDE.md), so every timer
+ * taken off the exe in frames comes out twice as long as the original ran it.
+ * Fifteen frames at the rate that walk was measured against is 0.5 s — which
+ * is exactly the tail play asked for: "и только потом через 0.5 с где-то
+ * вернуться к геймплею". Two readings agreeing, so it is written in seconds.
  */
-export const AFTERMATH_MAX = 3
+export const SETTLE = 0.5
 
 export interface Aftermath {
   /** What the camera is on: where the thing fell, or the crate coming down to
@@ -58,14 +47,11 @@ export interface Aftermath {
   at: { x: number; y: number; z: number }
   /** Seconds of quiet still owed. */
   quiet: number
-  /** Seconds this hold has run in total, against `AFTERMATH_MAX`. */
-  spent: number
 }
 
 export const beginAftermath = (at: { x: number; y: number; z: number }): Aftermath => ({
   at: { x: at.x, y: at.y, z: at.z },
-  quiet: SETTLE,
-  spent: 0
+  quiet: SETTLE
 })
 
 /** Look somewhere else — a crate takes the camera off the thing it replaces. */
@@ -81,14 +67,19 @@ export function watchAftermath(
 /**
  * One frame. `busy` is anything the exe's own list would object to, and play
  * named the set: a projectile still in the air, damage still landing, a pig
- * still swimming for the shore, a body still coming apart. Whatever the
- * scene can answer for goes in there. True when the wait is over — either
- * because everything settled and the quiet ran out, or because
- * `AFTERMATH_MAX` did.
+ * still swimming for the shore, a body still coming apart, the blow's own
+ * animation, and the crate all the way down to the ground and through
+ * whatever it lands with. Whatever the scene can answer for goes in there.
+ * True when the wait is over.
+ *
+ * There is NO ceiling on this. One was tried — three seconds flat, because a
+ * crate that started down through the smoke of the thing it replaced dragged
+ * the hold out to four and a half — but that was the interruption's fault
+ * rather than the crate's, and with the blow finishing first play wants the
+ * descent watched to the end: "нужно ждать пока сундук упадёт на землю… и
+ * только потом через 0.5 с где-то вернуться".
  */
 export function advanceAftermath(aftermath: Aftermath, delta: number, busy: boolean): boolean {
-  aftermath.spent += delta
-  if (aftermath.spent >= AFTERMATH_MAX) return true
   if (busy) {
     aftermath.quiet = SETTLE
     return false

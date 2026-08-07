@@ -91,6 +91,19 @@ pow.hud.layout.dial.green = [90, 150, 60] // repaints on the next frame
 pow.hud.print()                           // paste that into ui/hud.ts
 ```
 
+The battle's sounds work the same way. Which sound belongs to which moment
+is mostly a guess off the bank's own file names — the original refers to a
+sound by number and only a few of those call sites have been read — so they
+are meant to be picked by ear, in the moment they belong to:
+
+```js
+pow.sfx.list('P_')             // the bank, with indices; no filter lists all
+pow.sfx.play('P_LAND1')        // hear one, by name or by index
+pow.sfx.now()                  // which sound each moment uses right now
+pow.sfx.set('jump', 'P_EXERT') // rebind it live, and hear it
+pow.sfx.print()                // paste that into audio/battle.ts
+```
+
 The battle opens on CAMP. To play another map, open the devtools console
 (`Ctrl+Shift+I`) and type `pow.swapMap('ARTGUN')` — the battle restarts
 there with fresh spawns. `pow.swapMap()` with no argument lists every map

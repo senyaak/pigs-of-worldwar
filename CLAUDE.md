@@ -600,6 +600,16 @@ The acting pig's whole frame-by-frame state machine is pure
 (`lib/game/locomotion.ts`); the battle scene only feeds it intents and
 draws what it says.
 
+**The sound table is picked BY EAR, from the console.** `pow.sfx` is the same
+shape as `pow.hud`: `list()` the bank with indices, `play()` one, `now()` the
+current moment→sound table, `set('jump', 'P_EXERT')` to rebind it live and
+hear it, `print()` to paste the result back into `audio/battle.ts`
+(`audio/console.ts`, README). It exists because play's verdict on the movement
+sounds was "щас прям они не очень" and a name pick off 99 file names cannot be
+corrected any other way — a sound has to be heard in the moment it belongs to.
+`BATTLE_SOUNDS` is deliberately not `as const` so a rebind takes on the next
+event.
+
 **Sound is played by NAME out of the game's own bank.** `Audio/sfxday.srl`
 is a numbered list of 99 files and `FESounds/Fesounds.srl` 27 more, both
 plain text (docs/formats.md). The exe names a sound by INDEX, so anything
@@ -899,6 +909,27 @@ quiet frames start after the pig has finished moving.
 `AFTERMATH_MAX` stays at three seconds and the blow's animation is inside it,
 which leaves the crate roughly the last two — the camera comes off it just
 before it lands. That is the trade play asked for.
+
+**Then the ceiling came off again.** With the blow finishing first, play wants
+the descent watched to the end: "нужно ждать пока сундук упадёт на землю + там
+ещё эффект от падения и только потом через 0.5 с где-то вернуться".
+`AFTERMATH_MAX` is gone — it was there to stop a crate that started down
+through the smoke of the thing it replaced, and that was the interruption's
+fault, not the crate's.
+
+Two things fell out of that. **A crate landing now throws up the BREAK burst**
+(effect 0x3e, six rising puffs, no rings) — there was no landing effect at all
+and nothing has been read that spawns one for a placed object, so borrowing
+the engine's own ground-impact burst is the remake's, flagged at the call.
+`airDrop.ts`'s `onLanded` carries the spot for it.
+
+And **`SETTLE` is half a second, not one**, which is the same fifteen frames.
+`FRAME_SECONDS` here is 1/15, deliberately stretched from the engine's rate so
+the walk reads right against half-scale models — so every timer taken off the
+exe **in frames comes out twice as long as the original ran it**. Fifteen
+frames undistorted is 0.5 s, which is exactly what play asked for. Worth
+remembering the next time a decoded frame count feels sluggish; the constant is
+now written in seconds and says why.
 
 **And the tremor went up**, `AMPLITUDE` 4 → 7 ("дрож чутка слабая"). Worth
 knowing before the next nudge: the easing eats a chunk of it. Against white
