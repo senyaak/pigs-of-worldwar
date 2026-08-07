@@ -15,18 +15,27 @@
 // bone's offset inside it, which turns a bind-pose position back into a
 // bone-local one.
 //
-// **NOT mirrored, though it was tried.** Play said the original holds the
-// weapon in the other hand, so this flipped the models across z — and that is
-// what made the barrel point right: measured against the skeleton, the aiming
-// pose already carries the rifle 52° to the pig's LEFT at a level angle
-// (+60° full up, +88° full down), and mirroring sent it the other way. The
-// arms and the model agree with each other on the side, so a mirror moves the
-// weapon off the hands that hold it. If the original really shows the other
-// hand, the cause is further up than this file — most likely that a held
-// weapon is not rigid to an arm at all: the bone field is no attachment
-// (`WE_TELR` splits 13 vertices on bone 7 and 19 on bone 0, and most models
-// sit on 0 outright, the same "carries something else" the map props' field
-// does), and `Chars/PROPOINT.MAD` is sitting there unread.
+// **The MODEL is mirrored across z, and only the model.** Play says the
+// original holds it in the other hand, and the file is the weaker witness
+// here: its bone field is no attachment at all — `WE_TELR` splits 13 vertices
+// on bone 7 and 19 on bone 0, most models sit on 0 outright, which is the
+// same "carries something else" the map props' field does (main/assets.ts) —
+// so which arm it names is not evidence. `Chars/PROPOINT.MAD` is where the
+// real attachment points probably live and nothing in the exe has been traced
+// to it.
+//
+// The POSE stays as authored. Mirroring that too was tried and it is what
+// sent the barrel pointing right: the aiming stance already carries the rifle
+// 52° to the pig's LEFT at a level angle, +60° full up and +88° full down, so
+// flipping it aims the weapon the wrong way across the body. Only the mesh
+// moves, and the grip survives it — measured against the posed skeleton, the
+// nearest rifle vertex sits 83 units from the near hand and 110 from the far
+// one, against 76 and 168 unmirrored, on hands 203 apart holding a rifle 581
+// long. Both hands stay on the weapon.
+//
+// Mirroring negates z on the positions AND the normals and pairs each bone
+// with its opposite number, so the shape and its lighting both come out
+// right; nothing carries a negative scale.
 //
 // A weapon whose model the archive does not carry — the rocket, the guided
 // missile, the grenade launcher all ask for entries past its end — simply
@@ -55,6 +64,25 @@ export interface HeldWeapons {
    */
   show(pig: PigMesh, name: string | null): void
   dispose(): void
+}
+
+/**
+ * Each bone paired with its opposite number. The skeleton's sides run along
+ * Z — 3..5 and 6..8 the two arms, 9..11 and 12..14 the two legs, near-exact
+ * mirrors of each other (bone 4 at z +199 against bone 7 at z −193) — so
+ * mirroring a model means both flipping its z and swapping the bone it hangs
+ * off. Hip, spine and head are their own opposites.
+ */
+const MIRROR_BONE = [0, 1, 2, 6, 7, 8, 3, 4, 5, 12, 13, 14, 9, 10, 11]
+
+/** Flip a model's geometry across the body's midline, normals included. */
+function mirrorZ(geometry: THREE.BufferGeometry): void {
+  for (const name of ['position', 'normal']) {
+    const attribute = geometry.getAttribute(name)
+    if (!attribute) continue
+    for (let i = 0; i < attribute.count; i++) attribute.setZ(i, -attribute.getZ(i))
+    attribute.needsUpdate = true
+  }
 }
 
 /** Which bone most of a model's corners belong to. */
@@ -92,11 +120,15 @@ export function createHeldWeapons(): HeldWeapons {
   const wanted = new Map<PigMesh, string | null>()
   const held = new Map<PigMesh, { name: string; mesh: THREE.Mesh }>()
 
-  const build = (model: Model, textures: Texture[]): Art => ({
-    geometry: buildModelGeometry(model, textures),
-    materials: buildTextureMaterials(model, textures),
-    bone: mainBone(model)
-  })
+  const build = (model: Model, textures: Texture[]): Art => {
+    const geometry = buildModelGeometry(model, textures)
+    mirrorZ(geometry)
+    return {
+      geometry,
+      materials: buildTextureMaterials(model, textures),
+      bone: MIRROR_BONE[mainBone(model)] ?? 0
+    }
+  }
 
   /** Bring one pig's hand up to date with what was asked of it. */
   const apply = (pig: PigMesh): void => {
