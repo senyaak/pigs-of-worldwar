@@ -116,12 +116,22 @@ export interface Obstruction {
    * wall, and `standOn` has it.
    */
   blocks(x: number, z: number, footY: number, reach: number): boolean
+  /**
+   * Is this POINT inside something solid?
+   *
+   * `blocks` is shaped like a PIG — it works in feet, a step-up reach and a
+   * body radius — and a bullet is none of those. The projectile update reads
+   * the terrain table itself (0x43715f and three more inside 0x436xxx), so a
+   * shot really is stopped by the world; this is the object half of that.
+   */
+  solid(x: number, y: number, z: number): boolean
 }
 
 /** Nothing in the way — the default when a map's objects failed to load. */
 export const NO_OBSTACLES: Obstruction = {
   standOn: () => null,
-  blocks: () => false
+  blocks: () => false,
+  solid: () => false
 }
 
 /** The obstacle a POG record makes, or null when it is not solid. */
@@ -247,6 +257,16 @@ export class ObstacleField implements Obstruction {
     }
     return false
   }
+
+  solid(x: number, y: number, z: number): boolean {
+    for (const obstacle of this.near(x, z)) {
+      // Y counts DOWN, so inside is between the top and the bottom that way
+      // round. A point has no radius of its own.
+      if (y < obstacle.top || y > obstacle.bottom) continue
+      if (penetrates(obstacle, x, z, 0)) return true
+    }
+    return false
+  }
 }
 
 /** Where another pig is standing — a cylinder of the pig's own box. */
@@ -276,6 +296,9 @@ export function withPigs(field: Obstruction, pigs: PigBody[]): Obstruction {
         if (dx * dx + dz * dz <= reachSquared) return true
       }
       return false
-    }
+    },
+    // The pigs are not part of this one: a bullet resolves a body itself, so
+    // that it can hurt it (three/shots.ts).
+    solid: (x, y, z) => field.solid(x, y, z)
   }
 }

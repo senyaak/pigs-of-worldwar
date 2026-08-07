@@ -111,6 +111,16 @@ const RIFLE_CLOSE = 2048 / 3072
  * remake adds ON TOP, and says so.
  */
 export const SCOPE_MOUNT = { x: 44, y: 32, z: 230 }
+/**
+ * How much closer a full sniper zoom brings things.
+ *
+ * The exe hands `afSetZoom` a number from 0 to 0x1000 (lib/game/zoom.ts) and
+ * `afSetZoom` lives in a library that is NOT in the install, so what 0x1000
+ * does to a field of view cannot be read. Four times is the remake's pick:
+ * play calls it a sniper scope and the weapon's only other distinction is
+ * three times the rifle's range.
+ */
+export const SCOPE_MAGNIFY = 4
 /** The bone it hangs off. The same one a barrel and a blade do. */
 export const SCOPE_BONE = 5
 

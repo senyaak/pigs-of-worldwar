@@ -24,6 +24,8 @@ import { PIG_RADIUS } from '../../../lib/game/obstacles'
 import { hurt, isDead } from '../../../lib/game/health'
 import { ANIM } from '../../../lib/game/locomotion'
 import type { Target } from '../../../lib/game/targets'
+import type { Obstruction } from '../../../lib/game/obstacles'
+import type { TerrainQuery } from '../../../lib/game/terrain'
 import type { DamageNumbers } from './damageNumbers'
 import type { Soldier, Squad } from './squad'
 import { BATTLE_SOUNDS } from '../audio/battle'
@@ -84,6 +86,10 @@ export interface ShotParts {
   root: THREE.Object3D
   bank: () => Bank
   training: boolean
+  /** The ground, so a bullet cannot fly through a hill. */
+  query: TerrainQuery
+  /** The map's boxes, so it cannot fly through a wall either. */
+  obstacles: Obstruction
   targets: Target[]
   /** Whether the map SCRIPT has placed this dummy yet (lib/game/script.ts). */
   present: (id: number) => boolean
@@ -130,6 +136,12 @@ export function createShots(parts: ShotParts): Shots {
 
   /** Resolve one bullet where it now is. True if it is spent. */
   const land = (shot: Shot): boolean => {
+    // The WORLD first. The exe's projectile update reads the terrain table
+    // itself — four sites inside 0x436xxx, the same `[tile] & 0x1F` lookup
+    // the walk uses — so a shot is stopped by the ground, and the map's own
+    // boxes stop it the same way (lib/game/obstacles.ts).
+    if (shot.y >= parts.query.height(shot.x, shot.z)) return true
+    if (parts.obstacles.solid(shot.x, shot.y, shot.z)) return true
     for (const soldier of parts.squad.members) {
       if (isDead(soldier.pig)) continue
       const body = {

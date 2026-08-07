@@ -147,11 +147,15 @@ export function updateAim(
   aim: AimState,
   skill: number | null,
   direction: number,
-  deltaSeconds: number
+  deltaSeconds: number,
+  /** What the sniper's magnification does to the step — the scope makes the
+   * aim finer the closer it is zoomed (lib/game/zoom.ts). Identity for
+   * everything else. */
+  scale: (step: number) => number = (step) => step
 ): void {
   // Letting go drops the accumulator, so the next press starts slow again; a
   // fresh press is worth the step itself, not nothing, because the exe writes
   // the step into the accumulator on the frame the key goes down. Both live
   // in `rampedStep`, which the scope's sideways turn borrows.
-  aim.angle = clampAim(skill, aim.angle + rampedStep(aim, direction, deltaSeconds))
+  aim.angle = clampAim(skill, aim.angle + scale(rampedStep(aim, direction, deltaSeconds)))
 }

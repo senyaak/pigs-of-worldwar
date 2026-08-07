@@ -25,6 +25,7 @@ import { heal, isDead } from '../../../lib/game/health'
 import { targetsOf } from '../../../lib/game/targets'
 import type { Target } from '../../../lib/game/targets'
 import {
+  AIM_RAMP,
   aimPhase,
   aimRadians,
   createAim,
@@ -39,7 +40,7 @@ import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
 import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
-import { SCOPE_BONE, SCOPE_MOUNT, createChase } from './chase'
+import { SCOPE_BONE, SCOPE_MAGNIFY, SCOPE_MOUNT, createChase } from './chase'
 import type { View } from './chase'
 import { createDropIn } from './dropIn'
 import { buildMarker } from './marker'
@@ -55,6 +56,8 @@ import type { Firing } from '../../../lib/game/shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from '../../../lib/game/aftermath'
 import type { Aftermath } from '../../../lib/game/aftermath'
 import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
+import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../../../lib/game/zoom'
+import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createShots } from './shots'
 import { createPigVoice } from '../audio/pigVoice'
 import type { FloatingNumber } from './damageNumbers'
@@ -343,9 +346,14 @@ export function buildBattle(
   /** The rings a blow throws — the original's effect system, of which the
    * hand-to-hand hit is the first piece built (three/effects.ts). */
   const effects = createEffects(root)
-  /** The drift the sights have while they are up — the remake's own, and
-   * flagged as such at the constants (lib/game/wobble.ts). */
+  /** The drift the sights have while they are up — the engine's own random
+   * walk, borrowed off a body slipping on ice (lib/game/wobble.ts). */
   const wobble = createWobble()
+  /** The sniper's magnification, which creeps in on its own while the sights
+   * are up and resets the moment they drop (lib/game/zoom.ts). */
+  const zoom = createZoom()
+  /** The field of view the camera had before anything magnified it. */
+  const openFov = host.camera.fov
   /** The shot in progress: the ten-frame fuse and then the bullet's flight,
    * through neither of which is the pig driveable (lib/game/shot.ts). */
   let firing: Firing | null = null
@@ -407,6 +415,8 @@ export function buildBattle(
     root,
     bank: () => bank,
     training,
+    query,
+    obstacles,
     targets,
     present: (id) => !script.absent(id),
     numbers,
@@ -647,7 +657,11 @@ export function buildBattle(
     // Play asked for them matched, and matching them means running the turn
     // through the aim's own ramp (lib/game/aim.ts).
     const scoping = sighting && isGun(holding) && !firing
-    const swung = scoping ? rampedStep(scopeTurn, turning, delta) : 0
+    const swung = scoping
+      ? zoomsIn(holding)
+        ? zoomedStep(zoom, rampedStep(scopeTurn, turning, delta), AIM_RAMP)
+        : rampedStep(scopeTurn, turning, delta)
+      : 0
     if (!scoping) scopeTurn.rate = 0
 
     loco.x = active.pig.position.x
@@ -714,10 +728,28 @@ export function buildBattle(
       if (readying > 0) active.playOnce(weapon.readyClip)
     }
     readying = Math.max(0, readying - delta)
-    updateAim(aim, holding, weapon.aims ? aimIntent : 0, delta)
+    // …and the closer it is zoomed the finer the aim moves, which is the
+    // sniper's whole feel: `step = ((0x1000 - zoom) * step) >> 12`, floored
+    // at the base step (0x495e08).
+    updateAim(aim, holding, weapon.aims ? aimIntent : 0, delta, (step) =>
+      zoomsIn(holding) ? zoomedStep(zoom, step, AIM_RAMP) : step
+    )
     // The sights drift while they are up and are steady the moment they are
-    // not — the remake's own (lib/game/wobble.ts).
-    updateWobble(wobble, delta, sighting && isGun(holding))
+    // not. Both of these count ENGINE frames: the tremor steps once a frame
+    // at fifteen a second, which is what makes it a jitter rather than a
+    // glide, and the zoom creeps 0x20 a frame (lib/game/wobble.ts, zoom.ts).
+    const scoped = sighting && isGun(holding)
+    const frames = delta / FRAME_SECONDS
+    updateWobble(wobble, frames, scoped)
+    updateZoom(zoom, frames, scoped && zoomsIn(holding))
+    // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts
+    // a field of view is the library's and the library is not in the install,
+    // so SCOPE_MAGNIFY is the remake's pick and three/chase.ts says so.
+    const magnified = openFov / (1 + zoomFraction(zoom) * (SCOPE_MAGNIFY - 1))
+    if (Math.abs(host.camera.fov - magnified) > 1e-4) {
+      host.camera.fov = magnified
+      host.camera.updateProjectionMatrix()
+    }
     for (const soldier of squad.members) {
       const reaching = soldier === active && readying > 0
       weapons.show(soldier.mesh, reaching ? null : weaponModelName(soldier.pig.holding))

@@ -703,8 +703,42 @@ heading and the aim angle, as the exe builds it, so a breathing hand shifts
 the view without steering it.
 
 `lib/game/wobble.ts` survives as a declared EXAGGERATION on top — a degree of
-breath is not what play wants to feel — now about four degrees up and five
-across. Zero both amplitudes and the scope still breathes, just quietly.
+breath is not what play wants to feel. Zero its `SCALE` and the scope still
+breathes, just quietly.
+
+### The scope jitters, the sniper zooms, and bullets stop at walls, 2026-08-07
+
+Play: "дрожание совсем не то — щас плавает, а в оригинале прям дрожит /
+прожектайлы летят через стены / снайперский прицел начинает с малого зума и
+автоматом увеличивается до предела." All three are done and two of them are
+decoded outright.
+
+**The tremor is a RANDOM WALK, not a sine.** A sine floats, which is exactly
+what play saw. The engine's own held tremor is at 0x49e030 — the game puts it
+on a body standing on terrain type 4 or 11 — and it is two axes bouncing
+between ±0x80 with a fresh step of `8 + (rand() & 7)` every frame, reversing
+at the stops. `lib/game/wobble.ts` is now that shape at those numbers, scaled
+to a quarter, and **stepped at the engine's fifteen a second**: stepping it
+per rendered frame would smooth it straight back into a glide. The camera also
+has a shake of its own (0x49fea0) and it is the wrong kind — a decaying
+impulse, i.e. a blast.
+
+**The sniper's magnification is the view manager's**, and it closed a question
+`fire.md` had carried from the start. `afSetZoom` is a library entry at
+`[0x537fd4]`; every caller of the setter passes zero, and the ADDER has one
+caller — for skill 11 and skill 64 only, the input handler creeps the zoom in
+by **0x20 a frame** toward **0x1000** (0x495e75). The same handler scales the
+aim step by `(0x1000 − zoom) >> 12`, floored, so the sights get finer the
+closer they look. `lib/game/zoom.ts` has all of it. What 0x1000 does to a
+field of view cannot be read — that library is not in the install — so
+`SCOPE_MAGNIFY = 4` in `three/chase.ts` is the remake's pick.
+
+**Bullets stop at the world.** `ObstacleField.solid(x, y, z)` is a new POINT
+test — `blocks` is shaped like a pig, with feet and a step-up reach, which a
+bullet is not — and `three/shots.ts` checks the ground height and that box
+before it checks anyone's body. The exe's projectile update reads the terrain
+table itself at four sites inside 0x436xxx, so this is the shape of it rather
+than an invention.
 
 **Sideways now moves at the same rate as up and down.** That is the remake's
 choice and `rampedStep` in `lib/game/aim.ts` says so: the pad gives the aim a
