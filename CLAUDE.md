@@ -628,6 +628,39 @@ would be a stand-in nobody asked for.
 
 ### Threads left mid-pull
 
+**The next two jobs, in this order, and where each one starts.** Both came
+out of play on 2026-08-07 and both are named below as well; this is the
+shortcut.
+
+1. **The EFFECT system — there is none at all.** Play says a struck body
+   makes black smoke ("помойму чёрный дым" — the colour is the user's guess,
+   not read). The way in is `0x487ad0(x, y, id, life, …)`, the spawner: the
+   floating damage number is already decoded as its id **0x35** with life
+   **0x3e8** (`three/damageNumbers.ts`), so one call site is understood and
+   the rest of the table is one read away. The melee's own ids are per weapon
+   — **0x36** bayonet, 0x37 trotters and knife, 0x38 sword, 0x39 prod —
+   pushed through `0x487620` at 0x47619e..0x47627e
+   (`../pigs-disasm/weapons/melee.md`). Do this one FIRST: every weapon still
+   to come wants it, and it is bounded.
+2. **The map SCRIPT.** Three separate things now wait on it and they are one
+   job: the crate that drops in BY PARACHUTE when the first dummy goes down,
+   the tutorial's second bridge, and which dummy `[0x537df0]` has live. Play
+   is explicit about the first ("когда убиваешь первый — падает ящик на
+   парашутике с винтовкой") and the tutorial's own step list agrees — a step
+   ends on killing the dummy, collecting the crate, or reaching somewhere
+   (`lib/game/tutorial.ts`). The records are tagged already: field 14 = 23,
+   paired off by field 15 (`../pigs-disasm/objects/notes.md`). What is NOT
+   found is the code that runs it.
+
+Two smaller ones noted in play and not acted on: **a dying pig should come
+apart and leave its boots** (the exe already splits the two deaths and so
+does `lib/game/health.ts` — `died` and `gibbed` — but both wear clip 47 for
+now), and **`THREE.Clock` is deprecated** in favour of `THREE.Timer`.
+
+One spec fails and it is NOT from this work: `e2e/002/hud.spec.ts:168`, the
+name plate dropping on the move, fails at 300fc6e too — checked by checking
+that commit out and running it.
+
 - **A crate is walked THROUGH, where the original is shouldered into.** The
   records say a pickup is solid — shape kind 0, a real 3×3×4 box — and play
   remembers pushing at one before it goes. Making it solid, though, means
