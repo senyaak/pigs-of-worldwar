@@ -2,42 +2,29 @@
 //
 // `Chars/WEAPONS.MAD` is one mesh per weapon and the exe holds the 1-based
 // index of it at `[pig+0x58]`, out of the per-weapon record's +0x0c
-// (lib/game/weapons.ts). It is the same slot the canopy uses one field along,
-// so a rifle arrives exactly the way a parachute does.
+// (lib/game/weapons.ts). It is the same slot the canopy uses one field along.
 //
-// WHERE it hangs comes off the models themselves, with one correction from
-// play. Every one of them is authored around the pig's own skeleton on the
-// SAME side — the arm bones split along Z, not X (bone 4 at z +199, bone 7 at
-// z −193), and `WE_RIF` runs z −458..+123 out of bone 7 while `WE_LEWIS` and
-// `WE_MGUN` reach the same way out of the hip. So a held weapon is geometry
-// parented to a bone: vertices arrive resolved to the bind pose (the loader
-// adds the skeleton's accumulated offsets), and the mesh sits at MINUS that
-// bone's offset inside it, which turns a bind-pose position back into a
-// bone-local one.
+// WHERE it hangs is decoded, not judged. An animated model carries three
+// attachment slots, and 0x440d55 fills them:
 //
-// **It is CARRIED ACROSS to the other side, not mirrored.** Play says the
-// original holds it in the other hand, and the file is the weaker witness on
-// that: its bone field is no attachment at all — `WE_TELR` splits 13 vertices
-// on bone 7 and 19 on bone 0, most models sit on 0 outright, which is the
-// same "carries something else" the map props' field does (main/assets.ts) —
-// so which arm it names is not evidence. `Chars/PROPOINT.MAD` is where the
-// real attachment points probably live and nothing in the exe has been traced
-// to it.
+//   [pig+0x58]  the WEAPON           -> [animModel+0x40]
+//   a hat table at 0x51bc80          -> [animModel+0x44]
+//   [pig+0x5c]  canopy / rocket pack -> [animModel+0x48]
 //
-// Only the POSITION crosses the midline; the orientation is left exactly as
-// the arm holds it. Both stronger operations were tried and both are wrong.
-// Mirroring the POSE swings the barrel to the far side — the aiming stance
-// already carries the rifle 52° to one side at a level angle, +60° full up
-// and +88° full down, and reflecting that aims it across the body the other
-// way. Mirroring the weapon's whole TRANSFORM does the same thing to the
-// weapon alone. And hanging the mesh off the opposite arm bone arrives upside
-// down, because the two arms do not hold a rifle symmetrically: the rotation
-// that would fix that is about 93°, and it drifts 31 to 48 degrees across the
-// aim sweep, so no fixed correction exists either.
+// and `afDrawAnimModel` in `Data/_d3d.dll` draws each of them with a bone's
+// matrix copied straight in (0x1000dbd1..0x1000dc70): +0x40 takes the one at
+// +0xf0 of the built pose, +0x44 the one at +0x60, +0x48 the one at +0x30.
+// A pose entry is a 3×4 matrix, 0x30 bytes, so those are bones **5, 2 and 1**
+// — the hand, the head and the spine. Weapon in the hand, hat on the head,
+// parachute on the back.
 //
-// So: the mesh rides where its own arm puts it, turned the way its own arm
-// turns it, with the attachment point reflected in z — which is the body's
-// midline, the arm bones splitting along Z rather than X.
+// Two things follow. The bone is always 5 and never the one a model's own VTX
+// field names — that field is no attachment (`WE_TELR` splits 13 vertices on
+// bone 7 and 19 on bone 0, most models sit on 0 outright, the same "carries
+// something else" the map props' field does, main/assets.ts). And the matrix
+// goes in WHOLE, with no offset of its own, so the vertices are bone-local:
+// the accumulated bone offsets the model loader adds have to come back off
+// again, which is what `unresolve` does.
 //
 // A weapon whose model the archive does not carry — the rocket, the guided
 // missile, the grenade launcher all ask for entries past its end — simply
@@ -51,11 +38,12 @@ import type { Pig as PigMesh } from './pig'
 /** Where the models live, and where the canopy comes from too. */
 const WEAPON_ARCHIVE = 'Chars/WEAPONS.MAD'
 
+/** The bone a held weapon hangs off: the hand (exe 0x440d55, dll 0x1000dbd1). */
+const HAND = 5
+
 interface Art {
   geometry: THREE.BufferGeometry
   materials: THREE.Material[]
-  /** The bone the model's own vertices are skinned to. */
-  bone: number
 }
 
 export interface HeldWeapons {
@@ -65,36 +53,49 @@ export interface HeldWeapons {
    * a hand that changed its mind in the meantime is left alone.
    */
   show(pig: PigMesh, name: string | null): void
-  /** Carry every held weapon to where its arm has moved. Once a frame, after
-   * the animation has been applied. */
-  update(): void
   dispose(): void
 }
 
-/** Which bone most of a model's corners belong to. */
-function mainBone(model: Model): number {
-  const votes = new Map<number, number>()
-  for (const bone of model.boneIndices) votes.set(bone, (votes.get(bone) ?? 0) + 1)
-  let best = 0
-  let most = 0
-  for (const [bone, count] of votes) {
-    if (count > most) {
-      most = count
-      best = bone
-    }
-  }
-  return best
-}
-
 /** A bone's bind-pose offset from the model origin: its own and its parents'. */
-function bindOffset(bones: THREE.Bone[], index: number): THREE.Vector3 {
-  const at = new THREE.Vector3()
+function bindOffset(bones: THREE.Bone[], index: number, out: THREE.Vector3): THREE.Vector3 {
+  out.set(0, 0, 0)
   let node: THREE.Object3D | null = bones[index] ?? null
   while (node && (node as THREE.Bone).isBone) {
-    at.add(node.position)
+    out.add(node.position)
     node = node.parent
   }
-  return at
+  return out
+}
+
+/**
+ * Take the skeleton's accumulated offsets back OUT of a model's vertices.
+ *
+ * The loader adds them, because that is what a character model wants — its
+ * parts are authored bone-local and pile up on the origin otherwise
+ * (docs/formats.md). A held weapon is drawn with a bone's matrix and nothing
+ * else, so it wants them off again; and since the bone index they were added
+ * for is junk on these models, this simply undoes what was done rather than
+ * reading anything into it.
+ */
+function unresolve(model: Model, geometry: THREE.BufferGeometry, bones: THREE.Bone[]): void {
+  const position = geometry.getAttribute('position')
+  const at = new THREE.Vector3()
+  const offsets = new Map<number, THREE.Vector3>()
+  for (let corner = 0; corner < position.count; corner++) {
+    const bone = model.boneIndices[corner] ?? 0
+    let offset = offsets.get(bone)
+    if (!offset) {
+      offset = bindOffset(bones, bone, at).clone()
+      offsets.set(bone, offset)
+    }
+    position.setXYZ(
+      corner,
+      position.getX(corner) - offset.x,
+      position.getY(corner) - offset.y,
+      position.getZ(corner) - offset.z
+    )
+  }
+  position.needsUpdate = true
 }
 
 export function createHeldWeapons(): HeldWeapons {
@@ -104,23 +105,13 @@ export function createHeldWeapons(): HeldWeapons {
   const loading = new Set<string>()
   /** What each pig should be holding, and what it actually is. */
   const wanted = new Map<PigMesh, string | null>()
-  const held = new Map<
-    PigMesh,
-    { name: string; mesh: THREE.Mesh; bone: number; shift: THREE.Matrix4 }
-  >()
+  const held = new Map<PigMesh, { name: string; mesh: THREE.Mesh }>()
 
-  const build = (model: Model, textures: Texture[]): Art => ({
-    geometry: buildModelGeometry(model, textures),
-    materials: buildTextureMaterials(model, textures),
-    bone: mainBone(model)
-  })
-
-  // Scratch for `update`, which runs every frame for every armed pig.
-  const arm = new THREE.Matrix4()
-  const inverse = new THREE.Matrix4()
-  const at = new THREE.Vector3()
-  const turn = new THREE.Quaternion()
-  const size = new THREE.Vector3()
+  const build = (model: Model, textures: Texture[], bones: THREE.Bone[]): Art => {
+    const geometry = buildModelGeometry(model, textures)
+    unresolve(model, geometry, bones)
+    return { geometry, materials: buildTextureMaterials(model, textures) }
+  }
 
   /** Bring one pig's hand up to date with what was asked of it. */
   const apply = (pig: PigMesh): void => {
@@ -146,39 +137,18 @@ export function createHeldWeapons(): HeldWeapons {
           art.set(name, null)
           return
         }
-        art.set(name, build(result.model, result.textures))
+        art.set(name, build(result.model, result.textures, pig.bones))
         for (const each of wanted.keys()) apply(each)
       })
       return
     }
 
+    // Straight onto the hand bone, at its origin: the engine hands the bone's
+    // whole matrix over and adds nothing to it.
     const mesh = new THREE.Mesh(ready.geometry, ready.materials)
     mesh.name = name
-    // Placed by hand every frame, off the arm it belongs to (`update`).
-    mesh.matrixAutoUpdate = false
-    // Minus the bone's bind offset — what turns a bind-pose position back
-    // into a bone-local one.
-    const offset = bindOffset(pig.bones, ready.bone)
-    const shift = new THREE.Matrix4().makeTranslation(-offset.x, -offset.y, -offset.z)
-    pig.mesh.add(mesh)
-    held.set(pig, { name, mesh, bone: ready.bone, shift })
-    carry(pig)
-  }
-
-  /** One pig's weapon, put where its arm has it — on the other side. */
-  const carry = (pig: PigMesh): void => {
-    const entry = held.get(pig)
-    if (!entry) return
-    const bone = pig.bones[entry.bone] ?? pig.bones[0]
-    // The arm has to be current: this runs after the animation wrote it.
-    bone.updateWorldMatrix(true, false)
-    inverse.copy(pig.mesh.matrixWorld).invert()
-    arm.multiplyMatrices(inverse, bone.matrixWorld).multiply(entry.shift)
-    // Everything as the arm holds it, and then across the midline.
-    arm.decompose(at, turn, size)
-    at.z = -at.z
-    entry.mesh.matrix.compose(at, turn, size)
-    entry.mesh.matrixWorldNeedsUpdate = true
+    ;(pig.bones[HAND] ?? pig.bones[0]).add(mesh)
+    held.set(pig, { name, mesh })
   }
 
   return {
@@ -186,9 +156,6 @@ export function createHeldWeapons(): HeldWeapons {
       if ((wanted.get(pig) ?? null) === name) return
       wanted.set(pig, name)
       apply(pig)
-    },
-    update() {
-      for (const pig of held.keys()) carry(pig)
     },
     dispose() {
       for (const { mesh } of held.values()) mesh.removeFromParent()

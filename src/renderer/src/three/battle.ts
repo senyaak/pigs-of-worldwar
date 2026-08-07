@@ -401,9 +401,6 @@ export function buildBattle(
     time += delta
     update(delta)
     squad.update(delta)
-    // After the squad, because a held weapon is placed off the arm the
-    // animation has just moved (three/heldWeapon.ts).
-    weapons.update()
     marker.bob(time)
   }
   host.onFrame.add(onFrame)
