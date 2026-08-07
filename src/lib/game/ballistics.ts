@@ -203,6 +203,22 @@ export const fromExeAccel = (perFrameSquared: number): number =>
 export const PLAIN_GRAVITY = fromExeAccel(10)
 
 /**
+ * The ENGINE's own frame, for turning a decoded frame COUNT into seconds.
+ *
+ * `FRAME_SECONDS` above is not this. It is 1/15 because the walking speeds
+ * come out of the exe as a distance per frame and a pig is drawn at half
+ * size, so the rate was stretched to make the walk read right (CLAUDE.md).
+ * Every timer taken off the exe as a NUMBER OF FRAMES therefore runs twice as
+ * long as the original ran it, if it is converted with `FRAME_SECONDS`.
+ *
+ * So a duration read out of the binary is converted with this instead. The
+ * two places that do are the beat after a blow (15 frames, and play
+ * independently asked for the half second that gives) and the grenade's fuse.
+ */
+export const EXE_FRAME_SECONDS = 1 / 30
+export const fromExeFrames = (frames: number): number => frames * EXE_FRAME_SECONDS
+
+/**
  * Below this closing speed a landing is a landing, not a bounce.
  *
  * The exe's own, and not where it was first looked for: the impact handler

@@ -988,20 +988,39 @@ integrator's linear drag skipped for the projectile type outright. So
 clean parabola. The same reading says a BULLET does not vanish at the end of
 its range — it starts falling.
 
-**What is invented says so at the constant**: `FUSE_SECONDS`, `BLAST_RADIUS`
-and the linear falloff in `lib/game/grenade.ts`. The projectile's state machine
-(0x436938, seven arms on `[proj+0xB4]` with a per-state timer against row
-+0x14) is written down as far as it was followed and the fuse is not in it yet.
-Row +0x18 is read as the blast DAMAGE on its distribution — zero for all
-thirteen guns, a ladder from 25 to 750 for everything that goes off — while
-`fire.md` also has it compared against a counter, so one arm uses it each way.
+**The FUSE is decoded, and it is not three seconds — play said so and play was
+right.** Row **+0x18** is the fuse in frames, not the damage: the projectile's
+state machine (0x436938) starts a grenade in state 0, counts row +0x14 = three
+frames, dispatches on row +0x1C's low byte to the arm that moves it to state 1
+(0x4369e3), and state 1 is `cmp ecx,[esi+0B8h]` → state 6, which sets
+`[proj+0x31] = 1` and it is over. `[proj+0xB8]` is row +0x18 plus `rand() & 7`,
+written once in the constructor. So **150 frames and a little**, which at the
+engine's own rate is a touch over five seconds — `fromExeFrames` in
+ballistics.ts is that conversion and the second place to use it.
 
-**The gauge's art is placed by eye and wants correcting in the console.**
-`newpow3..7` are five 64×64 tiles laid left to right, which is measured rather
+That was a self-inflicted error worth remembering: the row field was read as
+damage "on its distribution" (zero for guns, a ladder for explosives) when
+`fire.md` had already recorded, correctly, that it is compared against a
+counter. **A distribution is a hint; an instruction is the answer.**
+
+**The blast's REACH is decoded too** — `BLAST_REACH = 0x400`, a half-extent per
+axis, from the last thing a projectile's update does: walk the pig list at
+`[0x51EE18]` and set `[pig+0x180]` on everything inside ±0x400 on all three
+(0x437775). What that flag MEANS is not followed and `grenade.ts` says so.
+What is left invented is `BLAST_DAMAGE` — the same gap `SHOT_DAMAGE` has — and
+the falloff across the box.
+
+**The gauge shows whenever a weapon that HAS one is in hand**, not only while
+it fills — which is what the original does with it. `charging()` returns 0
+rather than null for those, and null for everything else.
+
+Its art: `newpow3..7`, five 64×64 tiles laid left to right, measured rather
 than guessed (5 and 6 are 61% identical and flat outside rows 9..29 — a
-repeating middle), and the strip sits centred along the bottom. `newpow1`,
-`newpow2` and `powg1` ship with them and are deliberately NOT drawn: what they
-are has not been settled. `pow.hud.layout.gauge` is the editor.
+repeating middle), **clipped to their top 30 rows**, because below that every
+column is the dashboard's own rgb(8,8,8) and blitting the tiles whole hangs a
+black slab under the brass. Where the strip SITS is still eyework:
+`pow.hud.layout.gauge`. `newpow1`, `newpow2` and `powg1` ship with them and are
+deliberately NOT drawn — what they are has not been settled.
 
 **`pow.give(19)` is how a grenade is reached at all.** No crate on the training
 ground carries one — it hands out a bayonet and then a rifle — so the console

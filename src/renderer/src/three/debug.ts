@@ -54,7 +54,7 @@ export interface DebugParts {
   /** How many bullets are in flight. */
   shots: () => number
   /** How many grenades are in the air or lying about (three/grenades.ts). */
-  grenades: () => number
+  grenades: () => { x: number; y: number; z: number; fuse: number }[]
   /** How full the power gauge is, 0..1, or null when nothing charges. */
   charging: () => number | null
   /** Where the shot SEQUENCE has got to: the fuse, the flight, or nothing at

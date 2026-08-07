@@ -54,6 +54,16 @@ export async function nudge(page: Page, action: 'menuUp' | 'menuDown'): Promise<
 
 /** Light the bar with this label, then choose it. */
 export async function choose(page: Page, label: string): Promise<void> {
+  // The menu paints before its WORDS arrive: the labels come out of
+  // `fetext.bin` through the main process, so a spec that reaches the menu in
+  // the first tenth of a second finds four bars with nothing written on them.
+  // Only the first spec in a worker is ever fast enough to see it, which is
+  // why it went unnoticed until one was added at the top of a file.
+  await expect
+    .poll(async () => (await labels(page)).filter((one) => one.length > 0).length, {
+      message: 'the menu bars are still blank'
+    })
+    .toBeGreaterThan(0)
   const bars = await labels(page)
   const wanted = bars.indexOf(label)
   if (wanted < 0) throw new Error(`no menu bar says ${label} — the menu has ${bars.join(', ')}`)

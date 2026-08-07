@@ -114,9 +114,17 @@ export const LAYOUT = {
    */
   gauge: {
     width: 320,
-    height: 64,
+    /**
+     * How much of each 64-tall tile is actually the gauge. Measured, not
+     * eyework: below row 30 every column of `newpow5` is the dashboard's own
+     * rgb(8,8,8), so the bottom half of every tile is filler and blitting it
+     * whole hangs a black slab under the brass. The tiles are drawn CLIPPED
+     * to this.
+     */
+    height: 30,
     margin: { bottom: 12 },
-    /** The trough inside the strip, measured off `newpow5`'s own rows. */
+    /** The trough inside the strip, measured off `newpow5`'s own rows: the
+     * varying band runs y 9..29 and the brass sits in it. */
     trough: { x: 10, y: 9, width: 300, height: 21 },
     fill: [232, 176, 32] as [number, number, number]
   },
@@ -436,7 +444,20 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         )
         context.restore()
         for (let tile = 0; tile < 5; tile++) {
-          blit(art.get(`newpow${tile + 3}`), gaugeX + tile * 64, gaugeY)
+          const piece = art.get(`newpow${tile + 3}`)
+          if (!piece) continue
+          // Clipped: only the top of each tile is the gauge (LAYOUT.gauge).
+          context.drawImage(
+            piece.image,
+            0,
+            0,
+            piece.width,
+            GAUGE.height,
+            Math.round((gaugeX + tile * 64) * scale),
+            Math.round(gaugeY * scale),
+            Math.round(piece.width * scale),
+            Math.round(GAUGE.height * scale)
+          )
         }
       }
 

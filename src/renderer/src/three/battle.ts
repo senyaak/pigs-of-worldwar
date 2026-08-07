@@ -365,6 +365,17 @@ export function buildBattle(
   let fireHeld = false
   /** The power gauge, while one is filling (lib/game/gauge.ts). */
   let gauge: Gauge | null = null
+  /**
+   * What the dashboard shows: how full the gauge is, 0..1 — and **0 rather
+   * than null whenever the weapon in hand has one at all**, because that is
+   * when the original shows the thing. Null only when nothing in hand charges,
+   * and then the dashboard leaves the space empty (lib/game/weapons.ts, the
+   * record's own `+0x14`).
+   */
+  const showGauge = (): number | null => {
+    if (gauge) return gaugeFraction(gauge)
+    return weaponOf(game.currentPig.holding).power ? 0 : null
+  }
   /** What the gauge read when the button came up — the fuse carries it to the
    * throw, the way `Pig::Fire` parks it at `[pig+0x300]` (0x469371). */
   let thrownWith = 0
@@ -729,7 +740,6 @@ export function buildBattle(
       // watched.
       effects.update(delta)
       shots.update(delta)
-    grenades.update(delta)
       grenades.update(delta)
       airDrops.update(delta)
       numbers.update(delta)
@@ -1018,6 +1028,7 @@ export function buildBattle(
     numbers.update(delta)
     effects.update(delta)
     shots.update(delta)
+    grenades.update(delta)
     airDrops.update(delta)
     squad.update(delta)
     marker.bob(time)
@@ -1041,8 +1052,8 @@ export function buildBattle(
     smoke: () => effects.smoke(),
     script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
     shots: () => shots.live(),
-    grenades: () => grenades.live(),
-    charging: () => (gauge ? gaugeFraction(gauge) : null),
+    grenades: () => grenades.at(),
+    charging: () => showGauge(),
     firing: () => firing?.phase ?? null,
     barks: () => voice.spoken(),
     aftermath: () => aftermath !== null,
@@ -1076,7 +1087,7 @@ export function buildBattle(
       if (held && !fireHeld) fireRequested = true
       fireHeld = held
     },
-    charging: () => (gauge ? gaugeFraction(gauge) : null),
+    charging: () => showGauge(),
     setAim(direction) {
       aimIntent = direction
     },

@@ -23,7 +23,13 @@
 //
 // Pure, seconds and game space (Y-down), like the rest of lib/game.
 
-import { PLAIN_GRAVITY, bounceOff, fromExeSpeed, groundMaterial } from './ballistics'
+import {
+  PLAIN_GRAVITY,
+  bounceOff,
+  fromExeFrames,
+  fromExeSpeed,
+  groundMaterial
+} from './ballistics'
 import type { Bounciness, Velocity } from './ballistics'
 import { GAUGE_FULL } from './gauge'
 import { AIM_UNITS } from './aim'
@@ -37,18 +43,28 @@ export interface Lob {
   /** Row +0x00, exe units a frame at FULL charge. */
   speed: number
   /**
-   * Row +0x18.
+   * Row +0x18 — **the FUSE, in engine frames**, and emphatically not the
+   * damage this file first read it as.
    *
-   * Read as the BLAST, on the distribution rather than on a line of code:
-   * it is zero for every one of the thirteen guns and non-zero for every
-   * one of the things that go off — 150 the grenade family, 750 for skill
-   * 16, 250 for 34, 125 for 37/38, 25 for 35/36. That is a damage ladder
-   * and nothing else in either table looks like one. `fire.md` also has it
-   * compared against a counter at 0x436c6c, which is a real reading of a
-   * real instruction, so one of the two arms uses it for each. Correct this
-   * the moment the blast handler turns up.
+   * The projectile runs a seven-arm state machine on `[proj+0xB4]` against a
+   * frame counter at `[proj+0xA8]` (0x436938, table at 0x436DA0). A grenade's
+   * row +0x14 is non-zero, so the constructor starts it in **state 0**
+   * (0x43200c); state 0 counts `[proj+0xBC]` = row +0x14 = **3 frames** and
+   * then dispatches on row +0x1C's low byte, which for the whole family is 2
+   * — the arm that zeroes the counter and moves to **state 1** (0x4369e3).
+   * And state 1 is three instructions:
+   *
+   * ```
+   * 436a62  cmp ecx,[esi+0B8h]      ; the counter against the fuse
+   * 436a68  jbe ...                 ; not yet
+   * 436a6e  [proj+0xB4] = 6         ; ...and state 6 is [proj+0x31] = 1, done
+   * ```
+   *
+   * `[proj+0xB8]` is this field plus `rand() & 7`, written once in the
+   * constructor (0x43208b, 0x432095). So a hundred and fifty frames and a
+   * little.
    */
-  damage: number
+  fuse: number
 }
 
 /**
@@ -57,16 +73,16 @@ export interface Lob {
  * whatever those two fields drive (they feed effect 0x5D at 0x436665).
  */
 const LOBS: Record<number, Lob> = {
-  /** 19 GRENADE — the plain one, and the only one the tutorial hands out. */
-  19: { id: 412, kind: 24, speed: 300, damage: 150 },
-  20: { id: 413, kind: 25, speed: 300, damage: 150 },
-  21: { id: 414, kind: 26, speed: 300, damage: 150 },
-  22: { id: 415, kind: 27, speed: 300, damage: 150 },
-  23: { id: 416, kind: 28, speed: 300, damage: 150 },
-  24: { id: 417, kind: 29, speed: 300, damage: 150 },
-  25: { id: 418, kind: 30, speed: 300, damage: 150 },
-  26: { id: 419, kind: 31, speed: 300, damage: 150 },
-  27: { id: 420, kind: 32, speed: 300, damage: 150 }
+  /** 19 GRENADE — the plain one. */
+  19: { id: 412, kind: 24, speed: 300, fuse: 150 },
+  20: { id: 413, kind: 25, speed: 300, fuse: 150 },
+  21: { id: 414, kind: 26, speed: 300, fuse: 150 },
+  22: { id: 415, kind: 27, speed: 300, fuse: 150 },
+  23: { id: 416, kind: 28, speed: 300, fuse: 150 },
+  24: { id: 417, kind: 29, speed: 300, fuse: 150 },
+  25: { id: 418, kind: 30, speed: 300, fuse: 150 },
+  26: { id: 419, kind: 31, speed: 300, fuse: 150 },
+  27: { id: 420, kind: 32, speed: 300, fuse: 150 }
 }
 
 /** What this skill lobs, or null for everything that does not lob. */
@@ -77,37 +93,63 @@ export const lobOf = (skill: number | null): Lob | null =>
  * the gauge both ask. */
 export const isLobbed = (skill: number | null): boolean => lobOf(skill) !== null
 
-/**
- * How long a grenade burns before it goes off, in SECONDS.
- *
- * **The remake's own.** The row's +0x14 is 3 for every grenade and it is not a
- * fuse: the update reads it as a threshold on a per-state timer at 0x436961,
- * against a state machine of seven arms whose transitions have not been
- * followed. The lifetime cannot be it either — 1000 frames is over a minute.
- * So this is a number chosen to play, and it is the first thing to correct
- * against the original.
- */
-export const FUSE_SECONDS = 3
+/** The three frames of state 0 before the fuse proper starts — row +0x14. */
+export const ARMING_FRAMES = 3
+/** `rand() & 7` on top of the row's figure, once, in the constructor. */
+export const FUSE_JITTER = 7
 
 /**
- * How far the blast reaches, in game units.
+ * How long a grenade burns, in seconds — the row's own frames converted at
+ * the ENGINE's rate rather than at this remake's stretched one
+ * (`fromExeFrames` in ballistics.ts argues why). A hundred and fifty-three
+ * frames is a touch over five seconds.
  *
- * **The remake's own**, and there is nothing in the row for it: the two
- * collision-box bytes at +0x24 are 1 and 1, which is the same 64-unit unit a
- * prop's box uses and so is the size of the grenade rather than of its blast.
- * A pig is 640 units on a side, so this is a pig and a bit either way —
- * enough that a near miss still hurts and a shelter still works.
+ * `random` is injectable so a spec can pin the jitter.
  */
-export const BLAST_RADIUS = 800
+export const fuseSeconds = (row: Lob, random: () => number = Math.random): number =>
+  fromExeFrames(ARMING_FRAMES + row.fuse + Math.floor(random() * (FUSE_JITTER + 1)))
 
 /**
- * How much of the row's damage a body at this distance takes, 0..1.
+ * How far the blast reaches — a half-extent per AXIS, not a sphere.
  *
- * Linear to the rim, which is the remake's — nothing has been read. Anything
- * outside is untouched.
+ * The projectile's own proximity test, and the only notion of near it has:
+ * the last thing its update does (0x436933 -> 0x437650) is walk the pig list
+ * at `[0x51EE18]` and set `[pig+0x180]` on everything within **±0x400 on each
+ * of the three axes** — 0x437775, 0x43778b, 0x4377a1, with a 0 written on the
+ * way out. A box 2048 across against a pig 640 across.
+ *
+ * What `[pig+0x180]` MEANS is not followed. The same function drives the
+ * camera two calls earlier (0x49EC20, 0x49F740), so it may be "look at this
+ * one" or "cower" rather than "hurt this one". It stands in as the blast's
+ * reach because it is the only distance the projectile carries, and this note
+ * is here rather than a pretence that it was read as damage.
  */
-export const blastShare = (distance: number): number =>
-  distance >= BLAST_RADIUS ? 0 : 1 - distance / BLAST_RADIUS
+export const BLAST_REACH = 0x400
+
+/**
+ * How much of the damage a body takes, 0..1 — by the furthest AXIS, since the
+ * test above is a box and not a sphere.
+ *
+ * The FALLOFF is the remake's: the exe's test is flat, in or out, and a
+ * grenade taking full damage anywhere inside a 2048 box would make standing
+ * back pointless. Linear to the rim.
+ */
+export function blastShare(dx: number, dy: number, dz: number): number {
+  const reach = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz))
+  return reach >= BLAST_REACH ? 0 : 1 - reach / BLAST_REACH
+}
+
+/**
+ * What a blast takes off at the centre.
+ *
+ * **The remake's own**, and it is the same gap `SHOT_DAMAGE` has: the row
+ * field that looked like damage turned out to be the fuse, the weapon's
+ * 80-byte record has no damage in it either (searched at every width for the
+ * five melee figures, which ARE known), and the handler that would hold it
+ * has not been found. A grunt has fifty points, so this flattens one it lands
+ * on and leaves a heavy standing. Correct it against play.
+ */
+export const BLAST_DAMAGE = 60
 
 /** A grenade in the air, or rolling. Game space, Y-down; velocity a second. */
 export interface Lobbed {
@@ -118,8 +160,8 @@ export interface Lobbed {
   vx: number
   vy: number
   vz: number
-  /** Seconds left on the fuse. It runs from the throw, not from the landing —
-   * which is the remake's reading and the one the fuse constant above is. */
+  /** Seconds left. It runs from the THROW and nothing resets it on landing:
+   * state 1 is entered three frames in and only ever leaves for state 6. */
   fuse: number
   /** Whether it has stopped moving. Only for what draws it; the fuse does not
    * care. */
@@ -138,7 +180,8 @@ export function lob(
   from: { x: number; y: number; z: number },
   heading: number,
   aim: number,
-  charge: number
+  charge: number,
+  random: () => number = Math.random
 ): Lobbed | null {
   const row = lobOf(skill)
   if (!row) return null
@@ -156,7 +199,7 @@ export function lob(
     vx: Math.sin(heading) * flat,
     vy: -Math.sin(pitch) * speed,
     vz: Math.cos(heading) * flat,
-    fuse: FUSE_SECONDS,
+    fuse: fuseSeconds(row, random),
     resting: false
   }
 }

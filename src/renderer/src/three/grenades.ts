@@ -6,15 +6,17 @@
 // and then it is on its own parabola until the terrain or a box stops it.
 //
 // The BLAST is the part with the least binary behind it and it says so at
-// every constant it uses. What is decoded is the row's damage figure and the
-// fact that the thing arcs at all; the radius, the falloff and the fuse are
-// the remake's.
+// every constant it uses. Decoded: the arc, the fuse (150 engine frames off
+// the row, plus three of arming and a jitter of up to seven) and the ±0x400
+// box the projectile marks pigs in. Invented: how much it takes off, and the
+// falloff across that box.
 //
 // Everything here is game space (Y-down), under the battle's converted root.
 
 import * as THREE from 'three'
 import {
-  BLAST_RADIUS,
+  BLAST_DAMAGE,
+  BLAST_REACH,
   advanceLob,
   blastShare,
   bounceLob,
@@ -61,6 +63,10 @@ export interface Grenades {
   update(delta: number): void
   /** How many are live. */
   live(): number
+  /** Where each one is and how long it has left — what a spec measures a
+   * miss with, since a grenade that lands short looks exactly like a blast
+   * that does not reach. */
+  at(): { x: number; y: number; z: number; fuse: number }[]
   /** Where the newest one is, for the camera to ride — null when none is up. */
   head(): Lobbed | null
   clear(): void
@@ -106,8 +112,6 @@ export function createGrenades(parts: GrenadeParts): Grenades {
 
   /** Everything within reach takes its share. */
   const detonate = (shot: Lobbed): void => {
-    const row = lobOf(shot.skill)
-    const full = row?.damage ?? 0
     parts.effects.broke({ x: shot.x, y: shot.y, z: shot.z })
     for (const soldier of parts.squad.members) {
       if (isDead(soldier.pig)) continue
@@ -116,9 +120,9 @@ export function createGrenades(parts: GrenadeParts): Grenades {
         y: soldier.node.position.y,
         z: soldier.pig.position.z
       }
-      const share = blastShare(Math.hypot(body.x - shot.x, body.y - shot.y, body.z - shot.z))
+      const share = blastShare(body.x - shot.x, body.y - shot.y, body.z - shot.z)
       if (share === 0) continue
-      const amount = Math.round(full * share)
+      const amount = Math.round(BLAST_DAMAGE * share)
       if (amount <= 0) continue
       const outcome = hurt(soldier.pig, amount, parts.training)
       parts.numbers.show(body, amount)
@@ -127,11 +131,9 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     for (let i = standing.length - 1; i >= 0; i--) {
       const dummy = standing[i]
       if (!parts.present(dummy.id)) continue
-      const share = blastShare(
-        Math.hypot(dummy.x - shot.x, dummy.y - shot.y, dummy.z - shot.z)
-      )
+      const share = blastShare(dummy.x - shot.x, dummy.y - shot.y, dummy.z - shot.z)
       if (share === 0) continue
-      const amount = Math.round(full * share)
+      const amount = Math.round(BLAST_DAMAGE * share)
       if (amount <= 0) continue
       hurt(dummy, amount, false)
       parts.numbers.show(dummy, amount)
@@ -199,7 +201,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
         // Substep so a fast throw cannot pass clean through a hillside: at
         // full charge a grenade covers 4500 units a second.
         const speed = Math.hypot(shot.vx, shot.vy, shot.vz)
-        const steps = Math.max(1, Math.ceil((speed * delta) / BLAST_RADIUS))
+        const steps = Math.max(1, Math.ceil((speed * delta) / BLAST_REACH))
         let spent = false
         for (let step = 0; step < steps && !spent; step++) {
           const wasY = shot.y
@@ -213,6 +215,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
       redraw()
     },
     live: () => live.length,
+    at: () => live.map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     head: () => live[0] ?? null,
     clear() {
       live.length = 0
