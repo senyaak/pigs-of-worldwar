@@ -41,6 +41,8 @@ import { createDamageNumbers } from './damageNumbers'
 import { createEffects } from './effects'
 import { createAirDrops } from './airDrop'
 import { createScript } from '../../../lib/game/script'
+import { isGun } from '../../../lib/game/projectile'
+import { createShots } from './shots'
 import type { FloatingNumber } from './damageNumbers'
 import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
@@ -114,6 +116,10 @@ export interface BattleScene {
   fire(): void
   /** Point the weapon in hand: -1 down, 0 nothing held, +1 up. */
   setAim(direction: number): void
+  /** Whether the aim view is being HELD. The original keeps camera mode 0x0E
+   * for exactly as long as its pad bit is down and puts the remembered mode
+   * back the frame it goes up (three/chase.ts). */
+  setSighting(held: boolean): void
   /** Where the weapon in hand points, in the game's own angle units, or null
    * when the pig is holding nothing that aims (lib/game/aim.ts). */
   aim(): number | null
@@ -284,6 +290,8 @@ export function buildBattle(
   let fireRequested = false
   /** Which way the aim keys are pushing: -1 down, 0 nothing, +1 up. */
   let aimIntent = 0
+  /** Whether the aim view is held down. */
+  let sighting = false
   /** The weapons in hand, one mesh per pig that has one out. */
   const weapons = createHeldWeapons()
   /** What the acting pig had chosen last frame — a change is what brings a
@@ -327,6 +335,23 @@ export function buildBattle(
       advanceScript(target.id, target.y)
     }
   })
+  /** What a GUN does when the fire key goes down. It reads the same hand bone
+   * a swing does, and off the same table (three/shots.ts). */
+  const shots = createShots({
+    squad,
+    root,
+    bank: () => bank,
+    training,
+    targets: targetsOf(assets.objects),
+    present: (id) => !script.absent(id),
+    numbers,
+    onBroken: (target) => {
+      effects.broke(target)
+      props.take(target.id)
+      obstacles.remove(target.id)
+      advanceScript(target.id, target.y)
+    }
+  })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
    * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig
    * reaches for the rifle and then has it. */
@@ -348,7 +373,12 @@ export function buildBattle(
       ? 'face'
       : soldier === squad.of(game.currentPig) && swings.running()
         ? 'melee'
-        : 'chase'
+        : // The aim view, held, and only for something that shoots — the exe
+          // picks mode 0x0E by WEAPON (0x492dfa) and gates it on the same test
+          // the melee camera is gated on, which is false through a swing.
+          soldier === squad.of(game.currentPig) && sighting && isGun(holding)
+          ? 'rifle'
+          : 'chase'
     chase.follow(soldier.pig, soldier.node.position.y, dropIn.riseOver(soldier), delta, view)
   }
 
@@ -435,7 +465,13 @@ export function buildBattle(
     // Fire is what starts a swing, and only the acting pig's own weapon
     // answers. A press while one is already running is dropped, which is the
     // exe's fire gate (0x467a10 refuses on the same two flags).
-    if (fireRequested) swings.begin(active)
+    // F uses what is in hand: a melee skill swings, a gun shoots. The exe
+    // splits them at the same place — one arm of `Pig::Fire`'s own switch each
+    // (0x469415 against 0x46946d).
+    if (fireRequested) {
+      if (isGun(holding)) shots.fire(active, aim.angle)
+      else swings.begin(active)
+    }
     fireRequested = false
     // A swinging pig cannot be driven: the exe's walk refuses from the moment
     // the button goes down until the clip is spent (0x46afd5 tests both the
@@ -543,6 +579,7 @@ export function buildBattle(
     update(delta)
     numbers.update(delta)
     effects.update(delta)
+    shots.update(delta)
     airDrops.update(delta)
     squad.update(delta)
     marker.bob(time)
@@ -565,6 +602,7 @@ export function buildBattle(
     effects: () => effects.live(),
     smoke: () => effects.smoke(),
     script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
+    shots: () => shots.live(),
     warp: (x, z, heading) => {
       game.moveCurrentPig(x, z, heading)
       swings.reset()
@@ -595,6 +633,9 @@ export function buildBattle(
     setAim(direction) {
       aimIntent = direction
     },
+    setSighting(held) {
+      sighting = held
+    },
     aim: () => (scrubsPose(holding) ? aim.angle : null),
     sound(name) {
       bank.play(name)
@@ -607,6 +648,7 @@ export function buildBattle(
       dropIn.dispose()
       marker.dispose()
       effects.dispose()
+      shots.dispose()
       airDrops.dispose()
       weapons.dispose()
       squad.dispose()

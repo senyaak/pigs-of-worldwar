@@ -238,7 +238,13 @@ export function initBattle(onLeave: () => void): BattleView {
   const pushIntent = (): void => {
     const walk = (controller.isDown('walkForward') ? 1 : 0) - (controller.isDown('walkBack') ? 1 : 0)
     const turn = (controller.isDown('turnRight') ? 1 : 0) - (controller.isDown('turnLeft') ? 1 : 0)
-    const aim = (controller.isDown('aimUp') ? 1 : 0) - (controller.isDown('aimDown') ? 1 : 0)
+    let aim = (controller.isDown('aimUp') ? 1 : 0) - (controller.isDown('aimDown') ? 1 : 0)
+    // G is the AIM VIEW, and it is HELD — the original tests its two pad bits
+    // every frame and puts the camera back the frame they go up
+    // (`../../../../pigs-disasm/weapons/fire.md`). While it is down, W and S
+    // point the weapon instead of walking; A and D still turn the pig, which
+    // is what the exe leaves them doing.
+    const sighting = controller.isDown('aimMode')
     // The menu is a MODE, as it is in the exe: while it is up the pig stands
     // still and the keys move the cursor instead.
     if (hud.skills.open()) {
@@ -250,8 +256,10 @@ export function initBattle(onLeave: () => void): BattleView {
       return
     }
     steered = { walk: 0, turn: 0 }
-    scene?.setIntent(walk, turn)
+    if (sighting && aim === 0) aim = walk
+    scene?.setIntent(sighting ? 0 : walk, turn)
     scene?.setAim(aim)
+    scene?.setSighting(sighting)
   }
   controller.onChange(pushIntent)
   controller.onAction((action) => {

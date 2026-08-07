@@ -1,9 +1,9 @@
-// PHASE 002 (app) — the first battle scene: New Game drops two squads onto
+﻿// PHASE 002 (app) вЂ” the first battle scene: New Game drops two squads onto
 // ARCHI, the HUD names whose turn it is, End Turn rotates through players
 // and pigs, and the scene actually draws.
 //
 // The squad rosters here mirror ui/battle.ts; the rotation rules themselves
-// are pinned down in game-logic.spec.ts — this spec checks the wiring.
+// are pinned down in game-logic.spec.ts вЂ” this spec checks the wiring.
 
 import { existsSync } from 'node:fs'
 
@@ -19,14 +19,14 @@ import { GAME_DIR } from '../launch'
 
 /**
  * The center of a whole-tile wall on the battle map with dry open ground due
- * west of it — read from the shipped map, so it stays true if the map does.
+ * west of it вЂ” read from the shipped map, so it stays true if the map does.
  * Well inside the world limit: a pig clamped at the border is refused for a
  * different reason entirely.
  *
  * Of every such wall it takes the one with the LONGEST fall behind it. A
  * pig thrown off a wall onto rising ground barely goes anywhere; thrown off
  * onto a slope it bounces away down the hill, which is the behaviour worth
- * asserting — and the one the original is recognisable by.
+ * asserting вЂ” and the one the original is recognisable by.
  */
 function wallAboveASlope(): { x: number; z: number; query: TerrainQuery } {
   const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG')))
@@ -57,7 +57,7 @@ const positionOf = (at: { x: number; z: number }): [number, number] => [at.x, at
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
-    throw new Error('phase 002 starts from the .env phase 000 saves — run the whole suite, not this spec alone')
+    throw new Error('phase 002 starts from the .env phase 000 saves вЂ” run the whole suite, not this spec alone')
   }
 })
 
@@ -66,10 +66,12 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
-  // Turn 1: first player's first pig, full health, the clock running.
+  // Turn 1: first player's first pig, full health, the clock running. Full is
+  // FIFTY for a grunt — the maximum is the class's, out of the record at
+  // 0x4d02e0, and it is not 100 (lib/game/health.ts).
   await expect
     .poll(() => hud(page))
-    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
+    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
 
   // The battle canvas draws something that is not background.
   const foregroundPixels = async (): Promise<number> =>
@@ -103,16 +105,16 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   expect(before).toBeGreaterThan(40)
   await expect.poll(secondsLeft, { message: 'turn clock ticking' }).toBeLessThan(before)
 
-  // End Turn through the controller — the same action the button and the
+  // End Turn through the controller вЂ” the same action the button and the
   // Enter key fire. CAMP is the training ground and fields ONE pig, so the
   // turn comes straight back to it, with the clock reset.
   await tap(page, 'endTurn')
   await expect
     .poll(() => hud(page))
-    .toMatchObject({ turn: 2, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
+    .toMatchObject({ turn: 2, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
   expect(await secondsLeft()).toBeGreaterThan(40)
 
-  // Two sides rotate the way two sides do — on a map that HAS two.
+  // Two sides rotate the way two sides do вЂ” on a map that HAS two.
   expect(await swapMap(page, 'LIBERATE')).toBe(true)
   await expect
     .poll(() => hud(page))
@@ -136,7 +138,7 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   await startGame(page)
   await expect
     .poll(() => hud(page))
-    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
+    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
 
 
   expect(app.errors()).toEqual([])
@@ -145,7 +147,7 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
 test('a turn waits a beat before it starts, and any input cuts it short', async ({ app }) => {
   const { page } = app
   // NOT `startGame`, which lands the drop and then the beat is already
-  // running — this wants to catch it.
+  // running вЂ” this wants to catch it.
   await choose(page, 'ONE PLAYER')
   await expect(page.locator('#battle')).toBeVisible()
   await landed(page)
@@ -157,7 +159,7 @@ test('a turn waits a beat before it starts, and any input cuts it short', async 
   const held = await debugState(page)
   expect(Math.hypot(held.x - before.x, held.z - before.z), 'nothing drives yet').toBeLessThan(1)
 
-  // A press ends it AND is acted on — nothing a player does is swallowed,
+  // A press ends it AND is acted on вЂ” nothing a player does is swallowed,
   // which is the whole risk in putting a pause here.
   await hold(page, 'walkForward', 400)
   expect((await hud(page)).starting).toBe(false)
@@ -165,7 +167,7 @@ test('a turn waits a beat before it starts, and any input cuts it short', async 
   expect(Math.hypot(walked.x - before.x, walked.z - before.z), 'and it walked').toBeGreaterThan(50)
 
   // Every later turn gets its own beat. That it also runs out UNAIDED is
-  // pinned in game-logic.spec.ts, where it costs nothing — here it would be
+  // pinned in game-logic.spec.ts, where it costs nothing вЂ” here it would be
   // ten seconds of watching a still screen.
   await tap(page, 'endTurn')
   await expect.poll(async () => (await hud(page)).starting).toBe(true)
@@ -178,7 +180,7 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
-  // Walking moves the pig — position read off the scene, the ground truth
+  // Walking moves the pig вЂ” position read off the scene, the ground truth
   // the HUD only summarises.
   const start = await debugState(page)
   await hold(page, 'walkForward', 700)
@@ -195,7 +197,7 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   expect(Math.abs(turned.heading - walked.heading), 'turnRight rotated the pig').toBeGreaterThan(0.3)
 
   // Jump is a one-shot: it must leave the ground. Game space is Y-down, so
-  // airborne means a SMALLER y than standing. Back to the spawn first —
+  // airborne means a SMALLER y than standing. Back to the spawn first вЂ”
   // that tile is `standable`, where 700ms of walking lands is whatever the
   // map has there, and a pig that walked into the drink cannot jump.
   await warp(page, start.x, start.z, turned.heading)
@@ -204,7 +206,7 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   await tap(page, 'jump')
   // Not on the next frame: the pig crouches for one pass of the wind-up clip
   // and leaves the ground when that finishes (lib/game/locomotion). So watch
-  // for the apex rather than sampling at a fixed moment — game space is
+  // for the apex rather than sampling at a fixed moment вЂ” game space is
   // Y-down, so airborne is a SMALLER y than standing, and the hop clears
   // about 35 units (JUMP_RISE).
   const apex = await peakNodeY(page, grounded.nodeY - 20, 2000)
@@ -212,7 +214,7 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   const airborne = { nodeY: apex }
 
   // And it recharges. The cooldown once ticked down inside the turn-change
-  // block, where the next line reset it — so a pig could jump exactly once
+  // block, where the next line reset it вЂ” so a pig could jump exactly once
   // per turn and never again.
   await expect
     .poll(async () => (await debugState(page)).nodeY, { message: 'back on the ground' })
@@ -241,7 +243,7 @@ test('walk into a wall long enough and the pig is thrown out of it', async ({ ap
   await press(page, 'walkForward')
   let inside = await debugState(page)
   try {
-    // Nothing refuses the step, so it walks IN — and lands on a floor with
+    // Nothing refuses the step, so it walks IN вЂ” and lands on a floor with
     // 0.99 restitution and 0.01 friction, which shakes it about.
     await expect
       .poll(async () => !wall.query.walkable(...positionOf(await debugState(page))), {
@@ -256,8 +258,8 @@ test('walk into a wall long enough and the pig is thrown out of it', async ({ ap
   }
 
   // And it does not stay there. Which way out it takes is the terrain's
-  // business — 0.01 friction slides it off a slope, and the wedge counter
-  // throws it clear if the ground is too flat to slide on — but out it goes,
+  // business вЂ” 0.01 friction slides it off a slope, and the wedge counter
+  // throws it clear if the ground is too flat to slide on вЂ” but out it goes,
   // and that is the property worth holding: a pig left in a wall is a pig
   // that cannot be played.
   await expect
@@ -281,7 +283,7 @@ test('walk into a wall long enough and the pig is thrown out of it', async ({ ap
     .toBe(true)
 
   // And it is OUT: standing where a pig may stand. This is the one that
-  // matters — a pig left inside a wall is a pig that cannot be played.
+  // matters вЂ” a pig left inside a wall is a pig that cannot be played.
   const landed = await debugState(page)
   expect(wall.query.walkable(...positionOf(landed)), 'not left inside the wall').toBe(true)
 
@@ -295,7 +297,7 @@ test('a jump cannot be started from inside a wall, so it is no ladder', async ({
 
   // Riding a jump into a cliff face, landing higher up it and going again is
   // how a pig once climbed over everything and off the map. Walking in is
-  // allowed — the original refuses nothing about the ground — but the jump
+  // allowed вЂ” the original refuses nothing about the ground вЂ” but the jump
   // is not: "Can't jump from this tile type". So the climb ends on the first
   // landing inside the wall.
   const wall = wallAboveASlope()
@@ -325,3 +327,4 @@ test('a jump cannot be started from inside a wall, so it is no ladder', async ({
 
   expect(app.errors()).toEqual([])
 })
+

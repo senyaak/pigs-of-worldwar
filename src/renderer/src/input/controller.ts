@@ -139,6 +139,8 @@ export interface DebugHooks {
   smoke(): number
   /** What the map script is still holding back, and what is in the air. */
   script(): { absent: number[]; falling: number }
+  /** How many bullets are in flight (three/shots.ts). */
+  shots(): number
   /** Every pig's health, in turn order. */
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */

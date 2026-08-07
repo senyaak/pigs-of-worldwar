@@ -14,7 +14,7 @@ import { GAME_DIR } from '../launch'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { beginTurn, warp } from '../controller'
+import { beginTurn, chooseSkill, warp } from '../controller'
 import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
@@ -110,10 +110,10 @@ test('a bayonet swung at a dummy knocks it down', async ({ app }) => {
   await warp(page, crate!.x, crate!.z, 0)
   await expect.poll(async () => (await look(page)).carrying).toContain(BAYONET)
 
-  // Take it in hand the way a player does: R opens the menu, SPACE takes what
-  // is under the cursor. The pig carries one skill, so that is the bayonet.
-  await push(page, 'skills')
-  await push(page, 'jump')
+  // Take it in hand the way a player does, through the real menu — and by
+  // SKILL rather than by cell, because what else the pig is carrying decides
+  // which cell the bayonet lands in (e2e/controller.ts).
+  expect(await chooseSkill(page, BAYONET)).toBe(true)
   await expect.poll(async () => (await look(page)).holding).toBe(BAYONET)
 
   const before = (await look(page)).dummies

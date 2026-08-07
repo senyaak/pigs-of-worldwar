@@ -40,7 +40,8 @@ test('the console swaps the map; a name that does not ship is refused', async ({
   // — it stands somewhere real and walking moves it.
   await expect
     .poll(() => hud(page))
-    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
+    // A grunt has fifty — the class's own maximum (lib/game/health.ts).
+    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
   const start = await debugState(page)
   await hold(page, 'walkForward', 400)
   const walked = await debugState(page)

@@ -14,6 +14,9 @@ export type Action =
   | 'turnLeft'
   | 'turnRight'
   | 'jump'
+  | 'fire'
+  | 'aimMode'
+  | 'skills'
   | 'endTurn'
   | 'menuUp'
   | 'menuDown'
@@ -208,6 +211,35 @@ export const warp = (page: Page, x: number, z: number, heading: number): Promise
     },
     { x, z, heading }
   )
+
+/** What the acting pig has chosen out of the skill menu, or null. */
+export const holding = (page: Page): Promise<number | null> =>
+  page.evaluate(() => {
+    const pow = (window as unknown as { pow?: { debug?: { holding(): number | null } } }).pow
+    if (!pow?.debug) throw new Error('no battle scene is up — window.pow.debug is missing')
+    return pow.debug.holding()
+  })
+
+/**
+ * Take a particular SKILL in hand through the real menu.
+ *
+ * By skill and not by cell, deliberately. The menu's cells hold whatever the
+ * pig is carrying plus SKIP TURN, so which one a fixed number of cursor moves
+ * lands on depends on what has been collected — and a spec that assumes a
+ * position passes alone and fails in a full run, which is exactly what
+ * happened. This opens the menu, takes what is under the cursor, and if it is
+ * the wrong thing, moves on and tries again.
+ */
+export async function chooseSkill(page: Page, skill: number, cells = 12): Promise<boolean> {
+  await press(page, 'skills')
+  for (let step = 0; step < cells; step++) {
+    await press(page, 'jump')
+    if ((await holding(page)) === skill) return true
+    await press(page, 'skills')
+    await tap(page, 'turnRight')
+  }
+  return false
+}
 
 // The renderer declares `window.pow` too (input/controller.ts). These specs
 // are compiled in the same project, so re-declaring it would clash — the

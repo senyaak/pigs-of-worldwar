@@ -51,6 +51,8 @@ export interface DebugParts {
   smoke: () => number
   /** What the map SCRIPT is still holding back, and what is in the air. */
   script: () => { absent: number[]; falling: number }
+  /** How many bullets are in flight — a tracer is a line a spec cannot see. */
+  shots: () => number
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -102,6 +104,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** The records still off the map, and how many crates are coming down
        * under a canopy right now (lib/game/script.ts). */
       script: () => parts.script(),
+      /** Bullets still flying. A gun's range is a LIFETIME in frames, so this
+       * goes back to zero on its own (lib/game/projectile.ts). */
+      shots: () => parts.shots(),
       /** Every pig's health, side by side — what a bayonet is measured by. */
       health: () =>
         game.players.flatMap((player) =>

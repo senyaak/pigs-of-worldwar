@@ -10,6 +10,7 @@ export const ACTIONS = [
   'fire',
   'aimUp',
   'aimDown',
+  'aimMode',
   'endTurn',
   'menuUp',
   'menuDown',
@@ -28,7 +29,11 @@ export const HELD_ACTIONS: readonly Action[] = [
   'turnLeft',
   'turnRight',
   'aimUp',
-  'aimDown'
+  'aimDown',
+  // The aim view is HELD in the original — 0x4928dc tests two button bits of
+  // this frame's mask every frame and the frame either goes up, the remembered
+  // camera mode comes back (`../../../../pigs-disasm/weapons/fire.md`).
+  'aimMode'
 ]
 
 /** Physical keys → actions, in the battle. Several keys may share one. */
@@ -56,6 +61,10 @@ export const DEFAULT_BINDINGS: Record<string, Action> = {
   // bit is SPACE here, and space already jumps, so firing gets a key of its
   // own rather than a pig that cannot hop while it is armed.
   KeyF: 'fire',
+  // The aim view. The original holds it on a pad bit (0x100 or 0x1000) and
+  // steers with the ordinary controls underneath; G is the remake's key for
+  // it, and while it is down W and S drive the ANGLE instead of walking.
+  KeyG: 'aimMode',
   Enter: 'endTurn'
 }
 

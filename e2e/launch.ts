@@ -73,7 +73,10 @@ export async function launchApp(options: LaunchOptions): Promise<Launched> {
       POW_ENV_FILE: options.envFile,
       // Show the window without pulling the foreground off the developer —
       // a run launches the app several times (src/main/index.ts).
-      POW_NO_FOCUS: '1'
+      POW_NO_FOCUS: '1',
+      // …and do it QUIETLY. A phase is minutes of gunfire and squealing that
+      // nobody is listening to. Set POW_MUTE=0 to hear a run.
+      POW_MUTE: process.env['POW_MUTE'] ?? '1'
     } as Record<string, string>
   })
   const errors: string[] = []

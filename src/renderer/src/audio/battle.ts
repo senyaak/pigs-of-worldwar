@@ -52,6 +52,15 @@ export const BATTLE_SOUNDS = {
   stab: 'I_STAB',
   sword: 'I_SWORD',
   punch: 'P_PUNCH',
+  /**
+   * A gun going off. DECODED, and it is the pair that proves the shot's
+   * per-weapon jump table is indexed by `weapon − 6`: its first arm plays
+   * **0x2A** and its second **0x2B** (0x47a26d, 0x47a329), and entries 42 and
+   * 43 of `Audio/sfxday.srl` are `L_PISTOL` and `L_RIFLE` — which is exactly
+   * skills 6 and 7. `../../../pigs-disasm/weapons/fire.md`.
+   */
+  pistol: 'L_PISTOL',
+  rifle: 'L_RIFLE',
   /** A canopy opening over the level's drop-in. The bank carries P_CHUTE and
    * P_CHUTE1 and the exe's own choice is NOT decoded — `StartParachuting`
    * pushes 0x35 to an effect spawner, which is 53 and so is P_CHUTE, but the

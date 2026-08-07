@@ -61,6 +61,23 @@ const FACE_LIFT = 150 * MODEL_SCALE
 const MELEE_TURN = (612 / 4096) * 2 * Math.PI
 const MELEE_CLOSE = 1700 / 3072
 
+/**
+ * The AIM view: the shoulder rig pulled in, and nothing else.
+ *
+ * The original holds camera mode **0x0E**, its debug name "rifle cam"
+ * (0x4d8ea8), for as long as one of two pad bits is down, and it picks that
+ * mode for weapons 6..15, 17, 18 and 64 — every gun (0x492dfa). Its row of
+ * the table at 0x4d9528 is **2048** against the chase's 3072, so it comes in
+ * to two thirds and stays behind the shoulder: no swing, unlike the melee's.
+ * `../../../pigs-disasm/weapons/fire.md`.
+ *
+ * The row's second column is 1024 here against the chase's 768, which is what
+ * a zoom in 1024ths would look like — but nothing in the mode's own handler
+ * (0x4a2e30) has been traced reading it, so it is NOT applied. A field of
+ * view is the obvious place for it if it ever is.
+ */
+const RIFLE_CLOSE = 2048 / 3072
+
 /** Which way the rig is pointing at the pig from. */
 export type View =
   /** Over the shoulder — the ordinary battle camera. */
@@ -69,6 +86,8 @@ export type View =
   | 'face'
   /** Round to the side and close in: a hand-to-hand swing. */
   | 'melee'
+  /** Straight behind and closer: sighting a gun. */
+  | 'rifle'
 
 export interface Chase {
   /**
@@ -153,7 +172,13 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
     const back = face ? BACK : BACK + rise / (2 * Math.tan((camera.fov * Math.PI) / 360))
     // Behind the shoulders normally; ahead of the snout on the way down; and
     // round to one side, close in, for a swing.
-    const reach = face ? -back : view === 'melee' ? back * MELEE_CLOSE : back
+    const reach = face
+      ? -back
+      : view === 'melee'
+        ? back * MELEE_CLOSE
+        : view === 'rifle'
+          ? back * RIFLE_CLOSE
+          : back
     const from = view === 'melee' ? pig.heading + MELEE_TURN : pig.heading
     const behindX = pig.position.x - Math.sin(from) * reach
     const behindZ = pig.position.z - Math.cos(from) * reach

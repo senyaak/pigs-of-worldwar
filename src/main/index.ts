@@ -43,6 +43,14 @@ function createWindow(): void {
     }
   })
 
+  // POW_MUTE / --mute: no sound at all. The e2e suite sets it, because a
+  // full phase is a couple of minutes of gunfire and squealing coming out of
+  // the machine while nobody is listening. One line here beats a flag
+  // threaded through to every bank: Electron mutes the whole window.
+  if (process.argv.includes('--mute') || process.env['POW_MUTE'] === '1') {
+    window.webContents.setAudioMuted(true)
+  }
+
   window.on('ready-to-show', () => {
     if (!noFocus) {
       window.show()
