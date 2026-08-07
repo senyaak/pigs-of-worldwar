@@ -7,7 +7,7 @@
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-import { landed, tap } from './controller'
+import { beginTurn, landed, tap } from './controller'
 
 interface MenuHooks {
   selected(): number
@@ -72,4 +72,8 @@ export async function startGame(page: Page): Promise<void> {
   await choose(page, 'ONE PLAYER')
   await expect(page.locator('#battle')).toBeVisible()
   await landed(page)
+  // And past the beat at the top of the turn, which a player presses through
+  // — see `beginTurn`. The spec that is about the beat opens the battle by
+  // hand instead.
+  await beginTurn(page)
 }

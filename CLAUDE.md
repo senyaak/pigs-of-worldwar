@@ -351,14 +351,27 @@ back out to paste in. Placing this art is eyework — it took four rounds of
 "almost, seven pixels up" to seat the weapon slot — so do that in the
 console and commit the result, rather than rebuilding per pixel.
 
+**A turn's LENGTH is the level's, and the first three are 99 seconds.** The
+exe reads it from a 27-entry table at 0x4d1860 and multiplies by 100 into
+the clock (0x4309f1) — 99, 60, 45, 30, 15 as the campaign tightens, which is
+also why the dashboard's clock has exactly two digit windows. WHICH level is
+which map is NOT decoded (the name comes from its own array on a different
+index), so `lib/game/turns.ts` keys only CAMP, the training ground and so
+level 0, and says so.
+
 **A turn does not begin when it is handed over.** There is a beat first —
 its own mode in the original, with the debug line "START OF TURN - Press any
 key to continue" (exe 0x4d8a2c) and three ways out, each of which announces
-itself: timed out, digital input, pause button. The timeout is 998 ms
-(`TURN_START_SECONDS`), the clock does not run during it and the pig cannot
+itself: timed out, digital input, pause button. The timeout is 998 in the
+same hundredths the turn clock uses, so about **ten seconds**
+(`TURN_START_SECONDS`); the clock does not run during it and the pig cannot
 be driven, and the first input both ends it and is acted on in the same
-frame — swallowing a press would only annoy, and every spec that drives
-straight after `startGame` depends on it. `../pigs-disasm/turns/notes.md`.
+frame. Behind it the original flies its camera to the next pig, which the
+remake does not — so if ten seconds of a still screen reads wrong in play,
+that is the thing to fix, not the constant. Specs skip it through
+`pow.debug.beginTurn()`, the second debug WRITE after `warp`, because every
+key a player would press also drives the pig.
+`../pigs-disasm/turns/notes.md`.
 
 **A level OPENS with the drop-in.** A marker's flags bit 6 says its pig
 arrives by parachute, and on a campaign map that is the player's side of

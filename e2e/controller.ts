@@ -170,9 +170,27 @@ export async function swapMap(page: Page, name?: string): Promise<boolean> {
     if (!pow?.swapMap) throw new Error('pow.swapMap is missing — is the battle module loaded?')
     return pow.swapMap(wanted)
   }, name)
-  if (swapped) await landed(page)
+  if (swapped) {
+    await landed(page)
+    await beginTurn(page)
+  }
   return swapped
 }
+
+/**
+ * Start the turn now, skipping the beat the original waits out at the top of
+ * it (lib/game/game.ts). A player skips it by pressing anything; a spec
+ * cannot, because every key also drives the pig — and ten seconds a turn,
+ * over a suite this size, is a minute and a half of watching nothing.
+ *
+ * The spec that is ABOUT the beat does not use this (002/battle.spec.ts).
+ */
+export const beginTurn = (page: Page): Promise<void> =>
+  page.evaluate(() => {
+    const pow = (window as unknown as { pow?: { debug?: { beginTurn(): void } } }).pow
+    if (!pow?.debug) throw new Error('no battle scene is up — window.pow.debug is missing')
+    pow.debug.beginTurn()
+  })
 
 /** Put the acting pig somewhere specific, facing somewhere specific. Not a
  * player move — the scene exposes it purely so a spec can set up a situation

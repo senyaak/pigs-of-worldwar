@@ -164,9 +164,11 @@ test('a turn waits a beat before it starts, and any input cuts it short', async 
   const walked = await debugState(page)
   expect(Math.hypot(walked.x - before.x, walked.z - before.z), 'and it walked').toBeGreaterThan(50)
 
-  // Left alone it runs out on its own: End Turn, then just wait.
+  // Every later turn gets its own beat. That it also runs out UNAIDED is
+  // pinned in game-logic.spec.ts, where it costs nothing — here it would be
+  // ten seconds of watching a still screen.
   await tap(page, 'endTurn')
-  await expect.poll(async () => (await hud(page)).starting).toBe(false)
+  await expect.poll(async () => (await hud(page)).starting).toBe(true)
 
   expect(app.errors()).toEqual([])
 })

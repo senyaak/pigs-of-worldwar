@@ -91,7 +91,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** Where the chase camera actually is, world space — the only way a
        * spec can tell "swimming" from "the view has gone under the water". */
       camera: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
-      warp: parts.warp
+      warp: parts.warp,
+      beginTurn: () => game.beginTurn()
     }
   }
 }

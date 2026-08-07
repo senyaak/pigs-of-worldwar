@@ -149,6 +149,11 @@ export interface DebugHooks {
   /** Set the acting pig down somewhere, facing somewhere. Not a player move:
    * it exists so a spec can stage a situation it could not walk to. */
   warp(x: number, z: number, heading: number): void
+  /** Start the turn now, skipping the beat at the top of it. A player does
+   * this by pressing anything — but every key a player has also DRIVES the
+   * pig, and a spec that wanted a running clock would have to move first and
+   * measure after. This is that press without the pig moving. */
+  beginTurn(): void
 }
 
 declare global {

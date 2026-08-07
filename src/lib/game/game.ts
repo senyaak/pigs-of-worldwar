@@ -52,6 +52,10 @@ export interface GameConfig {
   turnSeconds?: number
 }
 
+/**
+ * A turn's length where the map does not say otherwise — `turnSecondsFor`
+ * has the decoded table and what is missing from it.
+ */
 export const DEFAULT_TURN_SECONDS = 45
 
 /**
@@ -60,17 +64,21 @@ export const DEFAULT_TURN_SECONDS = 45
  * It is a MODE of its own in the original, with its own debug line —
  * "START OF TURN - Press any key to continue" (exe 0x4d8a2c) — and three
  * ways out, each of which also announces itself: the timeout at 0x49134d,
- * any digital input at 0x491314, and the pause button at 0x491329. The
- * timeout is `[+0x484]`, set to 0x3E6 in the block of them at 0x48f1f9,
- * and its neighbours (0x7CE, 0x1F2, 0x1192) read as milliseconds two short
- * of a round number — so 998 ms, near enough one second.
+ * any digital input at 0x491314, and the pause button at 0x491329.
+ *
+ * The timeout is `[+0x484]` = 0x3E6 = 998, and the unit is HUNDREDTHS of a
+ * second: the same block sets the turn clock's own field to 4498, and the
+ * per-level turn length is fed into it as seconds × 100 (0x4309f8), so 4498
+ * is the 45 that table holds. Ten seconds, then — a "press any key" prompt
+ * with the camera flying to the next pig behind it, not a wait anybody
+ * sits through.
  *
  * The clock does not run during it and the pig cannot be driven; the first
  * input both ends the wait and is acted on, which is the remake's own
  * reading of "press any key" (the exe's mode machine is not decoded that
  * far, and swallowing the press would only annoy).
  */
-export const TURN_START_SECONDS = 0.998
+export const TURN_START_SECONDS = 9.98
 
 export class Game {
   readonly players: Player[]

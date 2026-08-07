@@ -8,6 +8,7 @@ import { TerrainQuery } from '../../../lib/game/terrain'
 import { buildWaterMask } from '../../../lib/game/watermask'
 import { battleSides } from '../../../lib/game/spawns'
 import { nations } from '../../../lib/game/teams'
+import { turnSecondsFor } from '../../../lib/game/turns'
 import type { Team } from '../../../lib/game/teams'
 import { artFor } from '../three/soldiers'
 import { existsForPlayers } from '../../../lib/formats/pog'
@@ -228,7 +229,10 @@ export function initBattle(onLeave: () => void): BattleView {
 
     game = new Game({
       players: squads.map((squad) => ({ name: squad.name, pigNames: squad.pigNames })),
-      spawns: squads.flatMap((squad) => squad.spawns)
+      spawns: squads.flatMap((squad) => squad.spawns),
+      // A turn's length is the LEVEL's, not a constant — 99 seconds on the
+      // training ground (lib/game/turns.ts).
+      turnSeconds: turnSecondsFor(name)
     })
 
     scene?.dispose()
