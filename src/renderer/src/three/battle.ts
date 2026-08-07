@@ -62,6 +62,10 @@ import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../../../lib/game/zoom'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createShots } from './shots'
+import { createGrenades } from './grenades'
+import { isLobbed } from '../../../lib/game/grenade'
+import { beginGauge, chargeGauge, gaugeFraction } from '../../../lib/game/gauge'
+import type { Gauge } from '../../../lib/game/gauge'
 import { createPigVoice } from '../audio/pigVoice'
 import type { FloatingNumber } from './damageNumbers'
 import { exposeBattleDebug } from './debug'
@@ -131,10 +135,13 @@ export interface BattleScene {
   setIntent(walk: number, turn: number): void
   /** Ask the acting pig to jump (ignored mid-air, swimming or sliding). */
   jump(): void
-  /** Ask it to use what it is holding. Only the five hand-to-hand skills
-   * answer so far — a bayonet swings, a rifle does nothing
-   * (lib/game/melee.ts). */
-  fire(): void
+  /** Whether the fire button is DOWN. Held, because the power gauge is what
+   * being held means: a weapon with one charges while it is and throws when
+   * it is not (lib/game/gauge.ts). Everything else goes off on the edge. */
+  setFiring(held: boolean): void
+  /** How full the power gauge is, 0..1 — or null when nothing is charging,
+   * which is what the dashboard hides it on. */
+  charging(): number | null
   /** Point the weapon in hand: -1 down, 0 nothing held, +1 up. */
   setAim(direction: number): void
   /** Whether the aim view is being HELD. The original keeps camera mode 0x0E
@@ -354,6 +361,13 @@ export function buildBattle(
   let jumpRequested = false
   /** Whether the fire key went down since the last frame. */
   let fireRequested = false
+  /** The fire button, last frame — the scene wants both edges of it. */
+  let fireHeld = false
+  /** The power gauge, while one is filling (lib/game/gauge.ts). */
+  let gauge: Gauge | null = null
+  /** What the gauge read when the button came up — the fuse carries it to the
+   * throw, the way `Pig::Fire` parks it at `[pig+0x300]` (0x469371). */
+  let thrownWith = 0
   /** Which way the aim keys are pushing: -1 down, 0 nothing, +1 up. */
   let aimIntent = 0
   /** Whether the aim view is held down. */
@@ -464,6 +478,20 @@ export function buildBattle(
     numbers,
     onBroken
   })
+  /** …and what a GRENADE does, which is a parabola rather than a line
+   * (three/grenades.ts). Same dummy list, same reason. */
+  const grenades = createGrenades({
+    squad,
+    root,
+    training,
+    query,
+    obstacles,
+    targets,
+    present: (id) => !script.absent(id),
+    numbers,
+    effects,
+    onBroken
+  })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
    * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig
    * reaches for the rifle and then has it. */
@@ -538,7 +566,7 @@ export function buildBattle(
     // own tail hands the camera the projectile and asks for mode 1
     // (0x47ad99). Only the acting pig's shot does this, and only while there
     // is something left to watch.
-    const bullet = firing?.phase === 'flight' ? shots.head() : null
+    const bullet = firing?.phase === 'flight' ? (shots.head() ?? grenades.head()) : null
     if (bullet && soldier === squad.of(game.currentPig)) {
       chase.ride(bullet, Math.atan2(bullet.vx, bullet.vz), delta)
       soldier.node.visible = true
@@ -587,6 +615,10 @@ export function buildBattle(
     aim = createAim(pig.holding)
     readying = 0
     firing = null
+    // A charge belongs to the pig that started it: a turn handed over mid-hold
+    // must not throw for whoever comes next.
+    gauge = null
+    thrownWith = 0
     aftermath = null
     pending = null
     sightingRefused = false
@@ -634,7 +666,11 @@ export function buildBattle(
     // goes down, through the swing or the flight, and on through the beat
     // that shows what it did. Play's rule, and the exe's own gate agrees —
     // `Pig::MayAct` is false for all of it.
-    const blowInProgress = firing !== null || aftermath !== null || swings.running()
+    const blowInProgress =
+      firing !== null ||
+      aftermath !== null ||
+      swings.running() ||
+      grenades.live() > 0
     if (!blowInProgress && (game.tick(delta) || isDead(game.currentPig))) {
       game.endTurn()
       jumpRequested = false
@@ -693,6 +729,8 @@ export function buildBattle(
       // watched.
       effects.update(delta)
       shots.update(delta)
+    grenades.update(delta)
+      grenades.update(delta)
       airDrops.update(delta)
       numbers.update(delta)
       // …AND THE BLOW ITSELF. The wait used to freeze the pig and put IDLE on
@@ -703,7 +741,7 @@ export function buildBattle(
       // was doing INSIDE the wait — that is what the wait is for.
       swings.update(delta, active)
       // The shot that caused all this ends here rather than a frame late.
-      if (firing?.phase === 'flight' && shots.live() === 0) firing = null
+      if (firing?.phase === 'flight' && shots.live() === 0 && grenades.live() === 0) firing = null
       // ONE THING AT A TIME. The script's next step waits for the thing that
       // triggered it to finish — play's rule for the whole game, "ждёшь конца
       // одной анимации и включаешь другую". Three separate things have to be
@@ -728,6 +766,7 @@ export function buildBattle(
         active.animating() ||
         effects.busy() ||
         shots.live() > 0 ||
+        grenades.live() > 0 ||
         numbers.live() > 0 ||
         airDrops.falling() > 0
       if (advanceAftermath(aftermath, delta, settling)) {
@@ -750,7 +789,12 @@ export function buildBattle(
     }
 
     if (fireRequested) {
-      if (isGun(holding)) {
+      if (isLobbed(holding)) {
+        // A weapon with a gauge does not go off on the press at all. The
+        // press starts it CHARGING and the throw comes on the release, or on
+        // its own if it tops out first (0x493796, lib/game/gauge.ts).
+        if (!gauge && !firing) gauge = beginGauge()
+      } else if (isGun(holding)) {
         // A gun is a SEQUENCE, and a press while one is running is refused —
         // `Pig::MayAct` is false from `Pig::Fire` until `Pig::Attack`
         // (lib/game/shot.ts). That refusal is the whole of why a rifle is not
@@ -828,6 +872,22 @@ export function buildBattle(
     // bayonet — which the block below then picks up.
     swings.update(delta, active)
 
+    // The gauge fills while the button is down. Both ways out of it end in
+    // the SAME ten-frame fuse a gun's press starts — `Pig::Fire` writes
+    // `[pig+0x231] = 0x0A` whatever is in hand — so the release does not
+    // throw, it arms (lib/game/shot.ts).
+    if (gauge) {
+      const topped = chargeGauge(gauge, delta / FRAME_SECONDS)
+      if (topped || !fireHeld) {
+        thrownWith = gauge.power
+        gauge = null
+        firing = beginFiring()
+        sighting = false
+        sightingRefused = true
+        voice.fire(game.players.indexOf(game.currentPlayer))
+      }
+    }
+
     // The shot, after the pig has been placed for the same reason a swing is:
     // the muzzle comes off the HAND bone (three/shots.ts). Ten frames between
     // the press and the bullet, and the frame the fuse runs out is the frame
@@ -835,7 +895,10 @@ export function buildBattle(
     if (firing && advanceFiring(firing, delta)) {
       // Where the sights were actually pointing — the drift is part of the
       // aim, not a decoration over it.
-      if (!shots.fire(active, aimedAngle())) firing = null
+      const away = isLobbed(holding)
+        ? grenades.throwOne(active, aimedAngle(), thrownWith)
+        : shots.fire(active, aimedAngle())
+      if (!away) firing = null
       else {
         // `Pig::Attack` puts the weapon's own attack clip on at the same
         // moment (0x46971a), the way a swing's does — the record's fourth
@@ -846,7 +909,7 @@ export function buildBattle(
     }
     // …and the sequence is over when there is nothing left in the air. The
     // camera comes back off the bullet and the turn clock starts again.
-    if (firing?.phase === 'flight' && shots.live() === 0) firing = null
+    if (firing?.phase === 'flight' && shots.live() === 0 && grenades.live() === 0) firing = null
 
     // The weapon in hand, and where it points. Choosing one out of the menu
     // is what starts it: the exe plays the getting-it-out clip and only puts
@@ -978,6 +1041,8 @@ export function buildBattle(
     smoke: () => effects.smoke(),
     script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
     shots: () => shots.live(),
+    grenades: () => grenades.live(),
+    charging: () => (gauge ? gaugeFraction(gauge) : null),
     firing: () => firing?.phase ?? null,
     barks: () => voice.spoken(),
     aftermath: () => aftermath !== null,
@@ -1005,9 +1070,13 @@ export function buildBattle(
     jump() {
       jumpRequested = true
     },
-    fire() {
-      fireRequested = true
+    setFiring(held) {
+      // The PRESS is what a gun and a blade answer to; the gauge wants the
+      // whole hold, and the frame it ends.
+      if (held && !fireHeld) fireRequested = true
+      fireHeld = held
     },
+    charging: () => (gauge ? gaugeFraction(gauge) : null),
     setAim(direction) {
       aimIntent = direction
     },
@@ -1030,6 +1099,7 @@ export function buildBattle(
       marker.dispose()
       effects.dispose()
       shots.dispose()
+      grenades.dispose()
       voice.dispose()
       airDrops.dispose()
       weapons.dispose()

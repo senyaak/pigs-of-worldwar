@@ -141,6 +141,11 @@ export interface DebugHooks {
   script(): { absent: number[]; falling: number }
   /** How many bullets are in flight (three/shots.ts). */
   shots(): number
+  /** How many grenades are in the air or lying about (three/grenades.ts). */
+  grenades(): number
+  /** How full the power gauge is, 0..1, or null when nothing is charging
+   * (lib/game/gauge.ts). */
+  charging(): number | null
   /** Where the shot sequence has got to — 'fuse', 'flight', or null when the
    * pig is its own again (lib/game/shot.ts). */
   firing(): string | null
@@ -220,6 +225,10 @@ declare global {
        * sends the tutorial's own line 227. The tutorial script will drive
        * the same bar when it lands. */
       say?(text?: string): void
+      /** Console command: put a skill in the acting pig's hands —
+       * `pow.give(19)` for a grenade. The remake's own: no crate on the
+       * training ground carries one, so nothing else can reach it. */
+      give?(skill?: number, amount?: number): boolean
       /** Which map the battle is on. */
       map?(): string
     }

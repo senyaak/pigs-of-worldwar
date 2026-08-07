@@ -57,8 +57,21 @@ while held; the brass dial top right turns with the angle and its slot shows
 what is in hand. A rifle comes up level and a grenade already lobbing at 45°,
 which is the weapon's own record talking.
 
-`F` uses it, and so far five skills answer: the ones the original resolves by
-CONTACT rather than by a projectile — the trotters, the knife, the **bayonet**,
+`F` uses it — and it is HELD now, because that is what the original's power
+gauge is. A weapon whose record asks for one charges while the button is down
+and throws when it comes up, or by itself if it fills first; everything else
+goes off on the press. The gauge shows along the bottom of the dashboard while
+it fills.
+
+A **grenade** is what that gauge is for. It leaves the hand on a parabola —
+the engine's own plain gravity, ten units a frame squared — arcs, bounces off
+the ground on the same per-surface friction a pig lands with, and goes off
+where it stops. No crate on the training ground carries one, so reach it from
+the console: `pow.give(19)`, then `R` to take it in hand. Its fuse and blast
+radius are the remake's guesses and want correcting by eye.
+
+Five skills still answer the old way — the ones the original resolves by
+CONTACT rather than by a projectile: the trotters, the knife, the **bayonet**,
 the sword and the cattle prod. The pig winds up for ten frames, swings the
 whole-body clip its record names, and the blade is live for four frames of it,
 sampled along its own length off the hand bone. Ten health off a pig it
@@ -71,10 +84,9 @@ the game's own letters — the original does that too, and in points. Walking
 is refused for the length of it, as the original refuses it, and the camera
 swings round to the pig's side and closes in — the original has a camera mode
 for exactly this and uses it for nothing else. The aim angle plays no part:
-the strike comes off the hand, and the original's does the same. Guns and
-grenades
-still do nothing — the power gauge and the projectile are the next piece.
-CAMP fields one pig, so try it on a map with two sides:
+the strike comes off the hand, and the original's does the same.
+
+CAMP fields one pig, so try any of it on a map with two sides:
 `pow.swapMap('LIBERATE')`.
 
 Every one of these is a named action in
@@ -140,6 +152,7 @@ with the original's own health behind it. A pig has its class's points, a
 fallen one stays down and is stepped over by the turn order, and nothing can
 die on the training ground because the original will not let it.
 
-Next up: the weapons that fire — the power gauge and the projectile — and the
-training ground's dummies, which are a real target in the original and wait
-on the map script that says which one is live.
+Guns fire, and grenades arc: the power gauge is the original's own, the throw
+speed comes off it the way the exe scales it, and the parabola is the engine's
+plain gravity. What a grenade's fuse and blast really are is not read yet, and
+those two numbers are the remake's.

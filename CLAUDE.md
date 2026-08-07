@@ -962,6 +962,51 @@ noise a chase at `EASE` settles to `sqrt(EASE / (2 − EASE))` of the sample,
 so 0.65 shows about seven tenths of whatever `AMPLITUDE` says. Turn the
 amplitude up rather than the ease down, or it goes back to floating.
 
+### GRENADES: the gauge is decoded, the fuse is not, 2026-08-07
+
+**The POWER GAUGE is built and it is the exe's throughout** (`lib/game/gauge.ts`).
+A weapon's record byte `+0x14` says whether it has one — already read into
+`Weapon.power` — and the fire button splits on it at 0x493796: with a gauge a
+fresh press charges `[game+0x4e4]` by **0x50 a frame to 0xfff** and the throw
+comes on the RELEASE or when it tops out; without one the press writes 1 and
+fires now. The charge rides to `[pig+0x300]`, into the projectile constructor,
+and becomes the flight speed as `row.speed * charge >> 12`. Fifty-two frames
+to fill, which is three and a half seconds.
+
+**So FIRE is a HELD action now** (`input/actions.ts`), and the scene is told
+both edges through `setFiring`. A gun and a blade still go off on the rising
+one; only a gauge weapon cares about the rest of the hold. A spec that only
+`press`ed fire and never released it was passing by accident and is fixed —
+a held action's press is idempotent, so the second one did nothing.
+
+**The ARC is the engine's own number.** `0x4aa0d0` turned out not to be
+"expire" at all — this repo had it recorded that way — but the physics world's
+attach-a-force call: type 0x1357, the pig, gets the terminal-velocity force
+and **everything else gets plain gravity, ten a frame squared**, with the
+integrator's linear drag skipped for the projectile type outright. So
+`PLAIN_GRAVITY` in `ballistics.ts` is read, not chosen, and a grenade is a
+clean parabola. The same reading says a BULLET does not vanish at the end of
+its range — it starts falling.
+
+**What is invented says so at the constant**: `FUSE_SECONDS`, `BLAST_RADIUS`
+and the linear falloff in `lib/game/grenade.ts`. The projectile's state machine
+(0x436938, seven arms on `[proj+0xB4]` with a per-state timer against row
++0x14) is written down as far as it was followed and the fuse is not in it yet.
+Row +0x18 is read as the blast DAMAGE on its distribution — zero for all
+thirteen guns, a ladder from 25 to 750 for everything that goes off — while
+`fire.md` also has it compared against a counter, so one arm uses it each way.
+
+**The gauge's art is placed by eye and wants correcting in the console.**
+`newpow3..7` are five 64×64 tiles laid left to right, which is measured rather
+than guessed (5 and 6 are 61% identical and flat outside rows 9..29 — a
+repeating middle), and the strip sits centred along the bottom. `newpow1`,
+`newpow2` and `powg1` ship with them and are deliberately NOT drawn: what they
+are has not been settled. `pow.hud.layout.gauge` is the editor.
+
+**`pow.give(19)` is how a grenade is reached at all.** No crate on the training
+ground carries one — it hands out a bayonet and then a rifle — so the console
+puts one in hand, the same way `pow.swapMap` picks a map. The remake's own.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.
@@ -1061,16 +1106,14 @@ amplitude up rather than the ease down, or it goes back to floating.
 
 ### Threads left mid-pull
 
-**The next job is GRENADES** — play cleared the shot and the aim view on
-2026-08-07 and named them as what comes next. What that opens up is the POWER
-GAUGE, which is the one big thing the firing work deliberately skipped:
-`../pigs-disasm/weapons/fire.md` has it at the top — 23 weapons carry
-`[weapon*80 + 0x4d7300 + 0x14]`, a fresh press charges `[game+0x4e4]` by 0x50
-a frame to 0xfff, and the throw happens on RELEASE or when it tops out
-(0x493812, 0x493b39). The projectile table already has the whole grenade
-family (kinds 24–32, speed 300, damage base 150, life 1000 — they expire on
-their own fuse, not by range), and `lib/game/projectile.ts` deliberately holds
-only the guns.
+**Grenades are built and the next thing they want is PLAY** — the section
+above says which numbers are the remake's. The two to correct first are
+`FUSE_SECONDS` and `BLAST_RADIUS` in `lib/game/grenade.ts`, and after those the
+gauge's own art placement (`pow.hud.layout.gauge`). The thread left mid-pull in
+the binary is the projectile's state machine at 0x436938: seven arms on
+`[proj+0xB4]`, a per-state timer at `[proj+0xA8]` against row +0x14, and a
+second dispatch through row +0x1C. Somewhere in there is the fuse, and with it
+what a grenade does when it stops rolling.
 
 Everything below this line is older, and the shot's own six items are DONE —
 see "The SHOT, end to end".

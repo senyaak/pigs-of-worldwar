@@ -33,7 +33,13 @@ export const HELD_ACTIONS: readonly Action[] = [
   // The aim view is HELD in the original — 0x4928dc tests two button bits of
   // this frame's mask every frame and the frame either goes up, the remembered
   // camera mode comes back (`../../../../pigs-disasm/weapons/fire.md`).
-  'aimMode'
+  'aimMode',
+  // …and so is FIRE, because that is what the power gauge is: a weapon with
+  // one charges while the button is down and throws when it comes up
+  // (0x493796, `lib/game/gauge.ts`). A weapon without one still goes off on
+  // the press, so the scene reads the EDGE for those — held here means the
+  // scene is told both edges rather than only the first.
+  'fire'
 ]
 
 /** Physical keys → actions, in the battle. Several keys may share one. */

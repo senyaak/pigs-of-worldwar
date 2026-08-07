@@ -26,6 +26,7 @@ import { skillName } from '../../../lib/game/skills'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../three/battle'
 import { BATTLE_SOUNDS } from '../audio/battle'
+import { give } from '../../../lib/game/inventory'
 import { byId } from './dom'
 
 // The training ground — the first map the original ever shows a player, and
@@ -213,6 +214,7 @@ export function initBattle(onLeave: () => void): BattleView {
       still: scene.still(),
       strings: battleText,
       aim: scene.aim(),
+      charge: scene.charging(),
       holding: game.currentPig.holding,
       scope: scene.scoped(),
       // The card is up for exactly as long as anyone is still in the air.
@@ -261,6 +263,10 @@ export function initBattle(onLeave: () => void): BattleView {
     scene?.setIntent(sighting ? 0 : walk, turn)
     scene?.setAim(aim)
     scene?.setSighting(sighting)
+    // F is HELD now: a weapon with a power gauge charges while it is down and
+    // throws on the way up. Everything else still goes off on the press, and
+    // the scene is the one that knows which it is holding.
+    scene?.setFiring(controller.isDown('fire'))
   }
   controller.onChange(pushIntent)
   controller.onAction((action) => {
@@ -285,9 +291,6 @@ export function initBattle(onLeave: () => void): BattleView {
       return
     }
     if (action === 'jump') scene?.jump()
-    // F uses what is in hand. Only the five hand-to-hand skills answer so
-    // far: a bayonet swings, a rifle waits for the shot to be built.
-    if (action === 'fire') scene?.fire()
     if (action === 'endTurn') {
       game?.endTurn()
       updateHud()
@@ -439,7 +442,22 @@ export function initBattle(onLeave: () => void): BattleView {
     },
     // The bar has no script driving it yet, so this is how it is watched:
     // any line, or the tutorial's own long one by default.
-    say: (text?: string) => hud.say(text ?? battleText[SAMPLE_LINE] ?? '')
+    say: (text?: string) => hud.say(text ?? battleText[SAMPLE_LINE] ?? ''),
+    // …and the console is how a weapon nobody's crate carries gets tried.
+    // The training ground hands out a bayonet and then a rifle and that is
+    // the whole of it, so a GRENADE cannot be reached by playing at all —
+    // `pow.give(19)` puts one in the acting pig's hands. The remake's own,
+    // like `pow.swapMap`: the original has no such thing.
+    give: (skill?: number, amount = 5) => {
+      if (skill === undefined || !game) {
+        console.log("usage: pow.give(19) — 19 is GRENADE; see pow.hud for the rest")
+        return false
+      }
+      give(game.currentPig.carrying, skill, amount)
+      game.currentPig.holding = skill
+      updateHud()
+      return true
+    }
   }
 
   return {

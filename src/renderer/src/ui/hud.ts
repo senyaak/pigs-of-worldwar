@@ -95,6 +95,32 @@ export const LAYOUT = {
     alpha: 0.5
   },
   /**
+   * The POWER GAUGE, and it only shows while something is charging — which
+   * is what the original does with it too, the weapon's own record saying
+   * whether it has one at all (lib/game/gauge.ts).
+   *
+   * The art is `newpow3` through `newpow7`, five 64x64 tiles laid LEFT TO
+   * RIGHT. That assembly is measured rather than guessed: 5 and 6 are 61%
+   * identical to each other and flat outside rows 9..29, which is a repeating
+   * middle, while 3, 4 and 7 carry detail — so the brass runs across a
+   * 320-wide strip in a trough 20 tall. `newpow1`/`newpow2` (64x20 each) and
+   * `powg1` (24x36) ship with them and are NOT drawn: what they are has not
+   * been settled, and a guess in the middle of the screen is worse than a
+   * gap.
+   *
+   * Where the strip SITS is eyework, like everything else on this object —
+   * nudge it in the console against the real screen. So is `fill`: the trough
+   * is brass and the original's charge colour has not been read.
+   */
+  gauge: {
+    width: 320,
+    height: 64,
+    margin: { bottom: 12 },
+    /** The trough inside the strip, measured off `newpow5`'s own rows. */
+    trough: { x: 10, y: 9, width: 300, height: 21 },
+    fill: [232, 176, 32] as [number, number, number]
+  },
+  /**
    * The scope the aim view looks through. Both numbers are EYEWORK, like the
    * rest of this object — nudge them in the console against the real screen
    * and `pow.hud.print()` the result back out.
@@ -169,6 +195,9 @@ export interface HudState {
   /** The skill the acting pig has in hand, whose icon fills the slot beside
    * the dial. Null leaves the slot empty. */
   holding: number | null
+  /** How full the power gauge is, 0..1, or null when nothing is charging —
+   * which is when the gauge is not drawn at all (lib/game/gauge.ts). */
+  charge: number | null
   /** The level's opening card — "TRAINING MISSION: BOOT CAMP" — while the
    * squad is still in the air, and null once it is down (ui/titleCard.ts). */
   title: string | null
@@ -313,7 +342,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       // A console change to either painted colour lands on the next frame.
       void repaint()
 
-      const { clock: CLOCK, dial: DIAL, plate: PLATE, scope: SCOPE } = LAYOUT
+      const { clock: CLOCK, dial: DIAL, gauge: GAUGE, plate: PLATE, scope: SCOPE } = LAYOUT
 
       // THE SCOPE, under everything else on the dashboard — the clock and the
       // dial sit on top of it, as they do in the original.
@@ -387,6 +416,29 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       const shown = Math.min(99, Math.max(0, Math.ceil(state.seconds)))
       blit(digits[Math.floor(shown / 10)], clockX + CLOCK.digits.x, clockY + CLOCK.digits.y)
       blit(digits[shown % 10], clockX + CLOCK.digits.x + CLOCK.digits.step, clockY + CLOCK.digits.y)
+
+      // The POWER GAUGE, centred along the bottom, and only while the button
+      // is down: the original shows it for the weapons whose record asks for
+      // one and hides it the rest of the time.
+      if (state.charge !== null) {
+        const gaugeX = Math.round((viewWidth - GAUGE.width) / 2)
+        const gaugeY = AUTHORED_HEIGHT - GAUGE.height - GAUGE.margin.bottom
+        const trough = GAUGE.trough
+        // The charge under the brass, so the trough's own rim frames it.
+        context.save()
+        context.scale(scale, scale)
+        context.fillStyle = `rgb(${GAUGE.fill.join(',')})`
+        context.fillRect(
+          gaugeX + trough.x,
+          gaugeY + trough.y,
+          Math.round(trough.width * Math.min(1, Math.max(0, state.charge))),
+          trough.height
+        )
+        context.restore()
+        for (let tile = 0; tile < 5; tile++) {
+          blit(art.get(`newpow${tile + 3}`), gaugeX + tile * 64, gaugeY)
+        }
+      }
 
       // The dial and the weapon slot, top right. The slot stays empty until
       // there is a weapon to put in it.

@@ -1,0 +1,228 @@
+// Grenades on the map.
+//
+// The rules are pure and next door (`lib/game/grenade.ts`); what this file
+// adds is the two things the domain cannot know — where the HAND is, and
+// where the ground is. A grenade leaves bone 5 like a bullet and a blade do,
+// and then it is on its own parabola until the terrain or a box stops it.
+//
+// The BLAST is the part with the least binary behind it and it says so at
+// every constant it uses. What is decoded is the row's damage figure and the
+// fact that the thing arcs at all; the radius, the falloff and the fuse are
+// the remake's.
+//
+// Everything here is game space (Y-down), under the battle's converted root.
+
+import * as THREE from 'three'
+import {
+  BLAST_RADIUS,
+  advanceLob,
+  blastShare,
+  bounceLob,
+  lob,
+  lobOf
+} from '../../../lib/game/grenade'
+import type { Lobbed } from '../../../lib/game/grenade'
+import { MODEL_SCALE } from '../../../lib/game/scale'
+import { hurt, isDead } from '../../../lib/game/health'
+import { ANIM } from '../../../lib/game/locomotion'
+import type { Target } from '../../../lib/game/targets'
+import type { Obstruction } from '../../../lib/game/obstacles'
+import type { TerrainQuery } from '../../../lib/game/terrain'
+import type { DamageNumbers } from './damageNumbers'
+import type { Effects } from './effects'
+import type { Soldier, Squad } from './squad'
+
+/** The bone a thrown thing leaves, as everything else does. */
+const HAND = 5
+
+/**
+ * Where it leaves the hand.
+ *
+ * The shot's own byte map (0x47cf68) picks a row of 0x4d0ee0 per weapon and
+ * the grenade family's rows have NOT been pulled out of it — that table is
+ * read for weapons 6..0x26 and the grenades are 19..27, so they are in range
+ * and simply not transcribed yet. The bone itself stands in meanwhile, which
+ * puts the throw at the trotter rather than a hand's length in front of it.
+ */
+const THROW_FROM = { x: 0, y: 0, z: 0 }
+
+/** How big one is drawn, model units. The body factory sizes a projectile off
+ * its kind and every grenade kind lands on the same `0x20 + 3` a rifle round
+ * gets (0x4a8ed5), so a grenade is drawn exactly as big as a bullet — which
+ * is small. Doubled here and flagged: it is a thing you are meant to watch
+ * arc, and a 35-unit ball at half model scale is four pixels. */
+const GRENADE_SIZE = 70
+
+export interface Grenades {
+  /** Throw one from this pig at `aim`, with the gauge's `charge` behind it.
+   * False if what it holds is not lobbed. */
+  throwOne(soldier: Soldier, aim: number, charge: number): boolean
+  /** One frame of every grenade in the air or rolling. */
+  update(delta: number): void
+  /** How many are live. */
+  live(): number
+  /** Where the newest one is, for the camera to ride — null when none is up. */
+  head(): Lobbed | null
+  clear(): void
+  dispose(): void
+}
+
+export interface GrenadeParts {
+  squad: Squad
+  root: THREE.Object3D
+  training: boolean
+  query: TerrainQuery
+  obstacles: Obstruction
+  targets: Target[]
+  /** Whether the map SCRIPT has placed this dummy yet (lib/game/script.ts). */
+  present: (id: number) => boolean
+  onBroken: (target: Target) => void
+  numbers: DamageNumbers
+  /** What the blast is drawn with — the engine's own break burst, which is
+   * the nearest thing decoded to an explosion (three/effects.ts). */
+  effects: Effects
+}
+
+const GRENADE_GEOMETRY = new THREE.SphereGeometry(1, 8, 6)
+
+export function createGrenades(parts: GrenadeParts): Grenades {
+  const live: Lobbed[] = []
+  const meshes: THREE.Mesh[] = []
+  const material = new THREE.MeshBasicMaterial({ color: 0x3f4a2a, fog: false })
+  const at = new THREE.Vector3()
+  /** The same array a swing and a shot splice from — one list of dummies for
+   * the whole battle, or a dummy dies twice (three/shots.ts says why). */
+  const standing: Target[] = parts.targets
+
+  const meshAt = (i: number): THREE.Mesh => {
+    while (meshes.length <= i) {
+      const mesh = new THREE.Mesh(GRENADE_GEOMETRY, material)
+      mesh.renderOrder = 1
+      parts.root.add(mesh)
+      meshes.push(mesh)
+    }
+    return meshes[i]
+  }
+
+  /** Everything within reach takes its share. */
+  const detonate = (shot: Lobbed): void => {
+    const row = lobOf(shot.skill)
+    const full = row?.damage ?? 0
+    parts.effects.broke({ x: shot.x, y: shot.y, z: shot.z })
+    for (const soldier of parts.squad.members) {
+      if (isDead(soldier.pig)) continue
+      const body = {
+        x: soldier.pig.position.x,
+        y: soldier.node.position.y,
+        z: soldier.pig.position.z
+      }
+      const share = blastShare(Math.hypot(body.x - shot.x, body.y - shot.y, body.z - shot.z))
+      if (share === 0) continue
+      const amount = Math.round(full * share)
+      if (amount <= 0) continue
+      const outcome = hurt(soldier.pig, amount, parts.training)
+      parts.numbers.show(body, amount)
+      if (outcome === 'died' || outcome === 'gibbed') soldier.playOnce(ANIM.DYING)
+    }
+    for (let i = standing.length - 1; i >= 0; i--) {
+      const dummy = standing[i]
+      if (!parts.present(dummy.id)) continue
+      const share = blastShare(
+        Math.hypot(dummy.x - shot.x, dummy.y - shot.y, dummy.z - shot.z)
+      )
+      if (share === 0) continue
+      const amount = Math.round(full * share)
+      if (amount <= 0) continue
+      hurt(dummy, amount, false)
+      parts.numbers.show(dummy, amount)
+      if (isDead(dummy)) {
+        standing.splice(i, 1)
+        parts.onBroken(dummy)
+      }
+    }
+  }
+
+  /** Put it back on whatever it went into. False when it met nothing. */
+  const settle = (shot: Lobbed, wasY: number): boolean => {
+    const ground = parts.query.height(shot.x, shot.z)
+    if (shot.y >= ground) {
+      bounceLob(
+        shot,
+        ground,
+        parts.query.normal(shot.x, shot.z),
+        parts.query.tileType(shot.x, shot.z),
+        !parts.query.walkable(shot.x, shot.z)
+      )
+      return true
+    }
+    // A box is a flat stop rather than a surface: the map's obstacles carry no
+    // normal, so a grenade that goes into one is put back where it came from
+    // and bounced off the vertical. Crude, and the same crudeness a bullet's
+    // `solid` test has.
+    if (parts.obstacles.solid(shot.x, shot.y, shot.z)) {
+      bounceLob(shot, wasY, { x: 0, y: -1, z: 0 }, 0, true)
+      return true
+    }
+    return false
+  }
+
+  const redraw = (): void => {
+    let i = 0
+    for (const shot of live) {
+      const mesh = meshAt(i++)
+      mesh.visible = true
+      mesh.position.set(shot.x, shot.y, shot.z)
+      mesh.scale.setScalar(GRENADE_SIZE * MODEL_SCALE)
+    }
+    for (let rest = i; rest < meshes.length; rest++) meshes[rest].visible = false
+  }
+
+  return {
+    throwOne(soldier, aim, charge) {
+      const skill = soldier.pig.holding
+      if (skill === null || !lobOf(skill)) return false
+      const bone = soldier.mesh.bones[HAND] ?? soldier.mesh.bones[0]
+      // The mixer wrote this frame's rotations and three would not fold them
+      // into the world matrices until it drew; the throw leaves first.
+      bone.updateMatrixWorld(true)
+      at.set(THROW_FROM.x, THROW_FROM.y, THROW_FROM.z)
+      bone.localToWorld(at)
+      parts.root.worldToLocal(at)
+      const shot = lob(skill, { x: at.x, y: at.y, z: at.z }, soldier.pig.heading, aim, charge)
+      if (!shot) return false
+      live.push(shot)
+      return true
+    },
+    update(delta) {
+      for (let i = live.length - 1; i >= 0; i--) {
+        const shot = live[i]
+        // Substep so a fast throw cannot pass clean through a hillside: at
+        // full charge a grenade covers 4500 units a second.
+        const speed = Math.hypot(shot.vx, shot.vy, shot.vz)
+        const steps = Math.max(1, Math.ceil((speed * delta) / BLAST_RADIUS))
+        let spent = false
+        for (let step = 0; step < steps && !spent; step++) {
+          const wasY = shot.y
+          spent = advanceLob(shot, delta / steps)
+          settle(shot, wasY)
+        }
+        if (!spent) continue
+        detonate(shot)
+        live.splice(i, 1)
+      }
+      redraw()
+    },
+    live: () => live.length,
+    head: () => live[0] ?? null,
+    clear() {
+      live.length = 0
+      redraw()
+    },
+    dispose() {
+      for (const mesh of meshes) parts.root.remove(mesh)
+      meshes.length = 0
+      live.length = 0
+      material.dispose()
+    }
+  }
+}

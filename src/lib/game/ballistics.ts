@@ -182,6 +182,27 @@ export function bounceSpeed(impact: number, restitution: number): number {
 export const fromExeSpeed = (perFrame: number): number => perFrame / FRAME_SECONDS
 
 /**
+ * …and an exe ACCELERATION, which is a distance per frame SQUARED. The
+ * integrator adds `F/m` to the velocity once a frame and the velocity to the
+ * position once a frame, so both scales come off the same clock.
+ */
+export const fromExeAccel = (perFrameSquared: number): number =>
+  perFrameSquared / FRAME_SECONDS / FRAME_SECONDS
+
+/**
+ * PLAIN GRAVITY, and it is what everything that is not a pig gets.
+ *
+ * The world owns three force generators (`../../../pigs-disasm/movement/notes.md`)
+ * and `0x4aa0d0` hands a body the one its TYPE asks for: type 0x1357, the
+ * pig, gets the terminal-velocity force at `[world+0x14]`, and **anything
+ * else gets `[world+0x10]`, a flat magnitude of 10**. A projectile is type
+ * 0x135D, so a grenade falls at ten a frame squared and keeps falling — and
+ * the integrator's linear drag is skipped for that type outright (0x410df3),
+ * so nothing bleeds its throw away either. A clean parabola.
+ */
+export const PLAIN_GRAVITY = fromExeAccel(10)
+
+/**
  * Below this closing speed a landing is a landing, not a bounce.
  *
  * The exe's own, and not where it was first looked for: the impact handler

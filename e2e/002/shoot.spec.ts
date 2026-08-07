@@ -70,11 +70,19 @@ const watchShots = (page: Page): Promise<void> =>
 const peakShots = (page: Page): Promise<number> =>
   page.evaluate(() => (window as unknown as { __fired?: number }).__fired ?? 0)
 
+/**
+ * A press AND a release. Fire is a HELD action now — the power gauge is what
+ * being held means (lib/game/gauge.ts) — so a press on its own is idempotent
+ * and a second one would do nothing at all. A gun still goes off on the
+ * rising edge; this just gives it both.
+ */
 const push = (page: Page, action: string): Promise<void> =>
   page.evaluate((a) => {
-    ;(window as unknown as { pow: { controller: { press(x: string): void } } }).pow.controller.press(
-      a
-    )
+    const controller = (
+      window as unknown as { pow: { controller: { press(x: string): void; release(x: string): void } } }
+    ).pow.controller
+    controller.press(a)
+    controller.release(a)
   }, action)
 
 const release = (page: Page, action: string): Promise<void> =>
