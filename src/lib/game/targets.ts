@@ -17,6 +17,7 @@
 import type { MapObject } from '../formats/pog'
 import { caught, strikeGap } from './melee'
 import type { Point } from './melee'
+import { HEIGHT_SCALE } from './terrain'
 
 /** What the training ground's dummies are called in a map's own `.MAD`. */
 export const DUMMY_MODEL = 'DUMMY'
@@ -37,8 +38,17 @@ export interface Target {
   /** The POG record's own id — what identifies its art, so a broken one can
    * be taken off the map and out of the collision world. */
   id: number
-  /** Where it stands, game space. `y` is the record's own elevation, which
-   * is the CENTRE of the model (lib/formats/pog.ts). */
+  /**
+   * Where it stands, in the GAME's own space — the space a pig's node lives
+   * in, and the space the blade's points come back in.
+   *
+   * The record's stored y is an ELEVATION, up-positive, of the model's
+   * CENTRE; game space is Y-DOWN and rides `HEIGHT_SCALE`. Converting it is
+   * not a detail: taking the record's y as it stands puts a dummy some three
+   * thousand units from a blade that has to be within 360 of it, so every
+   * swing missed on the vertical alone while the horizontal was dead on.
+   * `three/props.ts` places the ART by exactly this line.
+   */
   x: number
   y: number
   z: number
@@ -60,7 +70,7 @@ export function targetsOf(objects: MapObject[]): Target[] {
     .map((object) => ({
       id: object.id,
       x: object.x,
-      y: object.y,
+      y: -object.y * HEIGHT_SCALE,
       z: object.z,
       health: DUMMY_HEALTH
     }))

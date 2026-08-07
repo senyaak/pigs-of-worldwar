@@ -390,8 +390,17 @@ walks the whole pig list). `lib/game/parachute.ts` is the descent,
 swing's three blade points and, per pig and per dummy, the nearest approach on
 each axis — `gap.x`/`gap.z` against 170, `gap.y` against 360, `degrees`
 against 67.5. A strike has four separate ways of failing and no way to tell
-them apart by eye, and this exists because "урон не проходит" arrived with no
-way to answer it. Reach for it before touching the geometry.
+them apart by eye. It earned its keep on the first miss it was pointed at:
+`gap.x` 1.3 and `off` 0 with `gap.y` **3136** said in one line that the
+horizontal was perfect and the vertical was in the wrong SPACE — `targetsOf`
+had taken a POG record's stored y, which is an up-positive ELEVATION, as if
+it were a game-space (Y-down, `HEIGHT_SCALE`) coordinate. Two rounds of
+reasoning about bones had got nowhere; the numbers took one.
+
+`e2e/002/strike.spec.ts` is the pin that would have caught it — the whole
+path in one spec, collect the crate, take it in hand through the real menu,
+walk up and swing. The pure specs around it all passed while the feature did
+not work: what was broken lived BETWEEN them.
 
 **Health is POINTS, the maximum is the CLASS's, and it is not 100.** The
 constructor reads it out of a 128-byte record per class at 0x4d02e0 — the
