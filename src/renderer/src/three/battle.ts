@@ -683,16 +683,25 @@ export function buildBattle(
       shots.update(delta)
       airDrops.update(delta)
       numbers.update(delta)
+      // …AND THE BLOW ITSELF. The wait used to freeze the pig and put IDLE on
+      // it on the very frame the blow connected, which cut off the animation
+      // it was gating everything else on: a bayonet strikes on frames 11-14
+      // of a 36-frame clip, so twenty-odd frames of it were thrown away, and
+      // a gun's attack clip had only just started. The pig plays out what it
+      // was doing INSIDE the wait — that is what the wait is for.
+      swings.update(delta, active)
       // The shot that caused all this ends here rather than a frame late.
       if (firing?.phase === 'flight' && shots.live() === 0) firing = null
       // ONE THING AT A TIME. The script's next step waits for the thing that
-      // triggered it to finish coming apart — play's rule for the whole
-      // game, "ждёшь конца одной анимации и включаешь другую".
+      // triggered it to finish — play's rule for the whole game, "ждёшь конца
+      // одной анимации и включаешь другую". Three separate things have to be
+      // over: the pig's own clip (`animating`, a committed one-shot — the
+      // attack clip), the swing that is still holding it, and the break.
       //
       // `busy()`, not `smoke() === 0`: the break effect's burst does not fire
       // until its third frame, so counting puffs said "finished" on the very
       // frame the dummy broke and the crate started down through the smoke.
-      if (pending && !effects.busy()) {
+      if (pending && !swings.running() && !active.animating() && !effects.busy()) {
         advanceScript(pending.id, pending.y)
         pending = null
       }
@@ -703,6 +712,8 @@ export function buildBattle(
       // yet.
       const settling =
         pending !== null ||
+        swings.running() ||
+        active.animating() ||
         effects.busy() ||
         shots.live() > 0 ||
         numbers.live() > 0 ||
@@ -714,7 +725,11 @@ export function buildBattle(
         // Follow the crate down; a spot with nothing coming stays the spot.
         const crate = airDrops.watching()
         if (crate) watchAftermath(aftermath, crate)
-        active.setClip(ANIM.IDLE)
+        // Standing about is only what a pig does once it has finished. The
+        // same two guards the normal path uses (`swinging`, `animating`) —
+        // asking for a clip is what CANCELS a committed one (three/clips.ts),
+        // so this line unconditionally was the interruption.
+        if (!swings.swinging() && !active.animating()) active.setClip(ANIM.IDLE)
         squad.update(delta)
         watch(active, delta)
         onGameChanged()

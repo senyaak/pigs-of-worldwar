@@ -40,6 +40,13 @@ export const SETTLE = SETTLE_FRAMES * FRAME_SECONDS
  * that overruns: the break effect runs about a second, the canopy takes two
  * and a half more from 0xC00 up, and a second of quiet on top makes four and
  * a half. So the hold lets go after three seconds whatever is still going on;
+ *
+ * The ceiling is on the WHOLE hold, and the blow's own animation is inside
+ * it — a bayonet strikes on frame 11 of 36 and has most of a second left to
+ * run, which the crate then starts down after. So the crate gets roughly the
+ * last two seconds and the camera comes off it just before it lands. That is
+ * the trade play asked for: finishing one animation before starting the next
+ * matters more than watching the second one land.
  * a crate that has not landed keeps coming down behind the ordinary camera,
  * which it can, because nothing about a descent needs to be watched.
  */

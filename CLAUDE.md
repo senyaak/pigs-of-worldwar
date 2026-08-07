@@ -879,6 +879,33 @@ displayed value CHASES each sample at `EASE = 0.65` a frame instead of
 snapping to it. Two knobs: `AMPLITUDE` for how far, `EASE` for how hard.
 Nothing else in this file is invented — the shape is the exe's.
 
+### The wait was cutting off the very thing it waited for, 2026-08-07
+
+Play, again: "всё ещё анимация сброса ящика сильно рано прерывает предыдущую
+анимацию." The gate was not the problem — `effects.busy()` is the right test
+for the break. The problem was one line further down: the aftermath block put
+`ANIM.IDLE` on the pig on every frame of the wait, and **asking for a clip
+cancels a committed one** (`three/clips.ts`). A bayonet strikes on frames 11
+to 14 of a 36-frame clip, so the swing was thrown away with most of a second
+still to run, and a gun's attack clip was killed the frame after it started.
+The wait also never called `swings.update`, so nothing was advancing anyway.
+
+So the blow now plays out INSIDE the wait — `swings.update` runs there, the
+IDLE takes the same two guards the normal path uses (`swinging`,
+`animating`), and the script's next step waits on all three of the swing, the
+pig's own clip and the break. Both are in `settling` too, so the fifteen
+quiet frames start after the pig has finished moving.
+
+`AFTERMATH_MAX` stays at three seconds and the blow's animation is inside it,
+which leaves the crate roughly the last two — the camera comes off it just
+before it lands. That is the trade play asked for.
+
+**And the tremor went up**, `AMPLITUDE` 4 → 7 ("дрож чутка слабая"). Worth
+knowing before the next nudge: the easing eats a chunk of it. Against white
+noise a chase at `EASE` settles to `sqrt(EASE / (2 − EASE))` of the sample,
+so 0.65 shows about seven tenths of whatever `AMPLITUDE` says. Turn the
+amplitude up rather than the ease down, or it goes back to floating.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.

@@ -61,9 +61,15 @@
 /**
  * How far the resting stick reads, in 4096ths, after the handler's halving.
  * A byte axis is ±127 and a stick at rest sits in the low single figures;
- * four units is about a third of a degree. EYEWORK.
+ * seven units is a little over half a degree. EYEWORK — play asked for more
+ * than the four this started at.
+ *
+ * Note the easing below EATS some of it: against white noise, a chase at
+ * `EASE` settles to `sqrt(EASE / (2 - EASE))` of the sample, so 0.65 shows
+ * about seven tenths of whatever is set here. Turn this up, not `EASE` down,
+ * or the jitter goes back to being a float.
  */
-const AMPLITUDE = 4
+const AMPLITUDE = 7
 
 /**
  * How much of the way to a fresh sample one engine frame moves.
