@@ -15,32 +15,29 @@
 // bone's offset inside it, which turns a bind-pose position back into a
 // bone-local one.
 //
-// **The MODEL is mirrored across z, and only the model.** Play says the
-// original holds it in the other hand, and the file is the weaker witness
-// here: its bone field is no attachment at all — `WE_TELR` splits 13 vertices
+// **It is CARRIED ACROSS to the other side, not mirrored.** Play says the
+// original holds it in the other hand, and the file is the weaker witness on
+// that: its bone field is no attachment at all — `WE_TELR` splits 13 vertices
 // on bone 7 and 19 on bone 0, most models sit on 0 outright, which is the
 // same "carries something else" the map props' field does (main/assets.ts) —
 // so which arm it names is not evidence. `Chars/PROPOINT.MAD` is where the
 // real attachment points probably live and nothing in the exe has been traced
 // to it.
 //
-// The POSE stays as authored. Mirroring that too was tried and it is what
-// sent the barrel pointing right: the aiming stance already carries the rifle
-// 52° to the pig's LEFT at a level angle, +60° full up and +88° full down, so
-// flipping it aims the weapon the wrong way across the body. Only the mesh
-// moves, and the grip survives it — measured against the posed skeleton, the
-// nearest rifle vertex sits 83 units from the near hand and 110 from the far
-// one, against 76 and 168 unmirrored, on hands 203 apart holding a rifle 581
-// long. Both hands stay on the weapon.
-//
-// Mirroring negates z on the positions AND the normals, and then the mesh is
-// placed by MIRRORING ITS WHOLE TRANSFORM every frame rather than by hanging
-// it off the opposite arm. Hanging it there was tried and it arrives upside
+// Only the POSITION crosses the midline; the orientation is left exactly as
+// the arm holds it. Both stronger operations were tried and both are wrong.
+// Mirroring the POSE swings the barrel to the far side — the aiming stance
+// already carries the rifle 52° to one side at a level angle, +60° full up
+// and +88° full down, and reflecting that aims it across the body the other
+// way. Mirroring the weapon's whole TRANSFORM does the same thing to the
+// weapon alone. And hanging the mesh off the opposite arm bone arrives upside
 // down, because the two arms do not hold a rifle symmetrically: the rotation
-// that would fix it is about 93° — the roll that reads as upside down — and
-// it drifts 31 to 48 degrees across the aim sweep, so no fixed correction
-// exists. Reflecting the transform is exact at every frame instead, and
-// carries no negative scale, since the two flips cancel.
+// that would fix that is about 93°, and it drifts 31 to 48 degrees across the
+// aim sweep, so no fixed correction exists either.
+//
+// So: the mesh rides where its own arm puts it, turned the way its own arm
+// turns it, with the attachment point reflected in z — which is the body's
+// midline, the arm bones splitting along Z rather than X.
 //
 // A weapon whose model the archive does not carry — the rocket, the guided
 // missile, the grenade launcher all ask for entries past its end — simply
@@ -72,19 +69,6 @@ export interface HeldWeapons {
    * the animation has been applied. */
   update(): void
   dispose(): void
-}
-
-/** The body's midline: the skeleton's sides run along Z, not X. */
-const FLIP = new THREE.Matrix4().makeScale(1, 1, -1)
-
-/** Flip a model's geometry across the body's midline, normals included. */
-function mirrorZ(geometry: THREE.BufferGeometry): void {
-  for (const name of ['position', 'normal']) {
-    const attribute = geometry.getAttribute(name)
-    if (!attribute) continue
-    for (let i = 0; i < attribute.count; i++) attribute.setZ(i, -attribute.getZ(i))
-    attribute.needsUpdate = true
-  }
 }
 
 /** Which bone most of a model's corners belong to. */
@@ -125,19 +109,18 @@ export function createHeldWeapons(): HeldWeapons {
     { name: string; mesh: THREE.Mesh; bone: number; shift: THREE.Matrix4 }
   >()
 
-  const build = (model: Model, textures: Texture[]): Art => {
-    const geometry = buildModelGeometry(model, textures)
-    mirrorZ(geometry)
-    return {
-      geometry,
-      materials: buildTextureMaterials(model, textures),
-      bone: mainBone(model)
-    }
-  }
+  const build = (model: Model, textures: Texture[]): Art => ({
+    geometry: buildModelGeometry(model, textures),
+    materials: buildTextureMaterials(model, textures),
+    bone: mainBone(model)
+  })
 
   // Scratch for `update`, which runs every frame for every armed pig.
   const arm = new THREE.Matrix4()
   const inverse = new THREE.Matrix4()
+  const at = new THREE.Vector3()
+  const turn = new THREE.Quaternion()
+  const size = new THREE.Vector3()
 
   /** Bring one pig's hand up to date with what was asked of it. */
   const apply = (pig: PigMesh): void => {
@@ -173,16 +156,16 @@ export function createHeldWeapons(): HeldWeapons {
     mesh.name = name
     // Placed by hand every frame, off the arm it belongs to (`update`).
     mesh.matrixAutoUpdate = false
-    // The bone's bind offset, mirrored — what turns a mirrored bind-pose
-    // position back into a bone-local one.
-    const at = bindOffset(pig.bones, ready.bone)
-    const shift = new THREE.Matrix4().makeTranslation(-at.x, -at.y, at.z)
+    // Minus the bone's bind offset — what turns a bind-pose position back
+    // into a bone-local one.
+    const offset = bindOffset(pig.bones, ready.bone)
+    const shift = new THREE.Matrix4().makeTranslation(-offset.x, -offset.y, -offset.z)
     pig.mesh.add(mesh)
     held.set(pig, { name, mesh, bone: ready.bone, shift })
     carry(pig)
   }
 
-  /** One pig's weapon, put where the mirror image of its arm is now. */
+  /** One pig's weapon, put where its arm has it — on the other side. */
   const carry = (pig: PigMesh): void => {
     const entry = held.get(pig)
     if (!entry) return
@@ -190,9 +173,11 @@ export function createHeldWeapons(): HeldWeapons {
     // The arm has to be current: this runs after the animation wrote it.
     bone.updateWorldMatrix(true, false)
     inverse.copy(pig.mesh.matrixWorld).invert()
-    arm.multiplyMatrices(inverse, bone.matrixWorld)
-    // FLIP · arm · FLIP · shift — the arm's own transform, reflected.
-    entry.mesh.matrix.copy(arm).premultiply(FLIP).multiply(FLIP).multiply(entry.shift)
+    arm.multiplyMatrices(inverse, bone.matrixWorld).multiply(entry.shift)
+    // Everything as the arm holds it, and then across the midline.
+    arm.decompose(at, turn, size)
+    at.z = -at.z
+    entry.mesh.matrix.compose(at, turn, size)
     entry.mesh.matrixWorldNeedsUpdate = true
   }
 
