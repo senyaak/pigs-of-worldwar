@@ -50,10 +50,11 @@ and the pig stands still.
 
 `Space` in that menu takes the skill in hand: the pig reaches for it, comes
 up holding its model out of `Chars/WEAPONS.MAD`, and stands in the weapon's
-own aiming pose. `Q` and `E` point it, ±90° and accelerating while held, and
-the brass dial top right shows where. A rifle comes up level and a grenade
-already lobbing at 45°, which is the weapon's own record talking. Nothing
-fires yet.
+own aiming pose — which is a second animation channel over the walking one,
+so it can carry a rifle at a run. `Q` and `E` point it, ±90° and accelerating
+while held; the brass dial top right turns with the angle and its slot shows
+what is in hand. A rifle comes up level and a grenade already lobbing at 45°,
+which is the weapon's own record talking. Nothing fires yet.
 
 Every one of these is a named action in
 [src/renderer/src/input/controller.ts](src/renderer/src/input/controller.ts);

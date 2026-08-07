@@ -644,9 +644,9 @@ would be a stand-in nobody asked for.
   FITS the window is held for, which reads faster than a line can be read.
 - **The rest of the battle screen, in the order play asks for it**: the MAP
   bottom left (`MAPICONS.MTD`: `map1` plus the pig, heart, pickup and prop
-  markers); and the weapon SLOT beside the dial, which is drawn and stays
-  empty — the needle beside it now turns with the aim angle, but nothing
-  puts the chosen skill's icon in the slot.
+  markers), and the POWER gauge, which nothing has needed yet. The dial is
+  done — the needle turns with the aim angle and the slot beside it carries
+  the chosen skill's icon, out of the skill menu's own art.
 - **The menu has no entrance.** In the original the pieces DRIVE ON — the
   bars slide in rather than being there from the first frame. Deferred on
   purpose, along with the layout itself; whatever settles the coordinates
