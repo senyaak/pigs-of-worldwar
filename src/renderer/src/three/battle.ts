@@ -159,7 +159,9 @@ export function buildBattle(
       return
     }
 
-    // The turn clock runs regardless of what anyone does.
+    // The turn clock runs regardless of what anyone does — except that it
+    // does not start at once: `tick` burns the beat at the top of the turn
+    // first (lib/game/game.ts).
     if (game.tick(delta)) {
       game.endTurn()
       jumpRequested = false
@@ -168,6 +170,19 @@ export function buildBattle(
 
     const active = squad.of(game.currentPig)
     if (!active) return
+
+    // "START OF TURN - press any key to continue": the pig cannot be driven
+    // until the beat is out, and any input ends it — and is then acted on in
+    // this same frame, so nothing a player does is ever swallowed.
+    if (game.starting) {
+      if (intent.walk !== 0 || intent.turn !== 0 || jumpRequested) game.beginTurn()
+      else {
+        active.setClip(ANIM.IDLE)
+        watch(active, delta)
+        onGameChanged()
+        return
+      }
+    }
     for (const soldier of squad.members) if (soldier !== active) soldier.setClip(ANIM.IDLE)
 
     // Position and facing are the game's; everything else the frame needs —

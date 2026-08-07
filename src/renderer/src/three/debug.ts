@@ -52,7 +52,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
         health: game.currentPig.health,
         seconds: Math.max(0, Math.ceil(game.timeLeft)),
         swimming: query.isWater(game.currentPig.position.x, game.currentPig.position.z),
-        still: parts.still()
+        still: parts.still(),
+        starting: game.starting
       }),
       currentNodeY: () => squad.of(game.currentPig)?.node.position.y ?? 0,
       /** The level's opening drop: who is still arriving and how far up they

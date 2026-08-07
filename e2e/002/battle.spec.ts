@@ -9,8 +9,8 @@ import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
-import { debugState, hold, hud, peakNodeY, press, release, swapMap, tap, warp } from '../controller'
-import { startGame } from '../menu'
+import { debugState, hold, hud, landed, peakNodeY, press, release, swapMap, tap, warp } from '../controller'
+import { choose, startGame } from '../menu'
 import { TILE_STEP, TILE_WALL, TILE_WATER, parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
 import { readFileSync } from 'node:fs'
@@ -138,6 +138,35 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
     .poll(() => hud(page))
     .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
 
+
+  expect(app.errors()).toEqual([])
+})
+
+test('a turn waits a beat before it starts, and any input cuts it short', async ({ app }) => {
+  const { page } = app
+  // NOT `startGame`, which lands the drop and then the beat is already
+  // running — this wants to catch it.
+  await choose(page, 'ONE PLAYER')
+  await expect(page.locator('#battle')).toBeVisible()
+  await landed(page)
+
+  // "START OF TURN": the clock is full and not moving.
+  expect((await hud(page)).starting).toBe(true)
+  const before = await debugState(page)
+  await page.waitForTimeout(150)
+  const held = await debugState(page)
+  expect(Math.hypot(held.x - before.x, held.z - before.z), 'nothing drives yet').toBeLessThan(1)
+
+  // A press ends it AND is acted on — nothing a player does is swallowed,
+  // which is the whole risk in putting a pause here.
+  await hold(page, 'walkForward', 400)
+  expect((await hud(page)).starting).toBe(false)
+  const walked = await debugState(page)
+  expect(Math.hypot(walked.x - before.x, walked.z - before.z), 'and it walked').toBeGreaterThan(50)
+
+  // Left alone it runs out on its own: End Turn, then just wait.
+  await tap(page, 'endTurn')
+  await expect.poll(async () => (await hud(page)).starting).toBe(false)
 
   expect(app.errors()).toEqual([])
 })

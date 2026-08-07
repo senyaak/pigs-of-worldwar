@@ -54,12 +54,32 @@ export interface GameConfig {
 
 export const DEFAULT_TURN_SECONDS = 45
 
+/**
+ * The beat at the top of every turn, before the clock starts.
+ *
+ * It is a MODE of its own in the original, with its own debug line —
+ * "START OF TURN - Press any key to continue" (exe 0x4d8a2c) — and three
+ * ways out, each of which also announces itself: the timeout at 0x49134d,
+ * any digital input at 0x491314, and the pause button at 0x491329. The
+ * timeout is `[+0x484]`, set to 0x3E6 in the block of them at 0x48f1f9,
+ * and its neighbours (0x7CE, 0x1F2, 0x1192) read as milliseconds two short
+ * of a round number — so 998 ms, near enough one second.
+ *
+ * The clock does not run during it and the pig cannot be driven; the first
+ * input both ends the wait and is acted on, which is the remake's own
+ * reading of "press any key" (the exe's mode machine is not decoded that
+ * far, and swallowing the press would only annoy).
+ */
+export const TURN_START_SECONDS = 0.998
+
 export class Game {
   readonly players: Player[]
   readonly turnSeconds: number
   private currentPlayerIndex = 0
   private turnNumber = 1
   private timeLeftSeconds: number
+  /** Seconds left of the pause at the top of the turn (TURN_START_SECONDS). */
+  private startingFor = TURN_START_SECONDS
 
   constructor(config: GameConfig) {
     // One is allowed: the training ground fields a single pig, and the turn
@@ -112,11 +132,31 @@ export class Game {
   }
 
   /**
+   * Whether the turn has not begun yet — the beat the original waits out
+   * before it starts counting (TURN_START_SECONDS).
+   */
+  get starting(): boolean {
+    return this.startingFor > 0
+  }
+
+  /** Begin the turn now: what any input does, and what the wait does on its
+   * own once it runs out. */
+  beginTurn(): void {
+    this.startingFor = 0
+  }
+
+  /**
    * Advance the turn clock. Returns true exactly when this tick ran the
    * clock out — the caller ends the turn (and owns whatever ceremony that
    * involves).
    */
   tick(deltaSeconds: number): boolean {
+    // The turn has not started yet: the pause burns down instead of the
+    // clock, and nothing can run out.
+    if (this.startingFor > 0) {
+      this.startingFor = Math.max(0, this.startingFor - deltaSeconds)
+      return false
+    }
     if (this.timeLeftSeconds <= 0) return false
     this.timeLeftSeconds -= deltaSeconds
     return this.timeLeftSeconds <= 0
@@ -147,5 +187,6 @@ export class Game {
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length
     if (this.currentPlayerIndex === 0) this.turnNumber++
     this.timeLeftSeconds = this.turnSeconds
+    this.startingFor = TURN_START_SECONDS
   }
 }

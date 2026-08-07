@@ -118,6 +118,9 @@ export interface DebugHooks {
     seconds: number
     swimming: boolean
     still: number
+    /** Whether the turn has not begun yet — the beat before the clock
+     * starts, which any input ends (lib/game/game.ts). */
+    starting: boolean
   }
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }

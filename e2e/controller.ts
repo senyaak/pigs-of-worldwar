@@ -82,6 +82,8 @@ export interface HudState {
   swimming: boolean
   /** Seconds the acting pig has stood still: what the name plates wait for. */
   still: number
+  /** Whether the turn has not begun yet (lib/game/game.ts). */
+  starting: boolean
 }
 
 /**

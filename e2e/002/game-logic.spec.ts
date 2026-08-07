@@ -4,7 +4,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { DEFAULT_TURN_SECONDS, Game } from '../../src/lib/game/game'
+import { DEFAULT_TURN_SECONDS, Game, TURN_START_SECONDS } from '../../src/lib/game/game'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { readFileSync } from 'node:fs'
@@ -41,8 +41,33 @@ test('turns rotate players; each squad cycles through its pigs', () => {
   expect(game.currentPig.name).toBe('Fritz')
 })
 
+test('the turn does not begin at once — the clock waits out a beat first', () => {
+  const game = new Game({ ...config, turnSeconds: 10 })
+  // "START OF TURN - Press any key to continue": the clock is full and not
+  // running (exe 0x4d8a2c, and the timeout beside it).
+  expect(game.starting).toBe(true)
+  expect(game.tick(TURN_START_SECONDS / 2)).toBe(false)
+  expect(game.starting).toBe(true)
+  expect(game.timeLeft, 'the clock has not moved').toBe(10)
+
+  // It runs out on its own...
+  game.tick(TURN_START_SECONDS)
+  expect(game.starting).toBe(false)
+  game.tick(1)
+  expect(game.timeLeft).toBe(9)
+
+  // ...and every later turn gets its own, which any input can cut short.
+  game.endTurn()
+  expect(game.starting).toBe(true)
+  game.beginTurn()
+  expect(game.starting).toBe(false)
+  game.tick(2)
+  expect(game.timeLeft).toBe(8)
+})
+
 test('the turn clock ticks down, expires exactly once, and refills', () => {
   const game = new Game({ ...config, turnSeconds: 10 })
+  game.beginTurn()
   expect(game.timeLeft).toBe(10)
   expect(game.tick(4)).toBe(false)
   expect(game.timeLeft).toBe(6)
@@ -58,6 +83,7 @@ test('the turn clock ticks down, expires exactly once, and refills', () => {
   expect(game.tick(7)).toBe(true)
   expect(game.tick(1)).toBe(false)
   game.endTurn()
+  game.beginTurn()
   expect(game.timeLeft).toBe(10)
 
   expect(new Game(config).timeLeft).toBe(DEFAULT_TURN_SECONDS)
