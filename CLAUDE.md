@@ -802,11 +802,24 @@ magnification it is unusable. That was "дрож камеры всё ещё фу
 `lib/game/wobble.ts` now returns offsets in model units, across and up from
 wherever the hand has the camera.
 
-Searched for a dedicated scope tremor and there is none: `Pig::Aim`, the
-shot's angle read, the whole of the rifle cam handler, the camera's own
-`[cam+0xB8]` shake (a decaying blast), the view manager's RNG (constructor
-seeding), the zoomed-view input handler, and `0x46a960` (which just returns
-the aim angle). Written up in `../pigs-disasm/weapons/fire.md`.
+**The aim view reads the pad through its OWN arm** — found on the fourth pass
+and it settles the sideways-speed question for good. Holding the aim bit hands
+input to `0x495690`, which dispatches per camera mode, and mode 0x0E's arm
+(0x495b29) has constants of its own: both the turn and the aim accumulate by
+**1 a frame to a cap of 16**, against the ordinary handler's 2-to-0x20 and a
+flat 0x40. So down the sights both axes are half the speed and were already
+identical to each other. The remake had matched them by hand and called that
+its own choice; it is the original's, and `SIGHT_RAMP`/`SIGHT_TOP` in
+`lib/game/aim.ts` now say so.
+
+**There is no dedicated scope tremor, and `fire.md` now lists every place it
+is not** so the search is not run a fifth time: `Pig::Aim`, the shot's angle
+read, both branches of the rifle cam, `Camera::Shake` (0x4a0520 — its single
+caller is a sound routine armed for two explosion ids, and it is skipped
+entirely when `[0x51ABC8]` is set), the engine's terrain-gated random walk,
+the view manager's constructor seeding, `0x44E620` (polar to cartesian off the
+sin/cos tables), `0x46a960` (returns the aim angle), and the camera's own
+yaw/pitch accessors.
 
 ### Known divergences — deliberate, and each written up where it lives
 

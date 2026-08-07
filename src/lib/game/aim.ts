@@ -30,33 +30,47 @@ export const AIM_RAMP = 2
 export const AIM_TOP = 32
 
 /**
- * The same ramp, for anything else that wants to move at the aim's rate.
+ * DOWN THE SIGHTS both axes are slower, and they are the same as each other.
  *
- * The pad handler treats the two axes quite differently: the aim keys build
- * `[game+0x304]` up by 2 a frame to a cap of 0x20 (0x492bf5), while the TURN
- * keys push a flat 0x40 the instant they go down and never accumulate
- * (0x492bb8). So sideways is twice as fast as up-and-down AND instant, which
- * is exactly what a scope feels wrong doing.
+ * The aim view is not driven by the ordinary pad handler at all. Holding it
+ * puts the game in camera mode 0x0E and hands input to `0x495690`, which
+ * dispatches per mode through the byte map at 0x496514 — and mode 0x0E's arm
+ * is **0x495b29**, with numbers of its own:
  *
- * **Matching them is the remake's choice, not the exe's.** Play asked for it:
- * "в стороны надо скорость передвижения камеры уменьшить — чтобы в верх в низ
- * лево право одинаково быстро ездило в прицеле". Only the aim view is
- * changed; a pig turning on its feet still turns at the flat rate it always
- * did.
+ * ```
+ * 495b32  ebp = 0x10                              ; the cap, not 0x20
+ * 495b5a  [game+0x300]++  (the TURN accumulator)  ; by ONE, not two
+ * 495b6d  ...clamped to ebp
+ * 495db8  [game+0x304]++  (the AIM accumulator)   ; the same again
+ * ```
+ *
+ * So in the sights both axes ramp by **1 a frame to a cap of 16** — half the
+ * speed and half the acceleration of aiming while walking about, and
+ * identical to each other, which is what play asked for and the original
+ * already did. An earlier note here had the match down as the remake's own
+ * choice at the ordinary handler's 2 and 0x20; it is neither.
+ *
+ * Both also go through the sniper's zoom scaling in that arm (0x495b9a and
+ * 0x495c50, `lib/game/zoom.ts`).
  *
  * Returns how many angle units this frame is worth, and advances the ramp.
  */
+export const SIGHT_RAMP = 1
+export const SIGHT_TOP = 0x10
+
 export function rampedStep(
   ramp: { rate: number },
   direction: number,
-  deltaSeconds: number
+  deltaSeconds: number,
+  step = SIGHT_RAMP,
+  top = SIGHT_TOP
 ): number {
   if (direction === 0) {
     ramp.rate = 0
     return 0
   }
   const frames = deltaSeconds / FRAME_SECONDS
-  ramp.rate = Math.min(AIM_TOP, (ramp.rate === 0 ? AIM_RAMP : ramp.rate) + AIM_RAMP * frames)
+  ramp.rate = Math.min(top, (ramp.rate === 0 ? step : ramp.rate) + step * frames)
   return direction * ramp.rate * frames
 }
 
@@ -151,11 +165,18 @@ export function updateAim(
   /** What the sniper's magnification does to the step — the scope makes the
    * aim finer the closer it is zoomed (lib/game/zoom.ts). Identity for
    * everything else. */
-  scale: (step: number) => number = (step) => step
+  scale: (step: number) => number = (raw) => raw,
+  /** The ramp to use: the ordinary handler's by default, the aim view's own
+   * `SIGHT_RAMP`/`SIGHT_TOP` when the sights are up. */
+  step = AIM_RAMP,
+  top = AIM_TOP
 ): void {
   // Letting go drops the accumulator, so the next press starts slow again; a
   // fresh press is worth the step itself, not nothing, because the exe writes
   // the step into the accumulator on the frame the key goes down. Both live
   // in `rampedStep`, which the scope's sideways turn borrows.
-  aim.angle = clampAim(skill, aim.angle + scale(rampedStep(aim, direction, deltaSeconds)))
+  aim.angle = clampAim(
+    skill,
+    aim.angle + scale(rampedStep(aim, direction, deltaSeconds, step, top))
+  )
 }

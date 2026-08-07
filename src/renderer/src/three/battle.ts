@@ -26,6 +26,9 @@ import { targetsOf } from '../../../lib/game/targets'
 import type { Target } from '../../../lib/game/targets'
 import {
   AIM_RAMP,
+  AIM_TOP,
+  SIGHT_RAMP,
+  SIGHT_TOP,
   aimPhase,
   aimRadians,
   createAim,
@@ -725,9 +728,12 @@ export function buildBattle(
     // Play asked for them matched, and matching them means running the turn
     // through the aim's own ramp (lib/game/aim.ts).
     const scoping = sighting && isGun(holding) && !firing
+    // The same arm turns the pig, off its own accumulator and the same
+    // 1-to-16 ramp, so the two axes move together without the remake choosing
+    // anything.
     const swung = scoping
       ? zoomsIn(holding)
-        ? zoomedStep(zoom, rampedStep(scopeTurn, turning, delta), AIM_RAMP)
+        ? zoomedStep(zoom, rampedStep(scopeTurn, turning, delta), SIGHT_RAMP)
         : rampedStep(scopeTurn, turning, delta)
       : 0
     if (!scoping) scopeTurn.rate = 0
@@ -806,8 +812,17 @@ export function buildBattle(
     // had drifted to by the end of the ten-frame fuse rather than where they
     // were aimed — play: "будто секунду в сторону движения прицела продолжал
     // двигаться".
-    updateAim(aim, holding, firing ? 0 : weapon.aims ? aimIntent : 0, delta, (step) =>
-      zoomsIn(holding) ? zoomedStep(zoom, step, AIM_RAMP) : step
+    const sighted = sighting && isGun(holding)
+    updateAim(
+      aim,
+      holding,
+      firing ? 0 : weapon.aims ? aimIntent : 0,
+      delta,
+      (step) => (zoomsIn(holding) ? zoomedStep(zoom, step, SIGHT_RAMP) : step),
+      // Down the sights the aim view's own arm drives it, and it is slower
+      // (lib/game/aim.ts).
+      sighted ? SIGHT_RAMP : AIM_RAMP,
+      sighted ? SIGHT_TOP : AIM_TOP
     )
     // The sights drift while they are up and are steady the moment they are
     // not. Both of these count ENGINE frames: the tremor steps once a frame
