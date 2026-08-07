@@ -15,14 +15,18 @@
 // bone's offset inside it, which turns a bind-pose position back into a
 // bone-local one.
 //
-// **Mirrored across Z, because the original holds it in the other hand.**
-// That is play's word against the file's, and the file is the weaker witness
-// here: its bone field is not a reliable attachment — `WE_TELR` splits 13
-// vertices on bone 7 and 19 on bone 0, and most models sit on 0 outright,
-// which is the same "carries something else" the map props' bone field does
-// (main/assets.ts). Mirroring negates z on the positions AND the normals and
-// pairs each bone with its opposite number, so the shape and its lighting
-// both come out right; nothing carries a negative scale.
+// **NOT mirrored, though it was tried.** Play said the original holds the
+// weapon in the other hand, so this flipped the models across z — and that is
+// what made the barrel point right: measured against the skeleton, the aiming
+// pose already carries the rifle 52° to the pig's LEFT at a level angle
+// (+60° full up, +88° full down), and mirroring sent it the other way. The
+// arms and the model agree with each other on the side, so a mirror moves the
+// weapon off the hands that hold it. If the original really shows the other
+// hand, the cause is further up than this file — most likely that a held
+// weapon is not rigid to an arm at all: the bone field is no attachment
+// (`WE_TELR` splits 13 vertices on bone 7 and 19 on bone 0, and most models
+// sit on 0 outright, the same "carries something else" the map props' field
+// does), and `Chars/PROPOINT.MAD` is sitting there unread.
 //
 // A weapon whose model the archive does not carry — the rocket, the guided
 // missile, the grenade launcher all ask for entries past its end — simply
@@ -51,25 +55,6 @@ export interface HeldWeapons {
    */
   show(pig: PigMesh, name: string | null): void
   dispose(): void
-}
-
-/**
- * Each bone paired with its opposite number. The skeleton's sides run along
- * Z — 3..5 and 6..8 the two arms, 9..11 and 12..14 the two legs, near-exact
- * mirrors of each other (bone 4 at z +199 against bone 7 at z −193) — so
- * mirroring a model means both flipping its z and swapping the bone it hangs
- * off. Hip, spine and head are their own opposites.
- */
-const MIRROR_BONE = [0, 1, 2, 6, 7, 8, 3, 4, 5, 12, 13, 14, 9, 10, 11]
-
-/** Flip a model's geometry across the body's midline, normals included. */
-function mirrorZ(geometry: THREE.BufferGeometry): void {
-  for (const name of ['position', 'normal']) {
-    const attribute = geometry.getAttribute(name)
-    if (!attribute) continue
-    for (let i = 0; i < attribute.count; i++) attribute.setZ(i, -attribute.getZ(i))
-    attribute.needsUpdate = true
-  }
 }
 
 /** Which bone most of a model's corners belong to. */
@@ -107,15 +92,11 @@ export function createHeldWeapons(): HeldWeapons {
   const wanted = new Map<PigMesh, string | null>()
   const held = new Map<PigMesh, { name: string; mesh: THREE.Mesh }>()
 
-  const build = (model: Model, textures: Texture[]): Art => {
-    const geometry = buildModelGeometry(model, textures)
-    mirrorZ(geometry)
-    return {
-      geometry,
-      materials: buildTextureMaterials(model, textures),
-      bone: MIRROR_BONE[mainBone(model)] ?? 0
-    }
-  }
+  const build = (model: Model, textures: Texture[]): Art => ({
+    geometry: buildModelGeometry(model, textures),
+    materials: buildTextureMaterials(model, textures),
+    bone: mainBone(model)
+  })
 
   /** Bring one pig's hand up to date with what was asked of it. */
   const apply = (pig: PigMesh): void => {

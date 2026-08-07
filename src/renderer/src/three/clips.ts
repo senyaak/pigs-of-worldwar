@@ -43,21 +43,22 @@ const BONE_COUNT = 15
  * three. Take spine and head without the hip and the counter-turn is bare:
  * the pig stares 39° off.
  */
-const OVERLAY_BONES = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+const OVERLAY_BONES = [1, 2, 3, 4, 5, 6, 7, 8]
 
 /**
- * The weapon channel is MIRRORED, because the weapon it belongs to is: the
- * models are all authored on one side and play says the original holds them
- * on the other, so `three/heldWeapon.ts` flips them across the body's midline
- * — and the stance has to go with the rifle or the pig blades one way while
- * the weapon points the other.
+ * …with the hip's share of it FOLDED INTO THE SPINE instead of written to the
+ * hip, which is the one place this departs from the loop counts above.
  *
- * Mirroring across the Z plane sends each arm to its opposite number and
- * takes a stored triple (x, y, z) to (−x, −y, z): the sides' rotations are
- * `M·R·M` with `M = diag(1, 1, −1)`, which flips the sense of the X and Y
- * turns and leaves Z alone.
+ * The library writes its two halves into two separate pose arrays — the
+ * weapon channel's nine into 0x11cc0b40, the primary's six into 0x11cc0a30 —
+ * and then puts the PRIMARY channel's bone 0 into the second array's own
+ * bone-0 slot (0x1001223f). So the model's root is the primary's, and the
+ * weapon channel's bone 0 is the root of the upper chain alone. Written
+ * straight onto the hip it tilts the pig entire, legs and all, as the aim
+ * sweeps; composed into the spine it leans only the torso and still lets the
+ * head's −0.68 cancel the stance's +0.58 yaw.
  */
-const MIRROR = [0, 1, 2, 6, 7, 8, 3, 4, 5, 12, 13, 14, 9, 10, 11]
+const SPINE = 1
 
 // The MCAP rotation convention, settled by analysis of the shipped data
 // (pigs-disasm/anim/, three independent tests):
@@ -175,6 +176,8 @@ export function createPlayer(pig: Pig): Player {
   // Scratch for the overlay, which runs every frame and allocates nothing.
   const a = new THREE.Quaternion()
   const b = new THREE.Quaternion()
+  const hipOne = new THREE.Quaternion()
+  const hipTwo = new THREE.Quaternion()
   let overlaid: { clip: Clip; phase: number } | null = null
 
   /** Write the overlay's bones. Runs AFTER the mixer, which writes all of
@@ -186,14 +189,21 @@ export function createPlayer(pig: Pig): Player {
     const first = Math.floor(at)
     const second = Math.min(clip.frameCount - 1, first + 1)
     const between = at - first
+    const read = (frame: number, bone: number, out: THREE.Quaternion): THREE.Quaternion => {
+      const at = (frame * BONE_COUNT + bone) * 3
+      decodeRotation(clip.rotations[at], clip.rotations[at + 1], clip.rotations[at + 2], out)
+      return out
+    }
+    read(first, 0, hipOne)
+    read(second, 0, hipTwo)
     for (const bone of OVERLAY_BONES) {
       if (bone >= pig.bones.length) continue
-      // The pose is read off the bone's mirror image and flipped to match.
-      const source = MIRROR[bone]
-      const one = (first * BONE_COUNT + source) * 3
-      const two = (second * BONE_COUNT + source) * 3
-      decodeRotation(-clip.rotations[one], -clip.rotations[one + 1], clip.rotations[one + 2], a)
-      decodeRotation(-clip.rotations[two], -clip.rotations[two + 1], clip.rotations[two + 2], b)
+      read(first, bone, a)
+      read(second, bone, b)
+      if (bone === SPINE) {
+        a.premultiply(hipOne)
+        b.premultiply(hipTwo)
+      }
       pig.bones[bone].quaternion.copy(a).slerp(b, between)
     }
   }
