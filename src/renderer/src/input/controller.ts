@@ -146,6 +146,10 @@ export interface DebugHooks {
   firing(): string | null
   /** Every voice line the pigs have said, in order (audio/pigVoice.ts). */
   barks(): string[]
+  /** Whether the game is holding on what a blow left behind — the clock is
+   * stopped and the camera is on the spot or on the crate coming down
+   * (lib/game/aftermath.ts). */
+  aftermath(): boolean
   /** Every pig's health, in turn order. */
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */

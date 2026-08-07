@@ -32,6 +32,8 @@ interface Debug {
   effects(): number
   smoke(): number
   script(): { absent: number[]; falling: number }
+  aftermath(): boolean
+  hud(): { seconds: number }
   props(): { at: { name: string; x: number; z: number }[] }
 }
 
@@ -70,28 +72,54 @@ const look = (
  * lands. So the page keeps its own high-water mark, once a frame, and the
  * spec reads it afterwards.
  */
+interface Peak {
+  rings: number
+  smoke: number
+  falling: number
+  /** Whether the beat after the kill was ever seen running. */
+  held: boolean
+  /** The turn clock on the first and last frames of that beat. They must be
+   * the same number: the clock does not run through it. */
+  heldFirst: number
+  heldLast: number
+}
+
 const watchEffects = (page: Page): Promise<void> =>
   page.evaluate(() => {
-    const w = window as unknown as {
-      pow: { debug: Debug }
-      __peak?: { rings: number; smoke: number; falling: number }
-    }
-    w.__peak = { rings: 0, smoke: 0, falling: 0 }
+    const w = window as unknown as { pow: { debug: Debug }; __peak?: Peak }
+    w.__peak = { rings: 0, smoke: 0, falling: 0, held: false, heldFirst: 0, heldLast: 0 }
     const tick = (): void => {
       const peak = w.__peak!
       peak.rings = Math.max(peak.rings, w.pow.debug.effects())
       peak.smoke = Math.max(peak.smoke, w.pow.debug.smoke())
       peak.falling = Math.max(peak.falling, w.pow.debug.script().falling)
+      if (w.pow.debug.aftermath()) {
+        const seconds = w.pow.debug.hud().seconds
+        if (!peak.held) peak.heldFirst = seconds
+        peak.heldLast = seconds
+        peak.held = true
+      }
       requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
   })
 
-const peakEffects = (page: Page): Promise<{ rings: number; smoke: number; falling: number }> =>
+const peakEffects = (page: Page): Promise<Peak> =>
   page.evaluate(
     () =>
-      (window as unknown as { __peak?: { rings: number; smoke: number; falling: number } })
-        .__peak ?? { rings: 0, smoke: 0, falling: 0 }
+      (window as unknown as { __peak?: Peak }).__peak ?? {
+        rings: 0,
+        smoke: 0,
+        falling: 0,
+        held: false,
+        heldFirst: 0,
+        heldLast: 0
+      }
+  )
+
+const holding = (page: Page): Promise<boolean> =>
+  page.evaluate(() =>
+    (window as unknown as { pow: { debug: Debug } }).pow.debug.aftermath()
   )
 
 const push = (page: Page, action: string): Promise<void> =>
@@ -155,6 +183,15 @@ test('a bayonet swung at a dummy knocks it down', async ({ app }) => {
   // rifles waits on it. A crate is a pickup, so the placer drops it in from
   // 0xC00 up rather than switching it on (lib/game/script.ts).
   expect(peak.falling, 'the first dummy dropped no crate in').toBeGreaterThan(0)
+
+  // …and the game STOPPED to show it. The exe will not hand the turn on until
+  // nothing is live, and then not for another fifteen quiet frames, with the
+  // camera on whatever was just placed (0x4661a0, lib/game/aftermath.ts).
+  expect(peak.held, 'the kill did not hold the turn at all').toBe(true)
+  // The clock does not run through it — first frame and last read the same.
+  expect(peak.heldLast, 'the turn clock ran while the crate came down').toBe(peak.heldFirst)
+  // …and it lets go once the crate is down.
+  await expect.poll(async () => holding(page), { timeout: 9000 }).toBe(false)
 
   // …and if it did not land, say WHY rather than just failing.
   const after = await look(page)

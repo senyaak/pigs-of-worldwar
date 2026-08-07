@@ -45,6 +45,8 @@ import { createScript } from '../../../lib/game/script'
 import { isGun } from '../../../lib/game/projectile'
 import { advanceFiring, beginFiring } from '../../../lib/game/shot'
 import type { Firing } from '../../../lib/game/shot'
+import { advanceAftermath, beginAftermath, watchAftermath } from '../../../lib/game/aftermath'
+import type { Aftermath } from '../../../lib/game/aftermath'
 import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
 import { createShots } from './shots'
 import { createPigVoice } from '../audio/pigVoice'
@@ -335,6 +337,9 @@ export function buildBattle(
   /** The shot in progress: the ten-frame fuse and then the bullet's flight,
    * through neither of which is the pig driveable (lib/game/shot.ts). */
   let firing: Firing | null = null
+  /** The beat after a kill: the clock stops, the camera stays on the spot —
+   * or on the crate coming down to replace it (lib/game/aftermath.ts). */
+  let aftermath: Aftermath | null = null
   /** The pigs' own barks. The gun arm of `Pig::Fire` says one every shot,
    * walking twelve lines in rotation (audio/pigVoice.ts). */
   const voice = createPigVoice()
@@ -356,6 +361,11 @@ export function buildBattle(
     effects.broke(target)
     props.take(target.id)
     obstacles.remove(target.id)
+    // The turn stops here and the camera stays on the spot. What comes next —
+    // a crate under a canopy, most of the time — is watched from the same
+    // wait, and the pig is not given back until the sky is empty and fifteen
+    // frames of quiet have gone by (lib/game/aftermath.ts).
+    aftermath = beginAftermath(target)
     // …and its own command, which is the last thing the exe's break handler
     // does (0x48d972). This is what drops the next crate in.
     advanceScript(target.id, target.y)
@@ -419,6 +429,14 @@ export function buildBattle(
     const bullet = firing?.phase === 'flight' ? shots.head() : null
     if (bullet && soldier === squad.of(game.currentPig)) {
       chase.ride(bullet, Math.atan2(bullet.vx, bullet.vz), delta)
+      soldier.node.visible = true
+      return
+    }
+    // …and so does what the blow left behind. Mode 0 on the crate, which is
+    // the ordinary chase rig with something other than a pig in it
+    // (0x4661c2).
+    if (aftermath && soldier === squad.of(game.currentPig)) {
+      chase.ride(aftermath.at, soldier.pig.heading, delta)
       soldier.node.visible = true
       return
     }
@@ -492,7 +510,7 @@ export function buildBattle(
     // stopped being driveable — `Pig::MayAct` refuses on `[pig+0x230]`
     // (0x467a10) — and the clock does not run the player out of time while
     // the camera is away watching a bullet.
-    if (!firing && (game.tick(delta) || isDead(game.currentPig))) {
+    if (!firing && !aftermath && (game.tick(delta) || isDead(game.currentPig))) {
       game.endTurn()
       jumpRequested = false
       fireRequested = false
@@ -538,6 +556,37 @@ export function buildBattle(
     // F uses what is in hand: a melee skill swings, a gun shoots. The exe
     // splits them at the same place — one arm of `Pig::Fire`'s own switch each
     // (0x469415 against 0x46946d).
+    // …but nothing is answered at all while the blow is being shown. The jump
+    // key is the exception, and it is the same exception the level's opening
+    // drop makes: it cuts the canopy and brings the crate down now.
+    if (aftermath) {
+      if (jumpRequested) airDrops.cut()
+      jumpRequested = false
+      fireRequested = false
+      // The world keeps going — the crate has to reach the ground for the
+      // wait to end, and the smoke off the thing that broke is what is being
+      // watched.
+      effects.update(delta)
+      shots.update(delta)
+      airDrops.update(delta)
+      numbers.update(delta)
+      // The shot that caused all this ends here rather than a frame late.
+      if (firing?.phase === 'flight' && shots.live() === 0) firing = null
+      if (advanceAftermath(aftermath, delta, airDrops.falling() > 0 || shots.live() > 0)) {
+        aftermath = null
+        chase.reset()
+      } else {
+        // Follow the crate down; a spot with nothing coming stays the spot.
+        const crate = airDrops.watching()
+        if (crate) watchAftermath(aftermath, crate)
+        active.setClip(ANIM.IDLE)
+        squad.update(delta)
+        watch(active, delta)
+        onGameChanged()
+        return
+      }
+    }
+
     if (fireRequested) {
       if (isGun(holding)) {
         // A gun is a SEQUENCE, and a press while one is running is refused —
@@ -711,6 +760,7 @@ export function buildBattle(
     shots: () => shots.live(),
     firing: () => firing?.phase ?? null,
     barks: () => voice.spoken(),
+    aftermath: () => aftermath !== null,
     warp: (x, z, heading) => {
       game.moveCurrentPig(x, z, heading)
       swings.reset()

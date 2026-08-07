@@ -660,11 +660,38 @@ not what the list guessed:
    no chain could run past its first step — and **`Pig::ClearInventory` is
    called only when a CRATE is placed**, not on every placement.
 
-Left open on this thread, and all of it flagged where it lives: a gun's
+### The beat after the blow, 2026-08-07
+
+Play, straight after: "останавливается таймер и показывается как ящик на
+парашюте спускается… после попадания пару секунд показывается ещё то место, а
+только потом запускается таймер и показывается свин." All of it turned out to
+be one wait in the binary and it is now built (`lib/game/aftermath.ts`,
+decoded in `../pigs-disasm/turns/aftermath.md`).
+
+Knocking anything down stops the turn clock and takes the camera off the pig.
+It goes to whatever the script just placed — the exe hands the crate to the
+camera as its subject and asks for **mode 0**, the ordinary chase row, so the
+descent is framed exactly as a pig is (0x4661a0). The turn comes back only
+once nothing is still moving AND fifteen quiet frames have gone by on top:
+`0x415420` is one global counter that every other bail on the list zeroes, so
+the second is measured from the world settling, not from the blow.
+
+**Jump cuts the crate's canopy.** That one is play's guess ("вроде можно
+пробел нажать") and `airDrop.ts` says so at the method — a pig cuts its own
+with the same key, and nothing in the exe has been read either way.
+
+The WOBBLE got a second pass and a bigger number — a degree was invisible, it
+is now about two and a half up and three across. Still entirely the remake's:
+`fire.md` now carries the negative result, because three places could have
+held a drift and none does (`Pig::Aim` clamps and returns with no RNG, the
+shot reads the angle exactly, and the rifle cam's table row is picked by a
+constant).
+
+Left open on this whole thread, and all of it flagged where it lives: a gun's
 DAMAGE (`SHOT_DAMAGE = 20` is invented), the sniper's magnification, where a
 no-gauge weapon's charge becomes 0xFFF, what bit 0 of a body's `+0x44` means
-at 0x47a24b, and the melee's own battle cry — the same `0x43af70` call, not
-yet wired to a swing.
+at 0x47a24b, the melee's own battle cry — the same `0x43af70` call, not yet
+wired to a swing — and which mode number the wait above actually is.
 
 ### Known divergences — deliberate, and each written up where it lives
 

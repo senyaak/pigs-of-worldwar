@@ -59,6 +59,8 @@ export interface DebugParts {
   /** Every voice line the pigs have said, in order — the only way a spec can
    * hear one (audio/pigVoice.ts). */
   barks: () => string[]
+  /** Whether the beat after a blow is still running. */
+  aftermath: () => boolean
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -119,6 +121,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
       firing: () => parts.firing(),
       /** Every line a pig has said. */
       barks: () => parts.barks(),
+      /** True while the turn is held on what the blow left behind — the clock
+       * is stopped and the camera is off the pig (lib/game/aftermath.ts). */
+      aftermath: () => parts.aftermath(),
       /** Every pig's health, side by side — what a bayonet is measured by. */
       health: () =>
         game.players.flatMap((player) =>

@@ -1,11 +1,19 @@
 // The sights will not hold still.
 //
-// **All of this is the remake's own.** Nothing in the binary wobbles an aim:
-// `Pig::Aim` (0x46a7f0) adds the player's input to `[pig+0x304]`, clamps it to
-// ±0x3FF and stops, and the shot reads that field exactly (0x47a2b6). There is
-// no call to the RNG anywhere on the path and no per-frame drift term. Play
-// says the scope breathes, so it breathes here, and this file is where to come
-// when the real thing turns up.
+// **All of this is the remake's own, and it was looked for properly.** Three
+// places could hold it and none does:
+//
+// - `Pig::Aim` (0x46a7f0) adds the player's input to `[pig+0x304]`, clamps it
+//   to ±0x3FF and stops. No drift term, no call to the RNG.
+// - the shot reads `[pig+0x304]` exactly (0x47a2b6) — nothing is added on the
+//   way out of the barrel either;
+// - the rifle cam (0x4a2e30) builds its position off bone 5 and a row of the
+//   table at 0x4d0ee0, and the row is picked by `[0x4d0fa4]` — a CONSTANT,
+//   the only reference to that address in the whole image, so the offset does
+//   not cycle.
+//
+// Play says the scope breathes, so it breathes here. This file is where to
+// come when the real thing turns up.
 //
 // It is a BREATH, not noise: two slow sines at periods that do not divide each
 // other, so the drift never settles into a visible loop and never jumps. And
@@ -15,10 +23,17 @@
 //
 // Angles are the engine's 4096-to-the-turn units, like every other angle.
 
-/** How far off it drifts, in 4096ths — about a degree up and down, a little
- * more across. */
-const PITCH = 10
-const YAW = 14
+/**
+ * How far off it drifts, in 4096ths: about two and a half degrees up and down
+ * and three across.
+ *
+ * Pure EYEWORK, and the second pass at it — the first was a degree apiece and
+ * play could not see it. At the dummy-yard range of 1200 units this puts the
+ * muzzle some fifty to seventy units off centre, which is a fifth of a pig
+ * and still an easy shot.
+ */
+const PITCH = 28
+const YAW = 36
 /** Seconds a cycle. Deliberately not a ratio of small whole numbers. */
 const PITCH_PERIOD = 2.7
 const YAW_PERIOD = 3.9

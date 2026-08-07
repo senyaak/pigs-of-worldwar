@@ -13,7 +13,7 @@
 // Game space, Y-down, under the battle's converted root.
 
 import type * as THREE from 'three'
-import { DROP_HEIGHT, updateDrop } from '../../../lib/game/parachute'
+import { DROP_HEIGHT, cutChute, updateDrop } from '../../../lib/game/parachute'
 import type { DropState } from '../../../lib/game/parachute'
 import type { Model, Texture } from '../api'
 import { buildCanopies } from './parachute'
@@ -31,6 +31,19 @@ export interface AirDrops {
   update(delta: number): void
   /** How many are still in the air. */
   falling(): number
+  /**
+   * Where the first one still coming down is, for the camera to sit on — null
+   * when the sky is empty. Game space, Y-down.
+   */
+  watching(): { x: number; y: number; z: number } | null
+  /**
+   * Cut every canopy that is still up.
+   *
+   * Play's, and marked as such: a pig cuts its own with the jump key
+   * (`lib/game/parachute.ts`, `cutChute`) and the crate uses the same descent,
+   * so the same key ends it. The exe has not been read on whether it lets you.
+   */
+  cut(): void
   dispose(): void
 }
 
@@ -77,6 +90,21 @@ export function createAirDrops(
       }
     },
     falling: () => live.length,
+    watching() {
+      const first = live[0]
+      if (!first) return null
+      const mesh = props.meshOf(first.id)
+      if (!mesh) return null
+      return { x: mesh.position.x, y: first.drop.y, z: mesh.position.z }
+    },
+    cut() {
+      for (const one of live) {
+        if (!one.drop.chute) continue
+        cutChute(one.drop)
+        if (one.canopy && canopies) canopies.cut(one.canopy)
+        one.canopy = null
+      }
+    },
     dispose() {
       for (const one of live) if (one.canopy && canopies) canopies.cut(one.canopy)
       live.length = 0
