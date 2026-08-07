@@ -37,7 +37,16 @@ export const AIM_TOP = 32
  * at the sky.
  */
 export const AIM_LOB = 512
-const LEVEL_START = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 45, 46]
+const LEVEL_START = [
+  6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 45, 46,
+  // 3 BAYONET and 5 CATTLE PROD get there the long way in the exe:
+  // `ReadyWeapon` writes 0x200 like everything that is not a gun, and then
+  // `ChangeAimAngle(0)` pins them to zero (0x46a891). Level is where they
+  // belong and the animation proves it — the last frame of their
+  // getting-it-out clip IS frame 32 of their aiming clip, the level one, so
+  // a pig that draws and then jumps to 45° visibly snaps.
+  3, 5
+]
 
 /** Weapons that cannot be pointed below 45° (0x46a86d): the guided missile,
  * the mortar and the jetpack. */

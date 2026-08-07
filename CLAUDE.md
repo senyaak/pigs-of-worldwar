@@ -599,11 +599,21 @@ would be a stand-in nobody asked for.
   first weapon and tilting it is the whole of what a player does with it
   until firing exists. One `if` in `clampAim` restores it.
 
-  Two more things there are the remake's own: which BONE a weapon hangs off
-  (the models carry one — `WE_RIF` and `WE_KNIFE` are wholly on bone 7, the
-  right forearm — but nothing was read that says the engine uses it), and
-  that the aiming pose gives way the moment the pig walks, since the exe's
-  aiming MODE is not decoded far enough to say what it allows.
+  **The aiming pose is a SECOND animation channel, not a clip.** A pig has
+  two of them — `Pig::SetAnim` (0x471ef0) writes one block of fields and
+  0x471f50 an identical one beside it — and the weapon's clips go on the
+  second while running, walking and idling go on underneath. `mcap.mad` has
+  no armed run cycle at all; a pig charging with a bayonet is the ordinary
+  run with the weapon channel over its arms. `three/clips.ts` does that with
+  a bone overlay applied AFTER the mixer.
+
+  Two things there are the remake's own: which BONE a weapon hangs off (the
+  models carry one — `WE_RIF` and `WE_KNIFE` are wholly on bone 7, the right
+  forearm — but nothing was read that says the engine uses it), and which
+  bones the overlay takes (spine, head, both arms). The SHAPE of the second
+  is decoded: both channels hold six-entry key-frame lists and six is the
+  skeleton's branch count, so the split is per branch — but the mask itself
+  is inside `wh32lib.dll`'s `afGetKeyFrameList` and is not in the MCAP data.
 
   Three things in the menu are the remake's own and want play against them:
   where it sits and how it arrives (the exe computes its coordinates rather

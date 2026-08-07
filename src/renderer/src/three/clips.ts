@@ -24,6 +24,20 @@ import type { Pig } from './pig'
 const CLIP_FPS = 25
 const BONE_COUNT = 15
 
+/**
+ * Which bones the weapon channel takes, and which it leaves to whatever is
+ * playing underneath: spine, head and both arms, never the hip or the legs.
+ *
+ * WHICH bones is the remake's own — but the SHAPE is not. The engine holds
+ * the two channels as key-frame LISTS of six entries each, and counts the
+ * leading non-null ones (0x440edf); six is exactly the skeleton's branch
+ * count — hip, spine+head, each arm, each leg (docs/formats.md) — so the
+ * split is per branch and the arms-and-spine set is the one that makes a
+ * running pig hold its rifle. The mask itself is inside `wh32lib.dll`'s
+ * `afGetKeyFrameList` and has not been read.
+ */
+const OVERLAY_BONES = [1, 2, 3, 4, 5, 6, 7, 8]
+
 // The MCAP rotation convention, settled by analysis of the shipped data
 // (pigs-disasm/anim/, three independent tests):
 //
@@ -70,16 +84,22 @@ export interface Player {
    */
   playOnce(clip: Clip | null): void
   /**
-   * Hold a clip at one point of it, `phase` running 0..1 from its first frame
-   * to its last. Nothing advances afterwards — call it again to move.
+   * Lay a clip's UPPER BODY over whatever is playing, held at one point of
+   * it — `phase` runs 0..1 from its first frame to its last. Null clears it.
    *
-   * This is how the original aims. The aiming clips are not animations
-   * anybody plays: `Pig::ChangeAimAngle` hands one to 0x471f50 with a fixed
-   * cursor worked out from the angle, so the clip is a sweep from full up to
-   * full down and the angle is a cursor into it
-   * (../../../pigs-disasm/weapons/notes.md).
+   * This is the weapon channel. A pig has TWO animation slots, not one:
+   * `Pig::SetAnim` (0x471ef0) writes one block of fields and 0x471f50 writes
+   * a second, identical one beside it, and it is the second that carries
+   * getting a weapon out and holding the aim — the first goes on running,
+   * walking or idling underneath. That is why the original's pig can charge
+   * with a bayonet and still hold it: one clip in the legs, another in the
+   * arms (../../../pigs-disasm/weapons/notes.md).
+   *
+   * The angle is a cursor rather than a playback: the aiming clips are one
+   * 65-frame sweep from full up to full down, and `Pig::ChangeAimAngle`
+   * hands 0x471f50 a fixed frame worked out from it.
    */
-  pose(clip: Clip | null, phase: number): void
+  overlay(clip: Clip | null, phase: number): void
   /** Whether a `playOnce` is still running. False for a looping clip. */
   running(): boolean
   /** Advance time; call once per frame. */
@@ -131,36 +151,41 @@ export function createPlayer(pig: Pig): Player {
     action.play()
   }
 
-  // Scratch for `pose`, which runs every frame and allocates nothing.
+  // Scratch for the overlay, which runs every frame and allocates nothing.
   const a = new THREE.Quaternion()
   const b = new THREE.Quaternion()
+  let overlaid: { clip: Clip; phase: number } | null = null
+
+  /** Write the overlay's bones. Runs AFTER the mixer, which writes all of
+   * them — otherwise the clip underneath would put the arms straight back. */
+  const applyOverlay = (): void => {
+    if (!overlaid) return
+    const { clip, phase } = overlaid
+    const at = Math.max(0, Math.min(1, phase)) * (clip.frameCount - 1)
+    const first = Math.floor(at)
+    const second = Math.min(clip.frameCount - 1, first + 1)
+    const between = at - first
+    for (const bone of OVERLAY_BONES) {
+      if (bone >= pig.bones.length) continue
+      const one = (first * BONE_COUNT + bone) * 3
+      const two = (second * BONE_COUNT + bone) * 3
+      decodeRotation(clip.rotations[one], clip.rotations[one + 1], clip.rotations[one + 2], a)
+      decodeRotation(clip.rotations[two], clip.rotations[two + 1], clip.rotations[two + 2], b)
+      pig.bones[bone].quaternion.copy(a).slerp(b, between)
+    }
+  }
 
   return {
     play: (clip) => start(clip, false),
     playOnce: (clip) => start(clip, true),
-    pose(clip, phase) {
-      if (!clip || clip.frameCount === 0) return
-      // A held pose is not a playing one: whatever the mixer was doing has to
-      // stop, or it would write the bones back on the next update.
-      mixer?.stopAllAction()
-      mixer = null
-      left = 0
-      const at = Math.max(0, Math.min(1, phase)) * (clip.frameCount - 1)
-      const first = Math.floor(at)
-      const second = Math.min(clip.frameCount - 1, first + 1)
-      const between = at - first
-      const boneCount = Math.min(BONE_COUNT, pig.bones.length)
-      for (let bone = 0; bone < boneCount; bone++) {
-        const one = (first * BONE_COUNT + bone) * 3
-        const two = (second * BONE_COUNT + bone) * 3
-        decodeRotation(clip.rotations[one], clip.rotations[one + 1], clip.rotations[one + 2], a)
-        decodeRotation(clip.rotations[two], clip.rotations[two + 1], clip.rotations[two + 2], b)
-        pig.bones[bone].quaternion.copy(a).slerp(b, between)
-      }
+    overlay(clip, phase) {
+      overlaid = clip && clip.frameCount > 0 ? { clip, phase } : null
+      applyOverlay()
     },
     running: () => left > 0,
     update(delta) {
       mixer?.update(delta)
+      applyOverlay()
       if (left > 0) left = Math.max(0, left - delta)
     }
   }

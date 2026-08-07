@@ -55,12 +55,12 @@ export interface Soldier {
   /** Commit to a clip played through once, holding its last frame. */
   playOnce(index: number): void
   /**
-   * Hold a clip at one point of it — `phase` runs 0..1 from its first frame
-   * to its last — instead of wearing an animation. This is aiming: the exe
-   * scrubs the weapon's own aiming clip with the aim angle rather than
-   * playing it (three/clips.ts, lib/game/aim.ts).
+   * Lay a clip's upper body over whatever is worn, held at `phase` (0..1
+   * through it); -1 clears it. This is aiming — the pig runs, walks or idles
+   * underneath while its arms hold the weapon, which is how the original
+   * keeps two animations on one pig (three/clips.ts, lib/game/aim.ts).
    */
-  pose(index: number, phase: number): void
+  overlay(index: number, phase: number): void
   /** Whether a committed animation is still running. */
   animating(): boolean
   /** Put it where the game says it is: soles on the ground, sunk a little
@@ -130,12 +130,8 @@ export function fieldSquad(
         clip = index
         player.playOnce(assets.clips[index] ?? null)
       },
-      pose(index, phase) {
-        // A held pose leaves no animation running, so whatever was worn has
-        // to count as gone — otherwise the next `setClip` for the same index
-        // would see no change and never put it back.
-        clip = null
-        player.pose(assets.clips[index] ?? null, phase)
+      overlay(index, phase) {
+        player.overlay(assets.clips[index] ?? null, phase)
       },
       animating: () => player.running(),
       settle() {

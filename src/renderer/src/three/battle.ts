@@ -297,12 +297,18 @@ export function buildBattle(
       }
       else {
         active.setClip(ANIM.IDLE)
+        active.overlay(-1, 0)
         watch(active, delta)
         onGameChanged()
         return
       }
     }
-    for (const soldier of squad.members) if (soldier !== active) soldier.setClip(ANIM.IDLE)
+    for (const soldier of squad.members) {
+      if (soldier === active) continue
+      soldier.setClip(ANIM.IDLE)
+      // Only the pig being driven holds its weapon up; the rest stand.
+      soldier.overlay(-1, 0)
+    }
 
     // Position and facing are the game's; everything else the frame needs —
     // height, momentum, the wedge clock, which clip to wear — lives in the
@@ -355,25 +361,24 @@ export function buildBattle(
     // A committed clip — the jump's crouch, a landing's get-up — is started
     // once and left to play out; anything else is simply worn. The domain
     // says which is which and when a commitment ends, so this only has to
-    // avoid restarting the one already running.
-    //
-    // A pig standing with a weapon out wears neither: it holds the weapon's
-    // aiming clip at the one frame its angle points at. That the pose is a
-    // FROZEN clip rather than an animation is the original's own
-    // (three/clips.ts); that it gives way the moment the pig walks is this
-    // remake's, since the exe's aiming mode is not decoded far enough to say
-    // what it allows.
-    const posing =
-      !loco.commit && loco.airborne === null && intent.walk === 0 && scrubsPose(holding)
+    // avoid restarting the one already running. Getting a weapon out is a
+    // commitment of the same kind, and holds the pig until it is done.
     if (readying > 0) {
-      // The getting-it-out clip has the pig to itself until it is done.
-    } else if (posing) {
-      active.pose(weapon.aimClip, aimPhase(aim.angle))
+      // The getting-it-out clip has the pig to itself.
     } else if (loco.commit) {
       if (!active.animating()) active.playOnce(loco.clip)
     } else {
       active.setClip(loco.clip)
     }
+
+    // And over the top of it, the arms: the weapon's aiming clip held at the
+    // frame its angle points at. It is a SECOND channel, not a replacement —
+    // the pig runs, walks and idles underneath, which is what makes running
+    // with a weapon look like its own animation without there being one
+    // (three/clips.ts). It lands seamlessly because the getting-it-out clip
+    // ends on exactly the frame a level angle asks for.
+    const holdingUp = readying === 0 && loco.airborne === null && scrubsPose(holding)
+    active.overlay(holdingUp ? weapon.aimClip : -1, aimPhase(aim.angle))
 
     // How long the pig has done nothing: what brings its name plate back.
     // Being driven, being in the air or being pushed all count as moving.
