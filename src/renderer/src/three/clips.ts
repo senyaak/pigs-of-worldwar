@@ -26,17 +26,26 @@ const BONE_COUNT = 15
 
 /**
  * Which bones the weapon channel takes, and which it leaves to whatever is
- * playing underneath: spine, head and both arms, never the hip or the legs.
+ * playing underneath: the hip, the spine, the head and both arms — never the
+ * legs.
  *
- * WHICH bones is the remake's own — but the SHAPE is not. The engine holds
- * the two channels as key-frame LISTS of six entries each, and counts the
- * leading non-null ones (0x440edf); six is exactly the skeleton's branch
- * count — hip, spine+head, each arm, each leg (docs/formats.md) — so the
- * split is per branch and the arms-and-spine set is the one that makes a
- * running pig hold its rifle. The mask itself is inside `wh32lib.dll`'s
- * `afGetKeyFrameList` and has not been read.
+ * WHICH bones is the remake's own; the SHAPE is not. The engine holds the two
+ * channels as key-frame LISTS of six entries each and counts the leading
+ * non-null ones (0x440edf); six is exactly the skeleton's branch count — hip,
+ * spine+head, each arm, each leg (docs/formats.md) — so the split is per
+ * branch. The mask itself is inside `wh32lib.dll`'s `afGetKeyFrameList` and
+ * has not been read.
+ *
+ * **The HIP has to be in it**, and the data says so out loud. In the aiming
+ * pose the hip carries a yaw of 0.58 rad where an idle's is flat, and the
+ * head carries −0.68 against it: the body turns a third of a right angle into
+ * a rifle stance and the head turns back out of it, netting a pig that looks
+ * where it points. Leave the hip out and only the counter-turn survives — the
+ * pig aims straight ahead with its head cranked 39° to the side. The legs
+ * still animate underneath, since they hang off the hip and only inherit its
+ * turn.
  */
-const OVERLAY_BONES = [1, 2, 3, 4, 5, 6, 7, 8]
+const OVERLAY_BONES = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
 // The MCAP rotation convention, settled by analysis of the shipped data
 // (pigs-disasm/anim/, three independent tests):
