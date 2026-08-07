@@ -17,6 +17,7 @@ import { controller } from '../input/controller'
 import type { DropIn } from './dropIn'
 import type { MapProps } from './props'
 import type { Squad } from './squad'
+import { skillName } from '../../../lib/game/skills'
 
 export interface DebugParts {
   game: Game
@@ -32,6 +33,9 @@ export interface DebugParts {
   /** Seconds the acting pig has stood still — what the name plates wait for,
    * and the only way a spec can tell why they are up. */
   still: () => number
+  /** `gtext`, for naming what a pig is carrying. Empty on an install with
+   * no strings, which is not a reason for the battle to refuse to run. */
+  strings: () => string[]
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -56,6 +60,17 @@ export function exposeBattleDebug(parts: DebugParts): void {
         starting: game.starting
       }),
       currentNodeY: () => squad.of(game.currentPig)?.node.position.y ?? 0,
+      /** What the acting pig is carrying, in the order it picked things up:
+       * the skill's id, its name, and how many (−1 is unlimited, which is
+       * everything on the training ground). */
+      carrying: () =>
+        game.currentPig.carrying.map((slot) => ({
+          skill: slot.skill,
+          name: skillName(parts.strings(), slot.skill),
+          amount: slot.amount
+        })),
+      /** The skill chosen out of the menu, or null for empty hands. */
+      holding: () => game.currentPig.holding,
       /** The level's opening drop: who is still arriving and how far up they
        * are. `running` false is what says the battle has begun. */
       dropIn: () => dropIn.state(),

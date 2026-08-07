@@ -40,8 +40,8 @@ export const SILENT: Bank = {
 
 let shared: AudioContext | null = null
 
-/** The one AudioContext, made on first use. */
-function context(): AudioContext | null {
+/** The one AudioContext, made on first use — the speech shares it. */
+export function context(): AudioContext | null {
   if (shared) return shared
   try {
     shared = new AudioContext()

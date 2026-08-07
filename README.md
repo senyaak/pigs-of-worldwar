@@ -37,8 +37,15 @@ Controls in the battle (tank-style, as in the original):
 | `S` / `↓` | walk back |
 | `A` / `←` | turn left |
 | `D` / `→` | turn right |
-| `Space` | jump |
+| `Space` | jump — and, in the skill menu, take what is under the cursor |
+| `R` | open the skill menu (the original's own key is Return) |
 | `Enter` | end turn |
+
+Walk into a crate to collect it: what is inside goes into the pig's
+inventory — fifteen slots, as in the original, and everything is unlimited on
+the training ground — or straight into its health. `R` opens the menu over
+what it is carrying; the same walk/turn keys move the cursor while it is up,
+and the pig stands still. Nothing fires yet.
 
 Every one of these is a named action in
 [src/renderer/src/input/controller.ts](src/renderer/src/input/controller.ts);
@@ -81,7 +88,10 @@ moved off the display it fills, and that spec is about exactly that.
 
 ## Status
 
-Early stub: the app locates the game installation and lists its files.
-Next up: parsers for the game's data formats (`.MAD`/`.MTD` archives,
-`.PMG` map geometry, `.PTG` terrain textures, `.POG` object placement)
-and a Three.js viewer.
+A battle you can walk around: the map's own terrain, props and squads, the
+turn clock, the parachute drop the level opens with, the training ground's
+crates and the instructor talking you through them, and the skill menu over
+what a pig is carrying.
+
+Next up: the fight itself — choosing a skill actually doing something, the
+weapon panel, aiming and damage.

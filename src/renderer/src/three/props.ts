@@ -21,6 +21,10 @@ export interface MapProps {
   /** Records that got geometry. The rest are the `*_ME` spawn markers,
    * which have no model in the map's archive. */
   placed: number
+  /** Take one record's art off the map — a crate that has been collected.
+   * The geometry is shared with every other record of that model, so only
+   * the mesh goes. */
+  take(id: number): void
   dispose(): void
 }
 
@@ -39,11 +43,14 @@ export function buildMapProps(
   }
 
   let placed = 0
+  /** Every placed mesh by its record's id, so one can be taken away again. */
+  const byId = new Map<number, THREE.Mesh>()
   for (const object of objects) {
     const model = built.get(object.name)
     if (!model) continue
     const mesh = new THREE.Mesh(model.geometry, model.materials)
     mesh.name = object.name
+    byId.set(object.id, mesh)
     // Stored y is an ELEVATION in the PMG's own height space, so it rides
     // HEIGHT_SCALE exactly as the ground does; game space is Y-down, hence
     // the negation.
@@ -61,8 +68,15 @@ export function buildMapProps(
   return {
     group,
     placed,
+    take(id) {
+      const mesh = byId.get(id)
+      if (!mesh) return
+      group.remove(mesh)
+      byId.delete(id)
+    },
     dispose() {
       group.clear()
+      byId.clear()
       for (const { geometry, materials } of built.values()) disposeMesh(geometry, materials)
     }
   }

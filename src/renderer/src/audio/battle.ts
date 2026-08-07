@@ -24,6 +24,21 @@ export const BATTLE_SOUNDS = {
   ejected: 'P_OWW',
   /** Going into the water, and coming out of it. */
   splash: 'I_SPLASH',
+  /**
+   * Collecting a crate, and being refused one. These two are DECODED rather
+   * than picked by name: `Pig::GiveSkill` plays 0x5E at the pig's own
+   * position once the skill is in (0x4759F2, out of 0x475960), and 0x4F on
+   * the branch that finds fifteen slots already full (0x465925). Index 94
+   * and 79 in `Audio/sfxday.srl` are P_WHOOPE and P_OWW — the pig cheers,
+   * or complains (../pigs-disasm/skills/notes.md).
+   */
+  pickup: 'P_WHOOPE',
+  tooMany: 'P_OWW',
+  /** The skill menu driving in. A name pick, like the movement ones: the
+   * bank's own S_OPEN sits beside S_SELECT and S_CLOCK, which is the family
+   * of interface noises, and the exe's menu mode is not decoded far enough
+   * to say which index it asks for. */
+  menuOpen: 'S_OPEN',
   /** A canopy opening over the level's drop-in. The bank carries P_CHUTE and
    * P_CHUTE1 and the exe's own choice is NOT decoded — `StartParachuting`
    * pushes 0x35 to an effect spawner, which is 53 and so is P_CHUTE, but the

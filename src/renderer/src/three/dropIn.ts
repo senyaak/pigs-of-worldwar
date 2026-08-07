@@ -42,6 +42,11 @@ export interface DropIn {
   update(delta: number, cut: boolean): boolean
   /** How much hangs above this soldier that the camera must clear. */
   riseOver(soldier: Soldier): number
+  /** Whether this soldier is still on a canopy — the camera looks a pig on
+   * one in the face rather than following its shoulders. */
+  underCanopy(soldier: Soldier): boolean
+  /** Whether anyone is still coming down: what the opening card shows over. */
+  running(): boolean
   state(): DropInState
   dispose(): void
 }
@@ -51,6 +56,8 @@ export interface DropIn {
 const NOBODY: DropIn = {
   update: () => false,
   riseOver: () => 0,
+  underCanopy: () => false,
+  running: () => false,
   state: () => ({ running: false, pigs: [] }),
   dispose: () => {}
 }
@@ -144,6 +151,9 @@ export function createDropIn(
     },
     riseOver: (soldier) =>
       arrivals.find((arrival) => arrival.soldier === soldier)?.canopy ? canopies.rise : 0,
+    underCanopy: (soldier) =>
+      arrivals.find((arrival) => arrival.soldier === soldier)?.canopy != null,
+    running: () => arrivals.some((arrival) => !arrival.done),
     state: () => ({
       running: arrivals.some((arrival) => !arrival.done),
       pigs: arrivals

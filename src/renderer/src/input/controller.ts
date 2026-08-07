@@ -122,6 +122,11 @@ export interface DebugHooks {
      * starts, which any input ends (lib/game/game.ts). */
     starting: boolean
   }
+  /** What the acting pig is carrying, in pickup order — skill id, name and
+   * amount, where −1 means unlimited (lib/game/inventory.ts). */
+  carrying(): { skill: number; name: string; amount: number }[]
+  /** The skill in hand, chosen out of the menu, or null. */
+  holding(): number | null
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }
   /** Every sound the battle has played, in order. */
@@ -171,6 +176,11 @@ declare global {
       /** Console command: restart the battle on another map —
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
       swapMap?(name?: string): Promise<boolean>
+      /** Console command: put a line through the briefing bar —
+       * `pow.say('USE SHIFT BUTTON TO JUMP THE GAP.')`. With no argument it
+       * sends the tutorial's own line 227. The tutorial script will drive
+       * the same bar when it lands. */
+      say?(text?: string): void
       /** Which map the battle is on. */
       map?(): string
     }

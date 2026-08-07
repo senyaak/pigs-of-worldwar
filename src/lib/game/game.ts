@@ -6,6 +6,8 @@
 // player fields their pigs in order — every time a player's turn comes up,
 // the next pig of that squad is the one that acts.
 
+import type { Slot } from './inventory'
+
 export interface PigSpawn {
   x: number
   z: number
@@ -26,6 +28,13 @@ export interface Pig {
   /** Index into the player's squad. */
   index: number
   health: number
+  /** What it is carrying: up to fifteen skills, in the order they were
+   * picked up (lib/game/inventory.ts). A pig starts with nothing — every
+   * shipped map hands out its weapons in crates. */
+  carrying: Slot[]
+  /** The skill chosen out of the menu, or null for empty hands. Nothing
+   * fires it yet — it is what the weapon panel will show. */
+  holding: number | null
   position: { x: number; z: number }
   /** Facing, radians around Y in the game's own space. */
   heading: number
@@ -111,6 +120,8 @@ export class Game {
             name,
             index,
             health: 100,
+            carrying: [],
+            holding: null,
             position: { x: at.x, z: at.z },
             heading: at.heading ?? 0,
             pigClass: at.pigClass ?? GRUNT,

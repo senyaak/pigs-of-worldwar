@@ -17,7 +17,7 @@ import { parseMcapClip } from '../lib/formats/mcap'
 import type { McapClip } from '../lib/formats/mcap'
 import { decodeMgl } from '../lib/formats/mgl'
 import { parseBmp } from '../lib/formats/bmp'
-import { punchIndexZero, punchMagenta } from '../lib/formats/alpha'
+import { punchBlack, punchIndexZero, punchMagenta } from '../lib/formats/alpha'
 import { parseTab } from '../lib/formats/tab'
 import type { GlyphTable } from '../lib/formats/tab'
 import { parseText } from '../lib/formats/text'
@@ -191,6 +191,38 @@ export async function loadTims(full: string): Promise<TimImage[]> {
         width: tim.width,
         height: tim.height,
         rgba: tim.rgba
+      })
+    } catch (error) {
+      console.warn(`${path.basename(full)}: ${entry.name} — ${String(error)}`)
+    }
+  }
+  return images
+}
+
+/**
+ * Every BMP in one archive — `Language/Tims/MENUTIMS.MAD` is the skill menu:
+ * its frame plus one 56×34 icon per skill, named after the skill rather than
+ * numbered (TROTTER, KNIFE, BAYONET, … in the skill list's own order), and
+ * `SELECT.BMP`, the 86×52 highlight that sits over the chosen one.
+ *
+ * Same archive shape as the TIMs next door, different pictures inside, so
+ * the transparency has to be punched here — and the two halves key on
+ * DIFFERENT colours. The frame's see-through is magenta and its black is the
+ * widget's own inside, which must stay; the icons and the highlight sit on
+ * black fields that have to go (lib/formats/alpha.ts).
+ */
+export async function loadArchiveBmps(full: string): Promise<TimImage[]> {
+  const data = await fs.readFile(full)
+  const images: TimImage[] = []
+  for (const entry of parseArchive(data).entries) {
+    try {
+      const bmp = parseBmp(data.subarray(entry.offset, entry.offset + entry.size))
+      const name = entry.name.replace(/\.bmp$/i, '').toLowerCase()
+      images.push({
+        name,
+        width: bmp.width,
+        height: bmp.height,
+        rgba: name === 'menu' ? punchMagenta(bmp) : punchBlack(bmp)
       })
     } catch (error) {
       console.warn(`${path.basename(full)}: ${entry.name} — ${String(error)}`)

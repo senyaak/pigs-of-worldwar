@@ -92,3 +92,11 @@ export async function loadTims(relPath: string): Promise<SpriteSet> {
   if (!result.ok) throw new Error(result.error)
   return spriteSet(result.images)
 }
+
+/** Load every BMP in an archive — the skill menu's frame and its icons,
+ * which ship as BMPs in a MAD rather than TIMs (main/assets.ts). */
+export async function loadArchiveBmps(relPath: string): Promise<SpriteSet> {
+  const result = await window.api.loadArchiveBmps(relPath)
+  if (!result.ok) throw new Error(result.error)
+  return spriteSet(result.images)
+}

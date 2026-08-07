@@ -18,14 +18,25 @@ const LIFT = 900 * MODEL_SCALE
  * ground behind it. */
 const GAZE = 300 * MODEL_SCALE
 const CLEARANCE = 500 * MODEL_SCALE
+/**
+ * The drop-in view: the camera stands IN FRONT of a pig on a canopy and looks
+ * it in the face, which is what play remembers of the original's opening.
+ *
+ * It is the chase rig turned around — the same BACK, so the pig sits in the
+ * frame exactly as it always does — and only the lift is its own: level with
+ * the pig rather than over its shoulder, which is what makes it a face and
+ * not a top of a head.
+ */
+const FACE_LIFT = 150 * MODEL_SCALE
 
 export interface Chase {
   /**
    * Point at a pig standing at `nodeY` (game space, the model's origin).
    * `delta` null snaps rather than glides — a new acting pig, not a frame.
    * `rise` is anything hanging ABOVE the pig that has to stay in shot.
+   * `face` swaps the shoulder view for the drop-in one, in front of the pig.
    */
-  follow(pig: Pig, nodeY: number, rise: number, delta: number | null): void
+  follow(pig: Pig, nodeY: number, rise: number, delta: number | null, face: boolean): void
   /**
    * The chase's own wait, once a frame: parked through involuntary flight and
    * a beat beyond it, cleared the instant the player drives.
@@ -83,33 +94,38 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
   const want = (
     pig: Pig,
     nodeY: number,
-    rise: number
+    rise: number,
+    face: boolean
   ): { position: THREE.Vector3; target: THREE.Vector3 } => {
     const waterline = -query.surface(pig.position.x, pig.position.z)
+    // Looking a pig in the face means looking at the PIG: the canopy over it
+    // is out of frame on purpose, so `rise` is ignored on this side.
     const target = new THREE.Vector3(
       pig.position.x,
-      Math.max(-framedY(pig, nodeY), waterline) + GAZE + rise / 2,
+      Math.max(-framedY(pig, nodeY), waterline) + GAZE + (face ? 0 : rise / 2),
       -pig.position.z
     )
     // The pull-back that fits `rise` more height at this vertical field of
     // view — half the extra height over the tangent of half the angle. The
     // rig is built round a pig, so anything three times its height (a
     // canopy) needs the frame saying so rather than being cropped off.
-    const back = BACK + rise / (2 * Math.tan((camera.fov * Math.PI) / 360))
-    const behindX = pig.position.x - Math.sin(pig.heading) * back
-    const behindZ = pig.position.z - Math.cos(pig.heading) * back
+    const back = face ? BACK : BACK + rise / (2 * Math.tan((camera.fov * Math.PI) / 360))
+    // Behind the shoulders normally; ahead of the snout on the way down.
+    const reach = face ? -back : back
+    const behindX = pig.position.x - Math.sin(pig.heading) * reach
+    const behindZ = pig.position.z - Math.cos(pig.heading) * reach
     const terrainAtCamera = -query.surface(behindX, behindZ)
     const position = new THREE.Vector3(
       behindX,
-      Math.max(target.y + LIFT, terrainAtCamera + CLEARANCE),
+      Math.max(target.y + (face ? FACE_LIFT : LIFT), terrainAtCamera + CLEARANCE),
       -behindZ
     )
     return { position, target }
   }
 
   return {
-    follow(pig, nodeY, rise, delta) {
-      const { position, target } = want(pig, nodeY, rise)
+    follow(pig, nodeY, rise, delta, face) {
+      const { position, target } = want(pig, nodeY, rise, face)
       if (delta === null || !snapped) {
         at.copy(position)
         snapped = true

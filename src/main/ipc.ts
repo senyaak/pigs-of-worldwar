@@ -9,6 +9,7 @@ import { promises as fs } from 'node:fs'
 import { parseArchive } from '../lib/formats/mad'
 import { getGameDir, insideGameDir, setGameDir, walkDir } from './gameDir'
 import {
+  loadArchiveBmps,
   loadClips,
   loadFont,
   loadFrontendImages,
@@ -94,6 +95,14 @@ export function registerIpc(): void {
   ipcMain.handle('tims:load', async (_event, relPath: string) => {
     try {
       return { ok: true, images: await loadTims(insideGameDir(relPath)) }
+    } catch (error) {
+      return fail(relPath, error)
+    }
+  })
+
+  ipcMain.handle('bmps:load', async (_event, relPath: string) => {
+    try {
+      return { ok: true, images: await loadArchiveBmps(insideGameDir(relPath)) }
     } catch (error) {
       return fail(relPath, error)
     }

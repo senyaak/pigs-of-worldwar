@@ -38,9 +38,17 @@ export const PIG_HEIGHT = 5 * BOX_UNIT
  * A crate is only a PICKUP when it actually carries something, and that is
  * the difference between the crates a pig collects and the ones it walks
  * round. All 11 CRATE4s carry nothing, and so do two CRATE1s and two
- * CRATE2s out of the 540 — those are scenery, and solid. The rest hand over
- * a weapon or a health pack, so they cannot be blockers: in the original a
- * pig collects one by walking INTO it.
+ * CRATE2s out of the 540.
+ *
+ * The records say a pickup is SOLID — every one of CAMP's eleven carries
+ * shape kind 0 and a real box, 3×3×4 on a CRATE1 and 2×2×4 on a CRATE2 —
+ * and play remembers the shove that goes with it. It is nonetheless left OUT
+ * of the collision world here, because the two halves do not meet yet: this
+ * engine refuses a step that would END inside a box, so a solid crate is one
+ * the pig can never be inside, and a pickup collected on overlap is one it
+ * can never collect. Whatever reconciles them — collecting off the step's
+ * TARGET rather than its result, or a shove that resolves — is its own
+ * piece of work; until then a crate is walked into and through.
  */
 export const CRATE_TYPES = new Set([67, 68, 388])
 
@@ -78,6 +86,9 @@ export function isSolid(object: MapObject): boolean {
 
 /** One thing in the way — an oriented box, game space, Y-down. */
 export interface Obstacle {
+  /** The POG record's own id, so one can be taken out of the world again —
+   * a crate that has been collected. */
+  id: number
   x: number
   z: number
   /** The box's upper face: SMALLER than `bottom`, because Y counts down. */
@@ -115,7 +126,15 @@ export const NO_OBSTACLES: Obstruction = {
 
 /** The obstacle a POG record makes, or null when it is not solid. */
 export function obstacleOf(object: MapObject): Obstacle | null {
-  if (!isSolid(object)) return null
+  return isSolid(object) ? boxOf(object) : null
+}
+
+/**
+ * The box a record describes, whether or not it is in the collision world —
+ * a crate needs its own shape to be collected by (lib/game/pickups.ts) even
+ * while it is not something to walk into.
+ */
+export function boxOf(object: MapObject): Obstacle {
   // Stored y is an elevation of the model's CENTRE, in the PMG's own height
   // space — so it rides HEIGHT_SCALE, exactly as the ground and the drawn
   // prop do. Game space is Y-down, so the centre negates and the box's own
@@ -123,6 +142,7 @@ export function obstacleOf(object: MapObject): Obstacle | null {
   // `three/props.ts` scales the same way, and the two must not drift.
   const centre = -object.y * HEIGHT_SCALE
   return {
+    id: object.id,
     x: object.x,
     z: object.z,
     top: centre - object.box.y / 2,
@@ -134,7 +154,12 @@ export function obstacleOf(object: MapObject): Obstacle | null {
 }
 
 /** How near the pig's centre comes to a box, in its own frame. */
-function penetrates(obstacle: Obstacle, x: number, z: number, radius: number): boolean {
+export function penetrates(
+  obstacle: Obstacle,
+  x: number,
+  z: number,
+  radius: number
+): boolean {
   const dx = x - obstacle.x
   const dz = z - obstacle.z
   // Into the box's frame: the same axes three/props.ts turns the art onto.
@@ -158,6 +183,9 @@ const BUCKET = 512
  */
 export class ObstacleField implements Obstruction {
   private readonly buckets = new Map<number, Obstacle[]>()
+  /** Records taken out of the world since it was built: a crate a pig has
+   * collected is no longer something to push against. */
+  private readonly gone = new Set<number>()
   readonly obstacles: Obstacle[] = []
 
   constructor(objects: MapObject[]) {
@@ -182,10 +210,16 @@ export class ObstacleField implements Obstruction {
     return { col: Math.floor(x / BUCKET), row: Math.floor(z / BUCKET) }
   }
 
-  /** Everything that could reach (x, z). */
+  /** Everything that could reach (x, z), less whatever has been removed. */
   private near(x: number, z: number): Obstacle[] {
     const { col, row } = this.cell(x, z)
-    return this.buckets.get(col * 65536 + row) ?? []
+    const here = this.buckets.get(col * 65536 + row) ?? []
+    return this.gone.size === 0 ? here : here.filter((box) => !this.gone.has(box.id))
+  }
+
+  /** Take a record out of the collision world for good. */
+  remove(id: number): void {
+    this.gone.add(id)
   }
 
   standOn(x: number, z: number, footY: number, reach: number): number | null {

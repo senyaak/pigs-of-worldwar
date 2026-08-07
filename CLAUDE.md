@@ -568,18 +568,67 @@ would be a stand-in nobody asked for.
 
 ### Threads left mid-pull
 
-- **The rest of the battle screen, in the order play asks for it**: the
-  BRIEFING BAR that slides down from the top when the tutorial speaks
-  (`Language/Tims/TBOXTIMS.MAD` — `npro1..4`, two brass end caps and a black
-  scroll between them, drawn with the same GameChars the clock's archive
-  sits beside); the MAP bottom left (`MAPICONS.MTD`: `map1` plus the pig,
-  heart, pickup and prop markers); and the WEAPON panel top right when
-  there is a weapon. The bar belongs with the tutorial script — it is what
-  the script talks THROUGH — so it lands with it, not before.
+- **A crate is walked THROUGH, where the original is shouldered into.** The
+  records say a pickup is solid — shape kind 0, a real 3×3×4 box — and play
+  remembers pushing at one before it goes. Making it solid, though, means
+  the pig can never be inside it, and this engine's step refuses to END
+  inside a box, so the collect-on-overlap test never fires and the crate
+  becomes a thing to bump into forever. It is deliberately kept OUT of the
+  collision world until the two halves are reconciled (collect off the
+  step's target, or a shove that resolves) — `lib/game/obstacles.ts` says so
+  where it drops them.
+- **A pig carries skills, can choose one, and cannot FIRE it.** Crates are
+  collected by walking into them (`three/battle.ts` → `lib/game/pickups.ts`),
+  the contents go into fifteen slots with the exe's own stacking rules
+  (`lib/game/inventory.ts`), and `R` opens the game's own menu over them —
+  `MENUTIMS.MAD`'s frame with an icon per skill and `SELECT.BMP` over the
+  cursor, driving in from the right with `S_OPEN` behind it
+  (`ui/skillMenu.ts`). Choosing one sets `pig.holding` and NOTHING reads it:
+  there is no weapon panel, no aiming and no damage. That is the next piece
+  of work, and it is the whole fight.
+
+  Three things in the menu are the remake's own and want play against them:
+  where it sits and how it arrives (the exe computes its coordinates rather
+  than storing them); that SKIP TURN is what an empty-handed pig always has
+  in it, which is play's word and not the exe's; and that twelve cells hold
+  fifteen slots, since what the original does with the other three is not
+  decoded. Its art is two transparency keys, and those ARE measured — the
+  frame keys on magenta and keeps its black (that black is the widget's
+  inside), the icons and the highlight key on black (`main/assets.ts`).
+- **The tutorial speaks over the drop, over the round, and off every crate.**
+  The bar is the exe's own (`ui/briefingBar.ts`: `npro4` caps over four
+  `npro3` tiles, the ten-frame drop-in curve, a 206-wide window, the scroll
+  at 5 px a frame), the instructor is `Speech/Sku1/Train1` through
+  `audio/speech.ts`, and clip N always carries `gtext` 209 + N. The script
+  itself turned out to BE the crates — the tutorial dispatcher switches on
+  the skill just collected — so collecting is what speaks it
+  (`lib/game/tutorial.ts`). Two things still have nothing to fire them: the
+  "FOLLOW THE YELLOW PATH" lines, which the exe says when a crate is PLACED
+  by the map script, and the dummy.
+  `pow.say('…')` puts any line up meanwhile. The font is the game's own:
+  the bar's `macfont.bmp` is `FEText/BIG.BMP` pixel for pixel and its metrics
+  are read from `BIG.TAB`, so the bar loads `BIG` and kerns a pixel a pair as
+  the exe does. One number in it is still unchecked — the 300 ms a line that
+  FITS the window is held for, which reads faster than a line can be read.
+- **The rest of the battle screen, in the order play asks for it**: the MAP
+  bottom left (`MAPICONS.MTD`: `map1` plus the pig, heart, pickup and prop
+  markers); and the WEAPON panel top right when there is a weapon.
 - **The menu has no entrance.** In the original the pieces DRIVE ON — the
   bars slide in rather than being there from the first frame. Deferred on
   purpose, along with the layout itself; whatever settles the coordinates
   will settle where they come in from.
+- **There is no SKY.** The battle renders against a flat clear colour, while
+  the original ships `Skys/` — paired `.PTG`/`.PMG` files per mood
+  (`CLOUDY1`, `DAWN1`, `CLIMB`, plus `COLD` and `DESERT` folders). Neither
+  the format nor which map picks which sky is decoded. Own thread, after the
+  tutorial.
+- **The drop-in's card and camera are in, and both want a look.** The card
+  is the exe's (`gtext 159` + the mission name, centred, y = 160 —
+  `ui/titleCard.ts`), but only CAMP is answered: which display name goes
+  with which MAP FILE is stored nowhere, so every other map gets no card
+  rather than a guessed one. The face-on camera while a canopy is up is the
+  remake's own framing (`FACE_BACK`/`FACE_LIFT` in `three/chase.ts`), the
+  same way the chase's own distances are.
 
 - `0x406bb0`, 3280 bytes: the collision test itself. Knowing what else lives
   in that world would settle whether objects need their own handling.

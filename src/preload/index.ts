@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('frontend:images', entryNames),
   loadFont: (name: string): Promise<unknown> => ipcRenderer.invoke('frontend:font', name),
   loadTims: (relPath: string): Promise<unknown> => ipcRenderer.invoke('tims:load', relPath),
+  loadArchiveBmps: (relPath: string): Promise<unknown> =>
+    ipcRenderer.invoke('bmps:load', relPath),
   loadGameText: (which: string): Promise<unknown> => ipcRenderer.invoke('text:load', which),
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit')
 })

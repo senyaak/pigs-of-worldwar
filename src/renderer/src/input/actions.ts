@@ -12,6 +12,7 @@ export const ACTIONS = [
   'menuDown',
   'menuSelect',
   'menuBack',
+  'skills',
   'assets'
 ] as const
 
@@ -31,6 +32,10 @@ export const DEFAULT_BINDINGS: Record<string, Action> = {
   KeyD: 'turnRight',
   ArrowRight: 'turnRight',
   Space: 'jump',
+  // The original opens the skill menu with RETURN, and every tutorial line
+  // about it says so — but RETURN ends the turn here, so the menu is on R
+  // and the tutorial's wording is the one thing that disagrees.
+  KeyR: 'skills',
   Enter: 'endTurn'
 }
 

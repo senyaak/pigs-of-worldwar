@@ -26,6 +26,10 @@ import { loadFont } from './font'
 import type { Font } from './font'
 import { loadTims, tinted } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
+import { drawTitleCard } from './titleCard'
+import { createBriefingBar } from './briefingBar'
+import { createSkillMenu } from './skillMenu'
+import type { SkillMenu } from './skillMenu'
 
 const DASHBOARD = 'Language/Tims/dashtims.mad'
 const MARKERS = 'Language/Tims/MAPICONS.MTD'
@@ -103,12 +107,20 @@ export interface PigPlate {
 }
 
 export interface HudState {
+  /** Seconds since the last frame — the briefing bar's slide and scroll run
+   * on it; nothing else on the dashboard moves by itself. */
+  delta: number
   /** Seconds left in the turn; the clock shows two digits of it. */
   seconds: number
   /** Every living pig, projected by the scene. */
   pigs: PigPlate[]
   /** How long the acting pig has stood still. */
   still: number
+  /** `gtext`, for naming the skill under the menu's cursor. */
+  strings: string[]
+  /** The level's opening card — "TRAINING MISSION: BOOT CAMP" — while the
+   * squad is still in the air, and null once it is down (ui/titleCard.ts). */
+  title: string | null
 }
 
 export interface Hud {
@@ -116,6 +128,12 @@ export interface Hud {
   load(): Promise<void>
   /** Draw one frame over the battle. */
   draw(state: HudState): void
+  /** Send a line through the briefing bar (ui/briefingBar.ts). */
+  say(text: string): void
+  /** The skill menu, which the battle opens and drives (ui/skillMenu.ts). */
+  readonly skills: SkillMenu
+  /** Whether the bar still has anything to say. */
+  speaking(): boolean
   /** Wipe it — the battle is no longer the view. */
   clear(): void
 }
@@ -147,6 +165,12 @@ function offerLayout(): void {
 
 export function createHud(canvas: HTMLCanvasElement): Hud {
   offerLayout()
+  // The bar is its own piece with its own art and its own clock; the
+  // dashboard only owns the canvas they share.
+  const bar = createBriefingBar()
+  // What the pig is carrying, in the game's own frame. Its art is loaded
+  // beside the dashboard's and it draws over everything else.
+  const skills = createSkillMenu()
   let art: SpriteSet | null = null
   let font: Font | null = null
   let digits: Sprite[] = []
@@ -195,6 +219,8 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           heart: markers.get('iconhart')
         }
         await repaint()
+        await bar.load()
+        await skills.load()
         loaded = true
       } catch (error) {
         // A stripped install has no dashboard. Warn rather than error: the
@@ -203,7 +229,13 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       }
     },
 
+    say: (text) => bar.say(text),
+    skills,
+    speaking: () => bar.busy(),
+
     clear() {
+      bar.clear()
+      skills.close()
       const context = canvas.getContext('2d')
       if (context) context.clearRect(0, 0, canvas.width, canvas.height)
     },
@@ -213,15 +245,32 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       const context = canvas.getContext('2d')
       if (!context) return
       context.clearRect(0, 0, canvas.width, canvas.height)
-      if (!art || !font || !heart || fans.length === 0) return
       context.imageSmoothingEnabled = false
+
+      const scale = canvas.height / AUTHORED_HEIGHT
+      const viewWidth = canvas.width / scale
+
+      // The bar runs on its own clock and its own art, so it neither waits
+      // for the dashboard to decode nor stops when the dashboard is missing.
+      bar.update(state.delta)
+      context.save()
+      context.scale(scale, scale)
+      bar.draw(context, viewWidth)
+      context.restore()
+
+      if (!art || !font || !heart || fans.length === 0) return
       // A console change to either painted colour lands on the next frame.
       void repaint()
 
       const { clock: CLOCK, dial: DIAL, plate: PLATE } = LAYOUT
 
-      const scale = canvas.height / AUTHORED_HEIGHT
-      const viewWidth = canvas.width / scale
+      // The level's opening card, in the same units as everything else here.
+      if (state.title) {
+        context.save()
+        context.scale(scale, scale)
+        drawTitleCard(context, font, state.title, viewWidth)
+        context.restore()
+      }
       const blit = (sprite: Sprite, x: number, y: number): void => {
         context.drawImage(
           sprite.image,
@@ -270,6 +319,16 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       blit(art.get('ang5'), dialX + DIAL.slot.cap.x, dialY + DIAL.slot.cap.y)
       const needle = art.get('angpoint')
       blit(needle, dialX + DIAL.hub.x - needle.width, dialY + DIAL.hub.y - needle.height / 2)
+
+      // The skill menu goes over the brass, since it is a MODE rather than
+      // another gauge: while it is up the pig cannot be driven.
+      skills.update(state.delta)
+      if (skills.open()) {
+        context.save()
+        context.scale(scale, scale)
+        skills.draw(context, viewWidth, state.strings)
+        context.restore()
+      }
 
       // A pig's name, and its health beside a heart under it — once it has
       // stood still long enough. Drawn in the widget's own units, with the

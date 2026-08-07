@@ -38,6 +38,28 @@ export function punchMagenta(bmp: Bmp): Uint8Array {
   return rgba
 }
 
+/**
+ * A skill-menu icon: its background is BLACK rather than magenta.
+ *
+ * The menu's own frame keys on magenta and keeps its black — that black is
+ * the widget's inside — but the 56×34 icons and `SELECT.BMP` sit on a black
+ * field that has to go, and the palette entry holding it moves (255 on
+ * TROTTER, 252 on SELECT), so this is a colour test like the magenta one.
+ */
+export function punchBlack(bmp: Bmp): Uint8Array {
+  const rgba = new Uint8Array(bmp.rgba)
+  const colors = bmp.palette.byteLength / 4
+  const clear = new Uint8Array(colors)
+  for (let i = 0; i < colors; i++) {
+    const p = i * 4
+    clear[i] = bmp.palette[p] === 0 && bmp.palette[p + 1] === 0 && bmp.palette[p + 2] === 0 ? 1 : 0
+  }
+  for (let i = 0; i < bmp.indices.length; i++) {
+    if (clear[bmp.indices[i]]) rgba[i * 4 + 3] = 0
+  }
+  return rgba
+}
+
 /** A font atlas: palette entry 0 is the background. */
 export function punchIndexZero(bmp: Bmp): Uint8Array {
   const rgba = new Uint8Array(bmp.rgba)

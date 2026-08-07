@@ -156,6 +156,8 @@ export interface Api {
   loadSound(relPath: string): Promise<LoadSoundResult>
   loadFrontendImages(entryNames: string[]): Promise<FrontendImagesResult>
   loadFont(name: string): Promise<LoadFontResult>
+  /** Every BMP in a MAD — the skill menu's frame and icons. */
+  loadArchiveBmps(relPath: string): Promise<LoadTimsResult>
   loadGameText(which: string): Promise<LoadTextResult>
   loadTims(relPath: string): Promise<LoadTimsResult>
   quit(): Promise<void>

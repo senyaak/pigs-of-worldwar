@@ -16,6 +16,11 @@ import { buildWaterMask } from '../../../lib/game/watermask'
 import { ANIM, createLocomotion, updateLocomotion } from '../../../lib/game/locomotion'
 import type { LocomotionState } from '../../../lib/game/locomotion'
 import { ObstacleField, withPigs } from '../../../lib/game/obstacles'
+import { FULL_HEALTH, pickupsOf, reached, worthOf } from '../../../lib/game/pickups'
+import type { Pickup } from '../../../lib/game/pickups'
+import { amountOf, give } from '../../../lib/game/inventory'
+import type { GiveResult } from '../../../lib/game/inventory'
+import { isTrainingGround } from '../../../lib/game/tutorial'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
@@ -26,7 +31,7 @@ import { createDropIn } from './dropIn'
 import { buildMarker } from './marker'
 import { exposeBattleDebug } from './debug'
 import { SILENT, loadBank } from '../audio/bank'
-import { createBattleSounds } from '../audio/battle'
+import { BATTLE_SOUNDS, createBattleSounds } from '../audio/battle'
 import type { Bank } from '../audio/bank'
 import type { PigPlate } from '../ui/hud'
 import type { SceneHost } from './scene'
@@ -46,15 +51,36 @@ export interface BattleAssets {
   objects: MapObject[]
   props: MapProp[]
   propTextures: Texture[]
+  /** `gtext`, the battle's own strings — the skill names among them
+   * (lib/game/skills.ts). Empty is fine: a battle plays without them. */
+  strings: string[]
   /** `WE_PARA` out of `Chars/WEAPONS.MAD` — the canopy the drop-in hangs
    * under. Null is fine: a map whose squad parachutes simply stands instead
    * of dropping under nothing (three/dropIn.ts). */
   canopy: { model: Model; textures: Texture[] } | null
 }
 
+/** A crate the acting pig has just walked into. */
+export interface Collected {
+  /** Skill id, or null on a health crate (lib/game/skills.ts). */
+  skill: number | null
+  /** What the crate held — the map's own count, before the training ground
+   * makes it unlimited. */
+  amount: number
+  /** What the pig actually got: its slot's new amount, or the health. */
+  given: number
+  /** Whether the pig had room for it (lib/game/inventory.ts). */
+  result: GiveResult
+  /** Who picked it up. */
+  pig: Pig
+}
+
 export interface BattleScene {
   /** Point the camera at the active pig and park the marker over it. */
   focus(pig: Pig): void
+  /** Whether the level's opening drop is still going: what the dashboard
+   * shows the mission's title card over. */
+  dropping(): boolean
   /** Where each living pig's name hangs, in a view this big — the camera
    * lives here, so the dashboard asks rather than guesses. */
   plates(width: number, height: number): PigPlate[]
@@ -65,6 +91,9 @@ export interface BattleScene {
   setIntent(walk: number, turn: number): void
   /** Ask the acting pig to jump (ignored mid-air, swimming or sliding). */
   jump(): void
+  /** Play one of the battle's own effects by name — what the dashboard uses
+   * for the noises that belong to the game rather than to a pig. */
+  sound(name: string): void
   dispose(): void
 }
 
@@ -76,7 +105,12 @@ export function buildBattle(
   assets: BattleAssets,
   game: Game,
   /** Called whenever the game state changed this frame (HUD refresh). */
-  onGameChanged: () => void
+  onGameChanged: () => void,
+  /** Which map this is — the training ground hands out its crates on its own
+   * terms (lib/game/pickups.ts). */
+  map: string,
+  /** Called once per crate the acting pig walks into. */
+  onCollected: (collected: Collected) => void
 ): BattleScene {
   // The per-texel water verdict rides on the same art the ground draws —
   // a pig stands on the painted dry half of a shore tile and swims one
@@ -97,6 +131,57 @@ export function buildBattle(
   // The same records, as things to walk into. Static for the map's life —
   // only the pigs move, and they join per frame.
   const obstacles = new ObstacleField(assets.objects)
+  // The crates that carry something. A collected one is spliced out, so the
+  // list is what is still on the ground.
+  const pickups: Pickup[] = pickupsOf(assets.objects)
+  const training = isTrainingGround(map)
+
+  /** Crates a full pig has already been told it cannot carry: the refusal
+   * is said once, not once a frame while it stands there. */
+  const refused = new Set<number>()
+
+  /**
+   * Hand over any crate the acting pig is standing in. The exe's own order:
+   * the pickup gives the pig its contents (`Pig::GiveSkill`, 0x465425) and
+   * then goes away — a health crate straight into the pig's health, a skill
+   * crate into a slot, and on the training ground both on the training
+   * ground's terms (lib/game/pickups.ts).
+   */
+  const collect = (pig: Pig): void => {
+    for (let i = pickups.length - 1; i >= 0; i--) {
+      const pickup = pickups[i]
+      if (!reached(pickup, pig.position.x, pig.position.z)) continue
+      const worth = worthOf(pickup, training)
+      let result: GiveResult = 'taken'
+      let given = worth
+      if (pickup.skill === null) {
+        pig.health = Math.min(FULL_HEALTH, pig.health + worth)
+        given = pig.health
+      } else {
+        result = give(pig.carrying, pickup.skill, worth)
+        // A pig with fifteen skills already leaves the crate where it is —
+        // "THIS LITTLE PIG ALREADY HAS TOO MANY TOYS TO PLAY WITH".
+        if (result === 'full') {
+          if (!refused.has(pickup.id)) {
+            refused.add(pickup.id)
+            bank.play(BATTLE_SOUNDS.tooMany)
+            onCollected({ skill: pickup.skill, amount: pickup.amount, given: 0, result, pig })
+          }
+          continue
+        }
+        given = amountOf(pig.carrying, pickup.skill)
+      }
+      pickups.splice(i, 1)
+      // The pig cheers: the exe plays 0x5E at its own position the moment
+      // the skill is in (audio/battle.ts).
+      bank.play(BATTLE_SOUNDS.pickup)
+      props.take(pickup.id)
+      // It was something to push against a frame ago; leaving it in the
+      // collision world would leave an invisible crate behind.
+      obstacles.remove(pickup.id)
+      onCollected({ skill: pickup.skill, amount: pickup.amount, given, result, pig })
+    }
+  }
 
   // The battle's own sound bank, loaded beside the scene: silence until it
   // arrives, and silence for good if the install has no Audio folder.
@@ -131,9 +216,16 @@ export function buildBattle(
    * changes or is warped. */
   let loco: LocomotionState = createLocomotion(query, 0, 0, 0)
 
-  /** Camera and marker onto a pig, wherever it happens to be standing. */
+  /** Camera and marker onto a pig, wherever it happens to be standing — or
+   * hanging: a pig still on its canopy is watched from the front, face on. */
   const watch = (soldier: Soldier, delta: number | null): void => {
-    chase.follow(soldier.pig, soldier.node.position.y, dropIn.riseOver(soldier), delta)
+    chase.follow(
+      soldier.pig,
+      soldier.node.position.y,
+      dropIn.riseOver(soldier),
+      delta,
+      dropIn.underCanopy(soldier)
+    )
   }
 
   const focus = (pig: Pig): void => {
@@ -210,6 +302,8 @@ export function buildBattle(
     sounds.follow(loco, query.isWater(loco.x, loco.z))
     game.moveCurrentPig(loco.x, loco.z, loco.heading)
     active.place(loco.x, loco.y, loco.z, loco.heading)
+    // Walking INTO a crate is how one is collected; there is no button.
+    collect(active.pig)
     // A committed clip — the jump's crouch, a landing's get-up — is started
     // once and left to play out; anything else is simply worn. The domain
     // says which is which and when a commitment ends, so this only has to
@@ -255,6 +349,7 @@ export function buildBattle(
     camera: host.camera,
     bank: () => bank,
     still: () => still,
+    strings: () => assets.strings,
     warp: (x, z, heading) => {
       game.moveCurrentPig(x, z, heading)
       loco = createLocomotion(query, x, z, heading)
@@ -266,6 +361,7 @@ export function buildBattle(
 
   return {
     focus,
+    dropping: () => dropIn.running(),
     plates: (width, height) => squad.plates(host.camera, width, height),
     still: () => still,
     setIntent(walk, turn) {
@@ -274,6 +370,9 @@ export function buildBattle(
     },
     jump() {
       jumpRequested = true
+    },
+    sound(name) {
+      bank.play(name)
     },
     dispose() {
       host.onFrame.delete(onFrame)

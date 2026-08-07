@@ -18,6 +18,14 @@ import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
 import { controller } from '../input/controller'
 import { createHud } from './hud'
+import { missionTitle } from './titleCard'
+import { createSpeech } from '../audio/speech'
+import { CLIP_FOR, clipForPickup, isTrainingGround, lineFor } from '../../../lib/game/tutorial'
+import type { Cue } from '../../../lib/game/tutorial'
+import { skillName } from '../../../lib/game/skills'
+import { UNLIMITED } from '../../../lib/game/inventory'
+import type { Collected } from '../three/battle'
+import { BATTLE_SOUNDS } from '../audio/battle'
 import { byId } from './dom'
 
 // The training ground — the first map the original ever shows a player, and
@@ -47,6 +55,16 @@ const normalizeMap = (name: string): string =>
  * a marker's side bit is the nation (lib/game/teams.ts).
  */
 const SIDES_FIELDED = 2
+
+/** `gtext 227`, "USE SHIFT BUTTON TO JUMP THE GAP." — a real tutorial line,
+ * and a long enough one to scroll, which is what `pow.say()` shows. */
+const SAMPLE_LINE = 227
+
+/** What a collected crate puts through the briefing bar. `gtext 171` is the
+ * refusal, 172 the health crate's line — the exe writes the skill ones with
+ * its own "%u X%d" / "%u" (0x4CF9E8) out of the skill's name. */
+const TOO_MANY_TOYS = 171
+const FOUND_PROVISIONS = 172
 
 export interface BattleView {
   open(): Promise<boolean>
@@ -100,6 +118,64 @@ export function initBattle(onLeave: () => void): BattleView {
   let scene: BattleScene | null = null
   let query: TerrainQuery | null = null
   let map = DEFAULT_MAP
+  /** What the opening card says on this map — null on a map the game names
+   * nothing for (ui/titleCard.ts). */
+  let title: string | null = null
+  /** `gtext`, the battle's own strings: the mission titles, and 210..237,
+   * which are the 28 lines the tutorial speaks. */
+  let battleText: string[] = []
+  // The instructor. One voice for the whole app: a battle restarting on
+  // another map does not want a second sergeant talking over the first.
+  const speech = createSpeech()
+  /** Which cues have already been spoken this battle — each fires once. */
+  let cued = new Set<Cue>()
+
+  /**
+   * The tutorial speaking: the clip out of `Speech/Sku1/Train1`, and its line
+   * through the briefing bar. Only on the training ground, and only the once
+   * per battle (lib/game/tutorial.ts).
+   */
+  const cue = (kind: Cue): void => {
+    if (!isTrainingGround(map) || cued.has(kind)) return
+    cued.add(kind)
+    const clip = CLIP_FOR[kind]
+    speech.play(clip)
+    // Several of the lines are a single space — those steps are voice alone,
+    // and the bar has nothing to open for.
+    hud.say(lineFor(battleText, clip).trim())
+  }
+
+  /**
+   * A crate the pig just walked into: what the bar says about it, and what
+   * the sergeant makes of it.
+   *
+   * The wording is the exe's — the skill's own name with "X<count>" after it
+   * unless it arrived unlimited (0x4CF9E8), `gtext 172` ">S FINDS USEFUL
+   * PROVISIONS!" for a health crate, and `gtext 171` for a pig that already
+   * has fifteen skills.
+   */
+  const collected = ({ skill, amount, given, result, pig }: Collected): void => {
+    if (result === 'full') {
+      hud.say(battleText[TOO_MANY_TOYS] ?? '')
+      return
+    }
+    // On the training ground the crate IS the script, and the exe says its
+    // line FIRST: the tutorial is called at the top of `GiveSkill`, before
+    // the pickup's own message is queued (lib/game/tutorial.ts).
+    if (isTrainingGround(map)) {
+      const clip = clipForPickup(skill, amount)
+      if (clip !== 0) {
+        speech.play(clip)
+        hud.say(lineFor(battleText, clip).trim())
+      }
+    }
+    if (skill === null) {
+      hud.say((battleText[FOUND_PROVISIONS] ?? '').replace('>S', pig.name))
+      return
+    }
+    const name = skillName(battleText, skill)
+    hud.say(given === UNLIMITED ? name : `${name} X${given}`)
+  }
 
   const updateTileText = (): void => {
     if (!game) return
@@ -117,15 +193,26 @@ export function initBattle(onLeave: () => void): BattleView {
   }
 
   // The dashboard is drawn over the 3D view, on its own canvas, for as long
-  // as the battle is the view.
+  // as the battle is the view. It keeps its own clock: the scene's frame loop
+  // is three's, and the bar's slide belongs to the dashboard.
   let frame = 0
-  const paint = (): void => {
+  let painted = 0
+  const paint = (now: number): void => {
     frame = requestAnimationFrame(paint)
+    const delta = painted === 0 ? 0 : Math.min(0.1, (now - painted) / 1000)
+    painted = now
     if (!game || !scene) return
+    // The script's first two beats: the sergeant starts talking over the
+    // drop, and picks up again the moment the round is under way.
+    cue(scene.dropping() ? 'drop' : 'round')
     hud.draw({
+      delta,
       seconds: game.timeLeft,
       pigs: scene.plates(hudCanvas.clientWidth, hudCanvas.clientHeight),
-      still: scene.still()
+      still: scene.still(),
+      strings: battleText,
+      // The card is up for exactly as long as anyone is still in the air.
+      title: scene.dropping() ? title : null
     })
   }
 
@@ -140,14 +227,47 @@ export function initBattle(onLeave: () => void): BattleView {
   const battleEl = byId<HTMLDivElement>('battle')
   const isBattleUp = (): boolean => !battleEl.classList.contains('hidden')
 
+  /** The last frame's held directions, so the skill menu steps once per
+   * press rather than once per frame — the same keys drive a pig and a
+   * cursor, and a cursor wants edges. */
+  let steered = { walk: 0, turn: 0 }
+
   const pushIntent = (): void => {
     const walk = (controller.isDown('walkForward') ? 1 : 0) - (controller.isDown('walkBack') ? 1 : 0)
     const turn = (controller.isDown('turnRight') ? 1 : 0) - (controller.isDown('turnLeft') ? 1 : 0)
+    // The menu is a MODE, as it is in the exe: while it is up the pig stands
+    // still and the keys move the cursor instead.
+    if (hud.skills.open()) {
+      if (walk !== 0 && steered.walk === 0) hud.skills.move(0, walk > 0 ? -1 : 1)
+      if (turn !== 0 && steered.turn === 0) hud.skills.move(turn, 0)
+      steered = { walk, turn }
+      scene?.setIntent(0, 0)
+      return
+    }
+    steered = { walk: 0, turn: 0 }
     scene?.setIntent(walk, turn)
   }
   controller.onChange(pushIntent)
   controller.onAction((action) => {
     if (!isBattleUp()) return
+    if (action === 'skills') {
+      // R opens what the pig is carrying — plus what it can always do — and
+      // closes it again. It drives in from the right, with a noise.
+      if (game && hud.skills.toggle(game.currentPig.carrying)) {
+        scene?.sound(BATTLE_SOUNDS.menuOpen)
+      }
+      return
+    }
+    if (hud.skills.open()) {
+      // In the menu, the jump key is the SELECT key: it takes the skill
+      // under the cursor in hand and puts the menu away. Nothing fires it
+      // yet — that is the weapon panel's half of the job.
+      if (action === 'jump' && game) {
+        game.currentPig.holding = hud.skills.chosen()
+        hud.skills.close()
+      }
+      return
+    }
     if (action === 'jump') scene?.jump()
     if (action === 'endTurn') {
       game?.endTurn()
@@ -163,6 +283,8 @@ export function initBattle(onLeave: () => void): BattleView {
     game = null
     if (frame !== 0) cancelAnimationFrame(frame)
     frame = 0
+    painted = 0
+    speech.stop()
     hud.clear()
     onLeave()
   })
@@ -177,15 +299,26 @@ export function initBattle(onLeave: () => void): BattleView {
       console.log(scene ? `stayed on ${map}: ${error}` : `could not open ${name}: ${error}`)
       return false
     }
-    const [terrainResult, objectsResult, clipsResult, textResult] = await Promise.all([
-      window.api.loadTerrain(`Maps/${name}.PMG`),
-      window.api.loadMapObjects(`Maps/${name}.POG`),
-      window.api.loadClips(CHAR_ARCHIVE),
-      window.api.loadGameText('fetext'),
-      hud.load()
-    ])
+    const [terrainResult, objectsResult, clipsResult, textResult, battleTextResult] =
+      await Promise.all([
+        window.api.loadTerrain(`Maps/${name}.PMG`),
+        window.api.loadMapObjects(`Maps/${name}.POG`),
+        window.api.loadClips(CHAR_ARCHIVE),
+        window.api.loadGameText('fetext'),
+        // The battle's own strings: the mission titles and, next, everything
+        // the tutorial says.
+        window.api.loadGameText('gtext'),
+        hud.load()
+      ])
     if (!terrainResult.ok) return refuse(terrainResult.error)
     if (!textResult.ok) return refuse(textResult.error)
+    // An install with no gtext simply gets no card; it is not worth a battle.
+    battleText = battleTextResult.ok ? battleTextResult.strings : []
+    title = missionTitle(battleText, name)
+    // A restart is a fresh level: the sergeant stops mid-word and says his
+    // opening again.
+    speech.stop()
+    cued = new Set()
     const teams = nations(textResult.strings)
     if (teams.length === 0) return refuse('the install names no teams')
 
@@ -249,10 +382,13 @@ export function initBattle(onLeave: () => void): BattleView {
         objects,
         props: objectsResult.ok ? objectsResult.props : [],
         propTextures: objectsResult.ok ? objectsResult.textures : [],
+        strings: battleText,
         canopy
       },
       game,
-      updateTileText
+      updateTileText,
+      name,
+      collected
     )
     map = name
     updateHud()
@@ -281,7 +417,10 @@ export function initBattle(onLeave: () => void): BattleView {
         return false
       }
       return start(normalizeMap(name))
-    }
+    },
+    // The bar has no script driving it yet, so this is how it is watched:
+    // any line, or the tutorial's own long one by default.
+    say: (text?: string) => hud.say(text ?? battleText[SAMPLE_LINE] ?? '')
   }
 
   return {
@@ -292,6 +431,8 @@ export function initBattle(onLeave: () => void): BattleView {
       game = null
       if (frame !== 0) cancelAnimationFrame(frame)
       frame = 0
+      painted = 0
+      speech.stop()
       hud.clear()
     }
   }
