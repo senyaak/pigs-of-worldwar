@@ -19,6 +19,7 @@ import { hurt, isDead } from '../../../lib/game/health'
 import { ANIM } from '../../../lib/game/locomotion'
 import { reached } from '../../../lib/game/targets'
 import type { Target } from '../../../lib/game/targets'
+import type { DamageNumbers } from './damageNumbers'
 import { clipSeconds } from './clips'
 import type { Soldier, Squad } from './squad'
 import { BATTLE_SOUNDS } from '../audio/battle'
@@ -87,6 +88,9 @@ export interface SwingParts {
   targets: Target[]
   /** Take a broken one off the map and out of the collision world. */
   onBroken: (target: Target) => void
+  /** Put the damage up over whatever was hit — the original does, and in
+   * POINTS (three/damageNumbers.ts). */
+  numbers: DamageNumbers
 }
 
 export function createSwings(parts: SwingParts): Swings {
@@ -164,6 +168,7 @@ export function createSwings(parts: SwingParts): Swings {
       // The domain owns what a hit costs and whether it kills; this only
       // makes the noise and lays the body down.
       const outcome = hurt(target.pig, weapon.damage, parts.training)
+      parts.numbers.show(body, weapon.damage)
       parts.bank().play(BATTLE_SOUNDS[weapon.impact])
       if (outcome === 'died' || outcome === 'gibbed') target.playOnce(ANIM.DYING)
     }
@@ -181,6 +186,7 @@ export function createSwings(parts: SwingParts): Swings {
       if (!reached(blade, from, dummy)) continue
       // One point, so anything at all flattens it (lib/game/targets.ts).
       hurt(dummy, weapon.damage, false)
+      parts.numbers.show(dummy, weapon.damage)
       parts.bank().play(BATTLE_SOUNDS[weapon.impact])
       if (isDead(dummy)) {
         standing.splice(i, 1)

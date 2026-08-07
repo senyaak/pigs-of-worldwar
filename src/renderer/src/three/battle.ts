@@ -37,6 +37,8 @@ import { createDropIn } from './dropIn'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import { createSwings } from './swing'
+import { createDamageNumbers } from './damageNumbers'
+import type { FloatingNumber } from './damageNumbers'
 import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
 import { SILENT, loadBank } from '../audio/bank'
@@ -95,6 +97,9 @@ export interface BattleScene {
   plates(width: number, height: number): PigPlate[]
   /** Seconds the acting pig has stood still: the names come back with it. */
   still(): number
+  /** The damage numbers floating over the battle, projected into a view this
+   * big — the dashboard draws them in the game's own letters. */
+  numbers(width: number, height: number): FloatingNumber[]
   /** Tank controls from the input layer: walk -1|0|1 (back/stop/forward),
    * turn -1|0|1 (left/stop/right). */
   setIntent(walk: number, turn: number): void
@@ -240,6 +245,9 @@ export function buildBattle(
   let holding: number | null = null
   /** Where it points (lib/game/aim.ts). */
   let aim = createAim(null)
+  /** The damage that floats off whatever was just hit — the original's own
+   * effect, showing points (three/damageNumbers.ts). */
+  const numbers = createDamageNumbers()
   /** What a bayonet does when the fire key goes down. It reads BONES, so it
    * needs the squad and the root they hang in; the rules are pure next door
    * (lib/game/melee.ts). The aim angle is deliberately NOT among them. */
@@ -252,6 +260,7 @@ export function buildBattle(
     // The training ground's dummies are the other thing a swing can hit, and
     // the only one that is not a pig (lib/game/targets.ts).
     targets: targetsOf(assets.objects),
+    numbers,
     onBroken: (target) => {
       props.take(target.id)
       obstacles.remove(target.id)
@@ -471,6 +480,7 @@ export function buildBattle(
   const onFrame = (delta: number): void => {
     time += delta
     update(delta)
+    numbers.update(delta)
     squad.update(delta)
     marker.bob(time)
   }
@@ -503,6 +513,7 @@ export function buildBattle(
     focus,
     dropping: () => dropIn.running(),
     plates: (width, height) => squad.plates(host.camera, width, height),
+    numbers: (width, height) => numbers.project(host.camera, root, width, height),
     still: () => still,
     setIntent(walk, turn) {
       intent.walk = walk

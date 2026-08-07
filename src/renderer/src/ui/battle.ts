@@ -209,6 +209,7 @@ export function initBattle(onLeave: () => void): BattleView {
       delta,
       seconds: game.timeLeft,
       pigs: scene.plates(hudCanvas.clientWidth, hudCanvas.clientHeight),
+      numbers: scene.numbers(hudCanvas.clientWidth, hudCanvas.clientHeight),
       still: scene.still(),
       strings: battleText,
       aim: scene.aim(),

@@ -402,6 +402,17 @@ path in one spec, collect the crate, take it in hand through the real menu,
 walk up and swing. The pure specs around it all passed while the feature did
 not work: what was broken lived BETWEEN them.
 
+**The damage FLOATS off what was hit, in points.** It is the original's own
+effect, not a flourish: `Pig::TakeDamage` (0x467b5b) and the dummy's
+(0x48da5c) both call **0x487b90** with the body's position and `amount >> 7`,
+which spawns effect 0x35 with a life of 0x3e8 and the value at `+0xd4` (a
+style index per team at `+0xd8`, out of 16-byte records at 0x4cf1e4 — not
+used here). `three/damageNumbers.ts` holds them and `ui/hud.ts` draws them in
+the game's own letters, OUTSIDE the name plates' rest delay: a hit is exactly
+when nobody is standing still, so sharing that delay would hide every one.
+How it MOVES is not decoded — the rise and the fade are the remake's own, and
+so is reading 0x3e8 as milliseconds rather than the clock's hundredths.
+
 **Health is POINTS, the maximum is the CLASS's, and it is not 100.** The
 constructor reads it out of a 128-byte record per class at 0x4d02e0 — the
 same record whose `+0x04` is the thirteen `Pig::Walk` grants — so a grunt has

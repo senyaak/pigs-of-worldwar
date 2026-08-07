@@ -150,7 +150,9 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
 
   // What it says is what the game says, and the clock runs down.
   const before = await hud(page)
-  expect(before).toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 100 })
+  // Fifty, not a hundred: health is the pig's CLASS's and NOBBY is a grunt
+  // (lib/game/health.ts, out of the table at exe 0x4d02e0).
+  expect(before).toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
   expect(before.seconds).toBeGreaterThan(40)
   await expect
     .poll(async () => (await hud(page)).seconds, { message: 'the clock running down' })

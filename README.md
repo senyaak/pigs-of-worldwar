@@ -66,7 +66,8 @@ catches — five swings put a grunt down, because health is the pig's CLASS's
 and a grunt has fifty, not a hundred. Once per swing, and only what is in
 front of it inside 67.5°. The training ground's **dummies** are targets too,
 and they carry exactly one point, so any swing at all knocks one down — hit
-one and it goes off the map. Walking
+one and it goes off the map, and the damage floats up off whatever was hit in
+the game's own letters — the original does that too, and in points. Walking
 is refused for the length of it, as the original refuses it, and the camera
 swings round to the pig's side and closes in — the original has a camera mode
 for exactly this and uses it for nothing else. The aim angle plays no part:

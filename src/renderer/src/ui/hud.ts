@@ -30,6 +30,7 @@ import type { Sprite, SpriteSet } from './sprites'
 import { drawTitleCard } from './titleCard'
 import { createBriefingBar } from './briefingBar'
 import { createSkillMenu } from './skillMenu'
+import type { FloatingNumber } from '../three/damageNumbers'
 import type { SkillMenu } from './skillMenu'
 
 const DASHBOARD = 'Language/Tims/dashtims.mad'
@@ -127,6 +128,9 @@ export interface HudState {
   seconds: number
   /** Every living pig, projected by the scene. */
   pigs: PigPlate[]
+  /** The damage floating off whatever was just hit, projected by the scene
+   * (three/damageNumbers.ts). */
+  numbers: FloatingNumber[]
   /** How long the acting pig has stood still. */
   still: number
   /** `gtext`, for naming the skill under the menu's cursor. */
@@ -367,6 +371,28 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         context.save()
         context.scale(scale, scale)
         skills.draw(context, viewWidth, state.strings)
+        context.restore()
+      }
+
+      // The damage floating off whatever was just hit, in the same letters
+      // and the same widget units. It is the original's own effect (0x487b90)
+      // and it shows POINTS; how it MOVES is the remake's own, so it rises
+      // and thins out (three/damageNumbers.ts). Drawn before the plates and
+      // outside their delay: a hit is exactly when a player is NOT standing
+      // still, so waiting for the plates would hide every one of them.
+      if (state.numbers.length > 0) {
+        context.save()
+        context.scale(scale, scale)
+        for (const number of state.numbers) {
+          const text = String(number.value)
+          context.globalAlpha = Math.max(0, 1 - number.age)
+          font.draw(
+            context,
+            text,
+            Math.round(number.x / scale - font.measure(text) / 2),
+            Math.round(number.y / scale - font.height)
+          )
+        }
         context.restore()
       }
 
