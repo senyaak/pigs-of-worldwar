@@ -67,7 +67,15 @@ export const BATTLE_SOUNDS = {
    * landing pushes 0x1e through the same call and 30 is I_PICKUP, so the
    * match is a coincidence until someone reads that function. A name pick,
    * like the rest of this table. */
-  chute: 'P_CHUTE'
+  chute: 'P_CHUTE',
+  /**
+   * The aeroplane that brings a crate, heard before the canopy opens. Play
+   * named it — "там ещё звук самолёта перед парашютом" — and the bank has
+   * exactly one candidate, `BG_PLANE` at index 10. A NAME pick like the rest
+   * of this table: `BG_` is the bank's prefix for background beds and nothing
+   * has been traced starting this one.
+   */
+  plane: 'BG_PLANE'
 } as const
 
 export interface BattleSounds {

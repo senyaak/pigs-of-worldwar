@@ -65,17 +65,35 @@
  */
 const AMPLITUDE = 4
 
+/**
+ * How much of the way to a fresh sample one engine frame moves.
+ *
+ * A raw sample-and-hold is a square wave and reads as a rattle; play asked
+ * for "чуть плавнее — но не сильно". Two thirds keeps the jitter fast and
+ * uncorrelated but takes the hard edge off each step. One is the raw stick.
+ */
+const EASE = 0.65
+
 export interface Wobble {
-  /** The current sample on each axis, held for one engine frame. */
+  /** The sample each axis is heading for, drawn once an engine frame. */
   pitch: number
   yaw: number
+  /** …and where each one has actually got to. */
+  shownPitch: number
+  shownYaw: number
   /** Frames owed. A new sample lands once an engine frame at fifteen a
    * second — resampling per rendered frame at sixty would turn it into a
    * blur, and holding it longer would turn it into a wobble. */
   owed: number
 }
 
-export const createWobble = (): Wobble => ({ pitch: 0, yaw: 0, owed: 0 })
+export const createWobble = (): Wobble => ({
+  pitch: 0,
+  yaw: 0,
+  shownPitch: 0,
+  shownYaw: 0,
+  owed: 0
+})
 
 /**
  * Advance the tremor. `frames` is engine frames, not rendered ones.
@@ -90,19 +108,27 @@ export function updateWobble(
   if (!sighting) {
     wobble.pitch = 0
     wobble.yaw = 0
+    wobble.shownPitch = 0
+    wobble.shownYaw = 0
     wobble.owed = 0
     return
   }
   wobble.owed += frames
-  if (wobble.owed < 1) return
-  wobble.owed = wobble.owed % 1
-  wobble.pitch = (random() * 2 - 1) * AMPLITUDE
-  wobble.yaw = (random() * 2 - 1) * AMPLITUDE
+  if (wobble.owed >= 1) {
+    wobble.owed = wobble.owed % 1
+    wobble.pitch = (random() * 2 - 1) * AMPLITUDE
+    wobble.yaw = (random() * 2 - 1) * AMPLITUDE
+  }
+  // Chase the sample rather than snapping to it, by the same engine frames —
+  // so the smoothing does not get finer just because the screen is faster.
+  const ease = Math.min(1, EASE * Math.max(frames, 0))
+  wobble.shownPitch += (wobble.pitch - wobble.shownPitch) * ease
+  wobble.shownYaw += (wobble.yaw - wobble.shownYaw) * ease
 }
 
 /** How far off the pitch is this frame, in aim units. View only. */
-export const wobblePitch = (wobble: Wobble): number => wobble.pitch
+export const wobblePitch = (wobble: Wobble): number => wobble.shownPitch
 
 /** …and the yaw. The pig's own heading does not follow it: the model stands
  * where it stands and only the sights move. */
-export const wobbleYaw = (wobble: Wobble): number => wobble.yaw
+export const wobbleYaw = (wobble: Wobble): number => wobble.shownYaw

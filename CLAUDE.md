@@ -859,6 +859,12 @@ on touchdown.
 came back "на пс1 была другая, но похоже для пк поменяли". `sights` + `target`
 stay. The other archives under `Language/Tims` were not dumped.
 
+**A plane, then a canopy.** Play: "там ещё звук самолёта перед парашютом."
+`BG_PLANE` (index 10) is the bank's only candidate and `three/airDrop.ts`
+plays it on `send`, with `chute` half a second behind it — a NAME pick, like
+the rest of `audio/battle.ts`, since nothing has been traced starting that
+bed. `CHUTE_DELAY` is the gap.
+
 **The tremor, fifth pass: a STICK THAT NEVER SITS AT ZERO.** The aim view's
 own handler ends by unpacking six signed bytes out of `[game+0x444]` and
 `[game+0x44C]`, halving them and feeding them to the camera on every frame no
@@ -867,8 +873,11 @@ was made for the sights are wired to a stick, and a resting stick reads a few
 units either way and a *different* few every frame: a small, fast, ANGULAR
 jitter. On a keyboard those bytes are zero, which is why the remake's sights
 were dead still and every invented substitute felt wrong. `lib/game/wobble.ts`
-is now an independent sample per engine frame, ±4 of 4096, on the angles.
-`AMPLITUDE` is the knob.
+is now an independent sample per engine frame, ±4 of 4096, on the angles —
+and play's verdict was "почти хорошо, чуть плавнее, но не сильно", so the
+displayed value CHASES each sample at `EASE = 0.65` a frame instead of
+snapping to it. Two knobs: `AMPLITUDE` for how far, `EASE` for how hard.
+Nothing else in this file is invented — the shape is the exe's.
 
 ### Known divergences — deliberate, and each written up where it lives
 
@@ -969,8 +978,19 @@ is now an independent sample per engine frame, ±4 of 4096, on the angles.
 
 ### Threads left mid-pull
 
-The shot's six items are DONE — see "The SHOT, end to end" above, which also
-lists what each one left open. Everything below this line is older.
+**The next job is GRENADES** — play cleared the shot and the aim view on
+2026-08-07 and named them as what comes next. What that opens up is the POWER
+GAUGE, which is the one big thing the firing work deliberately skipped:
+`../pigs-disasm/weapons/fire.md` has it at the top — 23 weapons carry
+`[weapon*80 + 0x4d7300 + 0x14]`, a fresh press charges `[game+0x4e4]` by 0x50
+a frame to 0xfff, and the throw happens on RELEASE or when it tops out
+(0x493812, 0x493b39). The projectile table already has the whole grenade
+family (kinds 24–32, speed 300, damage base 150, life 1000 — they expire on
+their own fuse, not by range), and `lib/game/projectile.ts` deliberately holds
+only the guns.
+
+Everything below this line is older, and the shot's own six items are DONE —
+see "The SHOT, end to end".
 
 1. **The map SCRIPT — decoded and BUILT.** See below; what is left of it is a
    short list at the end of `../pigs-disasm/script/notes.md`, and none of it

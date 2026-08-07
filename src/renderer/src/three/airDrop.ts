@@ -49,11 +49,17 @@ export interface AirDrops {
   dispose(): void
 }
 
+/** How long after the aeroplane the canopy opens. Play's ordering — the
+ * plane is heard first — and the gap is eyework. */
+const CHUTE_DELAY = 0.5
+
 interface Falling {
   id: number
   drop: DropState
   ground: number
   canopy: THREE.Mesh | null
+  /** Seconds until the canopy is heard, or 0 once it has been. */
+  chuteIn: number
 }
 
 export function createAirDrops(
@@ -80,16 +86,21 @@ export function createAirDrops(
         id,
         drop: { y: fromY - DROP_HEIGHT, vy: 0, chute: true, landed: false },
         ground,
-        canopy: canopies && mesh ? canopies.open(mesh) : null
+        canopy: canopies && mesh ? canopies.open(mesh) : null,
+        chuteIn: CHUTE_DELAY
       })
-      // A canopy opening has a noise and nothing was making it — the bank's
-      // `chute` was decoded far enough to name and then never played
-      // (audio/battle.ts).
-      bank().play(BATTLE_SOUNDS.chute)
+      // The aeroplane first, then the canopy a beat later. Neither was making
+      // any noise at all: the bank's `chute` had been decoded far enough to
+      // name and then never played (audio/battle.ts).
+      bank().play(BATTLE_SOUNDS.plane)
     },
     update(delta) {
       for (let i = live.length - 1; i >= 0; i--) {
         const one = live[i]
+        if (one.chuteIn > 0) {
+          one.chuteIn -= delta
+          if (one.chuteIn <= 0) bank().play(BATTLE_SOUNDS.chute)
+        }
         updateDrop(one.drop, one.ground, delta)
         props.raise(one.id, one.drop.y)
         if (!one.drop.landed) continue
