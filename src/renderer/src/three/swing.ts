@@ -108,8 +108,10 @@ export function createSwings(parts: SwingParts): Swings {
   /** The last strike's measurements, for `pow.debug.strike()`. */
   let report: StrikeReport | null = null
   /** The dummies not yet knocked down. Spliced rather than flagged, the same
-   * way a collected crate leaves the pickup list. */
-  const standing: Target[] = [...parts.targets]
+   * way a collected crate leaves the pickup list — and spliced out of the
+   * caller's OWN list, not a copy of it, because a bullet knocks the same
+   * dummies down (three/shots.ts) and there is one training ground. */
+  const standing: Target[] = parts.targets
 
   const at = new THREE.Vector3()
 

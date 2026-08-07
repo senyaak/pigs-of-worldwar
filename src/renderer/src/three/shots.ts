@@ -13,10 +13,12 @@ import * as THREE from 'three'
 import {
   SHOT_DAMAGE,
   advanceShot,
+  bulletSize,
   fireShot,
   projectileOf,
   spentShot
 } from '../../../lib/game/projectile'
+import { MODEL_SCALE } from '../../../lib/game/scale'
 import type { Shot } from '../../../lib/game/projectile'
 import { PIG_RADIUS } from '../../../lib/game/obstacles'
 import { hurt, isDead } from '../../../lib/game/health'
@@ -69,8 +71,10 @@ export interface Shots {
   fire(soldier: Soldier, aim: number): boolean
   /** One frame of every bullet in the air. */
   update(delta: number): void
-  /** How many are still flying — a tracer is a line a spec cannot see. */
+  /** How many are still flying. */
   live(): number
+  /** Where the newest one is, for the camera to ride — null when none is up. */
+  head(): Shot | null
   clear(): void
   dispose(): void
 }
@@ -87,34 +91,35 @@ export interface ShotParts {
   numbers: DamageNumbers
 }
 
-/** One bullet's tracer: a short bright line along its own travel. */
-interface Tracer {
-  line: THREE.Line
-  geometry: THREE.BufferGeometry
-}
+/**
+ * The bullet's own body.
+ *
+ * One unit sphere, scaled per shot — the exe builds a real object for every
+ * projectile and sizes it off the kind (`bulletSize`), so a bullet is a thing
+ * in the world rather than a streak drawn after it. The colour is the remake's:
+ * the factory takes it out of the palette at 0x4de9d0 and that has not been
+ * read.
+ */
+const BULLET_GEOMETRY = new THREE.SphereGeometry(1, 8, 6)
 
 export function createShots(parts: ShotParts): Shots {
   const live: Shot[] = []
-  const tracers: Tracer[] = []
-  const material = new THREE.LineBasicMaterial({
-    color: 0xfff0b0,
-    transparent: true,
-    opacity: 0.9,
-    depthWrite: false
-  })
+  const bullets: THREE.Mesh[] = []
+  const material = new THREE.MeshBasicMaterial({ color: 0xfff0b0, fog: false })
   const at = new THREE.Vector3()
-  /** Dummies not yet knocked down, the same list a swing keeps. */
-  const standing: Target[] = [...parts.targets]
+  /** Dummies not yet knocked down — literally the same array a swing splices
+   * from (three/swing.ts). Two lists meant a dummy shot dead was still on the
+   * blade's list, so it could be killed twice and run its script twice. */
+  const standing: Target[] = parts.targets
 
-  const tracerAt = (i: number): Tracer => {
-    while (tracers.length <= i) {
-      const geometry = new THREE.BufferGeometry()
-      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
-      const line = new THREE.Line(geometry, material)
-      parts.root.add(line)
-      tracers.push({ line, geometry })
+  const bulletAt = (i: number): THREE.Mesh => {
+    while (bullets.length <= i) {
+      const mesh = new THREE.Mesh(BULLET_GEOMETRY, material)
+      mesh.renderOrder = 1
+      parts.root.add(mesh)
+      bullets.push(mesh)
     }
-    return tracers[i]
+    return bullets[i]
   }
 
   /** Whether this bullet is inside that body. */
@@ -156,21 +161,14 @@ export function createShots(parts: ShotParts): Shots {
   const redraw = (): void => {
     let i = 0
     for (const shot of live) {
-      const tracer = tracerAt(i++)
-      tracer.line.visible = true
-      // A tracer is one frame of travel drawn as a streak — the remake's own;
-      // what the original DRAWS a bullet as has not been read.
-      const array = tracer.geometry.getAttribute('position').array as Float32Array
-      array[0] = shot.x
-      array[1] = shot.y
-      array[2] = shot.z
-      array[3] = shot.x - shot.vx * 0.02
-      array[4] = shot.y - shot.vy * 0.02
-      array[5] = shot.z - shot.vz * 0.02
-      tracer.geometry.getAttribute('position').needsUpdate = true
-      tracer.geometry.computeBoundingSphere()
+      const mesh = bulletAt(i++)
+      const kind = projectileOf(shot.skill)
+      mesh.visible = true
+      mesh.position.set(shot.x, shot.y, shot.z)
+      const radius = (kind ? bulletSize(kind) : 35) * MODEL_SCALE
+      mesh.scale.setScalar(radius)
     }
-    for (let rest = i; rest < tracers.length; rest++) tracers[rest].line.visible = false
+    for (let rest = i; rest < bullets.length; rest++) bullets[rest].visible = false
   }
 
   return {
@@ -213,16 +211,14 @@ export function createShots(parts: ShotParts): Shots {
       redraw()
     },
     live: () => live.length,
+    head: () => live[0] ?? null,
     clear() {
       live.length = 0
       redraw()
     },
     dispose() {
-      for (const tracer of tracers) {
-        parts.root.remove(tracer.line)
-        tracer.geometry.dispose()
-      }
-      tracers.length = 0
+      for (const bullet of bullets) parts.root.remove(bullet)
+      bullets.length = 0
       live.length = 0
       material.dispose()
     }

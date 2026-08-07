@@ -141,6 +141,11 @@ export interface DebugHooks {
   script(): { absent: number[]; falling: number }
   /** How many bullets are in flight (three/shots.ts). */
   shots(): number
+  /** Where the shot sequence has got to — 'fuse', 'flight', or null when the
+   * pig is its own again (lib/game/shot.ts). */
+  firing(): string | null
+  /** Every voice line the pigs have said, in order (audio/pigVoice.ts). */
+  barks(): string[]
   /** Every pig's health, in turn order. */
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */

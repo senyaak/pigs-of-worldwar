@@ -26,6 +26,23 @@ export const CRATE = 19
  */
 export const ABSENT_OPCODES = [21, 23]
 
+/**
+ * The opcodes whose arm is GUARDED — 22 and 23, the ones that run 0x4aa6e7
+ * rather than the plain 0x4aa619. Its guard is the first thing it does:
+ *
+ * ```
+ * 4aa6f5  for every other object with a command:
+ * 4aa700    if ([other->cmd + 2] == [runner->cmd + 2]) -> place NOTHING
+ * ```
+ *
+ * — `+2` on both sides, so the test is "is anyone else still waiting on the
+ * label I waited on". Two dummies raised by the same signal are a PAIR: the
+ * first one to fall finds the second still holding its command and does
+ * nothing, and the second finds nobody and places the next step. **That is
+ * why the sniper rifle wants BOTH near dummies down and not one.**
+ */
+export const GUARDED_OPCODES = [22, 23]
+
 export interface Command {
   /** The record's own id. */
   id: number
@@ -102,8 +119,11 @@ export interface MapScript {
    * this one signals.
    *
    * The exe walks the whole object list and places EVERY match rather than
-   * the first, which is how CAMP's second bridge arrives — six records, all
+   * the first, which is how CAMP's second bridge arrives — seven records, all
    * waiting on the same 6 (`../../../pigs-disasm/script/notes.md`).
+   *
+   * Empty is a perfectly ordinary answer: an object whose arm is guarded and
+   * whose partners are still standing places nothing at all.
    */
   finish(id: number): Placement[]
 }
@@ -111,10 +131,30 @@ export interface MapScript {
 export function createScript(objects: MapObject[]): MapScript {
   const commands = new Map<number, Command>()
   const absent = new Set<number>()
+  /**
+   * Objects whose command no longer counts — the exe's `[obj+0x48] == 0`.
+   *
+   * Two things spend one. Placing a PICKUP clears the crate's own command
+   * (0x4aa6d0, and note the branch: the dummy path jumps over that line at
+   * 0x4aa659, so a placed DUMMY keeps its script and goes on to signal —
+   * which is the whole of how the chain runs more than one step deep). And
+   * finishing something takes it off the object list altogether, which the
+   * guard below cannot tell from a spent command and does not need to.
+   */
+  const spent = new Set<number>()
   for (const object of objects) {
     const command = commandOf(object)
     if (command) commands.set(object.id, command)
     if (startsAbsent(object)) absent.add(object.id)
+  }
+
+  /** Whether anyone ELSE is still waiting on the label this one waited on. */
+  const partnered = (id: number, command: Command): boolean => {
+    for (const [other, waiting] of commands) {
+      if (other === id || spent.has(other)) continue
+      if (waiting.waits === command.waits) return true
+    }
+    return false
   }
 
   return {
@@ -125,11 +165,18 @@ export function createScript(objects: MapObject[]): MapScript {
       // A label of zero signals nothing. Every crate is one of those, and so
       // is any record the loader gave no command at all.
       if (!command || command.signals === 0) return []
+      // Gone, whatever else happens: a broken dummy is off the list before
+      // the next one asks who is left.
+      spent.add(id)
+      // …and the guarded arm waits for the rest of its own group.
+      if (GUARDED_OPCODES.includes(command.opcode) && partnered(id, command)) return []
       const placed: Placement[] = []
       for (const [other, waiting] of commands) {
         if (!absent.has(other)) continue
         if (waiting.waits !== command.signals) continue
         absent.delete(other)
+        // A placed crate loses its command; a placed dummy keeps it.
+        if (waiting.parachute) spent.add(other)
         placed.push({ id: other, parachute: waiting.parachute })
       }
       return placed

@@ -106,7 +106,17 @@ export const LAYOUT = {
   scope: {
     /** How wide the hole is, of the authored 480-tall view. */
     size: 400,
-    surround: 'rgb(8,8,8)'
+    surround: 'rgb(8,8,8)',
+    /**
+     * How far each piece runs PAST its own edge, in authored pixels.
+     *
+     * The four quadrants and the surround around them are drawn through a
+     * fractional `scale`, so an edge that ends exactly where its neighbour
+     * begins lands between two device pixels and the join shows as a seam.
+     * Everything at a join is the same solid rgb(8,8,8), so a pixel of
+     * overlap costs nothing and closes all five of them.
+     */
+    overlap: 1
   },
   plate: {
     /** Seconds a pig must have stood still before its name comes back. */
@@ -315,6 +325,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       // which is PLAY's — the archive says nothing about it.
       if (state.scope) {
         const half = SCOPE.size / 2
+        const over = SCOPE.overlap
         const cx = viewWidth / 2
         const cy = AUTHORED_HEIGHT / 2
         context.save()
@@ -330,16 +341,19 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           context.translate(cx, cy)
           context.scale(sx, sy)
           // Each copy is drawn into its own quadrant with the art's outer
-          // corner AT the outer corner, so the arc meets its neighbours.
-          context.drawImage(corner.image, -half, -half, half, half)
+          // corner AT the outer corner, so the arc meets its neighbours — and
+          // a pixel PAST the centre lines, so the meeting leaves no seam.
+          context.drawImage(corner.image, -half, -half, half + over, half + over)
           context.restore()
         }
-        // …and everything past the four of them is that same near-black.
+        // …and everything past the four of them is that same near-black,
+        // started a pixel inside their outer edge for the same reason. The
+        // pixel it covers is the art's own solid corner, so nothing is lost.
         context.fillStyle = SCOPE.surround
-        context.fillRect(0, 0, viewWidth, cy - half)
-        context.fillRect(0, cy + half, viewWidth, AUTHORED_HEIGHT - (cy + half))
-        context.fillRect(0, cy - half, cx - half, SCOPE.size)
-        context.fillRect(cx + half, cy - half, viewWidth - (cx + half), SCOPE.size)
+        context.fillRect(0, 0, viewWidth, cy - half + over)
+        context.fillRect(0, cy + half - over, viewWidth, AUTHORED_HEIGHT - (cy + half - over))
+        context.fillRect(0, cy - half, cx - half + over, SCOPE.size)
+        context.fillRect(cx + half - over, cy - half, viewWidth - (cx + half - over), SCOPE.size)
         const mark = art.get('target')
         context.drawImage(mark.image, cx - mark.width / 2, cy - mark.height / 2)
         context.restore()

@@ -23,6 +23,7 @@ import type { GiveResult } from '../../../lib/game/inventory'
 import { isTrainingGround } from '../../../lib/game/tutorial'
 import { heal, isDead } from '../../../lib/game/health'
 import { targetsOf } from '../../../lib/game/targets'
+import type { Target } from '../../../lib/game/targets'
 import { aimPhase, aimRadians, createAim, scrubsPose, updateAim } from '../../../lib/game/aim'
 import { weaponModelName, weaponOf } from '../../../lib/game/weapons'
 import { meleeOf } from '../../../lib/game/melee'
@@ -42,7 +43,11 @@ import { createEffects } from './effects'
 import { createAirDrops } from './airDrop'
 import { createScript } from '../../../lib/game/script'
 import { isGun } from '../../../lib/game/projectile'
+import { advanceFiring, beginFiring } from '../../../lib/game/shot'
+import type { Firing } from '../../../lib/game/shot'
+import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
 import { createShots } from './shots'
+import { createPigVoice } from '../audio/pigVoice'
 import type { FloatingNumber } from './damageNumbers'
 import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
@@ -198,16 +203,18 @@ export function buildBattle(
    */
   const advanceScript = (id: number, fromY: number): void => {
     const placed = script.finish(id)
-    // Placing ANYTHING takes everything off the acting pig: the exe calls
-    // `Pig::ClearInventory` (0x468f50) inside both placement arms, on the pig
-    // whose turn it is. That is why the bayonet goes missing the moment the
-    // first dummy falls — the step is over, and the script hands the pig its
-    // next weapon instead (lib/game/inventory.ts).
+    // Putting a CRATE down takes everything off the acting pig: the exe calls
+    // `Pig::ClearInventory` (0x468f50) from the placement arms — but only on
+    // the pickup branch, the one that drops the thing in under a canopy
+    // (0x4aa6cb; the dummy branch jumps clean over it at 0x4aa659). That is
+    // why the bayonet goes missing the moment the first dummy falls: the step
+    // is over, the rifle is on its way down, and the tutorial hands you one
+    // weapon at a time (lib/game/inventory.ts).
     //
     // Clearing what it HOLDS is the remake's own line: the exe leaves
     // `[pig+0x2f4]` pointing at a weapon the pig no longer owns, and here the
     // model in its hands hangs off exactly that.
-    if (placed.length > 0) {
+    if (placed.some((one) => one.parachute)) {
       clearSlots(game.currentPig.carrying)
       game.currentPig.holding = null
     }
@@ -322,6 +329,37 @@ export function buildBattle(
   /** The rings a blow throws — the original's effect system, of which the
    * hand-to-hand hit is the first piece built (three/effects.ts). */
   const effects = createEffects(root)
+  /** The drift the sights have while they are up — the remake's own, and
+   * flagged as such at the constants (lib/game/wobble.ts). */
+  const wobble = createWobble()
+  /** The shot in progress: the ten-frame fuse and then the bullet's flight,
+   * through neither of which is the pig driveable (lib/game/shot.ts). */
+  let firing: Firing | null = null
+  /** The pigs' own barks. The gun arm of `Pig::Fire` says one every shot,
+   * walking twelve lines in rotation (audio/pigVoice.ts). */
+  const voice = createPigVoice()
+  /**
+   * The training ground's dummies — the other thing a blow can land on, and
+   * the only one that is not a pig (lib/game/targets.ts).
+   *
+   * ONE list, shared by the blade and the barrel. Each of them splices a
+   * dummy out when it goes down, so two lists meant a dummy shot dead was
+   * still standing as far as the bayonet was concerned — killable a second
+   * time, and its script step run twice.
+   */
+  const targets = targetsOf(assets.objects)
+  /** What both of them do when a dummy comes apart. */
+  const onBroken = (target: Target): void => {
+    // The exe throws this off the object's own BREAK handler (0x48d750), not
+    // off the blow — a different effect from the hit, and the one play
+    // remembers as smoke.
+    effects.broke(target)
+    props.take(target.id)
+    obstacles.remove(target.id)
+    // …and its own command, which is the last thing the exe's break handler
+    // does (0x48d972). This is what drops the next crate in.
+    advanceScript(target.id, target.y)
+  }
   /** What a bayonet does when the fire key goes down. It reads BONES, so it
    * needs the squad and the root they hang in; the rules are pure next door
    * (lib/game/melee.ts). The aim angle is deliberately NOT among them. */
@@ -331,26 +369,14 @@ export function buildBattle(
     bank: () => bank,
     root,
     training,
-    // The training ground's dummies are the other thing a swing can hit, and
-    // the only one that is not a pig (lib/game/targets.ts).
-    targets: targetsOf(assets.objects),
+    targets,
     // A dummy the script has not placed yet is not a target: the exe's own
     // strike tests `[obj+0x30]`, the placed flag, before it will hit one
     // (0x476319).
     present: (id) => !script.absent(id),
     numbers,
     effects,
-    onBroken: (target) => {
-      // The exe throws this off the object's own BREAK handler (0x48d750),
-      // not off the blow — a different effect from the hit, and the one play
-      // remembers as smoke.
-      effects.broke(target)
-      props.take(target.id)
-      obstacles.remove(target.id)
-      // …and its own command, which is the last thing the exe's break handler
-      // does (0x48d972). This is what drops the next crate in.
-      advanceScript(target.id, target.y)
-    }
+    onBroken
   })
   /** What a GUN does when the fire key goes down. It reads the same hand bone
    * a swing does, and off the same table (three/shots.ts). */
@@ -359,15 +385,10 @@ export function buildBattle(
     root,
     bank: () => bank,
     training,
-    targets: targetsOf(assets.objects),
+    targets,
     present: (id) => !script.absent(id),
     numbers,
-    onBroken: (target) => {
-      effects.broke(target)
-      props.take(target.id)
-      obstacles.remove(target.id)
-      advanceScript(target.id, target.y)
-    }
+    onBroken
   })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
    * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig
@@ -385,7 +406,22 @@ export function buildBattle(
    * and one mid-swing from the side, which is the original's own camera mode
    * for a hand-to-hand attack and the only thing that uses it (three/chase).
    */
+  /** Where the sights are actually pointing: the player's angle plus the
+   * drift. The stored angle stays the player's — the exe's `[pig+0x304]` is
+   * exact, and the wobble is the remake's (lib/game/wobble.ts). */
+  const aimedAngle = (): number => aim.angle + wobblePitch(wobble)
+
   const watch = (soldier: Soldier, delta: number | null): void => {
+    // A bullet in the air takes the camera off the pig altogether: the shot's
+    // own tail hands the camera the projectile and asks for mode 1
+    // (0x47ad99). Only the acting pig's shot does this, and only while there
+    // is something left to watch.
+    const bullet = firing?.phase === 'flight' ? shots.head() : null
+    if (bullet && soldier === squad.of(game.currentPig)) {
+      chase.ride(bullet, Math.atan2(bullet.vx, bullet.vz), delta)
+      soldier.node.visible = true
+      return
+    }
     const view: View = dropIn.underCanopy(soldier)
       ? 'face'
       : soldier === squad.of(game.currentPig) && swings.running()
@@ -402,7 +438,8 @@ export function buildBattle(
       dropIn.riseOver(soldier),
       delta,
       view,
-      aimRadians(aim.angle)
+      aimRadians(aimedAngle()),
+      aimRadians(wobbleYaw(wobble))
     )
     // The pig's own body is IN the way of its own eye. Hide the acting model
     // while the scope is up — every other pig stays, because those are what
@@ -450,7 +487,12 @@ export function buildBattle(
     // first (lib/game/game.ts). A pig that FELL this turn ends it the same
     // way the clock does — the exe hands the turn on from inside the damage
     // itself when the acting pig is the one that died (0x467d4f).
-    if (game.tick(delta) || isDead(game.currentPig)) {
+    //
+    // …and except through a SHOT. Once the fire key has gone down the pig has
+    // stopped being driveable — `Pig::MayAct` refuses on `[pig+0x230]`
+    // (0x467a10) — and the clock does not run the player out of time while
+    // the camera is away watching a bullet.
+    if (!firing && (game.tick(delta) || isDead(game.currentPig))) {
       game.endTurn()
       jumpRequested = false
       fireRequested = false
@@ -497,16 +539,29 @@ export function buildBattle(
     // splits them at the same place — one arm of `Pig::Fire`'s own switch each
     // (0x469415 against 0x46946d).
     if (fireRequested) {
-      if (isGun(holding)) shots.fire(active, aim.angle)
-      else swings.begin(active)
+      if (isGun(holding)) {
+        // A gun is a SEQUENCE, and a press while one is running is refused —
+        // `Pig::MayAct` is false from `Pig::Fire` until `Pig::Attack`
+        // (lib/game/shot.ts). That refusal is the whole of why a rifle is not
+        // a machine gun.
+        if (!firing) {
+          firing = beginFiring()
+          // Out of the sights the moment the trigger goes: the exe's aim
+          // camera is held on the very test that has just gone false.
+          sighting = false
+          // …and the pig says something. Twelve lines in rotation, per squad
+          // (audio/pigVoice.ts).
+          voice.fire(game.players.indexOf(game.currentPlayer))
+        }
+      } else swings.begin(active)
     }
     fireRequested = false
     // A swinging pig cannot be driven: the exe's walk refuses from the moment
     // the button goes down until the clip is spent (0x46afd5 tests both the
     // pending flag and the animation one) and its turn refuses for the clip
-    // alone (0x46af43).
-    const walking = swings.running() ? 0 : intent.walk
-    const turning = swings.swinging() ? 0 : intent.turn
+    // alone (0x46af43). A firing one cannot either, and on the same gate.
+    const walking = swings.running() || firing ? 0 : intent.walk
+    const turning = swings.swinging() || firing ? 0 : intent.turn
 
     loco.x = active.pig.position.x
     loco.z = active.pig.position.z
@@ -538,6 +593,26 @@ export function buildBattle(
     // bayonet — which the block below then picks up.
     swings.update(delta, active)
 
+    // The shot, after the pig has been placed for the same reason a swing is:
+    // the muzzle comes off the HAND bone (three/shots.ts). Ten frames between
+    // the press and the bullet, and the frame the fuse runs out is the frame
+    // it leaves.
+    if (firing && advanceFiring(firing, delta)) {
+      // Where the sights were actually pointing — the drift is part of the
+      // aim, not a decoration over it.
+      if (!shots.fire(active, aimedAngle())) firing = null
+      else {
+        // `Pig::Attack` puts the weapon's own attack clip on at the same
+        // moment (0x46971a), the way a swing's does — the record's fourth
+        // column (lib/game/weapons.ts).
+        const firearm = weaponOf(holding)
+        if (firearm.attackClip >= 0) active.playOnce(firearm.attackClip)
+      }
+    }
+    // …and the sequence is over when there is nothing left in the air. The
+    // camera comes back off the bullet and the turn clock starts again.
+    if (firing?.phase === 'flight' && shots.live() === 0) firing = null
+
     // The weapon in hand, and where it points. Choosing one out of the menu
     // is what starts it: the exe plays the getting-it-out clip and only puts
     // the model in the hand once that has run (`Pig::ReadyWeapon` 0x469090,
@@ -553,6 +628,9 @@ export function buildBattle(
     }
     readying = Math.max(0, readying - delta)
     updateAim(aim, holding, weapon.aims ? aimIntent : 0, delta)
+    // The sights drift while they are up and are steady the moment they are
+    // not — the remake's own (lib/game/wobble.ts).
+    updateWobble(wobble, delta, sighting && isGun(holding))
     for (const soldier of squad.members) {
       const reaching = soldier === active && readying > 0
       weapons.show(soldier.mesh, reaching ? null : weaponModelName(soldier.pig.holding))
@@ -631,6 +709,8 @@ export function buildBattle(
     smoke: () => effects.smoke(),
     script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
     shots: () => shots.live(),
+    firing: () => firing?.phase ?? null,
+    barks: () => voice.spoken(),
     warp: (x, z, heading) => {
       game.moveCurrentPig(x, z, heading)
       swings.reset()
@@ -678,6 +758,7 @@ export function buildBattle(
       marker.dispose()
       effects.dispose()
       shots.dispose()
+      voice.dispose()
       airDrops.dispose()
       weapons.dispose()
       squad.dispose()

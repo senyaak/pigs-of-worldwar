@@ -51,8 +51,14 @@ export interface DebugParts {
   smoke: () => number
   /** What the map SCRIPT is still holding back, and what is in the air. */
   script: () => { absent: number[]; falling: number }
-  /** How many bullets are in flight — a tracer is a line a spec cannot see. */
+  /** How many bullets are in flight. */
   shots: () => number
+  /** Where the shot SEQUENCE has got to: the fuse, the flight, or nothing at
+   * all (lib/game/shot.ts). */
+  firing: () => string | null
+  /** Every voice line the pigs have said, in order — the only way a spec can
+   * hear one (audio/pigVoice.ts). */
+  barks: () => string[]
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -107,6 +113,12 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** Bullets still flying. A gun's range is a LIFETIME in frames, so this
        * goes back to zero on its own (lib/game/projectile.ts). */
       shots: () => parts.shots(),
+      /** Where the shot sequence is: 'fuse' while the ten frames run down,
+       * 'flight' while the camera rides the bullet, null when the pig is its
+       * own again (lib/game/shot.ts). */
+      firing: () => parts.firing(),
+      /** Every line a pig has said. */
+      barks: () => parts.barks(),
       /** Every pig's health, side by side — what a bayonet is measured by. */
       health: () =>
         game.players.flatMap((player) =>

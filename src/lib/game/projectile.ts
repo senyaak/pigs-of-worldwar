@@ -155,6 +155,30 @@ export function advanceShot(shot: Shot, delta: number): void {
 /** Whether it has run out of range. */
 export const spentShot = (shot: Shot): boolean => shot.age >= shot.life
 
+/**
+ * How big a bullet is DRAWN, in model units.
+ *
+ * A projectile is not a streak in the original — it is an object with a real
+ * body, and the body factory sizes it off the projectile's own kind
+ * (0x4a8ed5, the arm the jump table at 0x4a90cc gives body type 0x135D):
+ *
+ * ```
+ * esi = [proj+0x88]                  ; the kind
+ * if (kind == 0x0C) esi = 100
+ * else              esi = (kind == 0x28 ? 0 : 3) + 0x20
+ * ```
+ *
+ * so **35 for every gun but the pistol**, whose kind is 12 and which gets a
+ * hundred. The same routine hands a pickup 128 and a pig-sized body 1024, and
+ * a crate really is about a eighth of the size of a pig, so this is a RADIUS
+ * in model units and a bullet is seventy across. Small, and meant to be: the
+ * shot camera flies along behind it (`../../../pigs-disasm/weapons/fire.md`).
+ */
+export function bulletSize(kind: Projectile): number {
+  if (kind.kind === 12) return 100
+  return kind.kind === 40 ? 32 : 35
+}
+
 /** How far a bullet reaches before it expires, in world units — the speed and
  * the life multiplied, which is the only place a range exists. */
 export const rangeOf = (kind: Projectile): number =>

@@ -27,6 +27,8 @@ interface Debug {
   carrying(): { skill: number }[]
   holding(): number | null
   shots(): number
+  firing(): string | null
+  barks(): string[]
   props(): { at: { name: string }[] }
 }
 
@@ -34,14 +36,22 @@ type Page = import('@playwright/test').Page
 
 const look = (
   page: Page
-): Promise<{ carrying: number[]; holding: number | null; dummies: number }> =>
+): Promise<{
+  carrying: number[]
+  holding: number | null
+  dummies: number
+  firing: string | null
+  barks: string[]
+}> =>
   page.evaluate(() => {
     const pow = (window as unknown as { pow?: { debug?: Debug } }).pow
     if (!pow?.debug) throw new Error('no battle scene is up')
     return {
       carrying: pow.debug.carrying().map((slot) => slot.skill),
       holding: pow.debug.holding(),
-      dummies: pow.debug.props().at.filter((each) => each.name === 'DUMMY').length
+      dummies: pow.debug.props().at.filter((each) => each.name === 'DUMMY').length,
+      firing: pow.debug.firing(),
+      barks: pow.debug.barks()
     }
   })
 
@@ -118,7 +128,25 @@ test('a rifle shot knocks a dummy down from across the yard', async ({ app }) =>
   await push(page, 'aimMode')
   await push(page, 'fire')
 
-  await expect.poll(async () => peakShots(page), { timeout: 9000 }).toBeGreaterThan(0)
+  // Firing is a SEQUENCE and the press is only the start of it: ten frames of
+  // fuse, then the bullet, then the camera rides it home (lib/game/shot.ts).
+  await expect.poll(async () => (await look(page)).firing, { timeout: 3000 }).toBe('fuse')
+  // …and the pig says something as the trigger goes, which is the gun arm of
+  // `Pig::Fire`'s other half (audio/pigVoice.ts). It is a file name, so a spec
+  // can say WHICH line without hearing it.
+  const barks = (await look(page)).barks
+  expect(barks, 'the pig fired without a word').toHaveLength(1)
+  expect(barks[0]).toMatch(/^Speech\/Sku1\/Pig0\d\/0\dEN0[23]0[1-6]\.wav$/)
+
+  // Leaning on the trigger must NOT loose a second bullet: `Pig::MayAct`
+  // refuses for the whole window between the press and the shot (0x467a10),
+  // which is what stops a rifle behaving like a machine gun.
+  for (let again = 0; again < 5; again++) await push(page, 'fire')
+  await expect.poll(async () => peakShots(page), { timeout: 9000 }).toBe(1)
+  expect((await look(page)).barks, 'a spammed trigger said more than one line').toHaveLength(1)
+
   await expect.poll(async () => (await look(page)).dummies, { timeout: 9000 }).toBe(standing - 1)
+  // …and the sequence lets go once the bullet is gone.
+  await expect.poll(async () => (await look(page)).firing, { timeout: 9000 }).toBeNull()
   await release(page, 'aimMode')
 })

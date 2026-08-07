@@ -84,12 +84,46 @@ test('killing the FIRST dummy drops a crate in, and it holds the rifle', () => {
   expect(placed.filter((one) => one.parachute)).toHaveLength(1)
 })
 
-test('a signal fires once — the second dummy finds nothing left to place', () => {
+test('a PAIR must both fall — the sniper rifle waits for the second dummy', () => {
+  // Play reported this as a bug against the remake — "после убийства двух
+  // ближних не падает снайперская винтовка" — and the exe puts the rule in
+  // one place. #7 and #10 both wait on 2 and both signal 3, and their arm is
+  // the GUARDED one (opcode 23): before it places anything it asks whether
+  // any other object is still waiting on the label IT waited on, and does
+  // nothing if there is (0x4aa700). So the first of the pair is silent and
+  // the second speaks for both.
   const script = createScript(CAMP)
-  expect(script.finish(at(7).id).length).toBeGreaterThan(0)
-  // #10 signals the same 3, and everything waiting on it is already down.
+  expect(commandOf(at(7))!.signals).toBe(3)
   expect(commandOf(at(10))!.signals).toBe(3)
-  expect(script.finish(at(10).id)).toEqual([])
+
+  // The whole chain, from the top, because the guard counts what is LEFT: the
+  // rifle crate waits on 2 as well, and only breaking the first dummy takes
+  // it out of the reckoning.
+  script.finish(at(0).id)
+  expect(script.finish(at(7).id), 'one of a pair placed something on its own').toEqual([])
+  const placed = script.finish(at(10).id)
+  expect(placed.length, 'the second of the pair placed nothing either').toBeGreaterThan(0)
+
+  // …and what it places is the sniper rifle, under a canopy — #9 waits on 3
+  // and its high byte is 11.
+  const sniper = at(9)
+  expect(sniper.contents?.weapon).toBe(11)
+  const crate = placed.find((one) => one.id === sniper.id)
+  expect(crate, 'the pair going down drops the sniper rifle in').toBeDefined()
+  expect(crate!.parachute).toBe(true)
+})
+
+test('a placed DUMMY keeps its script; a placed CRATE loses it', () => {
+  // The two branches of the placer part company on exactly this: the pickup
+  // path clears the placed object's command (0x4aa6d0) and the dummy path
+  // jumps straight over that line (0x4aa659). If a dummy lost its command
+  // the chain could never run more than one step, and CAMP runs seven.
+  const script = createScript(CAMP)
+  script.finish(at(0).id)
+  // #7 and #10 were just placed, and they still signal — proved by the pair
+  // above going on to drop the sniper. The crate placed alongside them does
+  // not: collecting it puts nothing on the map.
+  expect(script.finish(at(11).id)).toEqual([])
 })
 
 test('a record with no command finishes quietly', () => {

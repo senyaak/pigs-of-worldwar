@@ -121,8 +121,26 @@ export interface Chase {
     view: View,
     /** Where the weapon points, radians, positive UP. Only the scope reads
      * it (lib/game/aim.ts). */
-    aim?: number
+    aim?: number,
+    /** How far the sights have drifted off the pig's own facing, radians.
+     * Only the scope reads it, and only the sights move — the model stands
+     * where it stands (lib/game/wobble.ts). */
+    yaw?: number
   ): void
+  /**
+   * Ride a bullet.
+   *
+   * The moment a shot leaves, the exe hands the camera the PROJECTILE as its
+   * subject (`0x49ec20`, from the shot's own tail at 0x47ad99) and puts it in
+   * **mode 1** (`0x49f740(1, 0)`). Mode 1's row of the table at 0x4d9528 is
+   * `3072, 1024` — the same distance as the ordinary chase, so this is the
+   * chase rig with a bullet in the middle of it instead of a pig, and it gets
+   * the same numbers here for the same reason.
+   *
+   * `heading` is where the bullet is going, so the camera sits behind it and
+   * watches it fly away rather than side-on.
+   */
+  ride(at: { x: number; y: number; z: number }, heading: number, delta: number | null): void
   /**
    * The chase's own wait, once a frame: parked through involuntary flight and
    * a beat beyond it, cleared the instant the player drives.
@@ -182,23 +200,26 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
     nodeY: number,
     rise: number,
     view: View,
-    aim: number
+    aim: number,
+    yaw: number
   ): { position: THREE.Vector3; target: THREE.Vector3 } => {
     if (view === 'scope') {
       // Game space is Y-DOWN and the rig is Y-up, hence the negations. The
-      // eye looks along the pig's own heading, pitched by the aim.
+      // eye looks along the pig's own heading, pitched by the aim and drifted
+      // by the wobble.
+      const facing = pig.heading + yaw
       const eyeY = -framedY(pig, nodeY) + EYE_HEIGHT
       const ahead = Math.cos(aim)
       const position = new THREE.Vector3(
-        pig.position.x + Math.sin(pig.heading) * EYE_FORWARD * ahead,
+        pig.position.x + Math.sin(facing) * EYE_FORWARD * ahead,
         eyeY + Math.sin(aim) * EYE_FORWARD,
-        -(pig.position.z + Math.cos(pig.heading) * EYE_FORWARD * ahead)
+        -(pig.position.z + Math.cos(facing) * EYE_FORWARD * ahead)
       )
       const reach = 4096
       const target = new THREE.Vector3(
-        position.x + Math.sin(pig.heading) * reach * ahead,
+        position.x + Math.sin(facing) * reach * ahead,
         position.y + Math.sin(aim) * reach,
-        position.z - Math.cos(pig.heading) * reach * ahead
+        position.z - Math.cos(facing) * reach * ahead
       )
       return { position, target }
     }
@@ -238,14 +259,34 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
   }
 
   return {
-    follow(pig, nodeY, rise, delta, view, aim = 0) {
-      const { position, target } = want(pig, nodeY, rise, view, aim)
+    follow(pig, nodeY, rise, delta, view, aim = 0, yaw = 0) {
+      const { position, target } = want(pig, nodeY, rise, view, aim, yaw)
       // The scope SNAPS. Easing a first-person view is motion sickness: the
       // whole point of it is that the barrel and the frame are the same thing.
       if (delta === null || !snapped || view === 'scope') {
         at.copy(position)
         snapped = true
       } else if (wait <= 0) {
+        at.lerp(position, 1 - Math.exp(-6 * delta))
+      }
+      camera.position.copy(at)
+      camera.lookAt(target)
+    },
+    ride(point, heading, delta) {
+      const target = new THREE.Vector3(point.x, -point.y, -point.z)
+      const position = new THREE.Vector3(
+        point.x - Math.sin(heading) * BACK,
+        -point.y + LIFT,
+        -(point.z - Math.cos(heading) * BACK)
+      )
+      // The ground still has a say: a bullet skimming a slope must not put the
+      // camera inside it.
+      const floor = -query.surface(position.x, -position.z) + CLEARANCE
+      position.y = Math.max(position.y, floor)
+      if (delta === null || !snapped) {
+        at.copy(position)
+        snapped = true
+      } else {
         at.lerp(position, 1 - Math.exp(-6 * delta))
       }
       camera.position.copy(at)
