@@ -39,6 +39,8 @@ import { createHeldWeapons } from './heldWeapon'
 import { createSwings } from './swing'
 import { createDamageNumbers } from './damageNumbers'
 import { createEffects } from './effects'
+import { createAirDrops } from './airDrop'
+import { createScript } from '../../../lib/game/script'
 import type { FloatingNumber } from './damageNumbers'
 import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
@@ -160,6 +162,44 @@ export function buildBattle(
   const pickups: Pickup[] = pickupsOf(assets.objects)
   const training = isTrainingGround(map)
 
+  /**
+   * The map's SCRIPT: field 14 is an opcode and the objects are the program
+   * (lib/game/script.ts). Most of what CAMP carries is not on its ground at
+   * the start — eight dummies, the second bridge, and every crate but the
+   * first three — and each of them arrives when the thing it waits on has
+   * been finished off.
+   */
+  const script = createScript(assets.objects)
+  /** Crates that come down under a canopy, because the script says they are
+   * pickups and the placer drops those from 0xC00 up (three/airDrop.ts). */
+  const airDrops = createAirDrops(props, assets.canopy, (id) => obstacles.restore(id))
+  for (const id of script.waiting()) {
+    props.show(id, false)
+    // Off the map means off it entirely: an invisible dummy is not something
+    // to walk into either.
+    obstacles.remove(id)
+  }
+
+  /**
+   * Something has been finished — a crate collected, a dummy broken — so run
+   * its command and put on the map whatever was waiting on it.
+   *
+   * `fromY` is the FINISHER's height, because that is what the exe measures a
+   * canopy drop from rather than the crate's own ground (0x4aa755).
+   */
+  const advanceScript = (id: number, fromY: number): void => {
+    for (const placed of script.finish(id)) {
+      if (placed.parachute) {
+        // The collision world waits for the landing; a crate still in the air
+        // is not standing anywhere.
+        airDrops.send(placed.id, fromY)
+        continue
+      }
+      props.show(placed.id, true)
+      obstacles.restore(placed.id)
+    }
+  }
+
   /** Crates a full pig has already been told it cannot carry: the refusal
    * is said once, not once a frame while it stands there. */
   const refused = new Set<number>()
@@ -174,6 +214,8 @@ export function buildBattle(
   const collect = (pig: Pig): void => {
     for (let i = pickups.length - 1; i >= 0; i--) {
       const pickup = pickups[i]
+      // A crate the script has not placed yet is not there to be walked into.
+      if (script.absent(pickup.id)) continue
       if (!reached(pickup, pig.position.x, pig.position.z)) continue
       const worth = worthOf(pickup, training)
       let result: GiveResult = 'taken'
@@ -204,6 +246,9 @@ export function buildBattle(
       // It was something to push against a frame ago; leaving it in the
       // collision world would leave an invisible crate behind.
       obstacles.remove(pickup.id)
+      // A collected crate runs its own command — the exe does it from inside
+      // the pickup class (0x464633).
+      advanceScript(pickup.id, props.restingY(pickup.id) ?? 0)
       onCollected({ skill: pickup.skill, amount: pickup.amount, given, result, pig })
     }
   }
@@ -264,6 +309,10 @@ export function buildBattle(
     // The training ground's dummies are the other thing a swing can hit, and
     // the only one that is not a pig (lib/game/targets.ts).
     targets: targetsOf(assets.objects),
+    // A dummy the script has not placed yet is not a target: the exe's own
+    // strike tests `[obj+0x30]`, the placed flag, before it will hit one
+    // (0x476319).
+    present: (id) => !script.absent(id),
     numbers,
     effects,
     onBroken: (target) => {
@@ -273,6 +322,9 @@ export function buildBattle(
       effects.broke(target)
       props.take(target.id)
       obstacles.remove(target.id)
+      // …and its own command, which is the last thing the exe's break handler
+      // does (0x48d972). This is what drops the next crate in.
+      advanceScript(target.id, target.y)
     }
   })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
@@ -491,6 +543,7 @@ export function buildBattle(
     update(delta)
     numbers.update(delta)
     effects.update(delta)
+    airDrops.update(delta)
     squad.update(delta)
     marker.bob(time)
   }
@@ -511,6 +564,7 @@ export function buildBattle(
     strike: () => swings.lastStrike(),
     effects: () => effects.live(),
     smoke: () => effects.smoke(),
+    script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
     warp: (x, z, heading) => {
       game.moveCurrentPig(x, z, heading)
       swings.reset()
@@ -553,6 +607,7 @@ export function buildBattle(
       dropIn.dispose()
       marker.dispose()
       effects.dispose()
+      airDrops.dispose()
       weapons.dispose()
       squad.dispose()
       bank.dispose()

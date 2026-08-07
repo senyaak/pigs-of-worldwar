@@ -87,6 +87,9 @@ export interface SwingParts {
   training: boolean
   /** The map's dummies, as things to knock down (lib/game/targets.ts). */
   targets: Target[]
+  /** Whether the map SCRIPT has put this one on the ground yet — most of
+   * CAMP's are not there at the start (lib/game/script.ts). */
+  present: (id: number) => boolean
   /** Take a broken one off the map and out of the collision world. */
   onBroken: (target: Target) => void
   /** Put the damage up over whatever was hit — the original does, and in
@@ -187,6 +190,7 @@ export function createSwings(parts: SwingParts): Swings {
     // the target the same impact noise.
     for (let i = standing.length - 1; i >= 0; i--) {
       const dummy = standing[i]
+      if (!parts.present(dummy.id)) continue
       report.dummies.push({
         id: dummy.id,
         gap: strikeGap(blade, from, dummy),

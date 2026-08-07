@@ -25,6 +25,17 @@ export interface MapProps {
    * The geometry is shared with every other record of that model, so only
    * the mesh goes. */
   take(id: number): void
+  /** Whether one record's art is on the map at all — false while the map
+   * SCRIPT is still holding it back (lib/game/script.ts). */
+  show(id: number, visible: boolean): void
+  /** Move one record's art up or down, game space. What a crate coming down
+   * under a canopy needs, and nothing else uses. */
+  raise(id: number, y: number): void
+  /** Where a record's art was placed, or null if it got none. */
+  restingY(id: number): number | null
+  /** One record's mesh, for hanging something on — a canopy over a crate on
+   * its way down, and nothing else so far. */
+  meshOf(id: number): THREE.Object3D | null
   dispose(): void
 }
 
@@ -45,6 +56,9 @@ export function buildMapProps(
   let placed = 0
   /** Every placed mesh by its record's id, so one can be taken away again. */
   const byId = new Map<number, THREE.Mesh>()
+  /** …and where each one belongs, so a crate that came down under a canopy
+   * can be set back on its own spot. */
+  const restingY = new Map<number, number>()
   for (const object of objects) {
     const model = built.get(object.name)
     if (!model) continue
@@ -55,6 +69,7 @@ export function buildMapProps(
     // HEIGHT_SCALE exactly as the ground does; game space is Y-down, hence
     // the negation.
     mesh.position.set(object.x, -object.y * HEIGHT_SCALE, object.z)
+    restingY.set(object.id, mesh.position.y)
     mesh.rotation.y = modelRotationY(object.yaw)
     // A VTX unit is half a world unit (lib/game/scale.ts). The record's
     // position is already the world's, so the scale goes on the mesh alone
@@ -74,9 +89,20 @@ export function buildMapProps(
       group.remove(mesh)
       byId.delete(id)
     },
+    show(id, visible) {
+      const mesh = byId.get(id)
+      if (mesh) mesh.visible = visible
+    },
+    raise(id, y) {
+      const mesh = byId.get(id)
+      if (mesh) mesh.position.y = y
+    },
+    restingY: (id) => restingY.get(id) ?? null,
+    meshOf: (id) => byId.get(id) ?? null,
     dispose() {
       group.clear()
       byId.clear()
+      restingY.clear()
       for (const { geometry, materials } of built.values()) disposeMesh(geometry, materials)
     }
   }

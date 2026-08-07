@@ -431,6 +431,40 @@ burst (not built — the particle half is undecoded past its 40-byte record).
 `lib/game/effects.ts` is the rules, `three/effects.ts` the geometry,
 `../pigs-disasm/effects/notes.md` the read.
 
+**The map's SCRIPT runs, and the objects ARE the program.** There is no script
+file and no interpreter loop: every POG record may carry one command, **field
+14 is its opcode**, and the loader hangs it on the object at `+0x48`
+(0x4a6287). It runs when the object is FINISHED — a dummy breaking (0x48d972,
+the last thing its death handler does) or a crate being collected (0x464633).
+A chain of "and then", one link per object.
+
+**Field 15 is a PAIR of labels**, one byte each: the low one is what the object
+WAITS for, the high one what it SIGNALS. Except on a crate — field 14 of 19 —
+where the high byte is the CONTENTS instead, so a crate waits and never
+signals. Field 14 of **21 or 23** takes the object OFF the map at load
+(`[obj+0x30] = 0` and the body's no-draw bit, 0x4a62f2), which is what CAMP's
+23s are: eight dummies and the whole second bridge, seven records all waiting
+on the same label so it arrives assembled.
+
+**A crate comes down under a CANOPY and everything else just switches on**, and
+that is the record's own doing rather than a choice: the placer tests the
+waiting object's BODY TYPE, and `0x135b` — what the pickup constructor writes
+(0x4641bd) — gets lifted **0xC00 above whatever signalled** and falls
+(0x4aa64a). 0xC00 is the same 3072 the level's opening drop-in uses, so it is
+the same descent, constants and all (`three/airDrop.ts` over
+`lib/game/parachute.ts`).
+
+Read off the shipped CAMP, breaking the FIRST dummy places two more dummies and
+drops in a crate of **rifles** — which is what play said before any of it was
+read, down to the weapon. `lib/game/script.ts` is the rules and
+`../pigs-disasm/script/notes.md` the read; `pow.debug.script()` says what is
+still held back and what is in the air.
+
+One line in it is inferred rather than read and says so: where a CRATE with a
+wait label is hidden. The loader's own hide covers only opcodes 21 and 23, but
+it gives such a crate a command all the same and the placer's whole job is to
+switch it on — which would be nothing to do if it had never been off.
+
 **A thing BREAKING is a different effect, and that one IS the smoke.** Play
 said so — "там ещё чёрный дым в игре при уничтожении чего либо" — and the
 binary agrees: the object's own break handler (0x48d750, whose last act is to
@@ -655,13 +689,10 @@ would be a stand-in nobody asked for.
   two questions are one question, and it is deliberately left until the
   tutorial's intro reaches that ramp: whatever raises it is what will say
   how it is walked. Do not "fix" the collision for it before then.
-- **The map's SCRIPT is not run, so scripted objects are just there.** Field
-  14 is the script OPCODE — decoded since, see the thread below — and CAMP's
-  23s (eight dummies and the whole second bridge) are records the original
-  starts ABSENT and places later. The remake places everything at once, so
-  that bridge stands assembled from the first frame and reads as levitating
-  steps: flat slabs at 2208, 1984 and 1472 over four supports, which is
-  exactly what the file says and not a rendering fault.
+- **A bridge the script has placed still cannot be WALKED on.** Its pieces are
+  shape kind 1 and so bodiless, which is the same parked question the first
+  bridge has. The script now raises it at the right moment; climbing it is
+  still its own job.
 - **Two sides, though a map offers up to six.** The spawn markers name six
   (FINAL uses all of them, the arenas four); the battle fields the first two
   it finds, because there is no AI for the rest. There is no filling in
@@ -681,34 +712,9 @@ would be a stand-in nobody asked for.
 **The next job, and where it starts.** The effect system was the other one
 and it is built (see below); this is what is left of that pair.
 
-1. **The map SCRIPT — FOUND, and not yet built.** Three things wait on it and
-   they are one mechanism: the crate that drops in when the training ground's
-   first dummy goes down, the tutorial's second bridge, and why most of CAMP's
-   dummies are not the one being struck at.
-
-   There is no script file and no interpreter loop. **Every POG record may
-   carry one COMMAND, and field 14 is its opcode** — the loader builds it out
-   of fields 14, 15, 16, 25 and 27 (0x4a6287) and hangs it on the object at
-   `+0x48`. It runs when the object is FINISHED: a dummy breaking (0x48d972,
-   the last thing its death handler does) or a crate being collected
-   (0x464633). So the script is a chain of "and then", one link per object,
-   and `Object::RunScript` is **0x4aa170** — twenty-three opcodes, byte map at
-   0x4aa814 into a jump table at 0x4aa7f8, and a command's position is a TILE
-   column and row (`<<9`, less 0x3f00) rather than the world coordinates a
-   record stores.
-
-   Two lines are the whole of the "scripted objects are just there"
-   divergence: field 14 of **21 or 23** clears `[obj+0x30]` and sets the
-   body's no-draw bit (0x4a62f2), so those records START ABSENT. Field 14 of
-   **19** — which `formats/pog.ts` already calls CARRIES, a crate — gets a
-   command ONLY on the training ground, and there it becomes opcode 21 with
-   field 15's low byte as its operand.
-
-   What is left to read before it can be built: `0x4a7130`, which turns those
-   fields into the command record (and so says whether a remake needs anything
-   beyond the POG); the bodies of the tutorial's own arms 0x4aa619 and
-   0x4aa6e7; and the site that PLACES an object that started absent. All of it
-   is `../pigs-disasm/script/notes.md`.
+1. **The map SCRIPT — decoded and BUILT.** See below; what is left of it is a
+   short list at the end of `../pigs-disasm/script/notes.md`, and none of it
+   blocks anything.
 
 Two smaller ones noted in play and not acted on: **a dying pig should come
 apart and leave its boots** (the exe already splits the two deaths and so

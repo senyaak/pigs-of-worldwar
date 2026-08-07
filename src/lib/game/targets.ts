@@ -59,10 +59,9 @@ export interface Target {
  * Every dummy a map stands on its ground.
  *
  * Matched by MODEL NAME, which is how a record is paired to its geometry
- * anyway. CAMP carries eight, tagged with the script's own field-14 value of
- * 23 and paired off by field 15 into four groups — and WHICH of them the
- * original has live at any moment is script state the remake does not have
- * (see below), so all of them stand as targets here.
+ * anyway. CAMP carries eleven, all but the first tagged with the script's own
+ * field-14 value of 23 and paired off by field 15 — see below for who decides
+ * which are on the ground.
  */
 export function targetsOf(objects: MapObject[]): Target[] {
   return objects
@@ -89,14 +88,9 @@ export function reached(
   return caught(strikeGap(blade, attacker, target))
 }
 
-// **All eight are live, and that is the remake's own.** The exe does not walk
-// a list here: 0x4762e0 takes the single object at `[0x537df0]` and checks its
-// type, so seven of CAMP's eight are not the one being struck at any moment.
-// What moves that pointer is the map SCRIPT — the same script that raises the
-// tutorial's second bridge and places its crates, and it is not decoded. Until
-// it is, a dummy you can walk up to is a dummy you can hit.
-//
-// The other half of the same gap: play says knocking the first one down drops
-// a crate in by parachute, and the tutorial's own step list agrees — a step
-// ends on "killing the dummy, picking up the crate, or reaching somewhere"
-// (`lib/game/tutorial.ts`). That drop IS the script, so it is not here either.
+// **Which of them is actually THERE is the script's** — `lib/game/script.ts`,
+// and the battle asks it before a swing may catch one, the same way the exe's
+// strike tests the placed flag `[obj+0x30]` (0x476319). Every dummy CAMP
+// carries but the first is field-14 = 23, which means the loader takes it off
+// the map and something else has to put it back. The list here is still all of
+// them: a target that has not arrived yet is one that is going to.

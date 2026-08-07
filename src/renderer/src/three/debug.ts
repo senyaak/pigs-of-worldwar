@@ -49,6 +49,8 @@ export interface DebugParts {
   effects: () => number
   /** …and how many puffs of smoke: a thing BREAKING throws those instead. */
   smoke: () => number
+  /** What the map SCRIPT is still holding back, and what is in the air. */
+  script: () => { absent: number[]; falling: number }
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -97,6 +99,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** How many puffs of smoke are up — six per thing broken, for about
        * two thirds of a second (lib/game/effects.ts). */
       smoke: () => parts.smoke(),
+      /** The records still off the map, and how many crates are coming down
+       * under a canopy right now (lib/game/script.ts). */
+      script: () => parts.script(),
       /** Every pig's health, side by side — what a bayonet is measured by. */
       health: () =>
         game.players.flatMap((player) =>

@@ -222,6 +222,13 @@ export class ObstacleField implements Obstruction {
     this.gone.add(id)
   }
 
+  /** …and put one back, which is what the map SCRIPT does when it places an
+   * object that started off the map (lib/game/script.ts). Not the opposite of
+   * a collected crate — that one never returns. */
+  restore(id: number): void {
+    this.gone.delete(id)
+  }
+
   standOn(x: number, z: number, footY: number, reach: number): number | null {
     let best: number | null = null
     for (const obstacle of this.near(x, z)) {

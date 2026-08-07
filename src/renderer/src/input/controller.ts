@@ -137,6 +137,8 @@ export interface DebugHooks {
   effects(): number
   /** How many puffs of smoke a breaking has in the air (three/effects.ts). */
   smoke(): number
+  /** What the map script is still holding back, and what is in the air. */
+  script(): { absent: number[]; falling: number }
   /** Every pig's health, in turn order. */
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */

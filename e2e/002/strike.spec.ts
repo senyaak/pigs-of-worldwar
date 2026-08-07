@@ -31,6 +31,7 @@ interface Debug {
   strike(): unknown
   effects(): number
   smoke(): number
+  script(): { absent: number[]; falling: number }
   props(): { at: { name: string; x: number; z: number }[] }
 }
 
@@ -73,25 +74,24 @@ const watchEffects = (page: Page): Promise<void> =>
   page.evaluate(() => {
     const w = window as unknown as {
       pow: { debug: Debug }
-      __peak?: { rings: number; smoke: number }
+      __peak?: { rings: number; smoke: number; falling: number }
     }
-    w.__peak = { rings: 0, smoke: 0 }
+    w.__peak = { rings: 0, smoke: 0, falling: 0 }
     const tick = (): void => {
       const peak = w.__peak!
       peak.rings = Math.max(peak.rings, w.pow.debug.effects())
       peak.smoke = Math.max(peak.smoke, w.pow.debug.smoke())
+      peak.falling = Math.max(peak.falling, w.pow.debug.script().falling)
       requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
   })
 
-const peakEffects = (page: Page): Promise<{ rings: number; smoke: number }> =>
+const peakEffects = (page: Page): Promise<{ rings: number; smoke: number; falling: number }> =>
   page.evaluate(
     () =>
-      (window as unknown as { __peak?: { rings: number; smoke: number } }).__peak ?? {
-        rings: 0,
-        smoke: 0
-      }
+      (window as unknown as { __peak?: { rings: number; smoke: number; falling: number } })
+        .__peak ?? { rings: 0, smoke: 0, falling: 0 }
   )
 
 const push = (page: Page, action: string): Promise<void> =>
@@ -139,6 +139,10 @@ test('a bayonet swung at a dummy knocks it down', async ({ app }) => {
   const peak = await peakEffects(page)
   expect(peak.rings, 'the hit threw no rings').toBe(2)
   expect(peak.smoke, 'the dummy came apart without smoke').toBe(6)
+  // …and the map's SCRIPT ran: this dummy signals label 2, and a crate of
+  // rifles waits on it. A crate is a pickup, so the placer drops it in from
+  // 0xC00 up rather than switching it on (lib/game/script.ts).
+  expect(peak.falling, 'the first dummy dropped no crate in').toBeGreaterThan(0)
 
   // …and if it did not land, say WHY rather than just failing.
   const after = await look(page)
