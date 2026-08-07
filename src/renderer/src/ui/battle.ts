@@ -26,6 +26,10 @@ import { byId } from './dom'
 // like ARTGUN or ICEFLOW.
 const DEFAULT_MAP = 'CAMP'
 const CHAR_ARCHIVE = 'Chars/british.mad'
+/** Where the canopy lives: `WE_PARA`, the archive's 24th model, which is the
+ * one `Pig::StartParachuting` hangs off a pig (three/parachute.ts). */
+const WEAPON_ARCHIVE = 'Chars/WEAPONS.MAD'
+const CANOPY_MODEL = 'WE_PARA'
 
 /** 'artgun', 'ARTGUN.PMG' and 'Maps/ARTGUN.PMG' all mean ARTGUN. */
 const normalizeMap = (name: string): string =>
@@ -76,7 +80,8 @@ function mapSquads(objects: MapObject[], teams: Team[]): Squad[] {
         x: at.x,
         z: at.z,
         heading: at.heading,
-        pigClass: at.pigClass
+        pigClass: at.pigClass,
+        parachutes: at.parachutes
       }))
     }
   })
@@ -212,6 +217,15 @@ export function initBattle(onLeave: () => void): BattleView {
       return { base, model: result.model, textures: result.textures }
     })
 
+    // The canopy the level opens under. A squad that drops in without it
+    // would be hanging from nothing, so a failed load stands them on their
+    // markers instead of taking the battle down with it.
+    const canopyResult = await window.api.loadModel(WEAPON_ARCHIVE, CANOPY_MODEL)
+    if (!canopyResult.ok) console.log(`${name} without canopies: ${canopyResult.error}`)
+    const canopy = canopyResult.ok
+      ? { model: canopyResult.model, textures: canopyResult.textures }
+      : null
+
     game = new Game({
       players: squads.map((squad) => ({ name: squad.name, pigNames: squad.pigNames })),
       spawns: squads.flatMap((squad) => squad.spawns)
@@ -230,7 +244,8 @@ export function initBattle(onLeave: () => void): BattleView {
         // is reported and stepped over rather than taking the battle down.
         objects,
         props: objectsResult.ok ? objectsResult.props : [],
-        propTextures: objectsResult.ok ? objectsResult.textures : []
+        propTextures: objectsResult.ok ? objectsResult.textures : [],
+        canopy
       },
       game,
       updateTileText

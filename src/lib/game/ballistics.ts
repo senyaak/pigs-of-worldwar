@@ -79,10 +79,21 @@ export const RESTITUTION_MIN = 0xcc / FIXED
  * The original counts logic frames, not seconds, and its rate is NOT in the
  * disassembly — it imports timeGetTime but reaches it the same indirect way
  * it reaches the animation library, so no call site says how long a frame
- * is. 30 Hz is the console-port figure and the one that matches play; this
- * is the knob to turn if the wait feels wrong, not a finding.
+ * is. This is the knob, not a finding, and it is the ONLY one left in the
+ * speed chain: the request is 64, `Pig::Walk` takes `sar eax,4` of it times
+ * the class's 13 (0x46ad0d) for 52 units a frame, and a tile is 512 — all
+ * three read straight off the exe.
+ *
+ * It was 30 Hz, which put a grunt at 1560 units a second. Against a pig
+ * 640 units wide that reads as a walk; against the 320 the engine's own
+ * half scale makes it (`lib/game/scale.ts`) the same number is a sprint,
+ * and play says so. Halving the rate is the whole correction — the same
+ * factor 2 the model moved by, applied to the one number that is free.
+ * Everything else is per-FRAME and untouched: the jump still costs 15
+ * frames and the wedge counter still 25, they simply last as long as they
+ * always did in frames.
  */
-export const FRAME_SECONDS = 1 / 30
+export const FRAME_SECONDS = 1 / 15
 /** Frames wedged in a wall before the pig is thrown out (exe `cmp eax,19h`). */
 export const EJECT_SECONDS = 25 * FRAME_SECONDS
 /** …and before it is crushed instead (exe `cmp eax,0FAh`). Not modelled yet:

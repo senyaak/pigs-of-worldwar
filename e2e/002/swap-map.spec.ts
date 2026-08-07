@@ -9,16 +9,9 @@ import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
-import { debugState, hold, hud } from '../controller'
+import { debugState, hold, hud, swapMap } from '../controller'
 import { startGame } from '../menu'
 import type { Page } from '@playwright/test'
-
-const swapMap = (page: Page, name?: string): Promise<boolean> =>
-  page.evaluate((n) => {
-    const pow = (window as unknown as { pow?: { swapMap?(name?: string): Promise<boolean> } }).pow
-    if (!pow?.swapMap) throw new Error('pow.swapMap is missing — is the battle module loaded?')
-    return pow.swapMap(n)
-  }, name)
 
 const mapName = (page: Page): Promise<string> =>
   page.evaluate(() => {

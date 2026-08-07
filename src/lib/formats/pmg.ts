@@ -70,7 +70,20 @@ export function tileUvs(rotateFlip: number, corners: number[][]): number[][] {
   const slots = rotateFlip & FLIP_X ? [RING[1], RING[0], RING[3], RING[2]] : RING
   const rot = (rotateFlip & ROTATE) >> ROTATE_SHIFT
   const uvs = new Map(RING.map((corner, i) => [String(corner), slots[((i - rot) % 4 + 4) % 4]]))
-  return corners.map((corner) => uvs.get(String(corner)) as number[])
+  // `turn.js` scored the table above in the FILE's index space, where b runs
+  // with the file's row. The parse now reverses that row (a file row runs
+  // −z, see TerrainBlock.z), so `corners` arrive in the mirrored space and
+  // the lookup mirrors b to meet them. Same table, same pinned bytes — the
+  // measurement is a claim about texture-against-slope and both mirror
+  // together, so it is untouched by the world flipping.
+  //
+  // Worth recording where that leaves the flip nobody has found: composed
+  // this way the result is the DLL's own FORWARD shift with the texture's v
+  // complemented — so the odd flip now sits on v, the ordinary top-down /
+  // bottom-up texture convention, rather than on the direction of a turn.
+  // That is a likelier place for a real bug in the TIM → page path, and it
+  // is where to look next.
+  return corners.map((corner) => uvs.get(String([corner[0], 1 - corner[1]])) as number[])
 }
 
 export interface TerrainTile {
@@ -85,12 +98,32 @@ export interface TerrainBlock {
   /**
    * World position of the block's first vertex — its minimum x and minimum
    * z corner. Derived from the block's PLACE in the file, not from the
-   * fields it stores: `Map::Load` (exe 0x4a5635) overwrites both with
-   * `(col - 8) * 2048` and `(row - 8) * 2048` before anything reads them.
-   * The x it writes agrees with the stored field. The z does not — the file
-   * counts z down where the game counts it up — so trusting the file's z
-   * puts the whole map back to front, and every asymmetric texture with it.
-   * Vertices run +x with the column AND +z with the row.
+   * fields it stores: `Map::Load` (exe 0x4a5635) overwrites both before
+   * anything reads them. The x is `(col - 8) * 2048` and agrees with the
+   * stored field.
+   *
+   * **A FILE ROW RUNS −z, and the row order is reversed here so that it
+   * does.** Two sites in the original say so and neither reads the field
+   * `Map::Load` writes:
+   *
+   * - `Map::SampleHeight` (exe 0x4a5140) takes `row = (−z + 0x4000) >> 9` —
+   *   row 0 is at z = +16384 and the LAST row at −16384;
+   * - `afSetMap` (dll 0x100024c0) fills the render grid with its source
+   *   pointer starting one row PAST the end of the cell array and stepping
+   *   −0x500 (one row) per iteration, while the z it writes into the vertex
+   *   climbs from −16384 in +512 steps. Same answer, in the renderer.
+   *
+   * Counting z up with the row instead builds the whole world mirrored —
+   * which hides completely, because mesh, collision, props and spawns all
+   * mirror together and nothing internal can tell. It is visible only
+   * against the original, and play says plainly that our maps came out the
+   * wrong way round.
+   *
+   * So the parse emits block row `15 − R` with its vertex rows reversed
+   * (`4 − r`) and its tile rows with them (`3 − r`), which puts every vertex
+   * at the z `SampleHeight` would give it and leaves EVERY consumer with the
+   * simple rule it already had: vertices run +x with the column and +z with
+   * the row.
    */
   x: number
   z: number
@@ -127,26 +160,37 @@ export function parsePmg(data: Uint8Array): TerrainBlock[] {
     // height how-doc marks unreliable, +6 unknown; heights are absolute, so
     // neither is needed either.)
     const x = ((block % BLOCKS_PER_SIDE) - BLOCKS_PER_SIDE / 2) * (TILES_PER_SIDE * TILE_STEP)
-    const z = (Math.floor(block / BLOCKS_PER_SIDE) - BLOCKS_PER_SIDE / 2) * (TILES_PER_SIDE * TILE_STEP)
+    // A file row runs −z (see TerrainBlock.z): mirror the row here, once, and
+    // every consumer downstream keeps counting z up with the row.
+    const fileRow = Math.floor(block / BLOCKS_PER_SIDE)
+    const z = (BLOCKS_PER_SIDE - 1 - fileRow - BLOCKS_PER_SIDE / 2) * (TILES_PER_SIDE * TILE_STEP)
 
     // Four bytes per vertex: s16 height, u8 shade, one always-zero byte.
+    // Vertex rows come out reversed with the block: row 4 − r of the file is
+    // row r here, which is what keeps a block's shared edge on the edge its
+    // neighbour now shares.
     const heights = new Int16Array(VERTS_PER_SIDE * VERTS_PER_SIDE)
     const shades = new Uint8Array(heights.length)
-    for (let vertex = 0; vertex < heights.length; vertex++) {
-      heights[vertex] = view.getInt16(base + 8 + vertex * 4, true)
-      shades[vertex] = view.getUint8(base + 8 + vertex * 4 + 2)
+    for (let r = 0; r < VERTS_PER_SIDE; r++) {
+      for (let c = 0; c < VERTS_PER_SIDE; c++) {
+        const from = base + 8 + ((VERTS_PER_SIDE - 1 - r) * VERTS_PER_SIDE + c) * 4
+        heights[r * VERTS_PER_SIDE + c] = view.getInt16(from, true)
+        shades[r * VERTS_PER_SIDE + c] = view.getUint8(from + 2)
+      }
     }
 
     const tiles: TerrainTile[] = []
     const tilesBase = base + 8 + heights.length * 4 + 4
-    for (let tile = 0; tile < TILES_PER_SIDE * TILES_PER_SIDE; tile++) {
-      const o = tilesBase + tile * 16
-      tiles.push({
-        type: view.getUint8(o + 6),
-        slip: view.getUint8(o + 7),
-        rotateFlip: view.getUint8(o + 10),
-        texture: view.getUint32(o + 11, true)
-      })
+    for (let r = 0; r < TILES_PER_SIDE; r++) {
+      for (let c = 0; c < TILES_PER_SIDE; c++) {
+        const o = tilesBase + ((TILES_PER_SIDE - 1 - r) * TILES_PER_SIDE + c) * 16
+        tiles.push({
+          type: view.getUint8(o + 6),
+          slip: view.getUint8(o + 7),
+          rotateFlip: view.getUint8(o + 10),
+          texture: view.getUint32(o + 11, true)
+        })
+      }
     }
     blocks.push({ x, z, heights, shades, tiles })
   }

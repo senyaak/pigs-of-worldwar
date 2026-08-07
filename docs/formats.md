@@ -261,9 +261,19 @@ spare bytes). No how-doc was used — the layout is what the files say, and
 
 Fields, by index: 0-2 position, 3 the record's own 1-based place in the
 file, 4-6 pitch/yaw/roll in 4096ths of a turn, 7 object type, 8-10 collision
-box extents ÷128 **in the order (z, y, x)**, 13 a bitfield whose low six
-bits are always set, 17-24 and 30 always zero, 25-27 an unrelated second
-position that is editor scratch. 11, 12, 14-16, 28 and 29 are undecoded.
+box extents ÷128 **in the order (z, y, x)**, 13 a bitfield, 17-24 and 30
+always zero, 25-27 an unrelated second position that is editor scratch.
+11, 12, 14-16, 28 and 29 are undecoded.
+
+Field 13's HIGH byte is the side, one bit per nation. Its LOW byte is which
+games the record exists in — bit 5 "placed at all", bits 0-3 the one- to
+four-player games (exe 0x4a58cb) — plus **bit 6, which says a spawn
+marker's pig PARACHUTES in** when the level opens (0x4a5f11/0x4a676e). On a
+campaign map that bit picks out one side of five, the player's, and the
+enemy is already on the ground; a skirmish arena drops all four sides or
+none. Only the marker branch of the loader reads it, so the 315 ordinary
+records that carry it are saying something else.
+`../pigs-disasm/parachute/notes.md` has the proof over all 61 maps.
 
 A record is paired to its geometry **by name**: the base name of a
 VTX/NO2/FAC triple in the map's own `<NAME>.MAD`, textured from the sibling

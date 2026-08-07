@@ -10,6 +10,14 @@ Start with [README.md](README.md) (how to play and run), then
 Reverse-engineering findings live in a separate repo next door,
 [`../pigs-disasm`](../pigs-disasm) — notes plus the scripts that prove them.
 
+**Committing is standing permission, in both repos — do not ask.** Finish a
+piece of work and commit it, with the attribution the global rules give
+(author Senyaak, committer Claude via `GIT_COMMITTER_*`, no `Co-Authored-By`
+trailer). Two things still apply: never `git add -A` over a tree you did not
+leave — check `git status` first and stage only your own files, because work
+in progress from another session lives here regularly — and pushing is a
+separate question that is still worth asking.
+
 ## Traps that cost real time — do not rediscover these
 
 **Two coordinate systems, and they disagree.** Models (VTX) are **Y-down**.
@@ -28,7 +36,48 @@ Legs look fine either way (their bind direction is already down), so **only
 the arms reveal a sign error**. Full derivation with three proof scripts:
 `../pigs-disasm/anim/notes.md`.
 
-**The model faces +X**, hence `PIG_HEADING_OFFSET = -π/2`.
+**A model is drawn at HALF size — `MODEL_SCALE`, and it is a literal pushed
+86 times.** The body constructor (exe 0x45de90) stores its last three
+arguments at +0x60/+0x64/+0x68 and hands them to the library's `afScaleObj`
+(0x45e443); that function's unity is 4096 and eight sites pass it, while 86
+— the POG loader and the pig code alike — pass `0x800`. 2048/4096 = 0.5.
+The archive says the same without any disassembly: at 1:1 every prop is
+buried (DUMMY −259, CRATE1 −94, IRONGATE −380, the STW walls −256), at ½
+they land on the ground (−2, +1, +2, 0). Full trail in `lib/game/scale.ts`.
+The POG's collision box follows it — its unit is 64 world units, not 128 —
+and that unit lives in ONE place (`formats/pog.ts`); a second copy in
+`game/obstacles.ts` is what once left a pig radius 320 among halved boxes
+and quietly dropped every prop out of the collision world.
+
+**The model faces +X**, hence `PIG_HEADING_OFFSET = -π/2`, and play confirms
+it: a driven pig walks the way it is facing, which is what that offset aims.
+That matters because a SPAWN MARKER disagrees with it by exactly half a
+turn. A marker is a POG record, and the engine turns every record by ONE yaw
+about the vertical (exe 0x4a5bd5 pushes field 5 and no other angle), so a
+marker should ask for the same `yaw - π/2` a prop does and a spawn heading
+should be `yaw` outright — in play the pig then stands backwards. With the
+offset settled by the walk, the half turn is the MARKER's own:
+`spawns.ts` carries `yaw + π` and a marker's stored yaw simply does not mean
+what a prop's does. Not an open question.
+
+**The collision boxes do not work, and that is known.** Parked deliberately,
+not overlooked — the size and the turn are right (`formats/pog.ts`,
+`game/obstacles.ts`) but the behaviour is not, and it is its own job.
+
+**`FRAME_SECONDS` is 1/15, and it is the only free number in the speed
+chain.** The request is 64, `Pig::Walk` takes `sar eax,4` of it times the
+class's 13 for 52 units a frame, and a tile is 512 — all read off the exe.
+The rate is not in the disassembly at all. It was 1/30; against a pig at
+half scale that walk is a sprint, so it halved. Everything else counts
+FRAMES and is untouched. Cost: the jump hangs twice as long in seconds, and
+`JUMP_RISE = √MODEL_SCALE` in `locomotion.ts` is the remake's own correction
+so a hop stays the same fraction of a pig it always was.
+
+**Model UVs do NOT flip V.** They used to, "because TIM rows are top-down" —
+but the texture uploads with `flipY = false`, so data row 0 is already v = 0
+and the flip was a second one on top of nothing. Every model wore its
+texture upside down; the map's firs gave it away, being billboards with the
+whole tree painted on them, trunk and all.
 
 **`HEIGHT_SCALE` is the one vertical knob, and it is 1 against the exe.**
 The exe doubles the PMG heights in three places — collision sampler,
@@ -36,8 +85,15 @@ The exe doubles the PMG heights in three places — collision sampler,
 copies them in untouched, all verified. But a doubled CAMP plays as a
 mountain range and reads as stretched next to the original, so the remaster
 renders 1×. Do not "fix" this back from the disassembly alone; the
-contradiction is written up in `../pigs-disasm/movement/notes.md` and wants
-whatever undoes the doubling to be found first. Vertical constants lifted
+contradiction is written up in `../pigs-disasm/movement/notes.md`. There IS
+now a candidate for what undoes it — the models are drawn at half size, so
+the "reads as stretched" judgement was made against a pig twice the size it
+should be, and halved models plus doubled heights would stand a pig four
+times smaller against the relief. It is NOT taken, and this is no longer
+an untried idea: it was checked in play against the half-scale models and it
+still breaks the map. Leave `HEIGHT_SCALE` at 1 and do not re-propose the
+doubling — it changes the TERRAIN, which is a separate decision from the
+size of a model, and play has already answered it. Vertical constants lifted
 from the exe go through `fromExeY`, so they follow the knob.
 
 **Terrain height never refuses a step — and a wall is not a full stop
@@ -93,15 +149,31 @@ texture × shade, with the shade converted to linear first; lighting those
 polygons again — especially with the per-face normals `computeVertexNormals`
 gives split vertices — is exactly the faceting it replaces.
 
-**A block's world position is its PLACE in the file, not the offsets it
-stores.** `Map::Load` (exe 0x4a5635) overwrites both with `(col - 8) * 2048`
-and `(row - 8) * 2048` before anything reads them. The x agrees with the
-stored field; the z is its opposite, because the file counts z down where
-the game counts it up. Reading the stored z put the whole map back to front
-— which is invisible in isolation, since collision and mesh were mirrored
-together, and shows up as every asymmetric texture facing the wrong way.
-Vertices run +x with the column AND **+z with the row**. This is also why
-`WALL_SHAPES` no longer needs the mirror it used to carry.
+**A block's world position is its PLACE in the file, and A FILE ROW RUNS
+−z.** `Map::Load` (exe 0x4a5635) overwrites both stored offsets with
+`(col - 8) * 2048` and `(row - 8) * 2048`, and the x agrees with everything
+downstream — but the z does not mean what it looks like. The two sites that
+actually USE a coordinate both count the row the other way and neither
+reads that field: `Map::SampleHeight` takes `row = (-z + 0x4000) >> 9`, and
+`afSetMap` (dll 0x100024c0) walks the cell array BACKWARD, from one row past
+its end, while the z it writes climbs from -16384. Cell row r sits at
+`z = 16384 - 512*r`.
+
+Getting that backwards builds the whole world MIRRORED, which hides
+perfectly — mesh, collision, props and spawns mirror together, so nothing
+internal can tell — and is visible only against the original, where play
+says our maps came out the wrong way round. `parsePmg` mirrors the row once
+(block `15 - R`, vertex rows `4 - r`, tile rows `3 - r`) so that every
+consumer keeps the simple rule: vertices run +x with the column AND +z with
+the row. `../pigs-disasm/terrain/mirror.js` is the proof — 0 of 4096 cells
+disagree with `SampleHeight` on nine maps, against ~3500 the other way.
+
+Three things follow, and each is the same mirror leaving: the POG's z takes
+**no** negation (the 343-unit fit `objects/notes.md` measured for `-z` is
+the identical fit for `+z` once the terrain is right — and confirmed by
+READING since: the exe pushes the record's x/y/z into the constructor
+untouched), and `WALL_SHAPES` is the exe's jump
+table read literally, mirror-free.
 
 **A map does not place the same things in every game.** The low byte of a
 record's flags word is which player counts it exists in — the loader drops
@@ -110,14 +182,20 @@ as ten pigs until the byte splits them into the campaign's five snipers and
 the skirmish's five grunts, standing on the same five spots. The battle
 filters by its own number of sides before anything else looks at the list.
 
-**The POG counts z down too, and its yaw is NEGATED.** A map's objects are
+**The POG stores true world coordinates.** A map's objects are
 paired to geometry in the map's own `.MAD` **by name**, their stored z is
-the file's downward one (negate it, exactly as for a block), and their
+used as it stands (see the block rule above — the negation this once
+carried was the mirror), and their
 stored y is an ELEVATION of the model's CENTRE — so props hover their own
-half-height above the ground by design. The turn is `phi = −yaw − π/2`, and
-BOTH parts of that are measured rather than read: CAMP's bridge only forms
-one walkway with the angle negated, and its yaw-0 training dummy only faces
-the green path at `−π/2`. Two tests that look decisive are backwards —
+half-height above the ground by design (and it rides `HEIGHT_SCALE`, like
+the ground). The turn is `phi = yaw − π/2`, and **CAMP's iron gate is what
+pins it**: two records of the SAME model 1280 apart along z at yaws 1024 and
+3072, so a half turn out reads as the two leaves having swapped sides. Note
+the gate cannot test the SIGN — 90° and 270° give the same rotation either
+way — so it pins the quarter and nothing else. The training dummy is NOT
+evidence any more: after the map was un-mirrored it was recalculated from
+the mirror hypothesis rather than re-measured, and under the gate's rule it
+faces away from its path. Two tests that look decisive are backwards —
 walls near a long prop are the ones it CROSSES, and a bridge ramp climbs
 over the ditch, so its high end is above the LOW ground. Every name that
 fails to resolve ends in `_ME`: those records are the pig SPAWN markers,
@@ -132,7 +210,12 @@ turn. The four UVs are a ring round the quad: the byte mirrors ring slots
 0↔1 and 2↔3, then each corner takes the slot `rot` places round. Unturned,
 the texture lands u along +x and v along +z, v being the texture row.
 
-**The turn's direction is the one thing here measured, not read.** The
+**The turn's direction is the one thing here measured, not read.** (And
+with the map un-mirrored the residual has MOVED: composed against the
+reindexed rows the table equals the DLL's forward shift with the texture's
+**v** complemented, so the unfound flip is now an ordinary top-down /
+bottom-up v convention rather than a reversed rotation — a likelier place
+for a real bug in the TIM → page path, and the next thing to look at.) The
 disassembly composes to a forward shift; the shipped maps say backward, and
 the half-turn settles it — it is its own opposite, so it cannot be got
 wrong, and the quarter-turns have to land on its side (883 steep tiles,
@@ -153,9 +236,16 @@ gives a direction that is downhill on neither side.
 `afDrawAnimModel` and friends via `GetProcAddress`. Hunting skeletal maths in
 `warhogs_.exe` is a dead end (recorded in the notes).
 
-**Clip indices come from the exe's own name table**, not guesswork:
-0 run, 3 walk back, 4 turn on spot, 5 swim, 8-10 jump, 11 scramble,
-27/28 idle, 47-50 dying/drowning. See `../pigs-disasm/animations/notes.md`.
+**Clip indices come from the exe's own CALL SITES**, not from its name
+table: 0 run, 3 walk back, 4 turn on spot, 5 swim, 8-10 jump, 11 scramble,
+27/28 idle, 47-50 dying/drowning. The debug name table agrees with every one
+of those and is still not the authority — it lists 59 names where the code
+reaches 83 clips, and its LAST name is wrong: the exe parachutes with clip
+**82**, not the 58 it calls "Parachuting". Run the skeleton forward and 82
+is the hands-above-the-shoulders hang while 58 ranks 92nd of 93 for it. So
+read a clip off `ANIM` in `lib/game/locomotion.ts` (each entry cites the
+site that plays it), never off the table. `../pigs-disasm/animations/notes.md`
+and `../pigs-disasm/parachute/notes.md`.
 
 ## How the code is laid out
 
@@ -166,11 +256,19 @@ gives a direction that is downhill on neither side.
   `ballistics`). Pure too, so the domain specs drive them directly.
 - `src/main/` — `index.ts` lifecycle only, `gameDir.ts` locating the install,
   `assets.ts` loading through the readers, `ipc.ts` the IPC surface.
-- `src/renderer/src/` — `ui/` one module per view, `three/` scene/pig/terrain/
-  battle/clips/props, `audio/` the sound banks, `input/` the controller.
-  `main.ts` is composition only.
+- `src/renderer/src/` — `ui/` one module per view, `audio/` the sound banks,
+  `input/` the controller, `three/` the scene. `main.ts` is composition only.
+- `three/battle.ts` is WIRING and the frame's order of events, nothing more.
+  The pieces are one file each: `squad.ts` the pigs (mesh, clip, placement,
+  name plates), `chase.ts` the camera — the only thing in the battle that
+  works in three's Y-up world — `dropIn.ts` the level's opening parachute
+  phase, `parachute.ts` the canopy art, `marker.ts` the pointer overhead,
+  `debug.ts` the `window.pow.debug` surface the e2e suite looks through, and
+  `terrain.ts`/`props.ts`/`pig.ts`/`clips.ts`/`modelMesh.ts` as before.
 
 Keep modules small and single-purpose; that split was an explicit request.
+`battle.ts` reached 600 lines doing four jobs and was broken up on sight —
+do that again rather than letting one file grow a second concern.
 
 ## Input goes through the controller — including tests
 
@@ -252,6 +350,20 @@ nudges a piece against the real screen and `pow.hud.print()` writes the lot
 back out to paste in. Placing this art is eyework — it took four rounds of
 "almost, seven pixels up" to seat the weapon slot — so do that in the
 console and commit the result, rather than rebuilding per pixel.
+
+**A level OPENS with the drop-in.** A marker's flags bit 6 says its pig
+arrives by parachute, and on a campaign map that is the player's side of
+five while the enemy is already standing there. Those pigs start
+`fromExeY(3072)` above their own marker with a `WE_PARA` canopy over them
+and come down at the parachute force's terminal — about five seconds — with
+the turn clock and the controls stopped, because the original's parachute
+branch advances the clip and returns. `lib/game/parachute.ts` is the
+descent, `three/parachute.ts` the canopy, and the whole derivation is
+`../pigs-disasm/parachute/notes.md`. The chase camera leaves room for the
+canopy while one is up (`desiredCamera`'s `rise`); without that the canopy
+sits off the top of the frame, which is how it looked the first time. Every
+e2e entry into a battle waits it out through `landed()` — a spec that drives
+before then is driving nothing.
 
 Squads are fielded from the map's OWN spawn markers — position,
 facing, side and CLASS, each class dressed from its own model in
@@ -423,7 +535,8 @@ would be a stand-in nobody asked for.
   and six other sites write it.
 - The tile type's low 5 bits: 0x20 water, 0x80 wall and the twelve material
   rows are known; the rest of the meanings are not.
-- POG fields 11, 12, 14-16, 28 and 29, and what the always-set low six bits
-  of the flags word (13) mean. 14-16 look like the interesting ones — they
-  are non-zero mostly on crates and spawn markers, which is where a crate's
-  contents and a spawn's team would live.
+- POG fields 11, 12, 14-16, 28 and 29. 14-16 look like the interesting ones
+  — they are non-zero mostly on crates and spawn markers, which is where a
+  crate's contents and a spawn's team would live. Of the flags word (13),
+  the side, the player counts, "placed at all" and now bit 6 (the
+  parachute) are decoded; the rest of the low byte is not.

@@ -208,8 +208,13 @@ export function initMenu(handlers: { onNewGame: () => void; onAssets: () => void
     )
   }
 
+  // `now` is the frame's own timestamp, and rAF hands out the time the frame
+  // BEGAN — which can predate the `performance.now()` taken when the art
+  // finished loading. One negative millisecond floors to -1, and `-1 % n` is
+  // -1 in JS, so the first frame drew `undefined` and threw. Clamp the age
+  // rather than the index: an animation cannot start before it starts.
   const cycle = (frames: Sprite[], now: number): Sprite =>
-    frames[Math.floor(((now - started) / 1000) * COG_FPS) % frames.length]
+    frames[Math.floor((Math.max(0, now - started) / 1000) * COG_FPS) % frames.length]
 
   const draw = (now: number): void => {
     const context = canvas.getContext('2d')

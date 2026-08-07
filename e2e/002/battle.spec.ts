@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
-import { debugState, hold, hud, peakNodeY, press, release, tap, warp } from '../controller'
+import { debugState, hold, hud, peakNodeY, press, release, swapMap, tap, warp } from '../controller'
 import { startGame } from '../menu'
 import { TILE_STEP, TILE_WALL, TILE_WATER, parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
@@ -113,7 +113,7 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   expect(await secondsLeft()).toBeGreaterThan(40)
 
   // Two sides rotate the way two sides do — on a map that HAS two.
-  expect(await page.evaluate(() => window.pow!.swapMap!('LIBERATE'))).toBe(true)
+  expect(await swapMap(page, 'LIBERATE')).toBe(true)
   await expect
     .poll(() => hud(page))
     .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY' })
@@ -128,7 +128,7 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
     .poll(() => hud(page))
     .toMatchObject({ turn: 2, side: "TOMMY'S TROTTERS", pig: 'GINGER' })
   // Back to the map the rest of the phase warps around on.
-  expect(await page.evaluate(() => window.pow!.swapMap!('CAMP'))).toBe(true)
+  expect(await swapMap(page, 'CAMP')).toBe(true)
 
   // Leaving lands back on the menu; a fresh New Game starts over at turn 1.
   await page.locator('#battle-leave').click()
@@ -156,7 +156,10 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   expect(distance, 'walkForward moved the pig').toBeGreaterThan(200)
 
   // Turning aims it.
-  await hold(page, 'turnRight', 400)
+  // 800ms, not 400: a turn is 32/4096 of a circle per FRAME and a frame is
+  // twice as long as it was (ballistics.ts), so the same rotation takes
+  // twice the wall clock. The threshold below is what is being tested.
+  await hold(page, 'turnRight', 800)
   const turned = await debugState(page)
   expect(Math.abs(turned.heading - walked.heading), 'turnRight rotated the pig').toBeGreaterThan(0.3)
 
@@ -170,19 +173,19 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   await tap(page, 'jump')
   await page.waitForTimeout(120)
   const airborne = await debugState(page)
-  expect(airborne.nodeY, 'jump left the ground').toBeLessThan(grounded.nodeY - 50)
+  expect(airborne.nodeY, 'jump left the ground').toBeLessThan(grounded.nodeY - 20) // the hop's apex is 35 units now (JUMP_RISE)
 
   // And it recharges. The cooldown once ticked down inside the turn-change
   // block, where the next line reset it — so a pig could jump exactly once
   // per turn and never again.
   await expect
     .poll(async () => (await debugState(page)).nodeY, { message: 'back on the ground' })
-    .toBeGreaterThan(airborne.nodeY + 50)
+    .toBeGreaterThan(airborne.nodeY + 20)
   await page.waitForTimeout(600)
   const standing = await debugState(page)
   await tap(page, 'jump')
   await page.waitForTimeout(120)
-  expect((await debugState(page)).nodeY, 'jumped a second time').toBeLessThan(standing.nodeY - 50)
+  expect((await debugState(page)).nodeY, 'jumped a second time').toBeLessThan(standing.nodeY - 20)
 
   expect(app.errors()).toEqual([])
 })

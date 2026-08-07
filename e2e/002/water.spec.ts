@@ -44,7 +44,10 @@ const lake = (): TerrainQuery =>
 
 test('the water level is where the water-tile corners sit, dips notwithstanding', () => {
   const wet = lake()
-  expect(wet.waterElevation).toBe(200 * HEIGHT_SCALE)
+  // `shape` in the fixture is already WORLD elevation — it divides by
+  // HEIGHT_SCALE on the way into the block, and the query multiplies back —
+  // so these are the shape's own numbers, with no scale on top.
+  expect(wet.waterElevation).toBe(200)
   // A dry map has no level at all.
   expect(terrain(() => 300).waterElevation).toBeNull()
 })
@@ -52,8 +55,8 @@ test('the water level is where the water-tile corners sit, dips notwithstanding'
 test('the surface is the ground with everything under water raised to it', () => {
   const wet = lake()
   // Over the dip the surface reads the water level, not the seabed…
-  expect(wet.surface(0, 2000)).toBe(-200 * HEIGHT_SCALE)
-  expect(wet.height(0, 2000)).toBeCloseTo(-40 * HEIGHT_SCALE)
+  expect(wet.surface(0, 2000)).toBe(-200)
+  expect(wet.height(0, 2000)).toBeCloseTo(-40)
   // …and dry land above the level is untouched.
   expect(wet.surface(0, -2000)).toBeCloseTo(wet.height(0, -2000))
 })
@@ -66,7 +69,7 @@ test('a swimming pig floats at the surface — the seabed does not drag it down'
   updateLocomotion(overDip, wet, { walk: 0, turn: 0, jump: false }, FRAME_SECONDS)
   expect(overFlat.clip).toBe(ANIM.SWIM)
   expect(overDip.y, 'same depth over the hole').toBeCloseTo(overFlat.y)
-  expect(overDip.y).toBeCloseTo(-200 * HEIGHT_SCALE + SWIM_SINK)
+  expect(overDip.y).toBeCloseTo(-200 + SWIM_SINK)
 })
 
 test('CAMP: the fitted level is the 128 the mapmakers authored', () => {
@@ -169,8 +172,8 @@ test('each water region gets ITS OWN level — a raised pool is not underground'
     (_x, z) => (z < -4000 ? 100 : z > 4000 ? 700 : 400),
     (_x, z) => (z < -4200 || z > 4200 ? { type: 0x24 } : {})
   )
-  expect(twoPools.surface(0, -6000)).toBe(-100 * HEIGHT_SCALE)
-  expect(twoPools.surface(0, 6000)).toBe(-700 * HEIGHT_SCALE)
+  expect(twoPools.surface(0, -6000)).toBe(-100)
+  expect(twoPools.surface(0, 6000)).toBe(-700)
   // The dry middle is untouched ground.
   expect(twoPools.surface(0, 0)).toBeCloseTo(twoPools.height(0, 0))
 })

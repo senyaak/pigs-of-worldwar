@@ -4,9 +4,10 @@
 // button to click: a spec moves the lit bar with the controller, exactly as
 // the keyboard does, and reads the screen back through `window.pow.menu`.
 
+import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-import { tap } from './controller'
+import { landed, tap } from './controller'
 
 interface MenuHooks {
   selected(): number
@@ -62,5 +63,13 @@ export async function choose(page: Page, label: string): Promise<void> {
   await tap(page, 'menuSelect')
 }
 
-/** The one bar that leads anywhere yet: the training ground. */
-export const startGame = (page: Page): Promise<void> => choose(page, 'ONE PLAYER')
+/**
+ * The one bar that leads anywhere yet: the training ground — and then the
+ * level's opening drop, because CAMP's one marker carries the parachute bit
+ * and nothing on the ground moves until its pig is on it (`landed`).
+ */
+export async function startGame(page: Page): Promise<void> {
+  await choose(page, 'ONE PLAYER')
+  await expect(page.locator('#battle')).toBeVisible()
+  await landed(page)
+}

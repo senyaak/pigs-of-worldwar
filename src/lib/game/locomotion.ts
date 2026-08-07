@@ -29,6 +29,7 @@ import {
 } from './ballistics'
 import type { Bounciness } from './ballistics'
 import { FALL_SPEED_FACTOR, WALK_BACK_SPEED, WALK_SPEED, step } from './movement'
+import { MODEL_SCALE } from './scale'
 import { clampToWorld, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
 import { NO_OBSTACLES } from './obstacles'
@@ -92,12 +93,25 @@ export const GRAVITY = TERMINAL_FALL / FALL_TAU
  * Not modelled: the standing hop's wind-up. The exe plays clip 8 and only
  * calls `StartFalling` when that clip runs out (0x46e8e2), so its standing
  * jump begins a few frames late; ours leaves at once.
+ *
+ * **The launch rides `JUMP_RISE`, and that is the remake's own.** The exe's
+ * 0x30 puts the apex at 62 world units standing and 131 running, and those
+ * are absolute — they know nothing about how big the body is. The model is
+ * drawn at half size (`lib/game/scale.ts`) and the ground it falls back to
+ * did not change with it, so the same hop became twice the pig's height.
+ * Gravity here is the terrain's and is left alone, and under a fixed pull
+ * the apex goes as the SQUARE of the launch — so the square root of the
+ * model scale is what keeps a hop the same fraction of a pig it always was.
+ * Corrected against play, not derived: the exe cannot say how high a pig
+ * should jump relative to itself, only how high in units.
  */
-export const JUMP_SPEED = fromExeSpeed(0x30)
+export const JUMP_RISE = Math.sqrt(MODEL_SCALE)
+export const JUMP_SPEED = fromExeSpeed(0x30) * JUMP_RISE
 export const JUMP_PUSH = fromExeSpeed(0x30)
 export const JUMP_PUSH_DELAY = 3 * FRAME_SECONDS
 /** The launch, for a pig whose walking step this frame is `stride`. */
-export const jumpVelocity = (stride: number): number => -(JUMP_SPEED + Math.abs(stride) / 2)
+export const jumpVelocity = (stride: number): number =>
+  -(JUMP_SPEED + (Math.abs(stride) / 2) * JUMP_RISE)
 /** The eject's launch speed: the exe's 0x20 per logic frame. */
 export const EJECT_SPEED = fromExeSpeed(0x20)
 /**
@@ -116,6 +130,13 @@ export const SIDESTEP_SPEED = fromExeSpeed(8)
  * site of its play function (0x471ef0) rather than from the names:
  * `StartFalling` (0x4707f0) plays 9, the eject path (0x470c70) plays 38, and
  * the impact handler (0x470d10) plays 39.
+ *
+ * The call sites are the whole authority here, and PARACHUTE is what shows
+ * why: the exe's own debug name table calls clip 58 "Parachuting" and the
+ * exe parachutes with 82. Run the skeleton forward and 82 is the
+ * hands-above-the-shoulders hang while 58 ranks 92nd of 93 for it — the name
+ * table simply stops before the clips the code reaches
+ * (../../../pigs-disasm/parachute/notes.md).
  */
 export const ANIM = {
   RUN: 0,
@@ -123,6 +144,9 @@ export const ANIM = {
   TURN: 4,
   SWIM: 5,
   JUMP_MIDDLE: 9,
+  /** Coming down off a flight and standing up — what the parachute landing
+   * (0x4717d0) and the ordinary one (0x470910) both play, once. */
+  LAND: 10,
   /** Trying to climb. Not a movement state: `UpdateGroundState` raises a
    * flag whenever the pig stands on terrain type 11 under the low-5-bit
    * mask (`and edx,1Fh; cmp ecx,0Bh`, exe 0x46fde1/0x470082), and the
@@ -134,7 +158,9 @@ export const ANIM = {
   /** Thrown out of a wall — what `0x470c70` plays, and the only thing that
    * does. Ordinary falling is JUMP_MIDDLE; the impact handler plays BOUNCE. */
   EJECTED: 38,
-  BOUNCE: 39
+  BOUNCE: 39,
+  /** Hanging under a canopy — the level's opening drop (lib/game/parachute). */
+  PARACHUTE: 82
 } as const
 
 export interface Airborne {

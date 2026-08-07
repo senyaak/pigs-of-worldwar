@@ -5,10 +5,10 @@
 // `bottom`.
 //
 // The shapes come out of the .POG, which stores a collision box on every
-// record — extents ÷128 in the order (z, y, x), a COLLIDER rather than the
+// record — counts of BOX_UNIT in the order (z, y, x), a COLLIDER rather than the
 // art, since a tree's is its trunk (docs/formats.md). The pig's own box is
 // in there too: every one of the 772 spawn markers carries 5×5×5, so a pig
-// is 640 units on a side and this file needs no guess for it.
+// is 320 units on a side and this file needs no guess for it.
 //
 // The BEHAVIOUR is the one the disassembly already gave up. `TryMove`'s
 // dispatch (0x478e78) reads "hitting only the landscape is the successful
@@ -18,9 +18,10 @@
 // a full stop either: its top is ground when it is within the envelope, and
 // a wall only above that.
 
-import { SHAPE_BOX, modelRotationY } from '../formats/pog'
+import { BOX_UNIT, SHAPE_BOX, modelRotationY } from '../formats/pog'
 import type { MapObject } from '../formats/pog'
 import { isSpawnMarker } from './spawns'
+import { HEIGHT_SCALE } from './terrain'
 
 /**
  * The pig's collision box, from the spawn markers' own 5×5×5. Used as a
@@ -28,11 +29,8 @@ import { isSpawnMarker } from './spawns'
  * the original's own solver rounds a walking body's contact off anyway —
  * what a square pig buys is corners that catch.
  */
-export const PIG_RADIUS = (5 * 128) / 2
-export const PIG_HEIGHT = 5 * 128
-
-/** The stored box's unit — a quarter of a tile. */
-const BOX_UNIT = 128
+export const PIG_RADIUS = (5 * BOX_UNIT) / 2
+export const PIG_HEIGHT = 5 * BOX_UNIT
 
 /**
  * The crate models: CRATE1, CRATE2, CRATE4.
@@ -118,11 +116,12 @@ export const NO_OBSTACLES: Obstruction = {
 /** The obstacle a POG record makes, or null when it is not solid. */
 export function obstacleOf(object: MapObject): Obstacle | null {
   if (!isSolid(object)) return null
-  // Stored y is an elevation of the model's CENTRE; game space is Y-down,
-  // so the centre negates and the box's own half-height straddles it. No
-  // HEIGHT_SCALE here on purpose: the scene draws props at exactly -y, and
-  // collision has to be the surface that is drawn.
-  const centre = -object.y
+  // Stored y is an elevation of the model's CENTRE, in the PMG's own height
+  // space — so it rides HEIGHT_SCALE, exactly as the ground and the drawn
+  // prop do. Game space is Y-down, so the centre negates and the box's own
+  // half-height straddles it. Collision has to be the surface that is drawn:
+  // `three/props.ts` scales the same way, and the two must not drift.
+  const centre = -object.y * HEIGHT_SCALE
   return {
     x: object.x,
     z: object.z,

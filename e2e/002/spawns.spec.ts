@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { expect, test } from '../app'
+import { swapMap } from '../controller'
 import { GAME_DIR } from '../launch'
 import { startGame } from '../menu'
 import { existsForPlayers, parsePog } from '../../src/lib/formats/pog'
@@ -104,7 +105,7 @@ test('the battle fields the map’s own squads, dressed by class', async ({ app 
     z: trainee.z
   })
 
-  expect(await page.evaluate(() => window.pow!.swapMap!('LIBERATE'))).toBe(true)
+  expect(await swapMap(page, 'LIBERATE')).toBe(true)
   const squads = await page.evaluate(() => window.pow!.debug!.squads())
   expect(squads.map((squad) => squad.pigs.length)).toEqual([5, 5])
   expect(squads[0].pigs.map((pig) => pig.art)).toEqual([
@@ -126,5 +127,5 @@ test('the battle fields the map’s own squads, dressed by class', async ({ app 
 
   expect(app.errors()).toEqual([])
   // Leave the app on the map the rest of the phase expects.
-  expect(await page.evaluate(() => window.pow!.swapMap!('CAMP'))).toBe(true)
+  expect(await swapMap(page, 'CAMP')).toBe(true)
 })

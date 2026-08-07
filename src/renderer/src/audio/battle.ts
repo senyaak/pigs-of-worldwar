@@ -23,7 +23,14 @@ export const BATTLE_SOUNDS = {
   /** Thrown out of a wall by the wedge counter. */
   ejected: 'P_OWW',
   /** Going into the water, and coming out of it. */
-  splash: 'I_SPLASH'
+  splash: 'I_SPLASH',
+  /** A canopy opening over the level's drop-in. The bank carries P_CHUTE and
+   * P_CHUTE1 and the exe's own choice is NOT decoded — `StartParachuting`
+   * pushes 0x35 to an effect spawner, which is 53 and so is P_CHUTE, but the
+   * landing pushes 0x1e through the same call and 30 is I_PICKUP, so the
+   * match is a coincidence until someone reads that function. A name pick,
+   * like the rest of this table. */
+  chute: 'P_CHUTE'
 } as const
 
 export interface BattleSounds {

@@ -8,6 +8,7 @@
 
 import * as THREE from 'three'
 import type { Bone, Model, Texture } from '../api'
+import { MODEL_SCALE } from '../../../lib/game/scale'
 import { buildModelGeometry, buildTextureMaterials, disposeMesh } from './modelMesh'
 
 export interface Pig {
@@ -16,9 +17,16 @@ export interface Pig {
   mesh: THREE.SkinnedMesh
   /** Index-addressable bones, HIR order. */
   bones: THREE.Bone[]
-  /** Bind-pose distance from the model origin (hip) down to the soles,
-   * game Y-down units — what to subtract to stand ON the ground. */
+  /** Bind-pose distance from the model origin (hip) down to the soles, in
+   * WORLD units (the model's own, times `MODEL_SCALE`) — what to subtract
+   * to stand ON the ground. */
   footOffset: number
+  /** Model origin UP to the crown in the bind pose, WORLD units. The origin
+   * is the hip, not the soles — the mesh hangs `footOffset` below the node
+   * that carries it — so this, and not the pig's full height, is what
+   * anything hanging OVER a pig clears. A magic offset would stop meaning
+   * the same thing the moment the model's scale moved. */
+  crownRise: number
   dispose(): void
 }
 
@@ -64,22 +72,30 @@ export function buildPig(model: Model, textures: Texture[], skeleton: Bone[]): P
   // bone offset), and the bones start at exactly those offsets — so binding
   // with the identity transform lines the two up.
   mesh.bind(new THREE.Skeleton(bones))
+  // A VTX unit is half a world unit (lib/game/scale.ts). The scale rides on
+  // the MESH rather than the group below, because the battle reparents the
+  // mesh out of that group into its own converted root and only the mesh
+  // survives the move.
+  mesh.scale.setScalar(MODEL_SCALE)
 
   const group = new THREE.Group()
   group.rotation.x = Math.PI
   group.add(mesh)
 
-  // The lowest bind-pose vertex (game Y-down: the largest Y) is the soles.
+  // Game Y-down: the largest Y is the soles, the smallest the crown.
   let footOffset = 0
+  let crown = 0
   for (let i = 1; i < model.positions.length; i += 3) {
     if (model.positions[i] > footOffset) footOffset = model.positions[i]
+    if (model.positions[i] < crown) crown = model.positions[i]
   }
 
   return {
     group,
     mesh,
     bones,
-    footOffset,
+    footOffset: footOffset * MODEL_SCALE,
+    crownRise: -crown * MODEL_SCALE,
     dispose: () => disposeMesh(geometry, materials)
   }
 }

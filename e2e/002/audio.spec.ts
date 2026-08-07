@@ -75,10 +75,16 @@ test('the pig is heard jumping and landing', async ({ app }) => {
 
   // Somewhere flat, so the jump is a jump and not a fall.
   await warp(page, -4352, 8448, 0)
+
+  // From a BASELINE, not against the whole list: the level opens with a
+  // parachute drop that has already made its own noises (002/parachute), and
+  // `arrayContaining` over everything heard so far would be satisfied by the
+  // drop's landing before this jump had even come down.
+  const beforeJump = (await heard()).length
   await tap(page, 'jump')
   await expect
-    .poll(heard, { message: 'the jump and the landing' })
-    .toEqual(expect.arrayContaining([BATTLE_SOUNDS.jump, BATTLE_SOUNDS.land]))
+    .poll(async () => (await heard()).slice(beforeJump), { message: 'the jump and the landing' })
+    .toEqual([BATTLE_SOUNDS.jump, BATTLE_SOUNDS.land])
 
   // And walking on flat dry ground says nothing — footsteps are not wired
   // yet, and nothing else may fire on every frame.

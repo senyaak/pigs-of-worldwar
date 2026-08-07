@@ -14,6 +14,9 @@ export interface PigSpawn {
   /** Class index — Grunt 0, Gunner 1, … The map's own spawn markers carry
    * it (lib/game/spawns.ts); a fabricated spawn leaves it a grunt. */
   pigClass?: number
+  /** Whether the pig drops into the level under a canopy instead of
+   * standing on the marker from the first frame (lib/game/parachute.ts). */
+  parachutes?: boolean
 }
 
 export const GRUNT = 0
@@ -28,6 +31,10 @@ export interface Pig {
   heading: number
   /** Class index — what the pig is, before it is anywhere. */
   pigClass: number
+  /** Whether it arrives by parachute when the level opens. Where it lands is
+   * where it was always going to stand, so nothing else in the domain cares;
+   * the battle scene owns the descent. */
+  parachutes: boolean
 }
 
 export interface Player {
@@ -78,7 +85,8 @@ export class Game {
             health: 100,
             position: { x: at.x, z: at.z },
             heading: at.heading ?? 0,
-            pigClass: at.pigClass ?? GRUNT
+            pigClass: at.pigClass ?? GRUNT,
+            parachutes: at.parachutes ?? false
           }
         })
       }

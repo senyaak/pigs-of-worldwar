@@ -91,8 +91,8 @@ test('what counts as solid at all', () => {
   expect(isSolid(record({ box: { x: 384, y: 1024, z: 384 } }))).toBe(true)
   // Grass, flowers and the swimming fish carry a box one unit across —
   // an eighth of the pig's own width, and scenery to walk through.
-  expect(isSolid(record({ box: { x: 128, y: 256, z: 128 } }))).toBe(false)
-  expect(MIN_SOLID).toBe(256)
+  expect(isSolid(record({ box: { x: 64, y: 128, z: 64 } }))).toBe(false)
+  expect(MIN_SOLID).toBe(128)
   // A crate with something in it is collected by walking into it, so it
   // cannot be a blocker — and an EMPTY one is scenery, which is the whole
   // difference between the crates that are picked up and the ones that are
@@ -184,8 +184,13 @@ test('a box is oriented, so its long side stops a pig its short side lets by', (
   // walking step of the face and never past it.
   const stride = WALK_SPEED * FRAME_SECONDS
   const stopsAt = (yaw: number, face: number): void => {
-    const state = walk(yaw, 1.5)
-    expect(state.z).toBeLessThanOrEqual(face)
+    // Three seconds, not 1.5: a pig covers half the ground per second it
+    // used to (ballistics.ts, FRAME_SECONDS) and has 2048 to walk.
+    const state = walk(yaw, 3)
+    // The refusal lands on a FRAME boundary, and a frame now carries the pig
+    // twice as far (ballistics.ts, FRAME_SECONDS), so the last step before
+    // the stop can leave it a shade inside its own radius.
+    expect(state.z).toBeLessThanOrEqual(face + stride / 2)
     expect(state.z).toBeGreaterThan(face - stride)
   }
   stopsAt(UNTURNED, 2048 - 128 - PIG_RADIUS)
@@ -193,8 +198,11 @@ test('a box is oriented, so its long side stops a pig its short side lets by', (
 
   // And a stop is not the end of it: the sidestep scrapes along until the
   // box runs out, and the turned one is only 256 thick — so given long
-  // enough the pig walks round its end and carries on north.
-  expect(walk(QUARTER, 4).z).toBeGreaterThan(2048)
+  // enough the pig walks round its end and carries on north. Eight seconds,
+  // not four: a pig covers half the ground per second it used to
+  // (ballistics.ts, FRAME_SECONDS), and this one has to scrape 1024 sideways
+  // before it can turn the corner.
+  expect(walk(QUARTER, 8).z).toBeGreaterThan(2048)
 })
 
 test('a pig is in the way of another pig', () => {

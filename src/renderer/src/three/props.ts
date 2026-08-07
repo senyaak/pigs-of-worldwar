@@ -12,6 +12,8 @@ import * as THREE from 'three'
 import type { MapObject, MapProp, Texture } from '../api'
 import { buildModelGeometry, buildTextureMaterials, disposeMesh } from './modelMesh'
 import { modelRotationY } from '../../../lib/formats/pog'
+import { MODEL_SCALE } from '../../../lib/game/scale'
+import { HEIGHT_SCALE } from '../../../lib/game/terrain'
 
 export interface MapProps {
   /** Add to the battle's game-space root; not converted on its own. */
@@ -42,8 +44,16 @@ export function buildMapProps(
     if (!model) continue
     const mesh = new THREE.Mesh(model.geometry, model.materials)
     mesh.name = object.name
-    mesh.position.set(object.x, -object.y, object.z)
+    // Stored y is an ELEVATION in the PMG's own height space, so it rides
+    // HEIGHT_SCALE exactly as the ground does; game space is Y-down, hence
+    // the negation.
+    mesh.position.set(object.x, -object.y * HEIGHT_SCALE, object.z)
     mesh.rotation.y = modelRotationY(object.yaw)
+    // A VTX unit is half a world unit (lib/game/scale.ts). The record's
+    // position is already the world's, so the scale goes on the mesh alone
+    // and a prop shrinks about its own origin — which the POG puts at the
+    // model's CENTRE, so it stays where it was placed.
+    mesh.scale.setScalar(MODEL_SCALE)
     group.add(mesh)
     placed++
   }

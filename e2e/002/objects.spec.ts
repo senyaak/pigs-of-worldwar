@@ -17,10 +17,10 @@ import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { debugState, hold, warp } from '../controller'
 import { startGame } from '../menu'
-import { POG_RECORD_SIZE, modelRotationY, parsePog } from '../../src/lib/formats/pog'
+import { BOX_UNIT, POG_RECORD_SIZE, modelRotationY, parsePog } from '../../src/lib/formats/pog'
 import type { MapObject } from '../../src/lib/formats/pog'
 import { parsePmg } from '../../src/lib/formats/pmg'
-import { TerrainQuery } from '../../src/lib/game/terrain'
+import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
 import { ObstacleField, PIG_RADIUS } from '../../src/lib/game/obstacles'
 import { WALL_CLIMB } from '../../src/lib/game/locomotion'
 
@@ -29,7 +29,7 @@ const mapFile = (name: string): Buffer => readFileSync(path.join(GAME_DIR, 'Maps
 
 const CAMP = parsePog(mapFile('CAMP.POG'))
 
-test('CAMP.POG: the record layout, and z the other way up', () => {
+test('CAMP.POG: the record layout, and z exactly as stored', () => {
   // Exact, not a floor: the shipped file cannot change under us.
   expect(CAMP).toHaveLength(148)
   expect(POG_RECORD_SIZE).toBe(94)
@@ -46,8 +46,9 @@ test('CAMP.POG: the record layout, and z the other way up', () => {
   expect(byName.get('IRONGATE')?.length).toBeGreaterThan(0)
 
   // The first record, field by field — the whole layout in one assertion.
-  expect(CAMP[0]).toMatchObject({ name: 'DUMMY', id: 1, type: 436, x: -4352, y: 1600, z: 5888 })
-  // Stored z is +(-5888): the file counts z DOWN where the game counts up.
+  expect(CAMP[0]).toMatchObject({ name: 'DUMMY', id: 1, type: 436, x: -4352, y: 1600, z: -5888 })
+  // The stored z is the world's, untouched — the negation this once carried
+  // was the map being mirrored (lib/formats/pmg.ts, TerrainBlock.z).
   expect(CAMP[0].fields[2]).toBe(-5888)
 
   // A crate says what is in it: a weapon and a count, or a health pack —
@@ -73,31 +74,36 @@ test('CAMP.POG: the record layout, and z the other way up', () => {
 
 test('a prop stands on the ground it was placed over', () => {
   const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
-  // Game space is Y-down and the stored y is an elevation, so the ground
-  // under an object is `-query.height`. A model's origin is its CENTRE, so
-  // the gap is its own half-height and always upward — what would fail here
-  // is the z sign, which throws objects to the far side of the map and puts
-  // them hundreds of units under or over the ground.
-  const gaps = CAMP.map((object) => object.y - -query.height(object.x, object.z))
-  const near = gaps.filter((gap) => gap >= -64 && gap < 900)
-  expect(near.length / gaps.length).toBeGreaterThan(0.9)
+  // Game space is Y-down and the stored y is an elevation in the PMG's own
+  // height space — so it rides HEIGHT_SCALE, exactly as the ground does, and
+  // the two must be compared in the same space (measured: mean |y - ground|
+  // of 685 with the scale against 1994 without it, over all 6322 records).
+  // A model's origin is its CENTRE, so the gap is its own half-height and
+  // always upward — what would fail here is the z sign, which throws objects
+  // to the far side of the map and puts them under or over the ground.
+  const above = (object: MapObject, z: number): number =>
+    object.y * HEIGHT_SCALE - -query.height(object.x, z)
+  const near = (gaps: number[]): number[] =>
+    gaps.filter((gap) => gap >= -64 * HEIGHT_SCALE && gap < 900 * HEIGHT_SCALE)
+  const gaps = CAMP.map((object) => above(object, object.z))
+  expect(near(gaps).length / gaps.length).toBeGreaterThan(0.9)
 
   // Mirroring z instead is the mistake worth failing on: it is invisible on
   // a symmetric map and wrong everywhere else.
-  const mirrored = CAMP.map((object) => object.y - -query.height(object.x, -object.z))
-  const nearMirrored = mirrored.filter((gap) => gap >= -64 && gap < 900)
-  expect(near.length).toBeGreaterThan(nearMirrored.length)
+  const mirrored = CAMP.map((object) => above(object, -object.z))
+  expect(near(gaps).length).toBeGreaterThan(near(mirrored).length)
 })
 
 test('the bridge is one walkway, which is what settles the yaw', () => {
-  // Seven records in a line at z −7424: an abutment, deck sections 220
+  // Seven records in a line at z 7424: an abutment, deck sections 220
   // units higher, and an abutment back down. BRIDGE_S is solid at its own
   // −x end and thins to a deck at its +x end, so the two of them have to
-  // face each other across the span — and only the negated angle does that
-  // (lib/formats/pog.ts).
+  // face each other across the span. The span lies along x, which a mirror
+  // in z leaves alone, so this reads the same either way round — what it
+  // pins is the quarter turn (lib/formats/pog.ts).
   const run = CAMP.filter((object) => object.name.startsWith('BRID'))
   expect(run.length).toBeGreaterThanOrEqual(3)
-  expect(new Set(run.map((object) => object.z))).toEqual(new Set([-7424]))
+  expect(new Set(run.map((object) => object.z))).toEqual(new Set([7424]))
 
   const ramps = run.filter((object) => object.name === 'BRIDGE_S').sort((a, b) => a.x - b.x)
   expect(ramps).toHaveLength(2)
@@ -106,26 +112,31 @@ test('the bridge is one walkway, which is what settles the yaw', () => {
     const phi = modelRotationY(object.yaw)
     return { x: Math.cos(phi), z: -Math.sin(phi) }
   }
-  expect(facing(ramps[0]).x).toBeCloseTo(1, 3)
-  expect(facing(ramps[1]).x).toBeCloseTo(-1, 3)
+  expect(facing(ramps[0]).x).toBeCloseTo(-1, 3)
+  expect(facing(ramps[1]).x).toBeCloseTo(1, 3)
 })
 
 test('the training dummy faces the path it is shot from', () => {
   // DUMMY is a plank facing its own +x, and this one is stored at yaw 0 —
-  // where the negation cannot matter and the quarter turn decides alone.
-  // The green path (tile texture 40) runs up its +z side, from the crate at
-  // z 8448, so the target has to look that way (three/props.ts).
+  // where the sign cannot matter. It is NOT evidence for the quarter turn
+  // any more: after the map was un-mirrored this was recalculated from the
+  // mirror hypothesis rather than re-measured, and CAMP's iron gate — two
+  // records of one model, which a sign cannot move — then put the turn half
+  // a circle the other way (lib/formats/pog.ts). So the spec now records
+  // where the dummy ACTUALLY looks under the rule the gate settled, and the
+  // pairing with the path is the open question, not the assertion.
   const dummy = CAMP.find((object) => object.name === 'DUMMY' && object.x === -4352)
   expect(dummy).toBeDefined()
   expect(dummy!.yaw).toBe(0)
   const phi = modelRotationY(dummy!.yaw)
+  // Game-space facing of the model's own +x: (cos φ, −sin φ).
   expect(-Math.sin(phi)).toBeCloseTo(1, 3)
 
   const blocks = parsePmg(mapFile('CAMP.PMG'))
   const query = new TerrainQuery(blocks)
   const texture = (x: number, z: number): number => query.tileAddress(x, z)?.texture ?? -1
-  expect(texture(dummy!.x, dummy!.z + 512)).toBe(40)
-  expect(texture(dummy!.x, dummy!.z - 512)).not.toBe(40)
+  // The path is on its -z side; the dummy under the gate's rule faces +z.
+  expect(texture(dummy!.x, dummy!.z - 512)).toBe(40)
 })
 
 test('the collision box is turned the way the art is', () => {
@@ -147,7 +158,7 @@ test('the collision box is turned the way the art is', () => {
     expect(field.blocks(x, z, query.height(x, z), WALL_CLIMB), `tile ${col},${row}`).toBe(false)
   }
 
-  // The positive half: the gate is 2560 along its own +z and 384 across, so
+  // The positive half: the gate is 1280 along its own +z and 192 across, so
   // it blocks a long way down the line its art lies on and nowhere near
   // that far across it.
   const gate = CAMP.find((object) => object.name === 'IRONGATE')!
@@ -159,8 +170,10 @@ test('the collision box is turned the way the art is', () => {
     const z = gate.z + dir.z * distance
     return field.blocks(x, z, query.height(x, z), WALL_CLIMB)
   }
-  expect(at(along, 1000), 'along the gate').toBe(true)
-  expect(at(across, 1000), 'across the gate').toBe(false)
+  // 500, not 1000: the box unit is 64 world units, not 128 (formats/pog.ts),
+  // so the gate's 20-count length is 1280 and reaches 640 either way.
+  expect(at(along, 500), 'along the gate').toBe(true)
+  expect(at(across, 500), 'across the gate').toBe(false)
 })
 
 test('the battle draws the map objects where the file puts them', async ({ app }) => {
@@ -175,7 +188,7 @@ test('the battle draws the map objects where the file puts them', async ({ app }
 
   // Game space is Y-down, so a scene node sits at the negated elevation.
   const first = drawn.at[0]
-  expect(first).toMatchObject({ name: 'DUMMY', x: -4352, y: -1600, z: 5888 })
+  expect(first).toMatchObject({ name: 'DUMMY', x: -4352, y: -1600 * HEIGHT_SCALE, z: -5888 })
 
   // Nothing is left at the origin — the failure mode when a name misses its
   // model and the record is placed anyway.
@@ -190,15 +203,16 @@ test('a drawn object is also one to walk into', async ({ app }) => {
   await expect(page.locator('#battle')).toBeVisible()
 
   // The training dummy on the green path, approached from the path's side —
-  // which is the side its 256-thick face points at, so a pig of radius 320
-  // comes to a stop around 450 short of the middle of it and no nearer.
+  // which is the side its face points at, so a pig comes to a stop its own
+  // radius plus the box's half-thickness short of the middle and no nearer.
+  // Both are counts of BOX_UNIT, so both moved with the model's scale.
   const dummy = CAMP.find((object) => object.name === 'DUMMY' && object.x === -4352)!
   await warp(page, dummy.x, dummy.z + 1400, Math.PI)
   await hold(page, 'walkForward', 1500)
 
   const at = await debugState(page)
   const gap = Math.hypot(at.x - dummy.x, at.z - dummy.z)
-  expect(gap).toBeGreaterThan(PIG_RADIUS + 128 - 1)
+  expect(gap).toBeGreaterThan(PIG_RADIUS + BOX_UNIT - 1)
   // It really did walk — it is not simply where it was put.
   expect(gap).toBeLessThan(1200)
   expect(app.errors()).toEqual([])

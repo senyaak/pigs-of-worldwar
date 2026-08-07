@@ -91,6 +91,8 @@ export interface MapObject {
    * player count is: it clamps the count to 4, shifts the byte right by
    * count − 1 and tests bit 0. So bits 0..3 are one-, two-, three- and
    * four-player games — see `existsForPlayers`.
+   *
+   * Bit 6 of that same low byte is the PARACHUTE — see `parachutesIn`.
    */
   flags: number
   /**
@@ -134,14 +136,33 @@ const CARRIES = 19
 const NO_WEAPON = 0xff
 
 /**
- * The stored yaw as a rotation about the vertical: `−yaw − π/2`.
+ * The stored yaw as a rotation about the vertical: `yaw − π/2`.
  *
- * Both halves are measured, not read — the derivation is in
- * `../pigs-disasm/objects/notes.md`, and the short of it is CAMP's bridge
- * (only the negated angle turns its two abutments to face each other
- * across the span instead of away) and CAMP's yaw-0 training dummy (only
- * `−π/2` faces it at the path it is shot from, which is the same quarter
- * turn the pig's own art needs).
+ * The half turn is CAMP's iron gate, which is the strongest witness on the
+ * map: two records of the SAME model, 1280 apart along z (exactly its own
+ * length) at yaws 1024 and 3072. On `yaw + π/2` both leaves stood half a
+ * turn out, and because the two are one model the pair reads as having
+ * swapped sides. Note that the SIGN cannot be tested on them — 90° and 270°
+ * give the same rotation either way round — so this is the quarter turn
+ * moving, not the sign.
+ *
+ * What it costs: CAMP's yaw-0 training dummy then faces AWAY from the green
+ * path. That test is not evidence any more — after the map was un-mirrored
+ * it was recalculated from the mirror hypothesis rather than re-measured,
+ * so it confirms my own reasoning and not the data. Watch it in play.
+ *
+ * The quarter turn is measured — CAMP's yaw-0 training dummy only faces the
+ * green path it is shot from at a quarter turn, the same one the pig's own
+ * art needs (`../pigs-disasm/objects/notes.md`).
+ *
+ * This was `−yaw − π/2`, which is exactly this angle NEGATED, and the
+ * negation was the world being mirrored: a reflection in z turns every
+ * facing `(x, z)` into `(x, −z)`, which is the turn about the vertical
+ * running backwards. Fitting objects to a mirrored map therefore bought a
+ * mirrored angle to match, and with the map the right way round
+ * (`formats/pmg.ts`, `TerrainBlock.z`) both come back. The dummy still
+ * faces its path and the bridge still forms one walkway, because the path
+ * and the ditch mirrored with them.
  *
  * EVERYTHING that turns an object goes through this: the art in
  * `three/props.ts` and the collision box in `lib/game/obstacles.ts`. They
@@ -149,14 +170,24 @@ const NO_WEAPON = 0xff
  * turned differently from the model it belongs to — which reads in play as
  * an invisible wall a stride away from the gate that owns it.
  */
-export const modelRotationY = (yaw: number): number => -yaw - Math.PI / 2
+export const modelRotationY = (yaw: number): number => yaw - Math.PI / 2
 
 const weaponOf = (packed: number): number | null => {
   const weapon = (packed >> 8) & 0xff
   return weapon === NO_WEAPON ? null : weapon
 }
-/** Collision box extents are counts of this. */
-const BOX_UNIT = 128
+/**
+ * Collision box extents are counts of this, in WORLD units.
+ *
+ * The extents match a model's own bounding box exactly on anything boxy
+ * (`../pigs-disasm/objects/notes.md`) — but in the model's units, and a
+ * model is drawn at half size (`lib/game/scale.ts`). So the count's world
+ * value is 64, not the 128 a 1:1 reading gave it. Both fit the archive
+ * identically; what separates them is the ½ the engine scales every body
+ * by. A pig's marker says 5×5×5 — 320 units, against a grunt model 651
+ * tall halved to 325.
+ */
+export const BOX_UNIT = 64
 
 const readName = (data: Uint8Array, offset: number): string => {
   let name = ''
@@ -185,6 +216,34 @@ export function existsForPlayers(object: MapObject, players: number): boolean {
   return (low >> (Math.min(players, MOST_PLAYERS) - 1)) % 2 === 1
 }
 
+/** The flags bit that says a spawn marker's pig DROPS IN under a canopy. */
+const PARACHUTES = 0x40
+
+/**
+ * Whether this record's pig parachutes into the level instead of standing
+ * on its marker from the first frame.
+ *
+ * The object loader saves the bit per marker (exe 0x4a5f11,
+ * `mov al,[esi+3Ah]; shr al,6; and al,1`) and its closing pass over the pigs
+ * it built (0x4a676e) lifts the flagged ones 3072–3583 units above their own
+ * marker before handing them to `Pig::StartParachuting`.
+ *
+ * On the campaign maps it picks out exactly one side of five — the player's,
+ * with the enemy already on the ground when the level opens — and the
+ * skirmish arenas set it on all four sides or on none. It is per MARKER
+ * rather than per side, and four maps use that: GUNS lands 4 of 5, LIBERATE
+ * 3 of 5, MEDIX 2 of 6, RIDGE 1 of 5.
+ *
+ * Only the spawn-marker branch of the loader reads it (record types
+ * 0x1C5..0x1D0, gated at 0x4a5ce1), so the 315 ordinary records that carry
+ * it are saying something else, or nothing.
+ *
+ * Full derivation and the proof over all 61 shipped maps:
+ * `../../../../pigs-disasm/parachute/notes.md`.
+ */
+export const parachutesIn = (object: MapObject): boolean =>
+  (object.flags & PARACHUTES) !== 0
+
 export function parsePog(data: Uint8Array): MapObject[] {
   if (data.byteLength < 2) throw new Error(`POG is ${data.byteLength} bytes, too short for a count`)
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
@@ -206,7 +265,9 @@ export function parsePog(data: Uint8Array): MapObject[] {
       type: fields[7],
       x: fields[0],
       y: fields[1],
-      z: -fields[2],
+      // Stored as-is: the file's z IS the world's, now that the map is no
+      // longer mirrored. See `modelRotationY` above.
+      z: fields[2],
       pitch: angle(fields[4]),
       yaw: angle(fields[5]),
       roll: angle(fields[6]),

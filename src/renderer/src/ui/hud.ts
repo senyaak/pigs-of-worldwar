@@ -21,6 +21,7 @@
 // Anything anchored right or bottom is placed against the view's own edge,
 // since a wide window is wider than 640 of these units.
 
+import { MODEL_SCALE } from '../../../lib/game/scale'
 import { loadFont } from './font'
 import type { Font } from './font'
 import { loadTims, tinted } from './sprites'
@@ -80,8 +81,12 @@ export const LAYOUT = {
     delay: 2,
     /** Between the name and the health line under it. */
     gap: 2,
-    /** How far the name floats over the pig's own position, in GAME units. */
-    lift: 900,
+    /** How far the name floats over the pig's CROWN, in GAME units — the
+     * scene adds the pig's own height (three/pig.ts), so this is clearance
+     * and nothing else. It used to be 900 measured from the soles, which
+     * was two thirds of a pig's height of empty air and stopped meaning
+     * anything when the model's scale moved. */
+    lift: 120,
     heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
   }
 }
@@ -282,8 +287,12 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         const at = { x: plate.x / scale, y: plate.y / scale }
         const health = String(plate.health)
         const healthWidth = heartSize.width + gap + font.measure(health)
-        const top = at.y - line * 2 - PLATE.gap
-        if (top < 0 || at.y > canvas.height / scale) continue
+        // Two lines are drawn UPWARD from the anchor, so a pig near the top
+        // of the view puts them off it. Slide the block down to the edge
+        // rather than dropping it: a name that vanishes reads as a bug, and
+        // did.
+        const top = Math.max(0, at.y - line * 2 - PLATE.gap)
+        if (at.y > canvas.height / scale) continue
         font.draw(context, plate.name, Math.round(at.x - font.measure(plate.name) / 2), Math.round(top))
         const healthLeft = Math.round(at.x - healthWidth / 2)
         const healthTop = Math.round(top + line + PLATE.gap)

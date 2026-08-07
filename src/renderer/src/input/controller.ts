@@ -136,6 +136,13 @@ export interface DebugHooks {
     objects: number
     at: { name: string; x: number; y: number; z: number }[]
   }
+  /** The level's opening drop: who is still coming down under a canopy, and
+   * how far up. `running` false is what says the battle has begun — nothing
+   * else moves until it has (lib/game/parachute.ts). */
+  dropIn(): {
+    running: boolean
+    pigs: { name: string; y: number; landed: boolean; canopy: boolean }[]
+  }
   /** Set the acting pig down somewhere, facing somewhere. Not a player move:
    * it exists so a spec can stage a situation it could not walk to. */
   warp(x: number, z: number, heading: number): void

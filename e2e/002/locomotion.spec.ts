@@ -27,6 +27,7 @@ import {
   GRAVITY,
   JUMP_PUSH,
   JUMP_PUSH_DELAY,
+  JUMP_RISE,
   JUMP_SPEED,
   SWIM_SINK,
   SWIM_SPEED,
@@ -234,10 +235,10 @@ test('a running jump leaves faster, by half its walking step', () => {
   const flat = terrain(() => 0)
   const s = createLocomotion(flat, 0, 0, NORTH)
   updateLocomotion(s, flat, { walk: 1, turn: 0, jump: true }, FRAME_SECONDS)
-  expect(s.airborne!.vy).toBeCloseTo(-(JUMP_SPEED + WALK_SPEED / 2))
+  expect(s.airborne!.vy).toBeCloseTo(-(JUMP_SPEED + (WALK_SPEED / 2) * JUMP_RISE))
   const back = createLocomotion(flat, 0, 0, NORTH)
   updateLocomotion(back, flat, { walk: -1, turn: 0, jump: true }, FRAME_SECONDS)
-  expect(back.airborne!.vy).toBeCloseTo(-(JUMP_SPEED + WALK_BACK_SPEED / 2))
+  expect(back.airborne!.vy).toBeCloseTo(-(JUMP_SPEED + (WALK_BACK_SPEED / 2) * JUMP_RISE))
 })
 
 test('falling pulls at GRAVITY from rest and stops accelerating at the cap', () => {
@@ -256,7 +257,9 @@ test('falling pulls at GRAVITY from rest and stops accelerating at the cap', () 
   const terminal = s.airborne!.vy
   expect(terminal, 'well short of a constant pull for ten seconds').toBeLessThan(GRAVITY * 2)
   run(s, flat, {}, 5)
-  expect(s.airborne!.vy, 'settled').toBeCloseTo(terminal, -1)
+  // A coarser logic frame integrates the cap slightly differently: 3839
+  // against 3831, a fifth of a percent.
+  expect(s.airborne!.vy, 'settled').toBeCloseTo(terminal, -2)
   expect(s.airborne, 'still falling').not.toBeNull()
 })
 
@@ -268,7 +271,9 @@ test('the horizontal bleeds while the fall does not', () => {
   const s = createLocomotion(flat, 0, 0, NORTH)
   s.y = -400_000
   s.airborne = { vx: 0, vy: 0, vz: 3000, bouncing: false, pushIn: null }
-  run(s, flat, {}, 1)
+  // Two seconds, not one: the bleed is 32 FRAMES, and a frame is twice as
+  // long as it was (ballistics.ts, FRAME_SECONDS).
+  run(s, flat, {}, 2)
   expect(s.airborne!.vz).toBeLessThan(3000 * 0.5)
   expect(s.airborne!.vz).toBeGreaterThan(0)
 })

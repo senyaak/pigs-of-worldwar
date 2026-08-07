@@ -125,6 +125,53 @@ export const peakNodeY = (page: Page, above: number, ms: number): Promise<number
     { above, ms }
   )
 
+/**
+ * Wait out the level's opening drop, and resolve the frame it ends.
+ *
+ * A map whose squad parachutes in spends about five seconds with nobody on
+ * the ground and the turn clock stopped (lib/game/parachute.ts), so a spec
+ * that starts driving before this has resolved is driving nothing. Every
+ * entry into a battle goes through here — `startGame` and `swapMap` alike.
+ *
+ * Watched IN THE PAGE, every animation frame, for the same reason `peakNodeY`
+ * is: polling from the test backs off to a sample a second, and this wants to
+ * hand control back the moment the last pig stands up. `ms` is a backstop —
+ * it rejects rather than carrying on, so a drop that never lands fails the
+ * spec instead of quietly making it flaky.
+ */
+export const landed = (page: Page, ms = 30_000): Promise<void> =>
+  page.evaluate(
+    (limit) => {
+      const pow = (window as unknown as { pow?: { debug?: { dropIn(): { running: boolean } } } }).pow
+      if (!pow?.debug) throw new Error('no battle scene is up — window.pow.debug is missing')
+      return new Promise<void>((resolve, reject) => {
+        const deadline = performance.now() + limit
+        const sample = (): void => {
+          if (!pow.debug!.dropIn().running) resolve()
+          else if (performance.now() >= deadline) reject(new Error('the drop-in never landed'))
+          else requestAnimationFrame(sample)
+        }
+        requestAnimationFrame(sample)
+      })
+    },
+    ms
+  )
+
+/**
+ * The console map selector (`pow.swapMap`), with the new level's drop waited
+ * out — a swap restarts the battle, so it opens the same way New Game does.
+ * A refused swap leaves the running battle alone and has nothing to wait for.
+ */
+export async function swapMap(page: Page, name?: string): Promise<boolean> {
+  const swapped = await page.evaluate((wanted) => {
+    const pow = (window as unknown as { pow?: { swapMap?(name?: string): Promise<boolean> } }).pow
+    if (!pow?.swapMap) throw new Error('pow.swapMap is missing — is the battle module loaded?')
+    return pow.swapMap(wanted)
+  }, name)
+  if (swapped) await landed(page)
+  return swapped
+}
+
 /** Put the acting pig somewhere specific, facing somewhere specific. Not a
  * player move — the scene exposes it purely so a spec can set up a situation
  * (three/battle.ts). */

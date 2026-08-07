@@ -16,6 +16,7 @@
 // - `yaw` is a real facing: 62 markers of 772 sit at zero and the rest are
 //   spread right round.
 
+import { parachutesIn } from '../formats/pog'
 import type { MapObject } from '../formats/pog'
 
 export interface SpawnPoint {
@@ -29,6 +30,10 @@ export interface SpawnPoint {
   pigClass: number
   /** The marker's own name, e.g. `GR_ME`: the class GROUP. */
   marker: string
+  /** Whether this pig DROPS IN under a canopy rather than starting on the
+   * ground — flags bit 6, and on a campaign map it is the player's side
+   * that carries it (lib/formats/pog.ts, lib/game/parachute.ts). */
+  parachutes: boolean
 }
 
 /** A record is a spawn marker exactly when its name ends this way — and
@@ -60,13 +65,27 @@ export function mapSpawns(objects: MapObject[]): SpawnPoint[] {
     spawns.push({
       x: object.x,
       z: object.z,
-      // The mesh turn a marker's yaw asks for is `-yaw - π/2`
-      // (three/props.ts), and a pig's mesh is turned `heading - π/2` — so
-      // the heading the marker means is the negated angle.
-      heading: -object.yaw,
+      // Half a turn on from the marker's yaw, and the half turn belongs to
+      // the MARKER — that is settled, not open.
+      //
+      // The derivation says it should be `yaw` outright: a marker is a POG
+      // record, the engine turns every record by one yaw about the vertical
+      // (exe 0x4a5bd5 pushes field 5 and no other angle), so a marker asks
+      // for `yaw - π/2` like any prop — the turn CAMP's iron gate settled —
+      // and a pig's mesh is turned `heading + PIG_HEADING_OFFSET`, which is
+      // `heading - π/2`. Same rule, so heading = yaw. Tried; the pig spawns
+      // facing backwards.
+      //
+      // So one of the two is half a turn out, and PLAY separates them: a
+      // driven pig walks the way it is facing, which is exactly what
+      // `PIG_HEADING_OFFSET` aims. The offset is right. Nothing but the
+      // pig's starting position and facing was ever in question, and a
+      // marker's stored yaw simply does not mean what a prop's does.
+      heading: object.yaw + Math.PI,
       team,
       pigClass: object.type,
-      marker: object.name
+      marker: object.name,
+      parachutes: parachutesIn(object)
     })
   }
   return spawns

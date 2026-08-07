@@ -22,6 +22,15 @@ const BLOCK_SPAN = TILES_PER_SIDE * TILE_STEP
  * finding stays written down in `../pigs-disasm/movement/notes.md` with the
  * contradiction unresolved rather than quietly dropped.
  *
+ * A candidate for what resolves it exists and has been CHECKED IN PLAY at
+ * half model scale: it still breaks the map. Do not raise it again without
+ * being asked to. The candidate is: the engine draws every body at half size
+ * (`lib/game/scale.ts`), so the "reads as stretched" judgement was made
+ * against models twice the size they should be. Halved models plus doubled
+ * heights would stand a pig four times smaller against the relief. That
+ * changes the TERRAIN, which is a separate decision from the models, and it
+ * is deliberately not taken.
+ *
  * Everything horizontal — the 512 tile, the world limits — is unaffected.
  */
 export const HEIGHT_SCALE = 1
@@ -232,13 +241,21 @@ export function openWaterMask(blocks: TerrainBlock[]): boolean[][] {
  * unless `type & 0x80`, then switches on its low nibble 0..8 to test the
  * point against half a tile or a diagonal — the wall occupies a PART of the
  * tile, not all of it. 98% of the bytes in the shipped maps sit on wall
- * tiles, and the mirrored reading below puts the solid side on the raised
- * ground for 37% more tiles than the literal one
- * (`../pigs-disasm/movement/wall-shapes.js`); the exe measures its
- * fractional z along +z where a PMG row advances -z, which is exactly that
- * mirror.
+ * tiles.
  *
- * Coordinates are the tile's own, 0..1, tz running -z. 0 is the whole tile.
+ * All nine are read straight off the exe's jump table (0x4a710c) now, with
+ * no mirror on top: it takes `tx = x & 0x1ff` and `tz = z & 0x1ff`, both
+ * fractions along the POSITIVE axis, and the branches come out
+ * `tz<½`, `tx<½`, `tz>½`, `tx>½`, `tx>tz`, `tx+tz<1`, `tx<tz`, `tx+tz>1`
+ * in that order — exactly the table below. The mirror this used to carry
+ * (and the "37% more tiles" that argued for it) was the world being
+ * mirrored: the tile picked for a given z was the wrong one, and mirroring
+ * the shape inside it papered over that. With the map the right way round
+ * (`formats/pmg.ts`, `TerrainBlock.z`) the literal reading is the correct
+ * one.
+ *
+ * Coordinates are the tile's own, 0..1, both running with their axis.
+ * 0 is the whole tile.
  */
 const WALL_SHAPES: Record<number, (tx: number, tz: number) => boolean> = {
   0: () => true,
@@ -321,7 +338,7 @@ export class TerrainQuery {
 
   /**
    * Where (x, z) falls inside its tile, with both halves of that tile as
-   * planes. Slopes are per unit of `tx` (running +x) and `tz` (running -z);
+   * planes. Slopes are per unit of `tx` (running +x) and `tz` (running +z);
    * `origin` is the elevation those slopes start from.
    *
    * The original's sampler (`Map::SampleHeight`, VA 0x4a5140) splits every

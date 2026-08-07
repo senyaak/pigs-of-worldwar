@@ -1,47 +1,37 @@
-// The battle scene: a real map with two squads of pigs standing on it.
-// Everything game-space (Y-down) under the usual 180°-X group; the camera
-// works in three's Y-up world and follows the active pig.
+// The battle scene, assembled: a real map, the map's own squads standing on
+// it, and one frame loop that drives them.
+//
+// Everything game-space (Y-down) under the usual 180°-X group. What this
+// file owns is the WIRING and the frame's order of events; the pieces each
+// live next door — `squad.ts` the pigs, `chase.ts` the camera, `dropIn.ts`
+// the level's opening, `marker.ts` the pointer, `debug.ts` the window the
+// e2e suite looks through. The rules themselves are pure and live in
+// `lib/game`; this scene feeds them intents and draws what they say.
 
 import * as THREE from 'three'
-import type {
-  Bone,
-  Clip,
-  MapObject,
-  MapProp,
-  Model,
-  TerrainBlock,
-  TerrainTexture,
-  Texture
-} from '../api'
+import type { Bone, Clip, MapObject, MapProp, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
 import { TerrainQuery } from '../../../lib/game/terrain'
 import { buildWaterMask } from '../../../lib/game/watermask'
-import { ANIM, SWIM_SINK, createLocomotion, restingY, updateLocomotion } from '../../../lib/game/locomotion'
+import { ANIM, createLocomotion, updateLocomotion } from '../../../lib/game/locomotion'
 import type { LocomotionState } from '../../../lib/game/locomotion'
 import { ObstacleField, withPigs } from '../../../lib/game/obstacles'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
-import { classArt } from './soldiers'
+import { fieldSquad } from './squad'
+import type { Soldier, SoldierArt } from './squad'
+import { createChase } from './chase'
+import { createDropIn } from './dropIn'
+import { buildMarker } from './marker'
+import { exposeBattleDebug } from './debug'
 import { SILENT, loadBank } from '../audio/bank'
 import { createBattleSounds } from '../audio/battle'
 import type { Bank } from '../audio/bank'
-import { buildPig } from './pig'
-import type { Pig as PigMesh } from './pig'
-import { createPlayer } from './clips'
-import type { Player as ClipPlayer } from './clips'
-import { LAYOUT as HUD } from '../ui/hud'
 import type { PigPlate } from '../ui/hud'
 import type { SceneHost } from './scene'
-import { controller } from '../input/controller'
 
-/** One dressed soldier model out of Chars/british.mad. */
-export interface SoldierArt {
-  /** Archive base name, e.g. `pcgru_hi` (three/soldiers.ts). */
-  base: string
-  model: Model
-  textures: Texture[]
-}
+export type { SoldierArt } from './squad'
 
 export interface BattleAssets {
   blocks: TerrainBlock[]
@@ -56,6 +46,10 @@ export interface BattleAssets {
   objects: MapObject[]
   props: MapProp[]
   propTextures: Texture[]
+  /** `WE_PARA` out of `Chars/WEAPONS.MAD` — the canopy the drop-in hangs
+   * under. Null is fine: a map whose squad parachutes simply stands instead
+   * of dropping under nothing (three/dropIn.ts). */
+  canopy: { model: Model; textures: Texture[] } | null
 }
 
 export interface BattleScene {
@@ -73,10 +67,6 @@ export interface BattleScene {
   jump(): void
   dispose(): void
 }
-
-// The model's own forward axis — chosen so a pig FACES where it walks
-// (π had them strolling sideways like crabs; π/2 had them moonwalking).
-const PIG_HEADING_OFFSET = -Math.PI / 2
 
 /** The battle's sound bank — 99 numbered effects (lib/formats/srl.ts). */
 const GAME_SOUNDS = 'Audio/sfxday.srl'
@@ -98,8 +88,7 @@ export function buildBattle(
   const terrain: Terrain = buildTerrain(assets.blocks, assets.terrainTextures)
   // buildTerrain wraps in its own converted group; unwrap into ours. Its
   // one child is the inner game-space group — ground and water together.
-  const terrainMesh = terrain.group.children[0]
-  root.add(terrainMesh)
+  root.add(terrain.group.children[0])
 
   // Whatever the map stands on its ground: trees, crates, bridges, and on
   // the training map the dummies and the gate.
@@ -118,61 +107,18 @@ export function buildBattle(
     sounds = createBattleSounds(bank)
   })
 
-  interface PigEntry {
-    pig: Pig
-    mesh: PigMesh
-    node: THREE.Object3D
-    player: ClipPlayer
-    clip: number | null
-    /** The archive base actually drawn — which is the fallback when the
-     * pig's class had no art of its own. */
-    art: string
-  }
-  const pigMeshes: PigEntry[] = []
-  const setClip = (entry: PigEntry, index: number | null): void => {
-    if (entry.clip === index) return
-    entry.clip = index
-    entry.player.play(index === null ? null : (assets.clips[index] ?? null))
-  }
-  const artFor = (pigClass: number): SoldierArt =>
-    assets.soldiers.find((art) => art.base === classArt(pigClass)) ?? assets.soldiers[0]
-  for (const player of game.players) {
-    for (const pig of player.pigs) {
-      const art = artFor(pig.pigClass)
-      const mesh = buildPig(art.model, art.textures, assets.skeleton)
-      const node = mesh.group.children[0]
-      node.position.set(
-        pig.position.x,
-        query.height(pig.position.x, pig.position.z) - mesh.footOffset,
-        pig.position.z
-      )
-      node.rotation.y = pig.heading + PIG_HEADING_OFFSET
-      root.add(node)
-      const entry: PigEntry = {
-        pig,
-        mesh,
-        node,
-        player: createPlayer(mesh),
-        clip: null,
-        art: art.base
-      }
-      setClip(entry, ANIM.IDLE)
-      pigMeshes.push(entry)
-    }
-  }
-
-  // The active-pig marker: a slowly bobbing cone overhead (game-space, so
-  // it lives under the same converted root).
-  const marker = new THREE.Mesh(
-    new THREE.ConeGeometry(60, 140, 4),
-    new THREE.MeshStandardMaterial({ color: 0xd8e08a })
-  )
-  marker.rotation.x = Math.PI // point down in Y-down space
-  root.add(marker)
+  const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
+  // The level opens with whoever the map's markers say drops in. Built after
+  // the squad because it LIFTS them off it.
+  const dropIn = createDropIn(squad, query, assets.clips, assets.canopy, () => bank)
+  const marker = buildMarker(root)
+  const chase = createChase(host.camera, query)
 
   host.scene.add(root)
+  host.camera.near = 10
+  host.camera.far = 100_000
+  host.camera.updateProjectionMatrix()
 
-  let markerBase = new THREE.Vector3()
   let time = 0
   /** Seconds the acting pig has stood still, and where it stood. */
   let still = 0
@@ -184,100 +130,31 @@ export function buildBattle(
    * it intents and draws what it says. Reset whenever the acting pig
    * changes or is warped. */
   let loco: LocomotionState = createLocomotion(query, 0, 0, 0)
-  /** Smoothed chase-camera position (world space). */
-  const cameraPos = new THREE.Vector3()
-  let cameraSnapped = false
-  /** After a flight the camera stays put this long before gliding back
-   * behind the pig — resuming the chase the instant of landing is a jolt. */
-  const CHASE_DELAY = 0.5
-  let chaseWait = 0
 
-  host.camera.near = 10
-  host.camera.far = 100_000
-  host.camera.updateProjectionMatrix()
-
-  /** Sync a pig's node to its game position: soles on the ground, sunk a
-   * little when swimming. */
-  const settle = (entry: PigEntry): void => {
-    const { x, z } = entry.pig.position
-    entry.node.position.set(x, restingY(query, x, z) - entry.mesh.footOffset, z)
-  }
-
-  /**
-   * The height the camera frames a pig at: its node, less the sink when it
-   * is afloat.
-   *
-   * A swimming pig hangs SWIM_SINK below the water, and the moment the
-   * per-texel test concedes that a paddling pig IS swimming, it drops that
-   * whole distance in ONE frame — 280 units, on a shore whose seabed sits
-   * exactly at the water level, so nothing about the ground eases it. The
-   * camera followed the drop and lurched. Taking the same sink back off the
-   * height it frames cancels it exactly: the swap happens on the frame the
-   * pig sinks, so the two moves annihilate and the view never moves at all.
-   */
-  const framedY = (entry: PigEntry): number => {
-    const { x, z } = entry.pig.position
-    return entry.node.position.y - (query.isWater(x, z) ? SWIM_SINK : 0)
-  }
-
-  /**
-   * The chase camera hangs behind the pig's shoulders (world space; the
-   * root flips Y and Z out of the game's Y-down coordinates), clamped
-   * above the terrain so hills never swallow the view.
-   *
-   * Both heights are held against the VISIBLE surface rather than the
-   * ground, so a shore whose seabed runs on under the water sheet neither
-   * drags the gaze below the waterline nor sinks the camera under it — from
-   * beneath, an opaque sheet is the whole view.
-   */
-  const desiredCamera = (pig: Pig, nodeY: number): { position: THREE.Vector3; target: THREE.Vector3 } => {
-    const waterline = -query.surface(pig.position.x, pig.position.z)
-    const target = new THREE.Vector3(
-      pig.position.x,
-      Math.max(-nodeY, waterline) + 300,
-      -pig.position.z
-    )
-    const behindX = pig.position.x - Math.sin(pig.heading) * 2100
-    const behindZ = pig.position.z - Math.cos(pig.heading) * 2100
-    const terrainAtCamera = -query.surface(behindX, behindZ)
-    const position = new THREE.Vector3(
-      behindX,
-      Math.max(target.y + 900, terrainAtCamera + 500),
-      -behindZ
-    )
-    return { position, target }
-  }
-
-  const updateCamera = (active: PigEntry, delta: number | null): void => {
-    const { position, target } = desiredCamera(active.pig, framedY(active))
-    if (delta === null || !cameraSnapped) {
-      cameraPos.copy(position)
-      cameraSnapped = true
-    } else if (chaseWait <= 0) {
-      // The chase never chases a FLUNG pig: thrown, bouncing or sliding,
-      // the original's camera stands where it was and follows with its
-      // gaze alone — chasing one spun the view and drove it into the wall
-      // the pig had just been thrown off. `chaseWait` above is the whole
-      // rule: parked through involuntary flight and a beat beyond it,
-      // cleared the instant the player drives.
-      cameraPos.lerp(position, 1 - Math.exp(-6 * delta))
-    }
-    host.camera.position.copy(cameraPos)
-    host.camera.lookAt(target)
+  /** Camera and marker onto a pig, wherever it happens to be standing. */
+  const watch = (soldier: Soldier, delta: number | null): void => {
+    chase.follow(soldier.pig, soldier.node.position.y, dropIn.riseOver(soldier), delta)
   }
 
   const focus = (pig: Pig): void => {
     loco = createLocomotion(query, pig.position.x, pig.position.z, pig.heading)
     sounds.reset()
-    chaseWait = 0
-    const ground = query.height(pig.position.x, pig.position.z)
-    markerBase = new THREE.Vector3(pig.position.x, ground - 700, pig.position.z)
-    marker.position.copy(markerBase)
-    const active = pigMeshes.find((entry) => entry.pig === pig)
-    if (active) updateCamera(active, null)
+    chase.reset()
+    marker.moveTo(pig.position.x, query.height(pig.position.x, pig.position.z), pig.position.z)
+    const soldier = squad.of(pig)
+    if (soldier) watch(soldier, null)
   }
 
   const update = (delta: number): void => {
+    // The level's opening drop stops everything: no turn clock, no input,
+    // because the original's parachute branch does nothing else either.
+    if (dropIn.update(delta)) {
+      const arriving = squad.of(game.currentPig)
+      if (arriving) watch(arriving, delta)
+      onGameChanged()
+      return
+    }
+
     // The turn clock runs regardless of what anyone does.
     if (game.tick(delta)) {
       game.endTurn()
@@ -285,9 +162,9 @@ export function buildBattle(
       focus(game.currentPig)
     }
 
-    const active = pigMeshes.find((entry) => entry.pig === game.currentPig)
+    const active = squad.of(game.currentPig)
     if (!active) return
-    for (const entry of pigMeshes) if (entry !== active) setClip(entry, ANIM.IDLE)
+    for (const soldier of squad.members) if (soldier !== active) soldier.setClip(ANIM.IDLE)
 
     // Position and facing are the game's; everything else the frame needs —
     // height, momentum, the wedge clock, which clip to wear — lives in the
@@ -296,36 +173,25 @@ export function buildBattle(
     loco.x = active.pig.position.x
     loco.z = active.pig.position.z
     loco.heading = active.pig.heading
-    // The squad is in the way too: every pig but the acting one, as the
-    // body its own spawn marker measured (lib/game/obstacles).
-    const others = pigMeshes
-      .filter((entry) => entry !== active)
-      .map((entry) => ({
-        x: entry.pig.position.x,
-        z: entry.pig.position.z,
-        y: entry.node.position.y + entry.mesh.footOffset
-      }))
     updateLocomotion(
       loco,
       query,
       { walk: intent.walk, turn: intent.turn, jump: jumpRequested },
       delta,
-      withPigs(obstacles, others)
+      // The squad is in the way too: every pig but the acting one, as the
+      // body its own spawn marker measured (lib/game/obstacles).
+      withPigs(obstacles, squad.bodies(active))
     )
     jumpRequested = false
-    // The camera follows what the PLAYER does and stands off what happens
-    // TO the pig. Involuntary flight — bounced or thrown — parks it (and
-    // keeps it parked half a second past the landing); the player's own
-    // input clears the wait at once, because walking must never face the
-    // lens. A walk-off hop or a jump is the player driving, not flying.
-    if (loco.airborne?.bouncing || loco.airborne?.ejected) chaseWait = CHASE_DELAY
-    else if (intent.walk !== 0 || intent.turn !== 0) chaseWait = 0
-    else chaseWait = Math.max(0, chaseWait - delta)
+    chase.hold(
+      loco.airborne?.bouncing === true || loco.airborne?.ejected === true,
+      intent.walk !== 0 || intent.turn !== 0,
+      delta
+    )
     sounds.follow(loco, query.isWater(loco.x, loco.z))
     game.moveCurrentPig(loco.x, loco.z, loco.heading)
-    active.node.position.set(loco.x, loco.y - active.mesh.footOffset, loco.z)
-    active.node.rotation.y = loco.heading + PIG_HEADING_OFFSET
-    setClip(active, loco.clip)
+    active.place(loco.x, loco.y, loco.z, loco.heading)
+    active.setClip(loco.clip)
 
     // How long the pig has done nothing: what brings its name plate back.
     // Being driven, being in the air or being pushed all count as moving.
@@ -339,114 +205,41 @@ export function buildBattle(
     stillAt = { x: loco.x, z: loco.z, heading: loco.heading }
 
     // Marker and camera trail the pig every frame.
-    const ground = query.height(loco.x, loco.z)
-    markerBase.set(loco.x, ground - 700, loco.z)
-    marker.position.x = markerBase.x
-    marker.position.z = markerBase.z
-    updateCamera(active, delta)
+    marker.moveTo(loco.x, query.height(loco.x, loco.z), loco.z)
+    watch(active, delta)
     onGameChanged()
   }
 
   const onFrame = (delta: number): void => {
     time += delta
     update(delta)
-    for (const { player } of pigMeshes) player.update(delta)
-    marker.position.y = markerBase.y - Math.sin(time * 3) * 40
+    squad.update(delta)
+    marker.bob(time)
   }
   host.onFrame.add(onFrame)
 
-  // A window onto the acting pig, so the e2e suite can assert on where it
-  // actually IS rather than on what the HUD says about it. `warp` is the one
-  // write: a spec that wants a pig in front of a particular wall cannot walk
-  // it there across a whole map, and doing so through the controller would
-  // test the walk, not the wall.
-  window.pow = {
-    ...(window.pow ?? { controller }),
-    debug: {
-      currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
-      currentHeading: () => game.currentPig.heading,
-      /** Whose turn it is and how it stands. The dashboard says all of this
-       * in brass and in the game's own letters, which a spec cannot read —
-       * so the state comes from here and the pixels are asserted separately. */
-      hud: () => ({
-        turn: game.turn,
-        side: game.currentPlayer.name,
-        pig: game.currentPig.name,
-        health: game.currentPig.health,
-        seconds: Math.max(0, Math.ceil(game.timeLeft)),
-        swimming: query.isWater(game.currentPig.position.x, game.currentPig.position.z),
-        /** Seconds the acting pig has stood still — what the name plates
-         * wait for, and the only way a spec can tell why they are up. */
-        still
-      }),
-      currentNodeY: () => pigMeshes.find((e) => e.pig === game.currentPig)?.node.position.y ?? 0,
-      /** Every sound the battle has played, in order — a spec cannot
-       * listen, so this is what it asserts on instead. */
-      sounds: () => bank.played(),
-      /** The squads as they were fielded — where each pig started, what
-       * class the map called it, and which art it actually wears. */
-      squads: () =>
-        game.players.map((player) => ({
-          name: player.name,
-          pigs: player.pigs.map((pig) => {
-            const entry = pigMeshes.find((candidate) => candidate.pig === pig)
-            return {
-              name: pig.name,
-              pigClass: pig.pigClass,
-              art: entry?.art ?? '',
-              x: pig.position.x,
-              z: pig.position.z,
-              heading: pig.heading
-            }
-          })
-        })),
-      /** What the map put on its ground: how many .POG records were drawn,
-       * and where each one landed — the spec's only view of placement. */
-      props: () => ({
-        placed: props.placed,
-        objects: assets.objects.length,
-        at: props.group.children.map((mesh) => ({
-          name: mesh.name,
-          x: mesh.position.x,
-          y: mesh.position.y,
-          z: mesh.position.z
-        }))
-      }),
-      /** Where the chase camera actually is, world space — the only way a
-       * spec can tell "swimming" from "the view has gone under the water". */
-      camera: () => ({ x: host.camera.position.x, y: host.camera.position.y, z: host.camera.position.z }),
-      warp: (x: number, z: number, heading: number) => {
-        game.moveCurrentPig(x, z, heading)
-        loco = createLocomotion(query, x, z, heading)
-        const entry = pigMeshes.find((e) => e.pig === game.currentPig)
-        if (!entry) return
-        entry.node.rotation.y = heading + PIG_HEADING_OFFSET
-        settle(entry)
-      }
+  exposeBattleDebug({
+    game,
+    query,
+    squad,
+    dropIn,
+    props,
+    objectCount: assets.objects.length,
+    camera: host.camera,
+    bank: () => bank,
+    still: () => still,
+    warp: (x, z, heading) => {
+      game.moveCurrentPig(x, z, heading)
+      loco = createLocomotion(query, x, z, heading)
+      const soldier = squad.of(game.currentPig)
+      if (!soldier) return
+      soldier.place(x, loco.y, z, heading)
     }
-  }
+  })
 
   return {
     focus,
-    plates(width, height) {
-      const at = new THREE.Vector3()
-      const out: PigPlate[] = []
-      for (const entry of pigMeshes) {
-        if (entry.pig.health <= 0) continue
-        entry.node.getWorldPosition(at)
-        // World space is Y-up, so the plate hangs above by ADDING to y.
-        at.y += HUD.plate.lift
-        at.project(host.camera)
-        if (at.z > 1) continue // behind the camera
-        out.push({
-          x: (at.x * 0.5 + 0.5) * width,
-          y: (-at.y * 0.5 + 0.5) * height,
-          name: entry.pig.name,
-          health: entry.pig.health
-        })
-      }
-      return out
-    },
+    plates: (width, height) => squad.plates(host.camera, width, height),
     still: () => still,
     setIntent(walk, turn) {
       intent.walk = walk
@@ -460,10 +253,10 @@ export function buildBattle(
       host.scene.remove(root)
       terrain.dispose()
       props.dispose()
+      dropIn.dispose()
+      marker.dispose()
+      squad.dispose()
       bank.dispose()
-      for (const { mesh } of pigMeshes) mesh.dispose()
-      marker.geometry.dispose()
-      ;(marker.material as THREE.Material).dispose()
     }
   }
 }

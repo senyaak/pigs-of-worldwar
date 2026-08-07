@@ -21,8 +21,12 @@ import type { Pig } from './pig'
  * original slid its pigs too, and this stays a flat 25.
  * (`../pigs-disasm/movement/stride.js` has the measurement.)
  */
-const CLIP_FPS = 25
+export const CLIP_FPS = 25
 const BONE_COUNT = 15
+
+/** How long a clip runs at that rate — what a play-once needs to know. */
+export const clipSeconds = (clip: Clip | null | undefined): number =>
+  clip ? clip.frameCount / CLIP_FPS : 0
 
 // The MCAP rotation convention, settled by analysis of the shipped data
 // (pigs-disasm/anim/, three independent tests):
