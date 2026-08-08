@@ -448,7 +448,13 @@ export function initBattle(onLeave: () => void): BattleView {
   }
 
   return {
-    open: (name) => start(name ?? map),
+    // No name means ONE PLAYER, and ONE PLAYER is the training ground — not
+    // "wherever the battle was last". It used to fall back to the current map,
+    // which was harmless while only `pow.swapMap` could change it; the
+    // MULTI-PLAYER screen made a MENU action change it, and then ONE PLAYER
+    // opened CAMP's squad on LIBERATE's terrain. It cost a spec three phases
+    // away — the pig walked into water it should never have been near.
+    open: (name) => start(name ?? DEFAULT_MAP),
     close() {
       scene?.dispose()
       scene = null
