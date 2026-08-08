@@ -237,6 +237,7 @@ export function initBattle(onLeave: () => void): BattleView {
       charge: scene.charging(),
       holding: game.currentPig.holding,
       scope: scene.scoped(),
+      reticle: scene.reticle(),
       // The card carries the mission's name for as long as anyone is still in the
       // air, and then "GET READY >S..." for the beat at the top of every turn.
       title: scene.dropping()

@@ -1819,36 +1819,46 @@ away — a fuse, a flight and a landing all resolved before anything was drawn, 
 is what play saw as "2 раза вызвать выстрел, а цель стояла и не было прожектайла".
 Clamping is not a pause and does not pretend to be one; see the thread below.
 
-### The tremor: a JITTER on the aim, a DRIFT on the eye — 2026-08-08
+### THE RETICLE MOVES, NOT THE CAMERA — 2026-08-08
 
-Four passes and play corrected every one, so the shape is written down properly.
-The tremor is TWO things and the split is the whole point:
+Five passes at the scope's tremor and play found the mistake under all five in one
+line: "вместо того чтобы трясти прицел — ты тряс камеру?????"
 
-- the **JITTER** is on the ANGLE — an independent sample of about half a degree
-  every engine frame, eased towards, which is the resting analogue stick the aim
-  view's own handler feeds the camera. This is the version play called
-  ПРАВИЛЬНО and it is back exactly as it was, `AMPLITUDE` and `EASE`
-  included;
-- the **DRIFT** is on the **EYE** — a free random walk with **no centre and no
-  bound**: "ЦЕНТРА ВООБЩЕ НЕ ДОЛЖНО БЫТЬ — мы можем уехать в одном
-  направлении на 10 метров если рандо так сделает."
+That was it, and every earlier complaint was a symptom of it:
 
-**The eye is what keeps the shot honest, and this is the lesson of the pass.** An
-unbounded drift on the ANGLE is a lie — the crosshair is nailed to the middle of the
-screen, so the picture ends up pointing where the bullet will not go. Folding the
-drift into the bullet to fix that was worse: "пуля летела не туда только после
-твоего фикса." Moving the EYE slides the world across the sights instead: the
-target leaves the crosshair, the player brings it back, and the barrel points where
-the player put it and nowhere else. It is also where the exe's own scope motion lives
-— the rifle cam is a POSITION on the hand bone (0x4a2e30).
+- shaking the view DIRECTION leaves the crosshair pinned to the middle of the screen,
+  so the tremor reads as "в радиусе центра" however it is shaped;
+- the crosshair then LIES about where the bullet goes, because the bullet leaves along
+  the angle while the picture has been swung off it;
+- moving the EYE instead has the same problem from the other end — the barrel is
+  honest and the mark on the glass still cannot wander.
 
-Two shapes that were tried and are wrong, so they are not tried again: a bounded
-walk with a direction kept until the stop (two axes doing that is ONE ELLIPSE, and
-play said so on sight), and any zoom scaling that shrinks the tremor — the exe's
-`(0x1000 − zoom) >> 12` divides the player's own aiming STEP, which is control
-sensitivity, not the tremor. The zoom scales how far the eye travels, and nothing
-else. It FREEZES for the fuse rather than resetting, which is `Pig::Aim`'s own
+**What moves is the MARK.** `target` out of `dashtims.mad` travels inside the scope's
+ring, the camera holds perfectly still, and the shot leaves along whatever the mark is
+sitting on. So the picture is steady, the AIM is what shakes, and the player brings the
+target under a wandering crosshair instead of fighting a wandering world.
+`three/battle.ts` hands the dashboard the offset as a fraction of the view's height
+(`reticle`), `ui/hud.ts` draws the mark there, and `shots.fire`/`grenades.throwOne`
+take the yaw half so the bullet agrees.
+
+**And the ZOOM needs nothing of its own.** The offset is an ANGLE and a magnified view
+is fewer degrees tall, so the same tremor carries the mark further across the glass:
+"чем ближе, тем больше расстояния проходит" comes free. The `ZOOMED` fudge that
+stood in for it is gone, and so is the whole idea of scaling the tremor by the zoom.
+
+The two halves are the JITTER — an independent sample every engine frame, eased
+towards, which is the resting analogue stick and the shape play called ПРАВИЛЬНО
+— and the DRIFT, a free random walk with **no centre and no bound**: "ЦЕНТРА ВООБЩЕ
+НЕ ДОЛЖНО БЫТЬ — мы можем уехать в одном направлении на 10 метров если рандо так
+сделает." A walk does not run away in a hurry — it goes as the square root of the
+frames — so a few seconds in the scope is under a degree and the rare long excursion
+is the point. It FREEZES for the fuse rather than resetting, which is `Pig::Aim`'s own
 refusal from the press to the attack.
+
+**Four shapes that are WRONG and are not to be tried again**: a sine (floats); a
+bounded rattle round the centre (what play called в радиусе центра); a bounded walk
+with a direction kept until the stop (two axes doing that is ONE ELLIPSE, and play said
+so on sight); and anything that moves the CAMERA rather than the mark.
 
 ### "GET READY >S..." is the game's own words — 2026-08-08
 

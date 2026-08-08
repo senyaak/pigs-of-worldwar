@@ -59,32 +59,45 @@
 // `AMPLITUDE` is the knob. Zero it and the scope is dead still again.
 
 /**
- * ## A JITTER ON THE AIM, AND A DRIFT ON THE EYE - which is where each belongs
+ * ## THE RETICLE MOVES - not the camera. Play named the mistake outright
  *
- * Play settled both halves, and the split matters more than either number:
+ * "вместо того чтобы трясти прицел - ты тряс камеру?????" Yes, and every
+ * complaint before it was a symptom of exactly that:
  *
- * - the **JITTER** is the sampled-and-eased one that was right from the fifth pass
- *   ("раньше было ПРАВИЛЬНО"), a couple of aim units redrawn every
- *   engine frame. It is on the ANGLE, it is tiny, and it is the resting stick;
- * - the **DRIFT** is what makes the sights leave the target, and it has **no centre
- *   and no bound**: "ЦЕНТРА ВООБЩЕ НЕ ДОЛЖНО БЫТЬ - мы можем
- *   уехать в одном направлении на 10 метров если рандо так сделает." A free
- *   random walk, then, and it moves the **EYE** rather than the angle.
+ * - shaking the view DIRECTION kept the crosshair pinned to the middle of the
+ *   screen, so the tremor read as "в радиусе центра" however it was shaped;
+ * - the crosshair then LIED about where the bullet went, because the bullet left
+ *   along the angle and the picture had been swung off it;
+ * - and moving the EYE instead had the same problem from the other end: the barrel
+ *   was honest and the mark on the glass still could not wander.
  *
- * **The eye is why the bullet stays honest.** A drift on the ANGLE is a lie: the
- * crosshair is nailed to the middle of the screen, so an unbounded angular drift
- * eventually points the picture somewhere the shot will never go - and folding the
- * drift into the shot to fix that was worse, which play said in one line:
- * "пуля летела не туда только после твоего фикса". Moving the eye slides the
- * WORLD across the sights instead: the target drifts off the crosshair, the player
- * has to bring it back, and the barrel never points anywhere but where the player
- * put it. It is also where the exe's own scope motion comes from - the rifle cam is
- * a POSITION on the hand bone (0x4a2e30) and nothing else.
+ * What moves is the MARK. `target` out of `dashtims.mad` travels inside the scope's
+ * ring while the camera holds perfectly still, and the shot leaves along whatever
+ * the mark is on - so the picture is steady, the aim is what shakes, and what you
+ * see is exactly what you get. The player brings the target under a wandering
+ * crosshair rather than fighting a wandering world.
+ *
+ * The ZOOM then needs nothing of its own: the offset is an ANGLE, and a magnified
+ * view is fewer degrees across, so the same angle carries the mark further across
+ * the glass. "чем ближе, тем больше расстояния проходит" falls out of the
+ * magnification for free, and the `ZOOMED` fudge that used to be here is gone.
+ *
+ * ## What each half is
+ *
+ * - the **JITTER**: an independent sample every engine frame, eased towards. The
+ *   resting analogue stick, and the shape play called ПРАВИЛЬНО;
+ * - the **DRIFT**: a free random walk with **no centre and no bound** - "ЦЕНТРА
+ *   ВООБЩЕ НЕ ДОЛЖНО БЫТЬ, мы можем уехать в одном направлении на 10 метров
+ *   если рандо так сделает." A walk does not run away in a hurry - it goes as
+ *   the square root of the frames - so a few seconds in the scope is under a
+ *   degree, and the rare long excursion is the point rather than a bug.
+ *
+ * Both are in the game's own aim units, 4096 to the turn.
  */
 
 /**
  * How far the JITTER reaches, in 4096ths of a turn - about half a degree, and the
- * number play settled on before ("дрож чутка слабая" took it from 4 to 7).
+ * number play settled on ("дрож чутка слабая" took it from 4 to 7).
  *
  * The chase below eats some of it: against white noise a chase at `EASE` settles to
  * `sqrt(EASE / (2 - EASE))` of the sample, so 0.65 shows about seven tenths. Turn
@@ -96,37 +109,20 @@ const AMPLITUDE = 7
  * stick and reads as a rattle; play asked for "чуть плавнее, но не сильно". */
 const EASE = 0.65
 
-/**
- * How far the EYE wanders each engine frame, in game units, across the view and up
- * it. Eyework, and there is deliberately NO limit on where it gets to - that is the
- * whole of play's correction. `resetWobble` is what brings it home, and the sights
- * coming down is what calls it.
- */
-const DRIFT_STEP = 7
-
-/**
- * How much further the eye travels a second at full zoom.
- *
- * **The exe's zoom divisor is not this quantity, and one pass had it backwards.**
- * The aim-view arm scales what comes out of `[game+0x300]` by
- * `(0x1000 - zoom) >> 12` (0x495ecc), so a magnified view gets a FINER step - but
- * that accumulator is the player's own aiming input, i.e. control sensitivity,
- * which a scope wants fine. The tremor is what the player fights, and play's rule
- * for it is the other way about: closer covers more ground.
- */
-const ZOOMED = 2
+/** How far the DRIFT steps each engine frame, in aim units. Eyework, and there is
+ * deliberately no limit on where it gets to. */
+const DRIFT_STEP = 1.2
 
 export interface Wobble {
   /** The jitter's sample each axis is heading for, drawn once an engine frame. */
   sampledPitch: number
   sampledYaw: number
-  /** ...and where the jitter has actually got to, in aim units. */
+  /** ...and where the jitter has actually got to. */
   jitterPitch: number
   jitterYaw: number
-  /** Where the EYE has wandered to, in game units - across the view and up it.
-   * Unbounded on purpose. */
-  driftAcross: number
-  driftUp: number
+  /** ...and the drift, which goes wherever it goes. */
+  driftPitch: number
+  driftYaw: number
   /** Frames owed. A sample and a step land once an ENGINE frame: doing either per
    * rendered frame makes the tremor as fast as the screen. */
   owed: number
@@ -137,20 +133,20 @@ export const createWobble = (): Wobble => ({
   sampledYaw: 0,
   jitterPitch: 0,
   jitterYaw: 0,
-  driftAcross: 0,
-  driftUp: 0,
+  driftPitch: 0,
+  driftYaw: 0,
   owed: 0
 })
 
-/** Put the sights back where they are pointed. Used when they are lowered for
- * good - NOT while a shot is in the fuse, which HOLDS instead (see below). */
+/** Put the mark back in the middle. Used when the sights are lowered for good -
+ * NOT while a shot is in the fuse, which HOLDS instead (see below). */
 export function resetWobble(wobble: Wobble): void {
   wobble.sampledPitch = 0
   wobble.sampledYaw = 0
   wobble.jitterPitch = 0
   wobble.jitterYaw = 0
-  wobble.driftAcross = 0
-  wobble.driftUp = 0
+  wobble.driftPitch = 0
+  wobble.driftYaw = 0
   wobble.owed = 0
 }
 
@@ -161,27 +157,26 @@ export function resetWobble(wobble: Wobble): void {
  * `Pig::Aim`'s own behaviour and it matters: the exe's tremor arrives THROUGH
  * `Pig::Aim` (0x495cb0 calls 0x46A7F0 with the stick's step), that function bails
  * while `Pig::MayAct` is false, and `MayAct` is false from the fire press until the
- * attack. So in the original the sights stop dead for the length of the fuse.
+ * attack. So the mark stops dead for the length of the fuse and the bullet leaves
+ * along exactly what the player last saw.
  *
- * `zoom` is 0 wide open and 1 at the cap: it scales how far the EYE travels each
- * frame, and nothing else. `random` is injectable so a spec can pin it.
+ * `random` is injectable so a spec can pin it. There is no zoom argument: the offset
+ * is an angle and the magnification does that scaling by itself.
  */
 export function updateWobble(
   wobble: Wobble,
   frames: number,
-  zoom = 0,
   random: () => number = Math.random
 ): void {
-  const reach = 1 + Math.max(0, Math.min(1, zoom)) * (ZOOMED - 1)
   wobble.owed += frames
   while (wobble.owed >= 1) {
     wobble.owed -= 1
     // A fresh sample for the jitter...
     wobble.sampledPitch = (random() * 2 - 1) * AMPLITUDE
     wobble.sampledYaw = (random() * 2 - 1) * AMPLITUDE
-    // ...and a step for the EYE, in a fresh direction, going wherever it goes.
-    wobble.driftAcross += (random() * 2 - 1) * DRIFT_STEP * reach
-    wobble.driftUp += (random() * 2 - 1) * DRIFT_STEP * reach
+    // ...and a step for the drift, in a fresh direction, going wherever it goes.
+    wobble.driftPitch += (random() * 2 - 1) * DRIFT_STEP
+    wobble.driftYaw += (random() * 2 - 1) * DRIFT_STEP
   }
   // Chase the sample by the same engine frames, so the smoothing does not get
   // finer just because the screen is faster.
@@ -191,19 +186,12 @@ export function updateWobble(
 }
 
 /**
- * The JITTER on the pitch, in aim units - half a degree of stick, and the shot is
- * welcome to it: it is small enough that the crosshair does not lie.
+ * Where the MARK is, off the middle of the scope: the drift plus the jitter, in aim
+ * units. The camera does not take it and the shot DOES - that is the whole design
+ * (see the note at the top).
  */
-export const wobblePitch = (wobble: Wobble): number => wobble.jitterPitch
+export const wobblePitch = (wobble: Wobble): number => wobble.driftPitch + wobble.jitterPitch
 
-/** ...and on the yaw. The pig's own heading does not follow it - the model stands
- * where it stands; in the exe this axis goes to the pig's turn instead, and turning
- * the model from a tremor would fight the walk. */
-export const wobbleYaw = (wobble: Wobble): number => wobble.jitterYaw
-
-/** How far the EYE has wandered ACROSS the view, in game units. The picture moves
- * and the barrel does not (see the note at the top). */
-export const wobbleAcross = (wobble: Wobble): number => wobble.driftAcross
-
-/** ...and UP it. */
-export const wobbleUp = (wobble: Wobble): number => wobble.driftUp
+/** ...and the yaw, the same way. The pig's own heading does not follow it: the model
+ * stands where it stands and the barrel turns by this much on the shot alone. */
+export const wobbleYaw = (wobble: Wobble): number => wobble.driftYaw + wobble.jitterYaw
