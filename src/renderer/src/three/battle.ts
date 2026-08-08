@@ -511,7 +511,13 @@ export function buildBattle(
     numbers,
     effects,
     bank: () => bank,
-    onBroken
+    onBroken,
+    // Stay on the spot for the beat the blow's own wait gives it, which is what
+    // makes the burst visible at all: the camera leaves the grenade the frame it
+    // stops existing (lib/game/aftermath.ts).
+    onBlast: (at) => {
+      if (!aftermath) aftermath = beginAftermath(at)
+    }
   })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
    * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig

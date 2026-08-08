@@ -20,6 +20,7 @@ import {
   blastShare,
   bounceLob,
   SKIPS_ON_WATER,
+  WATER_BOUNCE,
   lob,
   lobOf,
   sinkLob
@@ -109,6 +110,10 @@ export interface GrenadeParts {
   /** Whether the map SCRIPT has placed this dummy yet (lib/game/script.ts). */
   present: (id: number) => boolean
   onBroken: (target: Target) => void
+  /** Where it went off. The camera comes off the grenade the instant it is
+   * gone, so without this the puffs happen behind the player — which is why
+   * play kept reporting that there was no explosion at all. */
+  onBlast: (at: { x: number; y: number; z: number }) => void
   numbers: DamageNumbers
   /** What the blast is drawn with. The right thing is effect **0x54**, which
    * the projectile's destructor spawns for kind 24 with the row's +0x04 as its
@@ -157,6 +162,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
   const detonate = (shot: Lobbed): void => {
     parts.effects.broke({ x: shot.x, y: shot.y, z: shot.z })
     playCue(parts.bank(), BATTLE_SOUNDS.blast)
+    parts.onBlast({ x: shot.x, y: shot.y, z: shot.z })
     const row = lobOf(shot.skill)
     if (!row) return
     /** Points at the core, and the share a body this far out takes. */
@@ -200,8 +206,10 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     if (parts.query.isWater(shot.x, shot.z) && shot.y >= parts.query.surface(shot.x, shot.z)) {
       const level = parts.query.surface(shot.x, shot.z)
       if (!shot.sunk && SKIPS_ON_WATER(shot)) {
-        // Flat off the surface: water has no slope to reflect about.
-        bounceLob(shot, level, { x: 0, y: -1, z: 0 }, 0, false)
+        // Flat off the surface, and on WATER's own pair — the ground's is very
+        // nearly perfect, which had a grenade skipping on the spot for ever
+        // instead of losing enough to go in.
+        bounceLob(shot, level, { x: 0, y: -1, z: 0 }, 0, false, WATER_BOUNCE)
         return true
       }
       sinkLob(shot, step)

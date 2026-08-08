@@ -27,7 +27,6 @@ import {
   BOUNCE_CUTOFF,
   FIXED,
   PLAIN_GRAVITY,
-  bounceOff,
   fromExeFrames,
   fromExeSpeed
 } from './ballistics'
@@ -150,6 +149,13 @@ export const BLAST_CORE = 512
  * never falls below a quarter inside the range. */
 export function blastShare(distance: number, range: number): number {
   if (range <= 0) return 1
+  // …and OUTSIDE the range, nothing. The exe has no such cap — what bounds its
+  // blast is the CONTACT, since `Pig::OnHit` only fires for bodies that touch,
+  // and an effect's body starts at 35 units (0x4a8f42, the same as a bullet's)
+  // and must GROW to reach anyone. How far it grows is in row 0's unread
+  // stages, so the range field stands in as the rim. Without the cap the
+  // formula alone reaches 3979, which play called too big.
+  if (distance >= range) return 0
   const past = Math.max(0, distance - BLAST_CORE)
   return Math.max(0, 1 - (3 * past) / (4 * range))
 }
@@ -263,8 +269,20 @@ export function sinkLob(shot: Lobbed, delta: number): void {
   const damp = Math.max(0, 1 - (1 - SINK_DRAG) * delta * 60)
   shot.vx *= damp
   shot.vz *= damp
-  shot.vy *= damp
+  // The VERTICAL is left alone: gravity has to be able to take it down, and
+  // damping that too is what left a grenade sitting on the water — play saw it
+  // ("застопорилась о воду и стоит на поверхности").
 }
+
+/**
+ * How much a SKIP off water keeps. Play again: a stone skips a few times and
+ * then goes in, which needs the surface to take something — at the ground's
+ * near-perfect 0xFFF a grenade bounced on the spot for ever instead of sinking.
+ *
+ * The remake's own outright: water is ART in this engine, not a body, so
+ * nothing in the exe collides with it and there is nothing to read.
+ */
+export const WATER_BOUNCE: Bounciness = { friction: 0.05, restitution: 0.45 }
 
 /**
  * One frame of flight — the parabola, and nothing else. Whether it has met
@@ -283,9 +301,23 @@ export function advanceLob(shot: Lobbed, delta: number): boolean {
 }
 
 /**
- * It hit something. Reflect off `normal` and lose what the surface takes,
- * through the same solver a pig lands with — a grenade is a body in the same
- * world, on the same per-terrain friction and restitution table.
+ * It hit something. Reflect off `normal` with the projectile's own pair.
+ *
+ * This does NOT go through `bounceOff`, and that is the fix for play's "трение
+ * всё ещё съедает энергию — в игре граната всё время хоть чуть-чуть да
+ * катится". Two things in there belong to a PIG and not to a thrown thing:
+ *
+ * 1. **The `>> 3`.** `bounceOff` returns the normal part as `e * vn / 8`, and
+ *    that eighth is `bounceSpeed`'s — the PIG's impact handler (0x4711d8 →
+ *    0x471247), which damps a landing so a pig does not ricochet off its own
+ *    behind. A projectile never reaches that handler; it goes through the
+ *    solver, which has no such term (`e = restitutionA * restitutionB` and
+ *    nothing else, 0x40f690). With the eighth in, a grenade at restitution
+ *    0.9998 came back with an eighth of what it arrived with.
+ * 2. **Friction once per CONTACT, not once per sub-step.** The scene walks a
+ *    grenade in steps of its own size, and every step that ended below the
+ *    surface used to take another 12.5% off the tangential. The exe resolves a
+ *    contact once.
  *
  * `y` is where the surface was, so the caller does not have to pin it twice.
  */
@@ -303,24 +335,20 @@ export function bounceLob(
    * multiplies in, the way the solver does it for a pig. */
   self: Bounciness = LOB_BOUNCE
 ): void {
-  const hit = bounceOff(
-    { x: shot.vx, y: shot.vy, z: shot.vz },
-    self,
-    // NEUTRAL, deliberately: the solver multiplies the two bodies' pairs, and
-    // a thrown thing's arm has already written the resolved values. Passing the
-    // tile here multiplied 0.9998 by grass's 0.4 and ate the bounce.
-    { friction: 1, restitution: 1 },
-    normal
-  )
   shot.y = y
-  shot.vx = hit.x
-  shot.vy = hit.y
-  shot.vz = hit.z
-  // Under a whisker of movement it is lying there. Only what draws it cares.
-  shot.resting = Math.abs(hit.x) + Math.abs(hit.y) + Math.abs(hit.z) < fromExeSpeed(1)
-  if (shot.resting) {
-    shot.vx = 0
-    shot.vy = 0
-    shot.vz = 0
-  }
+  const vn = shot.vx * normal.x + shot.vy * normal.y + shot.vz * normal.z
+  // Already leaving: there is no contact to resolve, and resolving it anyway
+  // is what took a slice off the roll every sub-step.
+  if (vn >= 0) return
+  const keep = Math.max(0, 1 - self.friction)
+  // Below a crawl the normal part stops coming back — the exe's own threshold
+  // (`BOUNCE_CUTOFF`), and without it a discrete step bounces for ever.
+  const e = -vn > BOUNCE_CUTOFF ? self.restitution : 0
+  shot.vx = (shot.vx - vn * normal.x) * keep - e * vn * normal.x
+  shot.vy = (shot.vy - vn * normal.y) * keep - e * vn * normal.y
+  shot.vz = (shot.vz - vn * normal.z) * keep - e * vn * normal.z
+  // A grenade in the original never quite stops rolling, so "resting" is only
+  // for what DRAWS it and the bar is low.
+  shot.resting =
+    Math.abs(shot.vx) + Math.abs(shot.vy) + Math.abs(shot.vz) < fromExeSpeed(1)
 }

@@ -1189,6 +1189,50 @@ not dodge — a pig you are driving is where you already know it is.
 the projectile's CENTRE, so a grenade resting on the ground was half buried and
 its downhill half went under a slope.
 
+### The grenade, fifth pass — where the energy was going, 2026-08-07
+
+**`bounceOff` carries a PIG's damping and a grenade must not use it.** Play:
+"трение всё ещё съедает энергию — в игре граната всё время хоть чуть-чуть да
+катится." Two separate things were wrong and neither was the coefficient:
+
+1. **The `>> 3`.** `bounceOff` returns the normal part as `e * vn / 8`, and that
+   eighth is `bounceSpeed`'s — the PIG's impact handler (0x4711d8 → 0x471247),
+   which stops a pig ricocheting off its own behind. The SOLVER has no such
+   term: `e = restitutionA * restitutionB` and nothing else (0x40f690). A
+   projectile never reaches the pig's handler, so at restitution 0.9998 it was
+   still coming back with an eighth of what it arrived with.
+2. **Friction once per CONTACT, not once per SUB-STEP.** The scene walks a
+   grenade in steps of its own size and every step that ended below the surface
+   took another 12.5% off the tangential. `bounceLob` now resolves nothing when
+   the thing is already leaving the surface, which is the exe's own condition.
+
+`bounceLob` does its own solve for exactly those two reasons and says so.
+
+**Water gets its OWN pair.** At the ground's near-perfect 0xFFF a grenade
+skipped on the spot for ever and never sank — "застопорилась о воду и стоит на
+поверхности". `WATER_BOUNCE` takes something out of each skip, and `sinkLob` no
+longer damps the VERTICAL, because damping the one component gravity works
+through is what held it up there. All of it is the remake's outright: water is
+ART in this engine, not a body, so nothing in the exe collides with it.
+
+**The blast's rim is capped at the range field**, and the reason it needed a cap
+is worth keeping: the exe bounds a blast by the CONTACT, since `Pig::OnHit` only
+fires for bodies that touch — and an effect's body is **35 units** to start with
+(0x4a8f42, the same as a bullet's, and the type map at 0x4a8ea0 confirms which
+arm 0x135E takes). So the exe's blast must GROW to reach anybody, and how far it
+grows is in row 0's unread stages. Uncapped the formula alone reaches 3979 units,
+which play called too big.
+
+**The gauge's track is the trough END TO END, 104..268.** Insetting it by half
+the slider's box was wrong twice: it moved the START, which was never the
+complaint, and the box is 24 wide while the art inside it is eight (cols 8..15),
+so the art is within four pixels of wherever the slider is put.
+
+**And the blast now HOLDS the camera.** That is why play kept reporting no
+explosion: the camera comes off a grenade the frame it stops existing, so the
+puffs were happening behind the player. `onBlast` starts the same wait a broken
+dummy starts.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.
