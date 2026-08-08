@@ -336,7 +336,16 @@ export function buildBattle(
   // the squad because it LIFTS them off it.
   const dropIn = createDropIn(squad, query, assets.canopy, () => bank)
   const marker = buildMarker(root)
-  const chase = createChase(host.camera, query)
+  const chase = createChase(host.camera, query, (x, y, z) => {
+    // What the projectile camera swings around: the map's boxes, and the
+    // ground itself where it stands above the line. `surface` rather than
+    // `height` so a water sheet does not read as a wall (lib/game/terrain.ts).
+    if (obstacles.solid(x, y, z)) return true
+    // Y-DOWN, so underground is a LARGER y — and with a margin, because a
+    // grenade lying still sits exactly on the surface and must not read as
+    // buried in it.
+    return y - query.surface(x, z) > 100
+  })
 
   host.scene.add(root)
   host.camera.near = 10

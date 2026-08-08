@@ -7,6 +7,8 @@ import type { Pig } from '../../../lib/game/game'
 import { SWIM_SINK } from '../../../lib/game/locomotion'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import type { TerrainQuery } from '../../../lib/game/terrain'
+import { clearHeading } from '../../../lib/game/sightline'
+import type { Blocked } from '../../../lib/game/sightline'
 
 /** After a flight the camera stays put this long before gliding back behind
  * the pig — resuming the chase the instant of landing is a jolt. */
@@ -189,7 +191,16 @@ export interface Chase {
   reset(): void
 }
 
-export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery): Chase {
+export function createChase(
+  camera: THREE.PerspectiveCamera,
+  query: TerrainQuery,
+  /**
+   * What the view cannot pass, in game space. Optional, and only `ride` uses
+   * it — the ordinary chase does not dodge, because a pig you are driving is
+   * where you already know it is. Null keeps the old behaviour exactly.
+   */
+  blocked: Blocked | null = null
+): Chase {
   /** Smoothed camera position (world space). */
   const at = new THREE.Vector3()
   let snapped = false
@@ -305,11 +316,18 @@ export function createChase(camera: THREE.PerspectiveCamera, query: TerrainQuery
       camera.lookAt(target)
     },
     ride(point, heading, delta) {
+      // Swing round whatever is in the way. THE REMAKE'S OWN — the original
+      // has no line-of-sight test anywhere in its camera code, which was
+      // checked (lib/game/sightline.ts says where) — and play asked for it
+      // because watching a grenade through a wall is no use.
+      const seen = blocked
+        ? clearHeading(point, heading, BACK, LIFT, blocked)
+        : heading
       const target = new THREE.Vector3(point.x, -point.y, -point.z)
       const position = new THREE.Vector3(
-        point.x - Math.sin(heading) * BACK,
+        point.x - Math.sin(seen) * BACK,
         -point.y + LIFT,
-        -(point.z - Math.cos(heading) * BACK)
+        -(point.z - Math.cos(seen) * BACK)
       )
       // The ground still has a say: a bullet skimming a slope must not put the
       // camera inside it.

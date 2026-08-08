@@ -1178,8 +1178,12 @@ float on the body is has not been read.
 `Map::IsBlocked` has ten callers and not one is in the camera code
 (0x49e000..0x4a6000); the camera's only world query is `Map::SampleHeight`, at
 fifteen sites, keeping itself off the ground. There is no line-of-sight test to
-restore, so swinging round an obstacle would be the remake's invention — not
-built, and this is why.
+restore, so swinging round an obstacle is the remake's invention. **Built
+anyway, by request** — and kept in one file with the whole argument at the top
+so it can be deleted in one go: `lib/game/sightline.ts` finds the nearest
+heading either side that can SEE the subject, sampling the LINE rather than
+just the camera point, and only `chase.ride` uses it. The ordinary chase does
+not dodge — a pig you are driving is where you already know it is.
 
 **And the mesh is lifted by the body's own radius.** The point that bounces is
 the projectile's CENTRE, so a grenade resting on the ground was half buried and
