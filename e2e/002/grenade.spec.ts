@@ -21,7 +21,7 @@ import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { GAUGE_SECONDS } from '../../src/lib/game/gauge'
-import { BLAST_REACH } from '../../src/lib/game/grenade'
+import { BLAST_CORE } from '../../src/lib/game/grenade'
 import { AIM_LOB } from '../../src/lib/game/aim'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
@@ -150,10 +150,10 @@ test('holding F to the top throws by itself', async ({ app }) => {
 
 test('what it drops at its feet flattens a dummy inside the blast', async ({ app }) => {
   const { page } = app
-  // Inside the blast's own reach — ±0x400 per axis, the projectile's only
-  // notion of near (lib/game/grenade.ts) — and far enough out that this is the
+  // Inside the blast's own CORE — 512 units, the radius the exe pays full
+  // damage over (lib/game/grenade.ts) — and far enough out that this is the
   // BLAST doing it rather than the thing landing on the dummy's head.
-  await armed(page, BLAST_REACH - 400)
+  await armed(page, BLAST_CORE - 100)
 
   // A bare tap charges almost nothing, so `row.speed * charge >> 12` is almost
   // nothing and the thing drops where the pig stands. A HALF-charged level

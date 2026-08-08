@@ -15,8 +15,7 @@
 
 import * as THREE from 'three'
 import {
-  BLAST_DAMAGE,
-  BLAST_REACH,
+  BLAST_CORE,
   advanceLob,
   blastShare,
   bounceLob,
@@ -25,6 +24,7 @@ import {
   sinkLob
 } from '../../../lib/game/grenade'
 import type { Lobbed } from '../../../lib/game/grenade'
+import { DAMAGE_UNIT } from '../../../lib/game/projectile'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { weaponModelName } from '../../../lib/game/weapons'
 import { createLobArt } from './lobArt'
@@ -138,6 +138,11 @@ export function createGrenades(parts: GrenadeParts): Grenades {
   const detonate = (shot: Lobbed): void => {
     parts.effects.broke({ x: shot.x, y: shot.y, z: shot.z })
     playCue(parts.bank(), BATTLE_SOUNDS.blast)
+    const row = lobOf(shot.skill)
+    if (!row) return
+    /** Points at the core, and the share a body this far out takes. */
+    const took = (dx: number, dy: number, dz: number): number =>
+      Math.round((row.damage * blastShare(Math.hypot(dx, dy, dz), row.blast)) / DAMAGE_UNIT)
     for (const soldier of parts.squad.members) {
       if (isDead(soldier.pig)) continue
       const body = {
@@ -145,9 +150,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
         y: soldier.node.position.y,
         z: soldier.pig.position.z
       }
-      const share = blastShare(body.x - shot.x, body.y - shot.y, body.z - shot.z)
-      if (share === 0) continue
-      const amount = Math.round(BLAST_DAMAGE * share)
+      const amount = took(body.x - shot.x, body.y - shot.y, body.z - shot.z)
       if (amount <= 0) continue
       const outcome = hurt(soldier.pig, amount, parts.training)
       parts.numbers.show(body, amount)
@@ -156,9 +159,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     for (let i = standing.length - 1; i >= 0; i--) {
       const dummy = standing[i]
       if (!parts.present(dummy.id)) continue
-      const share = blastShare(dummy.x - shot.x, dummy.y - shot.y, dummy.z - shot.z)
-      if (share === 0) continue
-      const amount = Math.round(BLAST_DAMAGE * share)
+      const amount = took(dummy.x - shot.x, dummy.y - shot.y, dummy.z - shot.z)
       if (amount <= 0) continue
       hurt(dummy, amount, false)
       parts.numbers.show(dummy, amount)
@@ -250,7 +251,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
         // Substep so a fast throw cannot pass clean through a hillside: at
         // full charge a grenade covers 4500 units a second.
         const speed = Math.hypot(shot.vx, shot.vy, shot.vz)
-        const steps = Math.max(1, Math.ceil((speed * delta) / BLAST_REACH))
+        const steps = Math.max(1, Math.ceil((speed * delta) / BLAST_CORE))
         let spent = false
         for (let step = 0; step < steps && !spent; step++) {
           const wasY = shot.y

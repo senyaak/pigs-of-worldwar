@@ -66,6 +66,12 @@ export interface Lob {
    * little.
    */
   fuse: number
+  /** Row +0x0C — what the blast takes off at its CORE, in 128ths of a point.
+   * 3840 for the plain grenade, which is thirty points against a grunt's
+   * fifty (`projectile.ts` has the whole ladder and the read). */
+  damage: number
+  /** Row +0x08 — how far the falloff runs past the core, in game units. */
+  blast: number
 }
 
 /**
@@ -75,15 +81,15 @@ export interface Lob {
  */
 const LOBS: Record<number, Lob> = {
   /** 19 GRENADE — the plain one. */
-  19: { id: 412, kind: 24, speed: 300, fuse: 150 },
-  20: { id: 413, kind: 25, speed: 300, fuse: 150 },
-  21: { id: 414, kind: 26, speed: 300, fuse: 150 },
-  22: { id: 415, kind: 27, speed: 300, fuse: 150 },
-  23: { id: 416, kind: 28, speed: 300, fuse: 150 },
-  24: { id: 417, kind: 29, speed: 300, fuse: 150 },
-  25: { id: 418, kind: 30, speed: 300, fuse: 150 },
-  26: { id: 419, kind: 31, speed: 300, fuse: 150 },
-  27: { id: 420, kind: 32, speed: 300, fuse: 150 }
+  19: { id: 412, kind: 24, speed: 300, fuse: 150, damage: 3840, blast: 2600 },
+  20: { id: 413, kind: 25, speed: 300, fuse: 150, damage: 3840, blast: 2600 },
+  21: { id: 414, kind: 26, speed: 300, fuse: 150, damage: 2560, blast: 0 },
+  22: { id: 415, kind: 27, speed: 300, fuse: 150, damage: 1920, blast: 0 },
+  23: { id: 416, kind: 28, speed: 300, fuse: 150, damage: 1920, blast: 0 },
+  24: { id: 417, kind: 29, speed: 300, fuse: 150, damage: 7680, blast: 3900 },
+  25: { id: 418, kind: 30, speed: 300, fuse: 150, damage: 3840, blast: 2600 },
+  26: { id: 419, kind: 31, speed: 300, fuse: 150, damage: 5120, blast: 2600 },
+  27: { id: 420, kind: 32, speed: 300, fuse: 150, damage: 3840, blast: 2600 }
 }
 
 /** What this skill lobs, or null for everything that does not lob. */
@@ -111,46 +117,42 @@ export const fuseSeconds = (row: Lob, random: () => number = Math.random): numbe
   fromExeFrames(ARMING_FRAMES + row.fuse + Math.floor(random() * (FUSE_JITTER + 1)))
 
 /**
- * How far the blast reaches — a half-extent per AXIS, not a sphere.
+ * The blast, DECODED end to end — `0x48CBA0`, which `Pig::OnHit`'s
+ * effect arm calls to work out how much (0x4778e8).
  *
- * The projectile's own proximity test, and the only notion of near it has:
- * the last thing its update does (0x436933 -> 0x437650) is walk the pig list
- * at `[0x51EE18]` and set `[pig+0x180]` on everything within **±0x400 on each
- * of the three axes** — 0x437775, 0x43778b, 0x4377a1, with a 0 written on the
- * way out. A box 2048 across against a pig 640 across.
+ * ```
+ * 48cc25  d = |pig.pos - effect.pos|
+ * 48cc33  esi = d - 0x200 ; if (esi < 0) esi = 0
+ * 48cc54  edi = [effect+0x68]              ; the FULL damage, row +0x0C
+ * 48cc57  ecx = the range                  ; [effect+0x60] and two more terms
+ * 48cc59  if (ecx <= 0) return edi         ; no range -> flat, which is a GUN
+ * 48cc5d  esi *= edi
+ * 48cc62  eax = (esi << 2) - esi           ; 3 * esi
+ * 48cc67  eax = -eax
+ * 48cc6d  eax /= (ecx << 2)                ; ...over 4 * range
+ * 48cc6f  return edi + eax
+ * ```
  *
- * What `[pig+0x180]` MEANS is not followed. The same function drives the
- * camera two calls earlier (0x49EC20, 0x49F740), so it may be "look at this
- * one" or "cower" rather than "hurt this one". It stands in as the blast's
- * reach because it is the only distance the projectile carries, and this note
- * is here rather than a pretence that it was read as damage.
+ * So: **a core of 512 units at full damage, then linear down to a QUARTER of
+ * it at the rim** — never to nothing, which is why standing back helps and
+ * hiding does not. Whether it hurts at all is the EFFECT's id, not the
+ * projectile's: `0x41 < id < 0x63` (0x4778b4, and 0x489493 where the same
+ * window stores the two fields). A grenade's blast is 0x54.
+ *
+ * Two terms of the exe's range are left out and this says so: it adds
+ * something off the struck body at `[body+0x4C]+0x0C` and subtracts the
+ * constant at `[0x4BD3FC]`, and neither has been chased. The row's own figure
+ * is what stands here.
  */
-export const BLAST_REACH = 0x400
+export const BLAST_CORE = 512
 
-/**
- * How much of the damage a body takes, 0..1 — by the furthest AXIS, since the
- * test above is a box and not a sphere.
- *
- * The FALLOFF is the remake's: the exe's test is flat, in or out, and a
- * grenade taking full damage anywhere inside a 2048 box would make standing
- * back pointless. Linear to the rim.
- */
-export function blastShare(dx: number, dy: number, dz: number): number {
-  const reach = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz))
-  return reach >= BLAST_REACH ? 0 : 1 - reach / BLAST_REACH
+/** The share of the core damage a body at this distance takes, 0..1 — and it
+ * never falls below a quarter inside the range. */
+export function blastShare(distance: number, range: number): number {
+  if (range <= 0) return 1
+  const past = Math.max(0, distance - BLAST_CORE)
+  return Math.max(0, 1 - (3 * past) / (4 * range))
 }
-
-/**
- * What a blast takes off at the centre.
- *
- * **The remake's own**, and it is the same gap `SHOT_DAMAGE` has: the row
- * field that looked like damage turned out to be the fuse, the weapon's
- * 80-byte record has no damage in it either (searched at every width for the
- * five melee figures, which ARE known), and the handler that would hold it
- * has not been found. A grunt has fifty points, so this flattens one it lands
- * on and leaves a heavy standing. Correct it against play.
- */
-export const BLAST_DAMAGE = 60
 
 /**
  * How a grenade meets the ground, and it is NOT the terrain's own material.

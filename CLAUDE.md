@@ -1084,10 +1084,29 @@ effect `0x54` plus sound `12` (`E_1`) at 100/100** — with the row's +0x04 as
 the effect's life and +0x08/+0x0C as its two parameters. No damage in the arm
 at all, so the hurt comes from elsewhere.
 
+**And the DAMAGE is decoded too — all of it, guns included.** It is not in the
+weapon's record and not in a per-weapon switch; both were searched and both
+searches were right. The physics world's contact loop calls the pig's
+`vtable+0x54` (`Pig::OnHit`, 0x477390), which switches on the other body's
+TYPE, and the arm for an **effect** gates on the effect's id being inside
+`0x41..0x63` before asking `0x48CBA0` how much. That function is a **core of
+512 units at full damage falling linearly to a QUARTER at the rim** — never to
+nothing — and it bails to flat damage when the range is zero, which every gun's
+is.
+
+So **row +0x08 is the blast range and row +0x0C is the damage in 128ths**, and
+the ladder is unmistakable: pistol and rifle 20 points, **sniper 40**, grenade
+30, freeze grenade 60, guided missile 75, and the **medic dart 0** — it heals,
+so it must not hurt. `SHOT_DAMAGE = 20` was invented and happened to be right
+for two weapons out of thirteen; `damageOf(skill)` replaces it. Two terms of
+the exe's range are left out and `grenade.ts` says which.
+
 **The sound is wired** (`BATTLE_SOUNDS.blast`); the VISUAL still borrows the
-break burst, because effect 0x54's own 143-byte parameter row at 0x4d61e8 has
-not been pulled out yet. That is the one remaining piece and
-`three/grenades.ts` says so at the field.
+break burst. `0x48CC90` turned out to be the effect's whole parameter-row
+accessor — `0x4D61E8 + row*143 + offset`, scaled by `[0x4D6C88 + offset]`, with
+the row index at `[effect+0xDC]` — so the one step left is which ROW id 0x54
+takes. Init's id dispatch is spread through 0x487d80..0x4881d0 rather than
+being a table.
 
 That read also settles what row +0x04/+0x08/+0x0C are — an effect's life and
 its two parameters, used by the every-fifth-frame TRAIL (0x4365f1, ids 0x5D and

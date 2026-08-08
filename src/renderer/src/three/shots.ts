@@ -11,7 +11,7 @@
 
 import * as THREE from 'three'
 import {
-  SHOT_DAMAGE,
+  damageOf,
   advanceShot,
   bulletSize,
   fireShot,
@@ -150,8 +150,9 @@ export function createShots(parts: ShotParts): Shots {
         z: soldier.pig.position.z
       }
       if (!inside(shot, body)) continue
-      const outcome = hurt(soldier.pig, SHOT_DAMAGE, parts.training)
-      parts.numbers.show(body, SHOT_DAMAGE)
+      const amount = damageOf(shot.skill)
+      const outcome = hurt(soldier.pig, amount, parts.training)
+      parts.numbers.show(body, amount)
       if (outcome === 'died' || outcome === 'gibbed') soldier.playOnce(ANIM.DYING)
       return true
     }
@@ -159,8 +160,9 @@ export function createShots(parts: ShotParts): Shots {
       const dummy = standing[i]
       if (!parts.present(dummy.id)) continue
       if (!inside(shot, dummy)) continue
-      hurt(dummy, SHOT_DAMAGE, false)
-      parts.numbers.show(dummy, SHOT_DAMAGE)
+      const amount = damageOf(shot.skill)
+      hurt(dummy, amount, false)
+      parts.numbers.show(dummy, amount)
       if (isDead(dummy)) {
         standing.splice(i, 1)
         parts.onBroken(dummy)

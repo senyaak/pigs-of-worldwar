@@ -30,6 +30,31 @@ export interface Projectile {
    * range as such.
    */
   life: number
+  /**
+   * Row +0x0C — **the DAMAGE, in the engine's 128ths of a point**, and it is
+   * decoded rather than invented at last.
+   *
+   * The handler this repo went looking for for weeks is not in the weapon's
+   * record and not in a per-weapon switch: it is `Pig::OnHit`, the pig's own
+   * `vtable+0x54` (0x477390), which the physics world's contact loop calls for
+   * every touching pair (0x4a8b4c). Its arm for a body of type 0x135E — an
+   * EFFECT — is 0x4778ae, and there the effect's id decides whether it hurts
+   * at all (`0x41 < id < 0x63`) before `0x48CBA0` works out how much.
+   * `0x489493` is where that window is written and it stores this field at
+   * `[effect+0x68]`.
+   *
+   * The ladder it gives is unmistakable: pistol and rifle 20 points, the
+   * SNIPER 40, the medic dart **0** — it heals, so it must not hurt — and 75
+   * for the guided missile. `SHOT_DAMAGE = 20` was invented and happened to be
+   * right for exactly two weapons.
+   */
+  damage: number
+  /**
+   * Row +0x08 — the blast RANGE, and **zero for every gun**, which is what
+   * makes a bullet's damage flat: the falloff is skipped outright when this is
+   * not positive (0x48cc59). Grenades carry 2600, the guided missile 5200.
+   */
+  blast: number
 }
 
 /**
@@ -39,21 +64,21 @@ export interface Projectile {
  * no collision box — so a bullet really is just a speed and a life.
  */
 const GUNS: Record<number, Projectile> = {
-  6: { id: 400, kind: 12, speed: 300, life: 20 },
+  6: { id: 400, kind: 12, speed: 300, life: 20, damage: 2560, blast: 0 },
   /** 7 RIFLE — the training ground's second weapon. */
-  7: { id: 401, kind: 13, speed: 300, life: 30 },
-  8: { id: 402, kind: 14, speed: 300, life: 30 },
-  9: { id: 404, kind: 16, speed: 300, life: 25 },
-  10: { id: 405, kind: 17, speed: 300, life: 25 },
+  7: { id: 401, kind: 13, speed: 300, life: 30, damage: 2560, blast: 0 },
+  8: { id: 402, kind: 14, speed: 300, life: 30, damage: 1920, blast: 0 },
+  9: { id: 404, kind: 16, speed: 300, life: 25, damage: 512, blast: 0 },
+  10: { id: 405, kind: 17, speed: 300, life: 25, damage: 1024, blast: 0 },
   /** 11 SNIPER RIFLE — the same speed and THREE times the reach, which is the
    * only thing separating it from the rifle in either table. */
-  11: { id: 403, kind: 15, speed: 300, life: 90 },
-  12: { id: 406, kind: 18, speed: 300, life: 15 },
-  13: { id: 407, kind: 19, speed: 300, life: 15 },
-  14: { id: 411, kind: 23, speed: 150, life: 20 },
-  15: { id: 434, kind: 46, speed: 300, life: 1000 },
-  17: { id: 424, kind: 36, speed: 300, life: 30 },
-  18: { id: 442, kind: 54, speed: 300, life: 30 }
+  11: { id: 403, kind: 15, speed: 300, life: 90, damage: 5120, blast: 0 },
+  12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0 },
+  13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0 },
+  14: { id: 411, kind: 23, speed: 150, life: 20, damage: 768, blast: 0 },
+  15: { id: 434, kind: 46, speed: 300, life: 1000, damage: 6400, blast: 3900 },
+  17: { id: 424, kind: 36, speed: 300, life: 30, damage: 0, blast: 0 },
+  18: { id: 442, kind: 54, speed: 300, life: 30, damage: 2560, blast: 0 }
 }
 
 /** What this skill throws, or null for everything that is not a gun. */
@@ -64,22 +89,13 @@ export const projectileOf = (skill: number | null): Projectile | null =>
  * both ask. */
 export const isGun = (skill: number | null): boolean => projectileOf(skill) !== null
 
-/**
- * How much a bullet takes off.
- *
- * **The remake's own, and the one number here that is.** The projectile row's
- * `+0x18` looked like a damage base and is not — it is a threshold the update
- * compares a counter against (0x436c6c) — and every gun's is zero anyway. The
- * weapon's own 80-byte record has no damage field either: searched all 80
- * bytes at every width for the five melee damages, which ARE known
- * (15/15/10/25/25), and none of them is in there. So a gun's damage lives in
- * the hit handler, the way `Pig::HitByHandToHand` holds the melee's, and that
- * handler is not found.
- *
- * Twenty points is three shots on a fifty-point grunt, which is the shape play
- * remembers. Correct it the moment the handler turns up.
- */
-export const SHOT_DAMAGE = 20
+/** The engine counts 128ths of a point; nothing ever makes a fractional one
+ * (lib/game/health.ts), so a row's figure comes out whole. */
+export const DAMAGE_UNIT = 128
+
+/** What this weapon's projectile takes off on a clean hit, in POINTS. */
+export const damageOf = (skill: number | null): number =>
+  Math.round((projectileOf(skill)?.damage ?? 0) / DAMAGE_UNIT)
 
 /** A bullet in flight. Position is game space (Y-down); velocity is units a
  * SECOND, like every other speed in the remake. */
