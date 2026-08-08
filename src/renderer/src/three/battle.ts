@@ -152,12 +152,15 @@ export interface BattleScene {
    * which is what the scope's ring is drawn over (ui/hud.ts). */
   scoped(): boolean
   /**
-   * Whether the pig is LOCKED: committed to a blow, watching what one did, or
-   * still on the beat at the top of its turn. What decides the control set
-   * (`lib/game/controls.ts`) — the scene owns the three states, so the scene is
-   * asked rather than each of them being mirrored out.
+   * The three states the CONTROL SET turns on that only the scene knows
+   * (`lib/game/controls.ts`) — asked for as a group rather than mirrored out one
+   * accessor at a time.
    */
-  locked(): boolean
+  situation(): { starting: boolean; locked: boolean; charging: boolean }
+  /** End the beat at the top of a turn. The `starting` control set's whole rule:
+   * any input starts the turn, and the same input is then re-read in the set that
+   * follows (lib/game/controls.ts). */
+  beginTurn(): void
   /** Where the weapon in hand points, in the game's own angle units, or null
    * when the pig is holding nothing that aims (lib/game/aim.ts). */
   aim(): number | null
@@ -1163,16 +1166,14 @@ export function buildBattle(
       sighting = held && !sightingRefused
     },
     scoped: () => sighting && isGun(holding) && !dropIn.running(),
-    /**
-     * `game.starting` is deliberately NOT in here. The beat at the top of a turn
-     * — "START OF TURN, press any key to continue" — is ended by ANY input, and
-     * the frame that ends it reads the walk, the turn and the aim to decide that
-     * (see `game.starting` below). Calling it locked would zero those before they
-     * arrived, and the beat could then only be ended with the jump or the fire
-     * key. The scene refuses to DRIVE the pig through the beat on its own line;
-     * that is the part that matters.
-     */
-    locked: () => committed() || aftermath !== null,
+    beginTurn: () => game.beginTurn(),
+    situation: () => ({
+      starting: game.starting,
+      // A gauge filling is its OWN control set rather than a hole in the lock,
+      // which is what it was for a commit and what play corrected.
+      charging: gauge !== null && !gauge.spent,
+      locked: committed() || aftermath !== null
+    }),
     // Whether there is an ANGLE, which is not the same question as whether
     // there is a POSE for the angle to scrub. `scrubsPose` was standing in for
     // both, and a grenade is in its exclusion list (0x46a8e8, nothing thrown

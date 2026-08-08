@@ -15,6 +15,7 @@ import { existsForPlayers } from '../../../lib/formats/pog'
 import type { LoadModelResult, MapObject } from '../api'
 import { ensureScene } from '../three/scene'
 import { modeOf, readControls, verbOf } from '../../../lib/game/controls'
+import type { ControlMode } from '../../../lib/game/controls'
 import type { Held } from '../../../lib/game/controls'
 import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
@@ -24,7 +25,7 @@ import { missionTitle } from './titleCard'
 import { createSpeech } from '../audio/speech'
 import { CLIP_FOR, clipForPickup, isTrainingGround, lineFor } from '../../../lib/game/tutorial'
 import type { Cue } from '../../../lib/game/tutorial'
-import { skillName } from '../../../lib/game/skills'
+import { SKILL, skillName } from '../../../lib/game/skills'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../three/battle'
 import { BATTLE_SOUNDS } from '../audio/battle'
@@ -248,6 +249,29 @@ export function initBattle(onLeave: () => void): BattleView {
    * fire lock. Now the modes are one pure table (`lib/game/controls.ts`) and this
    * is only the plumbing.
    */
+  const blank = { starting: false, locked: false, charging: false }
+  /**
+   * Which set is live — and if it is `starting`, resolve it away first.
+   *
+   * The beat at the top of a turn is a set with one rule: any input starts the
+   * turn, and the same input is then read again in whatever set follows. It cannot
+   * simply consume the input, because a HELD key never produces a one-shot verb
+   * and the beat would have nothing to end it.
+   */
+  const liveMode = (sighting: boolean): ControlMode => {
+    const ask = (): ControlMode =>
+      modeOf({ ...(scene?.situation() ?? blank), inventory: hud.skills.open(), sighting })
+    if (ask() !== 'starting') return ask()
+    scene?.beginTurn()
+    return ask()
+  }
+
+  /** Skill 65, SKIP TURN — the only way a player ends a turn. */
+  const skipTurn = (): void => {
+    game?.endTurn()
+    updateHud()
+  }
+
   const pushIntent = (): void => {
     const held: Held = {
       walk: (controller.isDown('walkForward') ? 1 : 0) - (controller.isDown('walkBack') ? 1 : 0),
@@ -260,11 +284,7 @@ export function initBattle(onLeave: () => void): BattleView {
       // …and so is F, because that is what the power gauge is (lib/game/gauge.ts).
       firing: controller.isDown('fire')
     }
-    const mode = modeOf({
-      inventory: hud.skills.open(),
-      locked: scene?.locked() === true,
-      sighting: held.sighting
-    })
+    const mode = liveMode(held.sighting)
     const intent = readControls(mode, held)
     if (mode === 'inventory') {
       // The cursor steps on the EDGE, and the axes are the pig's own keys.
@@ -285,11 +305,7 @@ export function initBattle(onLeave: () => void): BattleView {
     // What a one-shot key MEANS is the mode's to say, not this file's: SPACE is a
     // jump in the battle, SELECT in the inventory, the canopy's knife while a
     // crate is coming down, and nothing at all down the sights.
-    const mode = modeOf({
-      inventory: hud.skills.open(),
-      locked: scene?.locked() === true,
-      sighting: controller.isDown('aimMode')
-    })
+    const mode = liveMode(controller.isDown('aimMode'))
     switch (verbOf(mode, action)) {
       case 'openInventory':
         // R opens what the pig is carrying — plus what it can always do. It
@@ -302,11 +318,15 @@ export function initBattle(onLeave: () => void): BattleView {
         if (game) hud.skills.toggle(game.currentPig.carrying)
         return
       case 'choose':
-        // The pig then reaches for it and holds it (three/battle.ts). Nothing
-        // FIRES it yet.
         if (game) {
-          game.currentPig.holding = hud.skills.chosen()
+          const chosen = hud.skills.chosen()
           hud.skills.close()
+          // SKIP TURN is a SKILL, not a weapon: choosing it ends the turn instead
+          // of going into the pig's hands (lib/game/skills.ts).
+          if (chosen === SKILL.SKIP_TURN) skipTurn()
+          // …everything else the pig reaches for and holds (three/battle.ts).
+          // Nothing FIRES it yet.
+          else game.currentPig.holding = chosen
         }
         return
       case 'jump':
@@ -317,9 +337,12 @@ export function initBattle(onLeave: () => void): BattleView {
         // it on is all this has to do.
         scene?.jump()
         return
-      case 'endTurn':
-        game?.endTurn()
-        updateHud()
+      case 'beginTurn':
+        // Unreachable: `liveMode` resolves the beat away before asking. Named so
+        // the switch is total.
+        return
+      case 'skipTurn':
+        skipTurn()
         return
       default:
         return

@@ -6,19 +6,35 @@
 import { test, expect } from '@playwright/test'
 
 import { modeOf, readControls, verbOf } from '../../src/lib/game/controls'
-import type { Held } from '../../src/lib/game/controls'
+import type { Held, Situation } from '../../src/lib/game/controls'
 
 const still: Held = { walk: 0, turn: 0, aim: 0, sighting: false, firing: false }
 const driving = (over: Partial<Held> = {}): Held => ({ ...still, walk: 1, turn: 1, ...over })
 
-test('the modes fall in priority order, and a menu beats everything', () => {
-  expect(modeOf({ inventory: false, locked: false, sighting: false })).toBe('battle')
-  expect(modeOf({ inventory: false, locked: false, sighting: true })).toBe('sights')
-  expect(modeOf({ inventory: false, locked: true, sighting: false })).toBe('locked')
+const at = (over: Partial<Situation> = {}): Situation => ({
+  starting: false,
+  inventory: false,
+  locked: false,
+  charging: false,
+  sighting: false,
+  ...over
+})
+
+test('the modes fall in priority order', () => {
+  expect(modeOf(at())).toBe('battle')
+  expect(modeOf(at({ sighting: true }))).toBe('sights')
+  expect(modeOf(at({ locked: true }))).toBe('locked')
+  expect(modeOf(at({ charging: true }))).toBe('charging')
+  expect(modeOf(at({ inventory: true }))).toBe('inventory')
+  expect(modeOf(at({ starting: true }))).toBe('starting')
   // A committed pig cannot enter the sights…
-  expect(modeOf({ inventory: false, locked: true, sighting: true })).toBe('locked')
-  // …and the inventory beats the lot.
-  expect(modeOf({ inventory: true, locked: true, sighting: true })).toBe('inventory')
+  expect(modeOf(at({ locked: true, sighting: true }))).toBe('locked')
+  // …a filling gauge beats the lock, because it is what set it…
+  expect(modeOf(at({ locked: true, charging: true }))).toBe('charging')
+  // …a menu beats both…
+  expect(modeOf(at({ inventory: true, locked: true, charging: true }))).toBe('inventory')
+  // …and the beat at the top of a turn beats the lot.
+  expect(modeOf(at({ starting: true, inventory: true, locked: true }))).toBe('starting')
 })
 
 test('in the BATTLE all three axes drive', () => {
@@ -46,21 +62,37 @@ test('in the INVENTORY nothing drives, and the axes step the CURSOR', () => {
   expect(readControls('inventory', driving({ walk: -1, turn: 0 })).cursor).toEqual({ x: 0, y: 1 })
 })
 
-test('LOCKED stops everything but the fire key — and that one MUST get through', () => {
+test('LOCKED stops everything, fire included — it is not a lock with a hole', () => {
   const intent = readControls('locked', driving({ aim: 1, firing: true }))
+  expect(intent).toMatchObject({ walk: 0, turn: 0, aim: 0, firing: false })
+})
+
+test('CHARGING is the fire key and nothing else — play: "там просто другой контроллер"', () => {
+  // The gauge's own set. Its whole job is to see the button come UP, which is what
+  // the exe's split needs (0x493796: the press charges, the release throws), and
+  // it steers with nothing.
+  const intent = readControls('charging', driving({ aim: 1, firing: true }))
   expect(intent).toMatchObject({ walk: 0, turn: 0, aim: 0 })
-  // The press that locked the pig is the press that started the gauge charging,
-  // so cutting fire off here would make a power weapon impossible to throw — and
-  // a second press is what sets a live grenade off.
   expect(intent.firing).toBe(true)
 })
 
-test('the fire key is held in every mode that has one', () => {
-  for (const mode of ['battle', 'sights', 'locked'] as const) {
+test('the fire key is held where a mode has one, and dropped where it does not', () => {
+  for (const mode of ['battle', 'sights', 'charging'] as const) {
     expect(readControls(mode, { ...still, firing: true }).firing).toBe(true)
   }
-  // …but not in the inventory: nothing fires out of the menu.
-  expect(readControls('inventory', { ...still, firing: true }).firing).toBe(false)
+  for (const mode of ['inventory', 'locked', 'starting'] as const) {
+    expect(readControls(mode, { ...still, firing: true }).firing).toBe(false)
+  }
+})
+
+test('STARTING has one rule: any key starts the turn, whatever the key is', () => {
+  // And it cannot simply CONSUME the key, which is the trap: a held key never
+  // produces a one-shot verb, so a set that swallowed the axes could not be ended
+  // by them. The caller starts the turn and then re-reads the same input in the
+  // set that follows (`liveMode` in ui/battle.ts).
+  for (const action of ['jump', 'fire', 'skills', 'endTurn', 'walkForward']) {
+    expect(verbOf('starting', action)).toBe('beginTurn')
+  }
 })
 
 test('SPACE is a different verb in every mode', () => {
@@ -73,12 +105,24 @@ test('SPACE is a different verb in every mode', () => {
   expect(verbOf('locked', 'jump')).toBe('cutChute')
 })
 
-test('a locked pig cannot open its inventory or end its turn', () => {
-  expect(verbOf('locked', 'skills')).toBeNull()
-  expect(verbOf('locked', 'endTurn')).toBeNull()
+test('a locked or charging pig cannot open its inventory or end its turn', () => {
+  for (const mode of ['locked', 'charging'] as const) {
+    expect(verbOf(mode, 'skills')).toBeNull()
+    expect(verbOf(mode, 'endTurn')).toBeNull()
+    // The one thing either answers: the jump key cuts the opening drop's canopy.
+    expect(verbOf(mode, 'jump')).toBe('cutChute')
+  }
   // …and a menu swallows the turn key too.
   expect(verbOf('inventory', 'endTurn')).toBeNull()
   expect(verbOf('inventory', 'skills')).toBe('closeInventory')
+})
+
+test('ending a turn goes through the SKILL, not a path of its own', () => {
+  // Play: "закончить ход вообще можно только через умение." Skill 65, SKIP TURN,
+  // is always in the menu whatever the pig carries, so the key is a shortcut to
+  // it — and whatever the skill grows later, the key gets for free.
+  expect(verbOf('battle', 'endTurn')).toBe('skipTurn')
+  expect(verbOf('sights', 'endTurn')).toBe('skipTurn')
 })
 
 test('the sights are NOT a lock — play caught that one', () => {
@@ -88,5 +132,5 @@ test('the sights are NOT a lock — play caught that one', () => {
   expect(sighted.turn).not.toBe(0)
   expect(sighted.aim).not.toBe(0)
   expect(verbOf('sights', 'skills')).toBe('openInventory')
-  expect(verbOf('sights', 'endTurn')).toBe('endTurn')
+  expect(verbOf('sights', 'endTurn')).toBe('skipTurn')
 })

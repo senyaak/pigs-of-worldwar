@@ -1443,17 +1443,34 @@ own KEY map (`MENU_BINDINGS`) rather than reinterpreting the battle's actions.
 grew one method, `locked()`, because it is the one that owns `committed()` and the
 aftermath.
 
-Two things worth not rediscovering:
+**Play corrected the first cut twice, and both corrections removed an exception:**
+"ОГОНЬ проходит сквозь блокировку — а вот и нет, там просто другой контроллер",
+and "game.starting — так просто контроллер который принимает любую клавишу". Both
+right. A gauge filling is `charging`, a set that reads the button coming UP and
+steers with nothing (0x493796 is the exe's own split); the beat at the top of a
+turn is `starting`. With those two named, `locked` became what its name says —
+nothing gets through — and there are no carve-outs left anywhere.
 
-- **FIRE gets through the lock, and it has to.** The press that locks the pig is
-  the press that started the gauge charging, so cutting it off would make a power
-  weapon unthrowable — and a second press is what sets a live grenade off. It is
-  the only thing `locked` lets past.
-- **`game.starting` is NOT locked.** The beat at the top of a turn is ended by ANY
-  input and the frame that ends it reads the walk, the turn and the aim to notice.
-  Calling it locked zeroes those before they arrive, and the beat could then only
-  be ended with jump or fire. The scene refuses to DRIVE the pig through the beat
-  on its own line; that is the part that matters.
+**The one trap in `starting`, which cost two failing specs.** It cannot simply
+CONSUME the key: a HELD key never produces a one-shot verb, so a set that swallowed
+the axes could never be ended by them. Its rule is "any input starts the turn, and
+the same input is then re-read in the set that follows" — `liveMode` in
+`ui/battle.ts` resolves the mode away before asking for the axes.
+
+**Ending a turn is a SKILL.** Play: "закончить ход вообще можно только через
+умение." It is skill **65, SKIP TURN**, already always in the menu whatever the pig
+carries, and choosing it now ends the turn instead of going into the pig's hands.
+The Enter key and the dashboard button are shortcuts to that same skill rather than
+paths of their own, so whatever the skill grows later they get for free.
+
+**There is no sleep animation to give it.** The exe names 59 clips (a table just
+before the D3D wrapper's strings, 0 "Run cycle (normal)" through 58
+"Parachuting" — every ANIM constant in the repo checks out against it) and not one
+is a sleep or a doze; the menu's ICON is called `sleep`, which is what play was
+remembering. Skills 63, 65 and 66 are also OUT OF RANGE of `Pig::Fire`'s dispatch
+(it covers 1..62, 0x469408), so they never reach the fire path at all and cannot
+pick up an animation there. Nearest candidates if one is ever wanted: 46 "Thinking",
+33 "Cowering", 51 "Idle Cold". Not picked — a name pick here would be invention.
 
 One behaviour did change on purpose: ending the TURN mid-blow is refused now.
 `verbOf('locked', 'endTurn')` is null, where the old `onAction` ran it regardless.
