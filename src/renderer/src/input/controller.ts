@@ -220,15 +220,31 @@ export interface DebugHooks {
   beginTurn(): void
 }
 
+/** How a spec reads a frontend screen: the frontend draws on a canvas, so
+ * there is no markup to assert on (ui/barScreen.ts). */
+export interface BarScreenView {
+  selected(): number
+  labels(): string[]
+  /** What each bar says on the RIGHT — null where it carries no setting. */
+  values(): (string | null)[]
+}
+
 declare global {
   interface Window {
     pow?: {
       controller: Controller
       debug?: DebugHooks
-      /** The main menu, while it is the view: which bar is lit and what the
-       * bars say. The frontend draws on a canvas, so this is how a spec
-       * reads it (docs/testing.md). */
-      menu?: { selected(): number; labels(): string[] }
+      /** The main menu, while it is the view: which bar is lit, what the bars
+       * say, and what each says on the right where it carries a setting. The
+       * frontend draws on a canvas, so this is how a spec reads it
+       * (docs/testing.md). */
+      menu?: BarScreenView
+      /** The MULTI-PLAYER screen, read the same way (ui/multiPlayer.ts). */
+      multiPlayer?: BarScreenView
+      /** Where the frontend's furniture sits, live: nudge a piece in the
+       * console and `print()` it back out to paste into ui/barScreen.ts.
+       * Placing this art is eyework, the same as `pow.hud`. */
+      screen?: { layout: unknown; print(): unknown }
       /** The dashboard's layout, live: nudge a piece in the console and
        * `print()` it back out to paste into ui/hud.ts. */
       hud?: { layout: unknown; print(): unknown }

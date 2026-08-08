@@ -86,7 +86,10 @@ const GET_READY = 168
 const MISSES_TURN = 167
 
 export interface BattleView {
-  open(): Promise<boolean>
+  /** Open a battle. With no name it reopens whatever map the view is on,
+   * which is the training ground until something asks for another — the
+   * MULTI-PLAYER screen asks for a two-sided one (ui/multiPlayer.ts). */
+  open(name?: string): Promise<boolean>
   close(): void
 }
 
@@ -445,7 +448,7 @@ export function initBattle(onLeave: () => void): BattleView {
   }
 
   return {
-    open: () => start(map),
+    open: (name) => start(name ?? map),
     close() {
       scene?.dispose()
       scene = null

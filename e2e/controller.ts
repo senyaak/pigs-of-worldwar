@@ -22,6 +22,8 @@ export type Action =
   | 'endTurn'
   | 'menuUp'
   | 'menuDown'
+  | 'menuLeft'
+  | 'menuRight'
   | 'menuSelect'
   | 'menuBack'
   | 'assets'

@@ -14,6 +14,8 @@ export const ACTIONS = [
   'endTurn',
   'menuUp',
   'menuDown',
+  'menuLeft',
+  'menuRight',
   'menuSelect',
   'menuBack',
   'skills',
@@ -105,6 +107,13 @@ export const MENU_BINDINGS: Record<string, Action> = {
   ArrowUp: 'menuUp',
   KeyS: 'menuDown',
   ArrowDown: 'menuDown',
+  // Left and right CHANGE a setting where a bar carries one, which is the
+  // original's own instruction: "TO CHANGE THE RANK OF A PIG, POSITION CURSOR
+  // OVER IT AND INDICATE LEFT OR RIGHT" (fetext 780).
+  KeyA: 'menuLeft',
+  ArrowLeft: 'menuLeft',
+  KeyD: 'menuRight',
+  ArrowRight: 'menuRight',
   Enter: 'menuSelect',
   Space: 'menuSelect',
   Escape: 'menuBack',

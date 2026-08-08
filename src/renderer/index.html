@@ -216,13 +216,15 @@
       /* The frontend is authored for 640×480; it is scaled whole, letterboxed
          and unsmoothed, so it reads as the original rather than as a blurred
          stretch of it. */
-      #menu {
+      #menu,
+      #multiplayer {
         flex: 1;
         min-height: 0;
         background: #000;
         overflow: hidden;
       }
-      #menu-screen {
+      #menu-screen,
+      #mp-screen {
         display: block;
         width: 100%;
         height: 100%;
@@ -300,6 +302,9 @@
       </div>
       <div id="menu" class="hidden">
         <canvas id="menu-screen"></canvas>
+      </div>
+      <div id="multiplayer" class="hidden">
+        <canvas id="mp-screen"></canvas>
       </div>
       <div id="battle" class="hidden">
         <div id="battle-toolbar">

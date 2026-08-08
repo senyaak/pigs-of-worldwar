@@ -4,17 +4,19 @@
 import { byId } from './ui/dom'
 import { initWelcome } from './ui/welcome'
 import { initMenu } from './ui/menu'
+import { initMultiPlayer } from './ui/multiPlayer'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
 import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 
-type View = 'welcome' | 'menu' | 'battle' | 'browser' | 'archive' | 'viewer'
+type View = 'welcome' | 'menu' | 'multiplayer' | 'battle' | 'browser' | 'archive' | 'viewer'
 
 const panels: Record<View, HTMLElement[]> = {
   welcome: [byId('welcome')],
   menu: [byId('menu')],
+  multiplayer: [byId('multiplayer')],
   battle: [byId('battle')],
   browser: [byId('browser'), byId('file-list')],
   archive: [byId('archive-view')],
@@ -25,9 +27,12 @@ function show(view: View): void {
   for (const [name, elements] of Object.entries(panels)) {
     for (const element of elements) element.classList.toggle('hidden', name !== view)
   }
-  // The menu draws and listens only while it is the view.
+  // A frontend screen draws and listens only while it is the view — and they
+  // share one controller, so the one being left has to stop hearing it.
   if (view === 'menu') menu.enter()
   else menu.leave()
+  if (view === 'multiplayer') multiPlayer.enter()
+  else multiPlayer.leave()
 }
 
 // The viewer panel is shared by models (opened from an archive) and terrain
@@ -68,16 +73,40 @@ const menu = initMenu({
   onNewGame: () => {
     void battle.open().then((ok) => ok && show('battle'))
   },
+  onMultiPlayer: () => {
+    show('multiplayer')
+    void multiPlayer.load()
+  },
   onAssets: () => {
     show('browser')
     void browser.load()
   }
 })
+
+const multiPlayer = initMultiPlayer({
+  onStart: (map) => {
+    void battle.open(map).then((ok) => ok && show('battle'))
+  },
+  onBack: () => show('menu')
+})
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
 
-// The menu is drawn on a canvas, so what it says and which bar is lit are
-// only readable through here (docs/testing.md).
-if (window.pow) window.pow.menu = { selected: menu.selected, labels: menu.labels }
+// The frontend is drawn on a canvas, so what a screen says and which bar is
+// lit are only readable through here (docs/testing.md) — and where its
+// furniture sits is eyework, so the layout is editable from the console the
+// same way the dashboard's is.
+if (window.pow) {
+  window.pow.menu = { selected: menu.selected, labels: menu.labels, values: menu.values }
+  window.pow.multiPlayer = {
+    selected: multiPlayer.selected,
+    labels: multiPlayer.labels,
+    values: multiPlayer.values
+  }
+  window.pow.screen = {
+    layout: menu.layout,
+    print: () => JSON.parse(JSON.stringify(menu.layout))
+  }
+}
 
 // A located game lands on the main menu; the asset browsers hang off it.
 async function showGame(dir: string): Promise<void> {

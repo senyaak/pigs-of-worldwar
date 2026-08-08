@@ -19,13 +19,20 @@ import { existsSync } from 'node:fs'
 
 import { PHASE_ENV, launchApp } from './launch'
 import type { Launched } from './launch'
+import { tap } from './controller'
+import type { Action } from './controller'
 
-/** Every view the app can be showing, and the control that leaves it. */
-const EXITS: [string, string][] = [
-  ['#battle', '#battle-leave'],
-  ['#viewer', '#viewer-back'],
-  ['#archive-view', '#archive-back'],
-  ['#browser', '#browser-menu']
+/**
+ * Every view the app can be showing, and how to leave it. Most have a button;
+ * a FRONTEND screen has none — it is drawn on a canvas in the game's own art
+ * and is left the way a player leaves it, on the back key.
+ */
+const EXITS: [string, { click: string } | { key: Action }][] = [
+  ['#battle', { click: '#battle-leave' }],
+  ['#viewer', { click: '#viewer-back' }],
+  ['#archive-view', { click: '#archive-back' }],
+  ['#browser', { click: '#browser-menu' }],
+  ['#multiplayer', { key: 'menuBack' }]
 ]
 
 /**
@@ -38,7 +45,8 @@ export async function toMenu(page: Page): Promise<void> {
     if (await page.locator('#menu').isVisible()) return
     for (const [view, exit] of EXITS) {
       if (await page.locator(view).isVisible()) {
-        await page.locator(exit).click()
+        if ('click' in exit) await page.locator(exit.click).click()
+        else await tap(page, exit.key)
         break
       }
     }
