@@ -1397,13 +1397,21 @@ carries it and none of it is invented.
 the vertical and only the sideways travel is damped, so it sinks to the bed and is
 doused there.
 
-**COMMITTED is now the whole of input, not the jump alone.** Play: "после нажатия
-стрелять должно отключаться полностью управление — а не только прыжок, вообще
-всё." The old gate missed the biggest window of the lot — a weapon with a power
-gauge does not set `firing` on the press, so for the whole second and a half of
-the charge the pig could still be walked, turned and aimed. `committed()` in
-`three/battle.ts` now covers the sights, the gauge, the fuse and flight, the swing
-and anything still in the air, and walk, turn, jump and aim all read it.
+**COMMITTED is the whole of input, and it starts at the FIRE press.** Play: "после
+нажатия стрелять должно отключаться полностью управление — а не только прыжок,
+вообще всё." The old gate missed the biggest window of the lot — a weapon with a
+power gauge does not set `firing` on the press, so for the whole second and a half
+of the charge the pig could still be walked, turned and aimed. `committed()` in
+`three/battle.ts` covers the gauge, the fuse and flight, the swing and anything
+still in the air, and walk, turn, jump and aim all read it.
+
+**The SIGHTS are NOT in it**, and they were for one commit. Going down the sights
+hands over a DIFFERENT control set rather than taking control away — the turn
+drives the scope and the pig together through the aim's own ramp instead of the
+walk's, and Q and E move the aim — and the only thing the aim view actually takes
+is the JUMP (0x4928dc routes input through its own branch and no jump is reachable
+from it). Play named the distinction: "там должен включаться другой контрол сет —
+выключаться должно когда выстрел нажал, не прицел."
 
 **The gauge slider's end was three pixels out.** Measured off the ASSEMBLED strip
 with the right transparent colour (0x0000, which the slider's own measurement

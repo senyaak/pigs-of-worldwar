@@ -437,17 +437,24 @@ export function buildBattle(
   /**
    * Whether the pig has COMMITTED to a blow, and so cannot be driven at all.
    *
-   * Everything from the frame the button goes down to the frame the last thing
-   * it threw has gone: the gauge charging, the fuse and the flight, the swing
-   * itself, and anything still in the air. The exe's walk refuses from the
-   * moment the button goes down until the clip is spent (0x46afd5 tests both
-   * the pending flag and the animation one), its turn refuses for the clip
-   * alone (0x46af43), and `Pig::MayAct` is false through the whole of a shot
-   * (lib/game/shot.ts). Down the SIGHTS too: the exe routes the whole of input
-   * through a different branch while the aim bit is down (0x4928dc).
+   * Everything from the frame the FIRE button goes down to the frame the last
+   * thing it threw has gone: the gauge charging, the fuse and the flight, the
+   * swing itself, and anything still in the air. The exe's walk refuses from the
+   * moment the button goes down until the clip is spent (0x46afd5 tests both the
+   * pending flag and the animation one), its turn refuses for the clip alone
+   * (0x46af43), and `Pig::MayAct` is false through the whole of a shot
+   * (lib/game/shot.ts).
+   *
+   * **`sighting` is deliberately NOT in here**, and it was for one commit. Going
+   * down the sights does not take control away — it hands over a DIFFERENT
+   * control set, which is what the exe's own branch at 0x4928dc is: the turn
+   * drives the scope and the pig together through the aim's ramp rather than the
+   * walk's, Q and E move the aim, and the jump key stops being a jump. Play named
+   * the distinction — "там должен включаться другой контрол сет; выключаться
+   * должно когда выстрел нажал, не прицел". The jump is refused on its own line
+   * below, which is the only thing the aim view actually takes away.
    */
   const committed = (): boolean =>
-    sighting ||
     gauge !== null ||
     firing !== null ||
     swings.running() ||
@@ -866,31 +873,25 @@ export function buildBattle(
       } else swings.begin(active)
     }
     fireRequested = false
-    // A swinging pig cannot be driven: the exe's walk refuses from the moment
-    // the button goes down until the clip is spent (0x46afd5 tests both the
-    // pending flag and the animation one) and its turn refuses for the clip
-    // alone (0x46af43). A firing one cannot either, and on the same gate.
-    // Nothing else is driveable down the sights either — the aim view has the
-    // pad, so the jump key is not a jump while it is held. The remake's
-    // reading: the exe routes the whole of input through a different branch
-    // while the aim bit is down (0x4928dc), and no jump is reachable from it.
-    // Nor while a blow is in the air. The camera is off on the projectile and
-    // `Pig::MayAct` is false for the whole of it (lib/game/shot.ts) — play saw
-    // the pig hop about behind a grenade it could not see.
-    // **COMMITTED**, and it is now the whole of input rather than the jump
-    // alone. Play: "после нажатия стрелять должно отключаться полностью
-    // управление — а не только прыжок, вообще всё." The old gate missed the
-    // biggest window of the lot: a weapon with a power gauge does not set
-    // `firing` on the press — the press starts it CHARGING and the throw comes
-    // on the release — so for the whole second and a half of the charge the pig
-    // could still be walked, turned and aimed. It missed a bullet in the air
-    // too.
+    // **COMMITTED takes the whole of input, and it starts at the FIRE press.**
+    // Play: "после нажатия стрелять должно отключаться полностью управление — а
+    // не только прыжок, вообще всё." The gate used to miss the biggest window of
+    // the lot: a weapon with a power gauge does not set `firing` on the press —
+    // the press starts it CHARGING and the throw comes on the release — so for
+    // the whole second and a half of the charge the pig could still be walked,
+    // turned and aimed. It missed a bullet in the air too.
     if (committed()) {
       jumpRequested = false
       aimIntent = 0
     }
     const walking = committed() ? 0 : intent.walk
     const turning = committed() ? 0 : intent.turn
+    // The SIGHTS are a different control set, not a locked one — the walk and the
+    // turn below still answer, the turn through the aim's own ramp instead of the
+    // pig's. The one thing the aim view does take away is the JUMP: the exe routes
+    // input through its own branch while the aim bit is down (0x4928dc) and no
+    // jump is reachable from it, so the key is not a jump while G is held.
+    if (sighting) jumpRequested = false
 
     // Down the sights the two axes move together. The pad gives the turn a
     // flat 0x40 the moment the key goes down and the aim a ramp to 0x20, so
