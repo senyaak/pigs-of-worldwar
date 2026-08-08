@@ -1819,45 +1819,57 @@ away — a fuse, a flight and a landing all resolved before anything was drawn, 
 is what play saw as "2 раза вызвать выстрел, а цель стояла и не было прожектайла".
 Clamping is not a pause and does not pretend to be one; see the thread below.
 
-### The tremor, settled: a jitter on a WANDERING CENTRE — 2026-08-08
+### The tremor: a JITTER on the aim, a DRIFT on the eye — 2026-08-08
 
-Play, on the walk that replaced the sampled version: "ты держишь его в радиусе
-центра… щас реально по одному эллипсу ездит. Раньше было ПРАВИЛЬНО! Тебе надо было
-просто после каждого сдвига обновлять центр — чтобы могло уезжать в любую сторону."
+Four passes and play corrected every one, so the shape is written down properly.
+The tremor is TWO things and the split is the whole point:
 
-Both halves, and neither replaces the other: the JITTER is the sampled-and-eased one
-that was right (`AMPLITUDE` 7, `EASE` 0.65, back exactly as it was), and the CENTRE
-it jitters about takes a step of its own every engine frame in a FRESH random
-direction. A direction that is kept and reversed at the stops — which is what the
-walk did — is an ellipse when two axes do it; a direction redrawn every step is not.
-The zoom scales the centre's step, so closer covers more ground, and the bound does
-not move.
+- the **JITTER** is on the ANGLE — an independent sample of about half a degree
+  every engine frame, eased towards, which is the resting analogue stick the aim
+  view's own handler feeds the camera. This is the version play called
+  ПРАВИЛЬНО and it is back exactly as it was, `AMPLITUDE` and `EASE`
+  included;
+- the **DRIFT** is on the **EYE** — a free random walk with **no centre and no
+  bound**: "ЦЕНТРА ВООБЩЕ НЕ ДОЛЖНО БЫТЬ — мы можем уехать в одном
+  направлении на 10 метров если рандо так сделает."
 
-**And the SHOT reads the same offset the view does.** This is the bug behind
-"нажимаешь, прицел смотрит на 1 вещь, а стреляет будто секунду назад": the view was
-built on `aim.angle + wobble` while the bullet left along `aim.angle` alone, so the
-crosshair — which is nailed to the middle of the screen — was lying about where the
-shot would go. The exe has no such split: its tremor is the stick's own step going
-through `Pig::Aim` into `[pig+0x304]`, which is the field the bullet reads. The note
-here that used to say "the view jitters, the shot does not" was written before the
-stick was found feeding `Pig::Aim` and is wrong. `shots.fire` and
-`grenades.throwOne` take the yaw half too.
+**The eye is what keeps the shot honest, and this is the lesson of the pass.** An
+unbounded drift on the ANGLE is a lie — the crosshair is nailed to the middle of the
+screen, so the picture ends up pointing where the bullet will not go. Folding the
+drift into the bullet to fix that was worse: "пуля летела не туда только после
+твоего фикса." Moving the EYE slides the world across the sights instead: the
+target leaves the crosshair, the player brings it back, and the barrel points where
+the player put it and nowhere else. It is also where the exe's own scope motion lives
+— the rifle cam is a POSITION on the hand bone (0x4a2e30).
 
-**It FREEZES for the fuse rather than resetting.** `Pig::Aim` is refused from the
-press until the attack, and the tremor arrives through it, so the sights stop dead
-and the bullet leaves along exactly what the player last saw. Only lowering the
-sights for good clears it.
+Two shapes that were tried and are wrong, so they are not tried again: a bounded
+walk with a direction kept until the stop (two axes doing that is ONE ELLIPSE, and
+play said so on sight), and any zoom scaling that shrinks the tremor — the exe's
+`(0x1000 − zoom) >> 12` divides the player's own aiming STEP, which is control
+sensitivity, not the tremor. The zoom scales how far the eye travels, and nothing
+else. It FREEZES for the fuse rather than resetting, which is `Pig::Aim`'s own
+refusal from the press to the attack.
 
-**"START OF TURN" is on screen at last.** The beat has been in the domain since the
-turn clock landed and nothing ever showed it, so a handover read as instant — play:
-"подтверждение начала хода ты так и не сделал." The wording is the exe's own debug
-line (0x4d8a2c); putting it through the briefing bar is the remake's.
+### "GET READY >S..." is the game's own words — 2026-08-08
 
-**And a grenade in water sinks, measured end to end.** `e2e/002/sink.spec.ts` stands
-a pig in CAMP's pond, drops one at its feet and watches: the y only grows, it is gone
-after its couple of seconds, and the sounds carry `FT_WATER` and never `E_1`. Play
-reported it going off the moment it started sinking; whatever that was, it was not
-the douse path, and this spec is what will say so next time.
+The beat at the top of a turn has been in the domain since the turn clock landed and
+nothing ever showed it, so a handover read as instant: "когда кончается ход —
+следующий начинается мгновенно." A first pass invented a line out of the exe's
+debug print, and play sent a screenshot of the shipped game instead — big green
+letters over the battle, "GET READY TOMMY'S TROTTERS..." So it is **`gtext 168`**,
+with the SQUAD's name in it, on the same centred card the mission title uses. `gtext
+167` is ">S MISSES A TURN!" and is what SKIP TURN should say when the bar can be
+reached from the scene; the sound stands in meanwhile.
+
+**Do not invent a string this game already has.** Both of those were sitting in
+gtext, four numbers apart, next to the crate lines this repo already used.
+
+### The clock stops at the CHARGE — 2026-08-08
+
+Play: "при начинании зарядки броска таймер останавливается — так как это уже
+атака началась." Right, and it is the same gate as the rest: `Pig::MayAct` goes
+false on the press that starts the gauge, a second and a half before anything leaves
+the hand. `blowInProgress` now counts the gauge.
 
 ### Threads left mid-pull
 
@@ -1898,7 +1910,17 @@ here, which is to be read off a CALL SITE rather than off the name table (see th
 `ANIM` note in `locomotion.ts`), and skills 63/65/66 are out of range of
 `Pig::Fire`'s dispatch so there is no site to read.
 
-**6. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
+**6. The WATER SPLASH is in the wrong place and far too big — and it is what reads
+as a grenade EXPLODING on contact.** Play reported the blast twice more
+("всё ещё при контакте с водой граната взрывается сразу") and it is not the douse:
+`e2e/002/sink.spec.ts` stands a pig in CAMP's pond, drops one at its feet and
+measures the whole path — the y only grows, it is gone after its couple of seconds,
+`FT_WATER` is heard and `E_1` never is. So what is on screen at the moment of contact
+is THIS effect, in the air where it should be under the surface, and play has also
+asked for its DIRT look to be written down: "есть брызги земли — это потом
+запиши."
+
+**6b. The rest of the splash's placement.** Play: "эффект воды —
 не там, огромный, и вообще не на воде". `SPLASH_EFFECT` is effect 0x0E / parameter
 row 2 and the row is decoded — three rings at a lift of −500, a sixty-sprite cloud,
 a ten-particle burst — so what is wrong is the remake's, not the reading. Two

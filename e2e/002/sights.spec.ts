@@ -1,27 +1,38 @@
-// PHASE 002 (domain) — down the SIGHTS: the zoom, and the tremor it scales.
+// PHASE 002 (domain) - down the SIGHTS: the zoom, the tremor, and where each half
+// of the tremor belongs.
 //
-// The ZOOM is the exe's: 0x20 a frame to a cap of 0x1000, for skills 11 and 64
-// only, and the aim STEP is divided by `(0x1000 - zoom) >> 12` on the way out of
+// The ZOOM is the exe's: 0x20 a frame to a cap of 0x1000, for skills 11 and 64 only,
+// and the aim STEP is divided by `(0x1000 - zoom) >> 12` on the way out of
 // `[game+0x300]` so the sights get finer as they close in (0x495ecc, 0x495bc1).
 //
-// The TREMOR is not that quantity and must not take that divisor: the accumulator
-// is the player's own aiming step — control sensitivity, which a scope wants fine —
-// while the tremor is what the player fights. Play settled its shape over four
-// passes, and the last one is the design: a fast JITTER on a CENTRE THAT WALKS.
-// "тебе надо было просто после каждого сдвига обновлять центр — чтобы могло уезжать
-// в любую сторону. Раньше было ПРАВИЛЬНО." A pass with only the walk drew one
-// ellipse, because two axes sweeping between reflecting stops IS an ellipse.
+// The TREMOR is two things and play settled both, in four passes:
 //
-// And the SHOT reads the same offset the view does — see `wobblePitch`.
+//  - a JITTER on the ANGLE, sampled every engine frame and eased towards. Half a
+//    degree, and the version play called RIGHT.
+//  - a DRIFT on the EYE, a free random walk with no centre and no bound: "ЦЕНТРА
+//    ВООБЩЕ НЕ ДОЛЖНО БЫТЬ - мы можем уехать в одном направлении на 10
+//    метров если рандо так сделает."
+//
+// The eye is what keeps the shot honest: an unbounded drift on the ANGLE would point
+// the picture where the bullet will not go, and folding it into the bullet was worse
+// still - "пуля летела не туда только после твоего фикса".
 
 import { test, expect } from '@playwright/test'
 
 import { ZOOM_CAP, ZOOM_STEP, createZoom, updateZoom, zoomFraction, zoomsIn } from '../../src/lib/game/zoom'
-import { createWobble, resetWobble, updateWobble, wobblePitch, wobbleYaw } from '../../src/lib/game/wobble'
+import {
+  createWobble,
+  resetWobble,
+  updateWobble,
+  wobbleAcross,
+  wobblePitch,
+  wobbleUp,
+  wobbleYaw
+} from '../../src/lib/game/wobble'
 import { layerFires, layerSights, weaponLayer } from '../../src/lib/game/controls'
 import { SKILL } from '../../src/lib/game/skills'
 
-/** A deterministic stand-in for `Math.random` — varied, so a walk is a walk, and
+/** A deterministic stand-in for `Math.random` - varied, so a walk is a walk, and
  * repeatable, so the numbers below mean something. */
 const rolling = (): (() => number) => {
   let seed = 12345
@@ -39,17 +50,17 @@ const shaken = (zoom: number, frames = 240): ReturnType<typeof createWobble> => 
   return wobble
 }
 
-/** How far the CENTRE travels over `frames` frames — the sum of its steps, which
- * is what the zoom is meant to change. */
+/** How far the EYE travels over `frames` frames - the sum of its steps, which is
+ * what the zoom is meant to change. */
 const travelled = (zoom: number, frames = 240): number => {
   const wobble = createWobble()
   const random = rolling()
-  let was = wobble.driftPitch
+  let was = wobbleAcross(wobble)
   let along = 0
   for (let frame = 0; frame < frames; frame++) {
     updateWobble(wobble, 1, zoom, random)
-    along += Math.abs(wobble.driftPitch - was)
-    was = wobble.driftPitch
+    along += Math.abs(wobbleAcross(wobble) - was)
+    was = wobbleAcross(wobble)
   }
   return along
 }
@@ -72,58 +83,60 @@ test('only the two zooming skills zoom, and they creep to the cap', () => {
   expect(zoom.value).toBe(0)
 })
 
-test('the CENTRE walks, so the sights can wander off in any direction', () => {
-  // Play's correction, and the whole of it: "после каждого сдвига обновлять
-  // центр." A fresh direction every step, so it is a walk and not a sweep.
+test('the EYE wanders freely - no centre, and nothing pulls it back', () => {
+  // Play's correction, twice over: each step moves the eye and there is no radius
+  // it orbits. So over time it goes wherever the random took it.
   const wobble = createWobble()
   const random = rolling()
   const drift: number[] = []
   for (let frame = 0; frame < 240; frame++) {
     updateWobble(wobble, 1, 0, random)
-    drift.push(wobble.driftPitch)
+    drift.push(wobbleAcross(wobble))
   }
-  // It gets properly away from the middle — further than the jitter alone could.
-  expect(Math.max(...drift.map(Math.abs))).toBeGreaterThan(8)
-  // …and it gets there by STEPS: neighbours, not fresh samples.
+  // It gets properly away - further than any one step, because the steps add up.
+  expect(Math.max(...drift.map(Math.abs))).toBeGreaterThan(30)
+  // ...by STEPS, so consecutive frames are neighbours rather than fresh samples.
   const steps = drift.slice(1).map((one, i) => Math.abs(one - drift[i]))
-  expect(Math.max(...steps)).toBeLessThan(2)
-  // The direction is redrawn every step rather than held to a stop, which is what
-  // keeps it off the one ellipse a reflecting sweep drew: the sign of the step
-  // changes often.
-  const turns = drift
-    .slice(2)
-    .filter((one, i) => Math.sign(one - drift[i + 1]) !== Math.sign(drift[i + 1] - drift[i])).length
-  expect(turns).toBeGreaterThan(40)
-  // And the JITTER is still there on top, fast and its own size.
-  expect(Math.abs(wobble.jitterPitch)).toBeGreaterThan(0)
-  expect(wobblePitch(wobble)).toBeCloseTo(wobble.driftPitch + wobble.jitterPitch, 6)
+  expect(Math.max(...steps)).toBeLessThan(15)
+  // ...and the two axes are independent, which is what lets it go in any direction
+  // rather than along one line.
+  expect(wobbleUp(wobble)).not.toBeCloseTo(wobbleAcross(wobble), 3)
 })
 
-test('CLOSER TRAVELS FURTHER, and the radius stays put', () => {
-  // "чем ближе, тем больше расстояния проходит, а не тем шире радиус дёрганья."
+test('the ANGLE only ever carries the small JITTER, so the shot stays honest', () => {
+  // Half a degree of stick and no drift: what the bullet leaves along is the
+  // player's own angle, and the crosshair is not lying about it.
+  const wobble = shaken(0, 240)
+  expect(Math.abs(wobblePitch(wobble))).toBeLessThan(8)
+  expect(Math.abs(wobbleYaw(wobble))).toBeLessThan(8)
+  // The eye, by then, is somewhere else entirely.
+  expect(Math.abs(wobbleAcross(wobble))).toBeGreaterThan(Math.abs(wobblePitch(wobble)))
+})
+
+test('CLOSER TRAVELS FURTHER, and that is all the zoom does', () => {
   expect(travelled(1)).toBeGreaterThan(travelled(0) * 1.5)
-  // The bound is not the zoom's to move: 24 units either way, wide open or shut.
-  expect(Math.abs(shaken(1, 600).driftPitch)).toBeLessThanOrEqual(24)
-  expect(Math.abs(shaken(1, 600).driftYaw)).toBeLessThanOrEqual(24)
 })
 
-test('it FREEZES when it stops being advanced — that is the fuse', () => {
+test('it FREEZES when it stops being advanced - that is the fuse', () => {
   // `Pig::Aim` is refused from the fire press until the attack and the tremor
-  // arrives through it, so the sights stop dead and the bullet leaves along what
-  // the player last saw. Resetting instead read as the shot lagging a second.
+  // arrives through it, so the sights stop dead and the shot leaves along what the
+  // player last saw. Resetting instead read as the shot lagging a second.
   const wobble = shaken(0, 60)
-  const held = wobblePitch(wobble)
-  expect(held).not.toBe(0)
-  expect(wobblePitch(wobble)).toBe(held)
-  expect(wobbleYaw(wobble)).toBe(wobble.driftYaw + wobble.jitterYaw)
+  const eye = wobbleAcross(wobble)
+  const angle = wobblePitch(wobble)
+  expect(eye).not.toBe(0)
+  expect(wobbleAcross(wobble)).toBe(eye)
+  expect(wobblePitch(wobble)).toBe(angle)
 })
 
 test('nothing at all once the sights are lowered for good', () => {
   const wobble = shaken(0, 60)
-  expect(Math.abs(wobblePitch(wobble))).toBeGreaterThan(0)
+  expect(Math.abs(wobbleAcross(wobble))).toBeGreaterThan(0)
   resetWobble(wobble)
   expect(wobblePitch(wobble)).toBe(0)
   expect(wobbleYaw(wobble)).toBe(0)
+  expect(wobbleAcross(wobble)).toBe(0)
+  expect(wobbleUp(wobble)).toBe(0)
 })
 
 test('a weapon brings its own LAYER, and only two of them have an aim view', () => {

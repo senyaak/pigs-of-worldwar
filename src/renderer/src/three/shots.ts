@@ -19,7 +19,6 @@ import {
   spentShot
 } from '../../../lib/game/projectile'
 import { MODEL_SCALE } from '../../../lib/game/scale'
-import { aimRadians } from '../../../lib/game/aim'
 import type { Shot } from '../../../lib/game/projectile'
 import { PIG_RADIUS } from '../../../lib/game/obstacles'
 import { hurt, isDead } from '../../../lib/game/health'
@@ -71,11 +70,7 @@ export interface Shots {
   /** Loose one from this pig, pointed at `aim` — the angle in the engine's
    * 4096-to-the-turn units, which only the acting pig has (lib/game/aim.ts).
    * False if what it holds is not a gun. */
-  /** Fire one. `aim` is the elevation in the game's own angle units and `yaw` is
-   * a turn OFF the pig's heading, in the same units — the sights' own tremor
-   * (lib/game/wobble.ts), which the bullet has to follow or the crosshair is
-   * telling lies. */
-  fire(soldier: Soldier, aim: number, yaw?: number): boolean
+  fire(soldier: Soldier, aim: number): boolean
   /** One frame of every bullet in the air. */
   update(delta: number): void
   /** How many are still flying. */
@@ -191,7 +186,7 @@ export function createShots(parts: ShotParts): Shots {
   }
 
   return {
-    fire(soldier, aim, yaw = 0) {
+    fire(soldier, aim) {
       const skill = soldier.pig.holding
       if (skill === null || !projectileOf(skill)) return false
       const offset = MUZZLE[skill] ?? { x: 0, y: 0, z: 0 }
@@ -205,7 +200,7 @@ export function createShots(parts: ShotParts): Shots {
       const shot = fireShot(
         skill,
         { x: at.x, y: at.y, z: at.z },
-        soldier.pig.heading + aimRadians(yaw),
+        soldier.pig.heading,
         aim
       )
       if (!shot) return false

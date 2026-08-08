@@ -58,7 +58,15 @@ import { advanceFiring, beginFiring } from '../../../lib/game/shot'
 import type { Firing } from '../../../lib/game/shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from '../../../lib/game/aftermath'
 import type { Aftermath } from '../../../lib/game/aftermath'
-import { createWobble, resetWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
+import {
+  createWobble,
+  resetWobble,
+  updateWobble,
+  wobbleAcross,
+  wobblePitch,
+  wobbleUp,
+  wobbleYaw
+} from '../../../lib/game/wobble'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../../../lib/game/zoom'
 import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createShots } from './shots'
@@ -592,19 +600,15 @@ export function buildBattle(
    * for a hand-to-hand attack and the only thing that uses it (three/chase).
    */
   /**
-   * Where the sights are ACTUALLY pointing: the player's angle plus the tremor.
+   * Where the shot goes: the PLAYER's own angle, and nothing else on top.
    *
-   * The tremor has to be in here. The crosshair is nailed to the middle of the
-   * screen, so a view built on `aim.angle + wobble` while the bullet leaves along
-   * `aim.angle` alone is a picture that lies about where the shot goes — play read
-   * it as the shot lagging the sights by a second. The exe has no such split
-   * either: its tremor is the stick's step going through `Pig::Aim` into
-   * `[pig+0x304]`, and that is the field the bullet reads (lib/game/wobble.ts).
-   *
-   * `aim.angle` stays the PLAYER's own, untouched, because that is what the dial
-   * shows and what the next frame's input adds to.
+   * A pass folded the tremor in here on the argument that the crosshair would
+   * otherwise lie, and play answered it in one line: "пуля летела не туда
+   * только после твоего фикса." The barrel points where it was put. What
+   * makes the sights wander is the EYE moving instead — the world slides across
+   * the crosshair and the shot stays honest (lib/game/wobble.ts).
    */
-  const aimedAngle = (): number => aim.angle + wobblePitch(wobble)
+  const aimedAngle = (): number => aim.angle
 
   /**
    * Where the scope looks FROM: `SCOPE_MOUNT` in the hand bone's space, in
@@ -619,7 +623,7 @@ export function buildBattle(
     // itself still interpolates, so the pig moves smoothly and the view it is
     // holding does not.
     const frame = Math.floor(time / FRAME_SECONDS)
-    if (frame === eyeFrame) return heldEye
+    if (frame === eyeFrame) return drifted(heldEye, soldier.pig.heading)
     // A gap means the sights were down in between; start the lag afresh.
     if (frame > eyeFrame + 1) settled = false
     eyeFrame = frame
@@ -630,10 +634,6 @@ export function buildBattle(
     eyeAt.set(SCOPE_MOUNT.x, SCOPE_MOUNT.y, SCOPE_MOUNT.z)
     bone.localToWorld(eyeAt)
     root.worldToLocal(eyeAt)
-    // …and the tremor rides ON TOP of it, as a place rather than an angle:
-    // the exe's own drift is the hand moving, so it shifts the picture and
-    // cannot steer the bullet (lib/game/wobble.ts). Across is perpendicular
-    // to the pig's facing; up is up, which in this space is a SMALLER y.
     // …and the HEIGHT LAGS. The exe does not put the camera at the hand's y —
     // it moves a THIRD of the way there each frame and no further:
     //
@@ -651,7 +651,34 @@ export function buildBattle(
       z: eyeAt.z
     }
     settled = true
-    return heldEye
+    return drifted(heldEye, soldier.pig.heading)
+  }
+
+  /**
+   * The eye, with the tremor's DRIFT on it — across the pig's facing and up.
+   *
+   * This is where the wander belongs and where the exe's own scope motion comes
+   * from: the rifle cam is a POSITION on the hand bone and nothing else. Moving the
+   * eye slides the world across the sights, so the target leaves the crosshair and
+   * has to be brought back, while the barrel still points where the player put it.
+   * The drift has no bound — play was explicit: "ЦЕНТРА ВООБЩЕ НЕ ДОЛЖНО
+   * БЫТЬ, мы можем уехать в одном направлении на 10 метров."
+   *
+   * It is applied on the way OUT rather than into `heldEye`, so the height lag above
+   * keeps chasing the hand rather than chasing the drift.
+   */
+  const drifted = (
+    eye: { x: number; y: number; z: number },
+    facing: number
+  ): { x: number; y: number; z: number } => {
+    const across = wobbleAcross(wobble)
+    // Forward is (sin, cos) in this space (three/chase.ts), so across is (cos, −sin)
+    // — and up is a SMALLER y.
+    return {
+      x: eye.x + Math.cos(facing) * across,
+      y: eye.y - wobbleUp(wobble),
+      z: eye.z - Math.sin(facing) * across
+    }
   }
 
   const watch = (soldier: Soldier, delta: number | null): void => {
@@ -689,9 +716,9 @@ export function buildBattle(
       dropIn.riseOver(soldier),
       delta,
       view,
-      // The view and the SHOT take the same tremor — anything else is a picture
-      // that lies about where the bullet goes (`aimedAngle`, lib/game/wobble.ts).
-      aimRadians(aimedAngle()),
+      // The JITTER is on the angle and it is half a degree — the picture shivers
+      // and the bullet does not notice (lib/game/wobble.ts).
+      aimRadians(aim.angle + wobblePitch(wobble)),
       aimRadians(wobbleYaw(wobble)),
       view === 'scope' ? scopeEye(soldier) : null
     )
@@ -758,8 +785,14 @@ export function buildBattle(
     // goes down, through the swing or the flight, and on through the beat
     // that shows what it did. Play's rule, and the exe's own gate agrees —
     // `Pig::MayAct` is false for all of it.
+    // …and it starts at the CHARGE, not at the throw. Play: "при начинании
+    // зарядки броска таймер останавливается — так как это уже атака началась."
+    // Right, and it is the same gate as everything else here: `Pig::MayAct` goes
+    // false on the press that starts the gauge, a second and a half before
+    // anything leaves the hand.
     const blowInProgress =
       firing !== null ||
+      gauge !== null ||
       aftermath !== null ||
       swings.running() ||
       grenades.live() > 0
@@ -1022,8 +1055,8 @@ export function buildBattle(
       // Where the sights were actually pointing — the drift is part of the
       // aim, not a decoration over it.
       const away = isLobbed(holding)
-        ? grenades.throwOne(active, aimedAngle(), thrownWith, wobbleYaw(wobble))
-        : shots.fire(active, aimedAngle(), wobbleYaw(wobble))
+        ? grenades.throwOne(active, aimedAngle(), thrownWith)
+        : shots.fire(active, aimedAngle())
       if (!away) firing = null
       else {
         // `Pig::Attack` puts the weapon's own attack clip on at the same
