@@ -373,33 +373,65 @@ export const WATER_SPLASH_SOUND = 0x28
 export const WATER_DOUSE_SPEED = fromExeSpeed(0x96)
 
 /**
- * Whether this contact douses it rather than letting it carry on.
+ * …and above that speed it SKIPS. **The frog is in the engine after all, and it
+ * took being told twice to go and find it.**
  *
- * **And there is NO bounce off water to be found anywhere.** Play asked whether
- * the skip is driven by the speed in the water's own plane; three separate water
- * sites were read for it and not one of them reflects a velocity:
+ * The arm the fast case takes, 0x437e5d, was skimmed and written off as "a sound
+ * and an effect". Its last act is not either of those:
  *
- * - `0x437a57`, on tile bit 6 — builds a splash PROJECTILE at the water height
- *   and touches the thrown thing's velocity nowhere;
- * - `0x437bfb`, on tile bit 5 plus the texel mask — this arm, which removes it;
- * - and the physics side, `0x4161b5`: a body whose y comes within **32 units** of
- *   the water line has its position recorded and is then **deleted** —
- *   `vtable[0](1)` at 0x41626f. Not bounced. Deleted.
+ * ```
+ * 437e99  Sound::Play(0x12, 0x3C, 0x5A + (rand & 0x3F))
+ * 437ecb  0x487AD0(x, z, 0x0D, 0x3E8, ...)          ; the spray
+ * 437ed6  fld [contact+0x14]
+ * 437eea  ftol
+ * 437ef2  imul 66666667h ; sar edx,1                ; ...divided by FIVE
+ * 437ee5  push 400h
+ * 437f0b  0x4A9260(scalar / 5, 0x400, 0, 0)
+ * ```
  *
- * Which also answers the shape of the question. Whether anything bounces at all
- * is decided by the NORMAL component of the approach — that is what the solver's
- * `(1 + e)` multiplies — and the in-plane speed only decides how FAR apart the
- * hops land. So the stone-skip is a LAND behaviour here: `bounceLob` gives back
- * 0.32 of the drop and keeps 88% of the slide, which is exactly a skipping stone
- * over ground. On water the engine's answer is to end it.
+ * `0x4A9260(speed, angleA, angleB, ?)` sets a body's velocity — `[body+0x64]`,
+ * the same field the integrator advances — along a direction built from two
+ * angles in the engine's 4096-per-turn units (`[0x4BD778]` is 2π/4096). And
+ * **0x400 is 1024 of 4096: exactly a quarter turn, straight UP.**
  *
- * That contradicts what play remembers of the shipped game, and the contradiction
- * is left standing rather than papered over: the read is written down, the
- * behaviour follows the read, and if play still sees a grenade skipping across a
- * pond then one of these three sites is being reached differently than it looks.
+ * The reading is pinned by `Pig::EjectFromWall`, which calls the pair one after
+ * the other with the same speed — `0x4A9100(0x20, 0, bearing, 0)` for the
+ * horizontal and `0x4A9260(0x20, 0x3B6, 0, 0)` for the near-vertical 83.5° that
+ * pops the pig up and out (0x46fc65, 0x46fc77).
+ *
+ * So a fast contact with water gives the thing a kick straight up of **a fifth**
+ * of the contact scalar, on top of the travel it keeps. That is a skipping stone,
+ * and it decays by five each hop until it drops under the 150 and is doused.
+ *
+ * **And this is what settles which component `[contact+0x14]` is.** Play
+ * described the behaviour exactly: "если падает сверху быстро — нет отпрыга;
+ * если летит от свиньи как камень — прыгает по воде." A thing dropped straight
+ * down has all the approach in the NORMAL and none in the plane; a thing thrown
+ * flat has it the other way about. Only the **in-plane** reading makes the first
+ * douse and the second skip, so that is what the scalar is taken to be. The
+ * field's own identity is still not transcribed — see the note above — but the
+ * behaviour it has to produce is not in doubt.
  */
-export const dousedByWater = (shot: Lobbed): boolean =>
-  Math.hypot(shot.vx, shot.vy, shot.vz) < WATER_DOUSE_SPEED
+export const WATER_SKIP_KICK = 5
+
+/** How fast it has to be travelling ALONG the water to skip off it. */
+export const skipsOnWater = (shot: Lobbed): boolean =>
+  Math.hypot(shot.vx, shot.vz) >= WATER_DOUSE_SPEED
+
+/** …and if it does not, water douses it: no blast, no damage. */
+export const dousedByWater = (shot: Lobbed): boolean => !skipsOnWater(shot)
+
+/**
+ * One skip. The travel along the surface is left alone — the solver has already
+ * taken the tile's own friction off it, which is what makes the hops decay — and
+ * the vertical is SET to a fifth of it, upward.
+ */
+export function skipOffWater(shot: Lobbed): void {
+  const along = Math.hypot(shot.vx, shot.vz)
+  // Y-down, so up is negative.
+  shot.vy = -along / WATER_SKIP_KICK
+  shot.resting = false
+}
 
 /** The splash effect a douse leaves — id 0x0E, which snaps its own y to the
  * WATER HEIGHT (0x488c19) and reads parameter row **2**: three bright rings at

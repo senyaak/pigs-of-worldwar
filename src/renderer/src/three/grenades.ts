@@ -22,6 +22,8 @@ import {
   bounceLob,
   dousedByWater,
   lob,
+  skipOffWater,
+  skipsOnWater,
   lobBounce,
   lobOf,
   sinkLob
@@ -218,6 +220,27 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     // `surface` is the region's own fitted level (lib/game/terrain.ts), the line
     // a swimming pig floats at.
     if (parts.query.isWater(shot.x, shot.z) && shot.y >= parts.query.surface(shot.x, shot.z)) {
+      const level = parts.query.surface(shot.x, shot.z)
+      // FAST ALONG THE SURFACE: it SKIPS. The engine resolves the contact with
+      // the tile's own material and then kicks the thing straight up by a fifth
+      // of the in-plane speed (0x4A9260 with an angle of 0x400 — a quarter turn),
+      // which is a stone off a pond. The hops decay because the solver's friction
+      // takes off the travel each time, and when the travel drops under the bar
+      // the next contact douses it. lib/game/grenade.ts has the read.
+      if (skipsOnWater(shot)) {
+        bounceLob(
+          shot,
+          level,
+          { x: 0, y: -1, z: 0 },
+          parts.query.tileType(shot.x, shot.z),
+          false,
+          lobBounce(row)
+        )
+        skipOffWater(shot)
+        playCue(parts.bank(), BATTLE_SOUNDS.skim)
+        parts.effects.splash({ x: shot.x, y: level, z: shot.z })
+        return true
+      }
       // Crossing the surface: the noise, once.
       if (!shot.sunk) playCue(parts.bank(), BATTLE_SOUNDS.splash)
       sinkLob(shot, step)

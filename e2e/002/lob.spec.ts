@@ -15,6 +15,8 @@ import {
   WATER_DOUSE_SPEED,
   advanceLob,
   dousedByWater,
+  skipOffWater,
+  skipsOnWater,
   bounceLob,
   lobBounce,
   lobOf,
@@ -110,38 +112,55 @@ test('a contact already leaving is not resolved twice', () => {
   expect(shot.vy).toBe(-500)
 })
 
-test('water is a PASS-THROUGH: it splashes and keeps going down', () => {
-  // The engine's surface handler drops a splash at the water line and touches
-  // the thrown thing's velocity nowhere (0x437a57). So there is no gate to pass
-  // and nothing to bounce off — play was blunt about it: "граната НЕ ТОНЕТ В
-  // ВОДЕ, должна прям тонуть и идти вниз."
+test('thrown FLAT it skips off water — the frog, and it is the engine own', () => {
+  // 0x437e5d's last act is 0x4A9260(scalar/5, 0x400, 0, 0), and 0x400 of 4096 is
+  // a quarter turn: a kick straight UP of a fifth of the speed along the surface.
+  // Play insisted this existed and was right; the arm had been skimmed.
   const shot = dropped(0, 4000)
-  for (let frame = 0; frame < 30; frame++) {
-    advanceLob(shot, 1 / 30)
-    if (shot.y >= 0) sinkLob(shot, 1 / 30)
-  }
-  expect(shot.sunk).toBe(true)
-  // Still going DOWN, and further every frame.
-  expect(shot.vy).toBeGreaterThan(0)
-  expect(shot.y).toBeGreaterThan(0)
-  // …and its sideways travel has been damped away, so it does not slide off.
-  expect(shot.vx).toBeLessThan(4000 / 10)
+  expect(skipsOnWater(shot)).toBe(true)
+  skipOffWater(shot)
+  // Up (negative here), a fifth of the travel, and the travel itself untouched.
+  expect(shot.vy).toBeCloseTo(-4000 / 5, 3)
+  expect(shot.vx).toBe(4000)
 })
 
-test('and once it is in and slow, water DOUSES it — no blast', () => {
-  // Play half-remembered this and was right. The arm at 0x437bfb sets the
-  // projectile's quiet flag, and the destructor's first test then spawns nothing
-  // and plays nothing (0x4328c9). The bar is 150 a frame (0x437c8c).
-  const slow = dropped(0, 0)
-  expect(dousedByWater(slow)).toBe(true)
-  const fast = dropped(WATER_DOUSE_SPEED * 2, 0)
-  expect(dousedByWater(fast)).toBe(false)
-  // A grenade sinking under its own weight is slow long before it reaches a bed.
-  const sinking = dropped(0, 4000)
-  for (let frame = 0; frame < 10; frame++) {
-    advanceLob(sinking, 1 / 30)
-    sinkLob(sinking, 1 / 30)
+test('and dropped straight DOWN it does not — nothing is in the plane', () => {
+  // The gate is the speed ALONG the water, not the total. That is what makes a
+  // thing falling out of the sky go in while a thing thrown flat skips, which is
+  // how play described it and the only reading that produces both.
+  const falling = dropped(6000, 0)
+  expect(skipsOnWater(falling)).toBe(false)
+  expect(dousedByWater(falling)).toBe(true)
+  // …and something barely moving along it goes in too.
+  const dribbling = dropped(0, WATER_DOUSE_SPEED / 2)
+  expect(skipsOnWater(dribbling)).toBe(false)
+})
+
+test('the hops DECAY, because the surface takes friction off the travel', () => {
+  const shot = dropped(0, 4000)
+  const hops: number[] = []
+  for (let frame = 0; frame < 400 && hops.length < 40; frame++) {
+    advanceLob(shot, 1 / 30)
+    if (shot.y < 0) continue
+    if (skipsOnWater(shot)) {
+      bounceLob(shot, 0, UP, 0, false, lobBounce(ROW))
+      skipOffWater(shot)
+      hops.push(Math.hypot(shot.vx, shot.vz))
+      continue
+    }
+    sinkLob(shot, 1 / 30)
+    break
   }
+  // Several hops, each a little slower than the last, and then it goes in.
+  expect(hops.length).toBeGreaterThan(2)
+  expect(hops[hops.length - 1]).toBeLessThan(hops[0])
+  expect(shot.sunk).toBe(true)
+})
+
+test('once it is in and slow, water DOUSES it — no blast', () => {
+  // The arm at 0x437bfb sets the projectile's quiet flag, and the destructor's
+  // first test then spawns nothing and plays nothing (0x4328c9).
+  const sinking = dropped(0, 0)
   expect(dousedByWater(sinking)).toBe(true)
 })
 

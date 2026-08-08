@@ -87,6 +87,13 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    */
   doused: { sound: 'FT_WATER', volume: 80, pitch: 95, jitter: 31 },
   /**
+   * A thrown thing SKIMMING off the water instead of going in. DECODED with its
+   * mix: the fast arm plays index **0x12** at volume **0x3C** with a pitch of
+   * `0x5A + (rand & 0x3F)` (0x437e99), and index 18 of `Audio/sfxday.srl` is
+   * `FT_MUD` — the wet slap of a hoof, which is what skimming water sounds like.
+   */
+  skim: { sound: 'FT_MUD', volume: 60, pitch: 90, jitter: 63 },
+  /**
    * Collecting a crate, and being refused one. These two are DECODED rather
    * than picked by name: `Pig::GiveSkill` plays 0x5E at the pig's own
    * position once the skill is in (0x4759F2, out of 0x475960), and 0x4F on
