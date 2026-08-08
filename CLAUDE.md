@@ -1339,14 +1339,37 @@ dummy starts.
 
 ### Threads left mid-pull
 
-**Grenades are built and the next thing they want is PLAY** — the section
-above says which numbers are the remake's. The two to correct first are
-`FUSE_SECONDS` and `BLAST_RADIUS` in `lib/game/grenade.ts`, and after those the
-gauge's own art placement (`pow.hud.layout.gauge`). The thread left mid-pull in
-the binary is the projectile's state machine at 0x436938: seven arms on
-`[proj+0xB4]`, a per-state timer at `[proj+0xA8]` against row +0x14, and a
-second dispatch through row +0x1C. Somewhere in there is the fuse, and with it
-what a grenade does when it stops rolling.
+**The next job is the EXPLOSION'S LOOK, and it is the last thing about a
+grenade that is not decoded.** Everything else went: the gauge, the arc, the
+fuse, the bounce, the damage, the falloff, the range, the sound. What a blast
+looks like is still the BREAK BURST standing in — six puffs — and
+`three/grenades.ts` says so at the field.
+
+The whole path is mapped, so this starts from facts rather than a search:
+
+- a blast is **effect id 0x54**, spawned by the projectile's DESTRUCTOR
+  (0x432730 → the arm at 0x4328e5 → 0x432e51 → 0x435364);
+- its id resolves to **parameter ROW 0** — the same row a thing BREAKING uses.
+  `slot = [0x489680 + id - 1]`, `arm = [0x489574 + slot*4]` (the dispatch at
+  0x4881e8), and the arm is `push 0; call 0x48CCC0`. Cross-checked: id 0x3e, the
+  break burst, resolves to row 0 too, which `../pigs-disasm/effects/notes.md`
+  derived independently from the other end;
+- **`0x48CC90` is the row accessor** — `(s8)[0x4D61E8 + row*143 + offset]`
+  scaled by `[0x4D6C88 + offset]`, with the row index at `[effect+0xDC]`;
+- **row 0 has four stages this repo has never opened**, through `0x48bff0`
+  (twice) and `0x48c160` (twice). `0x48bff0(offset)` is legible: it asks the
+  accessor for that offset, and if it is non-zero allocates a 0xE4 CHILD effect
+  and builds it from `[effect+0xA8]`/`[effect+0xAC]`. So each stage is
+  `(row offset) → a child effect`, and the job is which offsets row 0 carries
+  and what the children are.
+
+`lib/game/effects.ts` already models a row as twelve timed stages with rings and
+bursts, so the machinery is there to receive this — what is missing is the data.
+
+One thing found on the way and worth not re-deriving: **an effect's collider is a
+sphere of radius 35** (0x4a8f42, reached by `jmp [eax*4+0x4a90CC]` at 0x4a8ece
+where `eax = type - 0x1357`, built by `0x407AF0` at 0x4a9044). It does not need
+to grow — that idea was invented to prop up a misread range and is gone.
 
 Everything below this line is older, and the shot's own six items are DONE —
 see "The SHOT, end to end".
