@@ -14,7 +14,8 @@
 // the disasm repo), so `LAYOUT` below carries the original's own numbers with
 // the address each came from. Three things in it are still eyework and say so:
 // both TRACKS, whose blitter's convention is undecoded, and the CARRIAGE —
-// which screen 1 does not even load, so it is the remake's outright.
+// which screen 1 does not load — the piece is the original's, on the SELECT
+// TEAM and ENTER YOUR NAME screens, but not on this one.
 //
 // The machine and the plates are STRETCHED — the frontend widens itself by a
 // global 50, and it does so in two different ways: a plate repeats a band of
