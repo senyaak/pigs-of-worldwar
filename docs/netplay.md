@@ -185,6 +185,26 @@ Decoded from `Language/Text/fetext.bin`, so none of it is guessed:
 | 460–463 | `ENTER TARGET IP ADDRESS`, `- HOST GAME -`, `OK`, `PRESS TAB TO START` | connecting |
 | 782 | "…UP TO 4 HUMAN OR COMPUTER PLAYERS" | the ceiling is four |
 
+## A lead nobody has followed: which map is which ARENA
+
+Measured off the shipped `.POG`s, filtered by the player-count byte:
+**exactly 25 maps field three or four sides** — ARCHI ARTGUN BHILL BOOM BUTE
+CMASS CREEPY2 DBOWL DVAL2 FINAL HELL2 HELL3 ICE ICEFLOW ISLAND LAKE LECPROD
+LUNAR1 MAZE MLAKE ONEWAY PLAY1 PLAY2 RIDGE SEPIA1 — and fetext carries
+**exactly 25 arena names** at 720–744. Fifty-three maps field two.
+
+Several pairs are obvious (DBOWL→DEATH BOWL, CMASS→CRATERMASS,
+ONEWAY→ONE WAY SYSTEM, DVAL2→DEATH VALLEY 2, MAZE→HEDGE MAZE), but the
+bijection does not close: FINAL is the campaign's six-sided last level, and
+BRIDGE THE GAP and DEATH VALLEY want BRIDGE and DVAL, which field two. **So it
+is a lead, not a reading, and it is not applied anywhere.** The answer is the
+exe's own map-name array — the same gap `ui/titleCard.ts` has for the
+campaign, where only CAMP is answered.
+
+Until it is read there is no honest **MULTI-PLAYER SELECT LEVEL** (fetext 105):
+a level list would show `DBOWL` in the original's font, and 53 entries want a
+scrolling column this art does not have. Deliberately not built.
+
 ## Order of work
 
 1. **The engine moves out.** Entity ownership leaves `three/*`, `world.ts`
@@ -202,9 +222,11 @@ Decoded from `Language/Text/fetext.bin`, so none of it is guessed:
 6. **Transport and lockstep** over a finished engine.
 7. **Prediction**, if play says it is needed.
 
-The remaining screens — `NETWORK: CONNECT`, `HOSTING NEW GAME`,
-`CHOOSE ARMY`, `FIELD CONDITIONS` — are pure frontend and touch neither the
-domain nor the scene, so they can be built at any point without colliding.
+The `NETWORK: *` screens are pure frontend and collide with nothing, but they
+are deliberately NOT built ahead of the transport: a field that takes an IP
+address and goes nowhere is a stand-in with no way to test it, and the shape
+of the screen depends on which transport answers (a direct address, or a join
+code a signalling server hands out).
 
 ## Done so far
 
@@ -216,3 +238,16 @@ domain nor the scene, so they can be built at any point without colliding.
   LIBERATE — a shipped map with two real squads — because the level select is
   not built, which makes two people on one keyboard the rung under all of
   this. Pinned by `e2e/001/multiplayer.spec.ts`.
+- **FIELD CONDITIONS** (`ui/fieldConditions.ts` over `lib/game/conditions.ts`),
+  with the turn clock, starting health and the squad cap reaching the battle
+  for real — `e2e/001/field-conditions.spec.ts` walks the whole path and
+  checks each pig against its CLASS's own figure, because a settings screen
+  that sets nothing passes every pure spec.
+
+  Two bugs fell out of building it and both were older than it. Screens share
+  one controller and tell themselves apart by a `visible` flag, so a
+  synchronous view swap delivered the same key press to the screen it had just
+  opened — navigation is queued now. And `menu.spec.ts` opened by asserting
+  the lit bar was at zero, which held only while nothing before it had ever
+  moved; `lightBar` came out of `choose`, and it leaves the machine settled,
+  because `nudge` returns the instant a bar starts its third-of-a-second flip.
