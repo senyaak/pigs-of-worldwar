@@ -248,16 +248,39 @@ export function createEffects(root: THREE.Object3D): Effects {
     return puffs[i]
   }
 
-  const blobAt = (i: number): THREE.Sprite => {
-    // NOT additive, and that is play's call: "чёрного дыма нет на взрыве".
-    // Additive light can only ever brighten, and row 0's second cloud is
-    // (4,3,0) — which through the draw's own gain is (25,19,0), a near-black.
-    // Added to the map it is invisible; laid over it, it is the black smoke.
-    // The blend MODE lives in wh32LIB.DLL and cannot be read out of the exe, so
-    // this is the remake's pick, made the way play describes the shipped game:
-    // a dull red ball with a dark cloud rolling out of it.
-    while (blobs.length <= i) blobs.push(newSprite(THREE.NormalBlending))
-    return blobs[i]
+  /**
+   * One of a fireball's sprites, and WHICH WAY it blends is decided by its own
+   * authored colour.
+   *
+   * The blend mode lives in `wh32LIB.DLL` and cannot be read out of the exe, so
+   * this is the remake's pick — but it is not arbitrary, because row 0's two
+   * clouds sit on opposite sides of any sensible line and each can only have
+   * been meant one way:
+   *
+   * - **(16,0,0)** is a saturated red with nothing else in it. A colour like
+   *   that is LIGHT: added, it is the flash. Laid over the map it is a red
+   *   stain, which play read as a spray of dirt — "граната делает взрыв землёй".
+   * - **(4,3,0)** comes out of the draw's gain as (25,19,0), a near-black. A
+   *   colour like that is SHADOW: added it is invisible, which is why the smoke
+   *   was missing — "чёрного дыма нет на взрыве". Laid over, it is the smoke.
+   *
+   * So a cloud bright enough to read as light is added and a dark one covers.
+   * Row 0 then draws what play describes: a red flash with black smoke rolling
+   * out of it, and no dirt in sight — which matters, because the exe has NO
+   * ground test anywhere in the blast (the destructor's arm is unconditional and
+   * its tail, 0x4357f9, is camera work), so the dirt could only ever have been
+   * the rendering.
+   */
+  const LIT = 8
+  const blobAt = (i: number, lit: boolean): THREE.Sprite => {
+    const want = lit ? THREE.AdditiveBlending : THREE.NormalBlending
+    while (blobs.length <= i) blobs.push(newSprite(want))
+    const sprite = blobs[i]
+    if (sprite.material.blending !== want) {
+      sprite.material.blending = want
+      sprite.material.needsUpdate = true
+    }
+    return sprite
   }
 
   /** Lay one puff out. Row 0's colour is 0x4210 — sixteen of thirty-one on
@@ -325,8 +348,9 @@ export function createEffects(root: THREE.Object3D): Effects {
         drape(sprite, one, effect.at)
       }
       for (const cloud of effect.clouds) {
+        const lit = Math.max(...cloud.colour) >= LIT
         for (const blob of cloud.blobs) {
-          const sprite = blobAt(b++)
+          const sprite = blobAt(b++, lit)
           sprite.visible = true
           kindle(sprite, cloud, blob, effect.at)
         }

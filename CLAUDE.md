@@ -1323,6 +1323,55 @@ pick. And a landing CRATE takes row 0's smoke without its fire (`DUST_EFFECT`) �
 it was borrowing the whole row, so once the row grew a fireball a crate arriving
 set one off ("коробка когда падает — искрит").
 
+### The grenade, eighth pass — read it properly, 2026-08-08
+
+Play: "давай лучше дизасми — там ведь всё стоит в движке". It did.
+
+**The TRAIL is in the CONSTRUCTOR.** Both of the projectile update's per-kind
+dispatches send a plain grenade to the exit, which is why looking there found
+nothing. `0x43247b` — the arm the whole grenade family takes — builds a PARENTED
+effect of id **0x15** at zero offset before anything else, so it follows the
+grenade. That effect has no parameter row at all (its Init arm never calls
+`0x48ccc0`, so the twelve-stage tail refuses it), and its update lays **six
+particles a frame evenly along the segment travelled** (0x48b024). Particle type
+0x16 is grey 0x4210, an age step of 0x14 so five frames, and no velocity, jitter
+or gravity. Six a frame for five frames is thirty alive — exactly the capacity id
+0x15 draws from Init's count table, which is the check on the whole read.
+`lib/game/trail.ts`, `three/lobTrail.ts`. **No fire in it**: play asked for smoke
+and fire, and the engine's trail is smoke.
+
+**Water is bit 6 of the tile byte, and a thrown thing goes THROUGH.** The
+projectile's own handler (0x437a57) puts a splash projectile at the water height,
+plays sound 0x28, and touches its velocity nowhere — no bounce, no material,
+nothing to stop it. `SKIPS_ON_WATER` is deleted along with `WATER_BOUNCE`; the
+skip play wanted is a LAND behaviour and falls out of the friction below.
+
+**Friction is a Coulomb IMPULSE and this had it as a fraction of the slide.**
+The solver normalises the tangential (0x4110c1, after the epsilon test at
+0x411084) and passes the friction product in as a scalar (0x40f980); restitution
+enters as the standard `(1 + e)` (0x40f6b4, where `[0x4BC1B4]` is −1). A
+direction times a scalar is not a fraction of a speed, and that is the whole of
+why a grenade would not roll: at rest on flat ground the contact carries only
+gravity's own increment, so the friction impulse available each frame is tiny.
+The magnitude inside `0x410F70` is not accounted for instruction by instruction —
+it is inlined operator overloading — so the remake uses the textbook
+`mu * (1 + e) * |vn|`, capped at what would stop the slide, and says which half
+is read and which is inferred.
+
+**The blast has NO ground test** — the destructor's arm is unconditional and its
+tail (0x4357f9) is camera work. So the clouds blend by their own authored colour
+instead: (16,0,0) is light and ADDS, which is the flash; (4,3,0) comes out of the
+draw's gain as (25,19,0) and COVERS, which is the black smoke. Additive light
+cannot darken, which is exactly why the smoke was missing — and a dark red laid
+over the map is what play was reading as thrown dirt.
+
+**And the gauge slider, MEASURED at last.** `powg1`'s transparent colour is
+palette index **11** (0x0000), not index 0 (which is a real 0x0421). Per column
+the drawn-texel counts are
+`0,0,0,0,0,0,0,13,17,19,33,34,34,33,19,17,13,0,0,0,0,0,0,0` — the marker is **ten
+pixels wide starting at x = 7**, not eight starting at 8. One pixel each side is
+exactly what kept showing.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.

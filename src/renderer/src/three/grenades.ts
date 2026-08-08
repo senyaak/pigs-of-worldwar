@@ -20,7 +20,6 @@ import {
   blastRange,
   blastShare,
   bounceLob,
-  SKIPS_ON_WATER,
   lob,
   lobBounce,
   lobOf,
@@ -31,6 +30,7 @@ import { DAMAGE_UNIT } from '../../../lib/game/projectile'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { weaponModelName } from '../../../lib/game/weapons'
 import { createLobArt } from './lobArt'
+import { createLobTrails } from './lobTrail'
 import { hurt, isDead } from '../../../lib/game/health'
 import { ANIM } from '../../../lib/game/locomotion'
 import type { Target } from '../../../lib/game/targets'
@@ -91,6 +91,8 @@ export interface Grenades {
   detonateNow(): void
   /** How many are live. */
   live(): number
+  /** How many puffs its smoke trail has up (lib/game/trail.ts). */
+  trail(): number
   /** Where each one is and how long it has left — what a spec measures a
    * miss with, since a grenade that lands short looks exactly like a blast
    * that does not reach. */
@@ -133,6 +135,10 @@ export function createGrenades(parts: GrenadeParts): Grenades {
    * is still loading, which is the one state that draws nothing at all. */
   const meshes: (THREE.Mesh | null)[] = []
   const art = createLobArt()
+  /** The smoke behind each one. The engine hangs it off the projectile in the
+   * CONSTRUCTOR — a parented effect of id 0x15 — so it is born with the grenade
+   * and dies a few frames after it (lib/game/trail.ts). */
+  const trails = createLobTrails(parts.root)
   const at = new THREE.Vector3()
   /** The same array a swing and a shot splice from — one list of dummies for
    * the whole battle, or a dummy dies twice (three/shots.ts says why). */
@@ -203,29 +209,15 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     // Its own row's physics material — the surface multiplies its half in.
     const row = lobOf(shot.skill)
     if (!row) return false
-    // WATER FIRST. A thrown thing SKIMS a pond while it still has the speed —
-    // the collision arm it takes is nearly elastic and the exe does not exempt
-    // water from it — and goes in once it does not. `surface` is the region's
-    // own fitted level where there is one (lib/game/terrain.ts), the line a
-    // swimming pig floats at.
+    // WATER FIRST, and a thrown thing GOES IN — it does not skip and it does not
+    // float. The engine's own handler (0x437a57, water being bit 6 of the tile
+    // byte) drops a splash projectile at the water line, plays sound 0x28 and
+    // touches the thrown thing's velocity nowhere at all: no bounce, no
+    // material, nothing to stop it. `lib/game/grenade.ts` has the read.
+    // `surface` is the region's own fitted level (lib/game/terrain.ts), the line
+    // a swimming pig floats at.
     if (parts.query.isWater(shot.x, shot.z) && shot.y >= parts.query.surface(shot.x, shot.z)) {
-      const level = parts.query.surface(shot.x, shot.z)
-      if (!shot.sunk && SKIPS_ON_WATER(shot)) {
-        // Flat off the surface, on the water TILE's own pair times the
-        // grenade's — the exe has no special case for a thrown thing on water
-        // (the slick 0.01/0.99 surface is the WALL, and only a pig gets it), so
-        // this is one surface among the twelve. The frog falls out of the
-        // numbers: about a third of the drop comes back each time.
-        bounceLob(
-          shot,
-          level,
-          { x: 0, y: -1, z: 0 },
-          parts.query.tileType(shot.x, shot.z),
-          false,
-          lobBounce(row)
-        )
-        return true
-      }
+      if (!shot.sunk) playCue(parts.bank(), BATTLE_SOUNDS.splash)
       sinkLob(shot, step)
       // …and it settles on the BED rather than falling through it.
       if (shot.y >= ground) {
@@ -320,6 +312,10 @@ export function createGrenades(parts: GrenadeParts): Grenades {
         detonate(shot)
         live.splice(i, 1)
       }
+      // The trail follows what is still up; anything gone stops laying and its
+      // last six fade out on their own.
+      for (const shot of live) trails.follow(shot, shot)
+      trails.update(delta)
       redraw()
     },
     detonateNow() {
@@ -330,11 +326,14 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     live: () => live.length,
     at: () => live.map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     head: () => live[0] ?? null,
+    trail: () => trails.live(),
     clear() {
+      trails.clear()
       live.length = 0
       clearMeshes()
     },
     dispose() {
+      trails.dispose()
       live.length = 0
       clearMeshes()
       art.dispose()

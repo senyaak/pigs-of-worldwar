@@ -12,7 +12,6 @@ import { test, expect } from '@playwright/test'
 
 import { BOUNCE_CUTOFF, TILE_MATERIALS } from '../../src/lib/game/ballistics'
 import {
-  SKIPS_ON_WATER,
   advanceLob,
   bounceLob,
   lobBounce,
@@ -70,13 +69,32 @@ test('the same throw on a different tile bounces differently', () => {
   expect(-soft.vy).toBeLessThan(-grass.vy / 3)
 })
 
-test('it keeps almost all of its ROLL — friction is 0.12, not 0.9998', () => {
-  // Play: "в игре граната всё время хоть чуть-чуть да катится."
+test('friction is a Coulomb IMPULSE, capped by the normal one', () => {
+  // The solver normalises the tangential and takes the friction product in as a
+  // scalar (0x4110c1, 0x40f980), with restitution entering as (1 + e). So what
+  // comes off the slide is mu * (1 + e) * |vn| — bounded by the contact, not a
+  // fraction of how fast it is sliding.
   const shot = dropped(1000, 4000)
   bounceLob(shot, 0, UP, 0, false, lobBounce(ROW))
-  const bite = ROW.friction * TILE_MATERIALS[0].friction
-  expect(shot.vx).toBeCloseTo(4000 * (1 - bite), 3)
-  expect(bite).toBeCloseTo(0.12, 2)
+  const mu = ROW.friction * TILE_MATERIALS[0].friction
+  const e = ROW.restitution * TILE_MATERIALS[0].restitution
+  expect(mu).toBeCloseTo(0.12, 2)
+  expect(shot.vx).toBeCloseTo(4000 - mu * (1 + e) * 1000, 3)
+})
+
+test('...which is why it ROLLS — play: "гранаты не катаются совсем"', () => {
+  // At rest on flat ground the contact carries only gravity's own increment, so
+  // the friction impulse available each frame is tiny. A flat fraction of the
+  // slide took an eighth off every frame regardless and stopped it dead.
+  const shot = dropped(0, 4000)
+  for (let frame = 0; frame < 30; frame++) {
+    advanceLob(shot, 1 / 30)
+    if (shot.y >= 0) bounceLob(shot, 0, UP, 0, false, lobBounce(ROW))
+  }
+  // A whole second later it is still going, and going most of its old speed.
+  expect(shot.vx).toBeGreaterThan(4000 * 0.6)
+  // …and the old law would have left it under a tenth of that.
+  expect(4000 * Math.pow(1 - 0.12, 30)) .toBeLessThan(4000 * 0.05)
 })
 
 test('a contact already leaving is not resolved twice', () => {
@@ -89,37 +107,23 @@ test('a contact already leaving is not resolved twice', () => {
   expect(shot.vy).toBe(-500)
 })
 
-test('the water gate is the DROP, not the speed — which is why it sank', () => {
-  // A grenade sliding across a pond keeps a big total speed for ever, so a
-  // total-speed gate never let it go in and play saw it stuck on the surface.
-  const sliding = dropped(0, 5000)
-  expect(SKIPS_ON_WATER(sliding)).toBe(false)
-  const arriving = dropped(BOUNCE_CUTOFF * 2, 5000)
-  expect(SKIPS_ON_WATER(arriving)).toBe(true)
-})
-
-test('a flat throw at water SKIPS and then goes under', () => {
-  // The frog, and the numbers bound it: a grenade arriving off hand height has
-  // about 1900 a second of drop, each hop keeps 0.32 of that, and the engine's
-  // own "too slow to bounce" bar is 750. So it is a hop or two — long ones,
-  // several tiles apiece at throwing speed — and then it is under. Not a dozen.
+test('water is a PASS-THROUGH: it splashes and keeps going down', () => {
+  // The engine's own water handler drops a splash projectile at the water line
+  // and touches the thrown thing's velocity nowhere (0x437a57). So there is no
+  // gate to pass and nothing to bounce off — play was blunt about it: "граната
+  // НЕ ТОНЕТ В ВОДЕ, должна прям тонуть и идти вниз."
   const shot = dropped(0, 4000)
-  shot.y = -200
-  let skips = 0
-  for (let frame = 0; frame < 200 && skips < 20; frame++) {
+  for (let frame = 0; frame < 30; frame++) {
     advanceLob(shot, 1 / 30)
-    if (shot.y < 0) continue
-    if (SKIPS_ON_WATER(shot)) {
-      bounceLob(shot, 0, UP, 0, false, lobBounce(ROW))
-      skips++
-      continue
-    }
-    sinkLob(shot, 1 / 30)
-    break
+    // Once past the surface it sinks, and nothing puts it back.
+    if (shot.y >= 0) sinkLob(shot, 1 / 30)
   }
-  expect(skips).toBeGreaterThan(0)
-  expect(skips).toBeLessThan(5)
   expect(shot.sunk).toBe(true)
+  // Still going DOWN, and further every frame.
+  expect(shot.vy).toBeGreaterThan(0)
+  expect(shot.y).toBeGreaterThan(0)
+  // …and its sideways travel has been damped away, so it does not slide off.
+  expect(shot.vx).toBeLessThan(4000 / 10)
 })
 
 test('a sunk grenade keeps FALLING — the vertical is left to gravity', () => {

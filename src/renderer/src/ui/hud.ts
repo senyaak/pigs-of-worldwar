@@ -133,15 +133,22 @@ export const LAYOUT = {
     /** The trough's own measured span and row, END TO END. */
     track: { from: 104, to: 268, y: 1 },
     /**
-     * The slider's box, and where its VISIBLE art sits inside it.
+     * The slider's box, and where its VISIBLE art sits inside it — MEASURED off
+     * the shipped TIM rather than eyeballed, which is what it took to stop this
+     * overhanging.
      *
-     * The box is 24 wide and the marker inside it is eight, at cols 8..15. The
-     * travel is the marker's, not the box's: centring the box on the track put
-     * the marker four pixels past the trough at full charge, which play saw
-     * ("порог идёт чуть дальше за шкалу при броске"). So the marker's LEFT edge
-     * runs `from` to `to - art.width`, and the box is drawn `art.x` behind it.
+     * `powg1` is 24×36 and its transparent colour is palette index **11**,
+     * which is 0x0000 — not index 0, which is a real 0x0421. Per column the
+     * count of drawn texels is
+     * `0,0,0,0,0,0,0,13,17,19,33,34,34,33,19,17,13,0,0,0,0,0,0,0`: the marker is
+     * **ten pixels wide starting at x = 7**. The note that had it at cols 8..15
+     * was wrong by one on each side, and one pixel is exactly what play kept
+     * seeing ("всё ещё чуть выходит за границу шкалы").
+     *
+     * The travel is the MARKER's: its left edge runs `from` to
+     * `to - art.width`, and the box is drawn `art.x` behind it.
      */
-    slider: { width: 24, height: 36, art: { x: 8, width: 8 } },
+    slider: { width: 24, height: 36, art: { x: 7, width: 10 } },
     /** The pair above the left end, `newpow1` then `newpow2`. */
     cap: { x: 0, y: -18 }
   },

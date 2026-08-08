@@ -296,26 +296,39 @@ export function lob(
 }
 
 /**
- * Whether this contact with water is a SKIP or the moment it goes in.
+ * Water is not a surface for a thrown thing: it GOES IN.
  *
- * Play wanted the frog: "должен быть эффект лягушки — как когда камни пускают
- * по глади воды". The test is how hard it is coming DOWN, not how fast it is
- * going — and that correction is the whole of why it used to get stuck on the
- * surface. A grenade sliding across a pond keeps a big total speed for ever, so
- * a total-speed gate never let it sink; what a skipping stone actually runs out
- * of is its vertical.
+ * **And the engine says so outright, which took a proper look to find.** Water
+ * is bit **6** of the tile byte — not the 0x80 the wall uses — and the
+ * projectile's own handler for it is at 0x437a57:
  *
- * Y-down, so a positive `vy` is INTO the water, and the bar is the engine's
- * only figure for "too slow to bounce" (`BOUNCE_CUTOFF`, 25 a frame) — the same
- * one `bounceLob` uses on the normal component. With the surface's real
- * numbers each skip keeps about a third of the drop, so three or four hops and
- * it is under.
+ * ```
+ * 437a57  cl = [map + tile*4 + 0x13B0E]
+ * 437a5e  cl >>= 6 ; cl &= 1            ; the WATER bit
+ * 437a6a  if (!water) -> 0x437BE9        ; nothing
+ * 437aa8  0x4A5140(x, z)                 ; the water HEIGHT, into the y
+ * 437ad2  Sound::Play(0x28, 100, 100)    ; the splash
+ * 437ae4  the tile's bit 15 picks id 0x1AD or 0x1AC
+ * 437b46  0x431F00(...)                  ; a SPLASH projectile at the surface
+ * ```
+ *
+ * There is no bounce anywhere in it, no material, and nothing that stops the
+ * thrown thing: the engine drops a splash at the water line and the grenade
+ * carries on down. So `SKIPS_ON_WATER` and `WATER_BOUNCE` are both gone — the
+ * skip play asked for is a LAND behaviour, which falls out of 0.12 friction on a
+ * flat throw, and water is what play has been shouting for: "граната НЕ ТОНЕТ В
+ * ВОДЕ, должна прям тонуть и идти вниз."
  */
-export const SKIPS_ON_WATER = (shot: Lobbed): boolean => shot.vy > BOUNCE_CUTOFF
+export const WATER_SPLASH_SOUND = 0x28
 
 /**
- * …and once it is too slow, it goes in. How fast a sunk grenade falls is the
- * remake's — the exe's own water handling for a projectile has not been read.
+ * One frame of going down through water. It keeps falling — gravity does that —
+ * and only its sideways travel is damped.
+ *
+ * `SINK_DRAG` is the remake's: the exe's splash arm does not touch the
+ * projectile's velocity at all, so nothing says how fast a grenade sinks. The
+ * VERTICAL is deliberately untouched, because damping the one component gravity
+ * works through is what once left a grenade standing on the water.
  */
 export const SINK_DRAG = 0.88
 export function sinkLob(shot: Lobbed, delta: number): void {
@@ -323,9 +336,6 @@ export function sinkLob(shot: Lobbed, delta: number): void {
   const damp = Math.max(0, 1 - (1 - SINK_DRAG) * delta * 60)
   shot.vx *= damp
   shot.vz *= damp
-  // The VERTICAL is left alone: gravity has to be able to take it down, and
-  // damping that too is what left a grenade sitting on the water — play saw it
-  // ("застопорилась о воду и стоит на поверхности").
 }
 
 /**
@@ -386,13 +396,40 @@ export function bounceLob(
   const ground = lobSurface(tileType)
   const friction = self.friction * ground.friction
   const restitution = self.restitution * ground.restitution
-  const keep = Math.max(0, 1 - friction)
   // Below a crawl the normal part stops coming back — the exe's own threshold
   // (`BOUNCE_CUTOFF`), and without it a discrete step bounces for ever.
   const e = -vn > BOUNCE_CUTOFF ? restitution : 0
-  shot.vx = (shot.vx - vn * normal.x) * keep - e * vn * normal.x
-  shot.vy = (shot.vy - vn * normal.y) * keep - e * vn * normal.y
-  shot.vz = (shot.vz - vn * normal.z) * keep - e * vn * normal.z
+  // The tangential, and how fast it is going along the surface.
+  const tx = shot.vx - vn * normal.x
+  const ty = shot.vy - vn * normal.y
+  const tz = shot.vz - vn * normal.z
+  const slide = Math.hypot(tx, ty, tz)
+  /**
+   * **Friction is a Coulomb IMPULSE, and this used to be a flat fraction of the
+   * sliding speed.** Play kept saying so — "трение всё ещё очень жёсткое,
+   * гранаты не катаются совсем" — and the solver settles it: it normalises the
+   * tangential (`0x4110c1`, after the epsilon test at 0x411084) and takes the
+   * friction product in as a SCALAR alongside the normal impulse (0x40f980),
+   * while restitution enters as the standard `(1 + e)` (0x40f6b4, where
+   * `[0x4BC1B4]` is −1). A direction times a scalar cannot be a fraction of the
+   * sliding speed.
+   *
+   * Which is the whole difference for ROLLING. A grenade at rest on flat ground
+   * meets the surface every frame with only gravity's own increment behind it,
+   * so the friction impulse available is tiny and it keeps going for seconds;
+   * `v * (1 - 0.12)` took an eighth off every frame no matter how gently it was
+   * resting, and stopped it dead in half a second.
+   *
+   * The magnitude below is the textbook form the solver's shape implies —
+   * `mu * (1 + e) * |vn|`, capped at what would stop the slide, since friction
+   * cannot reverse it. The `(1 + e)` and the mu are read; that they multiply is
+   * the inference, and it is the only one here.
+   */
+  const bite = Math.min(slide, friction * (1 + e) * -vn)
+  const keep = slide > 0 ? Math.max(0, 1 - bite / slide) : 0
+  shot.vx = tx * keep - e * vn * normal.x
+  shot.vy = ty * keep - e * vn * normal.y
+  shot.vz = tz * keep - e * vn * normal.z
   // A grenade in the original never quite stops rolling, so "resting" is only
   // for what DRAWS it and the bar is low.
   shot.resting =
