@@ -1600,40 +1600,93 @@ the regression play caught.
 
 ### Threads left mid-pull
 
-**The GRENADE is done, look and all** — the gauge, the arc, the fuse, the
-bounce, the damage, the falloff, the range, the sound, and now the explosion.
-Two findings out of that last pass are worth not re-deriving:
+Three jobs are open and play named all three. In the order they were named:
 
-- **+y is UP in the engine's world, and this repo had it backwards for the
-  effect system.** The exe's physics settles it: the world's three force
-  generators all point `(0,-1,0)` and one of them is gravity
-  (`../pigs-disasm/movement/notes.md`), so falling is y DECREASING. Four things
-  in the effect table agree — a burst's vertical launch cannot be negative, row
-  15 stacks rings at +100/+300/+600, a damage number trails at `y + 100`, and
-  row 0's cloud fires about +y against a decelerating force. The remake stays
-  Y-down and flips once, on the way in (`lib/game/cloud.ts`). **The old note
-  that `[+0x1d]` is "buoyancy, not gravity" is wrong wherever it survives.**
-- **An explosion is 140 sprites and 14 puffs, not six.** Row 0 — which id 0x54
-  and id 0x3e both resolve to, so a blast and a crate coming apart are the same
-  picture — has five live stages, and this repo was drawing one. The two big
-  ones go through `0x48bff0`, which is not a particle spawner at all: it hangs
-  its own array of 20-byte records off `[child+0x70]`, stepped by `0x48a7e0` and
-  drawn one sprite each by `0x489fa0`. Both spawners are written out in
-  `../pigs-disasm/effects/notes.md`.
+**1. INPUT should be POLLED per frame, and it is not.** Play: "onchange вообще
+плохой способ в играх — можно ведь подцепить контроль к каждому кадру". Right, and
+it is a real bug and not a smell: a control SET can change without a key moving, so
+`onChange` never fires and the pig keeps walking when the inventory takes over.
+Every verb that can change the set now calls `pushIntent()` by hand, which works
+and is a patch over the shape rather than a fix to it.
 
-One thing found on the way and worth not re-deriving: **an effect's collider is a
-sphere of radius 35** (0x4a8f42, reached by `jmp [eax*4+0x4a90CC]` at 0x4a8ece
-where `eax = type - 0x1357`, built by `0x407AF0` at 0x4a9044). It does not need
-to grow — that idea was invented to prop up a misread range and is gone.
+**It was tried and reverted, and the three things it needs are known** — five specs
+found all three at once, so start from here rather than from scratch:
 
-**What is left of the effect system:** `0x48c410`, stages D and E, which rows 1
-and 16 reach and row 0 does not; stage C, the inline flash, which no decoded row
-turns on; and the SIZE of a sprite, whose unit belongs to `wh32LIB.DLL` and so
-cannot come out of the exe — `BLOB_UNIT` and `PUFF_SIZE` in
-`three/effects.ts` are the remake's own and say so.
+- **a press LATCH on the held actions.** A press and its release can both land
+  between two frames and `isDown` is false at either end, so every tap is lost —
+  a spec's `tap('fire')` and a player's quick trigger alike. `controller.tookPress`
+  was written and worked; it is in the reverted diff.
+- **a gate so the beat at the top of a turn only resolves when there IS input.**
+  A poll runs whether a key moved or not, and resolving `starting` unconditionally
+  cut the beat short on the first frame of every turn.
+- **one frame loop, not two.** The dashboard's `paint` and three's `animate` are
+  separate `requestAnimationFrame`s, so which of them polls decides what frame a
+  press reaches the scene on. This is the part that was NOT solved and what the
+  shooting and grenade specs died on.
 
-**Still deferred, and named by play:** the RAMP is wrong ("рампа всё ещё
-кривая"), parked while the grenade was being built.
+The whole diagnosis is also written above `pushIntent` in `ui/battle.ts`.
+
+**2. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
+не там, огромный, и вообще не на воде". `SPLASH_EFFECT` is effect 0x0E / parameter
+row 2 and the row is decoded — three rings at a lift of −500, a sixty-sprite cloud,
+a ten-particle burst — so what is wrong is the remake's, not the reading. Two
+candidates and one is nearly certain: the ring's `lift` of −500 rides no scale while
+the ring's RADIUS rides `MODEL_SCALE`, and the SIZE scalars (`BLOB_UNIT`,
+`PUFF_SIZE`) were picked against a blast, not a splash. The y handed to
+`effects.splash` is `query.surface(x, z)`, which is the water line — check that
+first, because "вообще не на воде" points at it.
+
+**3. The RAMP is wrong**, and has been parked since the grenade started.
+
+### What is still not read
+
+- **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's
+  upward kick by. Filled at contact construction (0x409ca0, 0x409af9) from the
+  creator's argument, sitting between the contact's two three-float vectors, and at
+  least one creation site passes zero. The remake takes it as the IN-PLANE speed
+  because that is the only reading that makes a vertical drop sink and a flat throw
+  skip, which is how play describes it — but the field's identity is not
+  transcribed. `../pigs-disasm/weapons/fire.md`.
+- **effect 0x0D** — what a SKIP off water leaves. Not decoded past its jitter; the
+  splash (0x0E) stands in, which is why a skim and a sinking look alike.
+- **`0x48c410`**, stages D and E, which rows 1 and 16 reach and row 0 does not; and
+  **stage C**, the inline flash, which no decoded row turns on.
+- **a sprite's SIZE unit** belongs to `wh32LIB.DLL` and cannot come out of the exe.
+  `BLOB_UNIT`, `BLOB_ALPHA`, `PUFF_SIZE` and the trail's own pair are the remake's
+  and say so at the field.
+- **`ANIM.PARACHUTE = 82` against a table that names 59 clips.** The exe's clip
+  names run 0 "Run cycle (normal)" to 58 "Parachuting" — a table just before the
+  D3D wrapper's strings — and every other ANIM constant checks out against it. So
+  either MCAP holds more clips than the exe names, or 82 is wrong and the canopy
+  hangs on something else. The parachute works in play, so probably the first.
+  Noticed 2026-08-08 and not chased.
+
+### Worth not re-deriving
+
+- **+y is UP in the engine's world.** The exe's physics settles it: the world's
+  three force generators all point `(0,-1,0)` and one is gravity
+  (`../pigs-disasm/movement/notes.md`), so falling is y DECREASING. Four things in
+  the effect table agree — a burst's vertical launch cannot be negative, row 15
+  stacks rings at +100/+300/+600, a damage number trails at `y + 100`, and row 0's
+  cloud fires about +y against a decelerating force. The remake stays Y-down and
+  flips once, on the way in (`lib/game/cloud.ts`). **Any surviving note that
+  `[+0x1d]` is "buoyancy, not gravity" is wrong.**
+- **An explosion is 140 sprites and 14 puffs, not six.** Row 0 — which both id 0x54
+  and id 0x3e resolve to, so a blast and a crate coming apart are the same picture
+  — has five live stages. The two big ones go through `0x48bff0`, which is not a
+  particle spawner at all: it hangs its own array of 20-byte records off
+  `[child+0x70]`, stepped by `0x48a7e0` and drawn one sprite each by `0x489fa0`.
+- **An effect's collider is a sphere of radius 35** (0x4a8f42, via
+  `jmp [eax*4+0x4a90CC]` at 0x4a8ece where `eax = type - 0x1357`, built by
+  `0x407AF0` at 0x4a9044). It does not need to grow — that idea was invented to
+  prop up a misread range and is gone.
+- **"I could not find it" is never "it is not there".** Twice in one session: the
+  grenade's TRAIL was declared absent because both of the projectile update's
+  dispatches skip a plain grenade — it is in the CONSTRUCTOR (0x43247b); then the
+  water SKIP was declared absent, with a physics argument for why it could not
+  exist, and it was the last instruction of an arm that had been skimmed
+  (`0x4A9260(scalar/5, 0x400, 0, 0)` — a kick straight up). Read every arm to its
+  last instruction before concluding anything about it.
 
 Everything below this line is older, and the shot's own six items are DONE —
 see "The SHOT, end to end".
