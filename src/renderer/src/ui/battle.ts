@@ -329,9 +329,16 @@ export function initBattle(onLeave: () => void): BattleView {
         if (game && hud.skills.toggle(game.currentPig.carrying)) {
           scene?.sound(BATTLE_SOUNDS.menuOpen.sound)
         }
+        // …and the SET has just changed under the held keys. Play: "при открытии
+        // инвентаря продолжаю идти — это тоже баг." Nothing moved in the held set,
+        // so the controller has nothing to announce and `pushIntent` would not run
+        // again until the player let go — which is the flaw in reading input off a
+        // CHANGE rather than polling it. See the note at `pushIntent`.
+        pushIntent()
         return
       case 'closeInventory':
         if (game) hud.skills.toggle(game.currentPig.carrying)
+        pushIntent()
         return
       case 'choose':
         if (game) {
