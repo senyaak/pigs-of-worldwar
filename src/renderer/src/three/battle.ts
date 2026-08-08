@@ -215,11 +215,11 @@ export function buildBattle(
     (id, at) => {
       obstacles.restore(id)
       // A crate arriving kicks something up. Play named it — "там ещё эффект
-      // от падения" — and this is the remake's own: nothing has been read
-      // that spawns an effect for a placed object, so it borrows the BREAK
-      // burst (effect 0x3e, six rising puffs and no rings), which is what the
-      // engine already has for a thing meeting the ground hard.
-      effects.broke(at)
+      // от падения" — and this is the remake's own: nothing has been read that
+      // spawns an effect for a placed object. It takes row 0's SMOKE and not
+      // its fire, because a crate landing raises dust — and play saw what
+      // happened when it got the whole row ("коробка когда падает — искрит").
+      effects.dust(at)
     },
     () => bank
   )

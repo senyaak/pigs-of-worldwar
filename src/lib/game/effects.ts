@@ -223,6 +223,20 @@ export const BREAK_EFFECT: HitEffect = { ...ROW_ZERO, id: 0x3e }
  * other, which is what `three/grenades.ts` used to do. */
 export const BLAST_EFFECT: HitEffect = { ...ROW_ZERO, id: 0x54 }
 
+/**
+ * What a CRATE arriving under its canopy kicks up: row 0's smoke, and none of
+ * its fire.
+ *
+ * **The remake's own, and narrowed because play saw the difference** — "коробка
+ * когда падает — искрит, не должно быть". Nothing in the exe has been read that
+ * spawns an effect for a placed object, so this used to borrow row 0 whole; once
+ * row 0 turned out to carry a fireball, a landing crate was setting one off.
+ * A crate meeting the ground raises dust, so it takes the three bursts and
+ * leaves the two clouds behind. The id is row 0's own, since there is no id of
+ * its own to give it.
+ */
+export const DUST_EFFECT: HitEffect = { id: 0x3e, kind: 0, rings: [], bursts: ROW_ZERO.bursts }
+
 /** How far round the burst fans its particles: the same 1638.4-per-turn unit
  * the ring is drawn in, stepped `0x648 / count` a particle (0x48cb0b). */
 const BURST_SPREAD = 0x648 / 1638.4

@@ -130,11 +130,18 @@ export const LAYOUT = {
     width: 320,
     height: 64,
     margin: { bottom: 0 },
-    /** Where the slider's MIDDLE travels, and the line it rides — the trough's
-     * own measured span and row. */
+    /** The trough's own measured span and row, END TO END. */
     track: { from: 104, to: 268, y: 1 },
-    /** The slider's own art is 24 wide; this is what its middle is offset by. */
-    slider: { width: 24, height: 36 },
+    /**
+     * The slider's box, and where its VISIBLE art sits inside it.
+     *
+     * The box is 24 wide and the marker inside it is eight, at cols 8..15. The
+     * travel is the marker's, not the box's: centring the box on the track put
+     * the marker four pixels past the trough at full charge, which play saw
+     * ("порог идёт чуть дальше за шкалу при броске"). So the marker's LEFT edge
+     * runs `from` to `to - art.width`, and the box is drawn `art.x` behind it.
+     */
+    slider: { width: 24, height: 36, art: { x: 8, width: 8 } },
     /** The pair above the left end, `newpow1` then `newpow2`. */
     cap: { x: 0, y: -18 }
   },
@@ -449,9 +456,10 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         blit(art.get('newpow2'), gaugeX + GAUGE.cap.x + 64, gaugeY + GAUGE.cap.y)
         const along = Math.min(1, Math.max(0, state.charge))
         const track = GAUGE.track
+        const marker = GAUGE.slider.art
         blit(
           art.get('powg1'),
-          gaugeX + track.from + (track.to - track.from) * along - GAUGE.slider.width / 2,
+          gaugeX + track.from - marker.x + (track.to - track.from - marker.width) * along,
           gaugeY + track.y
         )
       }

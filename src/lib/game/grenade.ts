@@ -26,7 +26,9 @@
 import {
   BOUNCE_CUTOFF,
   FIXED,
+  GROUND_DEFAULT,
   PLAIN_GRAVITY,
+  TILE_MATERIALS,
   fromExeFrames,
   fromExeSpeed
 } from './ballistics'
@@ -85,6 +87,11 @@ export interface Lob {
    * followed.
    */
   blast: number
+  /** Row **+0x20** and **+0x22** — the projectile body's OWN physics material,
+   * set in the constructor (0x4323e2) and multiplied by the surface's the way
+   * a pig's is. See `lobBounce`. */
+  friction: number
+  restitution: number
 }
 
 /**
@@ -93,16 +100,19 @@ export interface Lob {
  * whatever those two fields drive (they feed effect 0x5D at 0x436665).
  */
 const LOBS: Record<number, Lob> = {
-  /** 19 GRENADE — the plain one. */
-  19: { id: 412, kind: 24, speed: 300, fuse: 150, damage: 3840, blast: 1024 },
-  20: { id: 413, kind: 25, speed: 300, fuse: 150, damage: 3840, blast: 1024 },
-  21: { id: 414, kind: 26, speed: 300, fuse: 150, damage: 2560, blast: 512 },
-  22: { id: 415, kind: 27, speed: 300, fuse: 150, damage: 1920, blast: 512 },
-  23: { id: 416, kind: 28, speed: 300, fuse: 150, damage: 1920, blast: 512 },
-  24: { id: 417, kind: 29, speed: 300, fuse: 150, damage: 7680, blast: 1536 },
-  25: { id: 418, kind: 30, speed: 300, fuse: 150, damage: 3840, blast: 1024 },
-  26: { id: 419, kind: 31, speed: 300, fuse: 150, damage: 5120, blast: 1024 },
-  27: { id: 420, kind: 32, speed: 300, fuse: 150, damage: 3840, blast: 1024 }
+  /** 19 GRENADE — the plain one. Friction 0.30, restitution 0.80, so 0.12 and
+   * 0.32 against grass: a few hops and then a long roll. */
+  19: { id: 412, kind: 24, speed: 300, fuse: 150, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
+  20: { id: 413, kind: 25, speed: 300, fuse: 150, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
+  21: { id: 414, kind: 26, speed: 300, fuse: 150, damage: 2560, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  22: { id: 415, kind: 27, speed: 300, fuse: 150, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  23: { id: 416, kind: 28, speed: 300, fuse: 150, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  24: { id: 417, kind: 29, speed: 300, fuse: 150, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  25: { id: 418, kind: 30, speed: 300, fuse: 150, damage: 3840, blast: 1024, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  /** 26 is the odd one twice over: half the row's +0x04 and no +0x08, and a
+   * material of 0.001 on both — it STICKS where it lands. */
+  26: { id: 419, kind: 31, speed: 300, fuse: 150, damage: 5120, blast: 1024, friction: 4 / FIXED, restitution: 4 / FIXED },
+  27: { id: 420, kind: 32, speed: 300, fuse: 150, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED }
 }
 
 /** What this skill lobs, or null for everything that does not lob. */
@@ -186,31 +196,47 @@ export function blastShare(distance: number, range: number): number {
 }
 
 /**
- * How a grenade meets the ground, and it is NOT the terrain's own material.
+ * How a grenade meets the ground: its OWN pair off its own row, multiplied by
+ * the surface's, exactly the way a pig's is.
  *
- * Row +0x10 is the one field that separates a gun from a thrown thing — 1
- * against 2 — and its single reader is inside the collision code (0x4157a5),
- * which branches on `== 1`. The arm everything LOBBED takes (0x4158d2) writes
- * its own pair before resolving: **0xFFF and 0x200 of 4096**, an almost
- * perfectly elastic bounce on almost no friction. A bullet's arm does not.
+ * **This replaces a wrong read, and play found it: "граната не должна прыгать
+ * как на батуте… о сушу прыгает как от воды."** The old version had the pair
+ * at 0xFFF/0x200 — restitution 0.9998 — taken from `[esi+0x28]`/`[esi+0x24]`
+ * in the lobbed collision arm (0x4158f3), and said they REPLACED the surface's
+ * own. Both halves were wrong:
  *
- * Which is what play describes: "если кидать вперёд чисто параллельно земли —
- * будет как камень прожектайл отскакивать." A flat throw skips.
+ * - `+0x24`, `+0x26` and `+0x28` are read and written as three consecutive
+ *   WORDS, and copied as a group into three globals (0x415cc5..0x415cde) —
+ *   they are a VECTOR on the query record that `0x4156d0` fills, not a
+ *   friction/restitution pair. The record is a segment test: `+0x1c..0x20` is
+ *   its start, `+0x3c..0x40` its end, `+0x34` a squared length. Nothing there
+ *   is a material.
+ * - The 0.01/0.99 pair that DOES go through `0x416560` (0x41564c) is the WALL,
+ *   which this repo already had right in `ballistics.ts`, and it is reached
+ *   only when the contacting body's owner is type **0x1357 — a pig**
+ *   (0x40e964). A thrown thing never gets it, so a grenade off a wall tile
+ *   takes the tile's own numbers like anything else.
  *
- * And they REPLACE the surface's own pair rather than multiplying with it,
- * which is what play felt as "слишком быстро теряет скорость из-за трения".
- * The proof is that they are different FIELDS: a tile's material goes through
- * `0x416560` onto the landscape BODY's `+0x58`/`+0x5c` (0x415600..0x41564c),
- * which is the pair the solver multiplies (0x40f690); the lobbed arm writes
- * 16-bit values onto the COLLISION RECORD at `+0x24`/`+0x28` just before
- * resolving. Two places, two purposes — so a grenade bounces at 0.9998 on
- * grass and on stone alike.
+ * What a projectile actually brings is row **+0x20** and **+0x22**, handed to
+ * `0x416560` on its own body in the constructor (0x43239b..0x4323e2, and the
+ * push order makes +0x20 the friction). For the plain grenade that is **0.30
+ * and 0.80**; against grass (tile 0, 0.40/0.40) the solver's multiply
+ * (0x40f690) gives **0.12 friction and 0.32 restitution**. Which is the whole
+ * behaviour play describes in one line: it hops a few times rather than
+ * trampolining, and then rolls a long way because 0.12 is very little friction.
  *
- * Which of the two is friction and which restitution is not proven; taken in
- * the order the movement notes use for the body's pair, where 0xFFF is
- * unmistakably a restitution and 0x200 a friction.
+ * Skill 26's kind is the odd one at 0.001/0.001 — it does not bounce at all.
  */
-export const LOB_BOUNCE: Bounciness = { friction: 0x200 / FIXED, restitution: 0xfff / FIXED }
+export const lobBounce = (row: Lob): Bounciness => ({
+  friction: row.friction,
+  restitution: row.restitution
+})
+
+/** What the SURFACE brings, for a thrown thing: the tile's own pair and
+ * nothing else. Deliberately not `groundMaterial`, whose wall override belongs
+ * to the pig alone. */
+export const lobSurface = (tileType: number): Bounciness =>
+  TILE_MATERIALS[tileType & 0x1f] ?? GROUND_DEFAULT
 
 /** A grenade in the air, or rolling. Game space, Y-down; velocity a second. */
 export interface Lobbed {
@@ -270,19 +296,22 @@ export function lob(
 }
 
 /**
- * How hard it has to be going to SKIP off water rather than go in.
+ * Whether this contact with water is a SKIP or the moment it goes in.
  *
- * Play: "не прыгает по воде граната." It should — the collision arm a thrown
- * thing takes is nearly elastic (`LOB_BOUNCE`) and the exe does not exempt
- * water from it, so a flat throw skims a pond exactly as it skims the ground.
- * What sinks it is running out of speed, not the water itself.
+ * Play wanted the frog: "должен быть эффект лягушки — как когда камни пускают
+ * по глади воды". The test is how hard it is coming DOWN, not how fast it is
+ * going — and that correction is the whole of why it used to get stuck on the
+ * surface. A grenade sliding across a pond keeps a big total speed for ever, so
+ * a total-speed gate never let it sink; what a skipping stone actually runs out
+ * of is its vertical.
  *
- * The threshold is the remake's: the same 25-a-frame the impact handler uses
- * to tell a landing from a bounce (`BOUNCE_CUTOFF`), which is the only figure
- * the engine has for "too slow to bounce".
+ * Y-down, so a positive `vy` is INTO the water, and the bar is the engine's
+ * only figure for "too slow to bounce" (`BOUNCE_CUTOFF`, 25 a frame) — the same
+ * one `bounceLob` uses on the normal component. With the surface's real
+ * numbers each skip keeps about a third of the drop, so three or four hops and
+ * it is under.
  */
-export const SKIPS_ON_WATER = (shot: Lobbed): boolean =>
-  Math.hypot(shot.vx, shot.vy, shot.vz) > BOUNCE_CUTOFF
+export const SKIPS_ON_WATER = (shot: Lobbed): boolean => shot.vy > BOUNCE_CUTOFF
 
 /**
  * …and once it is too slow, it goes in. How fast a sunk grenade falls is the
@@ -298,16 +327,6 @@ export function sinkLob(shot: Lobbed, delta: number): void {
   // damping that too is what left a grenade sitting on the water — play saw it
   // ("застопорилась о воду и стоит на поверхности").
 }
-
-/**
- * How much a SKIP off water keeps. Play again: a stone skips a few times and
- * then goes in, which needs the surface to take something — at the ground's
- * near-perfect 0xFFF a grenade bounced on the spot for ever instead of sinking.
- *
- * The remake's own outright: water is ART in this engine, not a body, so
- * nothing in the exe collides with it and there is nothing to read.
- */
-export const WATER_BOUNCE: Bounciness = { friction: 0.05, restitution: 0.45 }
 
 /**
  * One frame of flight — the parabola, and nothing else. Whether it has met
@@ -350,25 +369,27 @@ export function bounceLob(
   shot: Lobbed,
   y: number,
   normal: Velocity,
-  /** Kept in the signature though the pair above makes them unused: the caller
-   * knows them and the day the surface turns out to matter after all, this is
-   * where it goes. */
-  _tileType: number,
+  /** Which tile is under the contact. The surface brings its own half of the
+   * pair and the solver MULTIPLIES the two (0x40f690) — which is the whole
+   * reason a grenade behaves differently on stone and on sand, and why the old
+   * version that ignored this bounced off land the way it bounced off water. */
+  tileType: number,
   _blocked: boolean,
-  /** What the projectile brings to the collision. `LOB_BOUNCE` is the exe's
-   * own pair off the arm a thrown thing takes; the terrain's material still
-   * multiplies in, the way the solver does it for a pig. */
-  self: Bounciness = LOB_BOUNCE
+  /** What the projectile brings — its row's own pair (`lobBounce`). */
+  self: Bounciness
 ): void {
   shot.y = y
   const vn = shot.vx * normal.x + shot.vy * normal.y + shot.vz * normal.z
   // Already leaving: there is no contact to resolve, and resolving it anyway
   // is what took a slice off the roll every sub-step.
   if (vn >= 0) return
-  const keep = Math.max(0, 1 - self.friction)
+  const ground = lobSurface(tileType)
+  const friction = self.friction * ground.friction
+  const restitution = self.restitution * ground.restitution
+  const keep = Math.max(0, 1 - friction)
   // Below a crawl the normal part stops coming back — the exe's own threshold
   // (`BOUNCE_CUTOFF`), and without it a discrete step bounces for ever.
-  const e = -vn > BOUNCE_CUTOFF ? self.restitution : 0
+  const e = -vn > BOUNCE_CUTOFF ? restitution : 0
   shot.vx = (shot.vx - vn * normal.x) * keep - e * vn * normal.x
   shot.vy = (shot.vy - vn * normal.y) * keep - e * vn * normal.y
   shot.vz = (shot.vz - vn * normal.z) * keep - e * vn * normal.z

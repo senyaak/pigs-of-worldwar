@@ -21,8 +21,8 @@ import {
   blastShare,
   bounceLob,
   SKIPS_ON_WATER,
-  WATER_BOUNCE,
   lob,
+  lobBounce,
   lobOf,
   sinkLob
 } from '../../../lib/game/grenade'
@@ -200,6 +200,9 @@ export function createGrenades(parts: GrenadeParts): Grenades {
   /** Put it back on whatever it went into. False when it met nothing. */
   const settle = (shot: Lobbed, wasY: number, step: number): boolean => {
     const ground = parts.query.height(shot.x, shot.z)
+    // Its own row's physics material — the surface multiplies its half in.
+    const row = lobOf(shot.skill)
+    if (!row) return false
     // WATER FIRST. A thrown thing SKIMS a pond while it still has the speed —
     // the collision arm it takes is nearly elastic and the exe does not exempt
     // water from it — and goes in once it does not. `surface` is the region's
@@ -208,10 +211,19 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     if (parts.query.isWater(shot.x, shot.z) && shot.y >= parts.query.surface(shot.x, shot.z)) {
       const level = parts.query.surface(shot.x, shot.z)
       if (!shot.sunk && SKIPS_ON_WATER(shot)) {
-        // Flat off the surface, and on WATER's own pair — the ground's is very
-        // nearly perfect, which had a grenade skipping on the spot for ever
-        // instead of losing enough to go in.
-        bounceLob(shot, level, { x: 0, y: -1, z: 0 }, 0, false, WATER_BOUNCE)
+        // Flat off the surface, on the water TILE's own pair times the
+        // grenade's — the exe has no special case for a thrown thing on water
+        // (the slick 0.01/0.99 surface is the WALL, and only a pig gets it), so
+        // this is one surface among the twelve. The frog falls out of the
+        // numbers: about a third of the drop comes back each time.
+        bounceLob(
+          shot,
+          level,
+          { x: 0, y: -1, z: 0 },
+          parts.query.tileType(shot.x, shot.z),
+          false,
+          lobBounce(row)
+        )
         return true
       }
       sinkLob(shot, step)
@@ -231,7 +243,8 @@ export function createGrenades(parts: GrenadeParts): Grenades {
         ground,
         parts.query.normal(shot.x, shot.z),
         parts.query.tileType(shot.x, shot.z),
-        !parts.query.walkable(shot.x, shot.z)
+        !parts.query.walkable(shot.x, shot.z),
+        lobBounce(row)
       )
       return true
     }
@@ -240,7 +253,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     // and bounced off the vertical. Crude, and the same crudeness a bullet's
     // `solid` test has.
     if (parts.obstacles.solid(shot.x, shot.y, shot.z)) {
-      bounceLob(shot, wasY, { x: 0, y: -1, z: 0 }, 0, true)
+      bounceLob(shot, wasY, { x: 0, y: -1, z: 0 }, 0, true, lobBounce(row))
       return true
     }
     return false

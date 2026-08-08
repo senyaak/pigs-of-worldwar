@@ -1156,12 +1156,11 @@ exactly why an explosion and a breaking look the same and neither looks like
 much. **DONE the next day**: both spawners are decoded and all five stages are
 built. See the fifth pass at the end of this file.
 
-**The bounce REPLACES the surface's material, it does not multiply**, and play
-felt it as friction eating the throw. Two different fields prove it: a tile's
-pair goes onto the LANDSCAPE BODY's `+0x58`/`+0x5c` through `0x416560`, which is
-what the solver multiplies; the lobbed arm writes the COLLISION RECORD's
-`+0x24`/`+0x28` right before resolving. A grenade bounces at 0.9998 on grass and
-on stone alike.
+~~**The bounce REPLACES the surface's material, it does not multiply.**~~
+**WRONG, and corrected in the seventh pass below.** `+0x24`/`+0x26`/`+0x28` are
+three consecutive words of a VECTOR on a segment-query record, not a material
+pair, and the near-elastic 0.01/0.99 surface is the WALL and pig-only. A
+projectile's own pair is row `+0x20`/`+0x22`, and the surface's does multiply in.
 
 **The gauge fills in 1.7 s, not 3.4** — `EXE_FRAME_SECONDS` again, the third
 place to need it. 0x50 a frame to 0xfff is 52 ENGINE frames.
@@ -1197,8 +1196,8 @@ its downhill half went under a slope.
    eighth is `bounceSpeed`'s — the PIG's impact handler (0x4711d8 → 0x471247),
    which stops a pig ricocheting off its own behind. The SOLVER has no such
    term: `e = restitutionA * restitutionB` and nothing else (0x40f690). A
-   projectile never reaches the pig's handler, so at restitution 0.9998 it was
-   still coming back with an eighth of what it arrived with.
+   projectile never reaches the pig's handler, so it was coming back with an
+   eighth of what it arrived with on top of everything else being wrong.
 2. **Friction once per CONTACT, not once per SUB-STEP.** The scene walks a
    grenade in steps of its own size and every step that ended below the surface
    took another 12.5% off the tangential. `bounceLob` now resolves nothing when
@@ -1206,12 +1205,11 @@ its downhill half went under a slope.
 
 `bounceLob` does its own solve for exactly those two reasons and says so.
 
-**Water gets its OWN pair.** At the ground's near-perfect 0xFFF a grenade
-skipped on the spot for ever and never sank — "застопорилась о воду и стоит на
-поверхности". `WATER_BOUNCE` takes something out of each skip, and `sinkLob` no
-longer damps the VERTICAL, because damping the one component gravity works
-through is what held it up there. All of it is the remake's outright: water is
-ART in this engine, not a body, so nothing in the exe collides with it.
+~~**Water gets its OWN pair.**~~ **Gone in the seventh pass**: water is one
+surface among the twelve. What made a grenade sit on it was the 0.9998 above plus
+a skip gate on TOTAL speed rather than on the drop. `sinkLob` still leaves the
+VERTICAL alone, because damping the one component gravity works through is what
+held it up there.
 
 **The blast's range is row +0x04 = 1024, and there is no cap** — the first
 reading took it off +0x08 by matching Init's stack slots to `0x487AD0`'s
@@ -1283,6 +1281,47 @@ Two scalars are the remake's own and say so at the field: `BLOB_UNIT`, because
 a sprite's size is handed to `wh32LIB.DLL` and the unit is the library's, and
 the split where a puff's DRIFT rides `MODEL_SCALE` while the point it started
 from does not — same argument as the ring's radius.
+
+### The grenade, seventh pass — the BOUNCE was wrong all along, 2026-08-08
+
+Play, in one line each: "не должна прыгать как на батуте", "о сушу прыгает как от
+воды", "по воде застревает и не тонет — должен быть эффект лягушки". Three
+symptoms, one cause.
+
+**`+0x24`/`+0x28` were never a material pair.** They are two of three
+consecutive WORDS — `+0x24`, `+0x26`, `+0x28` — read and written as a group and
+copied into three globals together (0x415cc5). A vector, on a record whose other
+fields are a segment's start, its end and a squared length: `0x4156d0` is a
+segment query and nothing on it is a material. The 0.9998 restitution this repo
+carried for four passes came from misreading one word of it.
+
+**And the near-elastic 0.01/0.99 surface is the WALL, pig-only.** `ballistics.ts`
+already had it right as `WALL_MATERIAL`; what was missing is that the branch is
+gated on the contacting body's owner being type **0x1357** (0x40e964). A thrown
+thing never gets it.
+
+**What a projectile brings is row `+0x20`/`+0x22`**, handed to `0x416560` on its
+own body in the constructor (0x4323e2): for a plain grenade **0.30 friction, 0.80
+restitution**. The solver multiplies the two bodies' pairs, so against grass
+(0.40/0.40) it lands on **0.12 and 0.32** — a hop or two, then a long roll. Skill
+26's kind is 0.001 on both and does not bounce at all; it sticks.
+
+`WATER_BOUNCE` is deleted: water is one surface among the twelve, and the FROG
+falls out of the numbers rather than needing its own pair — a skip needs the
+tangential speed to survive, which 0.12 friction does, not the normal one to come
+back whole. What kept a grenade standing on a pond was the skip gate testing
+TOTAL speed: something sliding across water keeps that for ever. It tests the
+DROP now.
+
+**Three visual corrections in the same pass.** The gauge's slider travels its
+VISIBLE marker (eight pixels at cols 8..15 of a 24-wide box) rather than the box,
+because centring the box put the marker four pixels past the trough. The clouds
+are NOT additive — additive light cannot darken, and row 0's second cloud is a
+near-black whose whole job is to be smoke ("чёрного дыма нет на взрыве"); the
+blend mode lives in `wh32LIB.DLL` and cannot be read, so this is the remake's
+pick. And a landing CRATE takes row 0's smoke without its fire (`DUST_EFFECT`) —
+it was borrowing the whole row, so once the row grew a fireball a crate arriving
+set one off ("коробка когда падает — искрит").
 
 ### Known divergences — deliberate, and each written up where it lives
 

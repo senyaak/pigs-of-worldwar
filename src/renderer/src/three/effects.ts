@@ -14,6 +14,7 @@ import * as THREE from 'three'
 import {
   BLAST_EFFECT,
   BREAK_EFFECT,
+  DUST_EFFECT,
   RING_DEAD,
   RING_SEGMENTS,
   RING_SWEEP,
@@ -76,6 +77,14 @@ const PUFF_GROWTH = 1
 const BLOB_UNIT = 1 / 64
 const BLOB_SCALE = MODEL_SCALE
 
+/**
+ * How solid ONE of them is drawn. The remake's own, and it has to be: seventy
+ * sprites at full opacity is a painted ball rather than a cloud, and what makes
+ * a cloud is many thin layers. The `-1` the exe puts in the sprite struct might
+ * be this and might be anything; the draw is the library's.
+ */
+const BLOB_ALPHA = 0.4
+
 /** A point in game space, Y-down. */
 type Spot = { x: number; y: number; z: number }
 
@@ -89,6 +98,9 @@ export interface Effects {
   /** …and something EXPLODED here. The same parameter row as a breaking, and
    * that is the exe's own doing: both ids land on the same init arm. */
   blast(at: { x: number; y: number; z: number }): void
+  /** …and something heavy LANDED here. Row 0's smoke without its fire, so a
+   * crate arriving raises dust rather than going off (lib/game/effects.ts). */
+  dust(at: { x: number; y: number; z: number }): void
   /** Step them; call once a frame. */
   update(delta: number): void
   /** How many rings are alive — what a spec can see of an effect, since its
@@ -237,11 +249,14 @@ export function createEffects(root: THREE.Object3D): Effects {
   }
 
   const blobAt = (i: number): THREE.Sprite => {
-    // The fireball ADDS light: the engine hands the library a colour with the
-    // top bit of the packed word set (0x48a088) and lets the colour itself
-    // carry the fade, exactly as the ring does. A hundred and forty dark-red
-    // sprites over each other is what makes the middle bright.
-    while (blobs.length <= i) blobs.push(newSprite(THREE.AdditiveBlending))
+    // NOT additive, and that is play's call: "чёрного дыма нет на взрыве".
+    // Additive light can only ever brighten, and row 0's second cloud is
+    // (4,3,0) — which through the draw's own gain is (25,19,0), a near-black.
+    // Added to the map it is invisible; laid over it, it is the black smoke.
+    // The blend MODE lives in wh32LIB.DLL and cannot be read out of the exe, so
+    // this is the remake's pick, made the way play describes the shipped game:
+    // a dull red ball with a dark cloud rolling out of it.
+    while (blobs.length <= i) blobs.push(newSprite(THREE.NormalBlending))
     return blobs[i]
   }
 
@@ -290,7 +305,8 @@ export function createEffects(root: THREE.Object3D): Effects {
       cloudChannel(one.colour[1]) / 255,
       cloudChannel(one.colour[2]) / 255
     )
-    sprite.material.opacity = Math.min(1, (RING_DEAD - one.age) / (RING_DEAD * 0.1))
+    sprite.material.opacity =
+      BLOB_ALPHA * Math.min(1, (RING_DEAD - one.age) / (RING_DEAD * 0.1))
   }
 
   const redraw = (): void => {
@@ -332,6 +348,9 @@ export function createEffects(root: THREE.Object3D): Effects {
     },
     blast(at) {
       live.push(beginEffect(BLAST_EFFECT, at))
+    },
+    dust(at) {
+      live.push(beginEffect(DUST_EFFECT, at))
     },
     update(delta) {
       for (const effect of live) advanceEffect(effect, delta)
