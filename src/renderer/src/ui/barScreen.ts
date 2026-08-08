@@ -25,6 +25,7 @@ import { SILENT, loadBank } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
+import { entrance } from './entrance'
 
 /** The frontend's own bank — 27 sounds, the menu's clicks among them. */
 const FRONTEND_SOUNDS = 'FESounds/Fesounds.srl'
@@ -236,6 +237,10 @@ export function initBarScreen(config: {
   /** Whether the rows carry the MAIN MENU's own stagger (`LAYOUT.stagger`).
    * It is read off that screen's draw arm and belongs to no other. */
   stagger?: boolean
+  /** Where the screen DRIVES ON from, in the frontend's own units — the
+   * exe's per-screen table, and only the main menu's entry is claimed
+   * (`entrance.ts`). Left out, the screen is simply there. */
+  entersFrom?: number
   /** The back key, where the screen has somewhere to go back to. */
   onBack?: () => void
   /** F1, the remake's own asset browsers. */
@@ -270,6 +275,13 @@ export function initBarScreen(config: {
   let travel: { from: number; until: number } | null = null
   /** The bar the mouse is over, taken up as soon as the machine will move. */
   let hovered = -1
+  /** The screen's own arrival: one y displacement added to everything the
+   * machine draws. The backdrop is NOT displaced — the exe blits it before
+   * the switch that applies this (`entrance.ts`). */
+  const driveOn = entrance(config.entersFrom ?? 0)
+  /** What that displacement is right now. Read once a frame and shared with
+   * the mouse, so a click during the arrival hits the bar it looks at. */
+  let arrivalOffset = 0
 
   const travelling = (now: number): boolean => travel !== null && now < travel.until
 
@@ -335,7 +347,7 @@ export function initBarScreen(config: {
     const { dx, dy } = staggerOf(i)
     return {
       x: layout.bars.x + dx,
-      y: layout.bars.y + i * layout.bars.step + dy,
+      y: layout.bars.y + i * layout.bars.step + dy + arrivalOffset,
       width: plate.width + layout.bars.stretch
     }
   }
@@ -394,8 +406,12 @@ export function initBarScreen(config: {
   const draw = (now: number): void => {
     const context = canvas.getContext('2d')
     if (!context || !art || !big || !lit || !plain || !off) return
+    // Everything the machine draws is displaced by the arrival — everything
+    // except the backdrop, which the exe blits before the switch that applies
+    // it, so the sky stays put while the machine drives on.
+    arrivalOffset = driveOn.offset(now)
     const blit = (sprite: Sprite, x: number, y: number): void =>
-      context.drawImage(sprite.image, x, y)
+      context.drawImage(sprite.image, x, y + arrivalOffset)
     /** A row's plate: one sprite in two halves, so it comes out `stretch`
      * wider than the art. The exe's own way of doing it — see `SEAM`. */
     const drawPlate = (sprite: Sprite, x: number, y: number): void => {
@@ -416,7 +432,7 @@ export function initBarScreen(config: {
       context.drawImage(sprite.image, 0, top, sprite.width, band, x, y, sprite.width, band)
     }
 
-    blit(art.get('pigbkpc1'), 0, 0)
+    context.drawImage(art.get('pigbkpc1').image, 0, 0)
     blit(art.get('fullmenu'), layout.machine.x, layout.machine.y)
     blit(art.get('track'), layout.track.x, layout.track.y)
     blit(frameAt(dials, now), layout.dial.x, layout.dial.y)
@@ -436,7 +452,7 @@ export function initBarScreen(config: {
     if (turning === null) {
       centred(context, big, config.title(), {
         x: layout.title.x,
-        y: layout.title.y,
+        y: layout.title.y + arrivalOffset,
         width: title.width,
         height: title.height
       })
@@ -454,7 +470,7 @@ export function initBarScreen(config: {
           i === selection
             ? lamps[Math.floor((Math.max(0, now - started) / 1000) * LAMP_FPS) % lamps.length]
             : lamps[0]
-        drawLamp(lamp, i, layout.lamp.x, layout.lamp.y + i * layout.bars.step)
+        drawLamp(lamp, i, layout.lamp.x, layout.lamp.y + i * layout.bars.step + arrivalOffset)
       }
 
       if (turning !== null) continue
@@ -549,8 +565,10 @@ export function initBarScreen(config: {
     },
     enter() {
       visible = true
-      // Arriving IS the content change, so the plates turn over for it.
+      // Arriving IS the content change, so the plates turn over for it — and
+      // the machine drives on underneath them at the same moment.
       arrivedAt = performance.now()
+      driveOn.restart(arrivedAt)
       travel = null
       run(true)
     },
@@ -559,7 +577,9 @@ export function initBarScreen(config: {
     // over. Either refuses a press, so either is what a spec must wait out.
     flipping() {
       const now = performance.now()
-      return travelling(now) || now - arrivedAt < ARRIVE_SECONDS * 1000
+      return (
+        travelling(now) || now - arrivedAt < ARRIVE_SECONDS * 1000 || driveOn.moving()
+      )
     },
     labels: () => bars.map((bar) => bar.label()),
     values: () => bars.map((bar) => bar.value?.() ?? null),

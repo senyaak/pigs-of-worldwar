@@ -34,6 +34,9 @@ export function initMenu(handlers: {
     // This screen's rows are staggered, and only this one: the two numbers
     // are read off its own draw arm (exe 0x41bf6c) and no other arm has been.
     stagger: true,
+    // Screen 1 comes DOWN, from 650 of the frontend's own units above its
+    // resting place — the exe's per-screen table at 0x4C0A18 (`entrance.ts`).
+    entersFrom: -650,
     bars: [
       {
         label: () => feText(ITEM_TEXT[0]),
