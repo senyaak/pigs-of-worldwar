@@ -44,6 +44,10 @@ export const MENU_TUNING: Tuning = { gain: 8, damping: 17, cap: 80 }
 export interface Entrance {
   /** Advance to `now` and answer the y displacement in SCREEN pixels. */
   offset(now: number): number
+  /** The same displacement in the frontend's OWN units, unscaled. The screen's
+   * update arm gates on this rather than on pixels — the plates are asked to
+   * turn over once it has climbed past -50 (exe 0x423f57). */
+  raw(): number
   /** Come in again from the beginning. */
   restart(now: number): void
   /** Whether it is still on its way. */
@@ -96,6 +100,7 @@ export function entrance(from: number, tuning: Tuning = MENU_TUNING): Entrance {
       // pixel never reaches the screen (0x41bf43..0x41bfd0).
       return 2 * trunc(scaleY(value) / 2)
     },
+    raw: () => value,
     restart(now) {
       value = from
       velocity = 0

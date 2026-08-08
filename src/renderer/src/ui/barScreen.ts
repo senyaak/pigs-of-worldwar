@@ -35,6 +35,7 @@ import type { Bank } from '../audio/bank'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
 import { entrance } from './entrance'
+import { frameWalk } from './frames'
 
 /** The frontend's own bank — 27 sounds, the menu's clicks among them. */
 const FRONTEND_SOUNDS = 'FESounds/Fesounds.srl'
@@ -130,14 +131,17 @@ export const LAYOUT = {
 const SEAM = 24
 
 /**
- * How long the plates take to turn over when a screen ARRIVES.
- *
- * That is what the flip is for, and it is play's word: the bars turn when the
- * menu's CONTENTS change — MAIN MENU becoming ONE PLAYER — not when the lit
- * bar moves. This screen's contents never change once it is built, so its
- * arrival IS the change.
+ * The plates and the title are ONE widget in the original, and turning them
+ * over is a frame WALK rather than a timed animation: built on frame 2, asked
+ * for frame 6, one frame per engine tick, and 6 of six wraps back to the
+ * first. The request is guarded twice — the widget must not already be
+ * walking, and the screen's entrance must have climbed past `FLIP_AT` — so
+ * the flip lands as the machine finishes driving in. Every number is the
+ * exe's (0x423f57..0x423f75); play had said the same thing first.
  */
-const ARRIVE_SECONDS = 0.3
+const PLATE_BUILT_ON = 2
+const PLATE_TURNS_TO = 6
+const FLIP_AT = -50
 /**
  * How long the carriage takes to travel one bar — and, the same number, how
  * soon the next bar may be reached. The machine is not instant: a held key or
@@ -308,9 +312,6 @@ export function initBarScreen(config: {
   let selection = 0
   let visible = false
   let started = 0
-  /** When the screen last arrived — the plates and the title plate turn over
-   * for `ARRIVE_SECONDS` from here. */
-  let arrivedAt = -Infinity
   /** The carriage on its way from one bar to the next. It is what refuses a
    * second press, and its cog turns only while it is running. */
   let travel: { from: number; until: number } | null = null
@@ -320,6 +321,8 @@ export function initBarScreen(config: {
    * machine draws. The backdrop is NOT displaced — the exe blits it before
    * the switch that applies this (`entrance.ts`). */
   const driveOn = entrance(config.entersFrom ?? 0)
+  /** The plates and the title, which are one widget and turn together. */
+  let plate = frameWalk(PLATE_BUILT_ON, 6)
   /** What that displacement is right now. Read once a frame and shared with
    * the mouse, so a click during the arrival hits the bar it looks at. */
   let arrivalOffset = 0
@@ -527,18 +530,16 @@ export function initBarScreen(config: {
     blit(frameAt(cogs, now), layout.cog.x, layout.cog.y)
     blit(frameAt(cogbs, now), layout.cogb.x, layout.cogb.y)
 
-    // How far into the arrival the screen is, 0..1, or null once it has
-    // settled. The plates and the title plate both turn on it, together,
-    // because they are turning over to say the same new thing.
-    const arriving = (now - arrivedAt) / (ARRIVE_SECONDS * 1000)
-    const turning = arriving >= 0 && arriving < 1 ? arriving : null
-    const oneShot = (frames: Sprite[], through: number): Sprite =>
-      frames[Math.min(frames.length - 1, Math.floor(through * frames.length))]
+    // The plates and the title are one widget and turn together. The request
+    // to turn is made here, on the exe's own two guards — see PLATE_TURNS_TO.
+    if (driveOn.raw() > FLIP_AT) plate.goTo(now, PLATE_TURNS_TO)
+    const face = plates[plate.at(now)]
+    const turning = plate.walking()
 
-    const title = turning === null ? titles[0] : oneShot(titles, turning)
+    const title = titles[plate.at(now)]
     drawPlate(title, layout.title.x, layout.title.y + arrivalOffset, layout.title.seam)
     // Mid-turn a plate is edge-on to what it used to say, so it says nothing.
-    if (turning === null) {
+    if (!turning) {
       centred(context, big, config.title(), {
         x: layout.title.x,
         y: layout.title.y + arrivalOffset,
@@ -548,7 +549,6 @@ export function initBarScreen(config: {
     }
 
     for (let i = 0; i < bars.length; i++) {
-      const face = turning === null ? plates[0] : oneShot(plates, turning)
       const row = rowBox(i, face)
       drawPlate(face, row.x, row.y)
 
@@ -562,7 +562,7 @@ export function initBarScreen(config: {
         drawLamp(lamp, i, layout.lamp.x, layout.lamp.y + i * layout.bars.step + arrivalOffset)
       }
 
-      if (turning !== null) continue
+      if (turning) continue
 
       const bar = bars[i]
       const font = !bar.enabled() ? off : i === selection ? lit : plain
@@ -654,8 +654,9 @@ export function initBarScreen(config: {
       visible = true
       // Arriving IS the content change, so the plates turn over for it — and
       // the machine drives on underneath them at the same moment.
-      arrivedAt = performance.now()
-      driveOn.restart(arrivedAt)
+      const now = performance.now()
+      driveOn.restart(now)
+      plate = frameWalk(PLATE_BUILT_ON, 6)
       travel = null
       run(true)
     },
@@ -665,7 +666,7 @@ export function initBarScreen(config: {
     flipping() {
       const now = performance.now()
       return (
-        travelling(now) || now - arrivedAt < ARRIVE_SECONDS * 1000 || driveOn.moving()
+        travelling(now) || plate.walking() || driveOn.moving()
       )
     },
     labels: () => bars.map((bar) => bar.label()),

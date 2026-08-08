@@ -1461,6 +1461,18 @@ half of it, and the only reading under which this file's own sentence about the 
   behind it. Getting that wrong is what had our plates over the wrong
   recesses, and the machine 128 pixels too low.
 
+  **A widget's frame is a WALK, and the flip is the exe's own.** The original
+  never plays a clip: a widget holds one frame, something asks for another,
+  and a per-tick pass steps it there one frame at a time, rebuilding the
+  sprite each step (`ui/frames.ts`; decoded as 0x512C18 / 0x423E10 / 0x41FEC0
+  / 0x41F110). The plates and the title are ONE widget: built on frame 2,
+  asked for frame 6 — which wraps back to the first of six — one frame per
+  engine tick, and the request is guarded by the widget not already walking
+  AND by the entrance having climbed past -50. So the flip lands as the
+  machine finishes driving in. Every number there is read; the remake had put
+  the flip at that moment already, from play's word alone, and this replaced
+  a 0.3-second timer with the mechanism.
+
   **The dial's needle points at the lit row**, and that is play's word rather
   than the exe's: the widget is built once at frame 0 and nothing found so far
   moves it, so the twelve frames are spread over the rows and the needle
