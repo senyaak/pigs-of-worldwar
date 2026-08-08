@@ -2,7 +2,7 @@
 // APPLICATION, which is the screen the original opens on.
 //
 // It is four bars on the frontend's machine and nothing else: the backdrop,
-// the cog, the flip and the carriage all live in `barScreen.ts`, because
+// the cogs, the entrance and the flip all live in `barScreen.ts`, because
 // MULTI-PLAYER is the same furniture. What is left here is the list.
 //
 // OPTIONS is the one screen still not built, and it is drawn in the font's

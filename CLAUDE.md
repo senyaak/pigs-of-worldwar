@@ -1478,16 +1478,18 @@ half of it, and the only reading under which this file's own sentence about the 
   moves it, so the twelve frames are spread over the rows and the needle
   sweeps with the selection. Flagged at `needle` in `ui/barScreen.ts`.
 
-  Still eyework, and each says so at the field: BOTH TRACKS — the exe blits
+  **There is NO carriage on the menu.** The remake ran one — `selcog`, the
+  arrow with a cog above and below — up and down the column, and play threw
+  it out on sight. The disassembly had said the same first: screen 1 never
+  loads `selcog`. Exactly one loader arm does, the one serving screen ids 2,
+  3, 4, 11 and 12, which loads `name0..5` beside it — the SELECT TEAM / ENTER
+  YOUR NAME family, where it goes when those screens are built. `select.mgl`
+  is left out on the same evidence. The lit bar is told apart by its lighter
+  letters and by its lamp, which is the original's own way.
+
+  Still eyework, and it says so at the field: BOTH TRACKS — the exe blits
   `track` twice through `0x41AF70`, a blitter with an explicit destination
-  size whose convention is undecoded and whose two x values read off-screen —
-  and the CARRIAGE. On the carriage the disassembly says one thing only:
-  **screen 1 does not load `selcog`.** The piece itself is the original's —
-  exactly one loader arm reads it, the one serving screen ids 2, 3, 4, 11 and
-  12, which loads `name0..5` beside it and so is the SELECT TEAM / ENTER YOUR
-  NAME family. So it belongs to those screens, and whether the remake keeps
-  one on the menu is a choice rather than a correction. `select.mgl` is left
-  out on the same evidence.
+  size whose convention is undecoded and whose two x values read off-screen.
 
 - **The mouse works the menu, and the original's does not.** Hovering lights
   a bar, clicking chooses it. The original is keyboard and pad only (it even

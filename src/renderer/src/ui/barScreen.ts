@@ -12,10 +12,15 @@
 // its screen coordinates in the frontend's draw code rather than storing them,
 // and the MAIN MENU's arm has been read blit by blit (frontend/notes.md, in
 // the disasm repo), so `LAYOUT` below carries the original's own numbers with
-// the address each came from. Three things in it are still eyework and say so:
-// both TRACKS, whose blitter's convention is undecoded, and the CARRIAGE —
-// which screen 1 does not load — the piece is the original's, on the SELECT
-// TEAM and ENTER YOUR NAME screens, but not on this one.
+// the address each came from. What is still eyework says so: both TRACKS,
+// whose blitter's convention is undecoded.
+//
+// There is NO carriage here. The remake used to run one — `selcog`, the arrow
+// with a cog above and below — up and down the column, and play threw it out
+// on sight: the original has no such thing on this screen. The disassembly
+// says the same, and had said it before the screenshot: screen 1 never loads
+// `selcog`. It belongs to SELECT TEAM and ENTER YOUR NAME, which is where it
+// goes when those screens are built.
 //
 // The machine and the plates are STRETCHED — the frontend widens itself by a
 // global 50, and it does so in two different ways: a plate repeats a band of
@@ -52,7 +57,7 @@ export const SCREEN = { width: 640, height: 480 }
  *
  * `select.mgl` is deliberately NOT here, and the disassembly agrees with the
  * art: screen 1 never loads it. The lit bar is told apart by its lighter
- * letters and the carriage beside it.
+ * letters and by its lamp, which is the original's own way.
  */
 export const LAYOUT = {
   /**
@@ -110,7 +115,6 @@ export const LAYOUT = {
    * which play pointed at. The exe blits `track` TWICE, which is why there are
    * two of them here; where each lands is eyework for the same reason. */
   rightTrack: { x: 576, y: 0 },
-  carriage: { x: 184, offset: -103 },
   /** Read: the dial at (105, 192), one `cog` at (9, 192), and `cogb` — 96×208,
    * which is TWO cogs stacked in one sprite — at (539, 160) on the right.
    * Play named the missing pair before the disassembly did. */
@@ -143,17 +147,14 @@ const PLATE_BUILT_ON = 2
 const PLATE_TURNS_TO = 6
 const FLIP_AT = -50
 /**
- * How long the carriage takes to travel one bar — and, the same number, how
- * soon the next bar may be reached. The machine is not instant: a held key or
- * a mouse dragged down the column steps one bar at a time, and the click has
- * room to be heard instead of being cut off by the next one.
+ * How long the machine takes to move the light one bar, and so how soon the
+ * next bar may be reached. It is not instant: a held key or a mouse dragged
+ * down the column steps one bar at a time, and the click has room to be heard
+ * instead of being cut off by the next one. The remake's own number.
  */
 const TRAVEL_SECONDS = 0.3
 /** The machine idles at this many frames a second. */
 const COG_FPS = 12
-/** …and the carriage's own cog turns at this rate while it travels. Play:
- * "крутится при движении виджета". */
-const CARRIAGE_FPS = 20
 /** How fast the active item's lamp blinks, in full cycles a second. */
 const LAMP_FPS = 8
 
@@ -164,7 +165,6 @@ const ART = [
   'chose1', 'chose2', 'chose3', 'chose4', 'chose5', 'chose6',
   'title1', 'title2', 'title3', 'title4', 'title5', 'title6',
   'cog0', 'cog1', 'cog2', 'cog3', 'cog4', 'cog5',
-  'selcog1', 'selcog2', 'selcog3', 'selcog4', 'selcog5', 'selcog6',
   'cogb00', 'cogb01', 'cogb02', 'cogb03', 'cogb04', 'cogb05',
   'light1', 'light2', 'light3',
   'dial0001', 'dial0002', 'dial0003', 'dial0004', 'dial0005', 'dial0006',
@@ -200,7 +200,6 @@ function cloneLayout(): ScreenLayout {
     lamp: { ...LAYOUT.lamp },
     track: { ...LAYOUT.track },
     rightTrack: { ...LAYOUT.rightTrack },
-    carriage: { ...LAYOUT.carriage },
     cog: { ...LAYOUT.cog },
     dial: { ...LAYOUT.dial },
     setting: { ...LAYOUT.setting }
@@ -306,14 +305,13 @@ export function initBarScreen(config: {
   let dials: Sprite[] = []
   let plates: Sprite[] = []
   let titles: Sprite[] = []
-  let carriages: Sprite[] = []
   let lamps: Sprite[] = []
 
   let selection = 0
   let visible = false
   let started = 0
-  /** The carriage on its way from one bar to the next. It is what refuses a
-   * second press, and its cog turns only while it is running. */
+  /** The light on its way from one bar to the next. It is what refuses a
+   * second press, and what the dial's needle sweeps along with. */
   let travel: { from: number; until: number } | null = null
   /** The bar the mouse is over, taken up as soon as the machine will move. */
   let hovered = -1
@@ -329,7 +327,7 @@ export function initBarScreen(config: {
 
   const travelling = (now: number): boolean => travel !== null && now < travel.until
 
-  /** Move one bar, unless the carriage is still on its way. */
+  /** Move one bar, unless the light is still on its way. */
   const step = (by: number): void => {
     const now = performance.now()
     if (travelling(now)) return
@@ -455,7 +453,7 @@ export function initBarScreen(config: {
    * on entry, at frame 0 (`0x41F110(screen, 4, 0)`), and nothing found so far
    * moves it after that; what drives it in the original is not decoded. So the
    * twelve frames are spread evenly over the rows and the needle sweeps with
-   * the selection, the same fraction the carriage travels by.
+   * the selection, over the same travel the light takes.
    */
   const needle = (row: number): Sprite => {
     if (dials.length === 0) return dials[0]
@@ -514,8 +512,8 @@ export function initBarScreen(config: {
     }
 
     // Which row the machine is pointing at — a fraction while the selection
-    // is on its way, so the needle and the carriage both SWEEP rather than
-    // jump. Wanted before the furniture is drawn, because the dial reads it.
+    // is on its way, so the needle SWEEPS rather than jumps. Wanted before the
+    // furniture is drawn, because the dial reads it.
     const pointingAt = ((): number => {
       if (travel === null || now >= travel.until) return selection
       const through = 1 - (travel.until - now) / (TRAVEL_SECONDS * 1000)
@@ -582,14 +580,6 @@ export function initBarScreen(config: {
       )
     }
 
-    // The carriage RUNS to the bar rather than jumping to it, and its own cog
-    // turns while it is running — play: "крутится при движении виджета".
-    let cog = carriages[0]
-    if (travel !== null && now < travel.until) {
-      cog = carriages[Math.floor((Math.max(0, now - started) / 1000) * CARRIAGE_FPS) % carriages.length]
-    }
-    const chosen = layout.bars.y + pointingAt * layout.bars.step
-    blit(cog, layout.carriage.x, Math.round(chosen + layout.carriage.offset))
   }
 
   // The machine only turns while it is on screen: an app parked behind a
@@ -634,7 +624,6 @@ export function initBarScreen(config: {
         dials = art.frames('dial', 1, 12, 4)
         plates = art.frames('chose', 1, 6)
         titles = art.frames('title', 1, 6)
-        carriages = art.frames('selcog', 1, 6)
         lamps = art.frames('light', 1, 3)
       } catch (error) {
         // A stripped install has no frontend to wear. Warn rather than
@@ -661,7 +650,7 @@ export function initBarScreen(config: {
       run(true)
     },
     selected: () => selection,
-    // "Busy": the carriage is on its way, or the screen is still turning
+    // "Busy": the light is on its way, or the screen is still turning
     // over. Either refuses a press, so either is what a spec must wait out.
     flipping() {
       const now = performance.now()
