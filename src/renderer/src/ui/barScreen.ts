@@ -44,7 +44,20 @@ export const SCREEN = { width: 640, height: 480 }
 export const LAYOUT = {
   machine: { x: 56, y: 128 },
   title: { x: 216, y: 24 },
-  bars: { x: 240, y: 140, step: 44 },
+  /**
+   * The column. **The STEP is 40 and that is read, not chosen** — the exe's
+   * frontend draw arm places item `i` at `i*40` (0x41bfb9, and it bands its
+   * source rect the same way), and the ART agrees without any disassembly:
+   * `light1` decodes to exactly four lamp bands 36 tall with their tops at 6,
+   * 46, 87, 128. It was 44 by eye. Where the column SITS is still the
+   * remake's: the exe places it against the screen CENTRE and which screen id
+   * that arm draws is not pinned yet (`../pigs-disasm/frontend/notes.md`).
+   */
+  bars: { x: 240, y: 140, step: 40 },
+  /** One lamp per item, beside its bar — play: "круглые, на каждом пункте, но
+   * мигает только 1 активная". Where it sits is eyework; that it is one per
+   * item at the bars' own pitch is the art's own (see `bars.step`). */
+  lamp: { dx: -34, dy: 0 },
   /** The rack down the left, and the carriage that runs on it. */
   track: { x: 0, y: 0 },
   carriage: { x: 184, offset: -103 },
@@ -56,24 +69,38 @@ export const LAYOUT = {
 }
 
 /**
- * How long a bar takes to flip over when the selection reaches it — and, the
- * same number, how soon the next bar may be reached. The machine is not
- * instant: a held key or a mouse dragged down the column steps one bar at a
- * time, and the click has room to be heard instead of being cut off by the
- * next one.
+ * How long the plates take to turn over when a screen ARRIVES.
+ *
+ * That is what the flip is for, and it is play's word: the bars turn when the
+ * menu's CONTENTS change — MAIN MENU becoming ONE PLAYER — not when the lit
+ * bar moves. This screen's contents never change once it is built, so its
+ * arrival IS the change.
  */
-const FLIP_SECONDS = 0.3
+const ARRIVE_SECONDS = 0.3
+/**
+ * How long the carriage takes to travel one bar — and, the same number, how
+ * soon the next bar may be reached. The machine is not instant: a held key or
+ * a mouse dragged down the column steps one bar at a time, and the click has
+ * room to be heard instead of being cut off by the next one.
+ */
+const TRAVEL_SECONDS = 0.3
 /** The machine idles at this many frames a second. */
 const COG_FPS = 12
+/** …and the carriage's own cog turns at this rate while it travels. Play:
+ * "крутится при движении виджета". */
+const CARRIAGE_FPS = 20
+/** How fast the active item's lamp blinks, in full cycles a second. */
+const LAMP_FPS = 8
 
 const ART = [
   'pigbkpc1',
   'fullmenu',
   'track',
   'chose1', 'chose2', 'chose3', 'chose4', 'chose5', 'chose6',
-  'title1',
+  'title1', 'title2', 'title3', 'title4', 'title5', 'title6',
   'cog0', 'cog1', 'cog2', 'cog3', 'cog4', 'cog5',
-  'selcog1',
+  'selcog1', 'selcog2', 'selcog3', 'selcog4', 'selcog5', 'selcog6',
+  'lit1', 'lit2', 'lit3',
   'dial0001', 'dial0002', 'dial0003', 'dial0004', 'dial0005', 'dial0006',
   'dial0007', 'dial0008', 'dial0009', 'dial0010', 'dial0011', 'dial0012'
 ]
@@ -102,6 +129,7 @@ function cloneLayout(): ScreenLayout {
     machine: { ...LAYOUT.machine },
     title: { ...LAYOUT.title },
     bars: { ...LAYOUT.bars },
+    lamp: { ...LAYOUT.lamp },
     track: { ...LAYOUT.track },
     carriage: { ...LAYOUT.carriage },
     cog: { ...LAYOUT.cog },
@@ -199,22 +227,32 @@ export function initBarScreen(config: {
   let cogs: Sprite[] = []
   let dials: Sprite[] = []
   let plates: Sprite[] = []
+  let titles: Sprite[] = []
+  let carriages: Sprite[] = []
+  let lamps: Sprite[] = []
 
   let selection = 0
   let visible = false
-  let flipUntil = 0
   let started = 0
+  /** When the screen last arrived — the plates and the title plate turn over
+   * for `ARRIVE_SECONDS` from here. */
+  let arrivedAt = -Infinity
+  /** The carriage on its way from one bar to the next. It is what refuses a
+   * second press, and its cog turns only while it is running. */
+  let travel: { from: number; until: number } | null = null
   /** The bar the mouse is over, taken up as soon as the machine will move. */
   let hovered = -1
 
-  /** Move one bar, unless the last one is still turning. */
+  const travelling = (now: number): boolean => travel !== null && now < travel.until
+
+  /** Move one bar, unless the carriage is still on its way. */
   const step = (by: number): void => {
     const now = performance.now()
-    if (now < flipUntil) return
+    if (travelling(now)) return
     const next = (selection + by + bars.length) % bars.length
     if (next === selection) return
+    travel = { from: selection, until: now + TRAVEL_SECONDS * 1000 }
     selection = next
-    flipUntil = now + FLIP_SECONDS * 1000
     bank.play(CLICK)
   }
 
@@ -320,22 +358,37 @@ export function initBarScreen(config: {
     blit(frameAt(dials, now), layout.dial.x, layout.dial.y)
     blit(frameAt(cogs, now), layout.cog.x, layout.cog.y)
 
-    const title = art.get('title1')
-    blit(title, layout.title.x, layout.title.y)
-    centred(context, big, config.title(), title, layout.title.x, layout.title.y)
+    // How far into the arrival the screen is, 0..1, or null once it has
+    // settled. The plates and the title plate both turn on it, together,
+    // because they are turning over to say the same new thing.
+    const arriving = (now - arrivedAt) / (ARRIVE_SECONDS * 1000)
+    const turning = arriving >= 0 && arriving < 1 ? arriving : null
+    const oneShot = (frames: Sprite[], through: number): Sprite =>
+      frames[Math.min(frames.length - 1, Math.floor(through * frames.length))]
 
-    // A bar flips over as the selection lands on it; the letters come back
-    // when it has settled flat again.
-    const flipping = now < flipUntil
+    const title = turning === null ? titles[0] : oneShot(titles, turning)
+    blit(title, layout.title.x, layout.title.y)
+    // Mid-turn a plate is edge-on to what it used to say, so it says nothing.
+    if (turning === null) {
+      centred(context, big, config.title(), title, layout.title.x, layout.title.y)
+    }
+
     for (let i = 0; i < bars.length; i++) {
       const y = layout.bars.y + i * layout.bars.step
-      const turning = flipping && i === selection
-      const through = (flipUntil - now) / (FLIP_SECONDS * 1000)
-      const face = turning
-        ? plates[Math.min(plates.length - 1, Math.floor(through * plates.length))]
-        : plates[0]
+      const face = turning === null ? plates[0] : oneShot(plates, turning)
       blit(face, layout.bars.x, y)
-      if (turning) continue
+
+      // One lamp per item; only the lit one blinks, the rest sit at the
+      // dimmest frame the set has.
+      if (lamps.length > 0) {
+        const lamp =
+          i === selection
+            ? lamps[Math.floor((Math.max(0, now - started) / 1000) * LAMP_FPS) % lamps.length]
+            : lamps[0]
+        blit(lamp, layout.bars.x + layout.lamp.dx, y + layout.lamp.dy)
+      }
+
+      if (turning !== null) continue
 
       const bar = bars[i]
       const font = !bar.enabled() ? off : i === selection ? lit : plain
@@ -357,8 +410,17 @@ export function initBarScreen(config: {
       )
     }
 
-    const chosen = layout.bars.y + selection * layout.bars.step
-    blit(art.get('selcog1'), layout.carriage.x, chosen + layout.carriage.offset)
+    // The carriage RUNS to the bar rather than jumping to it, and its own cog
+    // turns while it is running — play: "крутится при движении виджета".
+    let row = selection
+    let cog = carriages[0]
+    if (travel !== null && now < travel.until) {
+      const through = 1 - (travel.until - now) / (TRAVEL_SECONDS * 1000)
+      row = travel.from + (selection - travel.from) * through
+      cog = carriages[Math.floor((Math.max(0, now - started) / 1000) * CARRIAGE_FPS) % carriages.length]
+    }
+    const chosen = layout.bars.y + row * layout.bars.step
+    blit(cog, layout.carriage.x, Math.round(chosen + layout.carriage.offset))
   }
 
   // The machine only turns while it is on screen: an app parked behind a
@@ -401,6 +463,9 @@ export function initBarScreen(config: {
         cogs = art.frames('cog', 0, 5)
         dials = art.frames('dial', 1, 12, 4)
         plates = art.frames('chose', 1, 6)
+        titles = art.frames('title', 1, 6)
+        carriages = art.frames('selcog', 1, 6)
+        lamps = art.frames('lit', 1, 3)
       } catch (error) {
         // A stripped install has no frontend to wear. Warn rather than
         // error: the e2e suite treats console.error as a failed run.
@@ -417,10 +482,18 @@ export function initBarScreen(config: {
     },
     enter() {
       visible = true
+      // Arriving IS the content change, so the plates turn over for it.
+      arrivedAt = performance.now()
+      travel = null
       run(true)
     },
     selected: () => selection,
-    flipping: () => performance.now() < flipUntil,
+    // "Busy": the carriage is on its way, or the screen is still turning
+    // over. Either refuses a press, so either is what a spec must wait out.
+    flipping() {
+      const now = performance.now()
+      return travelling(now) || now - arrivedAt < ARRIVE_SECONDS * 1000
+    },
     labels: () => bars.map((bar) => bar.label()),
     values: () => bars.map((bar) => bar.value?.() ?? null),
     layout
