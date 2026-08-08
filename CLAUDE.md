@@ -7,8 +7,13 @@ game folder, so `..` is the installation.
 
 Start with [README.md](README.md) (how to play and run), then
 [docs/testing.md](docs/testing.md) and [docs/formats.md](docs/formats.md).
-Reverse-engineering findings live in a separate repo next door,
-[`../pigs-disasm`](../pigs-disasm) — notes plus the scripts that prove them.
+Reverse-engineering findings live in the **disasm repo** — notes plus the
+scripts that prove them. Every bare path below of the form `anim/notes.md`,
+`movement/notes.md`, `effects/notes.md` and so on is a file inside it, never
+one in this tree. It is deliberately named and not linked: it is checked out
+alongside this one and gets a worktree of its own whenever this repo does, so
+any relative path written here would be right in one checkout and wrong in
+the next.
 
 **Committing is standing permission, in both repos — do not ask.** Finish a
 piece of work and commit it, with the attribution the global rules give
@@ -34,7 +39,7 @@ XYZ order. how-doc calls them quaternions; they are not. The negation is the
 subtle part — the game's matrices are row-major, the transpose of three's.
 Legs look fine either way (their bind direction is already down), so **only
 the arms reveal a sign error**. Full derivation with three proof scripts:
-`../pigs-disasm/anim/notes.md`.
+`anim/notes.md`.
 
 **A model is drawn at HALF size — `MODEL_SCALE`, and it is a literal pushed
 86 times.** The body constructor (exe 0x45de90) stores its last three
@@ -85,7 +90,7 @@ The exe doubles the PMG heights in three places — collision sampler,
 copies them in untouched, all verified. But a doubled CAMP plays as a
 mountain range and reads as stretched next to the original, so the remaster
 renders 1×. Do not "fix" this back from the disassembly alone; the
-contradiction is written up in `../pigs-disasm/movement/notes.md`. There IS
+contradiction is written up in `movement/notes.md`. There IS
 now a candidate for what undoes it — the models are drawn at half size, so
 the "reads as stretched" judgement was made against a pig twice the size it
 should be, and halved models plus doubled heights would stand a pig four
@@ -114,7 +119,7 @@ flags. 1857 of the shipped maps' 1865 climbing tiles are 0x2b, not 0x0b —
 an unmasked `=== 11` never fires, which is how Scramble went missing. The
 water bit is only a PREFILTER too — the verdict comes from the ART
 (`afIsPointWatery`), so mud banks with the bit set are LAND. See
-`../pigs-disasm/movement/notes.md`.
+`movement/notes.md`.
 
 **Water is art the artist made SEE-THROUGH — palette bit 0x8000, the PSX's
 semi-transparency flag.** A texel is water where ITS colour carries the bit,
@@ -165,7 +170,7 @@ internal can tell — and is visible only against the original, where play
 says our maps came out the wrong way round. `parsePmg` mirrors the row once
 (block `15 - R`, vertex rows `4 - r`, tile rows `3 - r`) so that every
 consumer keeps the simple rule: vertices run +x with the column AND +z with
-the row. `../pigs-disasm/terrain/mirror.js` is the proof — 0 of 4096 cells
+the row. `terrain/mirror.js` is the proof — 0 of 4096 cells
 disagree with `SampleHeight` on nine maps, against ~3500 the other way.
 
 Three things follow, and each is the same mirror leaving: the POG's z takes
@@ -199,7 +204,7 @@ faces away from its path. Two tests that look decisive are backwards —
 walls near a long prop are the ones it CROSSES, and a bridge ramp climbs
 over the ditch, so its high end is above the LOW ground. Every name that
 fails to resolve ends in `_ME`: those records are the pig SPAWN markers,
-with the class in `type`. See `../pigs-disasm/objects/notes.md`.
+with the class in `type`. See `objects/notes.md`.
 
 **`MapTileSlip` is not slip** — it is which half or diagonal of a wall tile
 is solid, read by `Map::IsBlocked` and by nothing else.
@@ -219,7 +224,7 @@ for a real bug in the TIM → page path, and the next thing to look at.) The
 disassembly composes to a forward shift; the shipped maps say backward, and
 the half-turn settles it — it is its own opposite, so it cannot be got
 wrong, and the quarter-turns have to land on its side (883 steep tiles,
-`../pigs-disasm/terrain/turn.js`). A reversal enters somewhere between
+`terrain/turn.js`). A reversal enters somewhere between
 `0x100010f2` and our pixels and has NOT been found; everything around it
 reads clean twice over. So: the table is pinned byte by byte in
 `e2e/000/terrain-viewer.spec.ts` — do not tune it by eye, and do not make it
@@ -244,8 +249,8 @@ reaches 83 clips, and its LAST name is wrong: the exe parachutes with clip
 **82**, not the 58 it calls "Parachuting". Run the skeleton forward and 82
 is the hands-above-the-shoulders hang while 58 ranks 92nd of 93 for it. So
 read a clip off `ANIM` in `lib/game/locomotion.ts` (each entry cites the
-site that plays it), never off the table. `../pigs-disasm/animations/notes.md`
-and `../pigs-disasm/parachute/notes.md`.
+site that plays it), never off the table. `animations/notes.md`
+and `parachute/notes.md`.
 
 ## How the code is laid out
 
@@ -372,7 +377,7 @@ remake does not — so if ten seconds of a still screen reads wrong in play,
 that is the thing to fix, not the constant. Specs skip it through
 `pow.debug.beginTurn()`, the second debug WRITE after `warp`, because every
 key a player would press also drives the pig.
-`../pigs-disasm/turns/notes.md`.
+`turns/notes.md`.
 
 **A level OPENS with the drop-in.** A marker's flags bit 6 says its pig
 arrives by parachute, and on a campaign map that is the player's side of
@@ -384,7 +389,7 @@ advances the clip and returns. The ONE key it answers is JUMP, which cuts
 every canopy at once and hands the squad back to gravity (the exe's handler
 walks the whole pig list). `lib/game/parachute.ts` is the descent,
 `three/parachute.ts` the canopy, and the whole derivation is
-`../pigs-disasm/parachute/notes.md`.
+`parachute/notes.md`.
 
 **A miss is measured, not guessed at.** `pow.debug.strike()` gives the last
 swing's three blade points and, per pig and per dummy, the nearest approach on
@@ -429,7 +434,7 @@ half a second — which is what play remembers as black smoke. The bayonet
 throws two rings, the sword three, the cattle prod three and a particle
 burst (not built — the particle half is undecoded past its 40-byte record).
 `lib/game/effects.ts` is the rules, `three/effects.ts` the geometry,
-`../pigs-disasm/effects/notes.md` the read.
+`effects/notes.md` the read.
 
 **The map's SCRIPT runs, and the objects ARE the program.** There is no script
 file and no interpreter loop: every POG record may carry one command, **field
@@ -457,7 +462,7 @@ the same descent, constants and all (`three/airDrop.ts` over
 Read off the shipped CAMP, breaking the FIRST dummy places two more dummies and
 drops in a crate of **rifles** — which is what play said before any of it was
 read, down to the weapon. `lib/game/script.ts` is the rules and
-`../pigs-disasm/script/notes.md` the read; `pow.debug.script()` says what is
+`script/notes.md` the read; `pow.debug.script()` says what is
 still held back and what is in the air.
 
 One line in it is inferred rather than read and says so: where a CRATE with a
@@ -480,7 +485,7 @@ Two things this paragraph used to say are now WRONG and corrected below: it is
 not six particles but fourteen over three bursts plus two clouds of seventy,
 and the byte the engine subtracts from the y velocity is **gravity**, not
 buoyancy — the engine's world is +y UP. Both are settled; see the grenade's
-last pass at the end of this file, and `../pigs-disasm/effects/notes.md`.
+last pass at the end of this file, and `effects/notes.md`.
 
 Two numbers in it are the remake's own and say so: a ring's SIZE rides
 `MODEL_SCALE`. The exe computes the radius in world units, but in a world
@@ -508,7 +513,7 @@ past dead is a different, messier death** (`GIB_BELOW`, strictly below), and
 **healing has NO ceiling** — `Pig::Heal` adds and stops, so a 50-point crate
 on a 50-point grunt leaves it at ninety and the original allows it. The
 `FULL_HEALTH = 100` clamp that used to live in `pickups.ts` was both numbers
-wrong and is gone. `../pigs-disasm/damage/notes.md`.
+wrong and is gone. `damage/notes.md`.
 
 Finding the pig's vtable is the fiddly step and worth not redoing: it is
 **0x4bd298** (`+0x34` TakeDamage 0x467ac0, `+0x38` Heal 0x467fd0), and the
@@ -568,7 +573,7 @@ the original's turn clock, tank controls, jumping, swimming (water by the
 art's own translucency, floats at the region's surface, sunk SWIM_SINK),
 scrambling on
 masked type 11, wall scrabble-and-eject, and ground movement taken from
-the exe — see `../pigs-disasm/movement/notes.md` for the derivation of
+the exe — see `movement/notes.md` for the derivation of
 every constant in `src/lib/game/movement.ts`, `ballistics.ts`,
 `locomotion.ts` and `watermask.ts`. The chase camera follows only what
 the player drives; flung pigs are watched from a standing camera that
@@ -603,7 +608,7 @@ three arguments are `(index, volume, pitch)` with 100 nominal on both scales.
 The order is pinned twice over: argument two never exceeds 100 anywhere in the
 binary while argument three reaches 140, and the jump asks for
 `90 + (rand() & 15)` on the third — a spread straddling nominal is a pitch
-jitter and nothing else. `../pigs-disasm/anim/audio-events.md` has the full
+jitter and nothing else. `anim/audio-events.md` has the full
 table and `anim/sounds.js` is the tool (wrapper → index, then annotate any
 disassembly with it).
 
@@ -639,7 +644,7 @@ decoded later drops straight in — but WHICH sound belongs to which moment is
 NOT decoded for the pig noises, and `audio/battle.ts` picks by name and says
 so. Correct those in play; the spec pins the plumbing, not the choice.
 Footsteps are deliberately not wired: they want the hoof-contact frames
-`../pigs-disasm/anim/audio-events.md` derives, and a footstep on a timer
+`anim/audio-events.md` derives, and a footstep on a timer
 would be a stand-in nobody asked for.
 
 ### The SHOT, end to end
@@ -666,7 +671,7 @@ not what the list guessed:
    the camera riding it (`chase.ride`, mode 1, whose row is the chase's own
    3072) → back to the pig when the air is empty. The turn clock does not run
    for any of it. The **pig voice** is new and its own module
-   (`audio/pigVoice.ts`, decoded in `../pigs-disasm/speech/pigs.md`):
+   (`audio/pigVoice.ts`, decoded in `speech/pigs.md`):
    `Speech/Sku1/Pig{NN}/{NN}{LANG}{CC}{VV}.wav`, twelve firing lines walked in
    rotation, and NN belongs to the squad rather than the pig.
 
@@ -698,7 +703,7 @@ Play, straight after: "останавливается таймер и показ
 парашюте спускается… после попадания пару секунд показывается ещё то место, а
 только потом запускается таймер и показывается свин." All of it turned out to
 be one wait in the binary and it is now built (`lib/game/aftermath.ts`,
-decoded in `../pigs-disasm/turns/aftermath.md`).
+decoded in `turns/aftermath.md`).
 
 Knocking anything down stops the turn clock and takes the camera off the pig.
 It goes to whatever the script just placed — the exe hands the crate to the
@@ -1204,7 +1209,7 @@ upside down.
 
 **+y is UP in the engine's world.** Read off the physics rather than argued
 from the models: the world builds three force generators and the direction is
-`(0,-1,0)` in all three, one of them gravity (`../pigs-disasm/movement/notes.md`
+`(0,-1,0)` in all three, one of them gravity (`movement/notes.md`
 already had this written down), so falling is y DECREASING. The effect table
 agrees from four independent directions — a burst's vertical launch is
 `rand()%100 * p * 3/100` and cannot be negative; row 15 stacks three shockwave
@@ -1392,7 +1397,7 @@ half of it, and the only reading under which this file's own sentence about the 
   scaled the mixer) was built and rejected on sight — the legs whirl, and
   the run clip is not foot-locked to begin with, its two hooves disagreeing
   by 40%. `three/clips.ts` plays everything at a flat 25;
-  `../pigs-disasm/movement/stride.js` is the measurement.
+  `movement/stride.js` is the measurement.
 - **Contact softening is not modelled.** The original lets a body penetrate
   and pushes it out by a decaying bias (0.2 → 0.02); a landing here pins to
   the ground height, so there is nothing to decay. `BOUNCE_CUTOFF` stands in.
@@ -1446,7 +1451,7 @@ half of it, and the only reading under which this file's own sentence about the 
 - **The menu's LAYOUT is the remake's own.** Every piece on it is the
   original's, and where each piece SITS is not: the exe computes its screen
   coordinates in the frontend's draw code rather than storing them, and
-  `../pigs-disasm/frontend/notes.md` traces that chain as far as the blitter
+  `frontend/notes.md` traces that chain as far as the blitter
   (0x41AFA0, called `draw(x, y, sprite, rect)`) and stops. So `LAYOUT` in
   `ui/menu.ts` is a reading of the art — bars clear of the machine's grille,
   the dial in its housing — and is meant to be corrected against play.
@@ -1628,7 +1633,7 @@ swim should sink past it. Which classes cannot is not read, and neither is what
 happens to one that has — play asked for it written down and left.
 
 **4. There are no FOOTSTEP sounds.** Deliberate so far and written up under the
-sound section: they want the hoof-contact frames `../pigs-disasm/anim/audio-events.md`
+sound section: they want the hoof-contact frames `anim/audio-events.md`
 derives, and a footstep on a timer is a stand-in nobody asked for. Play has now
 asked for them, so the next pass is the contact frames rather than the timer.
 
@@ -1681,7 +1686,7 @@ grenade fix. The flip is one line in `advanceEffect`; the lift should ride
   least one creation site passes zero. The remake takes it as the IN-PLANE speed
   because that is the only reading that makes a vertical drop sink and a flat throw
   skip, which is how play describes it — but the field's identity is not
-  transcribed. `../pigs-disasm/weapons/fire.md`.
+  transcribed. `weapons/fire.md`.
 - **effect 0x0D** — what a SKIP off water leaves. Not decoded past its jitter; the
   splash (0x0E) stands in, which is why a skim and a sinking look alike.
 - **`0x48c410`**, stages D and E, which rows 1 and 16 reach and row 0 does not; and
@@ -1700,7 +1705,7 @@ grenade fix. The flip is one line in `advanceEffect`; the lift should ride
 
 - **+y is UP in the engine's world.** The exe's physics settles it: the world's
   three force generators all point `(0,-1,0)` and one is gravity
-  (`../pigs-disasm/movement/notes.md`), so falling is y DECREASING. Four things in
+  (`movement/notes.md`), so falling is y DECREASING. Four things in
   the effect table agree — a burst's vertical launch cannot be negative, row 15
   stacks rings at +100/+300/+600, a damage number trails at `y + 100`, and row 0's
   cloud fires about +y against a decelerating force. The remake stays Y-down and
@@ -1727,7 +1732,7 @@ Everything below this line is older, and the shot's own six items are DONE —
 see "The SHOT, end to end".
 
 1. **The map SCRIPT — decoded and BUILT.** See below; what is left of it is a
-   short list at the end of `../pigs-disasm/script/notes.md`, and none of it
+   short list at the end of `script/notes.md`, and none of it
    blocks anything.
 
 Two smaller ones noted in play and not acted on: **a dying pig should come
@@ -1774,7 +1779,7 @@ POLLED" above.
   refused from the button down to the clip's end and turning for the clip
   (0x46afd5, 0x46af43); the round is spent as the clip goes on, and a pig out
   of them puts the weapon away. `lib/game/melee.ts` is the rules,
-  `three/swing.ts` the blade, `../pigs-disasm/weapons/melee.md` the read.
+  `three/swing.ts` the blade, `weapons/melee.md` the read.
 
   A strike is THREE points off bone 5, the hand — the weapon's row of the
   table at 0x4d0ee0 in full, halved, and the bone itself — tested per AXIS

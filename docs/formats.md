@@ -10,6 +10,11 @@ PC installation this repo lives in. Primary sources:
 
 All values are little-endian. "Verified" notes are from files in this install.
 
+Paths like `anim/notes.md` and `objects/layout.js` are files in the **disasm
+repo**, which is checked out next to this one — never files in this tree. No
+relative path is written for it on purpose: either repo may be worked in a
+worktree of its own, and a `../` would then point at the wrong checkout.
+
 ## MAD / MTD — archives
 
 Flat containers, no magic, no compression. Two layouts:
@@ -130,7 +135,7 @@ keyframes (entry length / 272 = frame count):
 how-doc calls the rotations quaternions; on real data they are **not** (found
 here): the fourth float of every bone is exactly 1.0 in every frame while the
 first three range over ±π. They are **euler angles in radians** plus a
-constant. The exact convention (solved in `pigs-disasm/anim/`, three
+constant. The exact convention (solved in `anim/`, three
 independent tests on the shipped data):
 
 ```
@@ -156,14 +161,14 @@ The leading field is **signed** and traces a smooth ramp up and back down
 offset, not an event marker; 41 of the 93 clips use it. Worth knowing because
 it rules out an animation event channel: footstep and weapon-release timings
 have to be **derived** from the skeleton, which works cleanly
-(`pigs-disasm/anim/audio-events.md`).
+(`anim/audio-events.md`).
 
 Playback rate is a guess (25 fps); the branch positions are small per-frame
 deltas whose exact meaning is still uninvestigated — clips play fine with
 rotations alone, minus root motion.
 
 **Clip indices are known** (recovered from the exe's debug-name pointer
-table — pigs-disasm/animations/notes.md): 0 run, 3 walk backwards, 4 turn on
+table — animations/notes.md): 0 run, 3 walk backwards, 4 turn on
 spot, 5 swim, 8/9/10 jump start/middle/end, 11 scramble, 27/28 idle cycles,
 38 falling, 47-49 dying, 50 drowning, 58 parachuting — 59 named of the 93
 entries in mcap.mad.
@@ -216,7 +221,7 @@ The turn's DIRECTION is the one part measured rather than read: the
 disassembly composes to a forward shift, the maps say backward, and the
 half-turn — its own opposite, so unmistakable — is what settles it. Numbers,
 addresses, and the reversal that has not been located:
-`../pigs-disasm/terrain/notes.md`. The table is pinned byte by byte in
+`terrain/notes.md`. The table is pinned byte by byte in
 `e2e/000/terrain-viewer.spec.ts`.
 
 Vertex heights are **elevation, up-positive** (found here) — the opposite of
@@ -251,7 +256,7 @@ literally. Sliding ground is derived from the terrain gradient instead.
 **POG — object placement**: a u16 count, `count` records of 94 bytes, then a
 u16 that is 0 (verified on all 61 shipped files; GENMUD alone trails eight
 spare bytes). No how-doc was used — the layout is what the files say, and
-`../pigs-disasm/objects/layout.js` reproduces every number below.
+`objects/layout.js` reproduces every number below.
 
 | offset | size | field |
 | ------ | ---- | ----- |
@@ -273,7 +278,7 @@ campaign map that bit picks out one side of five, the player's, and the
 enemy is already on the ground; a skirmish arena drops all four sides or
 none. Only the marker branch of the loader reads it, so the 315 ordinary
 records that carry it are saying something else.
-`../pigs-disasm/parachute/notes.md` has the proof over all 61 maps.
+`parachute/notes.md` has the proof over all 61 maps.
 
 A record is paired to its geometry **by name**: the base name of a
 VTX/NO2/FAC triple in the map's own `<NAME>.MAD`, textured from the sibling
@@ -300,7 +305,7 @@ both are measured, from CAMP's bridge (whose two ramp pieces only form one
 walkway under the negation) and its training dummy (stored at yaw 0, and
 facing the green path only under `−π/2`). Full derivation, including two
 tests that look decisive and are backwards:
-`../pigs-disasm/objects/notes.md`.
+`objects/notes.md`.
 
 ## SRL — sound banks (Audio/, FESounds/)
 
@@ -330,14 +335,14 @@ mono at 22050; the music in `MUSIC/` is Ogg Vorbis. Chromium decodes both.
 The thirteen footsteps sit at ids 14-26, one per surface material (GRASS,
 ICE, LAVA, METAL, MUD, QUAG, ROCK, SAND, SNOW, STONE, SWIM, WATER, WOOD).
 WHICH terrain type picks which is not decoded — see
-`../pigs-disasm/anim/audio-events.md`.
+`anim/audio-events.md`.
 
 ## MGL — frontend images (FEBmps/FEBMP.MAD)
 
 Every `.mgl` entry is an LZ77+RLE-compressed **8-bit BMP**. No community
 documentation existed; the compression was reverse-engineered here from the
 game's own decompressor (`warhogs_.exe` @ file offset `0x97dd0`) — full
-derivation in `pigs-disasm/mgl/notes.md`. One control byte dispatches:
+derivation in `mgl/notes.md`. One control byte dispatches:
 
 | control     | consumed | meaning |
 | ----------- | -------- | ------- |
@@ -400,7 +405,7 @@ the roster**: six blocks of ten, each a nation's name and its nine pigs —
 SMITH, JONES, then GARLIC GRUNTS, UNCLE HAMS HOGS, PIGGYSTROIKA,
 SUSHI-SWINE, SOW-A-KRAUTS, and at 226 the developers' own TEAM LARD. A spawn
 marker's side bit indexes those six (`lib/game/teams.ts`). The gtext map is
-in `pigs-disasm/text/notes.md`.
+in `text/notes.md`.
 
 ## The dashboard (`Language/Tims/dashtims.mad`)
 

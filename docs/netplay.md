@@ -149,8 +149,8 @@ key-frame events at frames 11–14 of 36 — and the domain already owns which
 clip plays (`locomotion.ts`). So the pose at a given frame comes from pure
 forward kinematics over `hir` + `mcap`: both readers exist, the rotation
 composition is derived and written down (`local = Rx(-x)·Ry(-y)·Rz(-z)`,
-parent-relative, XYZ order), and `../pigs-disasm/anim/notes.md` carries three
-scripts that prove it.
+parent-relative, XYZ order), and the disasm repo's `anim/notes.md` carries
+three scripts that prove it.
 
 The camera hangs off bone 5 too (`chase.ts`, `SCOPE_BONE`) and does **not**
 need this — it decides nothing in the world and may keep reading three's
