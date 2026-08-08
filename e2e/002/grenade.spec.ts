@@ -22,6 +22,7 @@ import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { GAUGE_SECONDS } from '../../src/lib/game/gauge'
 import { BLAST_REACH } from '../../src/lib/game/grenade'
+import { AIM_GRENADE } from '../../src/lib/game/aim'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const GRENADE = 19
@@ -39,6 +40,7 @@ interface Live {
 
 interface Debug {
   holding(): number | null
+  aim(): number | null
   charging(): number | null
   grenades(): Live[]
   props(): { at: { name: string }[] }
@@ -49,6 +51,7 @@ const look = (
 ): Promise<{
   holding: number | null
   charge: number | null
+  aim: number | null
   live: Live[]
   dummies: number
 }> =>
@@ -56,6 +59,7 @@ const look = (
     const debug = (window as unknown as { pow: { debug: Debug } }).pow.debug
     return {
       holding: debug.holding(),
+      aim: debug.aim(),
       charge: debug.charging(),
       live: debug.grenades(),
       dummies: debug.props().at.filter((one) => /DUMMY/i.test(one.name)).length
@@ -105,6 +109,27 @@ test('the gauge fills while F is held and the throw comes on the release', async
 
   // …and it goes off on its own, without having hit anything.
   await expect.poll(async () => (await look(page)).live.length, { timeout: 12000 }).toBe(0)
+})
+
+test('a grenade comes up lobbing, and Q and E move it', async ({ app }) => {
+  const { page } = app
+  await armed(page, 900)
+
+  // It comes out already pointing up — play's ~70°, which is what
+  // `AIM_GRENADE` is (lib/game/aim.ts).
+  expect((await look(page)).aim).toBe(AIM_GRENADE)
+
+  // …and the keys move it. This is what was broken: the angle was tracking
+  // all along, but `aim()` reported null for anything with no aiming POSE, so
+  // nothing on the dashboard ever showed it.
+  await press(page, 'aimDown')
+  try {
+    await expect
+      .poll(async () => (await look(page)).aim ?? 0, { timeout: 3000 })
+      .toBeLessThan(AIM_GRENADE - 40)
+  } finally {
+    await release(page, 'aimDown')
+  }
 })
 
 test('holding F to the top throws by itself', async ({ app }) => {

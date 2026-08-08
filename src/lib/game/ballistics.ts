@@ -16,7 +16,7 @@
  * The same 4096 is a FULL TURN for its angles — 0x400 is a right angle, not
  * a straight one.
  */
-const FIXED = 4096
+export const FIXED = 4096
 
 /** Standing on open ground (exe 0x400 / 0xa66). */
 export const FRICTION_FREE = 0x400 / FIXED

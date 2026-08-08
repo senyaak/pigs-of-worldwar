@@ -141,6 +141,9 @@ export interface DebugHooks {
   script(): { absent: number[]; falling: number }
   /** How many bullets are in flight (three/shots.ts). */
   shots(): number
+  /** Where the weapon in hand points, in the game's own angle units, or null
+   * when nothing that aims is out (lib/game/aim.ts). */
+  aim(): number | null
   /** How many grenades are in the air or lying about (three/grenades.ts). */
   grenades(): { x: number; y: number; z: number; fuse: number }[]
   /** How full the power gauge is, 0..1, or null when nothing is charging

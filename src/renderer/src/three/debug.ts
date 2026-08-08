@@ -53,6 +53,8 @@ export interface DebugParts {
   script: () => { absent: number[]; falling: number }
   /** How many bullets are in flight. */
   shots: () => number
+  /** Where the weapon in hand points, or null when nothing aims. */
+  aim: () => number | null
   /** How many grenades are in the air or lying about (three/grenades.ts). */
   grenades: () => { x: number; y: number; z: number; fuse: number }[]
   /** How full the power gauge is, 0..1, or null when nothing charges. */
@@ -119,6 +121,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** Bullets still flying. A gun's range is a LIFETIME in frames, so this
        * goes back to zero on its own (lib/game/projectile.ts). */
       shots: () => parts.shots(),
+      aim: () => parts.aim(),
       grenades: () => parts.grenades(),
       charging: () => parts.charging(),
       /** Where the shot sequence is: 'fuse' while the ten frames run down,

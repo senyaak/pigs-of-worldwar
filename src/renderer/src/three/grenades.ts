@@ -21,10 +21,13 @@ import {
   blastShare,
   bounceLob,
   lob,
-  lobOf
+  lobOf,
+  sinkLob
 } from '../../../lib/game/grenade'
 import type { Lobbed } from '../../../lib/game/grenade'
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import { weaponModelName } from '../../../lib/game/weapons'
+import { createLobArt } from './lobArt'
 import { hurt, isDead } from '../../../lib/game/health'
 import { ANIM } from '../../../lib/game/locomotion'
 import type { Target } from '../../../lib/game/targets'
@@ -48,19 +51,21 @@ const HAND = 5
  */
 const THROW_FROM = { x: 0, y: 0, z: 0 }
 
-/** How big one is drawn, model units. The body factory sizes a projectile off
- * its kind and every grenade kind lands on the same `0x20 + 3` a rifle round
- * gets (0x4a8ed5), so a grenade is drawn exactly as big as a bullet — which
- * is small. Doubled here and flagged: it is a thing you are meant to watch
- * arc, and a 35-unit ball at half model scale is four pixels. */
-const GRENADE_SIZE = 70
-
 export interface Grenades {
   /** Throw one from this pig at `aim`, with the gauge's `charge` behind it.
    * False if what it holds is not lobbed. */
   throwOne(soldier: Soldier, aim: number, charge: number): boolean
   /** One frame of every grenade in the air or rolling. */
   update(delta: number): void
+  /**
+   * Set off everything that is live, now.
+   *
+   * Play's: "при повторном нажатии f граната должна взрываться." Nothing in
+   * the exe has been read for it — the fire handler's own branch on a live
+   * projectile has not been found — so the trigger is the remake's while the
+   * blast it runs is the same one the fuse runs.
+   */
+  detonateNow(): void
   /** How many are live. */
   live(): number
   /** Where each one is and how long it has left — what a spec measures a
@@ -89,25 +94,36 @@ export interface GrenadeParts {
   effects: Effects
 }
 
-const GRENADE_GEOMETRY = new THREE.SphereGeometry(1, 8, 6)
-
 export function createGrenades(parts: GrenadeParts): Grenades {
   const live: Lobbed[] = []
-  const meshes: THREE.Mesh[] = []
-  const material = new THREE.MeshBasicMaterial({ color: 0x3f4a2a, fog: false })
+  /** The mesh drawn for each live grenade, by its index — null while the model
+   * is still loading, which is the one state that draws nothing at all. */
+  const meshes: (THREE.Mesh | null)[] = []
+  const art = createLobArt()
   const at = new THREE.Vector3()
   /** The same array a swing and a shot splice from — one list of dummies for
    * the whole battle, or a dummy dies twice (three/shots.ts says why). */
   const standing: Target[] = parts.targets
 
-  const meshAt = (i: number): THREE.Mesh => {
-    while (meshes.length <= i) {
-      const mesh = new THREE.Mesh(GRENADE_GEOMETRY, material)
-      mesh.renderOrder = 1
-      parts.root.add(mesh)
-      meshes.push(mesh)
-    }
-    return meshes[i]
+  /** The mesh for the i-th live grenade, made on demand out of the weapon's
+   * own model. Null until that model has arrived. */
+  const meshAt = (i: number, name: string | null): THREE.Mesh | null => {
+    while (meshes.length <= i) meshes.push(null)
+    if (meshes[i]) return meshes[i]
+    if (!name) return null
+    const mesh = art.take(name)
+    if (!mesh) return null
+    mesh.scale.setScalar(MODEL_SCALE)
+    parts.root.add(mesh)
+    meshes[i] = mesh
+    return mesh
+  }
+
+  /** Take every mesh off the scene — the list is index-aligned with `live`, so
+   * one going away shifts the rest. */
+  const clearMeshes = (): void => {
+    for (const mesh of meshes) if (mesh) art.release(mesh)
+    meshes.length = 0
   }
 
   /** Everything within reach takes its share. */
@@ -145,8 +161,24 @@ export function createGrenades(parts: GrenadeParts): Grenades {
   }
 
   /** Put it back on whatever it went into. False when it met nothing. */
-  const settle = (shot: Lobbed, wasY: number): boolean => {
+  const settle = (shot: Lobbed, wasY: number, step: number): boolean => {
     const ground = parts.query.height(shot.x, shot.z)
+    // WATER FIRST, and it is not a surface to bounce off: a thrown thing goes
+    // in and keeps going down. `surface` is the water region's own fitted level
+    // where there is one and the ground where there is not
+    // (lib/game/terrain.ts), which is the line a swimming pig floats at.
+    if (parts.query.isWater(shot.x, shot.z) && shot.y >= parts.query.surface(shot.x, shot.z)) {
+      sinkLob(shot, step)
+      // …and it settles on the BED rather than falling through it.
+      if (shot.y >= ground) {
+        shot.y = ground
+        shot.vx = 0
+        shot.vy = 0
+        shot.vz = 0
+        shot.resting = true
+      }
+      return true
+    }
     if (shot.y >= ground) {
       bounceLob(
         shot,
@@ -169,14 +201,22 @@ export function createGrenades(parts: GrenadeParts): Grenades {
   }
 
   const redraw = (): void => {
-    let i = 0
-    for (const shot of live) {
-      const mesh = meshAt(i++)
-      mesh.visible = true
+    // Index-aligned with `live`, and a splice shifts everything after it, so
+    // the simplest correct thing is to rebuild rather than track identities:
+    // there is never more than a handful in the air.
+    if (meshes.length > live.length) clearMeshes()
+    for (let i = 0; i < live.length; i++) {
+      const shot = live[i]
+      const mesh = meshAt(i, weaponModelName(shot.skill))
+      if (!mesh) continue
       mesh.position.set(shot.x, shot.y, shot.z)
-      mesh.scale.setScalar(GRENADE_SIZE * MODEL_SCALE)
+      // It POINTS along its flight, nose down as it falls. Nothing has been
+      // read about a projectile's orientation — the constructor hands the
+      // body a yaw and a pitch and the drawing half is not decoded — so this
+      // is the remake's, and it is the same pair the launch was built from.
+      mesh.rotation.y = Math.atan2(shot.vx, shot.vz) + Math.PI
+      mesh.rotation.x = Math.atan2(shot.vy, Math.hypot(shot.vx, shot.vz))
     }
-    for (let rest = i; rest < meshes.length; rest++) meshes[rest].visible = false
   }
 
   return {
@@ -206,7 +246,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
         for (let step = 0; step < steps && !spent; step++) {
           const wasY = shot.y
           spent = advanceLob(shot, delta / steps)
-          settle(shot, wasY)
+          settle(shot, wasY, delta / steps)
         }
         if (!spent) continue
         detonate(shot)
@@ -214,18 +254,22 @@ export function createGrenades(parts: GrenadeParts): Grenades {
       }
       redraw()
     },
+    detonateNow() {
+      for (const shot of live) detonate(shot)
+      live.length = 0
+      redraw()
+    },
     live: () => live.length,
     at: () => live.map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     head: () => live[0] ?? null,
     clear() {
       live.length = 0
-      redraw()
+      clearMeshes()
     },
     dispose() {
-      for (const mesh of meshes) parts.root.remove(mesh)
-      meshes.length = 0
       live.length = 0
-      material.dispose()
+      clearMeshes()
+      art.dispose()
     }
   }
 }

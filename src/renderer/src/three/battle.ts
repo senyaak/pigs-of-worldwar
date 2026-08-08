@@ -799,7 +799,14 @@ export function buildBattle(
     }
 
     if (fireRequested) {
-      if (isLobbed(holding)) {
+      // A grenade already in the air answers the button before anything else
+      // does: a second press sets it off where it lies. Play's, and
+      // `three/grenades.ts` says so at the method — nothing in the exe's fire
+      // handler has been read for it.
+      if (grenades.live() > 0) {
+        grenades.detonateNow()
+        fireRequested = false
+      } else if (isLobbed(holding)) {
         // A weapon with a gauge does not go off on the press at all. The
         // press starts it CHARGING and the throw comes on the release, or on
         // its own if it tops out first (0x493796, lib/game/gauge.ts).
@@ -1052,6 +1059,7 @@ export function buildBattle(
     smoke: () => effects.smoke(),
     script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
     shots: () => shots.live(),
+    aim: () => (weaponOf(game.currentPig.holding).aims ? aim.angle : null),
     grenades: () => grenades.at(),
     charging: () => showGauge(),
     firing: () => firing?.phase ?? null,
@@ -1097,7 +1105,13 @@ export function buildBattle(
       sighting = held && !sightingRefused
     },
     scoped: () => sighting && isGun(holding) && !dropIn.running(),
-    aim: () => (scrubsPose(holding) ? aim.angle : null),
+    // Whether there is an ANGLE, which is not the same question as whether
+    // there is a POSE for the angle to scrub. `scrubsPose` was standing in for
+    // both, and a grenade is in its exclusion list (0x46a8e8, nothing thrown
+    // has an aiming clip) — so the needle showed nothing and the angle looked
+    // dead, though it was tracking all along. Play: "нельзя наклонять куда
+    // кидаешь". The record's own `aims` bit is the right test.
+    aim: () => (weaponOf(holding).aims ? aim.angle : null),
     sound(name) {
       bank.play(name)
     },

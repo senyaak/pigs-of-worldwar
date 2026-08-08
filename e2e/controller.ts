@@ -16,6 +16,8 @@ export type Action =
   | 'jump'
   | 'fire'
   | 'aimMode'
+  | 'aimUp'
+  | 'aimDown'
   | 'skills'
   | 'endTurn'
   | 'menuUp'

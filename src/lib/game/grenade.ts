@@ -24,6 +24,7 @@
 // Pure, seconds and game space (Y-down), like the rest of lib/game.
 
 import {
+  FIXED,
   PLAIN_GRAVITY,
   bounceOff,
   fromExeFrames,
@@ -151,6 +152,24 @@ export function blastShare(dx: number, dy: number, dz: number): number {
  */
 export const BLAST_DAMAGE = 60
 
+/**
+ * How a grenade meets the ground, and it is NOT the terrain's own material.
+ *
+ * Row +0x10 is the one field that separates a gun from a thrown thing — 1
+ * against 2 — and its single reader is inside the collision code (0x4157a5),
+ * which branches on `== 1`. The arm everything LOBBED takes (0x4158d2) writes
+ * its own pair before resolving: **0xFFF and 0x200 of 4096**, an almost
+ * perfectly elastic bounce on almost no friction. A bullet's arm does not.
+ *
+ * Which is what play describes: "если кидать вперёд чисто параллельно земли —
+ * будет как камень прожектайл отскакивать." A flat throw skips.
+ *
+ * The two are 16-bit fields on the collision record rather than the body's own
+ * `+0x58`/`+0x5c` friction/restitution pair, so WHICH is which is not proven;
+ * taken in the order the movement notes use for that pair.
+ */
+export const LOB_BOUNCE: Bounciness = { friction: 0x200 / FIXED, restitution: 0xfff / FIXED }
+
 /** A grenade in the air, or rolling. Game space, Y-down; velocity a second. */
 export interface Lobbed {
   skill: number
@@ -166,6 +185,9 @@ export interface Lobbed {
   /** Whether it has stopped moving. Only for what draws it; the fuse does not
    * care. */
   resting: boolean
+  /** Whether it has gone into water. A thrown thing sinks — it does not skip
+   * off a pond — and the scene stops bouncing it once this is set. */
+  sunk: boolean
 }
 
 /**
@@ -200,8 +222,25 @@ export function lob(
     vy: -Math.sin(pitch) * speed,
     vz: Math.cos(heading) * flat,
     fuse: fuseSeconds(row, random),
-    resting: false
+    resting: false,
+    sunk: false
   }
+}
+
+/**
+ * It went into water. Nothing skips off a pond: the thing keeps falling,
+ * slowed, and the scene stops asking for a bounce.
+ *
+ * How fast a sunk grenade falls is the remake's — the exe's own water handling
+ * for a projectile has not been read.
+ */
+export const SINK_DRAG = 0.88
+export function sinkLob(shot: Lobbed, delta: number): void {
+  shot.sunk = true
+  const damp = Math.max(0, 1 - (1 - SINK_DRAG) * delta * 60)
+  shot.vx *= damp
+  shot.vz *= damp
+  shot.vy *= damp
 }
 
 /**
@@ -233,10 +272,10 @@ export function bounceLob(
   normal: Velocity,
   tileType: number,
   blocked: boolean,
-  /** The projectile's own bounciness. The exe gives a body a restitution per
-   * SURFACE and the thrower is not part of it, so this is the neutral side of
-   * `bounceOff` rather than a grenade-specific number. */
-  self: Bounciness = { friction: 0, restitution: 1 }
+  /** What the projectile brings to the collision. `LOB_BOUNCE` is the exe's
+   * own pair off the arm a thrown thing takes; the terrain's material still
+   * multiplies in, the way the solver does it for a pig. */
+  self: Bounciness = LOB_BOUNCE
 ): void {
   const hit = bounceOff(
     { x: shot.vx, y: shot.vy, z: shot.vz },

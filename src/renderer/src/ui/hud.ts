@@ -95,38 +95,38 @@ export const LAYOUT = {
     alpha: 0.5
   },
   /**
-   * The POWER GAUGE, and it only shows while something is charging — which
-   * is what the original does with it too, the weapon's own record saying
-   * whether it has one at all (lib/game/gauge.ts).
+   * The POWER GAUGE. Shown whenever the weapon in hand HAS one, which is what
+   * the original does with it — the record's own `+0x14` (lib/game/gauge.ts).
    *
-   * The art is `newpow3` through `newpow7`, five 64x64 tiles laid LEFT TO
-   * RIGHT. That assembly is measured rather than guessed: 5 and 6 are 61%
-   * identical to each other and flat outside rows 9..29, which is a repeating
-   * middle, while 3, 4 and 7 carry detail — so the brass runs across a
-   * 320-wide strip in a trough 20 tall. `newpow1`/`newpow2` (64x20 each) and
-   * `powg1` (24x36) ship with them and are NOT drawn: what they are has not
-   * been settled, and a guess in the middle of the screen is worse than a
-   * gap.
+   * The strip is `newpow3` through `newpow7`, five 64×64 tiles laid LEFT TO
+   * RIGHT, and that order is MEASURED: mean RGB distance across each candidate
+   * seam is 28 for 3|4, **2** for 4|5, **2** for 5|6 and 38 for 6|7, against
+   * 107..181 for every wrong pairing. `newpow3` is blank down its left four
+   * columns and `newpow7` down its right eleven, which is what makes them the
+   * two ends. All five are drawn WHOLE: index 0 is the TIM's transparent
+   * colour, so the black is a hole and not a slab — clipping them to their top
+   * thirty rows cut the ends' own art in half.
    *
-   * Where the strip SITS is eyework, like everything else on this object —
-   * nudge it in the console against the real screen. So is `fill`: the trough
-   * is brass and the original's charge colour has not been read.
+   * **`powg1` is the SLIDER**, not decoration: 24×36 with its content in cols
+   * 8..15, rows 1..32 — a marker eight pixels wide and thirty-two tall. It
+   * RUNS along the strip with the charge; the gauge is not a filling bar.
+   * Play's word, and the art agrees.
+   *
+   * `newpow1`/`newpow2` (64×20 each, a 128-wide pair by their own seam) are
+   * still not drawn: what they are has not been settled, and a guess in the
+   * middle of the screen is worse than a gap.
+   *
+   * Where the strip SITS, and where in it the slider travels, is eyework like
+   * the rest of this object — nudge it in the console and print it back out.
    */
   gauge: {
     width: 320,
-    /**
-     * How much of each 64-tall tile is actually the gauge. Measured, not
-     * eyework: below row 30 every column of `newpow5` is the dashboard's own
-     * rgb(8,8,8), so the bottom half of every tile is filler and blitting it
-     * whole hangs a black slab under the brass. The tiles are drawn CLIPPED
-     * to this.
-     */
-    height: 30,
+    height: 64,
     margin: { bottom: 12 },
-    /** The trough inside the strip, measured off `newpow5`'s own rows: the
-     * varying band runs y 9..29 and the brass sits in it. */
-    trough: { x: 10, y: 9, width: 300, height: 21 },
-    fill: [232, 176, 32] as [number, number, number]
+    /** How far along the strip the slider travels, and what line it rides. */
+    track: { from: 24, to: 296, y: 6 },
+    /** The slider's own art is 24 wide; this is where its middle sits. */
+    slider: { width: 24, height: 36 }
   },
   /**
    * The scope the aim view looks through. Both numbers are EYEWORK, like the
@@ -425,40 +425,22 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       blit(digits[Math.floor(shown / 10)], clockX + CLOCK.digits.x, clockY + CLOCK.digits.y)
       blit(digits[shown % 10], clockX + CLOCK.digits.x + CLOCK.digits.step, clockY + CLOCK.digits.y)
 
-      // The POWER GAUGE, centred along the bottom, and only while the button
-      // is down: the original shows it for the weapons whose record asks for
-      // one and hides it the rest of the time.
+      // The POWER GAUGE, centred along the bottom, and up for as long as
+      // something in hand has one. Five tiles WHOLE — index 0 is the TIM's
+      // transparent colour, so their black is a hole — and then the SLIDER
+      // running along them, which is what the gauge actually is: `powg1` moves,
+      // nothing fills.
       if (state.charge !== null) {
         const gaugeX = Math.round((viewWidth - GAUGE.width) / 2)
         const gaugeY = AUTHORED_HEIGHT - GAUGE.height - GAUGE.margin.bottom
-        const trough = GAUGE.trough
-        // The charge under the brass, so the trough's own rim frames it.
-        context.save()
-        context.scale(scale, scale)
-        context.fillStyle = `rgb(${GAUGE.fill.join(',')})`
-        context.fillRect(
-          gaugeX + trough.x,
-          gaugeY + trough.y,
-          Math.round(trough.width * Math.min(1, Math.max(0, state.charge))),
-          trough.height
+        for (let tile = 0; tile < 5; tile++) blit(art.get(`newpow${tile + 3}`), gaugeX + tile * 64, gaugeY)
+        const along = Math.min(1, Math.max(0, state.charge))
+        const track = GAUGE.track
+        blit(
+          art.get('powg1'),
+          gaugeX + track.from + (track.to - track.from) * along - GAUGE.slider.width / 2,
+          gaugeY + track.y
         )
-        context.restore()
-        for (let tile = 0; tile < 5; tile++) {
-          const piece = art.get(`newpow${tile + 3}`)
-          if (!piece) continue
-          // Clipped: only the top of each tile is the gauge (LAYOUT.gauge).
-          context.drawImage(
-            piece.image,
-            0,
-            0,
-            piece.width,
-            GAUGE.height,
-            Math.round((gaugeX + tile * 64) * scale),
-            Math.round(gaugeY * scale),
-            Math.round(piece.width * scale),
-            Math.round(GAUGE.height * scale)
-          )
-        }
       }
 
       // The dial and the weapon slot, top right. The slot stays empty until

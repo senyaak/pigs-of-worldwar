@@ -1026,6 +1026,57 @@ deliberately NOT drawn — what they are has not been settled.
 ground carries one — it hands out a bayonet and then a rifle — so the console
 puts one in hand, the same way `pow.swapMap` picks a map. The remake's own.
 
+### The grenade, second pass — play's list, 2026-08-07
+
+Eight things, and half of them turned out to be readable.
+
+**The angle was tracking all along and nothing showed it.** `scene.aim()` was
+gated on `scrubsPose`, which is about whether there is an aiming CLIP for the
+angle to scrub — and every thrown weapon is in that function's exclusion list,
+because nothing thrown has one. So the needle went dead and the angle looked
+frozen. The right test is the record's own `aims` bit. Two different questions
+wearing one predicate.
+
+**A grenade comes up at ~70°, not 45°.** Play's word (`AIM_GRENADE = 796`) and
+it overrides the read: `ReadyWeapon` writes 0x200 for everything that is not a
+gun and 0x200 is 45°, so either something after it moves a thrown weapon's
+angle or that write is not the one that matters. Flagged at the constant.
+
+**A thrown thing BOUNCES on its own numbers — decoded.** Row +0x10 is 1 for
+every gun and 2 for everything lobbed, its only reader is inside the collision
+code (0x4157a5), and the lobbed arm writes **0xFFF and 0x200 of 4096** onto the
+collision record before resolving: almost perfectly elastic, almost
+frictionless. That is play's "как камень отскакивать", and `LOB_BOUNCE` in
+`grenade.ts` is it. A bullet's arm has none of it.
+
+**Grenades sink.** Water is not a surface to skip off: `settle` checks
+`isWater` and the region's own fitted `surface` before it checks the ground,
+and a sunk grenade keeps falling to the bed. The sink rate is the remake's.
+
+**A second F sets a live one off.** Play's, and `grenades.ts` says so at the
+method — nothing in the exe's fire handler has been read for it.
+
+**It is drawn as `WE_GREN`**, its own model out of `Chars/WEAPONS.MAD`
+(`three/lobArt.ts`), free rather than bone-bound: the hand's copy un-resolves
+each vertex against its bone's bind offset and a thing in flight has no bone.
+Nothing draws a placeholder while it loads — a sphere kept "until the real one
+lands" is a stand-in that outlives its excuse.
+
+**The gauge, corrected twice.** The tile ORDER was right and MEASURED — mean
+RGB distance across each seam is 28 / **2** / **2** / 38 for 3|4|5|6|7 against
+107..181 for every wrong pairing — but clipping the tiles to their top thirty
+rows cut the two ends in half, and there was no need for the clip at all:
+index 0 is the TIM's transparent colour, so their black is a hole. And it is
+**not a filling bar**: `powg1` is the SLIDER — 24×36 with its art eight pixels
+wide and thirty-two tall — and it RUNS along the strip. `LAYOUT.gauge.track` is
+where it travels and that is eyework.
+
+**Still open: the EXPLOSION.** It borrows the break burst. State 6 only sets
+`[proj+0x31] = 1`, and whatever sweeps that flag and runs the per-kind
+detonation is not identified — `fire.md` now lists the three places it is NOT
+(the constructor's own switch at 0x4323f3, the every-fifth-frame trail at
+0x4365f1, and the unreached run of per-kind arms from 0x432400).
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.

@@ -82,6 +82,20 @@ export function rampedStep(
  * at the sky.
  */
 export const AIM_LOB = 512
+
+/**
+ * …except a GRENADE, which comes up at about seventy degrees.
+ *
+ * Play's, and it overrides the read: "когда в руки берёшь где-то на 70
+ * градусов ставится по дефолту". `ReadyWeapon` writes 0x200 for everything
+ * that is not a gun and 0x200 is 45°, so either something after it moves a
+ * thrown weapon's angle or the 45° reading is of the wrong write. 70° of 4096
+ * is 796, and it is inside the ±1023 the angle is clamped to.
+ */
+export const AIM_GRENADE = 796
+/** Which skills come up at `AIM_GRENADE` — the grenade family, 19..27. */
+const GRENADE_START = [19, 20, 21, 22, 23, 24, 25, 26, 27]
+
 const LEVEL_START = [
   6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 45, 46,
   // 3 BAYONET and 5 CATTLE PROD get there the long way in the exe:
@@ -105,6 +119,7 @@ const NO_POSE = [19, 20, 21, 22, 23, 24, 25, 26, 27, 33, 50]
  */
 export function readyAim(skill: number | null): number {
   if (skill === null) return 0
+  if (GRENADE_START.includes(skill)) return AIM_GRENADE
   return LEVEL_START.includes(skill) ? 0 : AIM_LOB
 }
 
