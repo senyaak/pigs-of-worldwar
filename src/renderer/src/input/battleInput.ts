@@ -100,7 +100,7 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
     aim: (test('aimUp') ? 1 : 0) - (test('aimDown') ? 1 : 0),
     // G is the AIM VIEW and it is HELD — the original tests its two pad bits
     // every frame and puts the remembered camera mode back the frame they go up
-    // (`../../../../pigs-disasm/weapons/fire.md`).
+    // (`weapons/fire.md`).
     sighting: test('aimMode'),
     // …and so is F, because that is what the power gauge is (lib/game/gauge.ts).
     firing: test('fire'),

@@ -14,7 +14,7 @@
 // dispatch (0x478e78) reads "hitting only the landscape is the successful
 // walk", so terrain never refuses a step and an OBJECT does — and the same
 // step-up envelope and sidestep the wall handling borrows are the object
-// path's own (../pigs-disasm/movement/notes.md). An object is therefore not
+// path's own (movement/notes.md). An object is therefore not
 // a full stop either: its top is ground when it is within the envelope, and
 // a wall only above that.
 

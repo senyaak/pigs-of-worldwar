@@ -1,6 +1,6 @@
 // MGL decompressor (frontend images, FEBmps/FEBMP.MAD). Pure, like the
 // others. The format was reverse-engineered from the game's own decompressor
-// (warhogs_.exe @ 0x97dd0) — full derivation in pigs-disasm/mgl/notes.md;
+// (warhogs_.exe @ 0x97dd0) — full derivation in mgl/notes.md;
 // grammar table in docs/formats.md. Output is an ordinary 8-bit BMP.
 
 export function decodeMgl(src: Uint8Array): Uint8Array {

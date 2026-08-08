@@ -19,7 +19,7 @@
 //    either — `0x4368f5` hands it to gravity and lets it drop. So a grenade
 //    is not on a range clock at all; it is on its own FUSE.
 //
-// `../../../pigs-disasm/weapons/fire.md`.
+// `weapons/fire.md`.
 //
 // Pure, seconds and game space (Y-down), like the rest of lib/game.
 

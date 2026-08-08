@@ -19,7 +19,7 @@ const BLOCK_SPAN = TILES_PER_SIDE * TILE_STEP
  * And yet a doubled CAMP plays as a mountain range: median slope 26.6°
  * against 14° at 1x, and it reads as stretched next to the original. The
  * remaster's yardstick is the original's look, so 1x it is, and the exe
- * finding stays written down in `../pigs-disasm/movement/notes.md` with the
+ * finding stays written down in `movement/notes.md` with the
  * contradiction unresolved rather than quietly dropped.
  *
  * A candidate for what resolves it exists and has been CHECKED IN PLAY at

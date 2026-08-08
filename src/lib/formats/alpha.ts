@@ -1,5 +1,5 @@
 // Which texel of a frontend bitmap is see-through. Two rules, both measured
-// off the shipped art (../pigs-disasm/frontend/notes.md):
+// off the shipped art (frontend/notes.md):
 //
 // - The `.mgl` sprites key on the COLOUR magenta — 248,0,248, the PSX's
 //   5-bit magenta. The palette entry holding it moves about (2 in `fullmenu`

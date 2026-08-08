@@ -13,7 +13,7 @@
 // forces back, drops the canopy and plays one clip.
 //
 // Derivation, addresses and the proof that the bit means this:
-// ../../../pigs-disasm/parachute/notes.md
+// parachute/notes.md
 
 import { FRAME_SECONDS, fromExeSpeed } from './ballistics'
 import { DRAG_TAU, FALL_TAU, TERMINAL_FALL } from './locomotion'

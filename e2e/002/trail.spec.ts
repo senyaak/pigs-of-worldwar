@@ -3,7 +3,7 @@
 // Play: "там нет шлейфа от гранаты." There is one, and it is in the projectile's
 // CONSTRUCTOR rather than its update — both of the update's per-kind dispatches
 // send a plain grenade straight to the exit, which is why looking there found
-// nothing. `../../../pigs-disasm/weapons/fire.md`.
+// nothing. `weapons/fire.md`.
 
 import { test, expect } from '@playwright/test'
 

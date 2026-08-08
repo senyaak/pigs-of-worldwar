@@ -2,7 +2,7 @@
 //
 // The numbers are the exe's: a per-class table at 0x4d02e0, death below one
 // whole point, a training ground that will not let a pig fall, and a heal
-// with no ceiling at all. `../../../pigs-disasm/damage/notes.md`.
+// with no ceiling at all. `damage/notes.md`.
 
 import { test, expect } from '@playwright/test'
 

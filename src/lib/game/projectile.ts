@@ -3,7 +3,7 @@
 // The original has ONE projectile class (vtable 0x4bc468, body type 0x135D,
 // 208 bytes) and a **40-byte row per kind at 0x4c2030** drives all of it. The
 // kind is `projectileId − 388`, and the id is field +0x10 of the weapon's own
-// 80-byte record. `../../../pigs-disasm/weapons/fire.md` is the read.
+// 80-byte record. `weapons/fire.md` is the read.
 //
 // Two of its numbers are the whole of a gun: a SPEED, and a LIFETIME in
 // FRAMES. Range is not stored anywhere — it is those two multiplied, which is
@@ -126,7 +126,7 @@ export interface Shot {
  * and for a weapon with no gauge that charge is 1 — which would make every
  * gun's speed zero and every one of the authored lifetimes meaningless. So the
  * multiply is read as the GAUGE's own and a gun takes the row's speed whole.
- * Written up in `../../../pigs-disasm/weapons/fire.md`; correct it if the
+ * Written up in `weapons/fire.md`; correct it if the
  * missing line turns up.
  */
 export function fireShot(
@@ -190,7 +190,7 @@ export const spentShot = (shot: Shot): boolean => shot.age >= shot.life
  * hundred. The same routine hands a pickup 128 and a pig-sized body 1024, and
  * a crate really is about a eighth of the size of a pig, so this is a RADIUS
  * in model units and a bullet is seventy across. Small, and meant to be: the
- * shot camera flies along behind it (`../../../pigs-disasm/weapons/fire.md`).
+ * shot camera flies along behind it (`weapons/fire.md`).
  */
 export function bulletSize(kind: Projectile): number {
   if (kind.kind === 12) return 100

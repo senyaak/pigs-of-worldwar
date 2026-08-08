@@ -4,6 +4,7 @@
 import { app } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
+import type { Dirent } from 'node:fs'
 import path from 'node:path'
 
 export const GAME_EXE = 'warhogs_.exe'
@@ -14,9 +15,14 @@ const ENV_KEY = 'GAME_DIR'
 // (docs/testing.md, "Isolation").
 const ENV_FILE = process.env['POW_ENV_FILE'] ?? path.join(app.getAppPath(), '.env')
 
-// Directories that may live inside the game folder but are not game data
-// (this project itself, disasm notes, VCS/deps).
-const IGNORED_DIRS = new Set(['node_modules', '.git', 'pigsOfWorldwar', 'pigs-disasm'])
+// Directories that may live inside the game folder but are not game data.
+// Naming them one by one stopped working the day either repo got a WORKTREE
+// — `pow-net`, `pigs-disasm-net` and whatever comes next are all siblings of
+// the game data — so what is skipped is any directory that is a git checkout,
+// which every worktree is: it carries a `.git`, a directory in the main clone
+// and a file in a worktree.
+const IGNORED_DIRS = new Set(['node_modules', '.git'])
+const isCheckout = (dirents: Dirent[]): boolean => dirents.some((d) => d.name === '.git')
 
 export interface FileEntry {
   path: string
@@ -105,6 +111,10 @@ export function insideGameDir(relPath: string): string {
 export async function walkDir(root: string, rel = ''): Promise<FileEntry[]> {
   const entries: FileEntry[] = []
   const dirents = await fs.readdir(path.join(root, rel), { withFileTypes: true })
+  // A checkout below the root is somebody's source tree, not game data — and
+  // the root itself is never one, so the game folder is walked as it always
+  // was even when this project sits inside it.
+  if (rel && isCheckout(dirents)) return entries
   for (const dirent of dirents) {
     const relPath = rel ? `${rel}/${dirent.name}` : dirent.name
     if (dirent.isDirectory()) {

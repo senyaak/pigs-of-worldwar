@@ -21,7 +21,7 @@ export const TILE_WALL = 0x80
  * Tile.rotateFlip: bit 0 mirrors the texture, bits 1-2 are a 0..3 quarter-turn
  * COUNT — how-doc's separate "Rotate90" and "Rotate180" are that number's two
  * bits, read straight out of `_d3d.dll!afAdjustMapTile`
- * (`../pigs-disasm/terrain/notes.md`).
+ * (`terrain/notes.md`).
  */
 export const FLIP_X = 1
 export const ROTATE = 6
@@ -60,11 +60,11 @@ const RING = [
  * maps, a one-sided wall texture agrees with the slope under it at -0.18 for
  * the half-turn — which is its own opposite and so cannot be got wrong — and
  * the quarter-turns only match that sign with the shift reversed
- * (`../pigs-disasm/terrain/turn.js`). A reversal enters somewhere between
+ * (`terrain/turn.js`). A reversal enters somewhere between
  * that instruction and this function and has not been found; until it is,
  * the maps win over my reading of them.
  *
- * Derivation, address by address: `../pigs-disasm/terrain/notes.md`.
+ * Derivation, address by address: `terrain/notes.md`.
  */
 export function tileUvs(rotateFlip: number, corners: number[][]): number[][] {
   const slots = rotateFlip & FLIP_X ? [RING[1], RING[0], RING[3], RING[2]] : RING

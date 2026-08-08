@@ -6,7 +6,7 @@
 // segment-test record and read as restitution 0.9998; the real one is the
 // projectile row's own +0x20/+0x22, multiplied by the tile's.
 //
-// `../../../pigs-disasm/weapons/fire.md`.
+// `weapons/fire.md`.
 
 import { test, expect } from '@playwright/test'
 

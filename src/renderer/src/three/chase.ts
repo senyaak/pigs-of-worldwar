@@ -37,7 +37,7 @@ const FACE_LIFT = 150 * MODEL_SCALE
  *
  * Both numbers are the exe's. `Pig::Fire` calls `0x49f740(0x13, 0)` on the
  * five hand-to-hand skills and nothing else ever asks for that mode
- * (`../pigs-disasm/weapons/melee.md`); the mode's own handler is 0x4a4940,
+ * (`weapons/melee.md`); the mode's own handler is 0x4a4940,
  * and with the flag 0 it takes the branch at 0x4a4bb5, which puts the camera
  * at `pigYaw − 0x264` — 612 of 4096, **53.8° round from straight behind**,
  * the ordinary chase being at the pig's own yaw with no offset at all
@@ -71,7 +71,7 @@ const MELEE_CLOSE = 1700 / 3072
  * mode for weapons 6..15, 17, 18 and 64 — every gun (0x492dfa). Its row of
  * the table at 0x4d9528 is **2048** against the chase's 3072, so it comes in
  * to two thirds and stays behind the shoulder: no swing, unlike the melee's.
- * `../../../pigs-disasm/weapons/fire.md`.
+ * `weapons/fire.md`.
  *
  * The row's second column is 1024 here against the chase's 768, which is what
  * a zoom in 1024ths would look like — but nothing in the mode's own handler

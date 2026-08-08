@@ -22,7 +22,7 @@
 // Which is also why a gun cannot be reading it: a gun's charge is 1, and
 // `300 * 1 >> 12` is zero. `lib/game/projectile.ts` says so at `fireShot`.
 //
-// Pure, in seconds. `../../../pigs-disasm/weapons/fire.md`.
+// Pure, in seconds. `weapons/fire.md`.
 
 import { EXE_FRAME_SECONDS } from './ballistics'
 

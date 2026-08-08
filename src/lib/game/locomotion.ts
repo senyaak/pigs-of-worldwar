@@ -14,7 +14,7 @@
 //   ever acts on a FALLING pig — a landing where `Map::IsBlocked` says yes
 //   is refused, so a body in a wall bounces until it is out or ejected.
 //
-// Derivations and addresses: ../../../pigs-disasm/movement/notes.md.
+// Derivations and addresses: movement/notes.md.
 
 import {
   EJECT_PITCH,
@@ -176,7 +176,7 @@ export const SIDESTEP_SPEED = fromExeSpeed(8)
  * exe parachutes with 82. Run the skeleton forward and 82 is the
  * hands-above-the-shoulders hang while 58 ranks 92nd of 93 for it — the name
  * table simply stops before the clips the code reaches
- * (../../../pigs-disasm/parachute/notes.md).
+ * (parachute/notes.md).
  */
 export const ANIM = {
   RUN: 0,

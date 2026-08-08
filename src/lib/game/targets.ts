@@ -9,7 +9,7 @@
 // **One point, and any hit at all destroys them.** The constructor reads the
 // health out of a table at 0x4d6d18 indexed by the record's type, and every
 // type the strike answers to — 0x43, 0x44, 0x45, 0x4b — is 128 of the engine's
-// 128ths: one whole point (`../../../pigs-disasm/weapons/melee.md`). Play said
+// 128ths: one whole point (`weapons/melee.md`). Play said
 // so before the disassembly did.
 //
 // Pure: records in, targets out, plus the reach test the melee shares.

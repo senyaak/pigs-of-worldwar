@@ -153,7 +153,7 @@ const NO_WEAPON = 0xff
  *
  * The quarter turn is measured — CAMP's yaw-0 training dummy only faces the
  * green path it is shot from at a quarter turn, the same one the pig's own
- * art needs (`../pigs-disasm/objects/notes.md`).
+ * art needs (`objects/notes.md`).
  *
  * This was `−yaw − π/2`, which is exactly this angle NEGATED, and the
  * negation was the world being mirrored: a reflection in z turns every
@@ -180,7 +180,7 @@ const weaponOf = (packed: number): number | null => {
  * Collision box extents are counts of this, in WORLD units.
  *
  * The extents match a model's own bounding box exactly on anything boxy
- * (`../pigs-disasm/objects/notes.md`) — but in the model's units, and a
+ * (`objects/notes.md`) — but in the model's units, and a
  * model is drawn at half size (`lib/game/scale.ts`). So the count's world
  * value is 64, not the 128 a 1:1 reading gave it. Both fit the archive
  * identically; what separates them is the ½ the engine scales every body
@@ -239,7 +239,7 @@ const PARACHUTES = 0x40
  * it are saying something else, or nothing.
  *
  * Full derivation and the proof over all 61 shipped maps:
- * `../../../../pigs-disasm/parachute/notes.md`.
+ * `parachute/notes.md`.
  */
 export const parachutesIn = (object: MapObject): boolean =>
   (object.flags & PARACHUTES) !== 0

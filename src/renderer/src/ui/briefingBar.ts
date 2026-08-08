@@ -1,7 +1,7 @@
 // The briefing bar: the black scroll that drops out of the top of the screen
 // and runs a line of text across it — what the tutorial talks THROUGH.
 //
-// Every number here is the exe's, out of `../../../../pigs-disasm/tutorial/notes.md`:
+// Every number here is the exe's, out of `tutorial/notes.md`:
 //
 // - the art is `Language/Tims/TBOXTIMS.MAD` — `npro4` is the 32×64 brass end
 //   cap and `npro3` the 64×64 scroll tile, which is what the draw at 0x45E930

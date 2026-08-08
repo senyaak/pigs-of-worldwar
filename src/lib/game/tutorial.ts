@@ -1,7 +1,7 @@
 // The training ground's script: what the instructor says, and what makes him
 // say it.
 //
-// The whole of it is in `../../../../pigs-disasm/tutorial/notes.md`. Two
+// The whole of it is in `tutorial/notes.md`. Two
 // facts hold it together:
 //
 // - there are 28 voice clips, `tr1_en01..28.wav`, and 28 lines, `gtext`

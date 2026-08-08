@@ -139,7 +139,7 @@ test('a SHORE tile is mixed art, and the waterline runs through it', () => {
 })
 
 test('CAMP: the pond is kind 2 outright, and its rim is not', () => {
-  // The shipped map, against pigs-disasm/terrain/watery.js: three textures
+  // The shipped map, against terrain/watery.js: three textures
   // classify as water and 80 flagged tiles wear them; the other 30 are
   // mixed art, where the waterline lives.
   const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG')))

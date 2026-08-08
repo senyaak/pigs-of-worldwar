@@ -2,7 +2,7 @@
 //
 // A projectile is a speed and a lifetime in frames, out of the 40-byte row per
 // kind at 0x4c2030 and the switch at 0x4320d5. Nothing stores a RANGE — it is
-// those two multiplied. `../../../pigs-disasm/weapons/fire.md`.
+// those two multiplied. `weapons/fire.md`.
 
 import { test, expect } from '@playwright/test'
 

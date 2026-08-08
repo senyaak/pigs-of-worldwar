@@ -14,7 +14,7 @@
 // Compose those and a vertex's world position is fixed with no freedom left.
 // The heights below are pulled out of the PMG's bytes rather than out of
 // `parsePmg`, so this asks nothing of the reader it is checking.
-// See ../pigs-disasm/terrain/notes.md and its `mirror.js`.
+// See terrain/notes.md and its `mirror.js`.
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -102,7 +102,7 @@ test('the map fills the exe world exactly, and squarely', () => {
 // map would invert it. The shipped maps do not carry the evidence — eight of
 // them hold 49 shaped wall tiles between them, and the literal shapes win 28
 // to 20 against the mirrored ones. That is noise, so nothing is asserted from
-// it, and `../pigs-disasm/movement/wall-shapes.js`'s "37% more tiles" should
+// it, and `movement/wall-shapes.js`'s "37% more tiles" should
 // not be leaned on either. What settles the shapes is `Map::IsBlocked`
 // (0x4a710c) taking both its fractions along the POSITIVE axis, which makes
 // its nine branches the literal table in `lib/game/terrain.ts`; what settles

@@ -2,7 +2,7 @@
 // to order: no Electron, no renderer, so it costs nothing to keep separate
 // from the turn rules next door.
 //
-// The rules come from the original (pigs-disasm/movement/notes.md). The one
+// The rules come from the original (movement/notes.md). The one
 // that matters most is negative: NOTHING about the ground refuses a step.
 // Neither height nor a wall — the exe's collision dispatch pins the pig to the
 // landscape however steep, and `TryMove` never asks whether a tile is a

@@ -41,8 +41,8 @@
 // below is the same test taken from the TIM instead, which needs no
 // guessing: no learnt colours, no thresholds.
 //
-// Derivation and per-map counts: ../../../pigs-disasm/movement/notes.md,
-// ../../../pigs-disasm/terrain/watery.js.
+// Derivation and per-map counts: movement/notes.md,
+// terrain/watery.js.
 
 import {
   BLOCKS_PER_SIDE,

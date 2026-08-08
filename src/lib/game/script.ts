@@ -7,7 +7,7 @@
 // handler does) or a crate being collected (0x464633). So the script is a chain
 // of "and then", one link per object.
 //
-// `../../../pigs-disasm/script/notes.md` is the read.
+// `script/notes.md` is the read.
 //
 // Pure: records in, verdicts out. WHEN something finishes is the battle's.
 
@@ -120,7 +120,7 @@ export interface MapScript {
    *
    * The exe walks the whole object list and places EVERY match rather than
    * the first, which is how CAMP's second bridge arrives — seven records, all
-   * waiting on the same 6 (`../../../pigs-disasm/script/notes.md`).
+   * waiting on the same 6 (`script/notes.md`).
    *
    * Empty is a perfectly ordinary answer: an object whose arm is guarded and
    * whose partners are still standing places nothing at all.

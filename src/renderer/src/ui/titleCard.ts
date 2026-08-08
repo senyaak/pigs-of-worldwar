@@ -7,7 +7,7 @@
 // starts at `gtext 11`. It is drawn centred on the screen's own centre at
 // y = 160, in the same font the rest of the battle's text uses — NOT through
 // the briefing bar's queue, which is a different thing entirely
-// (`../../../../pigs-disasm/tutorial/notes.md`).
+// (`tutorial/notes.md`).
 
 import { isTrainingGround } from '../../../lib/game/tutorial'
 import type { Font } from './font'
@@ -27,7 +27,7 @@ export const CARD_Y = 160
  *
  * Only the training ground is answered. Which display name goes with which
  * MAP FILE is not stored anywhere in the game — the exe pairs them through a
- * level index nothing here has (`../../../../pigs-disasm/text/notes.md`) — so
+ * level index nothing here has (`text/notes.md`) — so
  * every other map gets no card rather than a guessed one.
  */
 export function missionTitle(strings: string[], map: string): string | null {

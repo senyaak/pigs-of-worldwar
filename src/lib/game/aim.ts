@@ -4,7 +4,7 @@
 // 4096-to-the-turn units, so 1024 is 90°, and `Pig::ChangeAimAngle`
 // (exe 0x46a7f0) is the only thing that moves it: clamp, then a handful of
 // per-weapon rules, then the aiming pose is scrubbed to match.
-// `../../../pigs-disasm/weapons/notes.md` has the read.
+// `weapons/notes.md` has the read.
 //
 // Everything here is in the game's own units. The renderer asks for radians
 // and for a clip phase; nothing outside this file does that arithmetic.

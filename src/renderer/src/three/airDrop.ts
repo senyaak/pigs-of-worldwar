@@ -5,7 +5,7 @@
 // (exe 0x4641bd). Those the placer lifts **0xC00 above the thing that
 // signalled** and lets fall (0x4aa64a..0x4aa693). So a bridge appears and a
 // crate arrives, and which it is comes out of the record rather than out of a
-// choice made here. `../../../pigs-disasm/script/notes.md`.
+// choice made here. `script/notes.md`.
 //
 // 0xC00 is the same 3072 the level's own drop-in starts a pig at, so the
 // descent is the same one: `lib/game/parachute.ts`, canopy constants and all.

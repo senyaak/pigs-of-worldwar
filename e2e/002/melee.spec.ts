@@ -3,7 +3,7 @@
 // What these pin is the shape the exe gave it: a ten-frame wind-up before the
 // clip, four strikes over four consecutive frames of it, one hit per body per
 // swing, and a box that only catches what is in front.
-// `../../../pigs-disasm/weapons/melee.md` is the read.
+// `weapons/melee.md` is the read.
 
 import { test, expect } from '@playwright/test'
 

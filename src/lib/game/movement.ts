@@ -23,7 +23,7 @@
 //
 // Step-up and sidestep are deliberately absent: they belong to the object
 // collision path, and there are no objects in the scene yet. Their rules are
-// recorded in ../../../../pigs-disasm/movement/notes.md for when there are.
+// recorded in movement/notes.md for when there are.
 
 import { FRAME_SECONDS, fromExeSpeed } from './ballistics'
 import { clampToWorld, fromExeY } from './terrain'

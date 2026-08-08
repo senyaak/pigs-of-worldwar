@@ -101,7 +101,7 @@ test('ARCHI carries baked vertex shade, and neighbouring blocks agree on it', ()
 
 // The tile's rotate/flip byte, spelled out. This table is not a preference
 // and not a fit: it is what `_d3d.dll` does to the four UVs it keeps per
-// tile, transcribed in ../pigs-disasm/terrain/notes.md. Corners are (a, b)
+// tile, transcribed in terrain/notes.md. Corners are (a, b)
 // with a along +x and b along +z; V is the texture row, top-down.
 const CORNERS = [
   [0, 0],
@@ -120,7 +120,7 @@ const EXPECTED: Record<number, number[][]> = {
   // Bits 1-2 are ONE 0..3 turn count, not two independent flags, and the
   // flip is applied BEFORE the turn — both are how the old fit went wrong.
   // The half-turn is its own opposite, so it is the anchor the quarter-turns
-  // were measured against (../pigs-disasm/terrain/turn.js, and the note on
+  // were measured against (terrain/turn.js, and the note on
   // tileUvs, which also records where the one unfound flip now sits).
   2: [[1, 1], [1, 0], [0, 1], [0, 0]],
   3: [[0, 1], [0, 0], [1, 1], [1, 0]],

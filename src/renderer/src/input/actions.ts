@@ -49,7 +49,7 @@ export const HELD_ACTIONS: readonly Action[] = [
   'aimDown',
   // The aim view is HELD in the original — 0x4928dc tests two button bits of
   // this frame's mask every frame and the frame either goes up, the remembered
-  // camera mode comes back (`../../../../pigs-disasm/weapons/fire.md`).
+  // camera mode comes back (`weapons/fire.md`).
   'aimMode',
   // …and so is FIRE, because that is what the power gauge is: a weapon with
   // one charges while the button is down and throws when it comes up

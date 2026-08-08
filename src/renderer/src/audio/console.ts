@@ -8,7 +8,7 @@
 // (The jump, the landing and the slip were settled a different way: play
 // named P_SNORT1 for the jump, that led to the exe's own call site, and the
 // landing and the slip came out of the same sweep. Reading beats guessing
-// where reading is possible — `../pigs-disasm/anim/audio-events.md`.)
+// where reading is possible — `anim/audio-events.md`.)
 //
 // So:
 //

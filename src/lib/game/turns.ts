@@ -14,7 +14,7 @@
 // which is also why the dashboard's clock has exactly two digit windows:
 // 99 is the most it can ever show.
 //
-// Derivation: ../../../pigs-disasm/turns/notes.md.
+// Derivation: turns/notes.md.
 
 import { DEFAULT_TURN_SECONDS } from './game'
 
@@ -32,7 +32,7 @@ export const TURN_SECONDS_BY_LEVEL: readonly number[] = [
 
 /**
  * Which map is which LEVEL is not decoded — the map name comes from its own
- * array indexed by a different counter (`../../../pigs-disasm/turns/notes.md`)
+ * array indexed by a different counter (`turns/notes.md`)
  * — so this is what can be said by name, and no more.
  *
  * CAMP is the training ground, so it is level 0, so it is 99 seconds. Every

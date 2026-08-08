@@ -6,7 +6,7 @@
 // reason health is worth counting in POINTS (lib/game/health.ts). That
 // function spawns effect **0x35** with a life of 0x3e8 and hangs the value on
 // it at `+0xd4`, with a style index at `+0xd8` picked out of a 16-byte record
-// per team at 0x4cf1e4. `../../../pigs-disasm/damage/notes.md`.
+// per team at 0x4cf1e4. `damage/notes.md`.
 //
 // What is NOT decoded is how it MOVES — the effect's own update was not read.
 // So the rise and the fade below are the remake's own, and only the value,

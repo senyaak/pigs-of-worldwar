@@ -4,7 +4,7 @@
 // command, and it runs when the object is FINISHED. Field 15's low byte is
 // the label it waits for and its high byte the one it signals — except on a
 // crate, where the high byte is the contents instead.
-// `../../../pigs-disasm/script/notes.md`.
+// `script/notes.md`.
 
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'

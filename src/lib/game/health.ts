@@ -3,7 +3,7 @@
 // Everything that can be hurt in the original answers the same two virtual
 // slots — `[vtbl+0x34]` TakeDamage and `[vtbl+0x38]` Heal — so a pig and a
 // training dummy take a hit by the same rule with different numbers. The read
-// is `../../../pigs-disasm/damage/notes.md`.
+// is `damage/notes.md`.
 //
 // **The engine counts health in 128ths of a point** and every amount it is
 // given arrives as points shifted left seven (`Pig::GiveSkill` 0x465984, and

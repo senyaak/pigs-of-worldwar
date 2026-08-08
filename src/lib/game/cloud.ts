@@ -32,7 +32,7 @@
 // near-black one on frame 2, both fired up and out and pulled back down.
 //
 // Pure, and in the remake's game space (Y-DOWN) — see the note on the launch.
-// `../../../pigs-disasm/effects/notes.md`.
+// `effects/notes.md`.
 
 /** A full turn in the raw count the trig takes: the engine multiplies the
  * count by 5/2 and closes at 4096, so 0x648 is a turn less a whisker — the
@@ -130,7 +130,7 @@ const fixed = (f: number): number => Math.trunc(f * 4096) >> 4
  * **The launch is UPWARD, and this is where a long-standing sign error in the
  * notes gets corrected.** The engine's world has +y UP: its three force
  * generators all point `(0,-1,0)` and gravity is one of them
- * (`../../../pigs-disasm/movement/notes.md`), so falling is y going DOWN. The
+ * (`movement/notes.md`), so falling is y going DOWN. The
  * effect table agrees from four directions — every burst's vertical launch is
  * `rand()%100 * p * 3/100`, which can only be positive; row 15 stacks three
  * shockwave rings at +100, +300 and +600; a damage number lays its trail at

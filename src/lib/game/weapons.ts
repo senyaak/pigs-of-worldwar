@@ -13,7 +13,7 @@
 // table lines up perfectly (6 PISTOL gets "Aiming Handgun", 7 RIFLE "Aiming
 // Rifle", 9 MACHINE GUN "Aiming Machine gun", 29 BAZOOKA "Aiming Heavy
 // weapon", every grenade none at all), and read slot-aligned it hands MAP
-// VIEW an aiming pose. `../../../pigs-disasm/weapons/notes.md` has the whole
+// VIEW an aiming pose. `weapons/notes.md` has the whole
 // derivation.
 
 /**

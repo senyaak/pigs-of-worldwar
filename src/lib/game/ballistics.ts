@@ -9,7 +9,7 @@
 // 0.65 is what makes that read as coming off the wall with a bounce rather
 // than a step. Stay wedged for 250 frames and the pig dies, crushed.
 //
-// Derivation and addresses: ../../../../pigs-disasm/movement/notes.md.
+// Derivation and addresses: movement/notes.md.
 
 /**
  * The exe keeps these as 1/4096 fixed point; here they are the fractions.
@@ -192,7 +192,7 @@ export const fromExeAccel = (perFrameSquared: number): number =>
 /**
  * PLAIN GRAVITY, and it is what everything that is not a pig gets.
  *
- * The world owns three force generators (`../../../pigs-disasm/movement/notes.md`)
+ * The world owns three force generators (`movement/notes.md`)
  * and `0x4aa0d0` hands a body the one its TYPE asks for: type 0x1357, the
  * pig, gets the terminal-velocity force at `[world+0x14]`, and **anything
  * else gets `[world+0x10]`, a flat magnitude of 10**. A projectile is type

@@ -4,7 +4,7 @@
 // 2 KNIFE, 3 BAYONET, 4 SWORD, 5 CATTLE PROD — and the exe treats them as one
 // thing throughout: one jump-table arm in the fire dispatcher, one in the
 // animation picker, one in the strike, one in the damage.
-// `../../../pigs-disasm/weapons/melee.md` is the read; every number here cites
+// `weapons/melee.md` is the read; every number here cites
 // the site it came off.
 //
 // Pure, like the rest of lib/game: it takes points and gives verdicts. WHERE

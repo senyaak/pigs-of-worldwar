@@ -4,7 +4,7 @@
 // A sound is not just a file. The exe plays one through `Sound::Play`
 // (0x43A9D0, 222 call sites, `this` at `[0x51BBD4]`) and the first three
 // arguments are **index, volume, pitch**, both of the last two on a scale
-// where 100 is nominal — `../pigs-disasm/anim/audio-events.md` has the read
+// where 100 is nominal — `anim/audio-events.md` has the read
 // and the whole table. The argument order is pinned by the jump, which asks
 // for `90 + (rand() & 15)` on the third: a spread straddling 100 is a pitch
 // jitter and nothing else, and the second never exceeds 100 anywhere in the
@@ -99,7 +99,7 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * position once the skill is in (0x4759F2, out of 0x475960), and 0x4F on
    * the branch that finds fifteen slots already full (0x465925). Index 94
    * and 79 in `Audio/sfxday.srl` are P_WHOOPE and P_OWW — the pig cheers,
-   * or complains (../pigs-disasm/skills/notes.md). Both go out at HALF
+   * or complains (skills/notes.md). Both go out at HALF
    * volume, which is the exe's own mix.
    */
   pickup: { sound: 'P_WHOOPE', volume: 50, pitch: 100 },
@@ -127,7 +127,7 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * 0x20 for the knife, the bayonet and the cattle prod, 0x22 for the sword,
    * 0x51 for bare trotters and boots. Indices 33, 32, 34 and 81 of
    * `Audio/sfxday.srl` are I_SWMISS, I_STAB, I_SWORD and P_PUNCH: the whoosh
-   * and the three ways of connecting (../pigs-disasm/weapons/melee.md).
+   * and the three ways of connecting (weapons/melee.md).
    *
    * The whoosh's mix is the exe's own 100/100. The three impacts take their
    * index out of a register at 0x476712, so their volume and pitch are not
@@ -142,7 +142,7 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * per-weapon jump table is indexed by `weapon − 6`: its first arm plays
    * **0x2A** and its second **0x2B** (0x47a26d, 0x47a329), and entries 42 and
    * 43 of `Audio/sfxday.srl` are `L_PISTOL` and `L_RIFLE` — which is exactly
-   * skills 6 and 7. `../../../pigs-disasm/weapons/fire.md`.
+   * skills 6 and 7. `weapons/fire.md`.
    */
   pistol: { sound: 'L_PISTOL', volume: 100, pitch: 100 },
   rifle: { sound: 'L_RIFLE', volume: 100, pitch: 100 },

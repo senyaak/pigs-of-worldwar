@@ -19,7 +19,7 @@ import type { Pig } from './pig'
  * pig slides by half as much again. Driving playback off the walking speed
  * instead was tried and read plainly WRONG in play — the legs whirl. So the
  * original slid its pigs too, and this stays a flat 25.
- * (`../pigs-disasm/movement/stride.js` has the measurement.)
+ * (`movement/stride.js` has the measurement.)
  */
 const CLIP_FPS = 25
 const BONE_COUNT = 15
@@ -61,7 +61,7 @@ const OVERLAY_BONES = [1, 2, 3, 4, 5, 6, 7, 8]
 const SPINE = 1
 
 // The MCAP rotation convention, settled by analysis of the shipped data
-// (pigs-disasm/anim/, three independent tests):
+// (anim/, three independent tests):
 //
 //   local = Rx(-x) · Ry(-y) · Rz(-z),  applied PARENT-RELATIVE.
 //
@@ -115,7 +115,7 @@ export interface Player {
    * getting a weapon out and holding the aim — the first goes on running,
    * walking or idling underneath. That is why the original's pig can charge
    * with a bayonet and still hold it: one clip in the legs, another in the
-   * arms (../../../pigs-disasm/weapons/notes.md).
+   * arms (weapons/notes.md).
    *
    * The angle is a cursor rather than a playback: the aiming clips are one
    * 65-frame sweep from full up to full down, and `Pig::ChangeAimAngle`

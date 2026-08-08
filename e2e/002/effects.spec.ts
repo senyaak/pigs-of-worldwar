@@ -2,7 +2,7 @@
 //
 // Every number is out of the original's effect table: 143 signed bytes per
 // kind at 0x4d61e8, scaled per index by 0x4d6c88, read as twelve timed
-// stages. `../../../pigs-disasm/effects/notes.md`.
+// stages. `effects/notes.md`.
 
 import { test, expect } from '@playwright/test'
 

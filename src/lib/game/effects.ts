@@ -5,7 +5,7 @@
 // laid out as twelve timed stages. A stage spawns a CHILD effect of its own,
 // and for all five hand-to-hand weapons every live stage spawns the same
 // child — id 0x18, a RING. So a hit is two or three expanding, fading bands
-// and nothing else. `../../../pigs-disasm/effects/notes.md` is the read.
+// and nothing else. `effects/notes.md` is the read.
 //
 // Pure, like the rest of lib/game: it steps numbers. Drawing a band is the
 // scene's job (`three/effects.ts`).

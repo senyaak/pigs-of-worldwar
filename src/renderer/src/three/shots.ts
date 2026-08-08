@@ -5,7 +5,7 @@
 // builds it off the pose matrix of **bone 5**, the hand, and the weapon's own
 // row of the table at 0x4d0ee0 (0x47a115) — the same bone and the same table
 // the bayonet's blade comes out of, so a barrel and a blade hang off one
-// place. `../../../pigs-disasm/weapons/fire.md`.
+// place. `weapons/fire.md`.
 //
 // Everything here is game space (Y-down), under the battle's converted root.
 

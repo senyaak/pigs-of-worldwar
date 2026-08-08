@@ -10,12 +10,12 @@
 //
 // WHERE each piece sits is half taken from the game now. The exe computes its
 // screen coordinates in the frontend's draw code rather than storing them, and
-// the MAIN MENU's arm has been read line by line
-// (../pigs-disasm/frontend/notes.md) — so the COLUMN and its lamps are the
-// original's numbers, and the machine behind them is still the remake's
-// eyework, because which sprite sits in which slot of the exe's draw array is
-// not decoded. `pow.screen.layout` nudges the lot live and
-// `pow.screen.print()` writes it back out, the same way `pow.hud` does.
+// the MAIN MENU's arm has been read line by line (frontend/notes.md, in the
+// disasm repo) — so the COLUMN and its lamps are the original's numbers, and
+// the machine behind them is still the remake's eyework, because which sprite
+// sits in which slot of the exe's draw array is not decoded.
+// `pow.screen.layout` nudges the lot live and `pow.screen.print()` writes it
+// back out, the same way `pow.hud` does.
 
 import { loadFont } from './font'
 import type { Font } from './font'
