@@ -1536,8 +1536,10 @@ regression play caught.
   a level is fitted (mode of the region's corner heights; 128 on every
   shipped map's main water); render vertices below their region's level
   are raised to it; shore art gets its water texels punched (cutout); one
-  OPAQUE sheet of the map's averaged water colour sits a hair under each
-  region's level. NO wat01/wat02 pattern on the surface — the shipped
+  SEE-THROUGH sheet of the map's averaged water colour sits a hair under each
+  region's level (`WATER_ALPHA`, 0.62 — it was opaque and play produced a
+  screenshot of the shipped game showing a submerged pig through the
+  surface). NO wat01/wat02 pattern on the surface — the shipped
   game's footage shows smooth water, and every patterned attempt read
   wrong. What those two grey TIMs and the DLL's under-landscape 49×49
   water grid are actually FOR is still open (play memory says a sink/kill
@@ -1746,16 +1748,74 @@ the thing go down through it, while this remake draws one opaque sheet per regio
 The mesh clones its materials to do it, because `lobArt` shares one set between
 every copy of a model.
 
+### A weapon is a LAYER, the water is see-through, the camera teleports — 2026-08-08
+
+**Input composes: movement, plus what the weapon brings.** Play asked whether that
+was the right model — "каждое оружие свой контроллер; можно ведь комбинировать их,
+movement + melee или movement + gun?" — and it is, and it fixes a bug the flat
+priority list could not. `weaponLayer(skill)` in `controls.ts` is the table:
+`melee`, `gun`, `lob`, or `none` for empty hands and for a skill with no weapon
+behind it, keyed off the same three records the rest of the game uses. Only `gun`
+and `lob` have an AIM VIEW, so G with a bayonet no longer hands a set over — and
+since entering a set drops the driving keys, that is what had been stopping the pig
+dead. The exe agrees from the other end: 0x46a891 pins the bayonet's and the cattle
+prod's aim angle to zero, so there is nothing for an aim view to show. The `aims`
+bit was the first cut and it was too wide, because this remake lets a bayonet aim
+by request.
+
+**The water sheet is SEE-THROUGH.** Play settled it with a screenshot of the
+shipped game — a pig fully submerged, body plainly visible through the surface —
+and asked the obvious question: "так сделай просвечиваемой, в чём проблема?" None.
+`WATER_ALPHA` in `three/terrain.ts` is 0.62 with `depthWrite` off; the art has said
+so all along, since a water texel is one the artist marked with the PSX's
+semi-transparency bit. **The "draw a sinking grenade through the sheet" stand-in is
+deleted** — it existed only because the sheet was opaque.
+
+**The camera TELEPORTS to its new subject.** Play, as a question again: "камера
+должна телепортироваться за спину свина, а не передвигаться с той позиции где
+была." Yes. `chase.reset()` now clears `snapped` as well as the settle timer, so
+the next placement is a cut rather than a glide, and the end of a flight calls it —
+the camera used to fly home from wherever the bullet had got to.
+
+**The TREMOR grows as the sights close in, and the first attempt had it
+backwards.** Worth keeping written down: the exe's `(0x1000 − zoom) >> 12` divides
+what comes out of `[game+0x300]`, but that accumulator is a per-frame STEP that
+adds into the angle — control sensitivity, which a scope wants fine — while the
+remake's tremor is an OFFSET on the view. Different quantities; carrying the
+divisor across made the shake die out at magnification. `ZOOMED` in `wobble.ts`
+doubles it at the cap instead.
+
+**A frame is clamped to a tenth of a second.** `getDelta` is wall-clock and the
+browser stops calling `requestAnimationFrame` for a window nobody is looking at, so
+coming back from an alt-tab handed the world one step of however long the player was
+away — a fuse, a flight and a landing all resolved before anything was drawn, which
+is what play saw as "2 раза вызвать выстрел, а цель стояла и не было прожектайла".
+Clamping is not a pause and does not pretend to be one; see the thread below.
+
 ### Threads left mid-pull
 
-Four jobs are open and play named all four. In the order they were named:
+Six jobs are open and play named all six. In the order they were named:
 
-**1. There are no FOOTSTEP sounds.** Deliberate so far and written up under the
+**1. The game must not STOP in the background, and a real PAUSE is its own job.**
+Play: "на заднем плане отключать игру нельзя, как по мне — это убивает много чего…
+в сг проще паузу ставить, в мп вообще никаких остановок." The frame clamp above
+stops the damage but is not the feature: singleplayer wants a real pause (the
+original has one — the beat at the top of a turn lists the pause button as one of
+its three ways out, 0x4d8a2c) and multiplayer wants nothing of the kind. Deliberately
+not built yet.
+
+**2. A pig that cannot SWIM goes under, and stays visible down there.** From the
+same screenshot: the pig is below the surface with its name plate and health still
+up. `SWIM_SINK` puts a swimming pig's eyes at the waterline; a class that cannot
+swim should sink past it. Which classes cannot is not read, and neither is what
+happens to one that has — play asked for it written down and left.
+
+**3. There are no FOOTSTEP sounds.** Deliberate so far and written up under the
 sound section: they want the hoof-contact frames `../pigs-disasm/anim/audio-events.md`
 derives, and a footstep on a timer is a stand-in nobody asked for. Play has now
 asked for them, so the next pass is the contact frames rather than the timer.
 
-**2. The SKIP TURN animation is wrong, and it is the VICTORY clip.** Play, at a
+**4. The SKIP TURN animation is wrong, and it is the VICTORY clip.** Play, at a
 glance: "анимация пропуска хода кривая, и она на победу". `ANIM.THINKING = 46` was
 play's own pick a pass earlier, off the exe's 59-clip name table — "Thinking" —
 and the clip that plays is a celebration. Not chased: play asked for it written
@@ -1764,7 +1824,7 @@ here, which is to be read off a CALL SITE rather than off the name table (see th
 `ANIM` note in `locomotion.ts`), and skills 63/65/66 are out of range of
 `Pig::Fire`'s dispatch so there is no site to read.
 
-**3. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
+**5. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
 не там, огромный, и вообще не на воде". `SPLASH_EFFECT` is effect 0x0E / parameter
 row 2 and the row is decoded — three rings at a lift of −500, a sixty-sprite cloud,
 a ten-particle burst — so what is wrong is the remake's, not the reading. Two
@@ -1774,7 +1834,7 @@ the ring's RADIUS rides `MODEL_SCALE`, and the SIZE scalars (`BLOB_UNIT`,
 `effects.splash` is `query.surface(x, z)`, which is the water line — check that
 first, because "вообще не на воде" points at it.
 
-**4. The RAMP is wrong**, and has been parked since the grenade started.
+**6. The RAMP is wrong**, and has been parked since the grenade started.
 
 ### What is still not read
 

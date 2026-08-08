@@ -347,8 +347,21 @@ export function createChase(
       else if (driving) wait = 0
       else wait = Math.max(0, wait - delta)
     },
+    /**
+     * The camera's SUBJECT has changed — a new acting pig, a flight that has
+     * landed, a crate that has finished coming down. The next placement is a
+     * TELEPORT, not a glide.
+     *
+     * Play asked for it as a question and the answer is yes: "камера должна
+     * телепортироваться за спину свина, а не передвигаться с той позиции где
+     * была." Easing is for following one thing about; sliding across the map from
+     * whatever the camera was last looking at is just a long wrong shot. This used
+     * to clear only the settle timer, so a ride ending left `snapped` set and the
+     * ordinary chase lerped all the way home.
+     */
     reset() {
       wait = 0
+      snapped = false
     }
   }
 }

@@ -81,12 +81,25 @@ const AMPLITUDE = 7
 const EASE = 0.65
 
 /**
- * The smallest the tremor gets, whatever the zoom — one aim unit, which is the
- * exe's own floor on the step (`cmp eax,1; jge` at 0x495f1a, and again at
- * 0x495bc1 for the digital ramp). A scope at full magnification is not perfectly
- * dead in the original and must not be here.
+ * How much MORE it shakes at full zoom, on top of what the magnification does to
+ * the picture by itself.
+ *
+ * **This went in backwards first, and the mistake is worth keeping written down:
+ * the exe's divisor is not this quantity.** The aim-view arm scales what comes out
+ * of `[game+0x300]` by `(0x1000 − zoom) >> 12` (0x495ecc), so a magnified view
+ * gets a FINER step — but that accumulator is a STEP that adds into the angle
+ * frame by frame, i.e. control sensitivity, and a scope wants exactly that: fine
+ * control up close. The tremor here is an OFFSET on the view, which is a different
+ * quantity, and carrying the divisor across made the shake die out as the scope
+ * closed in. Play: "дёргание при увеличении ты сделал в обратную сторону — чем
+ * ближе, тем меньше, а надо наоборот."
+ *
+ * So it goes the other way, and eyework decides how far. 1 would leave the growth
+ * entirely to the magnification (a fixed angle covers `SCOPE_MAGNIFY` times more
+ * screen at the cap, which play read as "не масштабируется"); this doubles the
+ * angle on top of that.
  */
-const FLOOR = 1
+const ZOOMED = 2
 
 export interface Wobble {
   /** The sample each axis is heading for, drawn once an engine frame. */
@@ -112,14 +125,11 @@ export const createWobble = (): Wobble => ({
 /**
  * Advance the tremor. `frames` is engine frames, not rendered ones.
  *
- * `scale` is what the ZOOM leaves of it, 1 wide open and 0 at the cap, and it is
- * READ: the analogue axes land in `[game+0x300]`, the very accumulator the digital
- * ramp uses (0x495e9f — a stick under 32 writes `bx >> 4` straight into it), and
- * for the two zooming skills that accumulator then goes through
- * `(0x1000 − zoom) * step >> 12` exactly as the ramp does (0x495ecc onwards,
- * floored at ±1). So the sights get finer as they close in and so does the
- * tremor — play asked for it and the arm agrees: "при зуме дёрганье не
- * масштабируется, а должно."
+ * `zoom` is how far in the sights are, 0 wide open and 1 at the cap. **Closer
+ * shakes MORE** — play's rule, twice over: the first pass had no scaling at all
+ * ("при зуме дёрганье не масштабируется, а должно") and the second carried the
+ * exe's step divisor across and shrank it ("сделал в обратную сторону"). See
+ * `ZOOMED` for why that divisor is a different quantity from this one.
  *
  * `random` is injectable so a spec can pin it.
  */
@@ -127,7 +137,7 @@ export function updateWobble(
   wobble: Wobble,
   frames: number,
   sighting: boolean,
-  scale = 1,
+  zoom = 0,
   random: () => number = Math.random
 ): void {
   if (!sighting) {
@@ -141,7 +151,8 @@ export function updateWobble(
   wobble.owed += frames
   if (wobble.owed >= 1) {
     wobble.owed = wobble.owed % 1
-    const reach = Math.max(FLOOR, AMPLITUDE * Math.max(0, Math.min(1, scale)))
+    const close = Math.max(0, Math.min(1, zoom))
+    const reach = AMPLITUDE * (1 + close * (ZOOMED - 1))
     wobble.pitch = (random() * 2 - 1) * reach
     wobble.yaw = (random() * 2 - 1) * reach
   }

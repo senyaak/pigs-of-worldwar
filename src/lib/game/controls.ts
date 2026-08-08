@@ -16,6 +16,10 @@
 // Pure. This file knows nothing about keys, three.js or the scene: it takes what
 // is HELD and says what it means.
 
+import { meleeOf } from './melee'
+import { isLobbed } from './grenade'
+import { isGun } from './projectile'
+
 /**
  * The control sets. FRONTEND is a seventh and the odd one out — the main menu
  * binds its own KEY map (`MENU_BINDINGS`) rather than reinterpreting the battle's
@@ -96,6 +100,41 @@ export interface Situation {
   armed: boolean
   /** The aim-view key is down and what is in hand can use it. */
   sighting: boolean
+}
+
+/**
+ * What the WEAPON adds to the movement set — the composition play asked for:
+ * "каждое оружие — свой контроллер; можно ведь комбинировать их, скажем movement +
+ * melee или movement + gun?" Yes, and this is that table.
+ *
+ * A pig always has the movement set. On top of it, what is in its hands decides
+ * which extra controls exist at all — and the one that matters here is the AIM
+ * VIEW, because entering a set drops the driving keys, so a layer that has no aim
+ * view must leave the key inert rather than stopping the pig for nothing. Play
+ * found the bayonet doing exactly that: "G всё ещё стопорит на оружии штык."
+ *
+ * The engine agrees about the bayonet from the other end: 0x46a891 forces the aim
+ * angle to zero for skills 3 BAYONET and 5 CATTLE PROD, so there is nothing for an
+ * aim view to show. A blade is `movement + melee` and no more.
+ */
+export type WeaponLayer = 'none' | 'melee' | 'gun' | 'lob'
+
+/** Whether this layer has an aim view — a set where the walk POINTS instead. */
+export const layerSights = (layer: WeaponLayer): boolean => layer === 'gun' || layer === 'lob'
+
+/**
+ * Which layer a skill brings. One list per kind, and the kinds are the three
+ * tables the game already keys everything else off: the melee record
+ * (`lib/game/melee.ts`), the projectile row (`projectile.ts`) and the lobbed row
+ * (`grenade.ts`). Anything else — empty hands, SKIP TURN, a skill with no weapon
+ * behind it — adds nothing to the movement set.
+ */
+export function weaponLayer(skill: number | null): WeaponLayer {
+  if (skill === null) return 'none'
+  if (meleeOf(skill)) return 'melee'
+  if (isLobbed(skill)) return 'lob'
+  if (isGun(skill)) return 'gun'
+  return 'none'
 }
 
 /**

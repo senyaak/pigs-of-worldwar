@@ -47,9 +47,25 @@ export function ensureScene(container: HTMLElement): SceneHost {
   let framed: THREE.Object3D | null = null
 
   const clock = new THREE.Clock()
+  /**
+   * The longest step the world is ever advanced by, in seconds.
+   *
+   * `getDelta` is wall-clock, and the browser stops calling `requestAnimationFrame`
+   * for a window nobody is looking at — so coming back from an alt-tab hands the
+   * first frame however long the player was away. A ten-second step runs the whole
+   * of a shot inside one pass: play saw it as "я как-то смог 2 раза вызвать выстрел,
+   * а цель стояла и не было прожектайла", which is a fuse, a flight and a landing
+   * all resolved before anything was drawn.
+   *
+   * Clamping is not a PAUSE and does not pretend to be one — the world simply
+   * misses the time nobody was watching. A real pause is its own job (CLAUDE.md's
+   * thread list), and it has to be a pause in singleplayer and nothing at all in
+   * multiplayer, which is play's rule.
+   */
+  const LONGEST_FRAME = 0.1
   const animate = (): void => {
     requestAnimationFrame(animate)
-    const delta = clock.getDelta()
+    const delta = Math.min(LONGEST_FRAME, clock.getDelta())
     if (framed) framed.rotation.y += delta * 0.6
     for (const read of onInput) read()
     for (const callback of onFrame) callback(delta)

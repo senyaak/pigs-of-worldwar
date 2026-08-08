@@ -73,6 +73,7 @@ import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
 import { SILENT, loadBank } from '../audio/bank'
 import { BATTLE_SOUNDS, createBattleSounds, playCue } from '../audio/battle'
+import { layerSights, weaponLayer } from '../../../lib/game/controls'
 import { createSoundConsole } from '../audio/console'
 import type { Bank } from '../audio/bank'
 import type { PigPlate } from '../ui/hud'
@@ -1017,8 +1018,13 @@ export function buildBattle(
       }
     }
     // …and the sequence is over when there is nothing left in the air. The
-    // camera comes back off the bullet and the turn clock starts again.
-    if (firing?.phase === 'flight' && shots.live() === 0 && grenades.live() === 0) firing = null
+    // camera comes back off the bullet and the turn clock starts again — and it
+    // comes back by TELEPORTING behind the pig rather than flying home from
+    // wherever the bullet ended up (three/chase.ts, `reset`).
+    if (firing?.phase === 'flight' && shots.live() === 0 && grenades.live() === 0) {
+      firing = null
+      chase.reset()
+    }
 
     // The weapon in hand, and where it points. Choosing one out of the menu
     // is what starts it: the exe plays the getting-it-out clip and only puts
@@ -1062,10 +1068,10 @@ export function buildBattle(
     // glide, and the zoom creeps 0x20 a frame (lib/game/wobble.ts, zoom.ts).
     const scoped = sighting && isGun(holding)
     const frames = delta / FRAME_SECONDS
-    // The tremor rides the ZOOM, because the analogue axes go through the same
-    // `(0x1000 - zoom) >> 12` the aim step does (lib/game/wobble.ts). Play:
-    // "при зуме дёрганье не масштабируется, а должно."
-    updateWobble(wobble, frames, scoped, 1 - zoomFraction(zoom))
+    // The tremor rides the ZOOM, and the closer it looks the more it shakes —
+    // which is play's rule and not the exe's divisor (lib/game/wobble.ts explains
+    // why those are different quantities).
+    updateWobble(wobble, frames, scoped, zoomFraction(zoom))
     updateZoom(zoom, frames, scoped && zoomsIn(holding))
     // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts
     // a field of view is the library's and the library is not in the install,
@@ -1217,9 +1223,13 @@ export function buildBattle(
       // at once — "пока граната летит, не могу взорвать её."
       armed: grenades.live() > 0,
       locked: committed() || aftermath !== null,
-      // The record's own `aims` bit, the same test the dial reads — so the aim
-      // view answers for a gun and for a grenade and not for empty hands.
-      sights: weaponOf(game.currentPig.holding).aims && !dropIn.running()
+      // What is in the pig's HANDS decides whether there is an aim view to enter:
+      // a gun or something thrown has one, a blade does not, empty hands do not.
+      // The `aims` bit was the first cut and it was too wide — a bayonet aims here
+      // (by request; the exe pins it to zero) so G stopped the pig with one in
+      // hand. `weaponLayer` is the composition play asked for: movement, plus
+      // whatever the weapon brings (lib/game/controls.ts).
+      sights: layerSights(weaponLayer(game.currentPig.holding)) && !dropIn.running()
     }),
     // Whether there is an ANGLE, which is not the same question as whether
     // there is a POSE for the angle to scrub. `scrubsPose` was standing in for

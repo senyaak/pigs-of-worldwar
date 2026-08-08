@@ -56,6 +56,18 @@ interface TileRef {
   rotateFlip: number
 }
 
+/**
+ * How solid the water sheet is drawn — the remake's own number.
+ *
+ * A water texel is one the artist marked with the palette's 0x8000 bit, the PSX's
+ * semi-transparency flag (`lib/game/watermask.ts`), so the surface is BLENDED in
+ * the original and the shipped game shows a submerged pig plainly through it. How
+ * far that blend went is not in the exe — the blending is `wh32LIB.DLL`'s — so
+ * this is eyework: enough colour to read as water, clear enough to watch a thing
+ * go down through it.
+ */
+export const WATER_ALPHA = 0.62
+
 export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[]): Terrain {
   // Water, the original's shape: each water REGION carries its own fitted
   // level ("Fitting water." flood-fills them, exe 0x451b20); ground
@@ -237,11 +249,23 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
   group.rotation.x = Math.PI
   group.add(inner)
 
-  // The water surface: ONE plain, opaque sheet of the map's water colour
+  // The water surface: ONE plain SEE-THROUGH sheet of the map's water colour
   // where the ground is not — smooth, as the shipped game's water plays
-  // (its footage shows no pattern on the surface). Nothing to sort, and a
-  // swimming pig sinks visibly into it. It spans every water-flagged cell
-  // and one ring beyond, so the shore masks always have water to reveal.
+  // (its footage shows no pattern on the surface). It spans every water-flagged
+  // cell and one ring beyond, so the shore masks always have water to reveal.
+  //
+  // **See-through, because the original's water is.** It was opaque here, and
+  // that was a divergence with a cost play kept running into: a grenade going
+  // down disappeared behind it, and a pig in the drink is meant to be visible
+  // under the surface — play produced a screenshot of the shipped game with one
+  // fully submerged and the body plainly showing through. The art itself says the
+  // same thing: a water texel is one the artist marked with the PSX's
+  // semi-transparency bit (`lib/game/watermask.ts`), and the library draws a
+  // wholly-translucent tile blended rather than solid.
+  //
+  // `WATER_ALPHA` is the remake's own number — how far the PSX's blend actually
+  // went is not in the exe — and `depthWrite` is off so that whatever is under
+  // the surface still draws.
   let sheet: THREE.Mesh | null = null
   // A cell's own region level, or the nearest neighbouring region's — the
   // one-ring skirt under the shore masks takes the level of the water it
@@ -307,7 +331,10 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
             waterColor.g / 255,
             waterColor.b / 255
           ).convertSRGBToLinear(),
-          side: THREE.DoubleSide
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: WATER_ALPHA,
+          depthWrite: false
         })
       )
       inner.add(sheet)
