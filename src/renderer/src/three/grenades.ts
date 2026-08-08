@@ -20,7 +20,8 @@ import {
   blastRange,
   blastShare,
   bounceLob,
-  dousedByWater,
+  douseInWater,
+  sunkAway,
   lob,
   skipOffWater,
   skipsOnWater,
@@ -212,21 +213,26 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     // Its own row's physics material — the surface multiplies its half in.
     const row = lobOf(shot.skill)
     if (!row) return false
-    // WATER FIRST, and a thrown thing GOES IN — it does not skip and it does not
-    // float. The engine's own handler (0x437a57, water being bit 6 of the tile
-    // byte) drops a splash projectile at the water line, plays sound 0x28 and
-    // touches the thrown thing's velocity nowhere at all: no bounce, no
-    // material, nothing to stop it. `lib/game/grenade.ts` has the read.
-    // `surface` is the region's own fitted level (lib/game/terrain.ts), the line
-    // a swimming pig floats at.
+    // WATER FIRST, and it is ONE contact — the surface and the bed are the same
+    // plane. `Projectile::OnHitLandscape` (0x4377d0) is the whole of it: over a
+    // water-flagged tile it puts a splash at the water height and plays sound
+    // 0x28 at 100/100, and then the arm splits on the contact scalar — under 150
+    // it douses (0x437bfb), over it the thing is kicked up and skips (0x437e5d).
+    // Both were once written up here as if the crossing were a separate event; it
+    // is not, and it does not have to be: the shipped maps' water is 0 to 48
+    // units deep (`WATER_SINK_SPEED` has the measurement), so where the water is
+    // and where the ground is are the same place.
     if (parts.query.isWater(shot.x, shot.z) && shot.y >= parts.query.surface(shot.x, shot.z)) {
       const level = parts.query.surface(shot.x, shot.z)
+      // The splash and its noise happen either way — the handler does them before
+      // it looks at the speed at all.
+      playCue(parts.bank(), BATTLE_SOUNDS.splash)
       // FAST ALONG THE SURFACE: it SKIPS. The engine resolves the contact with
-      // the tile's own material and then kicks the thing straight up by a fifth
-      // of the in-plane speed (0x4A9260 with an angle of 0x400 — a quarter turn),
-      // which is a stone off a pond. The hops decay because the solver's friction
-      // takes off the travel each time, and when the travel drops under the bar
-      // the next contact douses it. lib/game/grenade.ts has the read.
+      // the tile's own material and then kicks the thing up by a fifth of the
+      // in-plane speed (0x4A9260 at an angle of 0x400 — a quarter turn, straight
+      // up), which is a stone off a pond, and the fifth is paid for out of the
+      // travel so the hops run down. lib/game/grenade.ts has the read and says
+      // which half of it is the remake's.
       if (skipsOnWater(shot)) {
         bounceLob(
           shot,
@@ -241,35 +247,15 @@ export function createGrenades(parts: GrenadeParts): Grenades {
         parts.effects.splash({ x: shot.x, y: level, z: shot.z })
         return true
       }
-      // Crossing the surface: the noise, once.
-      if (!shot.sunk) playCue(parts.bank(), BATTLE_SOUNDS.splash)
-      sinkLob(shot, step)
-      // …and it keeps going down until it meets the BED. It used to stop dead on
-      // contact, which play saw straight away: "на воде тупо при контакте
-      // застрял сразу". Nothing stops it here — gravity has the vertical and
-      // only the sideways travel is damped.
-      if (shot.y >= ground) {
-        // The bed, and the engine DOUSES it: a splash on the surface, and the
-        // quiet flag so the destructor spawns nothing at all. Play remembered
-        // this — "по-моему даже не взрываться" — and 0x437d34 is where it is
-        // written. `doused` is what tells the update to drop it WITHOUT a blast.
-        shot.y = ground
-        shot.vx = 0
-        shot.vy = 0
-        shot.vz = 0
-        shot.resting = true
-        if (dousedByWater(shot)) {
-          shot.doused = true
-          // The splash is drawn on the WATER LINE however deep it went, because
-          // effect 0x0E snaps its own y there (0x488c19).
-          parts.effects.splash({
-            x: shot.x,
-            y: parts.query.surface(shot.x, shot.z),
-            z: shot.z
-          })
-          playCue(parts.bank(), BATTLE_SOUNDS.doused)
-        }
-      }
+      // …or it goes in and DOWN, and it does not go off. The quiet flag is the
+      // engine's (0x437d34) — play remembered it before the binary said so,
+      // "по-моему даже не взрываться" — and the couple of seconds of sinking are
+      // the remake's, because there is nothing on these maps to sink through.
+      douseInWater(shot)
+      // The splash is drawn on the WATER LINE however deep it gets, because
+      // effect 0x0E snaps its own y there (0x488c19).
+      parts.effects.splash({ x: shot.x, y: level, z: shot.z })
+      playCue(parts.bank(), BATTLE_SOUNDS.doused)
       return true
     }
     if (shot.y >= ground) {
@@ -333,6 +319,16 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     update(delta) {
       for (let i = live.length - 1; i >= 0; i--) {
         const shot = live[i]
+        // DOUSED: it is under the water and on its way down. Nothing steps it but
+        // the sink — not the fuse, not the ground, not a bounce — and when its
+        // couple of seconds are up it is simply gone. The engine's quiet flag is
+        // the first thing the destructor tests and that branch spawns no effect
+        // and plays no sound (0x4328c9), so there is no blast to hold back.
+        if (shot.doused) {
+          sinkLob(shot, delta)
+          if (sunkAway(shot)) live.splice(i, 1)
+          continue
+        }
         // Substep by the grenade's OWN SIZE rather than by the blast: at full
         // charge it covers 4500 units a second, and a step of 512 walked it
         // clean through a slope — play saw it vanish under the ground where the
@@ -341,7 +337,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
         const speed = Math.hypot(shot.vx, shot.vy, shot.vz)
         const steps = Math.max(1, Math.ceil((speed * delta) / STEP_BY))
         let spent = false
-        for (let step = 0; step < steps && !spent; step++) {
+        for (let step = 0; step < steps && !spent && !shot.doused; step++) {
           const wasY = shot.y
           spent = advanceLob(shot, delta / steps)
           settle(shot, wasY, delta / steps)
@@ -349,14 +345,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
           // a slope reflects into the hill as often as out of it, and one
           // sub-step of that is enough to lose the thing.
           const floor = parts.query.height(shot.x, shot.z)
-          if (!shot.sunk && shot.y > floor) shot.y = floor
-        }
-        // DOUSED: it is gone, and it does not go off. The engine sets the
-        // projectile's quiet flag and the destructor's first test skips every
-        // effect and every sound (0x4328c9).
-        if (shot.doused) {
-          live.splice(i, 1)
-          continue
+          if (!shot.doused && shot.y > floor) shot.y = floor
         }
         if (!spent) continue
         detonate(shot)

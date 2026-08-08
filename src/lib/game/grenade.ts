@@ -253,14 +253,14 @@ export interface Lobbed {
   /** Whether it has stopped moving. Only for what draws it; the fuse does not
    * care. */
   resting: boolean
-  /** Whether it has gone into water. A thrown thing sinks — it does not skip
-   * off a pond — and the scene stops bouncing it once this is set. */
-  sunk: boolean
   /** Whether water has DOUSED it. The engine's own arm sets the projectile's
    * quiet flag and the destructor's first test then spawns no effect and plays
    * no sound (0x4328c9), so it leaves without going off — `WATER_DOUSE_SPEED`
-   * has the read. */
+   * has the read. Nothing bounces or explodes once this is set: it sinks. */
   doused: boolean
+  /** Seconds of sinking left, and only a doused one has any
+   * (`WATER_SINK_SECONDS`). */
+  sinking: number
 }
 
 /**
@@ -296,8 +296,8 @@ export function lob(
     vz: Math.cos(heading) * flat,
     fuse: fuseSeconds(row, random),
     resting: false,
-    sunk: false,
-    doused: false
+    doused: false,
+    sinking: 0
   }
 }
 
@@ -422,12 +422,31 @@ export const skipsOnWater = (shot: Lobbed): boolean =>
 export const dousedByWater = (shot: Lobbed): boolean => !skipsOnWater(shot)
 
 /**
- * One skip. The travel along the surface is left alone — the solver has already
- * taken the tile's own friction off it, which is what makes the hops decay — and
- * the vertical is SET to a fifth of it, upward.
+ * One skip: a fifth of the travel goes UP, and it is PAID FOR out of the travel.
+ *
+ * The fifth is read. That it is paid for is the remake's, and it is what the
+ * numbers force. This used to leave the travel alone on the reading that "the
+ * solver has already taken the tile's own friction off it" — measure that and it
+ * is nothing: water is terrain type **4** on every shipped map (CAMP, BAY and
+ * ARCHI are type 4 throughout), so the pair is 0.30 × 0.90 friction and 0.80 ×
+ * 0.10 restitution, and Coulomb friction is `mu * (1 + e) * |vn|` — on a FLAT
+ * skim the normal approach is a fraction of the travel, so a hop lost about two
+ * per cent. Seventeen hops, which is what play saw: "медленная граната на исходах
+ * сил пролетает весь водоём", and "прыжки дают будто буст" for the same reason —
+ * a free upward kick every time it touched.
+ *
+ * Paying for it costs a fifth of the travel a hop, so four or five hops, each
+ * shorter and lower than the last, and then the travel is under
+ * `WATER_DOUSE_SPEED` and the next contact douses it. Which is a stone off a
+ * pond, and it is also what this repo's own note has claimed the behaviour is
+ * since the arm was found — "it decays by five each hop until it drops under the
+ * 150" — a sentence that was only ever true if the fifth came out of the travel.
  */
 export function skipOffWater(shot: Lobbed): void {
   const along = Math.hypot(shot.vx, shot.vz)
+  const spent = 1 - 1 / WATER_SKIP_KICK
+  shot.vx *= spent
+  shot.vz *= spent
   // Y-down, so up is negative.
   shot.vy = -along / WATER_SKIP_KICK
   shot.resting = false
@@ -439,21 +458,51 @@ export function skipOffWater(shot: Lobbed): void {
 export const WATER_DOUSE_EFFECT = 0x0e
 
 /**
- * One frame of going down through water. It keeps falling — gravity does that —
- * and only its sideways travel is damped.
+ * **THE SINK IS THE REMAKE'S OWN, AND THE MAPS ARE WHY.** Measured over the
+ * shipped water: the bed is AT the water line. Depth `height − surface` on every
+ * wet sample of CAMP is 0, of BAY and ARCHI 0 at the median and 48 at the very
+ * deepest — because the maps author their water flat at one height and the load
+ * step raises everything under it to exactly that (`terrain.ts`). There is no
+ * body of water in the collision world to sink through: the surface and the
+ * bottom are the same plane, and the engine's own arm stops the thing dead there
+ * (0x4A9EE0 zeroes the body's velocity through vtable slot 4, 0x4A9E50 marks it
+ * finished).
  *
- * `SINK_DRAG` is the remake's: the exe's splash arm does not touch the
- * projectile's velocity at all, so nothing says how fast a grenade sinks. The
- * VERTICAL is deliberately untouched, because damping the one component gravity
- * works through is what once left a grenade standing on the water.
+ * So the sink cannot come out of the terrain and it cannot come out of the exe.
+ * Play asked for it plainly — "граната должна реально пару секунд тонуть, как и
+ * все прожектайлы" — so a doused thing goes on DOWN, through the bed, at a slow
+ * rate of its own, and is taken away when its couple of seconds are up. It is
+ * presentation, it is flagged as such, and both numbers are eyework.
  */
-export const SINK_DRAG = 0.88
-export function sinkLob(shot: Lobbed, delta: number): void {
-  shot.sunk = true
-  const damp = Math.max(0, 1 - (1 - SINK_DRAG) * delta * 60)
-  shot.vx *= damp
-  shot.vz *= damp
+export const WATER_SINK_SPEED = 220
+export const WATER_SINK_SECONDS = 2
+
+/**
+ * Water has doused it: no blast, no damage, and down it goes.
+ *
+ * The quiet flag is the engine's (`[proj+0x84] = 1`, 0x437d34, and the
+ * destructor's first test at 0x4328c9 takes the branch with no effect and no
+ * sound at all). The slow descent that follows is the remake's — see above.
+ */
+export function douseInWater(shot: Lobbed): void {
+  shot.doused = true
+  shot.sinking = WATER_SINK_SECONDS
+  shot.resting = false
+  // Whatever it was doing along the surface, it is not doing it under one.
+  shot.vx = 0
+  shot.vz = 0
+  shot.vy = WATER_SINK_SPEED
 }
+
+/** One frame of going down. Nothing steers it and nothing stops it — not the
+ * bed, which is the same plane as the water it went into. */
+export function sinkLob(shot: Lobbed, delta: number): void {
+  shot.y += shot.vy * delta
+  shot.sinking = Math.max(0, shot.sinking - delta)
+}
+
+/** Whether it has finished sinking and can go. */
+export const sunkAway = (shot: Lobbed): boolean => shot.doused && shot.sinking <= 0
 
 /**
  * One frame of flight — the parabola, and nothing else. Whether it has met

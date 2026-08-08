@@ -1375,10 +1375,12 @@ exactly what kept showing.
 ### The grenade, ninth pass — water douses it, 2026-08-08
 
 **A thrown thing that goes quietly into water DOES NOT GO OFF, and play
-half-remembered it before the binary said so.** There are two water paths and
-they are different tests: the surface crossing (tile bit 6, 0x437a57) puts a
-splash projectile at the water height and touches the thrown thing nowhere, while
-the CONTACT (0x437bfb, gated on `0x4A6FA0` — tile bit **5** plus the DLL's own
+half-remembered it before the binary said so.** ~~There are two water paths and
+they are different tests~~ — **there is ONE, and it is corrected below in "Water:
+the bed IS the surface": 0x437a57 and 0x437bfb are both inside `OnHitLandscape`
+and both happen at the same contact.** The splash (tile bit 6, 0x437a57) goes at
+the water height, and then
+the CONTACT arm (0x437bfb, gated on `0x4A6FA0` — tile bit **5** plus the DLL's own
 per-texel mask through `[0x538128]`, the same pair `lib/game/watermask.ts`
 builds) is the one that matters. Under **150 a frame** it plays FT_WATER, leaves
 effect **0x0E**, and sets `[proj+0x84]`. That byte is the FIRST thing the
@@ -1658,11 +1660,66 @@ measured over the whole dashboard, where the BRIEFING BAR comes and goes on the
 tutorial's clock rather than the pig's. Counted per band, every pixel of the
 difference was in the top eighth and the plate's own rows matched exactly.
 
+### Water: the bed IS the surface, and the frog pays for its hop — 2026-08-08
+
+Play: "граната должна реально пару секунд тонуть, как и все прожектайлы", and
+"прыжки дают будто буст, и медленная граната на исходах сил пролетает весь
+водоём". Both are the same misreading of the same handler, and two measurements
+settled it.
+
+**There is only ONE water event, and it is the LANDSCAPE contact.** This file used
+to describe two paths — a "surface crossing" at 0x437a57 and a "contact" at
+0x437bfb. They are the same function: `Projectile::OnHitLandscape` (0x4377d0,
+vtable +0x50) reads `[contact+0x14]` at its top, and inside it, in order: if the
+tile carries water bit 6, take the water HEIGHT (0x4A5140) and put a splash there
+with sound 0x28 at 100/100; then split on the scalar — under 150 douse (FT_WATER,
+effect 0x0E, the quiet flag, and 0x4A9EE0 zeroing the body's velocity through
+vtable slot 4 while 0x4A9E50 marks it finished), over 150 skip (FT_MUD, effect
+0x0D, and the kick).
+
+**And the shipped maps have no water to sink through.** Measured over CAMP, BAY
+and ARCHI: `height − surface` on every wet sample is **0** at the median, 48 at
+the deepest anywhere. The maps author their water flat at one height and the load
+step raises everything under it to exactly that, so the bed and the surface are
+the same plane. Which is also why effect 0x0E bothers to snap its own y to the
+water line: it is spawned from wherever the contact was, and that is never more
+than a pig's ankle below.
+
+So a couple of seconds of sinking cannot come from the terrain OR the exe — the
+world's three force generators are all gravity-flavoured and a projectile gets the
+plain one, with nothing for water. `WATER_SINK_SPEED` and `WATER_SINK_SECONDS` in
+`grenade.ts` are therefore the remake's own presentation: a doused thing goes on
+down THROUGH the bed at its own slow rate and is taken away when its two seconds
+are up. It never goes off — the quiet flag is the engine's.
+
+**Water is terrain type 4** — every wet sample of CAMP, BAY and ARCHI, and
+0.90/0.10 is the grippiest, least bouncy row in the material table. That is what
+kills the "free ride": a grenade brings 0.30/0.80, so the pair is 0.27 friction
+and 0.08 restitution — but Coulomb friction is `mu * (1 + e) * |vn|` and a FLAT
+skim's normal approach is a fraction of its travel, so a hop lost about **two per
+cent**. Seventeen hops is the width of a pond.
+
+**So the fifth is PAID FOR out of the travel.** `0x4A9260(scalar/5, 0x400, 0, 0)`
+is read — a fifth of the in-plane speed, straight up — and that it comes OUT of
+the travel rather than being free is the remake's. It is also the only reading
+under which this file's own sentence about the arm ("it decays by five each hop
+until it drops under the 150 and is doused") is true. Four or five hops, each
+shorter and lower, then the next contact douses it.
+
 ### Threads left mid-pull
 
-Two jobs are open and play named both. In the order they were named:
+Three jobs are open and play named all three. In the order they were named:
 
-**1. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
+**1. The SKIP TURN animation is wrong, and it is the VICTORY clip.** Play, at a
+glance: "анимация пропуска хода кривая, и она на победу". `ANIM.THINKING = 46` was
+play's own pick a pass earlier, off the exe's 59-clip name table — "Thinking" —
+and the clip that plays is a celebration. Not chased: play asked for it written
+down and left. Whatever replaces it wants the same treatment as every other clip
+here, which is to be read off a CALL SITE rather than off the name table (see the
+`ANIM` note in `locomotion.ts`), and skills 63/65/66 are out of range of
+`Pig::Fire`'s dispatch so there is no site to read.
+
+**2. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
 не там, огромный, и вообще не на воде". `SPLASH_EFFECT` is effect 0x0E / parameter
 row 2 and the row is decoded — three rings at a lift of −500, a sixty-sprite cloud,
 a ten-particle burst — so what is wrong is the remake's, not the reading. Two
@@ -1672,7 +1729,7 @@ the ring's RADIUS rides `MODEL_SCALE`, and the SIZE scalars (`BLOB_UNIT`,
 `effects.splash` is `query.surface(x, z)`, which is the water line — check that
 first, because "вообще не на воде" points at it.
 
-**2. The RAMP is wrong**, and has been parked since the grenade started.
+**3. The RAMP is wrong**, and has been parked since the grenade started.
 
 ### What is still not read
 

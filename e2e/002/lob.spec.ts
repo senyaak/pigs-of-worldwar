@@ -13,7 +13,10 @@ import { test, expect } from '@playwright/test'
 import { BOUNCE_CUTOFF, TILE_MATERIALS } from '../../src/lib/game/ballistics'
 import {
   WATER_DOUSE_SPEED,
+  WATER_SINK_SECONDS,
+  WATER_SINK_SPEED,
   advanceLob,
+  douseInWater,
   dousedByWater,
   skipOffWater,
   skipsOnWater,
@@ -21,7 +24,8 @@ import {
   lobBounce,
   lobOf,
   lobSurface,
-  sinkLob
+  sinkLob,
+  sunkAway
 } from '../../src/lib/game/grenade'
 import type { Lobbed } from '../../src/lib/game/grenade'
 
@@ -40,8 +44,8 @@ const dropped = (vy: number, vx = 0): Lobbed => ({
   vz: 0,
   fuse: 5,
   resting: false,
-  sunk: false,
-  doused: false
+  doused: false,
+  sinking: 0
 })
 
 test('a grenade brings its own material, and it is not near-elastic', () => {
@@ -119,9 +123,14 @@ test('thrown FLAT it skips off water — the frog, and it is the engine own', ()
   const shot = dropped(0, 4000)
   expect(skipsOnWater(shot)).toBe(true)
   skipOffWater(shot)
-  // Up (negative here), a fifth of the travel, and the travel itself untouched.
+  // Up (negative here), a fifth of the travel…
   expect(shot.vy).toBeCloseTo(-4000 / 5, 3)
-  expect(shot.vx).toBe(4000)
+  // …and PAID FOR out of it. Leaving the travel alone is what play saw as a free
+  // ride: "прыжки дают будто буст", and "медленная граната на исходах сил
+  // пролетает весь водоём". The tile's own friction does not begin to cover it —
+  // water is terrain type 4 everywhere and Coulomb friction goes with the NORMAL
+  // approach, which on a flat skim is a fraction of the travel.
+  expect(shot.vx).toBeCloseTo(4000 * 0.8, 3)
 })
 
 test('and dropped straight DOWN it does not — nothing is in the plane', () => {
@@ -136,25 +145,32 @@ test('and dropped straight DOWN it does not — nothing is in the plane', () => 
   expect(skipsOnWater(dribbling)).toBe(false)
 })
 
-test('the hops DECAY, because the surface takes friction off the travel', () => {
+test('the hops RUN DOWN, and a spent grenade cannot cross a pond', () => {
+  // The whole of play's complaint in one measurement. Water is type 4 (0.90
+  // friction, 0.10 restitution — measured over CAMP, BAY and ARCHI, every wet
+  // sample), a grenade brings 0.30/0.80, and each hop pays a fifth of its travel
+  // for the kick that lifts it.
   const shot = dropped(0, 4000)
   const hops: number[] = []
   for (let frame = 0; frame < 400 && hops.length < 40; frame++) {
     advanceLob(shot, 1 / 30)
     if (shot.y < 0) continue
     if (skipsOnWater(shot)) {
-      bounceLob(shot, 0, UP, 0, false, lobBounce(ROW))
+      bounceLob(shot, 0, UP, 4, false, lobBounce(ROW))
       skipOffWater(shot)
       hops.push(Math.hypot(shot.vx, shot.vz))
       continue
     }
-    sinkLob(shot, 1 / 30)
+    douseInWater(shot)
     break
   }
-  // Several hops, each a little slower than the last, and then it goes in.
+  // A handful of hops, each markedly slower than the last, and then it goes in.
   expect(hops.length).toBeGreaterThan(2)
-  expect(hops[hops.length - 1]).toBeLessThan(hops[0])
-  expect(shot.sunk).toBe(true)
+  expect(hops.length).toBeLessThan(10)
+  expect(hops[hops.length - 1]).toBeLessThan(hops[0] * 0.6)
+  // Nothing gains: a skip is an exchange, so the total speed never comes out of a
+  // contact higher than it went in.
+  expect(shot.doused).toBe(true)
 })
 
 test('once it is in and slow, water DOUSES it — no blast', () => {
@@ -164,12 +180,25 @@ test('once it is in and slow, water DOUSES it — no blast', () => {
   expect(dousedByWater(sinking)).toBe(true)
 })
 
-test('a sunk grenade keeps FALLING — the vertical is left to gravity', () => {
-  // Damping the vertical too is what left one standing on the water.
-  const shot = dropped(200, 3000)
-  sinkLob(shot, 1 / 30)
-  expect(shot.vy).toBe(200)
-  expect(shot.vx).toBeLessThan(3000)
-  advanceLob(shot, 1 / 30)
-  expect(shot.y).toBeGreaterThan(0)
+test('a doused grenade SINKS for a couple of seconds, then is simply gone', () => {
+  // Play: "граната должна реально пару секунд тонуть, как и все прожектайлы." It
+  // cannot come from the map — the shipped water is 0 to 48 units deep, the bed
+  // and the surface being the same plane — so the descent is the remake's and it
+  // goes THROUGH the bed on purpose.
+  const shot = dropped(6000, 0)
+  douseInWater(shot)
+  expect(shot.vx).toBe(0)
+  expect(shot.vy).toBe(WATER_SINK_SPEED)
+  expect(sunkAway(shot)).toBe(false)
+
+  let sunk = 0
+  for (let frame = 0; frame < 30 * (WATER_SINK_SECONDS + 1); frame++) {
+    if (sunkAway(shot)) break
+    sinkLob(shot, 1 / 30)
+    sunk++
+  }
+  // It went down, it took its couple of seconds about it, and then it went.
+  expect(shot.y).toBeCloseTo(WATER_SINK_SPEED * WATER_SINK_SECONDS, 0)
+  expect(sunk / 30).toBeCloseTo(WATER_SINK_SECONDS, 1)
+  expect(sunkAway(shot)).toBe(true)
 })
