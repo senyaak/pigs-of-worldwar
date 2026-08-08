@@ -1819,11 +1819,58 @@ away — a fuse, a flight and a landing all resolved before anything was drawn, 
 is what play saw as "2 раза вызвать выстрел, а цель стояла и не было прожектайла".
 Clamping is not a pause and does not pretend to be one; see the thread below.
 
+### The tremor, settled: a jitter on a WANDERING CENTRE — 2026-08-08
+
+Play, on the walk that replaced the sampled version: "ты держишь его в радиусе
+центра… щас реально по одному эллипсу ездит. Раньше было ПРАВИЛЬНО! Тебе надо было
+просто после каждого сдвига обновлять центр — чтобы могло уезжать в любую сторону."
+
+Both halves, and neither replaces the other: the JITTER is the sampled-and-eased one
+that was right (`AMPLITUDE` 7, `EASE` 0.65, back exactly as it was), and the CENTRE
+it jitters about takes a step of its own every engine frame in a FRESH random
+direction. A direction that is kept and reversed at the stops — which is what the
+walk did — is an ellipse when two axes do it; a direction redrawn every step is not.
+The zoom scales the centre's step, so closer covers more ground, and the bound does
+not move.
+
+**And the SHOT reads the same offset the view does.** This is the bug behind
+"нажимаешь, прицел смотрит на 1 вещь, а стреляет будто секунду назад": the view was
+built on `aim.angle + wobble` while the bullet left along `aim.angle` alone, so the
+crosshair — which is nailed to the middle of the screen — was lying about where the
+shot would go. The exe has no such split: its tremor is the stick's own step going
+through `Pig::Aim` into `[pig+0x304]`, which is the field the bullet reads. The note
+here that used to say "the view jitters, the shot does not" was written before the
+stick was found feeding `Pig::Aim` and is wrong. `shots.fire` and
+`grenades.throwOne` take the yaw half too.
+
+**It FREEZES for the fuse rather than resetting.** `Pig::Aim` is refused from the
+press until the attack, and the tremor arrives through it, so the sights stop dead
+and the bullet leaves along exactly what the player last saw. Only lowering the
+sights for good clears it.
+
+**"START OF TURN" is on screen at last.** The beat has been in the domain since the
+turn clock landed and nothing ever showed it, so a handover read as instant — play:
+"подтверждение начала хода ты так и не сделал." The wording is the exe's own debug
+line (0x4d8a2c); putting it through the briefing bar is the remake's.
+
+**And a grenade in water sinks, measured end to end.** `e2e/002/sink.spec.ts` stands
+a pig in CAMP's pond, drops one at its feet and watches: the y only grows, it is gone
+after its couple of seconds, and the sounds carry `FT_WATER` and never `E_1`. Play
+reported it going off the moment it started sinking; whatever that was, it was not
+the douse path, and this spec is what will say so next time.
+
 ### Threads left mid-pull
 
-Six jobs are open and play named all six. In the order they were named:
+Seven jobs are open and play named all seven. In the order they were named:
 
-**1. The game must not STOP in the background, and a real PAUSE is its own job.**
+**1. A PIG DOES NOT MOVE while it walks.** Play: "свиньи ещё не двигаются при
+ходьбе." Written down and not chased. Worth knowing before starting: the clips
+themselves play (`three/clips.ts` runs everything at a flat 25 fps and the walk is
+clip 0/3), the pig SLIDES by design and that is its own divergence above, and only
+the ACTING pig is driven — every other one is put on `ANIM.IDLE` every frame by the
+scene's own loop, which is the first place to look.
+
+**2. The game must not STOP in the background, and a real PAUSE is its own job.**
 Play: "на заднем плане отключать игру нельзя, как по мне — это убивает много чего…
 в сг проще паузу ставить, в мп вообще никаких остановок." The frame clamp above
 stops the damage but is not the feature: singleplayer wants a real pause (the
@@ -1831,18 +1878,18 @@ original has one — the beat at the top of a turn lists the pause button as one
 its three ways out, 0x4d8a2c) and multiplayer wants nothing of the kind. Deliberately
 not built yet.
 
-**2. A pig that cannot SWIM goes under, and stays visible down there.** From the
+**3. A pig that cannot SWIM goes under, and stays visible down there.** From the
 same screenshot: the pig is below the surface with its name plate and health still
 up. `SWIM_SINK` puts a swimming pig's eyes at the waterline; a class that cannot
 swim should sink past it. Which classes cannot is not read, and neither is what
 happens to one that has — play asked for it written down and left.
 
-**3. There are no FOOTSTEP sounds.** Deliberate so far and written up under the
+**4. There are no FOOTSTEP sounds.** Deliberate so far and written up under the
 sound section: they want the hoof-contact frames `../pigs-disasm/anim/audio-events.md`
 derives, and a footstep on a timer is a stand-in nobody asked for. Play has now
 asked for them, so the next pass is the contact frames rather than the timer.
 
-**4. The SKIP TURN animation is wrong, and it is the VICTORY clip.** Play, at a
+**5. The SKIP TURN animation is wrong, and it is the VICTORY clip.** Play, at a
 glance: "анимация пропуска хода кривая, и она на победу". `ANIM.THINKING = 46` was
 play's own pick a pass earlier, off the exe's 59-clip name table — "Thinking" —
 and the clip that plays is a celebration. Not chased: play asked for it written
@@ -1851,7 +1898,7 @@ here, which is to be read off a CALL SITE rather than off the name table (see th
 `ANIM` note in `locomotion.ts`), and skills 63/65/66 are out of range of
 `Pig::Fire`'s dispatch so there is no site to read.
 
-**5. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
+**6. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
 не там, огромный, и вообще не на воде". `SPLASH_EFFECT` is effect 0x0E / parameter
 row 2 and the row is decoded — three rings at a lift of −500, a sixty-sprite cloud,
 a ten-particle burst — so what is wrong is the remake's, not the reading. Two
@@ -1861,7 +1908,17 @@ the ring's RADIUS rides `MODEL_SCALE`, and the SIZE scalars (`BLOB_UNIT`,
 `effects.splash` is `query.surface(x, z)`, which is the water line — check that
 first, because "вообще не на воде" points at it.
 
-**6. The RAMP is wrong**, and has been parked since the grenade started.
+**And there is now a third candidate, which is probably the whole of it: the ring's
+`lift` is carried with the WRONG SIGN.** +y is up in the engine (settled four ways,
+`cloud.ts`), and row 15's shockwave stack at +100/+300/+600 goes UP — so row 2's
+−500 goes DOWN, under the surface, where a spreading ring belongs, and
+`advanceEffect` currently puts it 500 units into the AIR. It was fixed and reverted
+in the same session on play's instruction ("ПРИЧЁМ ТУТ ВСПЛЕСК? МЫ НЕ ДЕЛАЕМ
+ЕГО ЕЩЁ!"), because moving the splash belongs to this thread and not to a
+grenade fix. The flip is one line in `advanceEffect`; the lift should ride
+`MODEL_SCALE` the way the ring's radius does at the same time.
+
+**7. The RAMP is wrong**, and has been parked since the grenade started.
 
 ### What is still not read
 

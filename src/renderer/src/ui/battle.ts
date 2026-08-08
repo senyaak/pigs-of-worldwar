@@ -178,6 +178,26 @@ export function initBattle(onLeave: () => void): BattleView {
     hud.say(given === UNLIMITED ? name : `${name} X${given}`)
   }
 
+  /**
+   * "START OF TURN" — the beat before a turn, ON SCREEN.
+   *
+   * The beat has been in the domain since the turn clock landed (ten seconds, or
+   * any key, `lib/game/game.ts`) and nothing ever SHOWED it, so a turn handing over
+   * read as instant. Play: "подтверждение начала хода ты так и не сделал — когда
+   * кончается ход, следующий начинается мгновенно."
+   *
+   * The wording is the exe's own — its debug line at 0x4d8a2c is "START OF TURN -
+   * Press any key to continue" — and putting it through the briefing bar is the
+   * remake's, since what the original shows during its own beat is not decoded (it
+   * flies the camera to the next pig, which this does not do either).
+   */
+  let announced = false
+  const announceTurn = (starting: boolean, pig: string): void => {
+    if (starting === announced) return
+    announced = starting
+    hud.say(starting ? `${pig} - PRESS ANY KEY` : '')
+  }
+
   const updateTileText = (): void => {
     if (!game) return
     const { x, z } = game.currentPig.position
@@ -208,6 +228,7 @@ export function initBattle(onLeave: () => void): BattleView {
     // The script's first two beats: the sergeant starts talking over the
     // drop, and picks up again the moment the round is under way.
     cue(scene.dropping() ? 'drop' : 'round')
+    announceTurn(game.starting, game.currentPig.name)
     hud.draw({
       delta,
       seconds: game.timeLeft,

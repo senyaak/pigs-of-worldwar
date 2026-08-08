@@ -6,46 +6,52 @@
 //
 // The TREMOR is not that quantity and must not take that divisor: the accumulator
 // is the player's own aiming step — control sensitivity, which a scope wants fine —
-// while the tremor is what the player fights. Play settled it in three passes: no
-// scaling read as "при зуме дёрганье не масштабируется"; the divisor read as
-// "сделал в обратную сторону, чем ближе тем меньше"; and the sampled version read
-// as "держишь его в радиусе центра, а надо чтобы прицел уезжал". So it WALKS — the
-// engine's own tremor shape, 0x49e056 — and the zoom scales how far it travels,
-// not how wide it goes.
+// while the tremor is what the player fights. Play settled its shape over four
+// passes, and the last one is the design: a fast JITTER on a CENTRE THAT WALKS.
+// "тебе надо было просто после каждого сдвига обновлять центр — чтобы могло уезжать
+// в любую сторону. Раньше было ПРАВИЛЬНО." A pass with only the walk drew one
+// ellipse, because two axes sweeping between reflecting stops IS an ellipse.
+//
+// And the SHOT reads the same offset the view does — see `wobblePitch`.
 
 import { test, expect } from '@playwright/test'
 
 import { ZOOM_CAP, ZOOM_STEP, createZoom, updateZoom, zoomFraction, zoomsIn } from '../../src/lib/game/zoom'
-import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../src/lib/game/wobble'
+import { createWobble, resetWobble, updateWobble, wobblePitch, wobbleYaw } from '../../src/lib/game/wobble'
 import { layerFires, layerSights, weaponLayer } from '../../src/lib/game/controls'
 import { SKILL } from '../../src/lib/game/skills'
 
-/** A fixed "stick": the top of the step range, so a walk is repeatable. */
-const hard = (): number => 1
-
-/** How far the sights TRAVEL over `frames` engine frames at this zoom — the sum
- * of every step, not the distance from the middle. */
-const travelled = (zoom: number, frames = 60): number => {
-  const wobble = createWobble()
-  let was = wobblePitch(wobble)
-  let along = 0
-  for (let frame = 0; frame < frames; frame++) {
-    updateWobble(wobble, 1, true, zoom, hard)
-    along += Math.abs(wobblePitch(wobble) - was)
-    was = wobblePitch(wobble)
+/** A deterministic stand-in for `Math.random` — varied, so a walk is a walk, and
+ * repeatable, so the numbers below mean something. */
+const rolling = (): (() => number) => {
+  let seed = 12345
+  return () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff
+    return seed / 0x7fffffff
   }
-  return along
 }
 
-/** …and the furthest it ever gets from the middle. */
-const reach = (zoom: number, frames = 240): number => {
+/** Run the tremor for `frames` engine frames at this zoom. */
+const shaken = (zoom: number, frames = 240): ReturnType<typeof createWobble> => {
   const wobble = createWobble()
-  let most = 0
+  const random = rolling()
+  for (let frame = 0; frame < frames; frame++) updateWobble(wobble, 1, zoom, random)
+  return wobble
+}
+
+/** How far the CENTRE travels over `frames` frames — the sum of its steps, which
+ * is what the zoom is meant to change. */
+const travelled = (zoom: number, frames = 240): number => {
+  const wobble = createWobble()
+  const random = rolling()
+  let was = wobble.driftPitch
+  let along = 0
   for (let frame = 0; frame < frames; frame++) {
-    updateWobble(wobble, 1, true, zoom, hard)
-    most = Math.max(most, Math.abs(wobblePitch(wobble)), Math.abs(wobbleYaw(wobble)))
+    updateWobble(wobble, 1, zoom, random)
+    along += Math.abs(wobble.driftPitch - was)
+    was = wobble.driftPitch
   }
-  return most
+  return along
 }
 
 test('only the two zooming skills zoom, and they creep to the cap', () => {
@@ -66,43 +72,56 @@ test('only the two zooming skills zoom, and they creep to the cap', () => {
   expect(zoom.value).toBe(0)
 })
 
-test('the sights WANDER — the crosshair travels, it does not rattle in place', () => {
-  // Play, on the version that sampled and eased: "ты держишь его в радиусе центра,
-  // а надо чтобы прицел уезжал." A walk with a direction per axis, reversing only
-  // at the stops (the engine's own tremor, 0x49e056), so it crosses.
+test('the CENTRE walks, so the sights can wander off in any direction', () => {
+  // Play's correction, and the whole of it: "после каждого сдвига обновлять
+  // центр." A fresh direction every step, so it is a walk and not a sweep.
   const wobble = createWobble()
-  const seen: number[] = []
+  const random = rolling()
+  const drift: number[] = []
   for (let frame = 0; frame < 240; frame++) {
-    updateWobble(wobble, 1, true, 0, hard)
-    seen.push(wobblePitch(wobble))
+    updateWobble(wobble, 1, 0, random)
+    drift.push(wobble.driftPitch)
   }
-  // It reaches both stops, which a bounded rattle round the middle never does…
-  expect(Math.max(...seen)).toBeGreaterThan(20)
-  expect(Math.min(...seen)).toBeLessThan(-20)
-  // …and it gets there by walking: every step is small against the range it
-  // covers, so consecutive frames are neighbours rather than fresh samples.
-  const steps = seen.slice(1).map((one, i) => Math.abs(one - seen[i]))
-  expect(Math.max(...steps)).toBeLessThan(4)
-  // The two axes are not the same line: they start opposed and reverse at their
-  // own times, which is what makes it wander in every direction.
-  expect(wobbleYaw(wobble)).not.toBeCloseTo(wobblePitch(wobble), 3)
+  // It gets properly away from the middle — further than the jitter alone could.
+  expect(Math.max(...drift.map(Math.abs))).toBeGreaterThan(8)
+  // …and it gets there by STEPS: neighbours, not fresh samples.
+  const steps = drift.slice(1).map((one, i) => Math.abs(one - drift[i]))
+  expect(Math.max(...steps)).toBeLessThan(2)
+  // The direction is redrawn every step rather than held to a stop, which is what
+  // keeps it off the one ellipse a reflecting sweep drew: the sign of the step
+  // changes often.
+  const turns = drift
+    .slice(2)
+    .filter((one, i) => Math.sign(one - drift[i + 1]) !== Math.sign(drift[i + 1] - drift[i])).length
+  expect(turns).toBeGreaterThan(40)
+  // And the JITTER is still there on top, fast and its own size.
+  expect(Math.abs(wobble.jitterPitch)).toBeGreaterThan(0)
+  expect(wobblePitch(wobble)).toBeCloseTo(wobble.driftPitch + wobble.jitterPitch, 6)
 })
 
 test('CLOSER TRAVELS FURTHER, and the radius stays put', () => {
-  // The correction play asked for twice: not a wider jitter, more ground covered.
   // "чем ближе, тем больше расстояния проходит, а не тем шире радиус дёрганья."
-  const open = travelled(0)
-  const shut = travelled(1)
-  expect(shut).toBeGreaterThan(open * 1.5)
-  // …and the bound does NOT move with the zoom.
-  expect(reach(1)).toBeCloseTo(reach(0), 6)
+  expect(travelled(1)).toBeGreaterThan(travelled(0) * 1.5)
+  // The bound is not the zoom's to move: 24 units either way, wide open or shut.
+  expect(Math.abs(shaken(1, 600).driftPitch)).toBeLessThanOrEqual(24)
+  expect(Math.abs(shaken(1, 600).driftYaw)).toBeLessThanOrEqual(24)
 })
 
-test('nothing at all when the sights are not up', () => {
-  const wobble = createWobble()
-  updateWobble(wobble, 1, true, 0, hard)
+test('it FREEZES when it stops being advanced — that is the fuse', () => {
+  // `Pig::Aim` is refused from the fire press until the attack and the tremor
+  // arrives through it, so the sights stop dead and the bullet leaves along what
+  // the player last saw. Resetting instead read as the shot lagging a second.
+  const wobble = shaken(0, 60)
+  const held = wobblePitch(wobble)
+  expect(held).not.toBe(0)
+  expect(wobblePitch(wobble)).toBe(held)
+  expect(wobbleYaw(wobble)).toBe(wobble.driftYaw + wobble.jitterYaw)
+})
+
+test('nothing at all once the sights are lowered for good', () => {
+  const wobble = shaken(0, 60)
   expect(Math.abs(wobblePitch(wobble))).toBeGreaterThan(0)
-  updateWobble(wobble, 1, false, 0, hard)
+  resetWobble(wobble)
   expect(wobblePitch(wobble)).toBe(0)
   expect(wobbleYaw(wobble)).toBe(0)
 })

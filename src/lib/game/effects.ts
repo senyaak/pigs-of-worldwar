@@ -38,8 +38,15 @@ export interface RingStage {
   step: number
   /** Five bits each, 0..31, packed at `[ring+0x94]`. */
   colour: [number, number, number]
-  /** How far the ring sits off the strike, in the engine's Y (DOWN-positive),
-   * so a negative number is above it. Zero on every melee kind. */
+  /**
+   * How far the ring sits off the strike, in the engine's Y. Zero on every melee
+   * kind, and only the water splash uses it.
+   *
+   * **Its SIGN is wrong here and is deliberately left alone**: the splash is a
+   * thread of its own that play has parked (CLAUDE.md), and correcting the sign
+   * moves the splash. See that thread for the argument — in short, +y is up in the
+   * engine, so −500 is BELOW the water and this draws it above.
+   */
   lift: number
 }
 

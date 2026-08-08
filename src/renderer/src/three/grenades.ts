@@ -32,6 +32,7 @@ import {
 import type { Lobbed } from '../../../lib/game/grenade'
 import { DAMAGE_UNIT } from '../../../lib/game/projectile'
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import { aimRadians } from '../../../lib/game/aim'
 import { weaponModelName } from '../../../lib/game/weapons'
 import { createLobArt } from './lobArt'
 import { createLobTrails } from './lobTrail'
@@ -81,7 +82,7 @@ const THROW_FROM = { x: 0, y: 0, z: 0 }
 export interface Grenades {
   /** Throw one from this pig at `aim`, with the gauge's `charge` behind it.
    * False if what it holds is not lobbed. */
-  throwOne(soldier: Soldier, aim: number, charge: number): boolean
+  throwOne(soldier: Soldier, aim: number, charge: number, yaw?: number): boolean
   /** One frame of every grenade in the air or rolling. */
   update(delta: number): void
   /**
@@ -306,7 +307,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
   }
 
   return {
-    throwOne(soldier, aim, charge) {
+    throwOne(soldier, aim, charge, yaw = 0) {
       const skill = soldier.pig.holding
       if (skill === null || !lobOf(skill)) return false
       const bone = soldier.mesh.bones[HAND] ?? soldier.mesh.bones[0]
@@ -316,7 +317,15 @@ export function createGrenades(parts: GrenadeParts): Grenades {
       at.set(THROW_FROM.x, THROW_FROM.y, THROW_FROM.z)
       bone.localToWorld(at)
       parts.root.worldToLocal(at)
-      const shot = lob(skill, { x: at.x, y: at.y, z: at.z }, soldier.pig.heading, aim, charge)
+      const shot = lob(
+        skill,
+        { x: at.x, y: at.y, z: at.z },
+        // The sights' tremor turns the throw as well as the picture, or the
+        // crosshair is telling lies (lib/game/wobble.ts).
+        soldier.pig.heading + aimRadians(yaw),
+        aim,
+        charge
+      )
       if (!shot) return false
       live.push(shot)
       return true

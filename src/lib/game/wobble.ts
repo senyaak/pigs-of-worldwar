@@ -59,44 +59,53 @@
 // `AMPLITUDE` is the knob. Zero it and the scope is dead still again.
 
 /**
- * ## And it WALKS, it does not shiver in place — the fourth pass at its shape
+ * ## A JITTER ON A WANDERING CENTRE — and it took four goes at the shape
  *
- * Play, looking at the sample-and-hold version: "ты держишь его в радиусе центра,
- * а надо чтобы прицел уезжал — и чем ближе, тем больше расстояния проходит, а не
- * тем шире радиус дёрганья."
+ * Play settled it, and the last correction is the whole design: "тебе надо было
+ * просто после каждого сдвига обновлять центр — чтобы могло уезжать в любую
+ * сторону. Раньше было ПРАВИЛЬНО."
  *
- * That is a different mechanism, not a bigger number, and it is the ENGINE's — the
- * random walk at 0x49e030 quoted at the top of this file. A direction per axis, a
- * fresh step every frame, and a reversal only when it reaches the stop. So the
- * crosshair travels: it wanders off the target and comes back rather than rattling
- * around it, and the two axes reach their stops at different times, which is what
- * makes it wander in every direction rather than along a line.
+ * So both halves, and neither replaces the other:
  *
- * The version this replaces drew an independent sample each frame and eased
- * towards it, which is a bounded rattle however far the bound is put — exactly
- * what play described. Three things went with it: `AMPLITUDE`, `EASE`, and the
- * whole idea that the zoom should widen the bound.
+ * - the **JITTER** is what was right before — an independent sample of a couple of
+ *   units every engine frame, chased rather than snapped to, which is the resting
+ *   stick the arm above feeds the camera;
+ * - the **CENTRE** it jitters about does not sit still. It takes a step of its own
+ *   every frame, in a fresh random direction, and it is what makes the sights
+ *   travel: they wander off the target and have to be brought back.
+ *
+ * A pass with only the walk was tried and play read it exactly right — "щас реально
+ * по одному эллипсу ездит". Two axes each sweeping between reflecting stops IS an
+ * ellipse; a direction that is redrawn every step is not, and that is the
+ * difference between the two.
  */
 
 /**
- * How far the sights may wander from where they are pointed, in 4096ths of a turn
- * — about two degrees. EYEWORK, and it does NOT ride the zoom: play was explicit
- * that the radius is not what should grow.
+ * How far the JITTER reaches, in 4096ths of a turn — about half a degree, and the
+ * number play settled on before ("дрож чутка слабая" took it from 4 to 7).
+ *
+ * The chase below eats some of it: against white noise a chase at `EASE` settles to
+ * `sqrt(EASE / (2 − EASE))` of the sample, so 0.65 shows about seven tenths. Turn
+ * this up rather than `EASE` down, or it goes back to floating.
  */
-const BOUND = 24
+const AMPLITUDE = 7
+
+/** How much of the way to a fresh sample one engine frame moves. One is the raw
+ * stick and reads as a rattle; play asked for "чуть плавнее, но не сильно". */
+const EASE = 0.65
 
 /**
- * A step, in 128ths of `BOUND` a frame — `8 + (rand() & 7)` against the engine's
- * own ±0x80 stops (0x49e056), carried over as it stands. Eight to fifteen of a
- * hundred and twenty-eight is a crossing of the whole range in ten to seventeen
- * engine frames, so the sights sweep about once a second.
+ * How far the CENTRE steps each engine frame, in aim units, and how far it may get
+ * from where the player pointed. Both eyework.
+ *
+ * `DRIFT_BOUND` is about two degrees. It does not ride the zoom: play was explicit
+ * that the radius is not the thing that should grow.
  */
-const STEP_LOW = 8
-const STEP_SPAN = 8
-const STEP_UNIT = BOUND / 0x80
+const DRIFT_STEP = 1.2
+const DRIFT_BOUND = 24
 
 /**
- * How much further it travels a second at full zoom.
+ * How much further the centre travels a second at full zoom.
  *
  * **The exe's zoom divisor is not this quantity, and pass three had it backwards.**
  * The aim-view arm scales what comes out of `[game+0x300]` by
@@ -104,83 +113,104 @@ const STEP_UNIT = BOUND / 0x80
  * that accumulator is the player's own aiming input, i.e. control sensitivity,
  * which a scope wants fine. The tremor is what the player fights, and play's rule
  * for it is the other way about: closer covers more ground. It scales the STEP and
- * not the bound, which is what "чем ближе, тем больше расстояния проходит, а не тем
- * шире радиус" says.
+ * not the bound — "чем ближе, тем больше расстояния проходит, а не тем шире радиус".
  */
 const ZOOMED = 2
 
 export interface Wobble {
-  /** Where each axis has wandered to, in aim units. */
-  pitch: number
-  yaw: number
-  /** Which way each one is going, +1 or −1. Reversed at the stops, and only
-   * there — that is what makes it travel rather than rattle. */
-  pitchWay: number
-  yawWay: number
-  /** Frames owed. A step lands once an ENGINE frame: stepping per rendered frame
-   * would make the sweep as fast as the screen. */
+  /** The jitter's sample each axis is heading for, drawn once an engine frame. */
+  sampledPitch: number
+  sampledYaw: number
+  /** …where the jitter has actually got to. */
+  jitterPitch: number
+  jitterYaw: number
+  /** …and the centre it is jittering about, which walks. */
+  driftPitch: number
+  driftYaw: number
+  /** Frames owed. A sample and a step land once an ENGINE frame: doing either per
+   * rendered frame makes the tremor as fast as the screen. */
   owed: number
 }
 
 export const createWobble = (): Wobble => ({
-  pitch: 0,
-  yaw: 0,
-  pitchWay: 1,
-  yawWay: -1,
+  sampledPitch: 0,
+  sampledYaw: 0,
+  jitterPitch: 0,
+  jitterYaw: 0,
+  driftPitch: 0,
+  driftYaw: 0,
   owed: 0
 })
+
+/** Put the sights back where they are pointed. Used when they are lowered for
+ * good — NOT while a shot is in the fuse, which HOLDS instead (see below). */
+export function resetWobble(wobble: Wobble): void {
+  wobble.sampledPitch = 0
+  wobble.sampledYaw = 0
+  wobble.jitterPitch = 0
+  wobble.jitterYaw = 0
+  wobble.driftPitch = 0
+  wobble.driftYaw = 0
+  wobble.owed = 0
+}
 
 /**
  * Advance the tremor. `frames` is engine frames, not rendered ones.
  *
- * `zoom` is how far in the sights are, 0 wide open and 1 at the cap: it scales how
- * FAR the walk travels each frame and nothing else. `random` is injectable so a
- * spec can pin it.
+ * **Stop calling it and it FREEZES where it is** — nothing here resets. That is
+ * `Pig::Aim`'s own behaviour and it matters: the exe's tremor arrives THROUGH
+ * `Pig::Aim` (0x495cb0 calls 0x46A7F0 with the stick's step), that function bails
+ * while `Pig::MayAct` is false, and `MayAct` is false from the fire press until the
+ * attack. So in the original the sights stop dead for the length of the fuse and
+ * the bullet leaves along exactly what the player last saw. Zeroing it there
+ * instead was the bug play hit: "нажимаешь, прицел смотрит на 1 вещь, а стреляет
+ * будто секунду назад."
+ *
+ * `zoom` is 0 wide open and 1 at the cap: it scales how far the CENTRE travels each
+ * frame, and nothing else. `random` is injectable so a spec can pin it.
  */
 export function updateWobble(
   wobble: Wobble,
   frames: number,
-  sighting: boolean,
   zoom = 0,
   random: () => number = Math.random
 ): void {
-  if (!sighting) {
-    wobble.pitch = 0
-    wobble.yaw = 0
-    wobble.pitchWay = 1
-    wobble.yawWay = -1
-    wobble.owed = 0
-    return
-  }
   const reach = 1 + Math.max(0, Math.min(1, zoom)) * (ZOOMED - 1)
+  const bounded = (value: number): number =>
+    Math.max(-DRIFT_BOUND, Math.min(DRIFT_BOUND, value))
   wobble.owed += frames
   while (wobble.owed >= 1) {
     wobble.owed -= 1
-    const step = (): number => (STEP_LOW + random() * STEP_SPAN) * STEP_UNIT * reach
-    // Reversing AT THE STOP is the whole of it — nothing pulls it back towards
-    // the middle, so it crosses rather than hovers.
-    wobble.pitch += wobble.pitchWay * step()
-    if (wobble.pitch > BOUND) {
-      wobble.pitch = BOUND
-      wobble.pitchWay = -1
-    } else if (wobble.pitch < -BOUND) {
-      wobble.pitch = -BOUND
-      wobble.pitchWay = 1
-    }
-    wobble.yaw += wobble.yawWay * step()
-    if (wobble.yaw > BOUND) {
-      wobble.yaw = BOUND
-      wobble.yawWay = -1
-    } else if (wobble.yaw < -BOUND) {
-      wobble.yaw = -BOUND
-      wobble.yawWay = 1
-    }
+    // A fresh sample for the jitter…
+    wobble.sampledPitch = (random() * 2 - 1) * AMPLITUDE
+    wobble.sampledYaw = (random() * 2 - 1) * AMPLITUDE
+    // …and a step for the centre, in a FRESH direction each time. Keeping a
+    // direction and reversing at the stops is what drew the ellipse.
+    wobble.driftPitch = bounded(wobble.driftPitch + (random() * 2 - 1) * DRIFT_STEP * reach)
+    wobble.driftYaw = bounded(wobble.driftYaw + (random() * 2 - 1) * DRIFT_STEP * reach)
   }
+  // Chase the sample by the same engine frames, so the smoothing does not get
+  // finer just because the screen is faster.
+  const ease = Math.min(1, EASE * Math.max(frames, 0))
+  wobble.jitterPitch += (wobble.sampledPitch - wobble.jitterPitch) * ease
+  wobble.jitterYaw += (wobble.sampledYaw - wobble.jitterYaw) * ease
 }
 
-/** How far off the pitch has wandered, in aim units. View only. */
-export const wobblePitch = (wobble: Wobble): number => wobble.pitch
+/**
+ * How far off the pitch is, in aim units: the wandering centre plus the jitter on
+ * top of it.
+ *
+ * **The SHOT reads this too, and it must.** The picture and the bullet cannot
+ * disagree — the crosshair is nailed to the middle of the screen, so a view that
+ * points somewhere the bullet will not go is simply a lie, and play read it as the
+ * shot lagging. The exe has no such split: its tremor is the stick's own step going
+ * through `Pig::Aim` into `[pig+0x304]`, which is the field the bullet reads
+ * (0x47a2b6). An earlier note here claimed "the view jitters, the shot does not" —
+ * that was written before the stick was found feeding `Pig::Aim`, and it is wrong.
+ */
+export const wobblePitch = (wobble: Wobble): number => wobble.driftPitch + wobble.jitterPitch
 
-/** …and the yaw. The pig's own heading does not follow it: the model stands
- * where it stands and only the sights move. */
-export const wobbleYaw = (wobble: Wobble): number => wobble.yaw
+/** …and the yaw, the same way. The pig's own heading does not follow it — the model
+ * stands where it stands; in the exe this axis goes to the pig's turn instead, and
+ * turning the model from a tremor would fight the walk. */
+export const wobbleYaw = (wobble: Wobble): number => wobble.driftYaw + wobble.jitterYaw

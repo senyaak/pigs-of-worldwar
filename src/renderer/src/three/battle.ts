@@ -58,7 +58,7 @@ import { advanceFiring, beginFiring } from '../../../lib/game/shot'
 import type { Firing } from '../../../lib/game/shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from '../../../lib/game/aftermath'
 import type { Aftermath } from '../../../lib/game/aftermath'
-import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
+import { createWobble, resetWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../../../lib/game/zoom'
 import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createShots } from './shots'
@@ -591,10 +591,20 @@ export function buildBattle(
    * and one mid-swing from the side, which is the original's own camera mode
    * for a hand-to-hand attack and the only thing that uses it (three/chase).
    */
-  /** Where the sights are actually pointing: the player's angle plus the
-   * drift. The stored angle stays the player's — the exe's `[pig+0x304]` is
-   * exact, and the wobble is the remake's (lib/game/wobble.ts). */
-  const aimedAngle = (): number => aim.angle
+  /**
+   * Where the sights are ACTUALLY pointing: the player's angle plus the tremor.
+   *
+   * The tremor has to be in here. The crosshair is nailed to the middle of the
+   * screen, so a view built on `aim.angle + wobble` while the bullet leaves along
+   * `aim.angle` alone is a picture that lies about where the shot goes — play read
+   * it as the shot lagging the sights by a second. The exe has no such split
+   * either: its tremor is the stick's step going through `Pig::Aim` into
+   * `[pig+0x304]`, and that is the field the bullet reads (lib/game/wobble.ts).
+   *
+   * `aim.angle` stays the PLAYER's own, untouched, because that is what the dial
+   * shows and what the next frame's input adds to.
+   */
+  const aimedAngle = (): number => aim.angle + wobblePitch(wobble)
 
   /**
    * Where the scope looks FROM: `SCOPE_MOUNT` in the hand bone's space, in
@@ -679,10 +689,9 @@ export function buildBattle(
       dropIn.riseOver(soldier),
       delta,
       view,
-      // The VIEW jitters; the shot does not. The exe feeds the aim camera the
-      // analogue axes, and a resting stick is never quite zero
-      // (lib/game/wobble.ts). The bullet still leaves along `[pig+0x304]`.
-      aimRadians(aim.angle + wobblePitch(wobble)),
+      // The view and the SHOT take the same tremor — anything else is a picture
+      // that lies about where the bullet goes (`aimedAngle`, lib/game/wobble.ts).
+      aimRadians(aimedAngle()),
       aimRadians(wobbleYaw(wobble)),
       view === 'scope' ? scopeEye(soldier) : null
     )
@@ -1013,8 +1022,8 @@ export function buildBattle(
       // Where the sights were actually pointing — the drift is part of the
       // aim, not a decoration over it.
       const away = isLobbed(holding)
-        ? grenades.throwOne(active, aimedAngle(), thrownWith)
-        : shots.fire(active, aimedAngle())
+        ? grenades.throwOne(active, aimedAngle(), thrownWith, wobbleYaw(wobble))
+        : shots.fire(active, aimedAngle(), wobbleYaw(wobble))
       if (!away) firing = null
       else {
         // `Pig::Attack` puts the weapon's own attack clip on at the same
@@ -1075,10 +1084,17 @@ export function buildBattle(
     // glide, and the zoom creeps 0x20 a frame (lib/game/wobble.ts, zoom.ts).
     const scoped = sighting && isGun(holding)
     const frames = delta / FRAME_SECONDS
-    // The tremor rides the ZOOM, and the closer it looks the more it shakes —
-    // which is play's rule and not the exe's divisor (lib/game/wobble.ts explains
-    // why those are different quantities).
-    updateWobble(wobble, frames, scoped, zoomFraction(zoom))
+    // The tremor rides the ZOOM, and the closer it looks the further it travels —
+    // play's rule, not the exe's divisor (lib/game/wobble.ts explains why those are
+    // different quantities).
+    //
+    // **It FREEZES for the fuse rather than being reset.** `Pig::Aim` is refused
+    // from the fire press until the attack, and the tremor arrives through it, so
+    // in the original the sights stop dead and the bullet leaves along exactly what
+    // the player last saw. Zeroing it here is what made the shot look a second
+    // stale. Lowering the sights for good is the only thing that clears it.
+    if (scoped) updateWobble(wobble, frames, zoomFraction(zoom))
+    else if (!firing) resetWobble(wobble)
     updateZoom(zoom, frames, scoped && zoomsIn(holding))
     // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts
     // a field of view is the library's and the library is not in the install,
