@@ -31,6 +31,9 @@ export function initMenu(handlers: {
     canvas: byId<HTMLCanvasElement>('menu-screen'),
     title: () => feText(TITLE_TEXT),
     onAssets: handlers.onAssets,
+    // This screen's rows are staggered, and only this one: the two numbers
+    // are read off its own draw arm (exe 0x41bf6c) and no other arm has been.
+    stagger: true,
     bars: [
       {
         label: () => feText(ITEM_TEXT[0]),

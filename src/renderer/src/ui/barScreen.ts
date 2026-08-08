@@ -8,11 +8,13 @@
 // FEBmps/FEBMP.MAD, the letters out of FEText, the labels out of
 // Language/Text/fetext.bin.
 //
-// WHERE each piece sits is the one thing not taken from the game: the exe
-// computes its screen coordinates in the frontend's draw code rather than
-// storing them (../pigs-disasm/frontend/notes.md ends at the blitter), so
-// LAYOUT below is the remake's reading of the art and is meant to be
-// corrected against play — `pow.screen.layout` nudges it live and
+// WHERE each piece sits is half taken from the game now. The exe computes its
+// screen coordinates in the frontend's draw code rather than storing them, and
+// the MAIN MENU's arm has been read line by line
+// (../pigs-disasm/frontend/notes.md) — so the COLUMN and its lamps are the
+// original's numbers, and the machine behind them is still the remake's
+// eyework, because which sprite sits in which slot of the exe's draw array is
+// not decoded. `pow.screen.layout` nudges the lot live and
 // `pow.screen.print()` writes it back out, the same way `pow.hud` does.
 
 import { loadFont } from './font'
@@ -45,19 +47,33 @@ export const LAYOUT = {
   machine: { x: 56, y: 128 },
   title: { x: 216, y: 24 },
   /**
-   * The column. **The STEP is 40 and that is read, not chosen** — the exe's
-   * frontend draw arm places item `i` at `i*40` (0x41bfb9, and it bands its
-   * source rect the same way), and the ART agrees without any disassembly:
-   * `light1` decodes to exactly four lamp bands 36 tall with their tops at 6,
-   * 46, 87, 128. It was 44 by eye. Where the column SITS is still the
-   * remake's: the exe places it against the screen CENTRE and which screen id
-   * that arm draws is not pinned yet (`../pigs-disasm/frontend/notes.md`).
+   * The column, and **every number in it is READ** off the main menu's own
+   * draw arm (screen id 1, exe 0x41bf6c — the loader arm proves the identity:
+   * it decompresses `fullmenu`, `chose1..6`, `title1..6`, `light1..3` and the
+   * machinery, and none of the other screens' widgets).
+   *
+   * A row's plate sits at `0x13F + ebx - stretch/2` and is 40 apart from the
+   * next, where `ebx` rests at -10; a plate is drawn as TWO blits of one
+   * 160-wide `chose` so it comes out `stretch` wider (see `drawPlate`).
    */
-  bars: { x: 240, y: 140, step: 40 },
-  /** One lamp per item, beside its bar — play: "круглые, на каждом пункте, но
-   * мигает только 1 активная". Where it sits is eyework; that it is one per
-   * item at the bars' own pitch is the art's own (see `bars.step`). */
-  lamp: { dx: -34, dy: 0 },
+  bars: { x: 284, y: 182, step: 40, stretch: 50 },
+  /**
+   * The four-item arm's own stagger: rows 1 and 2 sit twelve pixels IN
+   * (0x41c007/0x41c011) and rows 2 and 3 two pixels DOWN (0x41bf25 seeds it,
+   * 0x41c056 sets it). Read off the MAIN MENU and nowhere else — every other
+   * screen is drawn by an arm that has not been read — so only that screen
+   * asks for it, through `stagger` in the config.
+   */
+  stagger: { indent: 12, drop: 2 },
+  /**
+   * One lamp per row, to the RIGHT of its plate, ending flush against it: the
+   * exe puts it at `0x1DE + stretch/2 + ebx` = 493 and `0xB0 + 40i` = 176,
+   * where the plate runs 284..494. The art is `light1..3`, a rack of FOUR
+   * lamps 48×176 that the exe cuts a 38-tall band out of at the column's own
+   * pitch — so `band` is which lamp, not which frame. Play: "круглые, на
+   * каждом пункте, но мигает только 1 активная".
+   */
+  lamp: { x: 493, y: 176, band: 38 },
   /** The rack down the left, and the carriage that runs on it. */
   track: { x: 0, y: 0 },
   carriage: { x: 184, offset: -103 },
@@ -67,6 +83,14 @@ export const LAYOUT = {
    * edge and the value in from the right, rather than one centred line. */
   setting: { labelInset: 12, valueInset: 12 }
 }
+
+/**
+ * Where the plate's two halves meet in the SOURCE image — the exe blits
+ * columns `0 .. SEAM + stretch` at the row's x and columns `SEAM .. width` at
+ * `x + SEAM + stretch`, so the two abut exactly and the columns just past the
+ * seam are the ones repeated (0x41c073, 0x41c0ed).
+ */
+const SEAM = 24
 
 /**
  * How long the plates take to turn over when a screen ARRIVES.
@@ -100,7 +124,7 @@ const ART = [
   'title1', 'title2', 'title3', 'title4', 'title5', 'title6',
   'cog0', 'cog1', 'cog2', 'cog3', 'cog4', 'cog5',
   'selcog1', 'selcog2', 'selcog3', 'selcog4', 'selcog5', 'selcog6',
-  'lit1', 'lit2', 'lit3',
+  'light1', 'light2', 'light3',
   'dial0001', 'dial0002', 'dial0003', 'dial0004', 'dial0005', 'dial0006',
   'dial0007', 'dial0008', 'dial0009', 'dial0010', 'dial0011', 'dial0012'
 ]
@@ -129,6 +153,7 @@ function cloneLayout(): ScreenLayout {
     machine: { ...LAYOUT.machine },
     title: { ...LAYOUT.title },
     bars: { ...LAYOUT.bars },
+    stagger: { ...LAYOUT.stagger },
     lamp: { ...LAYOUT.lamp },
     track: { ...LAYOUT.track },
     carriage: { ...LAYOUT.carriage },
@@ -208,6 +233,9 @@ export function initBarScreen(config: {
   /** The plate at the top — the screen's own fetext string. */
   title: () => string
   bars: Bar[]
+  /** Whether the rows carry the MAIN MENU's own stagger (`LAYOUT.stagger`).
+   * It is read off that screen's draw arm and belongs to no other. */
+  stagger?: boolean
   /** The back key, where the screen has somewhere to go back to. */
   onBack?: () => void
   /** F1, the remake's own asset browsers. */
@@ -293,6 +321,25 @@ export function initBarScreen(config: {
 
   // The mouse is the remake's own convenience: the original is driven from
   // the keyboard and the pad. Hovering lights a bar, clicking chooses it.
+  /** How far row `i` is nudged from the column's own corner. Zero unless the
+   * screen carries the main menu's stagger — see `LAYOUT.stagger`. */
+  const staggerOf = (i: number): { dx: number; dy: number } => {
+    if (!config.stagger) return { dx: 0, dy: 0 }
+    return {
+      dx: i === 1 || i === 2 ? layout.stagger.indent : 0,
+      dy: i >= 2 ? layout.stagger.drop : 0
+    }
+  }
+  /** A row's own corner and the width the stretched plate comes out at. */
+  const rowBox = (i: number, plate: Sprite): { x: number; y: number; width: number } => {
+    const { dx, dy } = staggerOf(i)
+    return {
+      x: layout.bars.x + dx,
+      y: layout.bars.y + i * layout.bars.step + dy,
+      width: plate.width + layout.bars.stretch
+    }
+  }
+
   const barUnder = (event: MouseEvent): number => {
     const box = canvas.getBoundingClientRect()
     // The canvas is letterboxed inside its box by object-fit: contain.
@@ -300,10 +347,10 @@ export function initBarScreen(config: {
     const x = (event.clientX - box.left - (box.width - SCREEN.width * scale) / 2) / scale
     const y = (event.clientY - box.top - (box.height - SCREEN.height * scale) / 2) / scale
     if (!art) return -1
-    const bar = art.get('chose1')
+    const plate = art.get('chose1')
     for (let i = 0; i < bars.length; i++) {
-      const top = layout.bars.y + i * layout.bars.step
-      if (x >= layout.bars.x && x < layout.bars.x + bar.width && y >= top && y < top + bar.height) {
+      const row = rowBox(i, plate)
+      if (x >= row.x && x < row.x + row.width && y >= row.y && y < row.y + plate.height) {
         return i
       }
     }
@@ -326,15 +373,13 @@ export function initBarScreen(config: {
     context: CanvasRenderingContext2D,
     font: Font,
     text: string,
-    sprite: Sprite,
-    x: number,
-    y: number
+    box: { x: number; y: number; width: number; height: number }
   ): void => {
     font.draw(
       context,
       text,
-      Math.round(x + (sprite.width - font.measure(text)) / 2),
-      Math.round(y + (sprite.height - font.height) / 2)
+      Math.round(box.x + (box.width - font.measure(text)) / 2),
+      Math.round(box.y + (box.height - font.height) / 2)
     )
   }
 
@@ -351,6 +396,25 @@ export function initBarScreen(config: {
     if (!context || !art || !big || !lit || !plain || !off) return
     const blit = (sprite: Sprite, x: number, y: number): void =>
       context.drawImage(sprite.image, x, y)
+    /** A row's plate: one sprite in two halves, so it comes out `stretch`
+     * wider than the art. The exe's own way of doing it — see `SEAM`. */
+    const drawPlate = (sprite: Sprite, x: number, y: number): void => {
+      const left = SEAM + layout.bars.stretch
+      context.drawImage(sprite.image, 0, 0, left, sprite.height, x, y, left, sprite.height)
+      const right = sprite.width - SEAM
+      context.drawImage(
+        sprite.image, SEAM, 0, right, sprite.height,
+        x + left, y, right, sprite.height
+      )
+    }
+    /** One lamp out of the rack of four, chosen by ROW rather than by frame.
+     * A screen with more rows than the rack has lamps repeats it — the exe
+     * only ever bands four, because the arm this is read off draws four. */
+    const drawLamp = (sprite: Sprite, row: number, x: number, y: number): void => {
+      const band = layout.lamp.band
+      const top = (row % 4) * layout.bars.step
+      context.drawImage(sprite.image, 0, top, sprite.width, band, x, y, sprite.width, band)
+    }
 
     blit(art.get('pigbkpc1'), 0, 0)
     blit(art.get('fullmenu'), layout.machine.x, layout.machine.y)
@@ -370,22 +434,27 @@ export function initBarScreen(config: {
     blit(title, layout.title.x, layout.title.y)
     // Mid-turn a plate is edge-on to what it used to say, so it says nothing.
     if (turning === null) {
-      centred(context, big, config.title(), title, layout.title.x, layout.title.y)
+      centred(context, big, config.title(), {
+        x: layout.title.x,
+        y: layout.title.y,
+        width: title.width,
+        height: title.height
+      })
     }
 
     for (let i = 0; i < bars.length; i++) {
-      const y = layout.bars.y + i * layout.bars.step
       const face = turning === null ? plates[0] : oneShot(plates, turning)
-      blit(face, layout.bars.x, y)
+      const row = rowBox(i, face)
+      drawPlate(face, row.x, row.y)
 
-      // One lamp per item; only the lit one blinks, the rest sit at the
-      // dimmest frame the set has.
+      // One lamp per row, to the right of its plate; only the lit one blinks,
+      // the rest sit at the dimmest frame the rack has.
       if (lamps.length > 0) {
         const lamp =
           i === selection
             ? lamps[Math.floor((Math.max(0, now - started) / 1000) * LAMP_FPS) % lamps.length]
             : lamps[0]
-        blit(lamp, layout.bars.x + layout.lamp.dx, y + layout.lamp.dy)
+        drawLamp(lamp, i, layout.lamp.x, layout.lamp.y + i * layout.bars.step)
       }
 
       if (turning !== null) continue
@@ -394,18 +463,16 @@ export function initBarScreen(config: {
       const font = !bar.enabled() ? off : i === selection ? lit : plain
       const value = bar.value?.() ?? null
       if (value === null) {
-        centred(context, font, bar.label(), face, layout.bars.x, y)
+        centred(context, font, bar.label(), { ...row, height: face.height })
         continue
       }
       // A setting reads left to right: what it is, then what it is set to.
-      const top = Math.round(y + (face.height - font.height) / 2)
-      font.draw(context, bar.label(), layout.bars.x + layout.setting.labelInset, top)
+      const top = Math.round(row.y + (face.height - font.height) / 2)
+      font.draw(context, bar.label(), row.x + layout.setting.labelInset, top)
       font.draw(
         context,
         value,
-        Math.round(
-          layout.bars.x + face.width - layout.setting.valueInset - font.measure(value)
-        ),
+        Math.round(row.x + row.width - layout.setting.valueInset - font.measure(value)),
         top
       )
     }
@@ -465,7 +532,7 @@ export function initBarScreen(config: {
         plates = art.frames('chose', 1, 6)
         titles = art.frames('title', 1, 6)
         carriages = art.frames('selcog', 1, 6)
-        lamps = art.frames('lit', 1, 3)
+        lamps = art.frames('light', 1, 3)
       } catch (error) {
         // A stripped install has no frontend to wear. Warn rather than
         // error: the e2e suite treats console.error as a failed run.
