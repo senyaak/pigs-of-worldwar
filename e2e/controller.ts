@@ -26,12 +26,25 @@ export type Action =
   | 'menuBack'
   | 'assets'
 
+/**
+ * Drive one method, then WAIT OUT A FRAME before handing control back.
+ *
+ * The battle reads its controls once a frame now (`input/battleInput.ts`), so a
+ * press that returned immediately would let the spec ask the game about a key it
+ * had not looked at yet — `chooseSkill` is the sharp case, since it presses and
+ * then reads `holding` on the very next round trip. Two frames rather than one
+ * because the scene's loop queues its next callback at the top of the current
+ * one, so the first frame we see may already be under way.
+ */
 const call = (page: Page, method: string, action: Action): Promise<void> =>
   page.evaluate(
-    (o) => {
+    async (o) => {
       const pow = (window as unknown as { pow?: { controller: Record<string, (a: string) => void> } }).pow
       if (!pow?.controller) throw new Error('window.pow.controller is missing — is the app built?')
       pow.controller[o.method](o.action)
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
     },
     { method, action }
   )

@@ -14,10 +14,7 @@ import { artFor } from '../three/soldiers'
 import { existsForPlayers } from '../../../lib/formats/pog'
 import type { LoadModelResult, MapObject } from '../api'
 import { ensureScene } from '../three/scene'
-import { modeOf, readControls, verbOf } from '../../../lib/game/controls'
-import { DRIVING_ACTIONS } from '../input/actions'
-import type { ControlMode } from '../../../lib/game/controls'
-import type { Held } from '../../../lib/game/controls'
+import { createBattleInput } from '../input/battleInput'
 import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
 import { controller } from '../input/controller'
@@ -26,10 +23,9 @@ import { missionTitle } from './titleCard'
 import { createSpeech } from '../audio/speech'
 import { CLIP_FOR, clipForPickup, isTrainingGround, lineFor } from '../../../lib/game/tutorial'
 import type { Cue } from '../../../lib/game/tutorial'
-import { SKILL, skillName } from '../../../lib/game/skills'
+import { skillName } from '../../../lib/game/skills'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../three/battle'
-import { BATTLE_SOUNDS } from '../audio/battle'
 import { give } from '../../../lib/game/inventory'
 import { byId } from './dom'
 
@@ -199,7 +195,9 @@ export function initBattle(onLeave: () => void): BattleView {
 
   // The dashboard is drawn over the 3D view, on its own canvas, for as long
   // as the battle is the view. It keeps its own clock: the scene's frame loop
-  // is three's, and the bar's slide belongs to the dashboard.
+  // is three's, and the bar's slide belongs to the dashboard. It DRAWS and
+  // nothing else — the controls are read in the scene's frame, which is the
+  // one the game steps in (input/battleInput.ts).
   let frame = 0
   let painted = 0
   const paint = (now: number): void => {
@@ -242,133 +240,18 @@ export function initBattle(onLeave: () => void): BattleView {
   const battleEl = byId<HTMLDivElement>('battle')
   const isBattleUp = (): boolean => !battleEl.classList.contains('hidden')
 
-  /** The last frame's cursor step, so the inventory moves once per PRESS rather
-   * than once per frame — the same keys drive a pig and a cursor, and a cursor
-   * wants edges. The pig's own axes do not: they are analogue. */
-  let stepped = { x: 0, y: 0 }
-
   /**
-   * Read the controller, ask which control set is live, and push what it means.
-   *
-   * The interpreting used to happen right here, in three `if`s that each knew a
-   * little about the state — which is how the sights once ended up sharing the
-   * fire lock. Now the modes are one pure table (`lib/game/controls.ts`) and this
-   * is only the plumbing.
+   * The controls, read once a frame in the SCENE's own loop
+   * (`input/battleInput.ts`). This file used to interpret them itself, on a
+   * change notification, and both halves of that were wrong: a control set can
+   * change while nothing on the keyboard moves, and the dashboard's loop is not
+   * the one the game steps in.
    */
-  const blank = { starting: false, locked: false, charging: false, armed: false }
-  /**
-   * The set that was live last time we looked. A CHANGE drops every driving key,
-   * so the new set starts from nothing held and the player presses again — which
-   * is what the sights already did and what opening the inventory did not.
-   *
-   * The verbs are left alone deliberately: `aimMode` and `fire` are what DEFINE
-   * two of the sets, and releasing them would flap straight back out again.
-   */
-  let wasMode: ControlMode | null = null
-  /**
-   * Which set is live — and if it is `starting`, resolve it away first.
-   *
-   * The beat at the top of a turn is a set with one rule: any input starts the
-   * turn, and the same input is then read again in whatever set follows. It cannot
-   * simply consume the input, because a HELD key never produces a one-shot verb
-   * and the beat would have nothing to end it.
-   */
-  const liveMode = (sighting: boolean): ControlMode => {
-    const ask = (): ControlMode =>
-      modeOf({ ...(scene?.situation() ?? blank), inventory: hud.skills.open(), sighting })
-    let mode = ask()
-    if (mode === 'starting') {
-      scene?.beginTurn()
-      mode = ask()
-    }
-    if (mode !== wasMode) {
-      wasMode = mode
-      for (const action of DRIVING_ACTIONS) controller.release(action)
-    }
-    return mode
-  }
-
-  const pushIntent = (): void => {
-    const held: Held = {
-      walk: (controller.isDown('walkForward') ? 1 : 0) - (controller.isDown('walkBack') ? 1 : 0),
-      turn: (controller.isDown('turnRight') ? 1 : 0) - (controller.isDown('turnLeft') ? 1 : 0),
-      aim: (controller.isDown('aimUp') ? 1 : 0) - (controller.isDown('aimDown') ? 1 : 0),
-      // G is the AIM VIEW and it is HELD — the original tests its two pad bits
-      // every frame and puts the remembered camera mode back the frame they go
-      // up (`../../../../pigs-disasm/weapons/fire.md`).
-      sighting: controller.isDown('aimMode'),
-      // …and so is F, because that is what the power gauge is (lib/game/gauge.ts).
-      firing: controller.isDown('fire')
-    }
-    const mode = liveMode(held.sighting)
-    const intent = readControls(mode, held)
-    if (mode === 'inventory') {
-      // The cursor steps on the EDGE, and the axes are the pig's own keys.
-      if (intent.cursor.y !== 0 && stepped.y === 0) hud.skills.move(0, intent.cursor.y)
-      if (intent.cursor.x !== 0 && stepped.x === 0) hud.skills.move(intent.cursor.x, 0)
-      stepped = { ...intent.cursor }
-    } else {
-      stepped = { x: 0, y: 0 }
-    }
-    scene?.setIntent(intent.walk, intent.turn)
-    scene?.setAim(intent.aim)
-    scene?.setSighting(intent.sighting)
-    scene?.setFiring(intent.firing)
-  }
-  controller.onChange(pushIntent)
-  controller.onAction((action) => {
-    if (!isBattleUp()) return
-    // What a one-shot key MEANS is the mode's to say, not this file's: SPACE is a
-    // jump in the battle, SELECT in the inventory, the canopy's knife while a
-    // crate is coming down, and nothing at all down the sights.
-    const mode = liveMode(controller.isDown('aimMode'))
-    switch (verbOf(mode, action)) {
-      case 'openInventory':
-        // R opens what the pig is carrying — plus what it can always do. It
-        // drives in from the right, with a noise.
-        if (game && hud.skills.toggle(game.currentPig.carrying)) {
-          scene?.sound(BATTLE_SOUNDS.menuOpen.sound)
-        }
-        // …and the SET has just changed under the held keys. Play: "при открытии
-        // инвентаря продолжаю идти — это тоже баг." Nothing moved in the held set,
-        // so the controller has nothing to announce and `pushIntent` would not run
-        // again until the player let go — which is the flaw in reading input off a
-        // CHANGE rather than polling it. See the note at `pushIntent`.
-        pushIntent()
-        return
-      case 'closeInventory':
-        if (game) hud.skills.toggle(game.currentPig.carrying)
-        pushIntent()
-        return
-      case 'choose':
-        if (game) {
-          // Everything the pig reaches for and HOLDS (three/battle.ts) — SKIP TURN
-          // included, which is the correction play asked for: "пропуск хода должен
-          // применяться на стрелять, а не на выборе". Nothing fires here.
-          game.currentPig.holding = hud.skills.chosen()
-          hud.skills.close()
-        }
-        return
-      case 'jump':
-        scene?.jump()
-        return
-      case 'cutChute':
-        // The scene owns the drop, and it reads the same jump request — passing
-        // it on is all this has to do.
-        scene?.jump()
-        return
-      case 'beginTurn':
-        // Unreachable: `liveMode` resolves the beat away before asking. Named so
-        // the switch is total.
-        return
-      case 'holdSkipTurn':
-        // The dashboard's own button, and nothing else now that Enter is gone: it
-        // takes the skill in hand rather than applying it. FIRE applies it.
-        if (game) game.currentPig.holding = SKILL.SKIP_TURN
-        return
-      default:
-        return
-    }
+  const input = createBattleInput({
+    scene: () => scene,
+    game: () => game,
+    skills: hud.skills,
+    up: isBattleUp
   })
   controller.bindKeyboard(isBattleUp)
 
@@ -465,8 +348,12 @@ export function initBattle(onLeave: () => void): BattleView {
     })
 
     scene?.dispose()
+    // The poll rides the scene's frame, ahead of the game's step — a Set, so
+    // asking for it again on every map swap registers it once.
+    const host = ensureScene(canvasHost)
+    host.onInput.add(input.poll)
     scene = buildBattle(
-      ensureScene(canvasHost),
+      host,
       {
         blocks: terrainResult.blocks,
         terrainTextures: terrainResult.textures,

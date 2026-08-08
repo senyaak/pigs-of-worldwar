@@ -170,17 +170,37 @@ test('a pig wears its name while it rests, and drops it while it walks', async (
   await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
 
-  // Everything painted, in pixels. The clock and the dial never change size
-  // — a digit tile is opaque whichever digit it shows — so anything that
-  // moves this number is the name plate coming and going.
+  // What is painted BELOW THE BRIEFING BAR, in pixels. The clock and the dial
+  // never change size — a digit tile is opaque whichever digit it shows — so
+  // anything that moves this number is the name plate coming and going.
+  //
+  // The top of the canvas is left out because the BAR is up there, and it runs on
+  // the tutorial's clock rather than on the pig's: the sergeant's opening line
+  // drops in and scrolls while this spec walks, which measured as thousands of
+  // pixels appearing out of nowhere. Counted per band, the whole difference was
+  // in the top eighth and the plate's own rows matched exactly. The `> NAME`
+  // assertion below is what keeps this honest — if the cut ever swallowed the
+  // plate itself, that is the line that fails.
+  //
+  // A FRAME IS WAITED OUT FIRST. The dashboard is drawn on its own loop and the
+  // controls are read in the scene's, so the pixels trail the state the specs
+  // poll by up to a frame.
+  const BAR_BAND = 0.18
   const painted = (): Promise<number> =>
-    page.evaluate(() => {
+    page.evaluate(async (skip) => {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
       const canvas = document.getElementById('battle-hud') as HTMLCanvasElement
       const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
       let count = 0
-      for (let i = 3; i < pixels.length; i += 4) if (pixels[i] !== 0) count++
+      for (let y = Math.ceil(canvas.height * skip); y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          if (pixels[(y * canvas.width + x) * 4 + 3] !== 0) count++
+        }
+      }
       return count
-    })
+    }, BAR_BAND)
 
   // A name in the big letters is worth thousands of pixels; the clock's
   // digits differ by a handful as they tick, so the two never blur.

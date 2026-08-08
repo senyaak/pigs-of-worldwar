@@ -1439,9 +1439,9 @@ held)` says what the axes mean, and `verbOf(mode, action)` says what a one-shot 
 IS. FRONTEND is a fifth set but never reaches this file — the main menu binds its
 own KEY map (`MENU_BINDINGS`) rather than reinterpreting the battle's actions.
 
-`ui/battle.ts` is plumbing now: collect what is held, ask, push. `three/battle.ts`
-grew one method, `locked()`, because it is the one that owns `committed()` and the
-aftermath.
+The plumbing — collect what is held, ask, act — is `input/battleInput.ts`, read once
+a frame (see "Input is POLLED" below). `three/battle.ts` grew one method,
+`situation()`, because it is the one that owns `committed()` and the aftermath.
 
 **Play corrected the first cut twice, and both corrections removed an exception:**
 "ОГОНЬ проходит сквозь блокировку — а вот и нет, там просто другой контроллер",
@@ -1455,7 +1455,7 @@ nothing gets through — and there are no carve-outs left anywhere.
 CONSUME the key: a HELD key never produces a one-shot verb, so a set that swallowed
 the axes could never be ended by them. Its rule is "any input starts the turn, and
 the same input is then re-read in the set that follows" — `liveMode` in
-`ui/battle.ts` resolves the mode away before asking for the axes.
+`input/battleInput.ts` resolves the mode away before asking for the axes.
 
 **Ending a turn is a SKILL.** Play: "закончить ход вообще можно только через
 умение." It is skill **65, SKIP TURN**, already always in the menu whatever the pig
@@ -1498,8 +1498,8 @@ is a frame stale up there.
 One behaviour did change on purpose: ending the TURN mid-blow is refused now.
 `verbOf('locked', 'endTurn')` is null, where the old `onAction` ran it regardless.
 
-`e2e/002/controls.spec.ts` is the table's spec — nine tests, and the last one is
-the regression play caught.
+`e2e/002/controls.spec.ts` is the table's spec, and the last of its tests is the
+regression play caught.
 
 ### Known divergences — deliberate, and each written up where it lives
 
@@ -1598,35 +1598,71 @@ the regression play caught.
   pushing at a wall visibly scrabbles in play, and clip 11 is what reads as
   it. Deliberate, in `locomotion.ts`.
 
+### Input is POLLED, once a frame — 2026-08-08
+
+Play: "onchange вообще плохой способ в играх; можно ведь подцепить контроль к
+каждому кадру — так же правильнее?" It is, and it was a bug rather than a smell:
+a control SET changes while nothing on the keyboard moves, so a listener on the
+held set is never told and the pig walks on under a menu. Every verb that could
+change the set was calling the push by hand — one patch per verb over the shape.
+
+**`input/battleInput.ts` is the whole of it now**, and `ui/battle.ts` is a view
+again: collect what is held, ask `lib/game/controls.ts`, act. The three things a
+poll needs — all three of which the first attempt died on at once, five specs
+deep:
+
+- **a press LATCH**, `controller.tookPress`. A press and its release both land
+  between two frames and `isDown` is false at either end, so every quick tap is
+  lost. One-shot actions need no latch: they are announced as they happen and get
+  QUEUED, in order, because the order is load-bearing — R and then SPACE opens the
+  inventory and takes what is under the cursor, and a set of "what went down"
+  cannot say which came first.
+- **a gate on the beat** at the top of a turn, `wakes` in `controls.ts`. A poll
+  runs whether the player touched anything or not. And it counts what went DOWN
+  this frame rather than what is down: "press any key", and a key still held
+  through the handover of a turn is not a press — letting one through meant
+  ending a turn with SKIP TURN ate the next pig's beat with the same finger.
+- **one loop.** `host.onInput` in `three/scene.ts` runs ahead of `onFrame`, so the
+  controls are read and the game steps on them in the same frame. The dashboard's
+  own `requestAnimationFrame` only draws. This is the part the first attempt never
+  solved.
+
+Three things fell out of it that the event-driven version had been hiding:
+
+**The FIRST look of a battle is not a set change**, and neither is leaving the
+beat. Both used to drop every driving key — the first left a pig that never walked
+at all, the second ate the very key that woke the turn. The rule stands otherwise
+and is what play asked for.
+
+**A PRESS cannot be worked out from the held state rising.** `Intent` carries
+`fired` beside `firing` and `setFiring(held, pressed)` takes both. A set that does
+not read the fire key reports it up while the player holds it, so LEAVING that set
+read as a fresh press — hold F through a shot and the grenade that came out of the
+far side went off the frame it appeared. That was a real bug in play as much as in
+the spec that caught it.
+
+**A second answer to "is the beat over" was dead and is gone.** `three/battle.ts`
+tested the intents for it as well; with the axes swallowed by the `starting` set
+that block could never fire.
+
+`e2e/002/battle.spec.ts` pins the play-reported behaviour end to end — walk, open
+the inventory with the key still down, and the pig stops — and `e2e/controller.ts`
+now waits a frame out after every press, because a spec that reads the game on the
+next round trip is reading it before the poll.
+
+**And `e2e/002/hud.spec.ts:168` passes**, which this file has carried as a failure
+for two days. It was two faults stacked: the pig never settled, because releasing
+a key the old code had already dropped from the held set announced nothing and the
+walk intent stood for ever — and then the name plate's pixel count was being
+measured over the whole dashboard, where the BRIEFING BAR comes and goes on the
+tutorial's clock rather than the pig's. Counted per band, every pixel of the
+difference was in the top eighth and the plate's own rows matched exactly.
+
 ### Threads left mid-pull
 
-Three jobs are open and play named all three. In the order they were named:
+Two jobs are open and play named both. In the order they were named:
 
-**1. INPUT should be POLLED per frame, and it is not.** Play: "onchange вообще
-плохой способ в играх — можно ведь подцепить контроль к каждому кадру". Right, and
-it is a real bug and not a smell: a control SET can change without a key moving, so
-`onChange` never fires and the pig keeps walking when the inventory takes over.
-Every verb that can change the set now calls `pushIntent()` by hand, which works
-and is a patch over the shape rather than a fix to it.
-
-**It was tried and reverted, and the three things it needs are known** — five specs
-found all three at once, so start from here rather than from scratch:
-
-- **a press LATCH on the held actions.** A press and its release can both land
-  between two frames and `isDown` is false at either end, so every tap is lost —
-  a spec's `tap('fire')` and a player's quick trigger alike. `controller.tookPress`
-  was written and worked; it is in the reverted diff.
-- **a gate so the beat at the top of a turn only resolves when there IS input.**
-  A poll runs whether a key moved or not, and resolving `starting` unconditionally
-  cut the beat short on the first frame of every turn.
-- **one frame loop, not two.** The dashboard's `paint` and three's `animate` are
-  separate `requestAnimationFrame`s, so which of them polls decides what frame a
-  press reaches the scene on. This is the part that was NOT solved and what the
-  shooting and grenade specs died on.
-
-The whole diagnosis is also written above `pushIntent` in `ui/battle.ts`.
-
-**2. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
+**1. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
 не там, огромный, и вообще не на воде". `SPLASH_EFFECT` is effect 0x0E / parameter
 row 2 and the row is decoded — three rings at a lift of −500, a sixty-sprite cloud,
 a ten-particle burst — so what is wrong is the remake's, not the reading. Two
@@ -1636,7 +1672,7 @@ the ring's RADIUS rides `MODEL_SCALE`, and the SIZE scalars (`BLOB_UNIT`,
 `effects.splash` is `query.surface(x, z)`, which is the water line — check that
 first, because "вообще не на воде" points at it.
 
-**3. The RAMP is wrong**, and has been parked since the grenade started.
+**2. The RAMP is wrong**, and has been parked since the grenade started.
 
 ### What is still not read
 
@@ -1700,9 +1736,9 @@ apart and leave its boots** (the exe already splits the two deaths and so
 does `lib/game/health.ts` — `died` and `gibbed` — but both wear clip 47 for
 now), and **`THREE.Clock` is deprecated** in favour of `THREE.Timer`.
 
-One spec fails and it is NOT from this work: `e2e/002/hud.spec.ts:168`, the
-name plate dropping on the move, fails at 300fc6e too — checked by checking
-that commit out and running it.
+**Nothing is failing.** `e2e/002/hud.spec.ts:168` was, since 300fc6e, and the
+poll fixed one half of it and a measurement fixed the other — see "Input is
+POLLED" above.
 
 - **A crate is walked THROUGH, where the original is shouldered into.** The
   records say a pickup is solid — shape kind 0, a real 3×3×4 box — and play

@@ -43,6 +43,17 @@ export interface Held {
   /** Whether the fire key is down. Held, because that is what the power gauge
    * is (lib/game/gauge.ts). */
   firing: boolean
+  /**
+   * Whether the fire key went DOWN this frame, which is a separate question from
+   * whether it is down — and it has to be asked separately.
+   *
+   * A gun goes off on the EDGE, and deriving that edge from `firing` rising is
+   * wrong once the sets are polled: a mode that does not read the fire key
+   * reports it as up while the player is still holding it, so LEAVING that mode
+   * looks exactly like a fresh press. Holding F through a shot then set off the
+   * next grenade the frame it appeared, which is what caught it.
+   */
+  fired: boolean
 }
 
 /** What the mode makes of it. */
@@ -56,6 +67,9 @@ export interface Intent {
   sighting: boolean
   /** Whether the scene should treat fire as held. */
   firing: boolean
+  /** Whether the scene should treat fire as having just been PRESSED. Passed
+   * wherever `firing` is passed and false everywhere else. */
+  fired: boolean
   /** Where the inventory cursor should step, this change. Zero everywhere but
    * `inventory`, and the caller is the one that de-edges it — a held key must
    * not walk the cursor every frame. */
@@ -110,12 +124,41 @@ export function modeOf(situation: Situation): ControlMode {
   return 'battle'
 }
 
+/**
+ * Whether this frame's input is ANYTHING at all — which is the whole of what the
+ * beat at the top of a turn ends on. The exe's own three ways out of it are a
+ * timeout, "digital input" and the pause button (0x4d8a2c): it does not care
+ * which key, and neither does this.
+ *
+ * It exists because input is POLLED now (`input/battleInput.ts`). A poll runs
+ * whether the player touched anything or not, so without this gate the beat is
+ * resolved on the first frame of every turn and never seen. `verbs` is how many
+ * one-shot presses arrived this frame — a held key shows up in `held` instead,
+ * and either counts.
+ *
+ * **What the caller passes is what went DOWN this frame, not what is down** —
+ * "press any key", and the press is the operative word. A key still held through
+ * the handover of a turn is not a press, and letting one through meant ending a
+ * turn with SKIP TURN ate the next pig's beat with the very same finger.
+ */
+export function wakes(held: Held, verbs: number): boolean {
+  return (
+    verbs > 0 ||
+    held.walk !== 0 ||
+    held.turn !== 0 ||
+    held.aim !== 0 ||
+    held.firing ||
+    held.sighting
+  )
+}
+
 const STILL: Intent = {
   walk: 0,
   turn: 0,
   aim: 0,
   sighting: false,
   firing: false,
+  fired: false,
   cursor: { x: 0, y: 0 }
 }
 
@@ -153,7 +196,9 @@ export function readControls(mode: ControlMode, held: Held): Intent {
     }
   }
   // The two sets whose only business is the fire button.
-  if (mode === 'charging' || mode === 'armed') return { ...STILL, firing: held.firing }
+  if (mode === 'charging' || mode === 'armed') {
+    return { ...STILL, firing: held.firing, fired: held.fired }
+  }
   if (mode === 'locked' || mode === 'starting') return { ...STILL }
   if (mode === 'sights') {
     return {
@@ -162,6 +207,7 @@ export function readControls(mode: ControlMode, held: Held): Intent {
       aim: held.aim !== 0 ? held.aim : held.walk,
       sighting: true,
       firing: held.firing,
+      fired: held.fired,
       cursor: { x: 0, y: 0 }
     }
   }
@@ -171,6 +217,7 @@ export function readControls(mode: ControlMode, held: Held): Intent {
     aim: held.aim,
     sighting: false,
     firing: held.firing,
+    fired: held.fired,
     cursor: { x: 0, y: 0 }
   }
 }

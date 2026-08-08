@@ -5,10 +5,10 @@
 
 import { test, expect } from '@playwright/test'
 
-import { modeOf, readControls, verbOf } from '../../src/lib/game/controls'
+import { modeOf, readControls, verbOf, wakes } from '../../src/lib/game/controls'
 import type { Held, Situation } from '../../src/lib/game/controls'
 
-const still: Held = { walk: 0, turn: 0, aim: 0, sighting: false, firing: false }
+const still: Held = { walk: 0, turn: 0, aim: 0, sighting: false, firing: false, fired: false }
 const driving = (over: Partial<Held> = {}): Held => ({ ...still, walk: 1, turn: 1, ...over })
 
 const at = (over: Partial<Situation> = {}): Situation => ({
@@ -86,6 +86,21 @@ test('the fire key is held where a mode has one, and dropped where it does not',
   }
 })
 
+test('the PRESS travels beside the hold, and never comes out of it', () => {
+  // A mode that reads the fire key gets both; one that does not gets neither.
+  for (const mode of ['battle', 'sights', 'charging', 'armed'] as const) {
+    expect(readControls(mode, { ...still, firing: true, fired: true }).fired).toBe(true)
+  }
+  for (const mode of ['inventory', 'locked', 'starting'] as const) {
+    expect(readControls(mode, { ...still, firing: true, fired: true }).fired).toBe(false)
+  }
+  // And the point of carrying it separately: a key that is DOWN without having
+  // just gone down is not a press. Leaving a set that reads the key as up — the
+  // lock, while a shot is in the air — would otherwise look like one, and the
+  // grenade that came out the far side went off the frame it appeared.
+  expect(readControls('armed', { ...still, firing: true }).fired).toBe(false)
+})
+
 test('STARTING has one rule: any key starts the turn, whatever the key is', () => {
   // And it cannot simply CONSUME the key, which is the trap: a held key never
   // produces a one-shot verb, so a set that swallowed the axes could not be ended
@@ -93,6 +108,22 @@ test('STARTING has one rule: any key starts the turn, whatever the key is', () =
   // set that follows (`liveMode` in ui/battle.ts).
   for (const action of ['jump', 'fire', 'skills', 'endTurn', 'walkForward']) {
     expect(verbOf('starting', action)).toBe('beginTurn')
+  }
+})
+
+test('…and the beat needs INPUT to end it, which is what a poll cannot assume', () => {
+  // The gate the per-frame poll needs. A poll runs whether the player touched
+  // anything or not, so without this `starting` resolves on the first frame of
+  // every turn and the beat is never seen — one of the three things the first
+  // attempt at polling died on (`input/battleInput.ts`).
+  expect(wakes(still, 0)).toBe(false)
+  expect(wakes(driving(), 0)).toBe(true)
+  // A one-shot press counts even though nothing is HELD — that is the whole
+  // point of counting them separately.
+  expect(wakes(still, 1)).toBe(true)
+  // …and so does every axis on its own, plus both of the held verbs.
+  for (const over of [{ walk: -1 }, { turn: 1 }, { aim: -1 }, { firing: true }, { sighting: true }]) {
+    expect(wakes({ ...still, ...over }, 0)).toBe(true)
   }
 })
 

@@ -17,10 +17,19 @@ export interface Controller {
   tap(action: Action): void
   /** Is this action currently held? */
   isDown(action: Action): boolean
+  /**
+   * Did this HELD action go DOWN since the last time anyone asked? Asking
+   * consumes it.
+   *
+   * The battle polls its controls once a frame (`input/battleInput.ts`), and a
+   * press with its release can both land between two frames — `isDown` is false
+   * at either end, so without a latch every quick tap is lost: a player's snap
+   * shot and a spec's `tap('fire')` alike. Two taps inside one frame do collapse
+   * into one.
+   */
+  tookPress(action: Action): boolean
   /** Release everything — used when a view closes or a turn is handed over. */
   releaseAll(): void
-  /** Called whenever the held set changes; the scene reads intent here. */
-  onChange(listener: () => void): () => void
   /** Called for one-shot actions (jump, endTurn). */
   onAction(listener: (action: Action) => void): () => void
   /** Route real keyboard events into the controller while `enabled()` is
@@ -31,12 +40,12 @@ export interface Controller {
 
 export function createController(): Controller {
   const held = new Set<Action>()
-  const changeListeners = new Set<() => void>()
+  /** Held actions that have gone down since anyone last looked — see
+   * `tookPress`. A one-shot action needs no latch: it is announced through
+   * `onAction` the moment it happens, and the battle queues those in order. */
+  const latched = new Set<Action>()
   const actionListeners = new Set<(action: Action) => void>()
 
-  const changed = (): void => {
-    for (const listener of changeListeners) listener()
-  }
   const fired = (action: Action): void => {
     for (const listener of actionListeners) listener(action)
   }
@@ -46,28 +55,23 @@ export function createController(): Controller {
       if (HELD_ACTIONS.includes(action)) {
         if (held.has(action)) return
         held.add(action)
-        changed()
+        latched.add(action)
       } else {
         fired(action)
       }
     },
     release(action) {
-      if (!held.delete(action)) return
-      changed()
+      held.delete(action)
     },
     tap(action) {
       controller.press(action)
       controller.release(action)
     },
     isDown: (action) => held.has(action),
+    tookPress: (action) => latched.delete(action),
     releaseAll() {
-      if (held.size === 0) return
       held.clear()
-      changed()
-    },
-    onChange(listener) {
-      changeListeners.add(listener)
-      return () => changeListeners.delete(listener)
+      latched.clear()
     },
     onAction(listener) {
       actionListeners.add(listener)

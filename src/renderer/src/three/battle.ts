@@ -136,10 +136,17 @@ export interface BattleScene {
   setIntent(walk: number, turn: number): void
   /** Ask the acting pig to jump (ignored mid-air, swimming or sliding). */
   jump(): void
-  /** Whether the fire button is DOWN. Held, because the power gauge is what
-   * being held means: a weapon with one charges while it is and throws when
-   * it is not (lib/game/gauge.ts). Everything else goes off on the edge. */
-  setFiring(held: boolean): void
+  /**
+   * Whether the fire button is DOWN, and whether it went down THIS frame.
+   *
+   * Held, because the power gauge is what being held means: a weapon with one
+   * charges while it is and throws when it is not (lib/game/gauge.ts). Everything
+   * else goes off on the press — and the press arrives as its own flag rather
+   * than being worked out from `held` rising, because a control set that does not
+   * read the fire key reports it up while the player is holding it, and leaving
+   * that set would otherwise look like a fresh press (lib/game/controls.ts).
+   */
+  setFiring(held: boolean, pressed: boolean): void
   /** How full the power gauge is, 0..1 — or null when nothing is charging,
    * which is what the dashboard hides it on. */
   charging(): number | null
@@ -745,20 +752,21 @@ export function buildBattle(
     const active = squad.of(game.currentPig)
     if (!active) return
 
-    // "START OF TURN - press any key to continue": the pig cannot be driven
-    // until the beat is out, and any input ends it — and is then acted on in
-    // this same frame, so nothing a player does is ever swallowed.
+    // "START OF TURN - press any key to continue": the pig stands, and nothing
+    // here ends the beat.
+    //
+    // ENDING it belongs to the input layer, and to one place in it: `starting` is
+    // a control SET whose whole rule is that any press ends the turn's beat and
+    // is then read again in the set that follows (`input/battleInput.ts`, which
+    // polls ahead of this every frame). This block used to test the intents for
+    // it as well — a second answer to the same question, and by the time input
+    // was polled a dead one, since the set swallows every axis while it is live.
     if (game.starting) {
-      if (intent.walk !== 0 || intent.turn !== 0 || aimIntent !== 0 || jumpRequested || fireRequested) {
-        game.beginTurn()
-      }
-      else {
-        active.setClip(ANIM.IDLE)
-        active.overlay(-1, 0)
-        watch(active, delta)
-        onGameChanged()
-        return
-      }
+      active.setClip(ANIM.IDLE)
+      active.overlay(-1, 0)
+      watch(active, delta)
+      onGameChanged()
+      return
     }
     for (const soldier of squad.members) {
       if (soldier === active) continue
@@ -1168,10 +1176,10 @@ export function buildBattle(
     jump() {
       jumpRequested = true
     },
-    setFiring(held) {
+    setFiring(held, pressed) {
       // The PRESS is what a gun and a blade answer to; the gauge wants the
       // whole hold, and the frame it ends.
-      if (held && !fireHeld) fireRequested = true
+      if (pressed) fireRequested = true
       fireHeld = held
     },
     charging: () => showGauge(),

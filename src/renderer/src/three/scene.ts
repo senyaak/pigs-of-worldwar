@@ -7,6 +7,16 @@ import * as THREE from 'three'
 export interface SceneHost {
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
+  /**
+   * Called every frame BEFORE `onFrame`, and this is where INPUT is read.
+   *
+   * One loop and one order: the controls are polled, then the game steps on
+   * what they said, in the same frame. There used to be two `requestAnimationFrame`
+   * loops that could each have done the reading — this one and the dashboard's —
+   * and which of them did it decided what frame a press reached the scene on.
+   * The dashboard's only draws (`input/battleInput.ts`).
+   */
+  onInput: Set<() => void>
   /** Called every frame with the elapsed seconds since the previous one. */
   onFrame: Set<(delta: number) => void>
   /** Frame `object` (already added to the scene) and start orbiting it. */
@@ -32,6 +42,7 @@ export function ensureScene(container: HTMLElement): SceneHost {
   sun.position.set(1, 2, 3)
   scene.add(sun)
 
+  const onInput = new Set<() => void>()
   const onFrame = new Set<(delta: number) => void>()
   let framed: THREE.Object3D | null = null
 
@@ -40,6 +51,7 @@ export function ensureScene(container: HTMLElement): SceneHost {
     requestAnimationFrame(animate)
     const delta = clock.getDelta()
     if (framed) framed.rotation.y += delta * 0.6
+    for (const read of onInput) read()
     for (const callback of onFrame) callback(delta)
     renderer.render(scene, camera)
   }
@@ -54,6 +66,7 @@ export function ensureScene(container: HTMLElement): SceneHost {
   const host: SceneHost = {
     scene,
     camera,
+    onInput,
     onFrame,
     frameObject(object) {
       framed = object

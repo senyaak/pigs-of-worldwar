@@ -243,6 +243,52 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
   expect(app.errors()).toEqual([])
 })
 
+test('opening the inventory STOPS the pig, with the key still down', async ({ app }) => {
+  const { page } = app
+  await startGame(page)
+  await expect(page.locator('#battle')).toBeVisible()
+
+  // Play's own bug, twice over: "при открытии инвентаря продолжаю идти", and the
+  // sights' half of it — "нажимаю прицел, останавливаюсь, и надо снова нажимать
+  // w". One rule now serves both: a change of control SET drops every driving
+  // key, so the new set starts from nothing held (`input/actions.ts`).
+  //
+  // It is also what the whole per-frame poll is FOR. Nothing on the keyboard
+  // moves when a menu opens, so a controller that only announces changes has
+  // nothing to announce and the walk carries on underneath — a listener cannot
+  // see this at all (`input/battleInput.ts`).
+  await press(page, 'walkForward')
+  const start = await debugState(page)
+  await page.waitForTimeout(300)
+  const walking = await debugState(page)
+  expect(Math.hypot(walking.x - start.x, walking.z - start.z), 'it is walking').toBeGreaterThan(50)
+
+  // R, and the key is never let go of.
+  await tap(page, 'skills')
+  await page.waitForTimeout(300)
+  const opened = await debugState(page)
+  await page.waitForTimeout(300)
+  const later = await debugState(page)
+  expect(Math.hypot(later.x - opened.x, later.z - opened.z), 'and it stopped').toBeLessThan(1)
+
+  // …and pressing it again does not walk either, because the menu is what the
+  // key means now. Out of the menu and it drives once more.
+  await press(page, 'walkForward')
+  await page.waitForTimeout(300)
+  const inMenu = await debugState(page)
+  expect(Math.hypot(inMenu.x - later.x, inMenu.z - later.z), 'the menu has the key').toBeLessThan(1)
+  await tap(page, 'skills')
+  await press(page, 'walkForward')
+  await page.waitForTimeout(300)
+  const freed = await debugState(page)
+  expect(Math.hypot(freed.x - inMenu.x, freed.z - inMenu.z), 'and it drives again').toBeGreaterThan(
+    50
+  )
+  await release(page, 'walkForward')
+
+  expect(app.errors()).toEqual([])
+})
+
 test('walk into a wall long enough and the pig is thrown out of it', async ({ app }) => {
   const { page } = app
   await startGame(page)
