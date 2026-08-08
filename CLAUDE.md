@@ -1448,15 +1448,19 @@ half of it, and the only reading under which this file's own sentence about the 
   when the weapon in hand needs one — and `FACETIMS.MAD`, despite the name,
   holds `wepn01..20` with the crosshair and pointers. The slot they go in
   is drawn and deliberately empty.
-- **The menu's LAYOUT is the remake's own.** Every piece on it is the
-  original's, and where each piece SITS is not: the exe computes its screen
-  coordinates in the frontend's draw code rather than storing them, and
-  `frontend/notes.md` traces that chain as far as the blitter
-  (0x41AFA0, called `draw(x, y, sprite, rect)`) and stops. So `LAYOUT` in
-  `ui/menu.ts` is a reading of the art — bars clear of the machine's grille,
-  the dial in its housing — and is meant to be corrected against play.
-  `select.mgl` is left out for the same reason: its window is 116 wide where
-  a bar's face is 144, so it frames something else somewhere else.
+- **The menu's COLUMN is the exe's, its MACHINE is still eyework.** The exe
+  computes its screen coordinates in the frontend's draw code rather than
+  storing them, and screen 1's arm has now been read line by line
+  (`frontend/notes.md`) — so the rows are the original's numbers: a `chose`
+  plate drawn as TWO blits so it comes out 50 pixels wider, at 284..494, a
+  `light` lamp banded by row flush against it at 493, 40 apart, and two
+  nudges that belong to that arm alone. What is NOT read is which sprite
+  sits in which slot of the exe's draw array, so the backdrop's machine, the
+  cog, the dial and the track are still placed by eye in `LAYOUT`
+  (`ui/barScreen.ts`) and are meant to be corrected against play.
+  `select.mgl` is left out on the art's own evidence: its window is 116 wide
+  where a bar's face is 144, so it frames something else somewhere else —
+  and screen 1 does not load it at all.
 - **The mouse works the menu, and the original's does not.** Hovering lights
   a bar, clicking chooses it. The original is keyboard and pad only (it even
   ships `nomouse.com`); this is the remake's convenience, and so is F1 for
@@ -1908,10 +1912,17 @@ POLLED" above.
   markers), and the POWER gauge, which nothing has needed yet. The dial is
   done — the needle turns with the aim angle and the slot beside it carries
   the chosen skill's icon, out of the skill menu's own art.
-- **The menu has no entrance.** In the original the pieces DRIVE ON — the
-  bars slide in rather than being there from the first frame. Deferred on
-  purpose, along with the layout itself; whatever settles the coordinates
-  will settle where they come in from.
+- **The menu DRIVES ON, and every number in that is read.** It comes down
+  from 380 pixels above — the exe's per-screen start table at 0x4C0A18, in
+  the frontend's own 1024×820 space — and settles on one shared damped
+  spring (0x41FD30) at its own arm's gain 8, damping 17 and cap 80. Ten
+  engine frames, with an OVERSHOOT the exe gets by not clamping the step.
+  `ui/entrance.ts`, stepped at `EXE_FRAME_SECONDS` rather than at the
+  screen's 25 repaints a second. The backdrop does not move with it: the exe
+  blits it before the switch that applies the displacement. Only the MAIN
+  MENU claims a start — the table has one for every screen, but which id is
+  which is only pinned for that one. What is still eyework is the MACHINE
+  behind the column; see the layout entry below.
 - **There is no SKY.** The battle renders against a flat clear colour, while
   the original ships `Skys/` — paired `.PTG`/`.PMG` files per mood
   (`CLOUDY1`, `DAWN1`, `CLIMB`, plus `COLD` and `DESERT` folders). Neither
