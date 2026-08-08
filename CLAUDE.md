@@ -1448,19 +1448,25 @@ half of it, and the only reading under which this file's own sentence about the 
   when the weapon in hand needs one — and `FACETIMS.MAD`, despite the name,
   holds `wepn01..20` with the crosshair and pointers. The slot they go in
   is drawn and deliberately empty.
-- **The menu's COLUMN is the exe's, its MACHINE is still eyework.** The exe
-  computes its screen coordinates in the frontend's draw code rather than
-  storing them, and screen 1's arm has now been read line by line
-  (`frontend/notes.md`) — so the rows are the original's numbers: a `chose`
-  plate drawn as TWO blits so it comes out 50 pixels wider, at 284..494, a
-  `light` lamp banded by row flush against it at 493, 40 apart, and two
-  nudges that belong to that arm alone. What is NOT read is which sprite
-  sits in which slot of the exe's draw array, so the backdrop's machine, the
-  cog, the dial and the track are still placed by eye in `LAYOUT`
-  (`ui/barScreen.ts`) and are meant to be corrected against play.
-  `select.mgl` is left out on the art's own evidence: its window is 116 wide
-  where a bar's face is 144, so it frames something else somewhere else —
-  and screen 1 does not load it at all.
+- **The menu's LAYOUT is the exe's, bar two pieces.** The exe computes its
+  screen coordinates in the draw code rather than storing them, and screen 1's
+  arm has been read blit by blit (`frontend/notes.md`), so `LAYOUT` in
+  `ui/barScreen.ts` carries the original's numbers with the address each came
+  from: the machine at (25, 0), the title at (261, 112), the column at 284
+  stepping 40, the lamps flush to its right at 493, the dial at (105, 192), a
+  cog at (9, 192) and `cogb` — 96×208, TWO cogs in one sprite — at (539, 160).
+  **The frontend widens itself by a global 50 and does it two ways**: a plate
+  repeats a band of its own art once, the machine repeats a two-pixel column
+  twenty-five times, so the grille GROWS with the column rather than sitting
+  behind it. Getting that wrong is what had our plates over the wrong
+  recesses, and the machine 128 pixels too low.
+
+  Still eyework, and both say so at the field: the TRACK, because the exe
+  blits it through `0x41AF70` — a blitter with an explicit destination size
+  whose convention is undecoded, and whose two x values read off-screen — and
+  the CARRIAGE. `select.mgl` is left out and the disassembly agrees with the
+  art: screen 1 never loads it.
+
 - **The mouse works the menu, and the original's does not.** Hovering lights
   a bar, clicking chooses it. The original is keyboard and pad only (it even
   ships `nomouse.com`); this is the remake's convenience, and so is F1 for

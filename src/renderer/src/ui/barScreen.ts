@@ -8,12 +8,19 @@
 // FEBmps/FEBMP.MAD, the letters out of FEText, the labels out of
 // Language/Text/fetext.bin.
 //
-// WHERE each piece sits is half taken from the game now. The exe computes its
-// screen coordinates in the frontend's draw code rather than storing them, and
-// the MAIN MENU's arm has been read line by line (frontend/notes.md, in the
-// disasm repo) — so the COLUMN and its lamps are the original's numbers, and
-// the machine behind them is still the remake's eyework, because which sprite
-// sits in which slot of the exe's draw array is not decoded.
+// WHERE each piece sits is the game's now, not the remake's. The exe computes
+// its screen coordinates in the frontend's draw code rather than storing them,
+// and the MAIN MENU's arm has been read blit by blit (frontend/notes.md, in
+// the disasm repo), so `LAYOUT` below carries the original's own numbers with
+// the address each came from. Two things in it are still eyework and say so:
+// the TRACK, whose blitter's convention is undecoded, and the CARRIAGE.
+//
+// The machine and the plates are STRETCHED — the frontend widens itself by a
+// global 50, and it does so in two different ways: a plate repeats a band of
+// its own art once, the machine repeats a two-pixel column twenty-five times.
+// That is why the grille grows with the column instead of sitting behind it,
+// and getting it wrong is what put our plates over the wrong recesses.
+//
 // `pow.screen.layout` nudges the lot live and `pow.screen.print()` writes it
 // back out, the same way `pow.hud` does.
 
@@ -37,16 +44,28 @@ const CLICK = 'CLICK5'
 export const SCREEN = { width: 640, height: 480 }
 
 /**
- * Where each piece lands. The remake's own — see the header — chosen so the
- * bars clear the machine's grille and the dial sits in its housing.
+ * Where each piece lands. Read off screen 1's draw arm unless the field says
+ * otherwise; every entry carries the address it came from.
  *
- * `select.mgl` is deliberately NOT here: its window is 116 wide where a bar's
- * face is 144, so it frames something else on some other screen, and the lit
- * bar is told apart by its lighter letters and the carriage beside it.
+ * `select.mgl` is deliberately NOT here, and the disassembly agrees with the
+ * art: screen 1 never loads it. The lit bar is told apart by its lighter
+ * letters and the carriage beside it.
  */
 export const LAYOUT = {
-  machine: { x: 56, y: 128 },
-  title: { x: 216, y: 24 },
+  /**
+   * The machine — `fullmenu`, 528×352, and it is STRETCHED by the same 50 the
+   * plates are, which is why its grille grows with the column instead of
+   * sitting behind it. Three blits: source `0..seam` at `x`, then a
+   * `column`-wide slice of the source repeated until the stretch is used up,
+   * then `seam..width` after it (exe 0x41c356, the loop at 0x41c404, and
+   * 0x41c47d). 25 at 0 was 56 at 128 by eye, and the 128 is exactly why the
+   * grille sat below the plates.
+   */
+  machine: { x: 25, y: 0, seam: 340, column: 2 },
+  /** The title plate, `title1..6` 208×64, stretched the plates' way — except
+   * that its two halves OVERLAP by ten columns rather than abutting, which is
+   * the exe's own doing (0x41c29b at 261 and 0x41c2f0 at 341, seam 40). */
+  title: { x: 261, y: 112, seam: 40 },
   /**
    * The column, and **every number in it is READ** off the main menu's own
    * draw arm (screen id 1, exe 0x41bf6c — the loader arm proves the identity:
@@ -75,19 +94,30 @@ export const LAYOUT = {
    * каждом пункте, но мигает только 1 активная".
    */
   lamp: { x: 493, y: 176, band: 38 },
-  /** The rack down the left, and the carriage that runs on it. */
+  /**
+   * The toothed rack, and it is the ONE piece of furniture still placed by
+   * eye. The exe blits `track` twice through `0x41AF70(x, y, sprite, rect,
+   * w, h)` — a blitter with an explicit destination size, stretching the
+   * 64×480 art to 638 tall — at y -272 and -222, and both of its x values
+   * land off the screen when read literally. That function's convention is
+   * not decoded, so this stays the remake's until it is.
+   */
   track: { x: 0, y: 0 },
   carriage: { x: 184, offset: -103 },
-  cog: { x: 512, y: 352 },
-  dial: { x: 56, y: 330 },
+  /** Read: the dial at (105, 192), one `cog` at (9, 192), and `cogb` — 96×208,
+   * which is TWO cogs stacked in one sprite — at (539, 160) on the right.
+   * Play named the missing pair before the disassembly did. */
+  dial: { x: 105, y: 192 },
+  cog: { x: 9, y: 192 },
+  cogb: { x: 539, y: 160 },
   /** A bar that carries a SETTING splits: the label sits in from the left
    * edge and the value in from the right, rather than one centred line. */
   setting: { labelInset: 12, valueInset: 12 }
 }
 
 /**
- * Where the plate's two halves meet in the SOURCE image — the exe blits
- * columns `0 .. SEAM + stretch` at the row's x and columns `SEAM .. width` at
+ * Where a PLATE's two halves meet in the SOURCE image — the exe blits columns
+ * `0 .. SEAM + stretch` at the row's x and columns `SEAM .. width` at
  * `x + SEAM + stretch`, so the two abut exactly and the columns just past the
  * seam are the ones repeated (0x41c073, 0x41c0ed).
  */
@@ -125,6 +155,7 @@ const ART = [
   'title1', 'title2', 'title3', 'title4', 'title5', 'title6',
   'cog0', 'cog1', 'cog2', 'cog3', 'cog4', 'cog5',
   'selcog1', 'selcog2', 'selcog3', 'selcog4', 'selcog5', 'selcog6',
+  'cogb00', 'cogb01', 'cogb02', 'cogb03', 'cogb04', 'cogb05',
   'light1', 'light2', 'light3',
   'dial0001', 'dial0002', 'dial0003', 'dial0004', 'dial0005', 'dial0006',
   'dial0007', 'dial0008', 'dial0009', 'dial0010', 'dial0011', 'dial0012'
@@ -153,6 +184,7 @@ function cloneLayout(): ScreenLayout {
   return {
     machine: { ...LAYOUT.machine },
     title: { ...LAYOUT.title },
+    cogb: { ...LAYOUT.cogb },
     bars: { ...LAYOUT.bars },
     stagger: { ...LAYOUT.stagger },
     lamp: { ...LAYOUT.lamp },
@@ -258,6 +290,8 @@ export function initBarScreen(config: {
   let plain: Font | null = null
   let off: Font | null = null
   let cogs: Sprite[] = []
+  /** `cogb00..05` — 96×208, which is TWO cogs stacked in one sprite. */
+  let cogbs: Sprite[] = []
   let dials: Sprite[] = []
   let plates: Sprite[] = []
   let titles: Sprite[] = []
@@ -412,16 +446,37 @@ export function initBarScreen(config: {
     arrivalOffset = driveOn.offset(now)
     const blit = (sprite: Sprite, x: number, y: number): void =>
       context.drawImage(sprite.image, x, y + arrivalOffset)
-    /** A row's plate: one sprite in two halves, so it comes out `stretch`
-     * wider than the art. The exe's own way of doing it — see `SEAM`. */
-    const drawPlate = (sprite: Sprite, x: number, y: number): void => {
-      const left = SEAM + layout.bars.stretch
+    /** A plate — a row's, or the title's — in two halves, so it comes out
+     * `stretch` wider than the art by repeating the columns just past the
+     * seam. The exe's own way of doing it; see `SEAM`. */
+    const drawPlate = (sprite: Sprite, x: number, y: number, seam = SEAM): void => {
+      const left = seam + layout.bars.stretch
       context.drawImage(sprite.image, 0, 0, left, sprite.height, x, y, left, sprite.height)
-      const right = sprite.width - SEAM
+      const right = sprite.width - seam
       context.drawImage(
-        sprite.image, SEAM, 0, right, sprite.height,
+        sprite.image, seam, 0, right, sprite.height,
         x + left, y, right, sprite.height
       )
+    }
+    /**
+     * The MACHINE, stretched the other way the exe knows: source `0..seam`,
+     * then one narrow COLUMN of the source repeated until the stretch is
+     * used up, then `seam..width`. Same total width as the plate's trick and
+     * a different picture — a grille gains bars rather than a wider bar.
+     */
+    const drawMachine = (sprite: Sprite, x: number, y: number): void => {
+      const { seam, column } = layout.machine
+      context.drawImage(sprite.image, 0, 0, seam, sprite.height, x, y, seam, sprite.height)
+      let at = x + seam
+      for (let done = 0; done < layout.bars.stretch; done += column) {
+        context.drawImage(
+          sprite.image, seam, 0, column, sprite.height,
+          at, y, column, sprite.height
+        )
+        at += column
+      }
+      const right = sprite.width - seam
+      context.drawImage(sprite.image, seam, 0, right, sprite.height, at, y, right, sprite.height)
     }
     /** One lamp out of the rack of four, chosen by ROW rather than by frame.
      * A screen with more rows than the rack has lamps repeats it — the exe
@@ -433,10 +488,11 @@ export function initBarScreen(config: {
     }
 
     context.drawImage(art.get('pigbkpc1').image, 0, 0)
-    blit(art.get('fullmenu'), layout.machine.x, layout.machine.y)
+    drawMachine(art.get('fullmenu'), layout.machine.x, layout.machine.y + arrivalOffset)
     blit(art.get('track'), layout.track.x, layout.track.y)
     blit(frameAt(dials, now), layout.dial.x, layout.dial.y)
     blit(frameAt(cogs, now), layout.cog.x, layout.cog.y)
+    blit(frameAt(cogbs, now), layout.cogb.x, layout.cogb.y)
 
     // How far into the arrival the screen is, 0..1, or null once it has
     // settled. The plates and the title plate both turn on it, together,
@@ -447,13 +503,13 @@ export function initBarScreen(config: {
       frames[Math.min(frames.length - 1, Math.floor(through * frames.length))]
 
     const title = turning === null ? titles[0] : oneShot(titles, turning)
-    blit(title, layout.title.x, layout.title.y)
+    drawPlate(title, layout.title.x, layout.title.y + arrivalOffset, layout.title.seam)
     // Mid-turn a plate is edge-on to what it used to say, so it says nothing.
     if (turning === null) {
       centred(context, big, config.title(), {
         x: layout.title.x,
         y: layout.title.y + arrivalOffset,
-        width: title.width,
+        width: title.width + layout.bars.stretch,
         height: title.height
       })
     }
@@ -544,6 +600,7 @@ export function initBarScreen(config: {
         plain = pieces.plain
         off = pieces.off
         cogs = art.frames('cog', 0, 5)
+        cogbs = art.frames('cogb', 0, 5, 2)
         dials = art.frames('dial', 1, 12, 4)
         plates = art.frames('chose', 1, 6)
         titles = art.frames('title', 1, 6)
