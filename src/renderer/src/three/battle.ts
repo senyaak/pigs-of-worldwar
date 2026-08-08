@@ -64,6 +64,7 @@ import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createShots } from './shots'
 import { createGrenades } from './grenades'
 import { isLobbed } from '../../../lib/game/grenade'
+import { SKILL } from '../../../lib/game/skills'
 import { beginGauge, chargeGauge, gaugeFraction } from '../../../lib/game/gauge'
 import type { Gauge } from '../../../lib/game/gauge'
 import { createPigVoice } from '../audio/pigVoice'
@@ -156,7 +157,7 @@ export interface BattleScene {
    * (`lib/game/controls.ts`) — asked for as a group rather than mirrored out one
    * accessor at a time.
    */
-  situation(): { starting: boolean; locked: boolean; charging: boolean }
+  situation(): { starting: boolean; locked: boolean; charging: boolean; armed: boolean }
   /** End the beat at the top of a turn. The `starting` control set's whole rule:
    * any input starts the turn, and the same input is then re-read in the set that
    * follows (lib/game/controls.ts). */
@@ -858,6 +859,18 @@ export function buildBattle(
       if (grenades.live() > 0) {
         grenades.detonateNow()
         fireRequested = false
+        // …asked of the PIG rather than of the cached `holding`, which is only
+        // synced further down the frame (where the getting-it-out clip starts) and
+        // is therefore a frame stale here.
+      } else if (active.pig.holding === SKILL.SKIP_TURN) {
+        // SKIP TURN is a skill taken in HAND and then used, like anything else
+        // (lib/game/controls.ts) — play: "пропуск хода должен применяться на
+        // стрелять, а не на выборе". Using it ends the turn.
+        fireRequested = false
+        game.endTurn()
+        focus(game.currentPig)
+        onGameChanged()
+        return
       } else if (isLobbed(holding)) {
         // A weapon with a gauge does not go off on the press at all. The
         // press starts it CHARGING and the throw comes on the release, or on
@@ -1058,6 +1071,11 @@ export function buildBattle(
       // whole-body animation for as long as it lasts.
     } else if (loco.commit) {
       if (!active.animating()) active.playOnce(loco.clip)
+    } else if (holding === SKILL.SKIP_TURN && loco.clip === ANIM.IDLE) {
+      // A pig with SKIP TURN in hand stands there THINKING about it — clip 46 of
+      // the fifty-nine the exe names, which play named too. It replaces the IDLE
+      // only: a pig can still walk about with the skill in hand, and then it walks.
+      active.setClip(ANIM.THINKING)
     } else {
       active.setClip(loco.clip)
     }
@@ -1172,6 +1190,10 @@ export function buildBattle(
       // A gauge filling is its OWN control set rather than a hole in the lock,
       // which is what it was for a commit and what play corrected.
       charging: gauge !== null && !gauge.spent,
+      // Something is still LIVE, and a second press of fire sets it off where it
+      // lies. Its own set, because the lock swallowed that press and play found it
+      // at once — "пока граната летит, не могу взорвать её."
+      armed: grenades.live() > 0,
       locked: committed() || aftermath !== null
     }),
     // Whether there is an ANGLE, which is not the same question as whether

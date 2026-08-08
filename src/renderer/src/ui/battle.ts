@@ -15,6 +15,7 @@ import { existsForPlayers } from '../../../lib/formats/pog'
 import type { LoadModelResult, MapObject } from '../api'
 import { ensureScene } from '../three/scene'
 import { modeOf, readControls, verbOf } from '../../../lib/game/controls'
+import { DRIVING_ACTIONS } from '../input/actions'
 import type { ControlMode } from '../../../lib/game/controls'
 import type { Held } from '../../../lib/game/controls'
 import { buildBattle } from '../three/battle'
@@ -227,7 +228,12 @@ export function initBattle(onLeave: () => void): BattleView {
 
   // The button is just another way to fire the action.
   byId<HTMLButtonElement>('battle-end-turn').addEventListener('click', () => {
+    // The whole gesture in one click, because that is what a button labelled END
+    // TURN means: take SKIP TURN in hand, then use it. It is not the menu applying
+    // a skill on being chosen — the menu still only hands it over — it is the
+    // remake's own shortcut for both halves (lib/game/controls.ts).
     controller.press('endTurn')
+    controller.tap('fire')
   })
 
   // Tank controls, original style — but the battle view never touches keys:
@@ -249,7 +255,16 @@ export function initBattle(onLeave: () => void): BattleView {
    * fire lock. Now the modes are one pure table (`lib/game/controls.ts`) and this
    * is only the plumbing.
    */
-  const blank = { starting: false, locked: false, charging: false }
+  const blank = { starting: false, locked: false, charging: false, armed: false }
+  /**
+   * The set that was live last time we looked. A CHANGE drops every driving key,
+   * so the new set starts from nothing held and the player presses again — which
+   * is what the sights already did and what opening the inventory did not.
+   *
+   * The verbs are left alone deliberately: `aimMode` and `fire` are what DEFINE
+   * two of the sets, and releasing them would flap straight back out again.
+   */
+  let wasMode: ControlMode | null = null
   /**
    * Which set is live — and if it is `starting`, resolve it away first.
    *
@@ -261,15 +276,16 @@ export function initBattle(onLeave: () => void): BattleView {
   const liveMode = (sighting: boolean): ControlMode => {
     const ask = (): ControlMode =>
       modeOf({ ...(scene?.situation() ?? blank), inventory: hud.skills.open(), sighting })
-    if (ask() !== 'starting') return ask()
-    scene?.beginTurn()
-    return ask()
-  }
-
-  /** Skill 65, SKIP TURN — the only way a player ends a turn. */
-  const skipTurn = (): void => {
-    game?.endTurn()
-    updateHud()
+    let mode = ask()
+    if (mode === 'starting') {
+      scene?.beginTurn()
+      mode = ask()
+    }
+    if (mode !== wasMode) {
+      wasMode = mode
+      for (const action of DRIVING_ACTIONS) controller.release(action)
+    }
+    return mode
   }
 
   const pushIntent = (): void => {
@@ -319,14 +335,11 @@ export function initBattle(onLeave: () => void): BattleView {
         return
       case 'choose':
         if (game) {
-          const chosen = hud.skills.chosen()
+          // Everything the pig reaches for and HOLDS (three/battle.ts) — SKIP TURN
+          // included, which is the correction play asked for: "пропуск хода должен
+          // применяться на стрелять, а не на выборе". Nothing fires here.
+          game.currentPig.holding = hud.skills.chosen()
           hud.skills.close()
-          // SKIP TURN is a SKILL, not a weapon: choosing it ends the turn instead
-          // of going into the pig's hands (lib/game/skills.ts).
-          if (chosen === SKILL.SKIP_TURN) skipTurn()
-          // …everything else the pig reaches for and holds (three/battle.ts).
-          // Nothing FIRES it yet.
-          else game.currentPig.holding = chosen
         }
         return
       case 'jump':
@@ -341,8 +354,10 @@ export function initBattle(onLeave: () => void): BattleView {
         // Unreachable: `liveMode` resolves the beat away before asking. Named so
         // the switch is total.
         return
-      case 'skipTurn':
-        skipTurn()
+      case 'holdSkipTurn':
+        // The dashboard's own button, and nothing else now that Enter is gone: it
+        // takes the skill in hand rather than applying it. FIRE applies it.
+        if (game) game.currentPig.holding = SKILL.SKIP_TURN
         return
       default:
         return

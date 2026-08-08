@@ -22,6 +22,23 @@ export const ACTIONS = [
 
 export type Action = (typeof ACTIONS)[number]
 
+/**
+ * The keys that DRIVE — the axes, as opposed to the verbs.
+ *
+ * They are dropped whenever the control set changes, so a new set always starts
+ * from nothing held. Play asked for it and gave both halves of the reason: the
+ * sights already stopped the pig and wanted W pressed again, while opening the
+ * inventory left it walking. One rule instead of two behaviours.
+ */
+export const DRIVING_ACTIONS: readonly Action[] = [
+  'walkForward',
+  'walkBack',
+  'turnLeft',
+  'turnRight',
+  'aimUp',
+  'aimDown'
+]
+
 /** Actions that do something while HELD, as opposed to on each press. */
 export const HELD_ACTIONS: readonly Action[] = [
   'walkForward',
@@ -70,8 +87,11 @@ export const DEFAULT_BINDINGS: Record<string, Action> = {
   // The aim view. The original holds it on a pad bit (0x100 or 0x1000) and
   // steers with the ordinary controls underneath; G is the remake's key for
   // it, and while it is down W and S drive the ANGLE instead of walking.
-  KeyG: 'aimMode',
-  Enter: 'endTurn'
+  KeyG: 'aimMode'
+  // …and there is no key for ENDING a turn. That is a SKILL — 65, SKIP TURN,
+  // always in the menu whatever the pig carries — taken in hand from the menu
+  // like a weapon and applied with FIRE (lib/game/controls.ts). Enter used to be
+  // bound here and play asked for it gone.
 }
 
 /**

@@ -9,7 +9,19 @@ import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
-import { debugState, hold, hud, landed, peakNodeY, press, release, swapMap, tap, warp } from '../controller'
+import {
+  debugState,
+  hold,
+  hud,
+  landed,
+  peakNodeY,
+  press,
+  release,
+  skipTurn,
+  tap,
+  swapMap,
+  warp
+} from '../controller'
 import { choose, startGame } from '../menu'
 import { TILE_STEP, TILE_WALL, TILE_WATER, parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
@@ -105,10 +117,12 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   expect(before).toBeGreaterThan(40)
   await expect.poll(secondsLeft, { message: 'turn clock ticking' }).toBeLessThan(before)
 
+  // End the turn the way a player must: SKIP TURN in hand, then FIRE. There is no
+  // key for it any more (e2e/controller.ts, lib/game/controls.ts).
   // End Turn through the controller вЂ” the same action the button and the
   // Enter key fire. CAMP is the training ground and fields ONE pig, so the
   // turn comes straight back to it, with the clock reset.
-  await tap(page, 'endTurn')
+  await skipTurn(page)
   await expect
     .poll(() => hud(page))
     .toMatchObject({ turn: 2, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
@@ -119,7 +133,7 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   await expect
     .poll(() => hud(page))
     .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY' })
-  await tap(page, 'endTurn')
+  await skipTurn(page)
   // The second side is the map's own choice: LIBERATE sets the French bit,
   // so the enemy IS the Garlic Grunts (lib/game/teams.ts).
   await expect
@@ -169,7 +183,7 @@ test('a turn waits a beat before it starts, and any input cuts it short', async 
   // Every later turn gets its own beat. That it also runs out UNAIDED is
   // pinned in game-logic.spec.ts, where it costs nothing вЂ” here it would be
   // ten seconds of watching a still screen.
-  await tap(page, 'endTurn')
+  await skipTurn(page)
   await expect.poll(async () => (await hud(page)).starting).toBe(true)
 
   expect(app.errors()).toEqual([])

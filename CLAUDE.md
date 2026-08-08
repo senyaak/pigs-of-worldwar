@@ -1472,6 +1472,29 @@ remembering. Skills 63, 65 and 66 are also OUT OF RANGE of `Pig::Fire`'s dispatc
 pick up an animation there. Nearest candidates if one is ever wanted: 46 "Thinking",
 33 "Cowering", 51 "Idle Cold". Not picked — a name pick here would be invention.
 
+**Play's second pass took two more exceptions out and found two bugs.**
+
+- **A set change drops every DRIVING key** (`DRIVING_ACTIONS`, the six axes). The
+  sights already stopped the pig and wanted W pressed again, while opening the
+  inventory left it walking — one rule instead of two behaviours. The VERBS are
+  left alone deliberately: `aimMode` and `fire` define two of the sets, and
+  releasing them would flap straight back out.
+- **A live grenade gets its own set, `armed`.** The moment `locked` stopped letting
+  fire through, a grenade in the air could not be detonated — the second press was
+  swallowed. Same shape as `charging`: the fire button and nothing else.
+- **The aim view cannot open the inventory.** It could, and should not.
+- **SKIP TURN applies on FIRE, not on being chosen**, and there is no key for it at
+  all now — Enter is unbound. Choosing 65 out of the menu takes it in HAND like a
+  weapon, the pig stands there wearing clip **46 "Thinking"** (play named it; the
+  exe's 59-clip table has no doze or sleep, and the menu's ICON being called
+  `sleep` is where the memory of one came from), and fire ends the turn. The
+  dashboard button is the remake's own shortcut for both halves in one click, and
+  says so.
+
+One nuance that cost a debug pass: the fire handler asks `active.pig.holding`
+rather than the cached `holding`, which is only synced further down the frame and
+is a frame stale up there.
+
 One behaviour did change on purpose: ending the TURN mid-blow is refused now.
 `verbOf('locked', 'endTurn')` is null, where the old `onAction` ran it regardless.
 

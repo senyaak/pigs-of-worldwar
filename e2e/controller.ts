@@ -246,3 +246,18 @@ export async function chooseSkill(page: Page, skill: number, cells = 12): Promis
 // The renderer declares `window.pow` too (input/controller.ts). These specs
 // are compiled in the same project, so re-declaring it would clash — the
 // evaluate() callbacks above reach it through a local shape instead.
+
+/**
+ * End the acting pig's turn the way a player must: SKIP TURN is a SKILL, taken in
+ * hand and then USED with the fire key. There is no key that ends a turn on its
+ * own any more — play asked for Enter gone and for the skill to apply on FIRE
+ * rather than on being chosen (`lib/game/controls.ts`).
+ *
+ * The `endTurn` action still exists as the dashboard button's own path, and all it
+ * does is put the skill in hand; the press-and-release after it is what applies it.
+ */
+export async function skipTurn(page: Page): Promise<void> {
+  await tap(page, 'endTurn')
+  await press(page, 'fire')
+  await release(page, 'fire')
+}

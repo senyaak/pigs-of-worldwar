@@ -201,6 +201,12 @@ export const ANIM = {
    * material table, which is exactly what you climb. */
   SCRAMBLE: 11,
   IDLE: 27,
+  /** Standing there working out what to do — clip **46** of the fifty-nine the exe
+   * names ("Thinking"). What a pig wears with SKIP TURN in hand: play named it when
+   * the skill got a use, and there is no doze or sleep clip in the table for it to
+   * have been instead — the menu's ICON is called `sleep`, which is where the
+   * memory of one came from. */
+  THINKING: 46,
   /** Thrown out of a wall — what `0x470c70` plays, and the only thing that
    * does. Ordinary falling is JUMP_MIDDLE; the impact handler plays BOUNCE. */
   EJECTED: 38,

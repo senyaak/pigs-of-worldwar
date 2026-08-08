@@ -16,6 +16,7 @@ const at = (over: Partial<Situation> = {}): Situation => ({
   inventory: false,
   locked: false,
   charging: false,
+  armed: false,
   sighting: false,
   ...over
 })
@@ -117,12 +118,30 @@ test('a locked or charging pig cannot open its inventory or end its turn', () =>
   expect(verbOf('inventory', 'skills')).toBe('closeInventory')
 })
 
-test('ending a turn goes through the SKILL, not a path of its own', () => {
-  // Play: "закончить ход вообще можно только через умение." Skill 65, SKIP TURN,
-  // is always in the menu whatever the pig carries, so the key is a shortcut to
-  // it — and whatever the skill grows later, the key gets for free.
-  expect(verbOf('battle', 'endTurn')).toBe('skipTurn')
-  expect(verbOf('sights', 'endTurn')).toBe('skipTurn')
+test('ending a turn goes through the SKILL, and only on FIRE', () => {
+  // Play, twice: "закончить ход вообще можно только через умение", then "пропуск
+  // хода должен применяться на стрелять — а не на выборе". So the verb only takes
+  // skill 65 IN HAND; the scene's fire handler is what applies it. There is no key
+  // bound to it at all now — the dashboard button is the only thing that gets here.
+  expect(verbOf('battle', 'endTurn')).toBe('holdSkipTurn')
+})
+
+test('the aim view cannot open the inventory', () => {
+  // Play: "инвентарь работает во время прицеливания" — it should not.
+  expect(verbOf('sights', 'skills')).toBeNull()
+})
+
+test('a live grenade gets its OWN set, or it could never be set off', () => {
+  // Play found this the moment `locked` stopped letting fire through: "пока
+  // граната летит — не могу взорвать её". `armed` beats the lock and passes the
+  // one key that matters.
+  expect(modeOf(at({ armed: true, locked: true }))).toBe('armed')
+  expect(readControls('armed', driving({ firing: true }))).toMatchObject({
+    walk: 0,
+    turn: 0,
+    aim: 0,
+    firing: true
+  })
 })
 
 test('the sights are NOT a lock — play caught that one', () => {
@@ -131,6 +150,5 @@ test('the sights are NOT a lock — play caught that one', () => {
   const sighted = readControls('sights', driving({ aim: 1 }))
   expect(sighted.turn).not.toBe(0)
   expect(sighted.aim).not.toBe(0)
-  expect(verbOf('sights', 'skills')).toBe('openInventory')
-  expect(verbOf('sights', 'endTurn')).toBe('skipTurn')
+  expect(verbOf('sights', 'endTurn')).toBe('holdSkipTurn')
 })

@@ -21,7 +21,14 @@
  * binds its own KEY map (`MENU_BINDINGS`) rather than reinterpreting the battle's
  * actions, so it never reaches this file.
  */
-export type ControlMode = 'starting' | 'battle' | 'sights' | 'charging' | 'inventory' | 'locked'
+export type ControlMode =
+  | 'starting'
+  | 'battle'
+  | 'sights'
+  | 'charging'
+  | 'armed'
+  | 'inventory'
+  | 'locked'
 
 /** What the player is holding, already reduced to axes. */
 export interface Held {
@@ -69,6 +76,10 @@ export interface Situation {
   locked: boolean
   /** A power gauge is filling — the fire key went down and has not come up. */
   charging: boolean
+  /** Something the pig threw is still LIVE. Its own set, because a second press
+   * of the fire key is what sets it off where it lies — and being locked used to
+   * swallow that press, so a grenade in the air could not be detonated. */
+  armed: boolean
   /** The aim-view key is down and what is in hand can use it. */
   sighting: boolean
 }
@@ -93,6 +104,7 @@ export function modeOf(situation: Situation): ControlMode {
   if (situation.starting) return 'starting'
   if (situation.inventory) return 'inventory'
   if (situation.charging) return 'charging'
+  if (situation.armed) return 'armed'
   if (situation.locked) return 'locked'
   if (situation.sighting) return 'sights'
   return 'battle'
@@ -119,6 +131,10 @@ const STILL: Intent = {
  * - **charging**: the fire key and NOTHING else. This set exists to watch the
  *   button come UP, which is the whole of what the gauge's own split needs
  *   (0x493796). It is not a lock with a hole in it.
+ * - **armed**: the fire key and nothing else again, for the other reason — a
+ *   second press sets off what is already in the air. Play found this one the
+ *   moment `locked` stopped letting fire through: "пока граната летит — не могу
+ *   взорвать её."
  * - **inventory**: nothing drives the pig; the axes step the CURSOR instead, and
  *   the vertical is inverted because forward is up the list.
  * - **starting**: nothing, because the caller never gets this far — the beat's own
@@ -136,8 +152,8 @@ export function readControls(mode: ControlMode, held: Held): Intent {
       cursor: { x: held.turn, y: held.walk > 0 ? -1 : held.walk < 0 ? 1 : 0 }
     }
   }
-  // The gauge's set: the button, and nothing it could steer with.
-  if (mode === 'charging') return { ...STILL, firing: held.firing }
+  // The two sets whose only business is the fire button.
+  if (mode === 'charging' || mode === 'armed') return { ...STILL, firing: held.firing }
   if (mode === 'locked' || mode === 'starting') return { ...STILL }
   if (mode === 'sights') {
     return {
@@ -173,7 +189,7 @@ export type Verb =
   | 'openInventory'
   | 'closeInventory'
   | 'beginTurn'
-  | 'skipTurn'
+  | 'holdSkipTurn'
 
 export function verbOf(mode: ControlMode, action: string): Verb | null {
   // The beat at the top of a turn: ANY key starts it, whatever the key is. The
@@ -187,7 +203,7 @@ export function verbOf(mode: ControlMode, action: string): Verb | null {
     if (action === 'skills') return 'closeInventory'
     return null
   }
-  if (mode === 'locked' || mode === 'charging') {
+  if (mode === 'locked' || mode === 'charging' || mode === 'armed') {
     // The one thing either of them answers, and it is the level's opening drop:
     // the jump key cuts the canopy and brings the crate down now.
     if (action === 'jump') return 'cutChute'
@@ -196,14 +212,21 @@ export function verbOf(mode: ControlMode, action: string): Verb | null {
   // The aim view takes the jump away and nothing else: the exe reaches no jump
   // from its own input branch while the bit is down (0x4928dc).
   if (action === 'jump') return mode === 'sights' ? null : 'jump'
-  if (action === 'skills') return 'openInventory'
+  // The inventory cannot be opened from the aim view — play: "инвентарь работает
+  // во время прицеливания", and it should not.
+  if (action === 'skills') return mode === 'sights' ? null : 'openInventory'
   /**
-   * Ending a turn is a SKILL — 65, SKIP TURN, always in the menu whatever the pig
-   * carries (lib/game/skills.ts). Play: "закончить ход вообще можно только через
-   * умение." So the key is a shortcut to that skill rather than a path of its own,
-   * and whatever the skill grows later — an animation, a noise — the key gets for
-   * free.
+   * Ending a turn is a SKILL, and it goes in the pig's HANDS like any other.
+   *
+   * Play, twice: "закончить ход вообще можно только через умение", then "пропуск
+   * хода должен применяться на стрелять — а не на выборе". So choosing 65 SKIP
+   * TURN out of the menu only takes it in hand — the pig stands there thinking
+   * about it — and the FIRE key is what applies it. Which also gives it a pose
+   * like a weapon's, since that is what holding a skill means here.
+   *
+   * The Enter key is gone with it: nothing but the menu and the dashboard's own
+   * button reaches this now.
    */
-  if (action === 'endTurn') return 'skipTurn'
+  if (action === 'endTurn') return 'holdSkipTurn'
   return null
 }
