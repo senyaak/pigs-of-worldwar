@@ -12,6 +12,7 @@
 
 import * as THREE from 'three'
 import {
+  BLAST_EFFECT,
   BREAK_EFFECT,
   RING_DEAD,
   RING_SEGMENTS,
@@ -23,6 +24,8 @@ import {
   spent
 } from '../../../lib/game/effects'
 import type { Effect, Particle, Ring } from '../../../lib/game/effects'
+import { cloudChannel, cloudSize } from '../../../lib/game/cloud'
+import type { Blob, Cloud } from '../../../lib/game/cloud'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 
 /**
@@ -55,6 +58,27 @@ const VERTS = (RING_SEGMENTS + 1) * 2
 const PUFF_SIZE = 110 * MODEL_SCALE
 const PUFF_GROWTH = 1
 
+/**
+ * What one of the fireball's sprites is measured in.
+ *
+ * `cloudSize` gives the engine's own figure — `(200 - age) * [+0x7e] * 12.5`,
+ * so 10000 down to 5250 for row 0 — but it is handed to the graphics library
+ * (`[0x54c5c8]`, which lives in `wh32LIB.DLL`) and the unit is the library's,
+ * not the world's. That half is not decoded and cannot be from the exe alone,
+ * so **this scalar is the remake's own**: a sixty-fourth, which is the fixed
+ * point everything else on the PSX side of this engine uses, and which lands a
+ * puff at about half a pig — 156 exe units, 78 after the model scale.
+ *
+ * The positions and the velocities are NOT in this unit: those go straight
+ * onto `[effect+0xa8]`, which is the world's own packed position, so they ride
+ * `MODEL_SCALE` like a ring for the same reason a ring does.
+ */
+const BLOB_UNIT = 1 / 64
+const BLOB_SCALE = MODEL_SCALE
+
+/** A point in game space, Y-down. */
+type Spot = { x: number; y: number; z: number }
+
 export interface Effects {
   /** Something took a hand-to-hand hit here (game space, Y-down). */
   hit(skill: number, at: { x: number; y: number; z: number }): void
@@ -62,6 +86,9 @@ export interface Effects {
    * of the exe's handler anything else that breaks. A different effect
    * entirely from a hit: smoke, and not a ring in it. */
   broke(at: { x: number; y: number; z: number }): void
+  /** …and something EXPLODED here. The same parameter row as a breaking, and
+   * that is the exe's own doing: both ids land on the same init arm. */
+  blast(at: { x: number; y: number; z: number }): void
   /** Step them; call once a frame. */
   update(delta: number): void
   /** How many rings are alive — what a spec can see of an effect, since its
@@ -69,14 +96,17 @@ export interface Effects {
   live(): number
   /** …and how many puffs of smoke. */
   smoke(): number
+  /** …and how many sprites the fireball has up. A spec cannot see a
+   * transparent quad any more than it can see a ring. */
+  fire(): number
   /**
    * Whether ANY effect is still running.
    *
-   * Not the same as "there is smoke on screen": the break effect's burst does
-   * not fire until its third frame (`BREAK_EFFECT`, stage `at: 3`), so a
-   * count of puffs is zero for the first fifth of a second and reads as
-   * finished before it has begun. Whatever waits for a thing to come apart
-   * has to wait on THIS (three/battle.ts).
+   * Not the same as "there is smoke on screen": row 0's bursts do not fire
+   * until its second and third frames, so a count of puffs is zero for the
+   * first tenth of a second and reads as finished before it has begun.
+   * Whatever waits for a thing to come apart has to wait on THIS
+   * (three/battle.ts).
    */
   busy(): boolean
   /** Drop the lot: a new battle, or a warp. */
@@ -174,6 +204,9 @@ export function createEffects(root: THREE.Object3D): Effects {
   const bands: Band[] = []
   /** …and one sprite per puff, the same way. */
   const puffs: THREE.Sprite[] = []
+  /** …and one per sprite of a fireball, of which there are a hundred and
+   * forty at once, so these are worth keeping rather than rebuilding. */
+  const blobs: THREE.Sprite[] = []
   const puffTexture = buildPuffTexture()
 
   const bandAt = (i: number): Band => {
@@ -185,27 +218,45 @@ export function createEffects(root: THREE.Object3D): Effects {
     return bands[i]
   }
 
+  const newSprite = (blending: THREE.Blending): THREE.Sprite => {
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: puffTexture,
+        transparent: true,
+        depthWrite: false,
+        blending
+      })
+    )
+    root.add(sprite)
+    return sprite
+  }
+
   const puffAt = (i: number): THREE.Sprite => {
-    while (puffs.length <= i) {
-      const sprite = new THREE.Sprite(
-        new THREE.SpriteMaterial({
-          map: puffTexture,
-          transparent: true,
-          depthWrite: false
-        })
-      )
-      root.add(sprite)
-      puffs.push(sprite)
-    }
+    while (puffs.length <= i) puffs.push(newSprite(THREE.NormalBlending))
     return puffs[i]
+  }
+
+  const blobAt = (i: number): THREE.Sprite => {
+    // The fireball ADDS light: the engine hands the library a colour with the
+    // top bit of the packed word set (0x48a088) and lets the colour itself
+    // carry the fade, exactly as the ring does. A hundred and forty dark-red
+    // sprites over each other is what makes the middle bright.
+    while (blobs.length <= i) blobs.push(newSprite(THREE.AdditiveBlending))
+    return blobs[i]
   }
 
   /** Lay one puff out. Row 0's colour is 0x4210 — sixteen of thirty-one on
    * every channel, which is the particle setter's own default and reads as
    * the dark smoke play remembers. */
-  const drape = (sprite: THREE.Sprite, one: Particle): void => {
+  const drape = (sprite: THREE.Sprite, one: Particle, at: Spot): void => {
     const age = one.age / RING_DEAD
-    sprite.position.set(one.x, one.y, one.z)
+    // The drift halves with the world the same way the fireball's does; the
+    // point it started from does not.
+    sprite.position.set(
+      at.x + (one.x - at.x) * BLOB_SCALE,
+      at.y + (one.y - at.y) * BLOB_SCALE,
+      at.z + (one.z - at.z) * BLOB_SCALE
+    )
     const size = PUFF_SIZE * (1 + PUFF_GROWTH * age)
     sprite.scale.set(size, size, size)
     const grey = 16 / 31
@@ -213,9 +264,39 @@ export function createEffects(root: THREE.Object3D): Effects {
     sprite.material.opacity = 1 - age
   }
 
+  /**
+   * Lay one of a fireball's sprites out.
+   *
+   * The engine's colour law is flat — `c * 400 >> 6` per channel, with nothing
+   * dividing by the age — so unlike a ring a cloud does not flash and does not
+   * fade. What it does is SHRINK, from twice its final size to it. The last
+   * tenth of the life takes the alpha out for the same reason the ring's does:
+   * an additive sprite that never leaves is a smear.
+   */
+  const kindle = (sprite: THREE.Sprite, one: Cloud, blob: Blob, at: Spot): void => {
+    // The OFFSET rides the scale, not the position: where the blast happened
+    // is a world coordinate and stays one, while how far a sprite has flown
+    // from it is a rig around a body and halves with it. Same split as the
+    // ring's radius, and the reason this is not `blob.x * BLOB_SCALE`.
+    sprite.position.set(
+      at.x + (blob.x - at.x) * BLOB_SCALE,
+      at.y + (blob.y - at.y) * BLOB_SCALE,
+      at.z + (blob.z - at.z) * BLOB_SCALE
+    )
+    const size = cloudSize(one) * BLOB_UNIT * BLOB_SCALE
+    sprite.scale.set(size, size, size)
+    sprite.material.color.setRGB(
+      cloudChannel(one.colour[0]) / 255,
+      cloudChannel(one.colour[1]) / 255,
+      cloudChannel(one.colour[2]) / 255
+    )
+    sprite.material.opacity = Math.min(1, (RING_DEAD - one.age) / (RING_DEAD * 0.1))
+  }
+
   const redraw = (): void => {
     let i = 0
     let p = 0
+    let b = 0
     for (const effect of live) {
       for (const one of effect.rings) {
         const band = bandAt(i++)
@@ -225,11 +306,19 @@ export function createEffects(root: THREE.Object3D): Effects {
       for (const one of effect.smoke) {
         const sprite = puffAt(p++)
         sprite.visible = true
-        drape(sprite, one)
+        drape(sprite, one, effect.at)
+      }
+      for (const cloud of effect.clouds) {
+        for (const blob of cloud.blobs) {
+          const sprite = blobAt(b++)
+          sprite.visible = true
+          kindle(sprite, cloud, blob, effect.at)
+        }
       }
     }
     for (let rest = i; rest < bands.length; rest++) bands[rest].mesh.visible = false
     for (let rest = p; rest < puffs.length; rest++) puffs[rest].visible = false
+    for (let rest = b; rest < blobs.length; rest++) blobs[rest].visible = false
   }
 
   return {
@@ -241,6 +330,9 @@ export function createEffects(root: THREE.Object3D): Effects {
     broke(at) {
       live.push(beginEffect(BREAK_EFFECT, at))
     },
+    blast(at) {
+      live.push(beginEffect(BLAST_EFFECT, at))
+    },
     update(delta) {
       for (const effect of live) advanceEffect(effect, delta)
       for (let i = live.length - 1; i >= 0; i--) if (spent(live[i])) live.splice(i, 1)
@@ -248,6 +340,11 @@ export function createEffects(root: THREE.Object3D): Effects {
     },
     live: () => live.reduce((n, effect) => n + effect.rings.length, 0),
     smoke: () => live.reduce((n, effect) => n + effect.smoke.length, 0),
+    fire: () =>
+      live.reduce(
+        (n, effect) => n + effect.clouds.reduce((m, cloud) => m + cloud.blobs.length, 0),
+        0
+      ),
     busy: () => live.length > 0,
     clear() {
       live.length = 0
@@ -259,13 +356,14 @@ export function createEffects(root: THREE.Object3D): Effects {
         band.geometry.dispose()
         band.material.dispose()
       }
-      for (const sprite of puffs) {
+      for (const sprite of [...puffs, ...blobs]) {
         root.remove(sprite)
         sprite.material.dispose()
       }
       puffTexture.dispose()
       bands.length = 0
       puffs.length = 0
+      blobs.length = 0
       live.length = 0
     }
   }

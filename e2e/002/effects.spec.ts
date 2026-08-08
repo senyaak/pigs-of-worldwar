@@ -6,8 +6,10 @@
 
 import { test, expect } from '@playwright/test'
 
-import { FRAME_SECONDS } from '../../src/lib/game/ballistics'
+import { EXE_FRAME_SECONDS } from '../../src/lib/game/ballistics'
+import { CLOUD_DEAD, CLOUD_STEP, cloudChannel, cloudSize } from '../../src/lib/game/cloud'
 import {
+  BLAST_EFFECT,
   BREAK_EFFECT,
   RING_DEAD,
   advanceEffect,
@@ -17,9 +19,13 @@ import {
   spent
 } from '../../src/lib/game/effects'
 
-/** Step an effect by whole frames, the way the engine does. */
+/**
+ * Step an effect by whole frames, the way the engine does — at the ENGINE's
+ * rate. `FRAME_SECONDS` is the walk's stretched 1/15 and nothing in the effect
+ * system counts a pig's stride.
+ */
 const frames = (effect: ReturnType<typeof beginEffect>, n: number): void => {
-  for (let i = 0; i < n; i++) advanceEffect(effect, FRAME_SECONDS)
+  for (let i = 0; i < n; i++) advanceEffect(effect, EXE_FRAME_SECONDS)
 }
 
 test('each melee weapon throws its own id and its own row', () => {
@@ -108,37 +114,99 @@ test('an effect is spent once its last ring has gone', () => {
   expect(spent(effect)).toBe(true)
 })
 
-test('a thing BREAKING makes smoke and not one ring', () => {
-  // Row 0 is a different animal from the hand-to-hand rows: stages F, G and H
-  // are all off, and what it has is the burst.
-  expect(BREAK_EFFECT.rings).toHaveLength(0)
-  const effect = beginEffect(BREAK_EFFECT, { x: 0, y: -100, z: 0 })
-  frames(effect, 2)
-  expect(effect.smoke).toHaveLength(0)
-  frames(effect, 1) // the burst is on frame 3
-  expect(effect.smoke).toHaveLength(6)
+test('a BLAST and a BREAKING are the same parameter row', () => {
+  // Both ids land on the same init arm — 0x488f80, `push 0; call 0x48ccc0` —
+  // so what separates them is the id and nothing about the look.
+  expect(BREAK_EFFECT.id).toBe(0x3e)
+  expect(BLAST_EFFECT.id).toBe(0x54)
+  expect(BREAK_EFFECT.kind).toBe(0)
+  expect(BLAST_EFFECT.kind).toBe(0)
+  expect(BLAST_EFFECT.clouds).toEqual(BREAK_EFFECT.clouds)
+  expect(BLAST_EFFECT.bursts).toEqual(BREAK_EFFECT.bursts)
 })
 
-test('the smoke RISES — the byte the engine calls gravity is buoyancy', () => {
-  // y is DOWN in this space, and the engine SUBTRACTS the byte from the y
-  // velocity every frame, so a puff climbs and climbs faster.
-  const effect = beginEffect(BREAK_EFFECT, { x: 0, y: 0, z: 0 })
-  frames(effect, 3)
-  const puff = effect.smoke[0]
-  expect(puff.y).toBeLessThan(0)
-  const firstStep = puff.y
+test('row 0 has no ring in it, and five stages that are not rings', () => {
+  // F, G and H are off, which is why a hit and a blast look nothing alike.
+  expect(BREAK_EFFECT.rings).toHaveLength(0)
+  expect(BREAK_EFFECT.clouds).toHaveLength(2)
+  expect(BREAK_EFFECT.bursts).toHaveLength(3)
+})
+
+test('the fireball is a hundred and forty sprites, and it comes first', () => {
+  const effect = beginEffect(BLAST_EFFECT, { x: 0, y: -100, z: 0 })
   frames(effect, 1)
-  expect(puff.y - firstStep).toBeLessThan(firstStep)
-  // …and outward at the same time: it left along its own bearing.
-  expect(Math.hypot(puff.x, puff.z)).toBeGreaterThan(0)
+  // Stage B on frame 1: seventy sprites, dark red.
+  expect(effect.clouds).toHaveLength(1)
+  expect(effect.clouds[0].blobs).toHaveLength(70)
+  expect(effect.clouds[0].colour).toEqual([16, 0, 0])
+  frames(effect, 1)
+  // …and stage A on frame 2, seventy more.
+  expect(effect.clouds).toHaveLength(2)
+  expect(effect.clouds[0].blobs.length + effect.clouds[1].blobs.length).toBe(140)
+})
+
+test('the fireball goes UP, and gravity brings it back', () => {
+  // The engine's world has +y up — all three of its force generators point
+  // (0,-1,0) — so the byte it subtracts from the vertical is gravity. Game
+  // space is Y-down, so a rising sprite has a NEGATIVE y velocity here.
+  const effect = beginEffect(BLAST_EFFECT, { x: 0, y: 0, z: 0 })
+  frames(effect, 1)
+  const cloud = effect.clouds[0]
+  expect(cloud.blobs.every((blob) => blob.dy < 0)).toBe(true)
+  const before = cloud.blobs[0].dy
+  frames(effect, 1)
+  // Gravity is 20 a frame and it takes the climb off, so dy moves toward zero.
+  expect(cloud.blobs[0].dy).toBe(before + 20)
+  // …and out along its own bearing at the same time.
+  expect(Math.hypot(cloud.blobs[0].x, cloud.blobs[0].z)).toBeGreaterThan(0)
+})
+
+test('a fireball SHRINKS over twenty frames and then is gone', () => {
+  const effect = beginEffect(BLAST_EFFECT, { x: 0, y: 0, z: 0 })
+  frames(effect, 1)
+  const cloud = effect.clouds[0]
+  const born = cloudSize(cloud)
+  frames(effect, 1)
+  expect(cloudSize(cloud)).toBeLessThan(born)
+  // The age steps 5 a frame and dies at 100: twenty frames, counted from the
+  // frame it was born on, since the step runs in that frame's own tail.
+  expect(CLOUD_DEAD / CLOUD_STEP).toBe(20)
+  frames(effect, 17) // frame 19, and both are still up
+  expect(effect.clouds).toHaveLength(2)
+  frames(effect, 1)
+  expect(effect.clouds).toHaveLength(1) // the second one is a frame behind
+  frames(effect, 1)
+  expect(effect.clouds).toHaveLength(0)
+})
+
+test('a cloud does not flash the way a ring does', () => {
+  // A ring divides its colour by its age and so is blinding on frame one; a
+  // cloud's law is flat, `c * 400 >> 6`, so the brightest anything gets is 193
+  // rather than 255.
+  expect(cloudChannel(16)).toBe(100)
+  expect(cloudChannel(0)).toBe(0)
+  expect(cloudChannel(31)).toBe(193)
+})
+
+test('the smoke bursts come after the fireball, and none of them falls', () => {
+  const effect = beginEffect(BREAK_EFFECT, { x: 0, y: 0, z: 0 })
+  frames(effect, 1)
+  expect(effect.smoke).toHaveLength(0)
+  frames(effect, 1) // stage I on frame 2
+  expect(effect.smoke).toHaveLength(4)
+  frames(effect, 1) // stages J and K on frame 3
+  expect(effect.smoke).toHaveLength(14)
+  // Row 0's bursts all carry a gravity of 0, so a puff drifts and never falls.
+  expect(effect.smoke.every((one) => one.gravity === 0)).toBe(true)
 })
 
 test('the smoke goes out, and the effect with it', () => {
   const effect = beginEffect(BREAK_EFFECT, { x: 0, y: 0, z: 0 })
   frames(effect, 3)
   expect(spent(effect)).toBe(false)
-  // A step of 10 is ten frames of life, counted from the frame it appeared.
-  frames(effect, 10)
+  // The longest-lived stage is K, at an age step of 3: thirty-four frames from
+  // the frame it appeared.
+  frames(effect, 34)
   expect(effect.smoke).toHaveLength(0)
   expect(spent(effect)).toBe(true)
 })
@@ -147,6 +215,6 @@ test('a long frame does not let a stage go by unfired', () => {
   // The engine counts FRAMES; a renderer that stalls hands back a delta worth
   // several, and both rings must still be born.
   const effect = beginEffect(hitEffectOf(4)!, { x: 0, y: 0, z: 0 })
-  advanceEffect(effect, FRAME_SECONDS * 6)
+  advanceEffect(effect, EXE_FRAME_SECONDS * 6)
   expect(effect.rings).toHaveLength(3)
 })

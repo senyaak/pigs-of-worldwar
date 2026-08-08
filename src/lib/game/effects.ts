@@ -10,7 +10,9 @@
 // Pure, like the rest of lib/game: it steps numbers. Drawing a band is the
 // scene's job (`three/effects.ts`).
 
-import { FRAME_SECONDS } from './ballistics'
+import { EXE_FRAME_SECONDS } from './ballistics'
+import { advanceCloud, cloudSpent, spawnCloud } from './cloud'
+import type { Cloud, CloudStage } from './cloud'
 
 /**
  * One ring the parent effect lets go, decoded straight out of its row.
@@ -42,34 +44,49 @@ export interface RingStage {
 }
 
 /**
- * A BURST of particles — the row's stage K, spawner 0x48c860.
+ * A BURST of particles — stages I and J through `0x48c160`, and K and L
+ * through `0x48c860`.
  *
- * None of the hand-to-hand rows but the cattle prod's has one; what does is
- * the effect a thing throws when it BREAKS, and it is the smoke play asks
- * for.
+ * None of the hand-to-hand rows but the cattle prod's has one; row 0, which
+ * is both a thing BREAKING and a grenade going off, has three.
+ *
+ * **The argument order is now pinned**, and it used to be guesswork. It comes
+ * out of `0x48c160` cleanly, and the check is free: the parameter the row
+ * gates the whole stage on — it must be greater than zero or nothing is built
+ * (0x48c19f) — is the one that lands in `[+0x18]`, the age step. A stage whose
+ * particles would never die is a stage the engine refuses, exactly as it
+ * refuses a ring with no age step. `0x48c860` is not accounted for
+ * instruction by instruction, but it gates on the same two parameters in the
+ * same order and packs its colour out of three, so it is read by parallel.
  */
 export interface BurstStage {
   /** The frame it goes off on. */
   at: number
   /** How many. It is `param(base + 0)`, written to `[0x537dec]` so that the
    * child effect — id 0x1a, the one id whose particle count comes out of a
-   * global — sizes its own array by it (0x48c8b4). */
+   * global — sizes its own array by it (0x48c8b4, 0x48c1b4). */
   count: number
-  /** Five bits each again, out of `param(base+6..8)` shifted together. */
+  /** Five bits each. Out of `param(base+6..8)` for stages K and L; the other
+   * two spawner's is the hard-coded 0x4210 (0x48c35d), which is the exact
+   * default the particle setter compares against — a mid grey. */
   colour: [number, number, number]
-  /** How fast a particle leaves, and how much it RISES a frame — the engine
-   * subtracts this from the y velocity every frame (0x48a73e) and y is DOWN,
-   * so the byte the code calls gravity is buoyancy. And how much of its life
-   * goes by a frame, 0..100 as everywhere else.
-   *
-   * **Which of the row's trailing numbers is which is NOT pinned.** The burst
-   * hands eleven parameters to 0x486b30 and the argument order did not come
-   * out of the read cleanly; what IS certain is the count, the colour, and
-   * the three FIELDS these land in (`[+0x18]` the age step, `[+0x1c]` the
-   * jitter, `[+0x1d]` the rise). The row's own three are 10, 15 and 8 and
-   * these are that set, assigned to fit — correct them against play. */
-  speed: number
-  rise: number
+  /** How fast one leaves sideways: `cos(bearing) * param(base+2) * 3`, the
+   * cosine in 256ths (0x48c2e6). */
+  out: number
+  /** …and upward: `rand()%100 * param(base+1) * 3 / 100`, so anywhere from
+   * nothing to three times it (0x48c302). Never negative — which is one of
+   * the four things that settle which way is up (`cloud.ts`). */
+  up: number
+  /** `param(base+3)` → `[+0x1c]`, the amplitude of the three `rand()%1024`
+   * draws the per-frame loop adds. **Not applied here**: how the draws scale
+   * by it did not come out of the read, and a wobble invented to fit would be
+   * a stand-in. */
+  jitter: number
+  /** `param(base+4)` → `[+0x1d]`, taken off the vertical every frame
+   * (0x48a73e). GRAVITY — see the sign argument in `cloud.ts`. */
+  gravity: number
+  /** `param(base+5)` → `[+0x18]`, and the gate: a particle lives `100 / this`
+   * frames. */
   step: number
 }
 
@@ -81,6 +98,7 @@ export interface HitEffect {
   kind: number
   rings: RingStage[]
   bursts?: BurstStage[]
+  clouds?: CloudStage[]
 }
 
 const ring = (
@@ -151,28 +169,59 @@ export const hitEffectOf = (skill: number | null): HitEffect | null =>
   skill === null ? null : (HITS[skill] ?? null)
 
 /**
- * What something throws when it BREAKS — a dummy going down, and by the look
- * of the handler anything else that comes apart.
+ * PARAMETER ROW 0, all five of its live stages — which is both a thing
+ * BREAKING and a grenade going OFF, because the two resolve to the same row.
  *
  * The break handler (0x48d750, whose last act is to run the object's script
  * command) spawns effect **0x3e** at a point jittered ±32 about the object,
  * with two other ids for two special cases it does not take: 0x4b for record
- * type 0x1f, and 6 where `[+0xb3]` is set. 0x3e resolves to parameter row
- * **0** (0x488f80 → `0x48ccc0(0)`).
+ * type 0x1f, and 6 where `[+0xb3]` is set. The grenade's own destructor arm
+ * spawns **0x54** (0x432e75, which falls into the shared tail at 0x435364).
+ * Both ids land on the same jump-table arm — `0x488f80`, `push 0; call
+ * 0x48ccc0` — so both read row 0, and what separates a blast from a breaking
+ * is only the id, which is what decides whether it hurts.
  *
- * Row 0 has **no rings at all** — stages F, G and H are off, which is why a
- * hit and a breaking look nothing alike. What it has is stage K, the burst,
- * and four stages through two spawners this read did not open (0x48bff0 twice
- * and 0x48c160 twice). So the smoke is here and there is more of row 0 than
- * this. The colour is the exact default the particle setter compares against,
- * 0x4210 — sixteen of thirty-one on every channel, a mid grey.
+ * Row 0 has **no rings at all** — F, G and H are off, which is why a hit and a
+ * blast look nothing alike. What it has is FIVE stages, and until now the
+ * remake drew one of them:
+ *
+ * | stage | frame | spawner | |
+ * | ----- | ----- | ------- | - |
+ * | B | 1 | 0x48bff0 | seventy sprites, dark RED |
+ * | A | 2 | 0x48bff0 | seventy more, near black |
+ * | I | 2 | 0x48c160 | four grey particles, no gravity |
+ * | J | 3 | 0x48c160 | four more, thrown higher and living longer |
+ * | K | 3 | 0x48c860 | six grey — the only one that was here |
+ *
+ * So an explosion is a hundred and forty sprites, not six, and the two colours
+ * (16,0,0) and (4,3,0) come out of the draw as roughly (100,0,0) and (25,19,0)
+ * — the channel gain is `c * 400 >> 6`, nothing divides by the age, and a
+ * cloud does not flash the way a ring does. Dark red over near-black over grey
+ * smoke is what a Hogs of War blast is made of.
  */
-export const BREAK_EFFECT: HitEffect = {
+export const ROW_ZERO: HitEffect = {
   id: 0x3e,
   kind: 0,
   rings: [],
-  bursts: [{ at: 3, count: 6, colour: [16, 16, 16], speed: 10, rise: 8, step: 10 }]
+  clouds: [
+    { at: 1, count: 70, colour: [16, 0, 0], up: 4, out: 3, gravity: 20, size: 4 },
+    { at: 2, count: 70, colour: [4, 3, 0], up: 5, out: 4, gravity: 20, size: 4 }
+  ],
+  bursts: [
+    { at: 2, count: 4, colour: [16, 16, 16], out: 10, up: 0, jitter: 25, gravity: 0, step: 10 },
+    { at: 3, count: 4, colour: [16, 16, 16], out: 10, up: 20, jitter: 25, gravity: 0, step: 6 },
+    { at: 3, count: 6, colour: [16, 16, 16], out: 10, up: 10, jitter: 0, gravity: 0, step: 3 }
+  ]
 }
+
+/** What a thing coming apart throws. Row 0, under the id the break handler
+ * uses. */
+export const BREAK_EFFECT: HitEffect = { ...ROW_ZERO, id: 0x3e }
+
+/** …and what a grenade throws. The same row under the destructor's own id —
+ * kept apart so the caller reads as what it is rather than borrowing the
+ * other, which is what `three/grenades.ts` used to do. */
+export const BLAST_EFFECT: HitEffect = { ...ROW_ZERO, id: 0x54 }
 
 /** How far round the burst fans its particles: the same 1638.4-per-turn unit
  * the ring is drawn in, stepped `0x648 / count` a particle (0x48cb0b). */
@@ -222,7 +271,9 @@ export interface Ring {
  * One of a burst's particles. The 40-byte record is decoded off the engine's
  * own per-frame loop (0x48a6ab): a position, a velocity added to it every
  * frame, an age 0..100 that steps and dies at 100, and the byte at `+0x1d`
- * taken off the y velocity — which in a Y-DOWN world is a rise, not a fall.
+ * taken off the y velocity — which is GRAVITY, the engine's world having +y
+ * up (the argument is in `cloud.ts`). Game space here, so the sign is flipped
+ * once on the way in.
  */
 export interface Particle {
   x: number
@@ -233,7 +284,7 @@ export interface Particle {
   dz: number
   age: number
   step: number
-  rise: number
+  gravity: number
 }
 
 /** An effect in flight: the stages it has still to let go, and what it has. */
@@ -245,8 +296,10 @@ export interface Effect {
   carry: number
   pending: RingStage[]
   waiting: BurstStage[]
+  brewing: CloudStage[]
   rings: Ring[]
   smoke: Particle[]
+  clouds: Cloud[]
   at: { x: number; y: number; z: number }
 }
 
@@ -257,8 +310,10 @@ export function beginEffect(effect: HitEffect, at: { x: number; y: number; z: nu
     carry: 0,
     pending: [...effect.rings],
     waiting: [...(effect.bursts ?? [])],
+    brewing: [...(effect.clouds ?? [])],
     rings: [],
     smoke: [],
+    clouds: [],
     at: { ...at }
   }
 }
@@ -267,16 +322,26 @@ export function beginEffect(effect: HitEffect, at: { x: number; y: number; z: nu
 export const spent = (effect: Effect): boolean =>
   effect.pending.length === 0 &&
   effect.waiting.length === 0 &&
+  effect.brewing.length === 0 &&
   effect.rings.length === 0 &&
-  effect.smoke.length === 0
+  effect.smoke.length === 0 &&
+  effect.clouds.length === 0
 
 /**
  * Step it. The engine counts FRAMES, so `delta` is converted and whole frames
  * are taken one at a time — a long frame must not let a stage go by unfired
  * or a ring skip its whole life.
+ *
+ * The rate is the ENGINE's, `EXE_FRAME_SECONDS`, and it used to be
+ * `FRAME_SECONDS`. That 1/15 is the one free number in the WALK chain — it
+ * halved so a pig at half scale would not sprint — and nothing in the effect
+ * system is tied to a pig's stride. Read at 1/15 every timer in here came out
+ * twice as long: a twenty-frame fireball took a second and a third to go off.
+ * Same argument as the fuse and the gauge, and this is the fourth place to
+ * need it.
  */
 export function advanceEffect(effect: Effect, delta: number): void {
-  effect.carry += delta / FRAME_SECONDS
+  effect.carry += delta / EXE_FRAME_SECONDS
   while (effect.carry >= 1) {
     effect.carry -= 1
     effect.frame++
@@ -315,14 +380,25 @@ export function advanceEffect(effect: Effect, delta: number): void {
           x: effect.at.x,
           y: effect.at.y,
           z: effect.at.z,
-          dx: Math.cos(angle) * stage.speed * 3,
-          dy: 0,
-          dz: Math.sin(angle) * stage.speed * 3,
+          dx: Math.cos(angle) * stage.out * 3,
+          // Upward, so negative here, and anywhere from nothing to three
+          // times the row's own figure: `rand()%100 * p * 3 / 100`.
+          dy: -((Math.floor(Math.random() * 100) * stage.up * 3) / 100),
+          dz: Math.sin(angle) * stage.out * 3,
           age: 0,
           step: stage.step,
-          rise: stage.rise
+          gravity: stage.gravity
         })
       }
+    }
+    for (let i = effect.brewing.length - 1; i >= 0; i--) {
+      const stage = effect.brewing[i]
+      if (stage.at !== effect.frame) continue
+      effect.brewing.splice(i, 1)
+      // The gate is the count itself: `param(base+0)` of zero and 0x48bff0
+      // builds nothing at all (0x48c017).
+      if (stage.count <= 0) continue
+      effect.clouds.push(spawnCloud(stage, effect.at))
     }
     // 0x48a840, in its own order: the age first, then the width, then the
     // radius, and the growth last off its own second difference.
@@ -333,16 +409,18 @@ export function advanceEffect(effect: Effect, delta: number): void {
       one.growth += one.drift
     }
     effect.rings = effect.rings.filter((one) => one.age < RING_DEAD)
-    // …and the particles, in the engine's order: the rise off the y velocity
+    // …and the particles, in the engine's order: gravity onto the y velocity
     // first, then the whole velocity added on (0x48a73e..0x48a774).
     for (const one of effect.smoke) {
-      one.dy -= one.rise
+      one.dy += one.gravity
       one.x += one.dx
       one.y += one.dy
       one.z += one.dz
       one.age += one.step
     }
     effect.smoke = effect.smoke.filter((one) => one.age < RING_DEAD)
+    for (const one of effect.clouds) advanceCloud(one)
+    effect.clouds = effect.clouds.filter((one) => !cloudSpent(one))
   }
 }
 

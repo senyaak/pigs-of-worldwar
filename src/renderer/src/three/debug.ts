@@ -49,6 +49,8 @@ export interface DebugParts {
   effects: () => number
   /** …and how many puffs of smoke: a thing BREAKING throws those instead. */
   smoke: () => number
+  /** …and how many sprites its FIREBALL has. */
+  fire: () => number
   /** What the map SCRIPT is still holding back, and what is in the air. */
   script: () => { absent: number[]; falling: number }
   /** How many bullets are in flight. */
@@ -112,9 +114,12 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** How many rings a blow has in the air — two or three per hit, for
        * about half a second (lib/game/effects.ts). */
       effects: () => parts.effects(),
-      /** How many puffs of smoke are up — six per thing broken, for about
-       * two thirds of a second (lib/game/effects.ts). */
+      /** How many puffs of smoke are up — fourteen per thing broken or blown
+       * up, over three bursts (lib/game/effects.ts). */
       smoke: () => parts.smoke(),
+      /** …and how many sprites the FIREBALL has: a hundred and forty at the
+       * peak, over two clouds a frame apart (lib/game/cloud.ts). */
+      fire: () => parts.fire(),
       /** The records still off the map, and how many crates are coming down
        * under a canopy right now (lib/game/script.ts). */
       script: () => parts.script(),

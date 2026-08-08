@@ -470,20 +470,17 @@ said so — "там ещё чёрный дым в игре при уничтож
 binary agrees: the object's own break handler (0x48d750, whose last act is to
 run its map-script command) spawns effect **0x3e** at a point jittered ±32
 about it, which resolves to parameter row **0**, and row 0 has no rings in it
-at all. What it has is the BURST: **six particles**, colour 0x4210 — sixteen
-of thirty-one on every channel, the exact default the particle setter
-compares against — fanned round the horizontal and RISING, because the byte
-the engine subtracts from the y velocity is buoyancy in a Y-down world. So a
-hit makes rings and a breaking makes smoke, and they are not the same code
-path. `onBroken` in `three/battle.ts` is the hook, the same way the exe hangs
-it on the object rather than on the blow.
+at all. What it has is the BURST: colour 0x4210 — sixteen of thirty-one on
+every channel, the exact default the particle setter compares against — fanned
+round the horizontal and RISING. So a hit makes rings and a breaking makes
+smoke, and they are not the same code path. `onBroken` in `three/battle.ts` is
+the hook, the same way the exe hangs it on the object rather than on the blow.
 
-Row 0 also enables four stages through two spawners the read did not open
-(0x48bff0 twice, 0x48c160 twice), so there is MORE to a breaking than the six
-puffs. And three of the burst's numbers — the age step, the jitter and the
-rise — are assigned to fit rather than pinned: the argument order into
-0x486b30 did not come out of the read cleanly. `lib/game/effects.ts` says so
-at the field. Correct them against play.
+Two things this paragraph used to say are now WRONG and corrected below: it is
+not six particles but fourteen over three bursts plus two clouds of seventy,
+and the byte the engine subtracts from the y velocity is **gravity**, not
+buoyancy — the engine's world is +y UP. Both are settled; see the grenade's
+last pass at the end of this file, and `../pigs-disasm/effects/notes.md`.
 
 Two numbers in it are the remake's own and say so: a ring's SIZE rides
 `MODEL_SCALE`. The exe computes the radius in world units, but in a world
@@ -1156,7 +1153,8 @@ So the missing explosion is not a missing row. It is **row 0's four other
 STAGES**, through `0x48bff0` and `0x48c160`, each keyed on a row OFFSET through
 `0x48CC90`. The remake draws one stage of five — the six-puff burst — which is
 exactly why an explosion and a breaking look the same and neither looks like
-much. `fire.md` has `0x48bff0` written out; that is the next job.
+much. **DONE the next day**: both spawners are decoded and all five stages are
+built. See the fifth pass at the end of this file.
 
 **The bounce REPLACES the surface's material, it does not multiply**, and play
 felt it as friction eating the throw. Two different fields prove it: a tile's
@@ -1239,6 +1237,52 @@ so the art is within four pixels of wherever the slider is put.
 explosion: the camera comes off a grenade the frame it stops existing, so the
 puffs were happening behind the player. `onBlast` starts the same wait a broken
 dummy starts.
+
+### The grenade, sixth pass — the explosion's LOOK, 2026-08-08
+
+Play: "эффект взрыва всё ещё не работает верно". It was not: the remake was
+drawing **one stage of five**, and the vertical of the whole effect system was
+upside down.
+
+**+y is UP in the engine's world.** Read off the physics rather than argued
+from the models: the world builds three force generators and the direction is
+`(0,-1,0)` in all three, one of them gravity (`../pigs-disasm/movement/notes.md`
+already had this written down), so falling is y DECREASING. The effect table
+agrees from four independent directions — a burst's vertical launch is
+`rand()%100 * p * 3/100` and cannot be negative; row 15 stacks three shockwave
+rings at +100, +300 and +600; a damage number lays its trail at `y + 100` and a
+damage number floats up; and row 0's cloud fires in a cone about +y against a
+force that decelerates it. So `[+0x1d]` and `[+0x12]` are **gravity**, and the
+note that called them buoyancy — which had stood since the melee rings — was
+wrong. The remake stays Y-down and flips the sign once, in `lib/game/cloud.ts`.
+
+**Row 0 is five stages, and the two big ones are not particles.** `0x48bff0`
+hangs its own array of 20-byte records off `[child+0x70]` — position, velocity,
+colour, one byte of gravity — stepped by `0x48a7e0` and drawn one SPRITE each by
+`0x489fa0`, both gated on that pointer being non-null. Seventy of them, twice: a
+dark red cloud on frame 1 and a near-black one on frame 2, each fired in a 44°
+cone with a random 1..2 on the speed, shrinking from twice its final size over
+twenty frames. `0x48c160` adds two more four-particle bursts. So a blast is
+**140 sprites and 14 puffs** where it used to be six, and it is the same picture
+a crate coming apart makes, because both ids resolve to the same arm.
+
+**`0x48c160` also PINNED the burst's argument order**, which had been "assigned
+to fit" since the melee pass. The check costs nothing: the parameter a stage is
+GATED on is the one that becomes the age step, exactly as a ring is gated on its
+own. The three numbers the old note guessed at are not the launch at all — they
+are `param(base+9..11)`, still unidentified.
+
+**The effect system now runs at the ENGINE's rate.** It was on `FRAME_SECONDS`,
+which is the walk's stretched 1/15 and exists so a pig at half scale does not
+sprint; nothing in here counts a stride. At 1/15 every timer came out twice as
+long and a twenty-frame fireball took a second and a third to go off.
+`EXE_FRAME_SECONDS`, and this is the fourth place to need it — the melee rings
+got twice as fast with it, deliberately.
+
+Two scalars are the remake's own and say so at the field: `BLOB_UNIT`, because
+a sprite's size is handed to `wh32LIB.DLL` and the unit is the library's, and
+the split where a puff's DRIFT rides `MODEL_SCALE` while the point it started
+from does not — same argument as the ring's radius.
 
 ### Known divergences — deliberate, and each written up where it lives
 
@@ -1339,37 +1383,40 @@ dummy starts.
 
 ### Threads left mid-pull
 
-**The next job is the EXPLOSION'S LOOK, and it is the last thing about a
-grenade that is not decoded.** Everything else went: the gauge, the arc, the
-fuse, the bounce, the damage, the falloff, the range, the sound. What a blast
-looks like is still the BREAK BURST standing in — six puffs — and
-`three/grenades.ts` says so at the field.
+**The GRENADE is done, look and all** — the gauge, the arc, the fuse, the
+bounce, the damage, the falloff, the range, the sound, and now the explosion.
+Two findings out of that last pass are worth not re-deriving:
 
-The whole path is mapped, so this starts from facts rather than a search:
-
-- a blast is **effect id 0x54**, spawned by the projectile's DESTRUCTOR
-  (0x432730 → the arm at 0x4328e5 → 0x432e51 → 0x435364);
-- its id resolves to **parameter ROW 0** — the same row a thing BREAKING uses.
-  `slot = [0x489680 + id - 1]`, `arm = [0x489574 + slot*4]` (the dispatch at
-  0x4881e8), and the arm is `push 0; call 0x48CCC0`. Cross-checked: id 0x3e, the
-  break burst, resolves to row 0 too, which `../pigs-disasm/effects/notes.md`
-  derived independently from the other end;
-- **`0x48CC90` is the row accessor** — `(s8)[0x4D61E8 + row*143 + offset]`
-  scaled by `[0x4D6C88 + offset]`, with the row index at `[effect+0xDC]`;
-- **row 0 has four stages this repo has never opened**, through `0x48bff0`
-  (twice) and `0x48c160` (twice). `0x48bff0(offset)` is legible: it asks the
-  accessor for that offset, and if it is non-zero allocates a 0xE4 CHILD effect
-  and builds it from `[effect+0xA8]`/`[effect+0xAC]`. So each stage is
-  `(row offset) → a child effect`, and the job is which offsets row 0 carries
-  and what the children are.
-
-`lib/game/effects.ts` already models a row as twelve timed stages with rings and
-bursts, so the machinery is there to receive this — what is missing is the data.
+- **+y is UP in the engine's world, and this repo had it backwards for the
+  effect system.** The exe's physics settles it: the world's three force
+  generators all point `(0,-1,0)` and one of them is gravity
+  (`../pigs-disasm/movement/notes.md`), so falling is y DECREASING. Four things
+  in the effect table agree — a burst's vertical launch cannot be negative, row
+  15 stacks rings at +100/+300/+600, a damage number trails at `y + 100`, and
+  row 0's cloud fires about +y against a decelerating force. The remake stays
+  Y-down and flips once, on the way in (`lib/game/cloud.ts`). **The old note
+  that `[+0x1d]` is "buoyancy, not gravity" is wrong wherever it survives.**
+- **An explosion is 140 sprites and 14 puffs, not six.** Row 0 — which id 0x54
+  and id 0x3e both resolve to, so a blast and a crate coming apart are the same
+  picture — has five live stages, and this repo was drawing one. The two big
+  ones go through `0x48bff0`, which is not a particle spawner at all: it hangs
+  its own array of 20-byte records off `[child+0x70]`, stepped by `0x48a7e0` and
+  drawn one sprite each by `0x489fa0`. Both spawners are written out in
+  `../pigs-disasm/effects/notes.md`.
 
 One thing found on the way and worth not re-deriving: **an effect's collider is a
 sphere of radius 35** (0x4a8f42, reached by `jmp [eax*4+0x4a90CC]` at 0x4a8ece
 where `eax = type - 0x1357`, built by `0x407AF0` at 0x4a9044). It does not need
 to grow — that idea was invented to prop up a misread range and is gone.
+
+**What is left of the effect system:** `0x48c410`, stages D and E, which rows 1
+and 16 reach and row 0 does not; stage C, the inline flash, which no decoded row
+turns on; and the SIZE of a sprite, whose unit belongs to `wh32LIB.DLL` and so
+cannot come out of the exe — `BLOB_UNIT` and `PUFF_SIZE` in
+`three/effects.ts` are the remake's own and say so.
+
+**Still deferred, and named by play:** the RAMP is wrong ("рампа всё ещё
+кривая"), parked while the grenade was being built.
 
 Everything below this line is older, and the shot's own six items are DONE —
 see "The SHOT, end to end".

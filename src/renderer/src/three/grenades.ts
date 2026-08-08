@@ -116,12 +116,12 @@ export interface GrenadeParts {
    * play kept reporting that there was no explosion at all. */
   onBlast: (at: { x: number; y: number; z: number }) => void
   numbers: DamageNumbers
-  /** What the blast is drawn with. The right thing is effect **0x54**, which
-   * the projectile's destructor spawns for kind 24 with the row's +0x04 as its
-   * life and +0x08/+0x0C as its two parameters (0x432e51 → 0x435364); that
-   * effect's own 143-byte parameter row has not been pulled out of 0x4d61e8
-   * yet, so the engine's break burst stands in and this comment is the
-   * pointer. `../../../pigs-disasm/weapons/fire.md`. */
+  /** What the blast is drawn with — effect **0x54**, which the projectile's
+   * destructor spawns for kind 24 with the row's +0x14 as its life and
+   * +0x18/+0x1C as its two arguments (0x432e51 → 0x435364). It reads parameter
+   * row **0**, which is now decoded whole: two clouds of seventy sprites and
+   * three bursts of smoke (`lib/game/effects.ts`). The break burst no longer
+   * stands in — it turned out to be one stage of the five. */
   effects: Effects
   /** Asked for rather than held, as everywhere else the bank is used. */
   bank: () => Bank
@@ -161,7 +161,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
 
   /** Everything within reach takes its share. */
   const detonate = (shot: Lobbed): void => {
-    parts.effects.broke({ x: shot.x, y: shot.y, z: shot.z })
+    parts.effects.blast({ x: shot.x, y: shot.y, z: shot.z })
     playCue(parts.bank(), BATTLE_SOUNDS.blast)
     parts.onBlast({ x: shot.x, y: shot.y, z: shot.z })
     const row = lobOf(shot.skill)

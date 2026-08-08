@@ -1076,6 +1076,7 @@ export function buildBattle(
     strike: () => swings.lastStrike(),
     effects: () => effects.live(),
     smoke: () => effects.smoke(),
+    fire: () => effects.fire(),
     script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
     shots: () => shots.live(),
     aim: () => (weaponOf(game.currentPig.holding).aims ? aim.angle : null),

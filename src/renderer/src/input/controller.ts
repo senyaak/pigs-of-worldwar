@@ -137,6 +137,8 @@ export interface DebugHooks {
   effects(): number
   /** How many puffs of smoke a breaking has in the air (three/effects.ts). */
   smoke(): number
+  /** …and how many sprites its fireball has (three/effects.ts). */
+  fire(): number
   /** What the map script is still holding back, and what is in the air. */
   script(): { absent: number[]; falling: number }
   /** How many bullets are in flight (three/shots.ts). */
