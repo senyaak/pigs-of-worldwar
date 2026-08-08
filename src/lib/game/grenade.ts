@@ -337,14 +337,29 @@ export const WATER_SPLASH_SOUND = 0x28
  * Inside it:
  *
  * ```
- * 437c8c  cmp ax,96h                  ; the arrival speed against 150
- * 437c90  jb  0x437CCE                ; slow -> DOUSE
+ * 437c8c  cmp ax,96h                  ; [contact+0x14] against 150
+ * 437c90  jb  0x437CCE                ; under it -> DOUSE
  * 437c9d  ...or kind 0x0C..0x17, 0x2C..0x2E, or [proj+0xA2] of 3 or 4
  * 437ccе  Sound::Play(0x19, 0x50, 0x5F + (rand & 0x1F))   ; 25 is FT_WATER
  * 437d26  0x487AD0(x, z, 0x0E, ...)   ; the splash effect
  * 437d34  [proj+0x84] = 1             ; the QUIET flag
  * 437d4b  0x4A9E50 ; 0x4A9EE0         ; ...and out of the world
  * ```
+ *
+ * **WHAT `[contact+0x14]` IS, is not settled, and this used to claim it was.**
+ * What is read: `0x4377d0` is the projectile's `OnHitLandscape(contact)` — vtable
+ * slot **+0x50**, called from the world's contact loop at 0x4a8b41 and only when
+ * the other body's owner is the world itself; and `[contact+0x14]` is a scalar
+ * filled at contact construction (0x409ca0 and the out-of-line 0x409af9), from
+ * the creator's own argument, sitting between the contact's two three-float
+ * vectors at +0x08..0x10 and +0x18..0x20. At least one creation site passes it
+ * **zero** (0x407844).
+ *
+ * So calling it "the arrival speed" was a guess dressed as a transcription. It is
+ * a scalar on a contact compared against 150, which is in the family of this
+ * engine's per-frame speeds — and that is all that has been earned. The remake
+ * uses the total speed because that is the only quantity it has that fits;
+ * `dousedByWater` is therefore **half read and half inference**, and says so.
  *
  * And `[proj+0x84]` is the first thing the destructor tests — `4328c9 if (al)
  * jmp 0x4357F9` — the branch that spawns **no effects and plays no sound at
@@ -357,7 +372,32 @@ export const WATER_SPLASH_SOUND = 0x28
  */
 export const WATER_DOUSE_SPEED = fromExeSpeed(0x96)
 
-/** Whether this contact douses it rather than letting it carry on. */
+/**
+ * Whether this contact douses it rather than letting it carry on.
+ *
+ * **And there is NO bounce off water to be found anywhere.** Play asked whether
+ * the skip is driven by the speed in the water's own plane; three separate water
+ * sites were read for it and not one of them reflects a velocity:
+ *
+ * - `0x437a57`, on tile bit 6 — builds a splash PROJECTILE at the water height
+ *   and touches the thrown thing's velocity nowhere;
+ * - `0x437bfb`, on tile bit 5 plus the texel mask — this arm, which removes it;
+ * - and the physics side, `0x4161b5`: a body whose y comes within **32 units** of
+ *   the water line has its position recorded and is then **deleted** —
+ *   `vtable[0](1)` at 0x41626f. Not bounced. Deleted.
+ *
+ * Which also answers the shape of the question. Whether anything bounces at all
+ * is decided by the NORMAL component of the approach — that is what the solver's
+ * `(1 + e)` multiplies — and the in-plane speed only decides how FAR apart the
+ * hops land. So the stone-skip is a LAND behaviour here: `bounceLob` gives back
+ * 0.32 of the drop and keeps 88% of the slide, which is exactly a skipping stone
+ * over ground. On water the engine's answer is to end it.
+ *
+ * That contradicts what play remembers of the shipped game, and the contradiction
+ * is left standing rather than papered over: the read is written down, the
+ * behaviour follows the read, and if play still sees a grenade skipping across a
+ * pond then one of these three sites is being reached differently than it looks.
+ */
 export const dousedByWater = (shot: Lobbed): boolean =>
   Math.hypot(shot.vx, shot.vy, shot.vz) < WATER_DOUSE_SPEED
 
