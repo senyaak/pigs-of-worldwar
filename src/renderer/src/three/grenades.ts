@@ -17,6 +17,7 @@ import * as THREE from 'three'
 import {
   BLAST_CORE,
   advanceLob,
+  blastRange,
   blastShare,
   bounceLob,
   SKIPS_ON_WATER,
@@ -166,8 +167,9 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     const row = lobOf(shot.skill)
     if (!row) return
     /** Points at the core, and the share a body this far out takes. */
+    const reach = blastRange(row)
     const took = (dx: number, dy: number, dz: number): number =>
-      Math.round((row.damage * blastShare(Math.hypot(dx, dy, dz), row.blast)) / DAMAGE_UNIT)
+      Math.round((row.damage * blastShare(Math.hypot(dx, dy, dz), reach)) / DAMAGE_UNIT)
     for (const soldier of parts.squad.members) {
       if (isDead(soldier.pig)) continue
       const body = {

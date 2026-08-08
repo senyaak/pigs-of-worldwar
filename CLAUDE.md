@@ -1215,13 +1215,20 @@ longer damps the VERTICAL, because damping the one component gravity works
 through is what held it up there. All of it is the remake's outright: water is
 ART in this engine, not a body, so nothing in the exe collides with it.
 
-**The blast's rim is capped at the range field**, and the reason it needed a cap
-is worth keeping: the exe bounds a blast by the CONTACT, since `Pig::OnHit` only
-fires for bodies that touch — and an effect's body is **35 units** to start with
-(0x4a8f42, the same as a bullet's, and the type map at 0x4a8ea0 confirms which
-arm 0x135E takes). So the exe's blast must GROW to reach anybody, and how far it
-grows is in row 0's unread stages. Uncapped the formula alone reaches 3979 units,
-which play called too big.
+**The blast's range is row +0x04 = 1024, and there is no cap** — the first
+reading took it off +0x08 by matching Init's stack slots to `0x487AD0`'s
+arguments in ORDER instead of counting the frame. Counted instruction by
+instruction (0x487b23..0x487b58): Init's arg 5, the ID, is `0x487AD0`'s arg 3;
+Init's arg 7, which becomes `[effect+0x60]`, is arg **4**; Init's arg 10, the
+damage, is arg 7. The damage was right all along.
+
+With 1024 the falloff bottoms out on its own at about **1195 units** — full
+damage inside one tile, nothing past two and a bit — so the stopgap cap is gone,
+and so is the theory that a blast has to GROW to reach anybody. That only
+existed to reconcile a 2600 range with a 35-unit effect body (0x4a8f42, reached
+by `jmp [eax*4+0x4a90CC]` where `eax = type - 0x1357`). Wrong premise, invented
+mechanism. **When a number does not fit, suspect the reading before inventing
+machinery to justify it.**
 
 **The gauge's track is the trough END TO END, 104..268.** Insetting it by half
 the slider's box was wrong twice: it moved the START, which was never the

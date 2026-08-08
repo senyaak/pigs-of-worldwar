@@ -50,9 +50,11 @@ export interface Projectile {
    */
   damage: number
   /**
-   * Row +0x08 — the blast RANGE, and **zero for every gun**, which is what
-   * makes a bullet's damage flat: the falloff is skipped outright when this is
-   * not positive (0x48cc59). Grenades carry 2600, the guided missile 5200.
+   * Row +0x08 — non-zero on everything explosive and **zero on every gun**,
+   * which is the cleanest "does this thing have a blast at all" flag in the
+   * table. It is NOT the blast's range: counting `Effect::Init`'s frame
+   * properly (see `grenade.ts`) puts the range at row +0x04 and leaves this as
+   * Init's arg 9, unfollowed.
    */
   blast: number
 }

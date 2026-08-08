@@ -69,7 +69,21 @@ export interface Lob {
    * 3840 for the plain grenade, which is thirty points against a grunt's
    * fifty (`projectile.ts` has the whole ladder and the read). */
   damage: number
-  /** Row +0x08 — how far the falloff runs past the core, in game units. */
+  /**
+   * Row **+0x04** — what the blast effect's range argument is built from.
+   *
+   * Which argument that is was got wrong once and is now COUNTED rather than
+   * guessed. `0x487AD0` is `ret 1Ch`, seven dwords, and the frame it hands to
+   * `Effect::Init` is legible instruction by instruction (0x487b23..0x487b5c):
+   * Init's arg 5 — the ID it dispatches on — is `0x487AD0`'s **arg 3**, Init's
+   * arg 7, which 0x4894c3 stores at `[effect+0x60]`, is **arg 4**, and Init's
+   * arg 10, stored at `[effect+0x68]`, is **arg 7**.
+   *
+   * The grenade's spawn is `0x487AD0(x, z, 0x54, row+0x04, 1, row+0x08,
+   * row+0x0C)`, so the range is row **+0x04 = 1024** and not the 2600 of
+   * +0x08 that a first reading took. What +0x08 is — Init's arg 9 — is not
+   * followed.
+   */
   blast: number
 }
 
@@ -80,15 +94,15 @@ export interface Lob {
  */
 const LOBS: Record<number, Lob> = {
   /** 19 GRENADE — the plain one. */
-  19: { id: 412, kind: 24, speed: 300, fuse: 150, damage: 3840, blast: 2600 },
-  20: { id: 413, kind: 25, speed: 300, fuse: 150, damage: 3840, blast: 2600 },
-  21: { id: 414, kind: 26, speed: 300, fuse: 150, damage: 2560, blast: 0 },
-  22: { id: 415, kind: 27, speed: 300, fuse: 150, damage: 1920, blast: 0 },
-  23: { id: 416, kind: 28, speed: 300, fuse: 150, damage: 1920, blast: 0 },
-  24: { id: 417, kind: 29, speed: 300, fuse: 150, damage: 7680, blast: 3900 },
-  25: { id: 418, kind: 30, speed: 300, fuse: 150, damage: 3840, blast: 2600 },
-  26: { id: 419, kind: 31, speed: 300, fuse: 150, damage: 5120, blast: 2600 },
-  27: { id: 420, kind: 32, speed: 300, fuse: 150, damage: 3840, blast: 2600 }
+  19: { id: 412, kind: 24, speed: 300, fuse: 150, damage: 3840, blast: 1024 },
+  20: { id: 413, kind: 25, speed: 300, fuse: 150, damage: 3840, blast: 1024 },
+  21: { id: 414, kind: 26, speed: 300, fuse: 150, damage: 2560, blast: 512 },
+  22: { id: 415, kind: 27, speed: 300, fuse: 150, damage: 1920, blast: 512 },
+  23: { id: 416, kind: 28, speed: 300, fuse: 150, damage: 1920, blast: 512 },
+  24: { id: 417, kind: 29, speed: 300, fuse: 150, damage: 7680, blast: 1536 },
+  25: { id: 418, kind: 30, speed: 300, fuse: 150, damage: 3840, blast: 1024 },
+  26: { id: 419, kind: 31, speed: 300, fuse: 150, damage: 5120, blast: 1024 },
+  27: { id: 420, kind: 32, speed: 300, fuse: 150, damage: 3840, blast: 1024 }
 }
 
 /** What this skill lobs, or null for everything that does not lob. */
@@ -145,17 +159,28 @@ export const fuseSeconds = (row: Lob, random: () => number = Math.random): numbe
  */
 export const BLAST_CORE = 512
 
+/**
+ * …and the same 512 comes off the RANGE.
+ *
+ * `[0x4BD3FC]` reads 512.0 and 0x48cc49 subtracts it, so the exe's divisor is
+ * `[effect+0x60] + [body+0x4C]+0x0C - 512`. For a grenade that is
+ * `1024 + something - 512`. The body's own term is a float nobody has read; it
+ * is left out and named here rather than guessed at.
+ */
+export const BLAST_BIAS = 512
+
+/** How far the falloff runs, for this row — the exe's divisor without the
+ * struck body's own unread term. */
+export const blastRange = (row: Lob): number => Math.max(0, row.blast - BLAST_BIAS)
+
 /** The share of the core damage a body at this distance takes, 0..1 — and it
  * never falls below a quarter inside the range. */
 export function blastShare(distance: number, range: number): number {
   if (range <= 0) return 1
-  // …and OUTSIDE the range, nothing. The exe has no such cap — what bounds its
-  // blast is the CONTACT, since `Pig::OnHit` only fires for bodies that touch,
-  // and an effect's body starts at 35 units (0x4a8f42, the same as a bullet's)
-  // and must GROW to reach anyone. How far it grows is in row 0's unread
-  // stages, so the range field stands in as the rim. Without the cap the
-  // formula alone reaches 3979, which play called too big.
-  if (distance >= range) return 0
+  // No cap and none needed: with the right range the formula bottoms out on
+  // its own at `512 + 4*range/3`, which for a grenade is about 1200 units —
+  // full damage inside one tile, nothing past two and a bit. The 3979 that had
+  // to be capped came from reading the range off the wrong argument.
   const past = Math.max(0, distance - BLAST_CORE)
   return Math.max(0, 1 - (3 * past) / (4 * range))
 }
