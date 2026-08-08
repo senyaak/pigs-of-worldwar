@@ -6,28 +6,18 @@ import type { BarScreenView } from './input/controller'
 import { initWelcome } from './ui/welcome'
 import { initMenu } from './ui/menu'
 import { initMultiPlayer } from './ui/multiPlayer'
-import { initFieldConditions } from './ui/fieldConditions'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
 import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 
-type View =
-  | 'welcome'
-  | 'menu'
-  | 'multiplayer'
-  | 'conditions'
-  | 'battle'
-  | 'browser'
-  | 'archive'
-  | 'viewer'
+type View = 'welcome' | 'menu' | 'multiplayer' | 'battle' | 'browser' | 'archive' | 'viewer'
 
 const panels: Record<View, HTMLElement[]> = {
   welcome: [byId('welcome')],
   menu: [byId('menu')],
   multiplayer: [byId('multiplayer')],
-  conditions: [byId('conditions')],
   battle: [byId('battle')],
   browser: [byId('browser'), byId('file-list')],
   archive: [byId('archive-view')],
@@ -96,20 +86,14 @@ const menu = initMenu({
 
 const multiPlayer = initMultiPlayer({
   onStart: (map) => {
-    void battle.open(map, conditions.conditions()).then((ok) => ok && show('battle'))
-  },
-  onConditions: () => {
-    show('conditions')
-    void conditions.load()
+    void battle.open(map).then((ok) => ok && show('battle'))
   },
   onBack: () => show('menu')
 })
 
-const conditions = initFieldConditions({ onBack: () => show('multiplayer') })
-
 /** The frontend's screens, by the view that shows them. Only one of them may
  * be drawing and hearing the controller at a time. */
-const screens = { menu, multiplayer: multiPlayer, conditions }
+const screens = { menu, multiplayer: multiPlayer }
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
 
 // The frontend is drawn on a canvas, so what a screen says and which bar is
@@ -125,7 +109,6 @@ if (window.pow) {
   })
   window.pow.menu = view(menu)
   window.pow.multiPlayer = view(multiPlayer)
-  window.pow.conditions = view(conditions)
   // Each screen carries its OWN layout, so a nudge in the console moves the
   // screen being looked at rather than all of them.
   window.pow.screen = {

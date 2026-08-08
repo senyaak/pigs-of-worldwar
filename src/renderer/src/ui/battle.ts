@@ -9,8 +9,6 @@ import { buildWaterMask } from '../../../lib/game/watermask'
 import { battleSides } from '../../../lib/game/spawns'
 import { nations } from '../../../lib/game/teams'
 import { turnSecondsFor } from '../../../lib/game/turns'
-import { DEFAULT_CONDITIONS } from '../../../lib/game/conditions'
-import type { Conditions } from '../../../lib/game/conditions'
 import type { Team } from '../../../lib/game/teams'
 import { artFor } from '../three/soldiers'
 import { existsForPlayers } from '../../../lib/formats/pog'
@@ -90,11 +88,8 @@ const MISSES_TURN = 167
 export interface BattleView {
   /** Open a battle. With no name it reopens whatever map the view is on,
    * which is the training ground until something asks for another — the
-   * MULTI-PLAYER screen asks for a two-sided one (ui/multiPlayer.ts).
-   *
-   * `set` is what FIELD CONDITIONS chose (lib/game/conditions.ts); without it
-   * the map's own rules stand, which is what the campaign wants. */
-  open(name?: string, set?: Conditions): Promise<boolean>
+   * MULTI-PLAYER screen asks for a two-sided one (ui/multiPlayer.ts). */
+  open(name?: string): Promise<boolean>
   close(): void
 }
 
@@ -113,16 +108,12 @@ interface Squad {
  * the training ground is one pig — there is no filling in, and a map that
  * carries no markers cannot be played.
  */
-function mapSquads(objects: MapObject[], teams: Team[], most: number): Squad[] {
+function mapSquads(objects: MapObject[], teams: Team[]): Squad[] {
   return battleSides(objects, SIDES_FIELDED).map((side, index) => {
     // The side bit the map set IS the nation; a map with a bit no nation
     // answers to falls back on the order it was found in.
     const team = teams[side[0]?.team] ?? teams[index]
-    // `most` is FIELD CONDITIONS' cap on a squad, and it is only ever a cap:
-    // a side is what its own markers carry, so asking for twenty on an arena
-    // of five still fields five. No filling in, the same rule the sides
-    // themselves follow.
-    const pigs = side.slice(0, Math.min(team.pigNames.length, most))
+    const pigs = side.slice(0, team.pigNames.length)
     return {
       name: team.name,
       pigNames: team.pigNames.slice(0, pigs.length),
@@ -149,9 +140,6 @@ export function initBattle(onLeave: () => void): BattleView {
   let scene: BattleScene | null = null
   let query: TerrainQuery | null = null
   let map = DEFAULT_MAP
-  /** What the last battle was set up with, so `pow.swapMap` and a reopen keep
-   * it rather than quietly dropping back to the defaults. */
-  let conditions: Conditions = DEFAULT_CONDITIONS
   /** What the opening card says on this map — null on a map the game names
    * nothing for (ui/titleCard.ts). */
   let title: string | null = null
@@ -308,7 +296,7 @@ export function initBattle(onLeave: () => void): BattleView {
 
   /** (Re)start the battle on `name` — fresh spawns, fresh turn order. A load
    * failure leaves whatever battle was running untouched. */
-  const start = async (name: string, set: Conditions = conditions): Promise<boolean> => {
+  const start = async (name: string): Promise<boolean> => {
     // A battle that cannot load stays unopened and says so in the console —
     // the same place a refused swapMap answers. The view never appears, so
     // there is nowhere on screen to put it.
@@ -354,7 +342,7 @@ export function initBattle(onLeave: () => void): BattleView {
       terrainResult.blocks,
       buildWaterMask(terrainResult.blocks, terrainResult.textures)
     )
-    const squads = mapSquads(objects, teams, set.pigs)
+    const squads = mapSquads(objects, teams)
     if (squads.length === 0) return refuse(`${name} carries no spawn markers — nothing to field`)
 
     // Which models to load is only known once the squads are: a map fields
@@ -381,10 +369,8 @@ export function initBattle(onLeave: () => void): BattleView {
       players: squads.map((squad) => ({ name: squad.name, pigNames: squad.pigNames })),
       spawns: squads.flatMap((squad) => squad.spawns),
       // A turn's length is the LEVEL's, not a constant — 99 seconds on the
-      // training ground (lib/game/turns.ts) — unless FIELD CONDITIONS named
-      // one, which is what a skirmish is allowed to do.
-      turnSeconds: set.turnSeconds ?? turnSecondsFor(name),
-      health: set.health
+      // training ground (lib/game/turns.ts).
+      turnSeconds: turnSecondsFor(name)
     })
 
     scene?.dispose()
@@ -414,7 +400,6 @@ export function initBattle(onLeave: () => void): BattleView {
       collected
     )
     map = name
-    conditions = set
     updateHud()
     if (frame === 0) frame = requestAnimationFrame(paint)
     return true
@@ -463,7 +448,7 @@ export function initBattle(onLeave: () => void): BattleView {
   }
 
   return {
-    open: (name, set) => start(name ?? map, set ?? conditions),
+    open: (name) => start(name ?? map),
     close() {
       scene?.dispose()
       scene = null

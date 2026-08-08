@@ -244,10 +244,6 @@ declare global {
       menu?: BarScreenView
       /** The MULTI-PLAYER screen, read the same way (ui/multiPlayer.ts). */
       multiPlayer?: BarScreenView
-      /** FIELD CONDITIONS — the rules a skirmish starts under. Its `values()`
-       * IS the setting, so a spec reads the whole screen's state through it
-       * (ui/fieldConditions.ts). */
-      conditions?: BarScreenView
       /** Where the frontend's furniture sits, live: nudge a piece in the
        * console and `print()` it back out to paste into ui/barScreen.ts.
        * Placing this art is eyework, the same as `pow.hud`. */

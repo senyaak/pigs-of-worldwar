@@ -14,7 +14,7 @@ import type { Page } from '@playwright/test'
 import { beginTurn, landed, tap } from './controller'
 
 /** Which screen's bars to read. The names are the `window.pow` keys. */
-export type Screen = 'menu' | 'multiPlayer' | 'conditions'
+export type Screen = 'menu' | 'multiPlayer'
 
 interface ScreenHooks {
   selected(): number

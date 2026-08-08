@@ -20,10 +20,11 @@
 //   GAMES, PLAYERS, HOSTING NEW GAME, CHOOSE ARMY (155-163), with ENTER
 //   TARGET IP ADDRESS and - HOST GAME - under it (460-461). It waits on a
 //   transport.
-//
-// FIELD CONDITIONS is its own screen and it is LIVE (ui/fieldConditions.ts):
-// the turn clock, the health every pig starts with and the cap on a squad all
-// reach the battle from it.
+// - FIELD CONDITIONS is its own screen too — the match rules at fetext
+//   297-301 (PIGS, TURN TIME, DEATHMATCH LIMIT, HEALTH, SUDDEN DEATH); the
+//   eight knobs at 276-283 shape a GENERATED level and belong to LEVEL SETUP
+//   instead. Every one of them is a rule the battle has no knob for, so it
+//   waits on the rules rather than the other way round.
 //
 // DONE is live, and it is the rung under all of it: two people on one
 // keyboard, taking turns, which is what the battle already does — the turn
@@ -69,8 +70,6 @@ export type MultiPlayerScreen = BarScreen
 export function initMultiPlayer(handlers: {
   /** Start the battle on a map. */
   onStart: (map: string) => void
-  /** Open FIELD CONDITIONS, which owns the rules the battle starts under. */
-  onConditions: () => void
   /** Back to the main menu. */
   onBack: () => void
 }): MultiPlayerScreen {
@@ -91,11 +90,7 @@ export function initMultiPlayer(handlers: {
       teamBar(2),
       teamBar(3),
       { label: () => feText(NETWORK_TEXT), enabled: () => false },
-      {
-        label: () => feText(CONDITIONS_TEXT),
-        enabled: () => true,
-        choose: handlers.onConditions
-      },
+      { label: () => feText(CONDITIONS_TEXT), enabled: () => false },
       {
         label: () => feText(DONE_TEXT),
         enabled: () => true,

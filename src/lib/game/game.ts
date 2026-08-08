@@ -8,8 +8,6 @@
 
 import type { Slot } from './inventory'
 import { isDead, maxHealthFor } from './health'
-import { scaleHealth } from './conditions'
-import type { HealthScale } from './conditions'
 
 export interface PigSpawn {
   x: number
@@ -69,12 +67,6 @@ export interface GameConfig {
   spawns: PigSpawn[]
   /** Seconds a player has per turn (the original's turn clock). */
   turnSeconds?: number
-  /**
-   * What FIELD CONDITIONS did to the health every pig starts with
-   * (lib/game/conditions.ts). It scales the CLASS's own figure, so a heavy
-   * stays twice a grunt whichever way it is set.
-   */
-  health?: HealthScale
 }
 
 /**
@@ -125,7 +117,6 @@ export class Game {
       throw new Error(`${pigCount} pigs need ${pigCount} spawns, got ${config.spawns.length}`)
     }
     let spawn = 0
-    const health = config.health ?? 'normal'
     this.players = config.players.map((player) => {
       if (player.pigNames.length === 0) throw new Error(`${player.name} has no pigs`)
       return {
@@ -137,7 +128,7 @@ export class Game {
           return {
             name,
             index,
-            health: scaleHealth(maxHealthFor(pigClass), health),
+            health: maxHealthFor(pigClass),
             carrying: [],
             holding: null,
             position: { x: at.x, z: at.z },

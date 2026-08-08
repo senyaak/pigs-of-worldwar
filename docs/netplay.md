@@ -238,16 +238,17 @@ code a signalling server hands out).
   LIBERATE — a shipped map with two real squads — because the level select is
   not built, which makes two people on one keyboard the rung under all of
   this. Pinned by `e2e/001/multiplayer.spec.ts`.
-- **FIELD CONDITIONS** (`ui/fieldConditions.ts` over `lib/game/conditions.ts`),
-  with the turn clock, starting health and the squad cap reaching the battle
-  for real — `e2e/001/field-conditions.spec.ts` walks the whole path and
-  checks each pig against its CLASS's own figure, because a settings screen
-  that sets nothing passes every pure spec.
+- **Two bugs found while trying to build FIELD CONDITIONS, and both older than
+  it.** Screens share one controller and tell themselves apart by a `visible`
+  flag, so a synchronous view swap delivered the same key press to the screen
+  it had just opened — choosing MULTI-PLAYER off the menu carried two screens
+  deep in one key. Navigation is queued now. And `menu.spec.ts` opened by
+  asserting the lit bar was at zero, which held only while nothing before it
+  had ever moved; `lightBar` came out of `choose`, and it leaves the machine
+  settled, because `nudge` returns the instant a bar starts its
+  third-of-a-second flip (`flipping()` is what makes that visible).
 
-  Two bugs fell out of building it and both were older than it. Screens share
-  one controller and tell themselves apart by a `visible` flag, so a
-  synchronous view swap delivered the same key press to the screen it had just
-  opened — navigation is queued now. And `menu.spec.ts` opened by asserting
-  the lit bar was at zero, which held only while nothing before it had ever
-  moved; `lightBar` came out of `choose`, and it leaves the machine settled,
-  because `nudge` returns the instant a bar starts its third-of-a-second flip.
+  The screen itself was **taken back out**. Every knob on it is a rule the
+  battle has no knob for, so making it real meant reaching into `lib/game`,
+  and the engine is not being touched until the split — that is the whole
+  point of the order below. It goes in when the rules exist to obey it.

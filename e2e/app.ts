@@ -32,9 +32,6 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   ['#viewer', { click: '#viewer-back' }],
   ['#archive-view', { click: '#archive-back' }],
   ['#browser', { click: '#browser-menu' }],
-  // Ordered inward-out: FIELD CONDITIONS goes back to MULTI-PLAYER, which
-  // goes back to the menu, so two passes of the loop leave both.
-  ['#conditions', { key: 'menuBack' }],
   ['#multiplayer', { key: 'menuBack' }]
 ]
 

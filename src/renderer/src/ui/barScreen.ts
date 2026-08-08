@@ -87,12 +87,10 @@ export interface Bar {
   /** What it says on the RIGHT — a bar that carries a setting rather than a
    * destination. Absent, or null, and the label is centred as usual. */
   value?(): string | null
-  /** Whether it leads anywhere / can be changed. */
+  /** Whether it leads anywhere. */
   enabled(): boolean
-  /** The select key. A setting bar may leave this empty. */
+  /** The select key. */
   choose?(): void
-  /** The left and right keys, for a bar that carries a setting. */
-  cycle?(by: number): void
 }
 
 /** Where one screen's pieces sit. Cloned per screen off `LAYOUT`, so a
@@ -242,19 +240,10 @@ export function initBarScreen(config: {
     navigate(bar.choose)
   }
 
-  const cycle = (by: number): void => {
-    const bar = bars[selection]
-    if (!bar.enabled() || !bar.cycle) return
-    bank.play(CLICK)
-    bar.cycle(by)
-  }
-
   controller.onAction((action) => {
     if (!visible) return
     if (action === 'menuUp') step(-1)
     else if (action === 'menuDown') step(1)
-    else if (action === 'menuLeft') cycle(-1)
-    else if (action === 'menuRight') cycle(1)
     else if (action === 'menuSelect') choose()
     else if (action === 'menuBack') {
       if (config.onBack) navigate(config.onBack)
