@@ -76,9 +76,10 @@ export const DEFAULT_BINDINGS: Record<string, Action> = {
   KeyR: 'skills',
   // The original aims with PAGE UP and PAGE DOWN — a pair of keys nowhere
   // near the walking hand. Q and E sit beside W and are held the same way
-  // the exe holds its own: they ramp (lib/game/aim.ts).
-  KeyQ: 'aimUp',
-  KeyE: 'aimDown',
+  // the exe holds its own: they ramp (lib/game/aim.ts). Which way round is
+  // play's call and they swapped them on sight.
+  KeyQ: 'aimDown',
+  KeyE: 'aimUp',
   // The original fires with the SELECT button, bit 0x20 of its mask — the
   // very same button that takes a skill out of the menu (exe 0x493796). That
   // bit is SPACE here, and space already jumps, so firing gets a key of its

@@ -117,10 +117,21 @@ export interface Situation {
  * angle to zero for skills 3 BAYONET and 5 CATTLE PROD, so there is nothing for an
  * aim view to show. A blade is `movement + melee` and no more.
  */
-export type WeaponLayer = 'none' | 'melee' | 'gun' | 'lob'
+export type WeaponLayer = 'none' | 'skill' | 'melee' | 'gun' | 'lob'
 
 /** Whether this layer has an aim view — a set where the walk POINTS instead. */
 export const layerSights = (layer: WeaponLayer): boolean => layer === 'gun' || layer === 'lob'
+
+/**
+ * Whether the FIRE key does anything in this layer.
+ *
+ * `none` is the empty hand and nothing else, and play drew the line there: "пропуск
+ * хода это не none — там есть реакция на f, а без оружия нет!" Right. SKIP TURN has
+ * no weapon behind it and no aim view, but it is a skill in the hands and F uses it,
+ * exactly as F uses anything else in them — so it gets a layer of its own rather
+ * than being lumped in with holding nothing.
+ */
+export const layerFires = (layer: WeaponLayer): boolean => layer !== 'none'
 
 /**
  * Which layer a skill brings. One list per kind, and the kinds are the three
@@ -134,7 +145,9 @@ export function weaponLayer(skill: number | null): WeaponLayer {
   if (meleeOf(skill)) return 'melee'
   if (isLobbed(skill)) return 'lob'
   if (isGun(skill)) return 'gun'
-  return 'none'
+  // A skill with no weapon behind it is still IN THE HANDS, and F uses it: SKIP
+  // TURN is the one the game always offers. Empty hands are the only `none`.
+  return 'skill'
 }
 
 /**

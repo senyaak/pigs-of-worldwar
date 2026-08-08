@@ -73,7 +73,7 @@ import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
 import { SILENT, loadBank } from '../audio/bank'
 import { BATTLE_SOUNDS, createBattleSounds, playCue } from '../audio/battle'
-import { layerSights, weaponLayer } from '../../../lib/game/controls'
+import { layerFires, layerSights, weaponLayer } from '../../../lib/game/controls'
 import { createSoundConsole } from '../audio/console'
 import type { Bank } from '../audio/bank'
 import type { PigPlate } from '../ui/hud'
@@ -871,6 +871,10 @@ export function buildBattle(
       }
     }
 
+    // An EMPTY hand has nothing to fire, and that is the one layer that has not:
+    // SKIP TURN has no weapon behind it and F still uses it (lib/game/controls.ts).
+    if (fireRequested && !layerFires(weaponLayer(active.pig.holding))) fireRequested = false
+
     if (fireRequested) {
       // A grenade already in the air answers the button before anything else
       // does: a second press sets it off where it lies. Play's, and
@@ -887,6 +891,9 @@ export function buildBattle(
         // (lib/game/controls.ts) — play: "пропуск хода должен применяться на
         // стрелять, а не на выборе". Using it ends the turn.
         fireRequested = false
+        // …and it SAYS SO. There was no confirmation at all and play asked for
+        // one; the cue is a name pick and `audio/battle.ts` says which.
+        playCue(bank, BATTLE_SOUNDS.skillUsed)
         game.endTurn()
         focus(game.currentPig)
         onGameChanged()

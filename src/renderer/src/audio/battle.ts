@@ -110,6 +110,17 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * to say which index it asks for. */
   menuOpen: { sound: 'S_OPEN', volume: 100, pitch: 100 },
   /**
+   * A skill being USED confirms itself — at the moment SKIP TURN there was
+   * nothing at all, and play noticed: "нет подтверждения хода при пропуске хода."
+   *
+   * `S_SELECT` out of the same interface family, and it is a NAME PICK like its
+   * neighbour above: the exe's menu mode is not decoded far enough to say what it
+   * plays when a skill goes off, and skills 63/65/66 are out of range of
+   * `Pig::Fire`'s dispatch entirely (it covers 1..62, 0x469408), so there is no
+   * arm to read one off. Correct it by ear from `pow.sfx`.
+   */
+  skillUsed: { sound: 'S_SELECT', volume: 100, pitch: 100 },
+  /**
    * A hand-to-hand swing, and what it lands with. All four are DECODED:
    * `Pig::HandToHandStrike` plays 0x21 as the blade goes live (event id 61,
    * 0x474c89) and the weapon's own impact index when it connects (0x476712) —

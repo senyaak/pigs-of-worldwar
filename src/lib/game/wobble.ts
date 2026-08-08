@@ -59,79 +59,83 @@
 // `AMPLITUDE` is the knob. Zero it and the scope is dead still again.
 
 /**
- * How far the resting stick reads, in 4096ths, after the handler's halving.
- * A byte axis is ±127 and a stick at rest sits in the low single figures;
- * seven units is a little over half a degree. EYEWORK — play asked for more
- * than the four this started at.
+ * ## And it WALKS, it does not shiver in place — the fourth pass at its shape
  *
- * Note the easing below EATS some of it: against white noise, a chase at
- * `EASE` settles to `sqrt(EASE / (2 - EASE))` of the sample, so 0.65 shows
- * about seven tenths of whatever is set here. Turn this up, not `EASE` down,
- * or the jitter goes back to being a float.
+ * Play, looking at the sample-and-hold version: "ты держишь его в радиусе центра,
+ * а надо чтобы прицел уезжал — и чем ближе, тем больше расстояния проходит, а не
+ * тем шире радиус дёрганья."
+ *
+ * That is a different mechanism, not a bigger number, and it is the ENGINE's — the
+ * random walk at 0x49e030 quoted at the top of this file. A direction per axis, a
+ * fresh step every frame, and a reversal only when it reaches the stop. So the
+ * crosshair travels: it wanders off the target and comes back rather than rattling
+ * around it, and the two axes reach their stops at different times, which is what
+ * makes it wander in every direction rather than along a line.
+ *
+ * The version this replaces drew an independent sample each frame and eased
+ * towards it, which is a bounded rattle however far the bound is put — exactly
+ * what play described. Three things went with it: `AMPLITUDE`, `EASE`, and the
+ * whole idea that the zoom should widen the bound.
  */
-const AMPLITUDE = 7
 
 /**
- * How much of the way to a fresh sample one engine frame moves.
- *
- * A raw sample-and-hold is a square wave and reads as a rattle; play asked
- * for "чуть плавнее — но не сильно". Two thirds keeps the jitter fast and
- * uncorrelated but takes the hard edge off each step. One is the raw stick.
+ * How far the sights may wander from where they are pointed, in 4096ths of a turn
+ * — about two degrees. EYEWORK, and it does NOT ride the zoom: play was explicit
+ * that the radius is not what should grow.
  */
-const EASE = 0.65
+const BOUND = 24
 
 /**
- * How much MORE it shakes at full zoom, on top of what the magnification does to
- * the picture by itself.
+ * A step, in 128ths of `BOUND` a frame — `8 + (rand() & 7)` against the engine's
+ * own ±0x80 stops (0x49e056), carried over as it stands. Eight to fifteen of a
+ * hundred and twenty-eight is a crossing of the whole range in ten to seventeen
+ * engine frames, so the sights sweep about once a second.
+ */
+const STEP_LOW = 8
+const STEP_SPAN = 8
+const STEP_UNIT = BOUND / 0x80
+
+/**
+ * How much further it travels a second at full zoom.
  *
- * **This went in backwards first, and the mistake is worth keeping written down:
- * the exe's divisor is not this quantity.** The aim-view arm scales what comes out
- * of `[game+0x300]` by `(0x1000 − zoom) >> 12` (0x495ecc), so a magnified view
- * gets a FINER step — but that accumulator is a STEP that adds into the angle
- * frame by frame, i.e. control sensitivity, and a scope wants exactly that: fine
- * control up close. The tremor here is an OFFSET on the view, which is a different
- * quantity, and carrying the divisor across made the shake die out as the scope
- * closed in. Play: "дёргание при увеличении ты сделал в обратную сторону — чем
- * ближе, тем меньше, а надо наоборот."
- *
- * So it goes the other way, and eyework decides how far. 1 would leave the growth
- * entirely to the magnification (a fixed angle covers `SCOPE_MAGNIFY` times more
- * screen at the cap, which play read as "не масштабируется"); this doubles the
- * angle on top of that.
+ * **The exe's zoom divisor is not this quantity, and pass three had it backwards.**
+ * The aim-view arm scales what comes out of `[game+0x300]` by
+ * `(0x1000 − zoom) >> 12` (0x495ecc), so a magnified view gets a FINER step — but
+ * that accumulator is the player's own aiming input, i.e. control sensitivity,
+ * which a scope wants fine. The tremor is what the player fights, and play's rule
+ * for it is the other way about: closer covers more ground. It scales the STEP and
+ * not the bound, which is what "чем ближе, тем больше расстояния проходит, а не тем
+ * шире радиус" says.
  */
 const ZOOMED = 2
 
 export interface Wobble {
-  /** The sample each axis is heading for, drawn once an engine frame. */
+  /** Where each axis has wandered to, in aim units. */
   pitch: number
   yaw: number
-  /** …and where each one has actually got to. */
-  shownPitch: number
-  shownYaw: number
-  /** Frames owed. A new sample lands once an engine frame at fifteen a
-   * second — resampling per rendered frame at sixty would turn it into a
-   * blur, and holding it longer would turn it into a wobble. */
+  /** Which way each one is going, +1 or −1. Reversed at the stops, and only
+   * there — that is what makes it travel rather than rattle. */
+  pitchWay: number
+  yawWay: number
+  /** Frames owed. A step lands once an ENGINE frame: stepping per rendered frame
+   * would make the sweep as fast as the screen. */
   owed: number
 }
 
 export const createWobble = (): Wobble => ({
   pitch: 0,
   yaw: 0,
-  shownPitch: 0,
-  shownYaw: 0,
+  pitchWay: 1,
+  yawWay: -1,
   owed: 0
 })
 
 /**
  * Advance the tremor. `frames` is engine frames, not rendered ones.
  *
- * `zoom` is how far in the sights are, 0 wide open and 1 at the cap. **Closer
- * shakes MORE** — play's rule, twice over: the first pass had no scaling at all
- * ("при зуме дёрганье не масштабируется, а должно") and the second carried the
- * exe's step divisor across and shrank it ("сделал в обратную сторону"). See
- * `ZOOMED` for why that divisor is a different quantity from this one.
- *
- * `random` is injectable so a spec can pin it.
+ * `zoom` is how far in the sights are, 0 wide open and 1 at the cap: it scales how
+ * FAR the walk travels each frame and nothing else. `random` is injectable so a
+ * spec can pin it.
  */
 export function updateWobble(
   wobble: Wobble,
@@ -143,29 +147,40 @@ export function updateWobble(
   if (!sighting) {
     wobble.pitch = 0
     wobble.yaw = 0
-    wobble.shownPitch = 0
-    wobble.shownYaw = 0
+    wobble.pitchWay = 1
+    wobble.yawWay = -1
     wobble.owed = 0
     return
   }
+  const reach = 1 + Math.max(0, Math.min(1, zoom)) * (ZOOMED - 1)
   wobble.owed += frames
-  if (wobble.owed >= 1) {
-    wobble.owed = wobble.owed % 1
-    const close = Math.max(0, Math.min(1, zoom))
-    const reach = AMPLITUDE * (1 + close * (ZOOMED - 1))
-    wobble.pitch = (random() * 2 - 1) * reach
-    wobble.yaw = (random() * 2 - 1) * reach
+  while (wobble.owed >= 1) {
+    wobble.owed -= 1
+    const step = (): number => (STEP_LOW + random() * STEP_SPAN) * STEP_UNIT * reach
+    // Reversing AT THE STOP is the whole of it — nothing pulls it back towards
+    // the middle, so it crosses rather than hovers.
+    wobble.pitch += wobble.pitchWay * step()
+    if (wobble.pitch > BOUND) {
+      wobble.pitch = BOUND
+      wobble.pitchWay = -1
+    } else if (wobble.pitch < -BOUND) {
+      wobble.pitch = -BOUND
+      wobble.pitchWay = 1
+    }
+    wobble.yaw += wobble.yawWay * step()
+    if (wobble.yaw > BOUND) {
+      wobble.yaw = BOUND
+      wobble.yawWay = -1
+    } else if (wobble.yaw < -BOUND) {
+      wobble.yaw = -BOUND
+      wobble.yawWay = 1
+    }
   }
-  // Chase the sample rather than snapping to it, by the same engine frames —
-  // so the smoothing does not get finer just because the screen is faster.
-  const ease = Math.min(1, EASE * Math.max(frames, 0))
-  wobble.shownPitch += (wobble.pitch - wobble.shownPitch) * ease
-  wobble.shownYaw += (wobble.yaw - wobble.shownYaw) * ease
 }
 
-/** How far off the pitch is this frame, in aim units. View only. */
-export const wobblePitch = (wobble: Wobble): number => wobble.shownPitch
+/** How far off the pitch has wandered, in aim units. View only. */
+export const wobblePitch = (wobble: Wobble): number => wobble.pitch
 
 /** …and the yaw. The pig's own heading does not follow it: the model stands
  * where it stands and only the sights move. */
-export const wobbleYaw = (wobble: Wobble): number => wobble.shownYaw
+export const wobbleYaw = (wobble: Wobble): number => wobble.yaw

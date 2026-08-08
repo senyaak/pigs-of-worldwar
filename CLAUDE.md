@@ -905,11 +905,9 @@ was made for the sights are wired to a stick, and a resting stick reads a few
 units either way and a *different* few every frame: a small, fast, ANGULAR
 jitter. On a keyboard those bytes are zero, which is why the remake's sights
 were dead still and every invented substitute felt wrong. `lib/game/wobble.ts`
-is now an independent sample per engine frame, ±4 of 4096, on the angles —
-and play's verdict was "почти хорошо, чуть плавнее, но не сильно", so the
-displayed value CHASES each sample at `EASE = 0.65` a frame instead of
-snapping to it. Two knobs: `AMPLITUDE` for how far, `EASE` for how hard.
-Nothing else in this file is invented — the shape is the exe's.
+was an independent sample per engine frame, eased towards. **Superseded in the
+seventh pass below: it WALKS now, and the sample-and-hold is gone with
+`AMPLITUDE` and `EASE`.**
 
 ### The wait was cutting off the very thing it waited for, 2026-08-07
 
@@ -953,7 +951,8 @@ frames undistorted is 0.5 s, which is exactly what play asked for. Worth
 remembering the next time a decoded frame count feels sluggish; the constant is
 now written in seconds and says why.
 
-**And the tremor went up**, `AMPLITUDE` 4 → 7 ("дрож чутка слабая"). Worth
+**And the tremor went up**, `AMPLITUDE` 4 → 7 ("дрож чутка слабая") — both
+constants are GONE, see the seventh pass. Worth
 knowing before the next nudge: the easing eats a chunk of it. Against white
 noise a chase at `EASE` settles to `sqrt(EASE / (2 − EASE))` of the sample,
 so 0.65 shows about seven tenths of whatever `AMPLITUDE` says. Turn the
@@ -1779,11 +1778,39 @@ the camera used to fly home from wherever the bullet had got to.
 
 **The TREMOR grows as the sights close in, and the first attempt had it
 backwards.** Worth keeping written down: the exe's `(0x1000 − zoom) >> 12` divides
-what comes out of `[game+0x300]`, but that accumulator is a per-frame STEP that
-adds into the angle — control sensitivity, which a scope wants fine — while the
-remake's tremor is an OFFSET on the view. Different quantities; carrying the
-divisor across made the shake die out at magnification. `ZOOMED` in `wobble.ts`
-doubles it at the cap instead.
+what comes out of `[game+0x300]`, but that accumulator is the player's own aiming
+STEP — control sensitivity, which a scope wants fine — while the tremor is what the
+player fights. Different quantities; carrying the divisor across made the shake die
+out at magnification. `ZOOMED` in `wobble.ts` goes the other way.
+
+### The sights WANDER, and the layer table grew a row — 2026-08-08
+
+**The tremor, seventh pass, and this time the MECHANISM changed rather than a
+number.** Play: "ты держишь его в радиусе центра, а надо чтобы прицел уезжал — и чем
+ближе, тем больше расстояния проходит, а не тем шире радиус дёрганья." A
+sample-and-hold with easing is a bounded rattle however far the bound is put, which
+is exactly what that describes. So `wobble.ts` is now a WALK — and the shape is the
+engine's own held tremor, the one quoted at the top of that file since the fifth
+pass and never used: a direction per axis, a fresh step of `8 + (rand() & 7)` every
+frame, and a reversal ONLY at the stop (0x49e056). The crosshair crosses instead of
+hovering; the two axes reach their stops at different times, so it wanders in every
+direction rather than along a line. `AMPLITUDE` and `EASE` are gone; `BOUND` is how
+far it may stray (eyework, about two degrees) and the ZOOM scales the STEP, which is
+what "больше расстояния, а не шире радиус" means.
+
+**`none` is the EMPTY HAND and nothing else.** Play: "пропуск хода это не none —
+там есть реакция на f, а без оружия нет!" Right, and the table said otherwise.
+`weaponLayer` gained `skill` — no weapon behind it, no aim view, but it is in the
+hands and F uses it — and `layerFires` is what makes that claim real: the fire key
+is dropped for an empty hand and answered for everything else.
+
+**Using a skill CONFIRMS itself.** There was no sound at all when SKIP TURN ended a
+turn. `BATTLE_SOUNDS.skillUsed` is `S_SELECT` out of the interface family and is a
+NAME PICK like its neighbours — skills 63/65/66 are out of range of `Pig::Fire`'s
+dispatch entirely, so there is no arm to read one off. Correct it by ear from
+`pow.sfx`.
+
+**Q and E are swapped**: Q points down, E points up. Play's call, on sight.
 
 **A frame is clamped to a tenth of a second.** `getDelta` is wall-clock and the
 browser stops calling `requestAnimationFrame` for a window nobody is looking at, so

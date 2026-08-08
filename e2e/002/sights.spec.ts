@@ -5,28 +5,43 @@
 // `[game+0x300]` so the sights get finer as they close in (0x495ecc, 0x495bc1).
 //
 // The TREMOR is not that quantity and must not take that divisor: the accumulator
-// is a step that adds into the angle — control sensitivity — while the tremor here
-// is an offset on the view. Play settled its direction, twice: no scaling at all
-// read as "при зуме дёрганье не масштабируется, а должно", and the divisor read as
-// "сделал в обратную сторону, чем ближе тем меньше, а надо наоборот". Closer
-// shakes MORE.
+// is the player's own aiming step — control sensitivity, which a scope wants fine —
+// while the tremor is what the player fights. Play settled it in three passes: no
+// scaling read as "при зуме дёрганье не масштабируется"; the divisor read as
+// "сделал в обратную сторону, чем ближе тем меньше"; and the sampled version read
+// as "держишь его в радиусе центра, а надо чтобы прицел уезжал". So it WALKS — the
+// engine's own tremor shape, 0x49e056 — and the zoom scales how far it travels,
+// not how wide it goes.
 
 import { test, expect } from '@playwright/test'
 
 import { ZOOM_CAP, ZOOM_STEP, createZoom, updateZoom, zoomFraction, zoomsIn } from '../../src/lib/game/zoom'
 import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../src/lib/game/wobble'
-import { layerSights, weaponLayer } from '../../src/lib/game/controls'
+import { layerFires, layerSights, weaponLayer } from '../../src/lib/game/controls'
 import { SKILL } from '../../src/lib/game/skills'
 
-/** A fixed "stick": the extremes, so a sample is the amplitude itself. */
+/** A fixed "stick": the top of the step range, so a walk is repeatable. */
 const hard = (): number => 1
 
-/** Settle the tremor at one zoom (0 wide open, 1 at the cap) and report how far
- * it reaches. */
-const reach = (zoom: number): number => {
+/** How far the sights TRAVEL over `frames` engine frames at this zoom — the sum
+ * of every step, not the distance from the middle. */
+const travelled = (zoom: number, frames = 60): number => {
+  const wobble = createWobble()
+  let was = wobblePitch(wobble)
+  let along = 0
+  for (let frame = 0; frame < frames; frame++) {
+    updateWobble(wobble, 1, true, zoom, hard)
+    along += Math.abs(wobblePitch(wobble) - was)
+    was = wobblePitch(wobble)
+  }
+  return along
+}
+
+/** …and the furthest it ever gets from the middle. */
+const reach = (zoom: number, frames = 240): number => {
   const wobble = createWobble()
   let most = 0
-  for (let frame = 0; frame < 60; frame++) {
+  for (let frame = 0; frame < frames; frame++) {
     updateWobble(wobble, 1, true, zoom, hard)
     most = Math.max(most, Math.abs(wobblePitch(wobble)), Math.abs(wobbleYaw(wobble)))
   }
@@ -51,18 +66,36 @@ test('only the two zooming skills zoom, and they creep to the cap', () => {
   expect(zoom.value).toBe(0)
 })
 
-test('the TREMOR grows as the sights close in — CLOSER SHAKES MORE', () => {
-  const open = reach(0)
-  const half = reach(0.5)
-  const shut = reach(1)
-  expect(open).toBeGreaterThan(0)
-  // Monotone, and the direction is the whole point of this test: it shipped
-  // backwards once and play caught it in one look.
-  expect(half).toBeGreaterThan(open)
-  expect(shut).toBeGreaterThan(half)
-  // …and it is the same shake wide open as it was before the zoom had any say, so
-  // turning the scope on does not change how a rifle without one feels.
-  expect(reach(0)).toBeCloseTo(open, 6)
+test('the sights WANDER — the crosshair travels, it does not rattle in place', () => {
+  // Play, on the version that sampled and eased: "ты держишь его в радиусе центра,
+  // а надо чтобы прицел уезжал." A walk with a direction per axis, reversing only
+  // at the stops (the engine's own tremor, 0x49e056), so it crosses.
+  const wobble = createWobble()
+  const seen: number[] = []
+  for (let frame = 0; frame < 240; frame++) {
+    updateWobble(wobble, 1, true, 0, hard)
+    seen.push(wobblePitch(wobble))
+  }
+  // It reaches both stops, which a bounded rattle round the middle never does…
+  expect(Math.max(...seen)).toBeGreaterThan(20)
+  expect(Math.min(...seen)).toBeLessThan(-20)
+  // …and it gets there by walking: every step is small against the range it
+  // covers, so consecutive frames are neighbours rather than fresh samples.
+  const steps = seen.slice(1).map((one, i) => Math.abs(one - seen[i]))
+  expect(Math.max(...steps)).toBeLessThan(4)
+  // The two axes are not the same line: they start opposed and reverse at their
+  // own times, which is what makes it wander in every direction.
+  expect(wobbleYaw(wobble)).not.toBeCloseTo(wobblePitch(wobble), 3)
+})
+
+test('CLOSER TRAVELS FURTHER, and the radius stays put', () => {
+  // The correction play asked for twice: not a wider jitter, more ground covered.
+  // "чем ближе, тем больше расстояния проходит, а не тем шире радиус дёрганья."
+  const open = travelled(0)
+  const shut = travelled(1)
+  expect(shut).toBeGreaterThan(open * 1.5)
+  // …and the bound does NOT move with the zoom.
+  expect(reach(1)).toBeCloseTo(reach(0), 6)
 })
 
 test('nothing at all when the sights are not up', () => {
@@ -80,8 +113,16 @@ test('a weapon brings its own LAYER, and only two of them have an aim view', () 
   expect(weaponLayer(3)).toBe('melee')
   expect(weaponLayer(19)).toBe('lob')
   expect(weaponLayer(11)).toBe('gun')
+  // An EMPTY hand is the only `none`. SKIP TURN has no weapon behind it and F
+  // still uses it, so it is its own layer — play drew that line: "пропуск хода
+  // это не none, там есть реакция на f, а без оружия нет!"
   expect(weaponLayer(null)).toBe('none')
-  expect(weaponLayer(SKILL.SKIP_TURN)).toBe('none')
+  expect(weaponLayer(SKILL.SKIP_TURN)).toBe('skill')
+  expect(layerFires('none')).toBe(false)
+  for (const layer of ['skill', 'melee', 'gun', 'lob'] as const) {
+    expect(layerFires(layer)).toBe(true)
+  }
+  expect(layerSights('skill')).toBe(false)
   // A BLADE has no aim view, which is the bug play kept hitting: G handed the
   // sights over, a set change drops the driving keys, and the pig stopped for
   // nothing. The exe agrees from the other end — 0x46a891 pins a bayonet's aim
