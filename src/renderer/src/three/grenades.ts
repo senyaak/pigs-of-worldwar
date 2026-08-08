@@ -36,6 +36,8 @@ import type { TerrainQuery } from '../../../lib/game/terrain'
 import type { DamageNumbers } from './damageNumbers'
 import type { Effects } from './effects'
 import type { Soldier, Squad } from './squad'
+import { BATTLE_SOUNDS, playCue } from '../audio/battle'
+import type { Bank } from '../audio/bank'
 
 /** The bone a thrown thing leaves, as everything else does. */
 const HAND = 5
@@ -89,9 +91,15 @@ export interface GrenadeParts {
   present: (id: number) => boolean
   onBroken: (target: Target) => void
   numbers: DamageNumbers
-  /** What the blast is drawn with — the engine's own break burst, which is
-   * the nearest thing decoded to an explosion (three/effects.ts). */
+  /** What the blast is drawn with. The right thing is effect **0x54**, which
+   * the projectile's destructor spawns for kind 24 with the row's +0x04 as its
+   * life and +0x08/+0x0C as its two parameters (0x432e51 → 0x435364); that
+   * effect's own 143-byte parameter row has not been pulled out of 0x4d61e8
+   * yet, so the engine's break burst stands in and this comment is the
+   * pointer. `../../../pigs-disasm/weapons/fire.md`. */
   effects: Effects
+  /** Asked for rather than held, as everywhere else the bank is used. */
+  bank: () => Bank
 }
 
 export function createGrenades(parts: GrenadeParts): Grenades {
@@ -129,6 +137,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
   /** Everything within reach takes its share. */
   const detonate = (shot: Lobbed): void => {
     parts.effects.broke({ x: shot.x, y: shot.y, z: shot.z })
+    playCue(parts.bank(), BATTLE_SOUNDS.blast)
     for (const soldier of parts.squad.members) {
       if (isDead(soldier.pig)) continue
       const body = {

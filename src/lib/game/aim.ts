@@ -80,21 +80,15 @@ export function rampedStep(
  * Guns come up LEVEL and everything else at 45°, already lobbing — which is
  * why a grenade is useful the moment it is out and a rifle is not pointing
  * at the sky.
+ *
+ * A grenade-specific ~70° was put in beside this for one commit, on a
+ * remembered figure, and taken straight back out: the 0x200 the exe writes is
+ * what a grenade comes up at, and 45° is what play sees once it is actually
+ * looked at. **What the engine gives gets checked in play BEFORE anything is
+ * substituted for it** — a remembered number is a reason to go and verify the
+ * decoded one, not a reason to replace it.
  */
 export const AIM_LOB = 512
-
-/**
- * …except a GRENADE, which comes up at about seventy degrees.
- *
- * Play's, and it overrides the read: "когда в руки берёшь где-то на 70
- * градусов ставится по дефолту". `ReadyWeapon` writes 0x200 for everything
- * that is not a gun and 0x200 is 45°, so either something after it moves a
- * thrown weapon's angle or the 45° reading is of the wrong write. 70° of 4096
- * is 796, and it is inside the ±1023 the angle is clamped to.
- */
-export const AIM_GRENADE = 796
-/** Which skills come up at `AIM_GRENADE` — the grenade family, 19..27. */
-const GRENADE_START = [19, 20, 21, 22, 23, 24, 25, 26, 27]
 
 const LEVEL_START = [
   6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 45, 46,
@@ -119,7 +113,6 @@ const NO_POSE = [19, 20, 21, 22, 23, 24, 25, 26, 27, 33, 50]
  */
 export function readyAim(skill: number | null): number {
   if (skill === null) return 0
-  if (GRENADE_START.includes(skill)) return AIM_GRENADE
   return LEVEL_START.includes(skill) ? 0 : AIM_LOB
 }
 

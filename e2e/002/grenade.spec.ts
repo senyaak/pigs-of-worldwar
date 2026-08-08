@@ -22,7 +22,7 @@ import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { GAUGE_SECONDS } from '../../src/lib/game/gauge'
 import { BLAST_REACH } from '../../src/lib/game/grenade'
-import { AIM_GRENADE } from '../../src/lib/game/aim'
+import { AIM_LOB } from '../../src/lib/game/aim'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const GRENADE = 19
@@ -115,9 +115,9 @@ test('a grenade comes up lobbing, and Q and E move it', async ({ app }) => {
   const { page } = app
   await armed(page, 900)
 
-  // It comes out already pointing up — play's ~70°, which is what
-  // `AIM_GRENADE` is (lib/game/aim.ts).
-  expect((await look(page)).aim).toBe(AIM_GRENADE)
+  // It comes out already pointing up: 45°, which is the 0x200 `ReadyWeapon`
+  // writes for everything that is not a gun (lib/game/aim.ts).
+  expect((await look(page)).aim).toBe(AIM_LOB)
 
   // …and the keys move it. This is what was broken: the angle was tracking
   // all along, but `aim()` reported null for anything with no aiming POSE, so
@@ -126,7 +126,7 @@ test('a grenade comes up lobbing, and Q and E move it', async ({ app }) => {
   try {
     await expect
       .poll(async () => (await look(page)).aim ?? 0, { timeout: 3000 })
-      .toBeLessThan(AIM_GRENADE - 40)
+      .toBeLessThan(AIM_LOB - 40)
   } finally {
     await release(page, 'aimDown')
   }

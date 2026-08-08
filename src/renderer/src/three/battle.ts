@@ -501,6 +501,7 @@ export function buildBattle(
     present: (id) => !script.absent(id),
     numbers,
     effects,
+    bank: () => bank,
     onBroken
   })
   /** Seconds left of the getting-it-out clip. The exe puts the model in the

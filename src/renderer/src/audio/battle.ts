@@ -133,7 +133,25 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * is the bank's prefix for background beds and nothing has been traced
    * starting this one.
    */
-  plane: { sound: 'BG_PLANE', volume: 100, pitch: 100 }
+  plane: { sound: 'BG_PLANE', volume: 100, pitch: 100 },
+  /**
+   * A grenade going off. DECODED, out of the projectile's own DESTRUCTOR
+   * (0x432730, which writes the projectile vtable 0x4BC468 over itself): its
+   * kind picks one of forty arms through the 55-entry table at 0x435A6C, and
+   * kind 24's — the plain grenade's — ends
+   *
+   * ```
+   * 435393  push 0Ch                ; index 12, E_1
+   * 43538f  push 64h ; push 64h     ; volume 100, pitch 100
+   * 4353a0  call 0043A9D0h
+   * ```
+   *
+   * Index 12 of `Audio/sfxday.srl` is `E_1`, with `E_1000P` beside it at 13 —
+   * `E_` for explosion. A neighbouring arm (kind 25, 0x432998) plays the same
+   * 12 with a pitch of `0x54 + (rand & 0x20)`, so some of the family jitter
+   * it; kind 24's is flat.
+   */
+  blast: { sound: 'E_1', volume: 100, pitch: 100 }
 }
 
 /**

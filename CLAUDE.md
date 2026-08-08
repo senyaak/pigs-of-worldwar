@@ -1037,10 +1037,14 @@ because nothing thrown has one. So the needle went dead and the angle looked
 frozen. The right test is the record's own `aims` bit. Two different questions
 wearing one predicate.
 
-**A grenade comes up at ~70°, not 45°.** Play's word (`AIM_GRENADE = 796`) and
-it overrides the read: `ReadyWeapon` writes 0x200 for everything that is not a
-gun and 0x200 is 45°, so either something after it moves a thrown weapon's
-angle or that write is not the one that matters. Flagged at the constant.
+**A grenade comes up at 45°, which is what the exe writes** — and that is a
+process note as much as a constant. A remembered ~70° went in over the decoded
+0x200 for one commit and came straight back out: "45 верно — я не так сказал —
+сначала проверяем то что находим в движке." **An unambiguous decoded value gets
+shipped and LOOKED AT before anything is substituted for it**; a remembered
+figure is a reason to go and check the read, not to replace it. Play overrides
+inferences — the wall envelope, the water, the clip playback — not clean
+transcriptions nobody has seen yet.
 
 **A thrown thing BOUNCES on its own numbers — decoded.** Row +0x10 is 1 for
 every gun and 2 for everything lobbed, its only reader is inside the collision
@@ -1071,11 +1075,24 @@ index 0 is the TIM's transparent colour, so their black is a hole. And it is
 wide and thirty-two tall — and it RUNS along the strip. `LAYOUT.gauge.track` is
 where it travels and that is eyework.
 
-**Still open: the EXPLOSION.** It borrows the break burst. State 6 only sets
-`[proj+0x31] = 1`, and whatever sweeps that flag and runs the per-kind
-detonation is not identified — `fire.md` now lists the three places it is NOT
-(the constructor's own switch at 0x4323f3, the every-fifth-frame trail at
-0x4365f1, and the unreached run of per-kind arms from 0x432400).
+**The EXPLOSION is in the projectile's DESTRUCTOR** — 0x432730, which
+identifies itself by writing the projectile vtable 0x4BC468 back over the
+object on its third instruction. That is why nothing in the update or the
+constructor looked like a blast. It switches the kind through a 55-entry table
+at 0x435A6C into forty arms, thirteen kilobytes of them, and **kind 24's is
+effect `0x54` plus sound `12` (`E_1`) at 100/100** — with the row's +0x04 as
+the effect's life and +0x08/+0x0C as its two parameters. No damage in the arm
+at all, so the hurt comes from elsewhere.
+
+**The sound is wired** (`BATTLE_SOUNDS.blast`); the VISUAL still borrows the
+break burst, because effect 0x54's own 143-byte parameter row at 0x4d61e8 has
+not been pulled out yet. That is the one remaining piece and
+`three/grenades.ts` says so at the field.
+
+That read also settles what row +0x04/+0x08/+0x0C are — an effect's life and
+its two parameters, used by the every-fifth-frame TRAIL (0x4365f1, ids 0x5D and
+0x5F) and by the blast alike — and rules out 0x4323f3, which is the
+CONSTRUCTOR's switch and so the launch's noise.
 
 ### Known divergences — deliberate, and each written up where it lives
 
