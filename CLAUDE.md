@@ -1419,6 +1419,48 @@ turned up): the flat profile runs x 92..**265**, not to 268. The start stays at
 104 where play has already accepted it, and the marker's travel now ends with its
 LAST pixel on the trough's last one.
 
+### Input is CONTROL SETS now, 2026-08-08
+
+Play asked whether switching control sets by context was the right approach. It is,
+and it is the engine's own: `0x4928dc` routes the whole of input through a
+different branch while the aim bit is down, the camera keeps a remembered mode and
+restores it when the bit goes up, and the skill menu is a mode too.
+
+It was also a real bug waiting to happen — and it had already happened once. The
+decision used to live in four places that each knew a little about the state:
+`if (hud.skills.open())` in `ui/battle.ts`, the sights' own two lines beside it,
+`committed()` in `three/battle.ts`, and the aftermath block below that. "What does
+W do right now" had no single answer to read, which is how the sights ended up
+inside the fire lock for a commit.
+
+`lib/game/controls.ts` is the table, and it is pure: `modeOf(situation)` picks one
+of **battle / sights / inventory / locked** in priority order, `readControls(mode,
+held)` says what the axes mean, and `verbOf(mode, action)` says what a one-shot key
+IS. FRONTEND is a fifth set but never reaches this file — the main menu binds its
+own KEY map (`MENU_BINDINGS`) rather than reinterpreting the battle's actions.
+
+`ui/battle.ts` is plumbing now: collect what is held, ask, push. `three/battle.ts`
+grew one method, `locked()`, because it is the one that owns `committed()` and the
+aftermath.
+
+Two things worth not rediscovering:
+
+- **FIRE gets through the lock, and it has to.** The press that locks the pig is
+  the press that started the gauge charging, so cutting it off would make a power
+  weapon unthrowable — and a second press is what sets a live grenade off. It is
+  the only thing `locked` lets past.
+- **`game.starting` is NOT locked.** The beat at the top of a turn is ended by ANY
+  input and the frame that ends it reads the walk, the turn and the aim to notice.
+  Calling it locked zeroes those before they arrive, and the beat could then only
+  be ended with jump or fire. The scene refuses to DRIVE the pig through the beat
+  on its own line; that is the part that matters.
+
+One behaviour did change on purpose: ending the TURN mid-blow is refused now.
+`verbOf('locked', 'endTurn')` is null, where the old `onAction` ran it regardless.
+
+`e2e/002/controls.spec.ts` is the table's spec — nine tests, and the last one is
+the regression play caught.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.

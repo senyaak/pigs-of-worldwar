@@ -151,6 +151,13 @@ export interface BattleScene {
   /** Whether the view is actually down the barrel — held AND holding a gun,
    * which is what the scope's ring is drawn over (ui/hud.ts). */
   scoped(): boolean
+  /**
+   * Whether the pig is LOCKED: committed to a blow, watching what one did, or
+   * still on the beat at the top of its turn. What decides the control set
+   * (`lib/game/controls.ts`) — the scene owns the three states, so the scene is
+   * asked rather than each of them being mirrored out.
+   */
+  locked(): boolean
   /** Where the weapon in hand points, in the game's own angle units, or null
    * when the pig is holding nothing that aims (lib/game/aim.ts). */
   aim(): number | null
@@ -1156,6 +1163,16 @@ export function buildBattle(
       sighting = held && !sightingRefused
     },
     scoped: () => sighting && isGun(holding) && !dropIn.running(),
+    /**
+     * `game.starting` is deliberately NOT in here. The beat at the top of a turn
+     * — "START OF TURN, press any key to continue" — is ended by ANY input, and
+     * the frame that ends it reads the walk, the turn and the aim to decide that
+     * (see `game.starting` below). Calling it locked would zero those before they
+     * arrived, and the beat could then only be ended with the jump or the fire
+     * key. The scene refuses to DRIVE the pig through the beat on its own line;
+     * that is the part that matters.
+     */
+    locked: () => committed() || aftermath !== null,
     // Whether there is an ANGLE, which is not the same question as whether
     // there is a POSE for the angle to scrub. `scrubsPose` was standing in for
     // both, and a grenade is in its exclusion list (0x46a8e8, nothing thrown

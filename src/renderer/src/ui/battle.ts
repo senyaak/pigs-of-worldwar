@@ -14,6 +14,8 @@ import { artFor } from '../three/soldiers'
 import { existsForPlayers } from '../../../lib/formats/pog'
 import type { LoadModelResult, MapObject } from '../api'
 import { ensureScene } from '../three/scene'
+import { modeOf, readControls, verbOf } from '../../../lib/game/controls'
+import type { Held } from '../../../lib/game/controls'
 import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
 import { controller } from '../input/controller'
@@ -233,67 +235,94 @@ export function initBattle(onLeave: () => void): BattleView {
   const battleEl = byId<HTMLDivElement>('battle')
   const isBattleUp = (): boolean => !battleEl.classList.contains('hidden')
 
-  /** The last frame's held directions, so the skill menu steps once per
-   * press rather than once per frame — the same keys drive a pig and a
-   * cursor, and a cursor wants edges. */
-  let steered = { walk: 0, turn: 0 }
+  /** The last frame's cursor step, so the inventory moves once per PRESS rather
+   * than once per frame — the same keys drive a pig and a cursor, and a cursor
+   * wants edges. The pig's own axes do not: they are analogue. */
+  let stepped = { x: 0, y: 0 }
 
+  /**
+   * Read the controller, ask which control set is live, and push what it means.
+   *
+   * The interpreting used to happen right here, in three `if`s that each knew a
+   * little about the state — which is how the sights once ended up sharing the
+   * fire lock. Now the modes are one pure table (`lib/game/controls.ts`) and this
+   * is only the plumbing.
+   */
   const pushIntent = (): void => {
-    const walk = (controller.isDown('walkForward') ? 1 : 0) - (controller.isDown('walkBack') ? 1 : 0)
-    const turn = (controller.isDown('turnRight') ? 1 : 0) - (controller.isDown('turnLeft') ? 1 : 0)
-    let aim = (controller.isDown('aimUp') ? 1 : 0) - (controller.isDown('aimDown') ? 1 : 0)
-    // G is the AIM VIEW, and it is HELD — the original tests its two pad bits
-    // every frame and puts the camera back the frame they go up
-    // (`../../../../pigs-disasm/weapons/fire.md`). While it is down, W and S
-    // point the weapon instead of walking; A and D still turn the pig, which
-    // is what the exe leaves them doing.
-    const sighting = controller.isDown('aimMode')
-    // The menu is a MODE, as it is in the exe: while it is up the pig stands
-    // still and the keys move the cursor instead.
-    if (hud.skills.open()) {
-      if (walk !== 0 && steered.walk === 0) hud.skills.move(0, walk > 0 ? -1 : 1)
-      if (turn !== 0 && steered.turn === 0) hud.skills.move(turn, 0)
-      steered = { walk, turn }
-      scene?.setIntent(0, 0)
-      scene?.setAim(0)
-      return
+    const held: Held = {
+      walk: (controller.isDown('walkForward') ? 1 : 0) - (controller.isDown('walkBack') ? 1 : 0),
+      turn: (controller.isDown('turnRight') ? 1 : 0) - (controller.isDown('turnLeft') ? 1 : 0),
+      aim: (controller.isDown('aimUp') ? 1 : 0) - (controller.isDown('aimDown') ? 1 : 0),
+      // G is the AIM VIEW and it is HELD — the original tests its two pad bits
+      // every frame and puts the remembered camera mode back the frame they go
+      // up (`../../../../pigs-disasm/weapons/fire.md`).
+      sighting: controller.isDown('aimMode'),
+      // …and so is F, because that is what the power gauge is (lib/game/gauge.ts).
+      firing: controller.isDown('fire')
     }
-    steered = { walk: 0, turn: 0 }
-    if (sighting && aim === 0) aim = walk
-    scene?.setIntent(sighting ? 0 : walk, turn)
-    scene?.setAim(aim)
-    scene?.setSighting(sighting)
-    // F is HELD now: a weapon with a power gauge charges while it is down and
-    // throws on the way up. Everything else still goes off on the press, and
-    // the scene is the one that knows which it is holding.
-    scene?.setFiring(controller.isDown('fire'))
+    const mode = modeOf({
+      inventory: hud.skills.open(),
+      locked: scene?.locked() === true,
+      sighting: held.sighting
+    })
+    const intent = readControls(mode, held)
+    if (mode === 'inventory') {
+      // The cursor steps on the EDGE, and the axes are the pig's own keys.
+      if (intent.cursor.y !== 0 && stepped.y === 0) hud.skills.move(0, intent.cursor.y)
+      if (intent.cursor.x !== 0 && stepped.x === 0) hud.skills.move(intent.cursor.x, 0)
+      stepped = { ...intent.cursor }
+    } else {
+      stepped = { x: 0, y: 0 }
+    }
+    scene?.setIntent(intent.walk, intent.turn)
+    scene?.setAim(intent.aim)
+    scene?.setSighting(intent.sighting)
+    scene?.setFiring(intent.firing)
   }
   controller.onChange(pushIntent)
   controller.onAction((action) => {
     if (!isBattleUp()) return
-    if (action === 'skills') {
-      // R opens what the pig is carrying — plus what it can always do — and
-      // closes it again. It drives in from the right, with a noise.
-      if (game && hud.skills.toggle(game.currentPig.carrying)) {
-        scene?.sound(BATTLE_SOUNDS.menuOpen.sound)
-      }
-      return
-    }
-    if (hud.skills.open()) {
-      // In the menu, the jump key is the SELECT key — SPACE, as in the
-      // original: it takes the skill under the cursor in hand and puts the
-      // menu away. The pig then reaches for it and holds it (three/battle).
-      // Nothing FIRES it yet.
-      if (action === 'jump' && game) {
-        game.currentPig.holding = hud.skills.chosen()
-        hud.skills.close()
-      }
-      return
-    }
-    if (action === 'jump') scene?.jump()
-    if (action === 'endTurn') {
-      game?.endTurn()
-      updateHud()
+    // What a one-shot key MEANS is the mode's to say, not this file's: SPACE is a
+    // jump in the battle, SELECT in the inventory, the canopy's knife while a
+    // crate is coming down, and nothing at all down the sights.
+    const mode = modeOf({
+      inventory: hud.skills.open(),
+      locked: scene?.locked() === true,
+      sighting: controller.isDown('aimMode')
+    })
+    switch (verbOf(mode, action)) {
+      case 'openInventory':
+        // R opens what the pig is carrying — plus what it can always do. It
+        // drives in from the right, with a noise.
+        if (game && hud.skills.toggle(game.currentPig.carrying)) {
+          scene?.sound(BATTLE_SOUNDS.menuOpen.sound)
+        }
+        return
+      case 'closeInventory':
+        if (game) hud.skills.toggle(game.currentPig.carrying)
+        return
+      case 'choose':
+        // The pig then reaches for it and holds it (three/battle.ts). Nothing
+        // FIRES it yet.
+        if (game) {
+          game.currentPig.holding = hud.skills.chosen()
+          hud.skills.close()
+        }
+        return
+      case 'jump':
+        scene?.jump()
+        return
+      case 'cutChute':
+        // The scene owns the drop, and it reads the same jump request — passing
+        // it on is all this has to do.
+        scene?.jump()
+        return
+      case 'endTurn':
+        game?.endTurn()
+        updateHud()
+        return
+      default:
+        return
     }
   })
   controller.bindKeyboard(isBattleUp)
