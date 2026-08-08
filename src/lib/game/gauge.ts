@@ -24,7 +24,7 @@
 //
 // Pure, in seconds. `../../../pigs-disasm/weapons/fire.md`.
 
-import { FRAME_SECONDS } from './ballistics'
+import { EXE_FRAME_SECONDS } from './ballistics'
 
 /** What a full charge reads — `[game+0x4e4]`'s ceiling, 0x493812. */
 export const GAUGE_FULL = 0xfff
@@ -32,10 +32,18 @@ export const GAUGE_FULL = 0xfff
 /** What one engine frame adds. */
 export const GAUGE_STEP = 0x50
 
-/** …so a gauge fills in this many frames, and 0xfff/0x50 is not a whole
- * number: the 52nd frame is the one that tops it out. */
+/**
+ * …so a gauge fills in this many frames, and 0xfff/0x50 is not a whole number:
+ * the 52nd frame is the one that tops it out.
+ *
+ * In SECONDS that is the engine's rate, not this remake's — `EXE_FRAME_SECONDS`
+ * in ballistics.ts argues why, and this is the third place to need it. At 1/15
+ * the fill took three and a half seconds and play said so ("шкала заполняется
+ * слишком медленно"); undistorted it is **1.7 s**, which is what a power gauge
+ * you hold through a throw ought to be.
+ */
 export const GAUGE_FRAMES = Math.ceil(GAUGE_FULL / GAUGE_STEP)
-export const GAUGE_SECONDS = GAUGE_FRAMES * FRAME_SECONDS
+export const GAUGE_SECONDS = GAUGE_FRAMES * EXE_FRAME_SECONDS
 
 /** A charge in progress. Null anywhere else — nothing is holding the button. */
 export interface Gauge {
@@ -50,7 +58,9 @@ export interface Gauge {
 export const beginGauge = (): Gauge => ({ power: 0, spent: false })
 
 /**
- * One frame of charging. `frames` is engine frames, not rendered ones.
+ * One frame of charging. `frames` is ENGINE frames — `delta /
+ * EXE_FRAME_SECONDS`, not `/ FRAME_SECONDS`, since 0x50 is a per-frame step
+ * off the exe.
  *
  * True on the frame it TOPS OUT, which is one of the two ways a throw
  * happens — the other is the button coming up, and that is the caller's to

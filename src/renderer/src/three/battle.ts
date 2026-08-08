@@ -60,7 +60,7 @@ import { advanceAftermath, beginAftermath, watchAftermath } from '../../../lib/g
 import type { Aftermath } from '../../../lib/game/aftermath'
 import { createWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../../../lib/game/zoom'
-import { FRAME_SECONDS } from '../../../lib/game/ballistics'
+import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createShots } from './shots'
 import { createGrenades } from './grenades'
 import { isLobbed } from '../../../lib/game/grenade'
@@ -898,7 +898,7 @@ export function buildBattle(
     // `[pig+0x231] = 0x0A` whatever is in hand — so the release does not
     // throw, it arms (lib/game/shot.ts).
     if (gauge) {
-      const topped = chargeGauge(gauge, delta / FRAME_SECONDS)
+      const topped = chargeGauge(gauge, delta / EXE_FRAME_SECONDS)
       if (topped || !fireHeld) {
         thrownWith = gauge.power
         gauge = null

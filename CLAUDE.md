@@ -1142,6 +1142,49 @@ anything is in the air, on the same gate the sights use.
 is what play saw. It is eyework with nothing decoded behind it and it predates
 the discovery that models are drawn at half size, so it halved with them.
 
+### The grenade, fourth pass — and the effect row is FOUND, 2026-08-07
+
+**The blast is parameter ROW 0 — the same row a thing breaking uses.** The row
+comes from a setter, `0x48CCC0`, whose twenty callers are all jump-table arms
+inside `Effect::Init`; the dispatch is `slot = [0x489680 + id - 1]`,
+`arm = [0x489574 + slot*4]` (0x4881e8). id 0x3e, the break burst, resolves to
+row 0 — which is the CHECK, since `effects/notes.md` derived that from the other
+end — and **id 0x54, the grenade's blast, is row 0 too**. What separates them is
+the id (which is what decides whether it hurts) and the constructor's arguments.
+
+So the missing explosion is not a missing row. It is **row 0's four other
+STAGES**, through `0x48bff0` and `0x48c160`, each keyed on a row OFFSET through
+`0x48CC90`. The remake draws one stage of five — the six-puff burst — which is
+exactly why an explosion and a breaking look the same and neither looks like
+much. `fire.md` has `0x48bff0` written out; that is the next job.
+
+**The bounce REPLACES the surface's material, it does not multiply**, and play
+felt it as friction eating the throw. Two different fields prove it: a tile's
+pair goes onto the LANDSCAPE BODY's `+0x58`/`+0x5c` through `0x416560`, which is
+what the solver multiplies; the lobbed arm writes the COLLISION RECORD's
+`+0x24`/`+0x28` right before resolving. A grenade bounces at 0.9998 on grass and
+on stone alike.
+
+**The gauge fills in 1.7 s, not 3.4** — `EXE_FRAME_SECONDS` again, the third
+place to need it. 0x50 a frame to 0xfff is 52 ENGINE frames.
+
+**Is the blast range exact?** Nearly. `[0x4BD3FC]` reads 512.0, the same figure
+the core uses, so it cancels against the core's own subtraction and the rim
+lands at `row+0x08 + the struck body's own term`. The remake uses `row+0x08`
+alone — the shape is exact, the rim is within about ten per cent, and what that
+float on the body is has not been read.
+
+**The camera does NOT avoid walls in the original, and that IS decoded.**
+`Map::IsBlocked` has ten callers and not one is in the camera code
+(0x49e000..0x4a6000); the camera's only world query is `Map::SampleHeight`, at
+fifteen sites, keeping itself off the ground. There is no line-of-sight test to
+restore, so swinging round an obstacle would be the remake's invention — not
+built, and this is why.
+
+**And the mesh is lifted by the body's own radius.** The point that bounces is
+the projectile's CENTRE, so a grenade resting on the ground was half buried and
+its downhill half went under a slope.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.

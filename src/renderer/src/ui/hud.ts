@@ -116,7 +116,9 @@ export const LAYOUT = {
    * x≈100 (up to row 63), then **dead constant at rows 1..37 from x 104 to
    * x 268**, then tall again. That flat middle is the trough; the two ends are
    * ornament. Play saw the difference — "набор силы идёт по шкале, а не через
-   * весь виджет".
+   * весь виджет" — and then that the slider still ran a little past its end,
+   * so the track is inset by half the slider's own width at each end: its ART
+   * has to stay inside the trough, not just its centre.
    *
    * `newpow1`/`newpow2` are the piece at the TOP LEFT: 64×20 each, and by
    * their own seam a 128-wide pair whose art sits at cols 45..89. Play named it
@@ -128,7 +130,7 @@ export const LAYOUT = {
     margin: { bottom: 0 },
     /** Where the slider's MIDDLE travels, and the line it rides — the trough's
      * own measured span and row. */
-    track: { from: 108, to: 264, y: 1 },
+    track: { from: 120, to: 252, y: 1 },
     /** The slider's own art is 24 wide; this is what its middle is offset by. */
     slider: { width: 24, height: 36 },
     /** The pair above the left end, `newpow1` then `newpow2`. */

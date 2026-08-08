@@ -43,9 +43,23 @@ import type { Bank } from '../audio/bank'
 /** The bone a thrown thing leaves, as everything else does. */
 const HAND = 5
 
-/** How far a grenade may move between collision tests, in game units — its own
- * drawn size, so it cannot step over a surface it is smaller than. */
+/**
+ * How far a grenade may move between collision tests, in game units — its own
+ * drawn size, so it cannot step over a surface it is smaller than. 35 is what
+ * the body factory gives a projectile (`bulletSize`, lib/game/projectile.ts).
+ */
 const STEP_BY = 35
+
+/**
+ * How far the MESH is lifted off the point that bounces.
+ *
+ * The point is the projectile's centre and the model hangs around it, so a
+ * grenade resting exactly on the ground is half buried — and on a slope its
+ * downhill half is under the surface, which is what play saw ("проваливается
+ * под текстуры где наклон"). Lifting by the body's own radius puts it ON the
+ * ground instead of in it. In MODEL units, like the mesh's scale.
+ */
+const MESH_LIFT = STEP_BY
 
 /**
  * Where it leaves the hand.
@@ -231,7 +245,8 @@ export function createGrenades(parts: GrenadeParts): Grenades {
       const shot = live[i]
       const mesh = meshAt(i, weaponModelName(shot.skill))
       if (!mesh) continue
-      mesh.position.set(shot.x, shot.y, shot.z)
+      // Y-DOWN, so lifting is subtracting.
+      mesh.position.set(shot.x, shot.y - MESH_LIFT * MODEL_SCALE, shot.z)
       // It POINTS along its flight, nose down as it falls. Nothing has been
       // read about a projectile's orientation — the constructor hands the
       // body a yaw and a pitch and the drawing half is not decoded — so this

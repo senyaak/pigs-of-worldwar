@@ -29,8 +29,7 @@ import {
   PLAIN_GRAVITY,
   bounceOff,
   fromExeFrames,
-  fromExeSpeed,
-  groundMaterial
+  fromExeSpeed
 } from './ballistics'
 import type { Bounciness, Velocity } from './ballistics'
 import { GAUGE_FULL } from './gauge'
@@ -167,9 +166,18 @@ export function blastShare(distance: number, range: number): number {
  * Which is what play describes: "если кидать вперёд чисто параллельно земли —
  * будет как камень прожектайл отскакивать." A flat throw skips.
  *
- * The two are 16-bit fields on the collision record rather than the body's own
- * `+0x58`/`+0x5c` friction/restitution pair, so WHICH is which is not proven;
- * taken in the order the movement notes use for that pair.
+ * And they REPLACE the surface's own pair rather than multiplying with it,
+ * which is what play felt as "слишком быстро теряет скорость из-за трения".
+ * The proof is that they are different FIELDS: a tile's material goes through
+ * `0x416560` onto the landscape BODY's `+0x58`/`+0x5c` (0x415600..0x41564c),
+ * which is the pair the solver multiplies (0x40f690); the lobbed arm writes
+ * 16-bit values onto the COLLISION RECORD at `+0x24`/`+0x28` just before
+ * resolving. Two places, two purposes — so a grenade bounces at 0.9998 on
+ * grass and on stone alike.
+ *
+ * Which of the two is friction and which restitution is not proven; taken in
+ * the order the movement notes use for the body's pair, where 0xFFF is
+ * unmistakably a restitution and 0x200 a friction.
  */
 export const LOB_BOUNCE: Bounciness = { friction: 0x200 / FIXED, restitution: 0xfff / FIXED }
 
@@ -285,8 +293,11 @@ export function bounceLob(
   shot: Lobbed,
   y: number,
   normal: Velocity,
-  tileType: number,
-  blocked: boolean,
+  /** Kept in the signature though the pair above makes them unused: the caller
+   * knows them and the day the surface turns out to matter after all, this is
+   * where it goes. */
+  _tileType: number,
+  _blocked: boolean,
   /** What the projectile brings to the collision. `LOB_BOUNCE` is the exe's
    * own pair off the arm a thrown thing takes; the terrain's material still
    * multiplies in, the way the solver does it for a pig. */
@@ -295,7 +306,10 @@ export function bounceLob(
   const hit = bounceOff(
     { x: shot.vx, y: shot.vy, z: shot.vz },
     self,
-    groundMaterial(tileType, blocked),
+    // NEUTRAL, deliberately: the solver multiplies the two bodies' pairs, and
+    // a thrown thing's arm has already written the resolved values. Passing the
+    // tile here multiplied 0.9998 by grass's 0.4 and ate the bounce.
+    { friction: 1, restitution: 1 },
     normal
   )
   shot.y = y
