@@ -434,6 +434,25 @@ export function buildBattle(
    * and by then the whole shot sequence owns the view.
    */
   let sightingRefused = false
+  /**
+   * Whether the pig has COMMITTED to a blow, and so cannot be driven at all.
+   *
+   * Everything from the frame the button goes down to the frame the last thing
+   * it threw has gone: the gauge charging, the fuse and the flight, the swing
+   * itself, and anything still in the air. The exe's walk refuses from the
+   * moment the button goes down until the clip is spent (0x46afd5 tests both
+   * the pending flag and the animation one), its turn refuses for the clip
+   * alone (0x46af43), and `Pig::MayAct` is false through the whole of a shot
+   * (lib/game/shot.ts). Down the SIGHTS too: the exe routes the whole of input
+   * through a different branch while the aim bit is down (0x4928dc).
+   */
+  const committed = (): boolean =>
+    sighting ||
+    gauge !== null ||
+    firing !== null ||
+    swings.running() ||
+    grenades.live() > 0 ||
+    shots.live() > 0
   /** The pigs' own barks. The gun arm of `Pig::Fire` says one every shot,
    * walking twelve lines in rotation (audio/pigVoice.ts). */
   const voice = createPigVoice()
@@ -858,9 +877,20 @@ export function buildBattle(
     // Nor while a blow is in the air. The camera is off on the projectile and
     // `Pig::MayAct` is false for the whole of it (lib/game/shot.ts) — play saw
     // the pig hop about behind a grenade it could not see.
-    if (sighting || firing || grenades.live() > 0) jumpRequested = false
-    const walking = swings.running() || firing ? 0 : intent.walk
-    const turning = swings.swinging() || firing ? 0 : intent.turn
+    // **COMMITTED**, and it is now the whole of input rather than the jump
+    // alone. Play: "после нажатия стрелять должно отключаться полностью
+    // управление — а не только прыжок, вообще всё." The old gate missed the
+    // biggest window of the lot: a weapon with a power gauge does not set
+    // `firing` on the press — the press starts it CHARGING and the throw comes
+    // on the release — so for the whole second and a half of the charge the pig
+    // could still be walked, turned and aimed. It missed a bullet in the air
+    // too.
+    if (committed()) {
+      jumpRequested = false
+      aimIntent = 0
+    }
+    const walking = committed() ? 0 : intent.walk
+    const turning = committed() ? 0 : intent.turn
 
     // Down the sights the two axes move together. The pad gives the turn a
     // flat 0x40 the moment the key goes down and the aim a ramp to 0x20, so
@@ -975,7 +1005,7 @@ export function buildBattle(
     updateAim(
       aim,
       holding,
-      firing ? 0 : weapon.aims ? aimIntent : 0,
+      committed() ? 0 : weapon.aims ? aimIntent : 0,
       delta,
       (step) => (zoomsIn(holding) ? zoomedStep(zoom, step, SIGHT_RAMP) : step),
       // Down the sights the aim view's own arm drives it, and it is slower

@@ -256,6 +256,11 @@ export interface Lobbed {
   /** Whether it has gone into water. A thrown thing sinks — it does not skip
    * off a pond — and the scene stops bouncing it once this is set. */
   sunk: boolean
+  /** Whether water has DOUSED it. The engine's own arm sets the projectile's
+   * quiet flag and the destructor's first test then spawns no effect and plays
+   * no sound (0x4328c9), so it leaves without going off — `WATER_DOUSE_SPEED`
+   * has the read. */
+  doused: boolean
 }
 
 /**
@@ -291,7 +296,8 @@ export function lob(
     vz: Math.cos(heading) * flat,
     fuse: fuseSeconds(row, random),
     resting: false,
-    sunk: false
+    sunk: false,
+    doused: false
   }
 }
 
@@ -320,6 +326,45 @@ export function lob(
  * ВОДЕ, должна прям тонуть и идти вниз."
  */
 export const WATER_SPLASH_SOUND = 0x28
+
+/**
+ * …and once it is in and slow, it is DOUSED — and does not go off.
+ *
+ * Play half-remembered this and was right: "я точно не помню, но по-моему даже
+ * не взрываться". `0x437bfb` is the arm, gated on `0x4A6FA0(x, z)` — the map's
+ * water test, tile flag **0x20** plus the art's own texel mask through
+ * `[0x538128]`, which is the same pair `lib/game/watermask.ts` already builds.
+ * Inside it:
+ *
+ * ```
+ * 437c8c  cmp ax,96h                  ; the arrival speed against 150
+ * 437c90  jb  0x437CCE                ; slow -> DOUSE
+ * 437c9d  ...or kind 0x0C..0x17, 0x2C..0x2E, or [proj+0xA2] of 3 or 4
+ * 437ccе  Sound::Play(0x19, 0x50, 0x5F + (rand & 0x1F))   ; 25 is FT_WATER
+ * 437d26  0x487AD0(x, z, 0x0E, ...)   ; the splash effect
+ * 437d34  [proj+0x84] = 1             ; the QUIET flag
+ * 437d4b  0x4A9E50 ; 0x4A9EE0         ; ...and out of the world
+ * ```
+ *
+ * And `[proj+0x84]` is the first thing the destructor tests — `4328c9 if (al)
+ * jmp 0x4357F9` — the branch that spawns **no effects and plays no sound at
+ * all**. So a grenade that goes quietly into water makes a splash, sinks, and
+ * that is the end of it: no blast, no damage.
+ *
+ * A FAST one (150 or more a frame) takes 0x437e5d instead — a different sound
+ * and effect, and the quiet flag is never set, so it carries on and still goes
+ * off on its fuse.
+ */
+export const WATER_DOUSE_SPEED = fromExeSpeed(0x96)
+
+/** Whether this contact douses it rather than letting it carry on. */
+export const dousedByWater = (shot: Lobbed): boolean =>
+  Math.hypot(shot.vx, shot.vy, shot.vz) < WATER_DOUSE_SPEED
+
+/** The splash effect a douse leaves — id 0x0E, which snaps its own y to the
+ * WATER HEIGHT (0x488c19) and reads parameter row **2**: three bright rings at
+ * −500, so above the surface, and a sixty-sprite white cloud. */
+export const WATER_DOUSE_EFFECT = 0x0e
 
 /**
  * One frame of going down through water. It keeps falling — gravity does that —

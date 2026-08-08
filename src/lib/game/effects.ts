@@ -237,6 +237,35 @@ export const BLAST_EFFECT: HitEffect = { ...ROW_ZERO, id: 0x54 }
  */
 export const DUST_EFFECT: HitEffect = { id: 0x3e, kind: 0, rings: [], bursts: ROW_ZERO.bursts }
 
+/**
+ * A SPLASH — effect id **0x0E**, parameter row **2**, and the whole of it is
+ * decoded.
+ *
+ * It is what a thrown thing leaves when water douses it (0x437d26,
+ * `lib/game/grenade.ts` has the arm). Its own Init arm is the one that snaps its
+ * y to the WATER HEIGHT before anything else — `0x4A5140(x, z)` into
+ * `[this+0xAA]` at 0x488c19 — so however deep the thing was when it was doused,
+ * the splash is drawn on the surface. That is why the grenade can sink out of
+ * sight and the splash still land where it went in.
+ *
+ * Row 2 is three RINGS at a lift of **−500**, which in a Y-down space is 500
+ * ABOVE the water, in a near-white (15,15,15) — plus a sixty-sprite white cloud
+ * and a ten-particle burst. Nothing about it is invented.
+ */
+export const SPLASH_EFFECT: HitEffect = {
+  id: 0x0e,
+  kind: 2,
+  rings: [
+    { at: 2, radius: 0, growth: 100, drift: 5, width: 20, spread: 0, step: 9, colour: [14, 14, 15], lift: -500 },
+    { at: 3, radius: 0, growth: 50, drift: 5, width: 20, spread: 0, step: 6, colour: [14, 14, 15], lift: -500 },
+    { at: 5, radius: 20, growth: 100, drift: 10, width: 20, spread: 0, step: 6, colour: [14, 14, 15], lift: -500 }
+  ],
+  clouds: [{ at: 3, count: 60, colour: [15, 15, 15], up: 3, out: 1, gravity: 30, size: 4 }],
+  bursts: [
+    { at: 3, count: 10, colour: [8, 8, 8], out: 20, up: 90, jitter: 25, gravity: 26, step: 3 }
+  ]
+}
+
 /** How far round the burst fans its particles: the same 1638.4-per-turn unit
  * the ring is drawn in, stepped `0x648 / count` a particle (0x48cb0b). */
 const BURST_SPREAD = 0x648 / 1638.4

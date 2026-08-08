@@ -130,8 +130,18 @@ export const LAYOUT = {
     width: 320,
     height: 64,
     margin: { bottom: 0 },
-    /** The trough's own measured span and row, END TO END. */
-    track: { from: 104, to: 268, y: 1 },
+    /**
+     * The trough's own span and row. `to` is **265**, and it was 268 — those
+     * three pixels are what play kept seeing go over the edge.
+     *
+     * MEASURED off the ASSEMBLED strip with the right transparent colour, which
+     * is the TIM's 0x0000 rather than palette index 0: per column the drawn
+     * profile is dead constant at rows 0..39 from **x 92 to x 265**, with the
+     * taller ornament either side. The old 104..268 came from treating a
+     * different index as the hole. The START is deliberately left where play has
+     * already accepted it — only the end moved.
+     */
+    track: { from: 104, to: 265, y: 1 },
     /**
      * The slider's box, and where its VISIBLE art sits inside it — MEASURED off
      * the shipped TIM rather than eyeballed, which is what it took to stop this
@@ -146,7 +156,8 @@ export const LAYOUT = {
      * seeing ("всё ещё чуть выходит за границу шкалы").
      *
      * The travel is the MARKER's: its left edge runs `from` to
-     * `to - art.width`, and the box is drawn `art.x` behind it.
+     * `to - art.width + 1`, so its LAST pixel lands on the trough's last one
+     * and never past it. The box is drawn `art.x` behind the marker.
      */
     slider: { width: 24, height: 36, art: { x: 7, width: 10 } },
     /** The pair above the left end, `newpow1` then `newpow2`. */
@@ -464,9 +475,10 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         const along = Math.min(1, Math.max(0, state.charge))
         const track = GAUGE.track
         const marker = GAUGE.slider.art
+        const travel = track.to - track.from - marker.width + 1
         blit(
           art.get('powg1'),
-          gaugeX + track.from - marker.x + (track.to - track.from - marker.width) * along,
+          gaugeX + track.from - marker.x + travel * along,
           gaugeY + track.y
         )
       }

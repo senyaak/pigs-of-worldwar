@@ -1372,6 +1372,45 @@ the drawn-texel counts are
 pixels wide starting at x = 7**, not eight starting at 8. One pixel each side is
 exactly what kept showing.
 
+### The grenade, ninth pass — water douses it, 2026-08-08
+
+**A thrown thing that goes quietly into water DOES NOT GO OFF, and play
+half-remembered it before the binary said so.** There are two water paths and
+they are different tests: the surface crossing (tile bit 6, 0x437a57) puts a
+splash projectile at the water height and touches the thrown thing nowhere, while
+the CONTACT (0x437bfb, gated on `0x4A6FA0` — tile bit **5** plus the DLL's own
+per-texel mask through `[0x538128]`, the same pair `lib/game/watermask.ts`
+builds) is the one that matters. Under **150 a frame** it plays FT_WATER, leaves
+effect **0x0E**, and sets `[proj+0x84]`. That byte is the FIRST thing the
+destructor tests (`4328c9`), and its branch has no effects and no sound at all.
+So: splash, sink, and nothing else. `dousedByWater` in `lib/game/grenade.ts`.
+
+Effect 0x0E is worth its own line: its Init arm writes the water height over its
+own y (0x488c19) before reading parameter **row 2**, so the splash is drawn on the
+SURFACE however deep the thing sank — which is why the grenade can go out of
+sight and the splash still land where it went in. Row 2 is three near-white rings
+at a lift of −500, a sixty-sprite cloud and a ten-particle burst; `SPLASH_EFFECT`
+carries it and none of it is invented.
+
+**And it no longer stops dead on contact** — play saw that immediately ("на воде
+тупо при контакте застрял сразу"). Nothing holds it at the surface: gravity has
+the vertical and only the sideways travel is damped, so it sinks to the bed and is
+doused there.
+
+**COMMITTED is now the whole of input, not the jump alone.** Play: "после нажатия
+стрелять должно отключаться полностью управление — а не только прыжок, вообще
+всё." The old gate missed the biggest window of the lot — a weapon with a power
+gauge does not set `firing` on the press, so for the whole second and a half of
+the charge the pig could still be walked, turned and aimed. `committed()` in
+`three/battle.ts` now covers the sights, the gauge, the fuse and flight, the swing
+and anything still in the air, and walk, turn, jump and aim all read it.
+
+**The gauge slider's end was three pixels out.** Measured off the ASSEMBLED strip
+with the right transparent colour (0x0000, which the slider's own measurement
+turned up): the flat profile runs x 92..**265**, not to 268. The start stays at
+104 where play has already accepted it, and the marker's travel now ends with its
+LAST pixel on the trough's last one.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.

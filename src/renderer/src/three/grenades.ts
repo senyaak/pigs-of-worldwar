@@ -20,6 +20,7 @@ import {
   blastRange,
   blastShare,
   bounceLob,
+  dousedByWater,
   lob,
   lobBounce,
   lobOf,
@@ -217,15 +218,34 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     // `surface` is the region's own fitted level (lib/game/terrain.ts), the line
     // a swimming pig floats at.
     if (parts.query.isWater(shot.x, shot.z) && shot.y >= parts.query.surface(shot.x, shot.z)) {
+      // Crossing the surface: the noise, once.
       if (!shot.sunk) playCue(parts.bank(), BATTLE_SOUNDS.splash)
       sinkLob(shot, step)
-      // …and it settles on the BED rather than falling through it.
+      // …and it keeps going down until it meets the BED. It used to stop dead on
+      // contact, which play saw straight away: "на воде тупо при контакте
+      // застрял сразу". Nothing stops it here — gravity has the vertical and
+      // only the sideways travel is damped.
       if (shot.y >= ground) {
+        // The bed, and the engine DOUSES it: a splash on the surface, and the
+        // quiet flag so the destructor spawns nothing at all. Play remembered
+        // this — "по-моему даже не взрываться" — and 0x437d34 is where it is
+        // written. `doused` is what tells the update to drop it WITHOUT a blast.
         shot.y = ground
         shot.vx = 0
         shot.vy = 0
         shot.vz = 0
         shot.resting = true
+        if (dousedByWater(shot)) {
+          shot.doused = true
+          // The splash is drawn on the WATER LINE however deep it went, because
+          // effect 0x0E snaps its own y there (0x488c19).
+          parts.effects.splash({
+            x: shot.x,
+            y: parts.query.surface(shot.x, shot.z),
+            z: shot.z
+          })
+          playCue(parts.bank(), BATTLE_SOUNDS.doused)
+        }
       }
       return true
     }
@@ -307,6 +327,13 @@ export function createGrenades(parts: GrenadeParts): Grenades {
           // sub-step of that is enough to lose the thing.
           const floor = parts.query.height(shot.x, shot.z)
           if (!shot.sunk && shot.y > floor) shot.y = floor
+        }
+        // DOUSED: it is gone, and it does not go off. The engine sets the
+        // projectile's quiet flag and the destructor's first test skips every
+        // effect and every sound (0x4328c9).
+        if (shot.doused) {
+          live.splice(i, 1)
+          continue
         }
         if (!spent) continue
         detonate(shot)

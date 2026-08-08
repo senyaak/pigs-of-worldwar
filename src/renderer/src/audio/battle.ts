@@ -76,6 +76,17 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * the nominal one, which is what most of the binary asks for. */
   splash: { sound: 'I_SPLASH', volume: 100, pitch: 100 },
   /**
+   * A thrown thing being DOUSED by water. DECODED, mix and all: the projectile's
+   * water arm plays index **25** at volume **0x50** with a pitch of
+   * `0x5F + (rand & 0x1F)` (0x437cf3), and index 25 of `Audio/sfxday.srl` is
+   * **FT_WATER** — which the offset check confirms three other ways (I_PICKUP at
+   * 30, I_STAB at 32, L_PISTOL at 42).
+   *
+   * The same arm sets the projectile's quiet flag, so this is the LAST noise a
+   * grenade in water makes — there is no blast after it (lib/game/grenade.ts).
+   */
+  doused: { sound: 'FT_WATER', volume: 80, pitch: 95, jitter: 31 },
+  /**
    * Collecting a crate, and being refused one. These two are DECODED rather
    * than picked by name: `Pig::GiveSkill` plays 0x5E at the pig's own
    * position once the skill is in (0x4759F2, out of 0x475960), and 0x4F on

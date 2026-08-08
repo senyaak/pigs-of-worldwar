@@ -12,7 +12,9 @@ import { test, expect } from '@playwright/test'
 
 import { BOUNCE_CUTOFF, TILE_MATERIALS } from '../../src/lib/game/ballistics'
 import {
+  WATER_DOUSE_SPEED,
   advanceLob,
+  dousedByWater,
   bounceLob,
   lobBounce,
   lobOf,
@@ -36,7 +38,8 @@ const dropped = (vy: number, vx = 0): Lobbed => ({
   vz: 0,
   fuse: 5,
   resting: false,
-  sunk: false
+  sunk: false,
+  doused: false
 })
 
 test('a grenade brings its own material, and it is not near-elastic', () => {
@@ -108,14 +111,13 @@ test('a contact already leaving is not resolved twice', () => {
 })
 
 test('water is a PASS-THROUGH: it splashes and keeps going down', () => {
-  // The engine's own water handler drops a splash projectile at the water line
-  // and touches the thrown thing's velocity nowhere (0x437a57). So there is no
-  // gate to pass and nothing to bounce off — play was blunt about it: "граната
-  // НЕ ТОНЕТ В ВОДЕ, должна прям тонуть и идти вниз."
+  // The engine's surface handler drops a splash at the water line and touches
+  // the thrown thing's velocity nowhere (0x437a57). So there is no gate to pass
+  // and nothing to bounce off — play was blunt about it: "граната НЕ ТОНЕТ В
+  // ВОДЕ, должна прям тонуть и идти вниз."
   const shot = dropped(0, 4000)
   for (let frame = 0; frame < 30; frame++) {
     advanceLob(shot, 1 / 30)
-    // Once past the surface it sinks, and nothing puts it back.
     if (shot.y >= 0) sinkLob(shot, 1 / 30)
   }
   expect(shot.sunk).toBe(true)
@@ -124,6 +126,23 @@ test('water is a PASS-THROUGH: it splashes and keeps going down', () => {
   expect(shot.y).toBeGreaterThan(0)
   // …and its sideways travel has been damped away, so it does not slide off.
   expect(shot.vx).toBeLessThan(4000 / 10)
+})
+
+test('and once it is in and slow, water DOUSES it — no blast', () => {
+  // Play half-remembered this and was right. The arm at 0x437bfb sets the
+  // projectile's quiet flag, and the destructor's first test then spawns nothing
+  // and plays nothing (0x4328c9). The bar is 150 a frame (0x437c8c).
+  const slow = dropped(0, 0)
+  expect(dousedByWater(slow)).toBe(true)
+  const fast = dropped(WATER_DOUSE_SPEED * 2, 0)
+  expect(dousedByWater(fast)).toBe(false)
+  // A grenade sinking under its own weight is slow long before it reaches a bed.
+  const sinking = dropped(0, 4000)
+  for (let frame = 0; frame < 10; frame++) {
+    advanceLob(sinking, 1 / 30)
+    sinkLob(sinking, 1 / 30)
+  }
+  expect(dousedByWater(sinking)).toBe(true)
 })
 
 test('a sunk grenade keeps FALLING — the vertical is left to gravity', () => {

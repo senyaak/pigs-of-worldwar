@@ -15,6 +15,7 @@ import {
   BLAST_EFFECT,
   BREAK_EFFECT,
   DUST_EFFECT,
+  SPLASH_EFFECT,
   RING_DEAD,
   RING_SEGMENTS,
   RING_SWEEP,
@@ -101,6 +102,10 @@ export interface Effects {
   /** …and something heavy LANDED here. Row 0's smoke without its fire, so a
    * crate arriving raises dust rather than going off (lib/game/effects.ts). */
   dust(at: { x: number; y: number; z: number }): void
+  /** …and something went into WATER here. Effect 0x0E, row 2: three bright
+   * rings and a white cloud. Pass the WATER LINE, not where the thing is — the
+   * engine's own arm snaps its y to the surface (lib/game/effects.ts). */
+  splash(at: { x: number; y: number; z: number }): void
   /** Step them; call once a frame. */
   update(delta: number): void
   /** How many rings are alive — what a spec can see of an effect, since its
@@ -375,6 +380,9 @@ export function createEffects(root: THREE.Object3D): Effects {
     },
     dust(at) {
       live.push(beginEffect(DUST_EFFECT, at))
+    },
+    splash(at) {
+      live.push(beginEffect(SPLASH_EFFECT, at))
     },
     update(delta) {
       for (const effect of live) advanceEffect(effect, delta)
