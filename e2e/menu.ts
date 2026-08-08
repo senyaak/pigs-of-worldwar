@@ -14,12 +14,13 @@ import type { Page } from '@playwright/test'
 import { beginTurn, landed, tap } from './controller'
 
 /** Which screen's bars to read. The names are the `window.pow` keys. */
-export type Screen = 'menu' | 'multiPlayer'
+export type Screen = 'menu' | 'multiPlayer' | 'conditions'
 
 interface ScreenHooks {
   selected(): number
   labels(): string[]
   values(): (string | null)[]
+  flipping(): boolean
 }
 
 type PowScreens = { pow?: Partial<Record<Screen, ScreenHooks>> }
@@ -75,8 +76,15 @@ export async function nudge(
   )
 }
 
-/** Light the bar with this label, then choose it. */
-export async function choose(
+/**
+ * Move the lit bar onto the one with this label, and stop there.
+ *
+ * A SETTING is not chosen, it is nudged left and right, so lighting a bar and
+ * choosing it are two different things — and a spec must never assume where
+ * the cursor was left: a screen is come back to wherever the last spec put it,
+ * and the suite's file order is not fixed (docs/testing.md, worker fixtures).
+ */
+export async function lightBar(
   page: Page,
   label: string,
   screen: Screen = 'menu'
@@ -97,6 +105,29 @@ export async function choose(
   for (let at = await selection(page, screen); at !== wanted; at = await selection(page, screen)) {
     await nudge(page, wanted > at ? 'menuDown' : 'menuUp', screen)
   }
+  // And leave the machine SETTLED. `nudge` returns the instant the bar starts
+  // turning, and for the next third of a second the machine refuses to move —
+  // so a spec that pressed straight after this would be measuring the flip it
+  // caused rather than what it meant to test.
+  await expect
+    .poll(
+      () =>
+        page.evaluate((which) => {
+          const hooks = (window as unknown as PowScreens).pow?.[which]
+          return hooks ? hooks.flipping() : false
+        }, screen),
+      { message: 'the bar is still turning over' }
+    )
+    .toBe(false)
+}
+
+/** Light the bar with this label, then choose it. */
+export async function choose(
+  page: Page,
+  label: string,
+  screen: Screen = 'menu'
+): Promise<void> {
+  await lightBar(page, label, screen)
   await tap(page, 'menuSelect')
 }
 

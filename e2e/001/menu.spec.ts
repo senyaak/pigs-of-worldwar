@@ -17,7 +17,7 @@ import { existsSync } from 'node:fs'
 import { PHASE_ENV, launchApp, openAssets } from '../launch'
 import { expect, test } from '../app'
 import { tap } from '../controller'
-import { choose, labels, nudge, selection, startGame } from '../menu'
+import { choose, labels, lightBar, nudge, selection, startGame } from '../menu'
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
@@ -58,6 +58,11 @@ test('the menu is the original screen, in the original letters', async ({ app })
 
 test('the lit bar moves one at a time, and wraps', async ({ app }) => {
   const { page } = app
+  // Start from the top DELIBERATELY. A screen is come back to wherever it was
+  // left, and the suite's file order is not fixed, so a spec that reaches the
+  // menu after one that opened MULTI-PLAYER finds the bar already moved —
+  // which is what this line used to assert away.
+  await lightBar(page, 'ONE PLAYER')
   expect(await selection(page)).toBe(0)
 
   // The machine will not move again while a bar is still turning, so a

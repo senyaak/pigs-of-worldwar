@@ -2,21 +2,32 @@
 // visible. No rendering or IPC details live here.
 
 import { byId } from './ui/dom'
+import type { BarScreenView } from './input/controller'
 import { initWelcome } from './ui/welcome'
 import { initMenu } from './ui/menu'
 import { initMultiPlayer } from './ui/multiPlayer'
+import { initFieldConditions } from './ui/fieldConditions'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
 import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 
-type View = 'welcome' | 'menu' | 'multiplayer' | 'battle' | 'browser' | 'archive' | 'viewer'
+type View =
+  | 'welcome'
+  | 'menu'
+  | 'multiplayer'
+  | 'conditions'
+  | 'battle'
+  | 'browser'
+  | 'archive'
+  | 'viewer'
 
 const panels: Record<View, HTMLElement[]> = {
   welcome: [byId('welcome')],
   menu: [byId('menu')],
   multiplayer: [byId('multiplayer')],
+  conditions: [byId('conditions')],
   battle: [byId('battle')],
   browser: [byId('browser'), byId('file-list')],
   archive: [byId('archive-view')],
@@ -29,10 +40,10 @@ function show(view: View): void {
   }
   // A frontend screen draws and listens only while it is the view — and they
   // share one controller, so the one being left has to stop hearing it.
-  if (view === 'menu') menu.enter()
-  else menu.leave()
-  if (view === 'multiplayer') multiPlayer.enter()
-  else multiPlayer.leave()
+  for (const [name, screen] of Object.entries(screens)) {
+    if (view === name) screen.enter()
+    else screen.leave()
+  }
 }
 
 // The viewer panel is shared by models (opened from an archive) and terrain
@@ -85,10 +96,20 @@ const menu = initMenu({
 
 const multiPlayer = initMultiPlayer({
   onStart: (map) => {
-    void battle.open(map).then((ok) => ok && show('battle'))
+    void battle.open(map, conditions.conditions()).then((ok) => ok && show('battle'))
+  },
+  onConditions: () => {
+    show('conditions')
+    void conditions.load()
   },
   onBack: () => show('menu')
 })
+
+const conditions = initFieldConditions({ onBack: () => show('multiplayer') })
+
+/** The frontend's screens, by the view that shows them. Only one of them may
+ * be drawing and hearing the controller at a time. */
+const screens = { menu, multiplayer: multiPlayer, conditions }
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
 
 // The frontend is drawn on a canvas, so what a screen says and which bar is
@@ -96,15 +117,27 @@ byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('me
 // furniture sits is eyework, so the layout is editable from the console the
 // same way the dashboard's is.
 if (window.pow) {
-  window.pow.menu = { selected: menu.selected, labels: menu.labels, values: menu.values }
-  window.pow.multiPlayer = {
-    selected: multiPlayer.selected,
-    labels: multiPlayer.labels,
-    values: multiPlayer.values
-  }
+  const view = (screen: (typeof screens)[keyof typeof screens]): BarScreenView => ({
+    selected: screen.selected,
+    labels: screen.labels,
+    values: screen.values,
+    flipping: screen.flipping
+  })
+  window.pow.menu = view(menu)
+  window.pow.multiPlayer = view(multiPlayer)
+  window.pow.conditions = view(conditions)
+  // Each screen carries its OWN layout, so a nudge in the console moves the
+  // screen being looked at rather than all of them.
   window.pow.screen = {
-    layout: menu.layout,
-    print: () => JSON.parse(JSON.stringify(menu.layout))
+    layout: Object.fromEntries(
+      Object.entries(screens).map(([name, screen]) => [name, screen.layout])
+    ),
+    print: () =>
+      JSON.parse(
+        JSON.stringify(
+          Object.fromEntries(Object.entries(screens).map(([n, s]) => [n, s.layout]))
+        )
+      )
   }
 }
 

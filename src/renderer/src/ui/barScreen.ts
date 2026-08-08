@@ -95,6 +95,23 @@ export interface Bar {
   cycle?(by: number): void
 }
 
+/** Where one screen's pieces sit. Cloned per screen off `LAYOUT`, so a
+ * console nudge moves the screen being looked at and not every screen. */
+export type ScreenLayout = typeof LAYOUT
+
+function cloneLayout(): ScreenLayout {
+  return {
+    machine: { ...LAYOUT.machine },
+    title: { ...LAYOUT.title },
+    bars: { ...LAYOUT.bars },
+    track: { ...LAYOUT.track },
+    carriage: { ...LAYOUT.carriage },
+    cog: { ...LAYOUT.cog },
+    dial: { ...LAYOUT.dial },
+    setting: { ...LAYOUT.setting }
+  }
+}
+
 export interface BarScreen {
   /** Decode the art and take over the canvas; safe to call once a session. */
   load(): Promise<void>
@@ -104,13 +121,17 @@ export interface BarScreen {
   enter(): void
   /** Which bar is lit, for the specs. */
   selected(): number
+  /** Whether a bar is still turning over — the machine refuses to move again
+   * until it has settled, so a spec that presses through a flip is pressing
+   * into a refusal (`e2e/menu.ts`). */
+  flipping(): boolean
   /** What the bars say, in order, for the specs. */
   labels(): string[]
   /** What the bars say on the right, in order — null where a bar carries no
    * setting. The specs read a screen's STATE through this. */
   values(): (string | null)[]
-  /** The live layout, for the console. */
-  layout: typeof LAYOUT
+  /** This screen's live layout, for the console. */
+  layout: ScreenLayout
 }
 
 /**
@@ -167,6 +188,7 @@ export function initBarScreen(config: {
   onAssets?: () => void
 }): BarScreen {
   const { canvas, bars } = config
+  const layout = cloneLayout()
   canvas.width = SCREEN.width
   canvas.height = SCREEN.height
 
@@ -198,11 +220,26 @@ export function initBarScreen(config: {
     bank.play(CLICK)
   }
 
+  /**
+   * Leave this screen for another.
+   *
+   * Every screen listens to the SAME controller and tells itself apart by
+   * `visible` — so a handler that swaps the view synchronously flips that
+   * flag while the press is still being delivered, and the screen it just
+   * opened receives the very same press. That is not hypothetical: choosing
+   * MULTI-PLAYER off the menu carried straight through to whatever bar the
+   * MULTI-PLAYER screen happened to have lit, two screens deep in one key.
+   *
+   * So a navigation is queued and runs once the press has finished being
+   * delivered. Nothing else about the handler changes.
+   */
+  const navigate = (go: () => void): void => queueMicrotask(go)
+
   const choose = (): void => {
     const bar = bars[selection]
     if (!bar.enabled() || !bar.choose) return
     bank.play(CLICK)
-    bar.choose()
+    navigate(bar.choose)
   }
 
   const cycle = (by: number): void => {
@@ -219,8 +256,11 @@ export function initBarScreen(config: {
     else if (action === 'menuLeft') cycle(-1)
     else if (action === 'menuRight') cycle(1)
     else if (action === 'menuSelect') choose()
-    else if (action === 'menuBack') config.onBack?.()
-    else if (action === 'assets') config.onAssets?.()
+    else if (action === 'menuBack') {
+      if (config.onBack) navigate(config.onBack)
+    } else if (action === 'assets') {
+      if (config.onAssets) navigate(config.onAssets)
+    }
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
 
@@ -235,8 +275,8 @@ export function initBarScreen(config: {
     if (!art) return -1
     const bar = art.get('chose1')
     for (let i = 0; i < bars.length; i++) {
-      const top = LAYOUT.bars.y + i * LAYOUT.bars.step
-      if (x >= LAYOUT.bars.x && x < LAYOUT.bars.x + bar.width && y >= top && y < top + bar.height) {
+      const top = layout.bars.y + i * layout.bars.step
+      if (x >= layout.bars.x && x < layout.bars.x + bar.width && y >= top && y < top + bar.height) {
         return i
       }
     }
@@ -286,50 +326,50 @@ export function initBarScreen(config: {
       context.drawImage(sprite.image, x, y)
 
     blit(art.get('pigbkpc1'), 0, 0)
-    blit(art.get('fullmenu'), LAYOUT.machine.x, LAYOUT.machine.y)
-    blit(art.get('track'), LAYOUT.track.x, LAYOUT.track.y)
-    blit(frameAt(dials, now), LAYOUT.dial.x, LAYOUT.dial.y)
-    blit(frameAt(cogs, now), LAYOUT.cog.x, LAYOUT.cog.y)
+    blit(art.get('fullmenu'), layout.machine.x, layout.machine.y)
+    blit(art.get('track'), layout.track.x, layout.track.y)
+    blit(frameAt(dials, now), layout.dial.x, layout.dial.y)
+    blit(frameAt(cogs, now), layout.cog.x, layout.cog.y)
 
     const title = art.get('title1')
-    blit(title, LAYOUT.title.x, LAYOUT.title.y)
-    centred(context, big, config.title(), title, LAYOUT.title.x, LAYOUT.title.y)
+    blit(title, layout.title.x, layout.title.y)
+    centred(context, big, config.title(), title, layout.title.x, layout.title.y)
 
     // A bar flips over as the selection lands on it; the letters come back
     // when it has settled flat again.
     const flipping = now < flipUntil
     for (let i = 0; i < bars.length; i++) {
-      const y = LAYOUT.bars.y + i * LAYOUT.bars.step
+      const y = layout.bars.y + i * layout.bars.step
       const turning = flipping && i === selection
       const through = (flipUntil - now) / (FLIP_SECONDS * 1000)
       const face = turning
         ? plates[Math.min(plates.length - 1, Math.floor(through * plates.length))]
         : plates[0]
-      blit(face, LAYOUT.bars.x, y)
+      blit(face, layout.bars.x, y)
       if (turning) continue
 
       const bar = bars[i]
       const font = !bar.enabled() ? off : i === selection ? lit : plain
       const value = bar.value?.() ?? null
       if (value === null) {
-        centred(context, font, bar.label(), face, LAYOUT.bars.x, y)
+        centred(context, font, bar.label(), face, layout.bars.x, y)
         continue
       }
       // A setting reads left to right: what it is, then what it is set to.
       const top = Math.round(y + (face.height - font.height) / 2)
-      font.draw(context, bar.label(), LAYOUT.bars.x + LAYOUT.setting.labelInset, top)
+      font.draw(context, bar.label(), layout.bars.x + layout.setting.labelInset, top)
       font.draw(
         context,
         value,
         Math.round(
-          LAYOUT.bars.x + face.width - LAYOUT.setting.valueInset - font.measure(value)
+          layout.bars.x + face.width - layout.setting.valueInset - font.measure(value)
         ),
         top
       )
     }
 
-    const chosen = LAYOUT.bars.y + selection * LAYOUT.bars.step
-    blit(art.get('selcog1'), LAYOUT.carriage.x, chosen + LAYOUT.carriage.offset)
+    const chosen = layout.bars.y + selection * layout.bars.step
+    blit(art.get('selcog1'), layout.carriage.x, chosen + layout.carriage.offset)
   }
 
   // The machine only turns while it is on screen: an app parked behind a
@@ -391,8 +431,9 @@ export function initBarScreen(config: {
       run(true)
     },
     selected: () => selection,
+    flipping: () => performance.now() < flipUntil,
     labels: () => bars.map((bar) => bar.label()),
     values: () => bars.map((bar) => bar.value?.() ?? null),
-    layout: LAYOUT
+    layout
   }
 }
