@@ -642,7 +642,7 @@ Footsteps are deliberately not wired: they want the hoof-contact frames
 `../pigs-disasm/anim/audio-events.md` derives, and a footstep on a timer
 would be a stand-in nobody asked for.
 
-### The SHOT, end to end — the six things play named, 2026-08-07
+### The SHOT, end to end
 
 Aiming and firing landed in this order: the projectile's rules
 (`lib/game/projectile.ts`), the aim view on a HELD G, the scope overlay, the
@@ -692,7 +692,7 @@ not what the list guessed:
    no chain could run past its first step — and **`Pig::ClearInventory` is
    called only when a CRATE is placed**, not on every placement.
 
-### The beat after the blow, 2026-08-07
+### The beat after the blow
 
 Play, straight after: "останавливается таймер и показывается как ящик на
 парашюте спускается… после попадания пару секунд показывается ещё то место, а
@@ -712,7 +712,7 @@ the second is measured from the world settling, not from the blow.
 пробел нажать") and `airDrop.ts` says so at the method — a pig cuts its own
 with the same key, and nothing in the exe has been read either way.
 
-### The scope is bolted to the HAND, 2026-08-07
+### The scope is bolted to the HAND
 
 Play pushed back on the wobble — "если не нашёл, так надо лучше искать" — and
 they were right. The earlier negative result was right about the ANGLE and
@@ -738,7 +738,7 @@ the view without steering it.
 breath is not what play wants to feel. Zero its `SCALE` and the scope still
 breathes, just quietly.
 
-### The scope jitters, the sniper zooms, and bullets stop at walls, 2026-08-07
+### The SIGHTS: the eye is sampled once a frame, the sniper zooms
 
 Play: "дрожание совсем не то — щас плавает, а в оригинале прям дрожит /
 прожектайлы летят через стены / снайперский прицел начинает с малого зума и
@@ -754,15 +754,9 @@ perfectly still and the rest jump, biggest step 2.16 against a mean of 0.13.
 The exe places this camera once a game frame; sampling an interpolated
 skeleton at sixty was the bug.
 
-**The tremor is a RANDOM WALK, not a sine.** A sine floats, which is exactly
-what play saw. The engine's own held tremor is at 0x49e030 — the game puts it
-on a body standing on terrain type 4 or 11 — and it is two axes bouncing
-between ±0x80 with a fresh step of `8 + (rand() & 7)` every frame, reversing
-at the stops. `lib/game/wobble.ts` is now that shape at those numbers, scaled
-to a quarter, and **stepped at the engine's fifteen a second**: stepping it
-per rendered frame would smooth it straight back into a glide. The camera also
-has a shake of its own (0x49fea0) and it is the wrong kind — a decaying
-impulse, i.e. a blast.
+**The camera's own shake is the wrong kind** — 0x49fea0 jitters all three axes and
+decays the amplitude every frame (0x4a0002), which is a blast, not something held.
+Where the tremor DID come from is at the end of this file.
 
 **The sniper's magnification is the view manager's**, and it closed a question
 `fire.md` had carried from the start. `afSetZoom` is a library entry at
@@ -794,7 +788,7 @@ no-gauge weapon's charge becomes 0xFFF, what bit 0 of a body's `+0x44` means
 at 0x47a24b, the melee's own battle cry — the same `0x43af70` call, not yet
 wired to a swing — and which mode number the wait above actually is.
 
-### One thing at a time, and the sights hold still, 2026-08-07
+### One thing at a time, and the sights hold still
 
 Play's list after watching it run, and what each turned out to be.
 
@@ -825,15 +819,6 @@ drifted to by the end of the ten-frame fuse — play: "будто секунду
 through a different branch entirely while the aim bit is held (0x4928dc) and
 no jump is reachable from it.
 
-**The tremor moves the EYE, not the aim** — third pass, and this one is the
-binary's shape rather than a guess. The shot reads `[pig+0x304]` exactly and
-the rifle cam is a POSITION on the hand, so in the original a tremor shifts
-the picture and *cannot* steer the bullet. An angular jitter does both, swings
-the whole world, and gets worse the further you look; at four times
-magnification it is unusable. That was "дрож камеры всё ещё фу".
-`lib/game/wobble.ts` now returns offsets in model units, across and up from
-wherever the hand has the camera.
-
 **The aim view reads the pad through its OWN arm** — found on the fourth pass
 and it settles the sideways-speed question for good. Holding the aim bit hands
 input to `0x495690`, which dispatches per camera mode, and mode 0x0E's arm
@@ -857,16 +842,12 @@ count was zero on the frame the dummy broke and the parachute started down
 through the smoke anyway. `effects.busy()` is the whole effect, stages
 included.
 
-**There is no dedicated scope tremor, and `fire.md` now lists every place it
-is not** so the search is not run a fifth time: `Pig::Aim`, the shot's angle
-read, both branches of the rifle cam, `Camera::Shake` (0x4a0520 — its single
-caller is a sound routine armed for two explosion ids, and it is skipped
-entirely when `[0x51ABC8]` is set), the engine's terrain-gated random walk,
-the view manager's constructor seeding, `0x44E620` (polar to cartesian off the
-sin/cos tables), `0x46a960` (returns the aim angle), and the camera's own
-yaw/pitch accessors.
+**`fire.md` lists every place a dedicated scope tremor is NOT**, so that search is
+not run a sixth time: `Pig::Aim`, the shot's angle read, both branches of the rifle
+cam, `Camera::Shake`, the engine's terrain-gated random walk, the view manager's
+constructor seeding, `0x44E620` and `0x46a960`, and the camera's own accessors.
 
-### The beat has a ceiling, the crate has a voice, 2026-08-07
+### The beat has a ceiling, the crate has a voice
 
 **The hold now ends after three seconds whatever is going on.** Play: "надо
 думаю ждать 2-3 секунды пока завершится всё", and "без ящика гуд — с ящиком
@@ -897,19 +878,15 @@ plays it on `send`, with `chute` half a second behind it — a NAME pick, like
 the rest of `audio/battle.ts`, since nothing has been traced starting that
 bed. `CHUTE_DELAY` is the gap.
 
-**The tremor, fifth pass: a STICK THAT NEVER SITS AT ZERO.** The aim view's
-own handler ends by unpacking six signed bytes out of `[game+0x444]` and
-`[game+0x44C]`, halving them and feeding them to the camera on every frame no
-direction is held (0x495699 onwards) — the analogue axes. On the machine this
-was made for the sights are wired to a stick, and a resting stick reads a few
-units either way and a *different* few every frame: a small, fast, ANGULAR
-jitter. On a keyboard those bytes are zero, which is why the remake's sights
-were dead still and every invented substitute felt wrong. `lib/game/wobble.ts`
-was an independent sample per engine frame, eased towards. **Superseded in the
-seventh pass below: it WALKS now, and the sample-and-hold is gone with
-`AMPLITUDE` and `EASE`.**
+**The tremor is the analogue STICK.** The aim view's handler ends by unpacking six
+signed bytes out of `[game+0x444]` and `[game+0x44C]`, halving them and feeding them on
+every frame no direction is held (0x495699 onwards). On the machine this was made for
+the sights are wired to a stick and a resting stick reads a few units either way, a
+different few every frame; on a keyboard those bytes are zero, which is why the sights
+were dead still and every invented substitute felt wrong. Where that reading GOES took
+five more passes — see the last section of this file.
 
-### The wait was cutting off the very thing it waited for, 2026-08-07
+### The wait was cutting off the very thing it waited for
 
 Play, again: "всё ещё анимация сброса ящика сильно рано прерывает предыдущую
 анимацию." The gate was not the problem — `effects.busy()` is the right test
@@ -951,14 +928,7 @@ frames undistorted is 0.5 s, which is exactly what play asked for. Worth
 remembering the next time a decoded frame count feels sluggish; the constant is
 now written in seconds and says why.
 
-**And the tremor went up**, `AMPLITUDE` 4 → 7 ("дрож чутка слабая") — both
-constants are GONE, see the seventh pass. Worth
-knowing before the next nudge: the easing eats a chunk of it. Against white
-noise a chase at `EASE` settles to `sqrt(EASE / (2 − EASE))` of the sample,
-so 0.65 shows about seven tenths of whatever `AMPLITUDE` says. Turn the
-amplitude up rather than the ease down, or it goes back to floating.
-
-### GRENADES: the gauge is decoded, the fuse is not, 2026-08-07
+### GRENADES: the gauge, the fuse and the blast's reach
 
 **The POWER GAUGE is built and it is the exe's throughout** (`lib/game/gauge.ts`).
 A weapon's record byte `+0x14` says whether it has one — already read into
@@ -1022,7 +992,7 @@ deliberately NOT drawn — what they are has not been settled.
 ground carries one — it hands out a bayonet and then a rifle — so the console
 puts one in hand, the same way `pow.swapMap` picks a map. The remake's own.
 
-### The grenade, second pass — play's list, 2026-08-07
+### GRENADES: the arc, the angle, the bounce and the blast
 
 Eight things, and half of them turned out to be readable.
 
@@ -1109,7 +1079,7 @@ its two parameters, used by the every-fifth-frame TRAIL (0x4365f1, ids 0x5D and
 0x5F) and by the blast alike — and rules out 0x4323f3, which is the
 CONSTRUCTOR's switch and so the launch's noise.
 
-### The grenade, third pass — 2026-08-07
+### GRENADES: the gauge widget, the skim, the substep
 
 **The gauge widget, measured properly.** Per assembled column the art's
 vertical extent is tall and irregular out to x≈100, then **dead constant at
@@ -1138,7 +1108,7 @@ anything is in the air, on the same gate the sights use.
 is what play saw. It is eyework with nothing decoded behind it and it predates
 the discovery that models are drawn at half size, so it halved with them.
 
-### The grenade, fourth pass — and the effect row is FOUND, 2026-08-07
+### GRENADES: the effect ROW is found
 
 **The blast is parameter ROW 0 — the same row a thing breaking uses.** The row
 comes from a setter, `0x48CCC0`, whose twenty callers are all jump-table arms
@@ -1155,11 +1125,8 @@ exactly why an explosion and a breaking look the same and neither looks like
 much. **DONE the next day**: both spawners are decoded and all five stages are
 built. See the fifth pass at the end of this file.
 
-~~**The bounce REPLACES the surface's material, it does not multiply.**~~
-**WRONG, and corrected in the seventh pass below.** `+0x24`/`+0x26`/`+0x28` are
-three consecutive words of a VECTOR on a segment-query record, not a material
-pair, and the near-elastic 0.01/0.99 surface is the WALL and pig-only. A
-projectile's own pair is row `+0x20`/`+0x22`, and the surface's does multiply in.
+**The bounce MULTIPLIES the surface's material** — see "the BOUNCE was wrong all
+along" below for the read, and for the two words this paragraph used to have wrong.
 
 **The gauge fills in 1.7 s, not 3.4** — `EXE_FRAME_SECONDS` again, the third
 place to need it. 0x50 a frame to 0xfff is 52 ENGINE frames.
@@ -1185,7 +1152,7 @@ not dodge — a pig you are driving is where you already know it is.
 the projectile's CENTRE, so a grenade resting on the ground was half buried and
 its downhill half went under a slope.
 
-### The grenade, fifth pass — where the energy was going, 2026-08-07
+### GRENADES: where the energy was going
 
 **`bounceOff` carries a PIG's damping and a grenade must not use it.** Play:
 "трение всё ещё съедает энергию — в игре граната всё время хоть чуть-чуть да
@@ -1203,12 +1170,6 @@ its downhill half went under a slope.
    the thing is already leaving the surface, which is the exe's own condition.
 
 `bounceLob` does its own solve for exactly those two reasons and says so.
-
-~~**Water gets its OWN pair.**~~ **Gone in the seventh pass**: water is one
-surface among the twelve. What made a grenade sit on it was the 0.9998 above plus
-a skip gate on TOTAL speed rather than on the drop. `sinkLob` still leaves the
-VERTICAL alone, because damping the one component gravity works through is what
-held it up there.
 
 **The blast's range is row +0x04 = 1024, and there is no cap** — the first
 reading took it off +0x08 by matching Init's stack slots to `0x487AD0`'s
@@ -1235,7 +1196,7 @@ explosion: the camera comes off a grenade the frame it stops existing, so the
 puffs were happening behind the player. `onBlast` starts the same wait a broken
 dummy starts.
 
-### The grenade, sixth pass — the explosion's LOOK, 2026-08-08
+### GRENADES: the explosion's LOOK, and +y is UP
 
 Play: "эффект взрыва всё ещё не работает верно". It was not: the remake was
 drawing **one stage of five**, and the vertical of the whole effect system was
@@ -1281,7 +1242,7 @@ a sprite's size is handed to `wh32LIB.DLL` and the unit is the library's, and
 the split where a puff's DRIFT rides `MODEL_SCALE` while the point it started
 from does not — same argument as the ring's radius.
 
-### The grenade, seventh pass — the BOUNCE was wrong all along, 2026-08-08
+### GRENADES: the BOUNCE was wrong all along
 
 Play, in one line each: "не должна прыгать как на батуте", "о сушу прыгает как от
 воды", "по воде застревает и не тонет — должен быть эффект лягушки". Three
@@ -1322,7 +1283,7 @@ pick. And a landing CRATE takes row 0's smoke without its fire (`DUST_EFFECT`) �
 it was borrowing the whole row, so once the row grew a fireball a crate arriving
 set one off ("коробка когда падает — искрит").
 
-### The grenade, eighth pass — read it properly, 2026-08-08
+### GRENADES: the trail, the water, and Coulomb friction
 
 Play: "давай лучше дизасми — там ведь всё стоит в движке". It did.
 
@@ -1371,14 +1332,13 @@ the drawn-texel counts are
 pixels wide starting at x = 7**, not eight starting at 8. One pixel each side is
 exactly what kept showing.
 
-### The grenade, ninth pass — water douses it, 2026-08-08
+### GRENADES: water DOUSES it, and the maps have no depth
 
 **A thrown thing that goes quietly into water DOES NOT GO OFF, and play
-half-remembered it before the binary said so.** ~~There are two water paths and
-they are different tests~~ — **there is ONE, and it is corrected below in "Water:
-the bed IS the surface": 0x437a57 and 0x437bfb are both inside `OnHitLandscape`
-and both happen at the same contact.** The splash (tile bit 6, 0x437a57) goes at
-the water height, and then
+half-remembered it before the binary said so.** There is ONE water path, not two —
+0x437a57 and 0x437bfb are arms of the same `OnHitLandscape` and both happen at the
+same contact (the measurement is at the end of this section). The splash (tile bit 6,
+0x437a57) goes at the water height, and then
 the CONTACT arm (0x437bfb, gated on `0x4A6FA0` — tile bit **5** plus the DLL's own
 per-texel mask through `[0x538128]`, the same pair `lib/game/watermask.ts`
 builds) is the one that matters. Under **150 a frame** it plays FT_WATER, leaves
@@ -1398,109 +1358,30 @@ carries it and none of it is invented.
 the vertical and only the sideways travel is damped, so it sinks to the bed and is
 doused there.
 
-**COMMITTED is the whole of input, and it starts at the FIRE press.** Play: "после
-нажатия стрелять должно отключаться полностью управление — а не только прыжок,
-вообще всё." The old gate missed the biggest window of the lot — a weapon with a
-power gauge does not set `firing` on the press, so for the whole second and a half
-of the charge the pig could still be walked, turned and aimed. `committed()` in
-`three/battle.ts` covers the gauge, the fuse and flight, the swing and anything
-still in the air, and walk, turn, jump and aim all read it.
+**One water handler, not two, and the maps have NO DEPTH.** 0x437a57 and 0x437bfb are
+arms of the same `Projectile::OnHitLandscape` (0x4377d0), so a thrown thing is untouched
+until it reaches the ground and then gets the splash AND one of the two arms. Measured
+over the shipped water — CAMP, BAY, ARCHI — `bed − water line` is **0** at the median
+and 48 at the deepest anywhere: the maps author their water flat and the load step
+raises everything under it to exactly that, so the surface and the bottom are the same
+plane. Which is also why effect 0x0E snaps its own y to the water height.
 
-**The SIGHTS are NOT in it**, and they were for one commit. Going down the sights
-hands over a DIFFERENT control set rather than taking control away — the turn
-drives the scope and the pig together through the aim's own ramp instead of the
-walk's, and Q and E move the aim — and the only thing the aim view actually takes
-is the JUMP (0x4928dc routes input through its own branch and no jump is reachable
-from it). Play named the distinction: "там должен включаться другой контрол сет —
-выключаться должно когда выстрел нажал, не прицел."
+So a couple of seconds of sinking cannot come from the terrain or the exe — the
+world's three force generators are all gravity-flavoured and a projectile gets the
+plain one. `WATER_SINK_SPEED`/`WATER_SINK_SECONDS` are the remake's presentation: a
+doused thing goes on down THROUGH the bed and is taken away when its two seconds are
+up. It never goes off, it cannot be detonated by hand, and it does not hold the turn
+open (`grenades.live()` counts only what is not doused). `e2e/002/sink.spec.ts`
+measures the whole path — a pig in CAMP's pond, a grenade at its feet, the y only
+growing, `FT_WATER` heard and `E_1` never.
 
-**The gauge slider's end was three pixels out.** Measured off the ASSEMBLED strip
-with the right transparent colour (0x0000, which the slider's own measurement
-turned up): the flat profile runs x 92..**265**, not to 268. The start stays at
-104 where play has already accepted it, and the marker's travel now ends with its
-LAST pixel on the trough's last one.
-
-### Input is CONTROL SETS now, 2026-08-08
-
-Play asked whether switching control sets by context was the right approach. It is,
-and it is the engine's own: `0x4928dc` routes the whole of input through a
-different branch while the aim bit is down, the camera keeps a remembered mode and
-restores it when the bit goes up, and the skill menu is a mode too.
-
-It was also a real bug waiting to happen — and it had already happened once. The
-decision used to live in four places that each knew a little about the state:
-`if (hud.skills.open())` in `ui/battle.ts`, the sights' own two lines beside it,
-`committed()` in `three/battle.ts`, and the aftermath block below that. "What does
-W do right now" had no single answer to read, which is how the sights ended up
-inside the fire lock for a commit.
-
-`lib/game/controls.ts` is the table, and it is pure: `modeOf(situation)` picks one
-of **battle / sights / inventory / locked** in priority order, `readControls(mode,
-held)` says what the axes mean, and `verbOf(mode, action)` says what a one-shot key
-IS. FRONTEND is a fifth set but never reaches this file — the main menu binds its
-own KEY map (`MENU_BINDINGS`) rather than reinterpreting the battle's actions.
-
-The plumbing — collect what is held, ask, act — is `input/battleInput.ts`, read once
-a frame (see "Input is POLLED" below). `three/battle.ts` grew one method,
-`situation()`, because it is the one that owns `committed()` and the aftermath.
-
-**Play corrected the first cut twice, and both corrections removed an exception:**
-"ОГОНЬ проходит сквозь блокировку — а вот и нет, там просто другой контроллер",
-and "game.starting — так просто контроллер который принимает любую клавишу". Both
-right. A gauge filling is `charging`, a set that reads the button coming UP and
-steers with nothing (0x493796 is the exe's own split); the beat at the top of a
-turn is `starting`. With those two named, `locked` became what its name says —
-nothing gets through — and there are no carve-outs left anywhere.
-
-**The one trap in `starting`, which cost two failing specs.** It cannot simply
-CONSUME the key: a HELD key never produces a one-shot verb, so a set that swallowed
-the axes could never be ended by them. Its rule is "any input starts the turn, and
-the same input is then re-read in the set that follows" — `liveMode` in
-`input/battleInput.ts` resolves the mode away before asking for the axes.
-
-**Ending a turn is a SKILL.** Play: "закончить ход вообще можно только через
-умение." It is skill **65, SKIP TURN**, already always in the menu whatever the pig
-carries, and choosing it now ends the turn instead of going into the pig's hands.
-The Enter key and the dashboard button are shortcuts to that same skill rather than
-paths of their own, so whatever the skill grows later they get for free.
-
-**There is no sleep animation to give it.** The exe names 59 clips (a table just
-before the D3D wrapper's strings, 0 "Run cycle (normal)" through 58
-"Parachuting" — every ANIM constant in the repo checks out against it) and not one
-is a sleep or a doze; the menu's ICON is called `sleep`, which is what play was
-remembering. Skills 63, 65 and 66 are also OUT OF RANGE of `Pig::Fire`'s dispatch
-(it covers 1..62, 0x469408), so they never reach the fire path at all and cannot
-pick up an animation there. Nearest candidates if one is ever wanted: 46 "Thinking",
-33 "Cowering", 51 "Idle Cold". Not picked — a name pick here would be invention.
-
-**Play's second pass took two more exceptions out and found two bugs.**
-
-- **A set change drops every DRIVING key** (`DRIVING_ACTIONS`, the six axes). The
-  sights already stopped the pig and wanted W pressed again, while opening the
-  inventory left it walking — one rule instead of two behaviours. The VERBS are
-  left alone deliberately: `aimMode` and `fire` define two of the sets, and
-  releasing them would flap straight back out.
-- **A live grenade gets its own set, `armed`.** The moment `locked` stopped letting
-  fire through, a grenade in the air could not be detonated — the second press was
-  swallowed. Same shape as `charging`: the fire button and nothing else.
-- **The aim view cannot open the inventory.** It could, and should not.
-- **SKIP TURN applies on FIRE, not on being chosen**, and there is no key for it at
-  all now — Enter is unbound. Choosing 65 out of the menu takes it in HAND like a
-  weapon, the pig stands there wearing clip **46 "Thinking"** (play named it; the
-  exe's 59-clip table has no doze or sleep, and the menu's ICON being called
-  `sleep` is where the memory of one came from), and fire ends the turn. The
-  dashboard button is the remake's own shortcut for both halves in one click, and
-  says so.
-
-One nuance that cost a debug pass: the fire handler asks `active.pig.holding`
-rather than the cached `holding`, which is only synced further down the frame and
-is a frame stale up there.
-
-One behaviour did change on purpose: ending the TURN mid-blow is refused now.
-`verbOf('locked', 'endTurn')` is null, where the old `onAction` ran it regardless.
-
-`e2e/002/controls.spec.ts` is the table's spec, and the last of its tests is the
-regression play caught.
+**Water is terrain type 4** on every wet sample, which is 0.90/0.10 — the grippiest,
+least bouncy row. Against a grenade's own 0.30/0.80 that is 0.27 friction, but Coulomb
+friction goes with the NORMAL approach and a flat skim's is a fraction of its travel,
+so a hop was losing about **two per cent**: seventeen hops, the width of a pond. So the
+fifth that lifts it (`0x4A9260`, read) is PAID FOR out of the travel — the remake's
+half of it, and the only reading under which this file's own sentence about the arm
+("it decays by five each hop") is true. Four or five hops, each shorter, then a douse.
 
 ### Known divergences — deliberate, and each written up where it lives
 
@@ -1601,280 +1482,125 @@ regression play caught.
   pushing at a wall visibly scrabbles in play, and clip 11 is what reads as
   it. Deliberate, in `locomotion.ts`.
 
-### Input is POLLED, once a frame — 2026-08-08
+### INPUT: control sets, polled once a frame
 
-Play: "onchange вообще плохой способ в играх; можно ведь подцепить контроль к
-каждому кадру — так же правильнее?" It is, and it was a bug rather than a smell:
-a control SET changes while nothing on the keyboard moves, so a listener on the
-held set is never told and the pig walks on under a menu. Every verb that could
-change the set was calling the push by hand — one patch per verb over the shape.
+**What a key means is one pure table** (`lib/game/controls.ts`): `modeOf` picks a
+control SET, `readControls` says what the axes mean in it, `verbOf` says what a
+one-shot key IS. The engine does the same and says so — `0x4928dc` routes the whole
+of input through a different branch while the aim bit is down, the camera keeps a
+remembered mode and restores it when the bit goes up, and the skill menu is a mode.
+The sets: **starting / inventory / charging / armed / locked / sights / battle**, in
+that priority. The frontend is a set that never reaches this file: the menu binds its
+own KEY map instead.
 
-**`input/battleInput.ts` is the whole of it now**, and `ui/battle.ts` is a view
-again: collect what is held, ask `lib/game/controls.ts`, act. The three things a
-poll needs — all three of which the first attempt died on at once, five specs
-deep:
+**Two of them exist because play refused an exception.** "ОГОНЬ проходит сквозь
+блокировку — а вот и нет! там просто другой контроллер!" A filling gauge is
+`charging` (it reads the button coming UP, which is the exe's own split at 0x493796);
+the beat at the top of a turn is `starting`. With both named, `locked` means what it
+says and there are no carve-outs anywhere.
 
-- **a press LATCH**, `controller.tookPress`. A press and its release both land
-  between two frames and `isDown` is false at either end, so every quick tap is
-  lost. One-shot actions need no latch: they are announced as they happen and get
-  QUEUED, in order, because the order is load-bearing — R and then SPACE opens the
-  inventory and takes what is under the cursor, and a set of "what went down"
-  cannot say which came first.
-- **a gate on the beat** at the top of a turn, `wakes` in `controls.ts`. A poll
-  runs whether the player touched anything or not. And it counts what went DOWN
-  this frame rather than what is down: "press any key", and a key still held
-  through the handover of a turn is not a press — letting one through meant
-  ending a turn with SKIP TURN ate the next pig's beat with the same finger.
-- **one loop.** `host.onInput` in `three/scene.ts` runs ahead of `onFrame`, so the
-  controls are read and the game steps on them in the same frame. The dashboard's
-  own `requestAnimationFrame` only draws. This is the part the first attempt never
-  solved.
+**A WEAPON is a layer on top of movement**, which is play's model: "каждое оружие —
+свой контроллер; можно ведь комбинировать их — movement + melee или movement +
+gun?" `weaponLayer` is that table: `melee`, `gun`, `lob`, `skill`, or `none` for an
+empty hand. Only `gun` and `lob` have an AIM VIEW — a blade must leave G inert,
+because entering a set DROPS the driving keys and G with a bayonet was stopping the
+pig for nothing (and 0x46a891 pins a bayonet's aim angle to zero, so there is nothing
+to show). Only `none` refuses FIRE: SKIP TURN has no weapon behind it and F still uses
+it — "пропуск хода это не none, там есть реакция на f, а без оружия нет."
 
-Three things fell out of it that the event-driven version had been hiding:
+**A set change drops every DRIVING key** (`DRIVING_ACTIONS`), so a new set starts from
+nothing held. The sights already did that and the inventory did not — one rule instead
+of two behaviours. Two changes CARRY the keys instead: the first look of a battle
+(there is no set to have come from) and leaving the BEAT (its rule is that the same
+input is read again in the set that follows). Both cost a failing spec on the way in.
 
-**The FIRST look of a battle is not a set change**, and neither is leaving the
-beat. Both used to drop every driving key — the first left a pig that never walked
-at all, the second ate the very key that woke the turn. The rule stands otherwise
-and is what play asked for.
+**Input is POLLED, once a frame, in the SCENE's loop** (`input/battleInput.ts`, from
+`host.onInput` ahead of `onFrame`). Play asked for it — "onchange вообще плохой
+способ в играх" — and it is a bug, not a style: a set changes while nothing on the
+keyboard moves, so a listener is never told and the pig walks on under a menu. Three
+things a poll needs, all three of which killed the first attempt:
 
-**A PRESS cannot be worked out from the held state rising.** `Intent` carries
-`fired` beside `firing` and `setFiring(held, pressed)` takes both. A set that does
-not read the fire key reports it up while the player holds it, so LEAVING that set
-read as a fresh press — hold F through a shot and the grenade that came out of the
-far side went off the frame it appeared. That was a real bug in play as much as in
-the spec that caught it.
+- **a press LATCH** (`controller.tookPress`) — a press and its release both land
+  between two frames and `isDown` is false at either end. One-shot actions need none:
+  they are announced as they happen and QUEUED, in order, because order is
+  load-bearing (R then SPACE opens the inventory and takes what is under the cursor);
+- **a gate on the beat** (`wakes`) — a poll runs whether the player touched anything
+  or not, and it counts what went DOWN this frame rather than what is down: "press any
+  key", and a key still held through a handover is not a press;
+- **one loop.** The dashboard's own `requestAnimationFrame` only draws.
 
-**A second answer to "is the beat over" was dead and is gone.** `three/battle.ts`
-tested the intents for it as well; with the axes swallowed by the `starting` set
-that block could never fire.
+**A PRESS cannot be derived from the held state rising.** `Intent` carries `fired`
+beside `firing` and `setFiring(held, pressed)` takes both: a set that does not read the
+fire key reports it up while the player holds it, so LEAVING that set read as a fresh
+press — hold F through a shot and the grenade that came out the far side went off the
+frame it appeared.
 
-`e2e/002/battle.spec.ts` pins the play-reported behaviour end to end — walk, open
-the inventory with the key still down, and the pig stops — and `e2e/controller.ts`
-now waits a frame out after every press, because a spec that reads the game on the
-next round trip is reading it before the poll.
+**A window that loses focus never sees the key come UP**, so `bindKeyboard` drops
+everything on `blur` and `visibilitychange`. An alt-tab with G down held the aim view
+for ever, and since W POINTS rather than walks down there, the pig could not be driven
+again until G was pressed and released. Nothing downstream can recover from a stuck
+key.
 
-**And `e2e/002/hud.spec.ts:168` passes**, which this file has carried as a failure
-for two days. It was two faults stacked: the pig never settled, because releasing
-a key the old code had already dropped from the held set announced nothing and the
-walk intent stood for ever — and then the name plate's pixel count was being
-measured over the whole dashboard, where the BRIEFING BAR comes and goes on the
-tutorial's clock rather than the pig's. Counted per band, every pixel of the
-difference was in the top eighth and the plate's own rows matched exactly.
+**Ending a turn is a SKILL** — 65, SKIP TURN, always in the menu. Choosing it takes it
+in HAND and FIRE applies it; there is no key bound to it at all. R CANCELS a choice and
+puts the weapon away. The `endTurn` action survives as the dashboard button's own path.
+`e2e/002/controls.spec.ts` is the table's spec and `e2e/002/battle.spec.ts` drives the
+two bugs play found by hand (the inventory stopping the pig, and the blur).
 
-### Water: the bed IS the surface, and the frog pays for its hop — 2026-08-08
+### The TURN's own beats
 
-Play: "граната должна реально пару секунд тонуть, как и все прожектайлы", and
-"прыжки дают будто буст, и медленная граната на исходах сил пролетает весь
-водоём". Both are the same misreading of the same handler, and two measurements
-settled it.
+**"GET READY >S..." is `gtext 168`**, and it is the game's own answer to the beat at
+the top of a turn. The beat had been in the domain since the turn clock landed and
+nothing ever showed it, so a handover read as instant. A first pass invented a line out
+of the exe's debug print; play sent a screenshot of the shipped game instead — big
+green letters over the battle — so it is that string, with the SQUAD's name in it, on
+the same centred card the mission title uses. **`gtext 167` is ">S MISSES A TURN!"**,
+which is what SKIP TURN should say once the bar can be reached from the scene; a sound
+cue stands in. **Do not invent a string this game already has**: both were sitting in
+gtext four numbers apart, beside the crate lines this repo already used.
 
-**There is only ONE water event, and it is the LANDSCAPE contact.** This file used
-to describe two paths — a "surface crossing" at 0x437a57 and a "contact" at
-0x437bfb. They are the same function: `Projectile::OnHitLandscape` (0x4377d0,
-vtable +0x50) reads `[contact+0x14]` at its top, and inside it, in order: if the
-tile carries water bit 6, take the water HEIGHT (0x4A5140) and put a splash there
-with sound 0x28 at 100/100; then split on the scalar — under 150 douse (FT_WATER,
-effect 0x0E, the quiet flag, and 0x4A9EE0 zeroing the body's velocity through
-vtable slot 4 while 0x4A9E50 marks it finished), over 150 skip (FT_MUD, effect
-0x0D, and the kick).
+**The clock stops at the CHARGE, not at the throw.** Play: "при начинании зарядки
+броска таймер останавливается — так как это уже атака началась." Same gate as the
+rest: `Pig::MayAct` goes false on the press that starts the gauge, a second and a half
+before anything leaves the hand.
 
-**And the shipped maps have no water to sink through.** Measured over CAMP, BAY
-and ARCHI: `height − surface` on every wet sample is **0** at the median, 48 at
-the deepest anywhere. The maps author their water flat at one height and the load
-step raises everything under it to exactly that, so the bed and the surface are
-the same plane. Which is also why effect 0x0E bothers to snap its own y to the
-water line: it is spawned from wherever the contact was, and that is never more
-than a pig's ankle below.
+**The camera TELEPORTS to a new subject** rather than gliding across the map —
+`chase.reset()` clears `snapped` as well as the settle timer, and the end of a flight
+calls it. Play asked and the answer is yes: easing is for following one thing about.
 
-So a couple of seconds of sinking cannot come from the terrain OR the exe — the
-world's three force generators are all gravity-flavoured and a projectile gets the
-plain one, with nothing for water. `WATER_SINK_SPEED` and `WATER_SINK_SECONDS` in
-`grenade.ts` are therefore the remake's own presentation: a doused thing goes on
-down THROUGH the bed at its own slow rate and is taken away when its two seconds
-are up. It never goes off — the quiet flag is the engine's.
+**A frame is clamped to a tenth of a second.** `getDelta` is wall-clock and the browser
+stops calling `requestAnimationFrame` for a window nobody is looking at, so coming back
+from an alt-tab handed the world one step of however long the player was away — a
+fuse, a flight and a landing all resolved before anything drew, which play saw as
+"2 раза вызвать выстрел, а цель стояла и не было прожектайла". Clamping is not a
+pause and does not pretend to be one; a real one is a thread of its own.
 
-**Water is terrain type 4** — every wet sample of CAMP, BAY and ARCHI, and
-0.90/0.10 is the grippiest, least bouncy row in the material table. That is what
-kills the "free ride": a grenade brings 0.30/0.80, so the pair is 0.27 friction
-and 0.08 restitution — but Coulomb friction is `mu * (1 + e) * |vn|` and a FLAT
-skim's normal approach is a fraction of its travel, so a hop lost about **two per
-cent**. Seventeen hops is the width of a pond.
-
-**So the fifth is PAID FOR out of the travel.** `0x4A9260(scalar/5, 0x400, 0, 0)`
-is read — a fifth of the in-plane speed, straight up — and that it comes OUT of
-the travel rather than being free is the remake's. It is also the only reading
-under which this file's own sentence about the arm ("it decays by five each hop
-until it drops under the 150 and is doused") is true. Four or five hops, each
-shorter and lower, then the next contact douses it.
-
-### Alt-tab, the aim key, and the zoom — 2026-08-08
-
-Play's list after a session with it, and five of the seven were one lesson each.
-
-**A window that loses focus never sees the key come UP.** Alt-tab out with G down
-and the aim view is held for ever; since W POINTS rather than walks down there, the
-pig could not be driven again until G was pressed and released. Play found it the
-hard way — through a shot and a crate coming down — and named the right shape:
-"это основная проблема таких вещей, я поэтому и говорил про проверку каждый кадр."
-`bindKeyboard` now drops everything on `blur` and on `visibilitychange`. Nothing
-downstream can recover from a stuck key, because as far as the controller is
-concerned it is simply down.
-
-**The aim view needs something in hand that POINTS.** `situation()` grew `sights`
-— the record's own `aims` bit, the same test the dial reads — and the key alone no
-longer hands the set over. It has to be gated there rather than ignored later,
-because entering a set DROPS the driving keys, so G with empty hands stopped a
-walking pig for nothing: "нажатие g когда нельзя прицеливаться всё ещё отменяет
-движение — БАГ."
-
-**R is CANCEL and it puts the weapon away.** Play asked twice, the second time in
-capitals. SPACE is the only thing that leaves a skill in the pig's hands.
-
-**The TREMOR rides the zoom, and that is READ.** The analogue axes land in
-`[game+0x300]` — the very accumulator the digital ramp uses, a stick under 32
-writing `bx >> 4` straight into it at 0x495e9f — and for skills 11 and 64 that
-accumulator then goes through `(0x1000 − zoom) * step >> 12` exactly as the ramp
-does (0x495ecc onwards), floored at ±1. So the sights get finer as they close in
-and so does the shake; `updateWobble` takes the scale and floors at one aim unit,
-because the original's scope is not perfectly dead at full magnification either.
-`e2e/002/sights.spec.ts` pins it.
-
-**A SINKING grenade is out of the game but still on screen.** It cannot be set off
-by hand any more — `grenades.live()` counts only what is not doused, which is also
-what stops it holding the turn open — and it is drawn THROUGH the water, which is a
-stand-in flagged at the call: the original's water is translucent art and you watch
-the thing go down through it, while this remake draws one opaque sheet per region.
-The mesh clones its materials to do it, because `lobArt` shares one set between
-every copy of a model.
-
-### A weapon is a LAYER, the water is see-through, the camera teleports — 2026-08-08
-
-**Input composes: movement, plus what the weapon brings.** Play asked whether that
-was the right model — "каждое оружие свой контроллер; можно ведь комбинировать их,
-movement + melee или movement + gun?" — and it is, and it fixes a bug the flat
-priority list could not. `weaponLayer(skill)` in `controls.ts` is the table:
-`melee`, `gun`, `lob`, or `none` for empty hands and for a skill with no weapon
-behind it, keyed off the same three records the rest of the game uses. Only `gun`
-and `lob` have an AIM VIEW, so G with a bayonet no longer hands a set over — and
-since entering a set drops the driving keys, that is what had been stopping the pig
-dead. The exe agrees from the other end: 0x46a891 pins the bayonet's and the cattle
-prod's aim angle to zero, so there is nothing for an aim view to show. The `aims`
-bit was the first cut and it was too wide, because this remake lets a bayonet aim
-by request.
-
-**The water sheet is SEE-THROUGH.** Play settled it with a screenshot of the
-shipped game — a pig fully submerged, body plainly visible through the surface —
-and asked the obvious question: "так сделай просвечиваемой, в чём проблема?" None.
-`WATER_ALPHA` in `three/terrain.ts` is 0.62 with `depthWrite` off; the art has said
-so all along, since a water texel is one the artist marked with the PSX's
-semi-transparency bit. **The "draw a sinking grenade through the sheet" stand-in is
-deleted** — it existed only because the sheet was opaque.
-
-**The camera TELEPORTS to its new subject.** Play, as a question again: "камера
-должна телепортироваться за спину свина, а не передвигаться с той позиции где
-была." Yes. `chase.reset()` now clears `snapped` as well as the settle timer, so
-the next placement is a cut rather than a glide, and the end of a flight calls it —
-the camera used to fly home from wherever the bullet had got to.
-
-**The TREMOR grows as the sights close in, and the first attempt had it
-backwards.** Worth keeping written down: the exe's `(0x1000 − zoom) >> 12` divides
-what comes out of `[game+0x300]`, but that accumulator is the player's own aiming
-STEP — control sensitivity, which a scope wants fine — while the tremor is what the
-player fights. Different quantities; carrying the divisor across made the shake die
-out at magnification. `ZOOMED` in `wobble.ts` goes the other way.
-
-### The sights WANDER, and the layer table grew a row — 2026-08-08
-
-**The tremor, seventh pass, and this time the MECHANISM changed rather than a
-number.** Play: "ты держишь его в радиусе центра, а надо чтобы прицел уезжал — и чем
-ближе, тем больше расстояния проходит, а не тем шире радиус дёрганья." A
-sample-and-hold with easing is a bounded rattle however far the bound is put, which
-is exactly what that describes. So `wobble.ts` is now a WALK — and the shape is the
-engine's own held tremor, the one quoted at the top of that file since the fifth
-pass and never used: a direction per axis, a fresh step of `8 + (rand() & 7)` every
-frame, and a reversal ONLY at the stop (0x49e056). The crosshair crosses instead of
-hovering; the two axes reach their stops at different times, so it wanders in every
-direction rather than along a line. `AMPLITUDE` and `EASE` are gone; `BOUND` is how
-far it may stray (eyework, about two degrees) and the ZOOM scales the STEP, which is
-what "больше расстояния, а не шире радиус" means.
-
-**`none` is the EMPTY HAND and nothing else.** Play: "пропуск хода это не none —
-там есть реакция на f, а без оружия нет!" Right, and the table said otherwise.
-`weaponLayer` gained `skill` — no weapon behind it, no aim view, but it is in the
-hands and F uses it — and `layerFires` is what makes that claim real: the fire key
-is dropped for an empty hand and answered for everything else.
-
-**Using a skill CONFIRMS itself.** There was no sound at all when SKIP TURN ended a
-turn. `BATTLE_SOUNDS.skillUsed` is `S_SELECT` out of the interface family and is a
-NAME PICK like its neighbours — skills 63/65/66 are out of range of `Pig::Fire`'s
-dispatch entirely, so there is no arm to read one off. Correct it by ear from
-`pow.sfx`.
-
-**Q and E are swapped**: Q points down, E points up. Play's call, on sight.
-
-**A frame is clamped to a tenth of a second.** `getDelta` is wall-clock and the
-browser stops calling `requestAnimationFrame` for a window nobody is looking at, so
-coming back from an alt-tab handed the world one step of however long the player was
-away — a fuse, a flight and a landing all resolved before anything was drawn, which
-is what play saw as "2 раза вызвать выстрел, а цель стояла и не было прожектайла".
-Clamping is not a pause and does not pretend to be one; see the thread below.
-
-### The tremor goes IN THE ENGINE, and the camera just shows it — 2026-08-08
+### The TREMOR goes in the ENGINE, and the camera just shows it
 
 Five passes kept the scope's tremor BESIDE the aim — on the view's direction, on the
-eye, on the mark drawn over the glass — and every one produced the same class of bug.
-Play cut through it twice: "вместо того чтобы трясти прицел — ты тряс камеру?????",
-and then the fix in one sentence: **"то что у тебя на камере было — должно было уйти в
-движок, а камера просто всегда должна отражать то что в движке."**
+eye, on a mark drawn over the glass — and every one produced the same class of bug.
+Play cut through it: "вместо того чтобы трясти прицел — ты тряс камеру?????", then
+**"то что у тебя на камере было — должно было уйти в движок, а камера просто всегда
+должна отражать то что в движке."**
 
-So there is ONE number. The tremor is a STEP added into `aim.angle` every engine
-frame, and its other axis into the pig's TURN — which is exactly what the exe does:
-the aim view's handler feeds the analogue stick's reading through `Pig::Aim`
-(0x495cb0 → 0x46A7F0) for one axis and the turn for the other, and `[pig+0x304]` is
-the field the CAMERA reads, the field the SHOT reads (0x47a2b6) and the field the dial
-shows. Nothing can disagree because there is nothing to disagree with.
+So there is ONE number. The tremor is a STEP added into `aim.angle` every engine frame,
+its other axis into the pig's TURN — which is what the exe does: the aim view's
+handler feeds the analogue stick through `Pig::Aim` (0x495cb0 → 0x46A7F0) for one axis
+and the turn for the other, and `[pig+0x304]` is the field the CAMERA reads, the field
+the SHOT reads (0x47a2b6) and the field the dial shows. Nothing can disagree because
+there is nothing to disagree with. Everything asked for falls out of it: the picture
+follows the sight; nothing is bounded but the aim's own ±0x3FF; closer travels further
+because the step is an angle and a magnified view is fewer degrees across; and one walk
+of small steps reads as a rattle frame to frame and a drift over seconds — which is
+what a resting stick IS. `AMPLITUDE` is the only knob left.
 
-Everything play asked for falls out of that one change:
-
-- **the picture follows the sight** — the camera looks along the aim, and the aim is
-  what moved;
-- **nothing is bounded** — a walk of small steps, held only by the aim's own ±0x3FF,
-  which is the exe's clamp;
-- **closer travels further** — the step is an ANGLE and a magnified view is fewer
-  degrees across, so the same step carries the picture further over the glass. No
-  `ZOOMED` fudge, no zoom argument anywhere in `wobble.ts`;
-- **one mechanism gives both feels** — frame to frame a couple of units reads as a
-  rattle, over seconds it wanders off. That is what a resting stick IS, and why the
-  exe needs nothing else. `AMPLITUDE` is the only knob left.
-
-**Five shapes that are WRONG, and none of them is to be tried again**: a sine
-(floats); a bounded rattle round the centre ("в радиусе центра"); a bounded walk with
-a direction kept until the stop (two axes doing that is ONE ELLIPSE); an offset on the
-EYE; and a mark that moves over the glass while the camera holds still. The last two
-share the fault the first three hid: **a second number the camera and the barrel can
-read differently.** If the picture and the bullet can ever disagree, the design is
-wrong — put it in the engine and let the camera report it.
-
-### "GET READY >S..." is the game's own words — 2026-08-08
-
-The beat at the top of a turn has been in the domain since the turn clock landed and
-nothing ever showed it, so a handover read as instant: "когда кончается ход —
-следующий начинается мгновенно." A first pass invented a line out of the exe's
-debug print, and play sent a screenshot of the shipped game instead — big green
-letters over the battle, "GET READY TOMMY'S TROTTERS..." So it is **`gtext 168`**,
-with the SQUAD's name in it, on the same centred card the mission title uses. `gtext
-167` is ">S MISSES A TURN!" and is what SKIP TURN should say when the bar can be
-reached from the scene; the sound stands in meanwhile.
-
-**Do not invent a string this game already has.** Both of those were sitting in
-gtext, four numbers apart, next to the crate lines this repo already used.
-
-### The clock stops at the CHARGE — 2026-08-08
-
-Play: "при начинании зарядки броска таймер останавливается — так как это уже
-атака началась." Right, and it is the same gate as the rest: `Pig::MayAct` goes
-false on the press that starts the gauge, a second and a half before anything leaves
-the hand. `blowInProgress` now counts the gauge.
+**Five shapes that are WRONG, and none is to be tried again**: a sine (floats); a
+bounded rattle round the centre ("в радиусе центра"); a bounded walk with a direction
+kept until the stop (two axes doing that is ONE ELLIPSE); an offset on the EYE; and a
+mark that moves over the glass while the camera holds still. The last two share the
+fault the first three hid: **a second number the camera and the barrel can read
+differently. If the picture and the bullet can ever disagree, the design is wrong —
+put it in the engine and let the camera report it.**
 
 ### Threads left mid-pull
 
