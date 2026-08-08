@@ -52,9 +52,16 @@ export const SWIM_SPEED = fromExeSpeed(16)
  * a second, and holding a key past that is the whole of turning.
  */
 export const TURN_SPEED = ((0x20 / 4096) * 2 * Math.PI) / FRAME_SECONDS
-/** How deep a swimming pig sits below the surface (game Y-down: +down) —
- * deep enough that only the head and shoulders clear the water. */
-export const SWIM_SINK = 280
+/**
+ * How deep a swimming pig sits below the surface (game Y-down: +down).
+ *
+ * EYEWORK — nothing in the exe has been read for it — and it was set at 280
+ * before the models were found to be drawn at HALF size (`MODEL_SCALE`). A pig
+ * is 320 tall, so 280 put it under to the eyebrows, which is what play saw:
+ * "свин начал тонуть больше чем надо". Halved with the model, it leaves the
+ * top half clear — head and shoulders.
+ */
+export const SWIM_SINK = 140
 
 /**
  * FALLING — and the original's pull is a terminal velocity, not a constant.

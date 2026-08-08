@@ -19,6 +19,7 @@ import {
   advanceLob,
   blastShare,
   bounceLob,
+  SKIPS_ON_WATER,
   lob,
   lobOf,
   sinkLob
@@ -41,6 +42,10 @@ import type { Bank } from '../audio/bank'
 
 /** The bone a thrown thing leaves, as everything else does. */
 const HAND = 5
+
+/** How far a grenade may move between collision tests, in game units — its own
+ * drawn size, so it cannot step over a surface it is smaller than. */
+const STEP_BY = 35
 
 /**
  * Where it leaves the hand.
@@ -173,11 +178,18 @@ export function createGrenades(parts: GrenadeParts): Grenades {
   /** Put it back on whatever it went into. False when it met nothing. */
   const settle = (shot: Lobbed, wasY: number, step: number): boolean => {
     const ground = parts.query.height(shot.x, shot.z)
-    // WATER FIRST, and it is not a surface to bounce off: a thrown thing goes
-    // in and keeps going down. `surface` is the water region's own fitted level
-    // where there is one and the ground where there is not
-    // (lib/game/terrain.ts), which is the line a swimming pig floats at.
+    // WATER FIRST. A thrown thing SKIMS a pond while it still has the speed —
+    // the collision arm it takes is nearly elastic and the exe does not exempt
+    // water from it — and goes in once it does not. `surface` is the region's
+    // own fitted level where there is one (lib/game/terrain.ts), the line a
+    // swimming pig floats at.
     if (parts.query.isWater(shot.x, shot.z) && shot.y >= parts.query.surface(shot.x, shot.z)) {
+      const level = parts.query.surface(shot.x, shot.z)
+      if (!shot.sunk && SKIPS_ON_WATER(shot)) {
+        // Flat off the surface: water has no slope to reflect about.
+        bounceLob(shot, level, { x: 0, y: -1, z: 0 }, 0, false)
+        return true
+      }
       sinkLob(shot, step)
       // …and it settles on the BED rather than falling through it.
       if (shot.y >= ground) {
@@ -248,15 +260,23 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     update(delta) {
       for (let i = live.length - 1; i >= 0; i--) {
         const shot = live[i]
-        // Substep so a fast throw cannot pass clean through a hillside: at
-        // full charge a grenade covers 4500 units a second.
+        // Substep by the grenade's OWN SIZE rather than by the blast: at full
+        // charge it covers 4500 units a second, and a step of 512 walked it
+        // clean through a slope — play saw it vanish under the ground where the
+        // terrain tilts. 35 model units is what the body factory gives a
+        // projectile (lib/game/projectile.ts, `bulletSize`).
         const speed = Math.hypot(shot.vx, shot.vy, shot.vz)
-        const steps = Math.max(1, Math.ceil((speed * delta) / BLAST_CORE))
+        const steps = Math.max(1, Math.ceil((speed * delta) / STEP_BY))
         let spent = false
         for (let step = 0; step < steps && !spent; step++) {
           const wasY = shot.y
           spent = advanceLob(shot, delta / steps)
           settle(shot, wasY, delta / steps)
+          // Whatever happened, it does not END below the ground. A bounce off
+          // a slope reflects into the hill as often as out of it, and one
+          // sub-step of that is enough to lose the thing.
+          const floor = parts.query.height(shot.x, shot.z)
+          if (!shot.sunk && shot.y > floor) shot.y = floor
         }
         if (!spent) continue
         detonate(shot)

@@ -24,6 +24,7 @@
 // Pure, seconds and game space (Y-down), like the rest of lib/game.
 
 import {
+  BOUNCE_CUTOFF,
   FIXED,
   PLAIN_GRAVITY,
   bounceOff,
@@ -230,11 +231,23 @@ export function lob(
 }
 
 /**
- * It went into water. Nothing skips off a pond: the thing keeps falling,
- * slowed, and the scene stops asking for a bounce.
+ * How hard it has to be going to SKIP off water rather than go in.
  *
- * How fast a sunk grenade falls is the remake's — the exe's own water handling
- * for a projectile has not been read.
+ * Play: "не прыгает по воде граната." It should — the collision arm a thrown
+ * thing takes is nearly elastic (`LOB_BOUNCE`) and the exe does not exempt
+ * water from it, so a flat throw skims a pond exactly as it skims the ground.
+ * What sinks it is running out of speed, not the water itself.
+ *
+ * The threshold is the remake's: the same 25-a-frame the impact handler uses
+ * to tell a landing from a bounce (`BOUNCE_CUTOFF`), which is the only figure
+ * the engine has for "too slow to bounce".
+ */
+export const SKIPS_ON_WATER = (shot: Lobbed): boolean =>
+  Math.hypot(shot.vx, shot.vy, shot.vz) > BOUNCE_CUTOFF
+
+/**
+ * …and once it is too slow, it goes in. How fast a sunk grenade falls is the
+ * remake's — the exe's own water handling for a projectile has not been read.
  */
 export const SINK_DRAG = 0.88
 export function sinkLob(shot: Lobbed, delta: number): void {

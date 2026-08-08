@@ -1113,6 +1113,35 @@ its two parameters, used by the every-fifth-frame TRAIL (0x4365f1, ids 0x5D and
 0x5F) and by the blast alike — and rules out 0x4323f3, which is the
 CONSTRUCTOR's switch and so the launch's noise.
 
+### The grenade, third pass — 2026-08-07
+
+**The gauge widget, measured properly.** Per assembled column the art's
+vertical extent is tall and irregular out to x≈100, then **dead constant at
+rows 1..37 from x 104 to 268**, then tall again: the flat middle is the TROUGH
+and the ends are ornament. So the slider travels 108..264, not across the whole
+320 — play saw it ("набор силы идёт по шкале, а не через весь виджет").
+`newpow1`/`newpow2` are the missing piece at the top left and are drawn now;
+the margin went to 0 to close the gap under it. Everything about WHERE remains
+`pow.hud.layout.gauge`.
+
+**A grenade SKIMS water while it has the speed.** The lobbed collision arm is
+nearly elastic and the exe does not exempt water from it, so a flat throw skips
+a pond exactly as it skips the ground; what sinks it is running out of speed,
+and the threshold is `BOUNCE_CUTOFF`, the only figure the engine has for "too
+slow to bounce". Play named both halves, one turn apart.
+
+**It no longer falls through slopes.** The substep was the blast's 512 units; a
+grenade is 35 across, and at 4500 a second a 512 step walks straight through a
+tilted surface. It substeps by its own size now and is clamped above the ground
+at the end of every one.
+
+**No jumping behind a grenade.** `jumpRequested` is dropped while `firing` or
+anything is in the air, on the same gate the sights use.
+
+**`SWIM_SINK` was 280 against a pig 320 tall** — under to the eyebrows, which
+is what play saw. It is eyework with nothing decoded behind it and it predates
+the discovery that models are drawn at half size, so it halved with them.
+
 ### Known divergences — deliberate, and each written up where it lives
 
 - **`HEIGHT_SCALE` is 1** though the exe doubles. See above.

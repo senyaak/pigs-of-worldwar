@@ -840,7 +840,10 @@ export function buildBattle(
     // pad, so the jump key is not a jump while it is held. The remake's
     // reading: the exe routes the whole of input through a different branch
     // while the aim bit is down (0x4928dc), and no jump is reachable from it.
-    if (sighting) jumpRequested = false
+    // Nor while a blow is in the air. The camera is off on the projectile and
+    // `Pig::MayAct` is false for the whole of it (lib/game/shot.ts) — play saw
+    // the pig hop about behind a grenade it could not see.
+    if (sighting || firing || grenades.live() > 0) jumpRequested = false
     const walking = swings.running() || firing ? 0 : intent.walk
     const turning = swings.swinging() || firing ? 0 : intent.turn
 
