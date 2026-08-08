@@ -84,7 +84,13 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
    */
   let wasMode: ControlMode | null = null
 
-  const blank = { starting: false, locked: false, charging: false, armed: false }
+  const blank = {
+    starting: false,
+    locked: false,
+    charging: false,
+    armed: false,
+    sights: false
+  }
 
   /** The axes, by whichever test the caller wants: everything that is DOWN, or
    * only what went down this frame. */
@@ -119,12 +125,18 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
    * again in the set that follows".
    */
   const liveMode = (sighting: boolean, woke: boolean): ControlMode => {
-    const ask = (): ControlMode =>
-      modeOf({
-        ...(host.scene()?.situation() ?? blank),
+    const ask = (): ControlMode => {
+      // `sights` is whether the aim view is REACHABLE — the scene's to answer,
+      // because it is the record in the pig's hands that decides. The key alone
+      // is not enough: a set change drops the driving keys, so G with nothing
+      // that points used to stop the pig for no reason at all.
+      const { sights, ...situation } = host.scene()?.situation() ?? blank
+      return modeOf({
+        ...situation,
         inventory: host.skills.open(),
-        sighting
+        sighting: sighting && sights
       })
+    }
     let mode = ask()
     if (mode === 'starting' && woke) {
       host.scene()?.beginTurn()
@@ -169,7 +181,13 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
         }
         return
       case 'closeInventory':
-        if (game) host.skills.toggle(game.currentPig.carrying)
+        if (game) {
+          host.skills.toggle(game.currentPig.carrying)
+          // R is CANCEL, and cancelling puts the weapon away — play asked for it
+          // twice, the second time in capitals. SPACE is the only thing that
+          // leaves a skill in the pig's hands.
+          game.currentPig.holding = null
+        }
         return
       case 'choose':
         if (game) {

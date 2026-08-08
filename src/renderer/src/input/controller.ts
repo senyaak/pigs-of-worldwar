@@ -91,11 +91,31 @@ export function createController(): Controller {
         const action = bindings[event.code]
         if (action) controller.release(action)
       }
+      /**
+       * A window that loses focus never sees the key come UP.
+       *
+       * Alt-tab out with G down and the sights are held for ever: the control set
+       * stays on the aim view, and since W POINTS rather than walks down there,
+       * the pig cannot be driven again until G is pressed and released. Play hit
+       * exactly that — "нажал g, сделал альт-таб, вернулся, прицел не вышел… и
+       * кстати поломалась ходьба от этого" — and it took a shot and a crate coming
+       * down before it was obvious. Nothing downstream can recover from it,
+       * because as far as the controller is concerned the key IS down.
+       *
+       * So the window losing focus drops everything, held keys and latches alike.
+       * `visibilitychange` as well as `blur`: a minimised window gets one and not
+       * always the other.
+       */
+      const drop = (): void => controller.releaseAll()
       window.addEventListener('keydown', down)
       window.addEventListener('keyup', up)
+      window.addEventListener('blur', drop)
+      document.addEventListener('visibilitychange', drop)
       return () => {
         window.removeEventListener('keydown', down)
         window.removeEventListener('keyup', up)
+        window.removeEventListener('blur', drop)
+        document.removeEventListener('visibilitychange', drop)
       }
     }
   }

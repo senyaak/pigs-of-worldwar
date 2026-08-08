@@ -80,6 +80,14 @@ const AMPLITUDE = 7
  */
 const EASE = 0.65
 
+/**
+ * The smallest the tremor gets, whatever the zoom — one aim unit, which is the
+ * exe's own floor on the step (`cmp eax,1; jge` at 0x495f1a, and again at
+ * 0x495bc1 for the digital ramp). A scope at full magnification is not perfectly
+ * dead in the original and must not be here.
+ */
+const FLOOR = 1
+
 export interface Wobble {
   /** The sample each axis is heading for, drawn once an engine frame. */
   pitch: number
@@ -103,12 +111,23 @@ export const createWobble = (): Wobble => ({
 
 /**
  * Advance the tremor. `frames` is engine frames, not rendered ones.
+ *
+ * `scale` is what the ZOOM leaves of it, 1 wide open and 0 at the cap, and it is
+ * READ: the analogue axes land in `[game+0x300]`, the very accumulator the digital
+ * ramp uses (0x495e9f — a stick under 32 writes `bx >> 4` straight into it), and
+ * for the two zooming skills that accumulator then goes through
+ * `(0x1000 − zoom) * step >> 12` exactly as the ramp does (0x495ecc onwards,
+ * floored at ±1). So the sights get finer as they close in and so does the
+ * tremor — play asked for it and the arm agrees: "при зуме дёрганье не
+ * масштабируется, а должно."
+ *
  * `random` is injectable so a spec can pin it.
  */
 export function updateWobble(
   wobble: Wobble,
   frames: number,
   sighting: boolean,
+  scale = 1,
   random: () => number = Math.random
 ): void {
   if (!sighting) {
@@ -122,8 +141,9 @@ export function updateWobble(
   wobble.owed += frames
   if (wobble.owed >= 1) {
     wobble.owed = wobble.owed % 1
-    wobble.pitch = (random() * 2 - 1) * AMPLITUDE
-    wobble.yaw = (random() * 2 - 1) * AMPLITUDE
+    const reach = Math.max(FLOOR, AMPLITUDE * Math.max(0, Math.min(1, scale)))
+    wobble.pitch = (random() * 2 - 1) * reach
+    wobble.yaw = (random() * 2 - 1) * reach
   }
   // Chase the sample rather than snapping to it, by the same engine frames —
   // so the smoothing does not get finer just because the screen is faster.

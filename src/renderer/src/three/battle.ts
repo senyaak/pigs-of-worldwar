@@ -164,7 +164,18 @@ export interface BattleScene {
    * (`lib/game/controls.ts`) — asked for as a group rather than mirrored out one
    * accessor at a time.
    */
-  situation(): { starting: boolean; locked: boolean; charging: boolean; armed: boolean }
+  situation(): {
+    starting: boolean
+    locked: boolean
+    charging: boolean
+    armed: boolean
+    /** Whether the aim view can be entered AT ALL — what is in hand has to be
+     * something that points. Without this the key hands over the sights whatever
+     * the pig is carrying, and since a change of set drops the driving keys, G
+     * with empty hands simply stopped the pig. Play: "нажатие g когда нельзя
+     * прицеливаться всё ещё отменяет движение". */
+    sights: boolean
+  }
   /** End the beat at the top of a turn. The `starting` control set's whole rule:
    * any input starts the turn, and the same input is then re-read in the set that
    * follows (lib/game/controls.ts). */
@@ -1051,7 +1062,10 @@ export function buildBattle(
     // glide, and the zoom creeps 0x20 a frame (lib/game/wobble.ts, zoom.ts).
     const scoped = sighting && isGun(holding)
     const frames = delta / FRAME_SECONDS
-    updateWobble(wobble, frames, scoped)
+    // The tremor rides the ZOOM, because the analogue axes go through the same
+    // `(0x1000 - zoom) >> 12` the aim step does (lib/game/wobble.ts). Play:
+    // "при зуме дёрганье не масштабируется, а должно."
+    updateWobble(wobble, frames, scoped, 1 - zoomFraction(zoom))
     updateZoom(zoom, frames, scoped && zoomsIn(holding))
     // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts
     // a field of view is the library's and the library is not in the install,
@@ -1202,7 +1216,10 @@ export function buildBattle(
       // lies. Its own set, because the lock swallowed that press and play found it
       // at once — "пока граната летит, не могу взорвать её."
       armed: grenades.live() > 0,
-      locked: committed() || aftermath !== null
+      locked: committed() || aftermath !== null,
+      // The record's own `aims` bit, the same test the dial reads — so the aim
+      // view answers for a gun and for a grenade and not for empty hands.
+      sights: weaponOf(game.currentPig.holding).aims && !dropIn.running()
     }),
     // Whether there is an ANGLE, which is not the same question as whether
     // there is a POSE for the angle to scrub. `scrubsPose` was standing in for

@@ -162,10 +162,41 @@ export function createGrenades(parts: GrenadeParts): Grenades {
     return mesh
   }
 
+  /**
+   * Draw this one regardless of what is in front of it. Used for the sink, and
+   * only because this remake's water is an opaque sheet.
+   *
+   * It CLONES the materials to do it: `lobArt` shares one set between every copy
+   * of a model (its own comment says so), so flipping `depthTest` in place would
+   * flip it for a grenade still in the air beside this one. The clones go with the
+   * mesh — `own` is what says a mesh has some to dispose of.
+   */
+  const showThrough = (mesh: THREE.Mesh): void => {
+    if (mesh.userData.own === true) return
+    const shared = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    mesh.material = shared.map((material) => {
+      const copy = material.clone()
+      copy.depthTest = false
+      return copy
+    })
+    mesh.renderOrder = 1
+    mesh.userData.own = true
+  }
+
   /** Take every mesh off the scene — the list is index-aligned with `live`, so
    * one going away shifts the rest. */
   const clearMeshes = (): void => {
-    for (const mesh of meshes) if (mesh) art.release(mesh)
+    for (const mesh of meshes) {
+      if (!mesh) continue
+      // Its own clones are its own to dispose of; the shared set belongs to
+      // `lobArt` and is not touched.
+      if (mesh.userData.own === true) {
+        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          material.dispose()
+        }
+      }
+      art.release(mesh)
+    }
     meshes.length = 0
   }
 
@@ -297,6 +328,14 @@ export function createGrenades(parts: GrenadeParts): Grenades {
       // is the remake's, and it is the same pair the launch was built from.
       mesh.rotation.y = Math.atan2(shot.vx, shot.vz) + Math.PI
       mesh.rotation.x = Math.atan2(shot.vy, Math.hypot(shot.vx, shot.vz))
+      // A SINKING one is drawn THROUGH the water, and that is a stand-in for the
+      // water itself. Play: "гранату не видно в воде, а в игре видно как она
+      // тонет." The original's water is translucent art and you watch it go down
+      // through it; this remake draws one OPAQUE sheet per region (a divergence
+      // that has its own line in CLAUDE.md), so a grenade below the line
+      // disappears behind it. Until the sheet is see-through, the grenade ignores
+      // depth and is drawn last instead. Goes away with the sheet.
+      if (shot.doused) showThrough(mesh)
     }
   }
 
@@ -358,11 +397,24 @@ export function createGrenades(parts: GrenadeParts): Grenades {
       redraw()
     },
     detonateNow() {
-      for (const shot of live) detonate(shot)
-      live.length = 0
+      // A DOUSED one is not set off by anything, ever: the engine's quiet flag is
+      // the first thing the destructor tests and that branch has no blast in it
+      // (0x4328c9). Play caught the hand-detonate going through it — "взрывать
+      // руками когда граната тонет ещё можно" — and it goes on sinking instead.
+      for (let i = live.length - 1; i >= 0; i--) {
+        if (live[i].doused) continue
+        detonate(live[i])
+        live.splice(i, 1)
+      }
       redraw()
     },
-    live: () => live.length,
+    /**
+     * How many are LIVE — which a sinking one is not. It cannot be set off, it
+     * cannot hurt anybody, and it must not hold the turn: this count is what says
+     * the pig is committed, what keeps the shot sequence open, and what turns the
+     * fire key into a detonator (three/battle.ts).
+     */
+    live: () => live.filter((one) => !one.doused).length,
     at: () => live.map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     head: () => live[0] ?? null,
     trail: () => trails.live(),

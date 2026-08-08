@@ -1706,11 +1706,56 @@ under which this file's own sentence about the arm ("it decays by five each hop
 until it drops under the 150 and is doused") is true. Four or five hops, each
 shorter and lower, then the next contact douses it.
 
+### Alt-tab, the aim key, and the zoom — 2026-08-08
+
+Play's list after a session with it, and five of the seven were one lesson each.
+
+**A window that loses focus never sees the key come UP.** Alt-tab out with G down
+and the aim view is held for ever; since W POINTS rather than walks down there, the
+pig could not be driven again until G was pressed and released. Play found it the
+hard way — through a shot and a crate coming down — and named the right shape:
+"это основная проблема таких вещей, я поэтому и говорил про проверку каждый кадр."
+`bindKeyboard` now drops everything on `blur` and on `visibilitychange`. Nothing
+downstream can recover from a stuck key, because as far as the controller is
+concerned it is simply down.
+
+**The aim view needs something in hand that POINTS.** `situation()` grew `sights`
+— the record's own `aims` bit, the same test the dial reads — and the key alone no
+longer hands the set over. It has to be gated there rather than ignored later,
+because entering a set DROPS the driving keys, so G with empty hands stopped a
+walking pig for nothing: "нажатие g когда нельзя прицеливаться всё ещё отменяет
+движение — БАГ."
+
+**R is CANCEL and it puts the weapon away.** Play asked twice, the second time in
+capitals. SPACE is the only thing that leaves a skill in the pig's hands.
+
+**The TREMOR rides the zoom, and that is READ.** The analogue axes land in
+`[game+0x300]` — the very accumulator the digital ramp uses, a stick under 32
+writing `bx >> 4` straight into it at 0x495e9f — and for skills 11 and 64 that
+accumulator then goes through `(0x1000 − zoom) * step >> 12` exactly as the ramp
+does (0x495ecc onwards), floored at ±1. So the sights get finer as they close in
+and so does the shake; `updateWobble` takes the scale and floors at one aim unit,
+because the original's scope is not perfectly dead at full magnification either.
+`e2e/002/sights.spec.ts` pins it.
+
+**A SINKING grenade is out of the game but still on screen.** It cannot be set off
+by hand any more — `grenades.live()` counts only what is not doused, which is also
+what stops it holding the turn open — and it is drawn THROUGH the water, which is a
+stand-in flagged at the call: the original's water is translucent art and you watch
+the thing go down through it, while this remake draws one opaque sheet per region.
+The mesh clones its materials to do it, because `lobArt` shares one set between
+every copy of a model.
+
 ### Threads left mid-pull
 
-Three jobs are open and play named all three. In the order they were named:
+Four jobs are open and play named all four. In the order they were named:
 
-**1. The SKIP TURN animation is wrong, and it is the VICTORY clip.** Play, at a
+**1. There are no FOOTSTEP sounds.** Deliberate so far and written up under the
+sound section: they want the hoof-contact frames `../pigs-disasm/anim/audio-events.md`
+derives, and a footstep on a timer is a stand-in nobody asked for. Play has now
+asked for them, so the next pass is the contact frames rather than the timer.
+
+**2. The SKIP TURN animation is wrong, and it is the VICTORY clip.** Play, at a
 glance: "анимация пропуска хода кривая, и она на победу". `ANIM.THINKING = 46` was
 play's own pick a pass earlier, off the exe's 59-clip name table — "Thinking" —
 and the clip that plays is a celebration. Not chased: play asked for it written
@@ -1719,7 +1764,7 @@ here, which is to be read off a CALL SITE rather than off the name table (see th
 `ANIM` note in `locomotion.ts`), and skills 63/65/66 are out of range of
 `Pig::Fire`'s dispatch so there is no site to read.
 
-**2. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
+**3. The WATER SPLASH is in the wrong place and far too big.** Play: "эффект воды —
 не там, огромный, и вообще не на воде". `SPLASH_EFFECT` is effect 0x0E / parameter
 row 2 and the row is decoded — three rings at a lift of −500, a sixty-sprite cloud,
 a ten-particle burst — so what is wrong is the remake's, not the reading. Two
@@ -1729,7 +1774,7 @@ the ring's RADIUS rides `MODEL_SCALE`, and the SIZE scalars (`BLOB_UNIT`,
 `effects.splash` is `query.surface(x, z)`, which is the water line — check that
 first, because "вообще не на воде" points at it.
 
-**3. The RAMP is wrong**, and has been parked since the grenade started.
+**4. The RAMP is wrong**, and has been parked since the grenade started.
 
 ### What is still not read
 

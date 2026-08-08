@@ -289,6 +289,49 @@ test('opening the inventory STOPS the pig, with the key still down', async ({ ap
   expect(app.errors()).toEqual([])
 })
 
+test('G with nothing that points does nothing, and losing focus lets go', async ({ app }) => {
+  const { page } = app
+  await startGame(page)
+  await expect(page.locator('#battle')).toBeVisible()
+
+  // A pig fresh off the drop holds nothing, so the aim view is not reachable and
+  // the key must be inert. It was not: entering the sights hands over a control
+  // SET, a set change drops the driving keys, and so G stopped a walking pig for
+  // no reason at all. Play: "нажатие g когда нельзя прицеливаться всё ещё
+  // отменяет движение — БАГ."
+  await press(page, 'walkForward')
+  await page.waitForTimeout(200)
+  await press(page, 'aimMode')
+  const before = await debugState(page)
+  await page.waitForTimeout(300)
+  const after = await debugState(page)
+  expect(
+    Math.hypot(after.x - before.x, after.z - before.z),
+    'G did not stop the walk'
+  ).toBeGreaterThan(50)
+
+  // …and the window losing focus drops every key it is holding. Without it an
+  // alt-tab out with a key down leaves it down for ever — no keyup ever arrives —
+  // which is how play lost the sights AND the walk in one go: "нажал g, сделал
+  // альт-таб, вернулся, прицел не вышел… и кстати поломалась ходьба от этого."
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+  await page.waitForTimeout(150)
+  const dropped = await debugState(page)
+  await page.waitForTimeout(300)
+  const stopped = await debugState(page)
+  expect(
+    Math.hypot(stopped.x - dropped.x, stopped.z - dropped.z),
+    'the blur let go of the walk'
+  ).toBeLessThan(1)
+  const held = await page.evaluate(() => {
+    const pow = (window as unknown as { pow: { controller: { isDown(a: string): boolean } } }).pow
+    return ['walkForward', 'aimMode', 'fire'].filter((a) => pow.controller.isDown(a))
+  })
+  expect(held, 'nothing is still held').toEqual([])
+
+  expect(app.errors()).toEqual([])
+})
+
 test('walk into a wall long enough and the pig is thrown out of it', async ({ app }) => {
   const { page } = app
   await startGame(page)
