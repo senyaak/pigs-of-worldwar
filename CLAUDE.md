@@ -1461,11 +1461,17 @@ half of it, and the only reading under which this file's own sentence about the 
   behind it. Getting that wrong is what had our plates over the wrong
   recesses, and the machine 128 pixels too low.
 
-  Still eyework, and both say so at the field: the TRACK, because the exe
-  blits it through `0x41AF70` — a blitter with an explicit destination size
-  whose convention is undecoded, and whose two x values read off-screen — and
-  the CARRIAGE. `select.mgl` is left out and the disassembly agrees with the
-  art: screen 1 never loads it.
+  **The dial's needle points at the lit row**, and that is play's word rather
+  than the exe's: the widget is built once at frame 0 and nothing found so far
+  moves it, so the twelve frames are spread over the rows and the needle
+  sweeps with the selection. Flagged at `needle` in `ui/barScreen.ts`.
+
+  Still eyework, and each says so at the field: BOTH TRACKS — the exe blits
+  `track` twice through `0x41AF70`, a blitter with an explicit destination
+  size whose convention is undecoded and whose two x values read off-screen —
+  and the CARRIAGE, which is the remake's outright: **screen 1 does not load
+  `selcog` at all**, so the original's main menu has no such piece. Same for
+  `select.mgl`, which is left out.
 
 - **The mouse works the menu, and the original's does not.** Hovering lights
   a bar, clicking chooses it. The original is keyboard and pad only (it even

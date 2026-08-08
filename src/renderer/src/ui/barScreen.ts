@@ -1,5 +1,5 @@
-// The frontend's MACHINE: a backdrop, a turning cog and dial, and a column of
-// bars that flip over as the selection lands on them.
+// The frontend's MACHINE: a backdrop, turning cogs, a dial whose needle points
+// at the lit row, and a column of bars that flip over when the screen arrives.
 //
 // It is one screen in the original's art and more than one screen in the
 // game — MAIN MENU and MULTI-PLAYER are the same furniture wearing different
@@ -12,8 +12,9 @@
 // its screen coordinates in the frontend's draw code rather than storing them,
 // and the MAIN MENU's arm has been read blit by blit (frontend/notes.md, in
 // the disasm repo), so `LAYOUT` below carries the original's own numbers with
-// the address each came from. Two things in it are still eyework and say so:
-// the TRACK, whose blitter's convention is undecoded, and the CARRIAGE.
+// the address each came from. Three things in it are still eyework and say so:
+// both TRACKS, whose blitter's convention is undecoded, and the CARRIAGE —
+// which screen 1 does not even load, so it is the remake's outright.
 //
 // The machine and the plates are STRETCHED — the frontend widens itself by a
 // global 50, and it does so in two different ways: a plate repeats a band of
@@ -103,6 +104,10 @@ export const LAYOUT = {
    * not decoded, so this stays the remake's until it is.
    */
   track: { x: 0, y: 0 },
+  /** The second one, down the RIGHT edge — the rack the pair of cogs runs on,
+   * which play pointed at. The exe blits `track` TWICE, which is why there are
+   * two of them here; where each lands is eyework for the same reason. */
+  rightTrack: { x: 576, y: 0 },
   carriage: { x: 184, offset: -103 },
   /** Read: the dial at (105, 192), one `cog` at (9, 192), and `cogb` — 96×208,
    * which is TWO cogs stacked in one sprite — at (539, 160) on the right.
@@ -189,6 +194,7 @@ function cloneLayout(): ScreenLayout {
     stagger: { ...LAYOUT.stagger },
     lamp: { ...LAYOUT.lamp },
     track: { ...LAYOUT.track },
+    rightTrack: { ...LAYOUT.rightTrack },
     carriage: { ...LAYOUT.carriage },
     cog: { ...LAYOUT.cog },
     dial: { ...LAYOUT.dial },
@@ -437,6 +443,22 @@ export function initBarScreen(config: {
   const frameAt = (frames: Sprite[], now: number): Sprite =>
     frames[Math.floor((Math.max(0, now - started) / 1000) * COG_FPS) % frames.length]
 
+  /**
+   * The dial's NEEDLE, pointing at the lit row.
+   *
+   * Play's word — "именно она показывает на активное меню, а не ездит как
+   * попало" — and the remake's own mechanism. The exe builds this widget once,
+   * on entry, at frame 0 (`0x41F110(screen, 4, 0)`), and nothing found so far
+   * moves it after that; what drives it in the original is not decoded. So the
+   * twelve frames are spread evenly over the rows and the needle sweeps with
+   * the selection, the same fraction the carriage travels by.
+   */
+  const needle = (row: number): Sprite => {
+    if (dials.length === 0) return dials[0]
+    const across = bars.length > 1 ? row / (bars.length - 1) : 0
+    return dials[Math.round(across * (dials.length - 1))]
+  }
+
   const draw = (now: number): void => {
     const context = canvas.getContext('2d')
     if (!context || !art || !big || !lit || !plain || !off) return
@@ -487,10 +509,20 @@ export function initBarScreen(config: {
       context.drawImage(sprite.image, 0, top, sprite.width, band, x, y, sprite.width, band)
     }
 
+    // Which row the machine is pointing at — a fraction while the selection
+    // is on its way, so the needle and the carriage both SWEEP rather than
+    // jump. Wanted before the furniture is drawn, because the dial reads it.
+    const pointingAt = ((): number => {
+      if (travel === null || now >= travel.until) return selection
+      const through = 1 - (travel.until - now) / (TRAVEL_SECONDS * 1000)
+      return travel.from + (selection - travel.from) * through
+    })()
+
     context.drawImage(art.get('pigbkpc1').image, 0, 0)
     drawMachine(art.get('fullmenu'), layout.machine.x, layout.machine.y + arrivalOffset)
     blit(art.get('track'), layout.track.x, layout.track.y)
-    blit(frameAt(dials, now), layout.dial.x, layout.dial.y)
+    blit(art.get('track'), layout.rightTrack.x, layout.rightTrack.y)
+    blit(needle(pointingAt), layout.dial.x, layout.dial.y)
     blit(frameAt(cogs, now), layout.cog.x, layout.cog.y)
     blit(frameAt(cogbs, now), layout.cogb.x, layout.cogb.y)
 
@@ -551,14 +583,11 @@ export function initBarScreen(config: {
 
     // The carriage RUNS to the bar rather than jumping to it, and its own cog
     // turns while it is running — play: "крутится при движении виджета".
-    let row = selection
     let cog = carriages[0]
     if (travel !== null && now < travel.until) {
-      const through = 1 - (travel.until - now) / (TRAVEL_SECONDS * 1000)
-      row = travel.from + (selection - travel.from) * through
       cog = carriages[Math.floor((Math.max(0, now - started) / 1000) * CARRIAGE_FPS) % carriages.length]
     }
-    const chosen = layout.bars.y + row * layout.bars.step
+    const chosen = layout.bars.y + pointingAt * layout.bars.step
     blit(cog, layout.carriage.x, Math.round(chosen + layout.carriage.offset))
   }
 
