@@ -229,9 +229,6 @@ export interface HudState {
   /** Whether the aim view is up: the scope's ring, its black surround and
    * its mark go over the whole screen while it is (three/chase.ts). */
   scope: boolean
-  /** Where the scope's MARK sits, off centre, as a fraction of the view's HEIGHT
-   * (three/battle.ts). Zero when nothing is scoped. */
-  reticle: { x: number; y: number }
   /** `gtext`, for naming the skill under the menu's cursor. */
   strings: string[]
   /** Where the weapon in hand points, in the game's own angle units, or null
@@ -429,19 +426,12 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         context.fillRect(0, cy + half - over, viewWidth, AUTHORED_HEIGHT - (cy + half - over))
         context.fillRect(0, cy - half, cx - half + over, SCOPE.size)
         context.fillRect(cx + half - over, cy - half, viewWidth - (cx + half - over), SCOPE.size)
-        // THE MARK MOVES, and the ring does not. That is the tremor: the camera
-        // holds still and `target` wanders inside the eyepiece, so the picture is
-        // steady and the AIM is what shakes. Play named the mistake it replaces -
-        // "вместо того чтобы трясти прицел, ты тряс камеру?????" - and the shot
-        // leaves along the same offset, so what is under the mark is what is hit
-        // (lib/game/wobble.ts, three/battle.ts `reticle`).
+        // The mark sits in the MIDDLE, because the camera looks along the aim and
+        // the tremor is in the aim: the world moves under a still crosshair, which
+        // is the only arrangement in which the crosshair tells the truth
+        // (lib/game/wobble.ts).
         const mark = art.get('target')
-        const off = state.reticle
-        context.drawImage(
-          mark.image,
-          cx - mark.width / 2 + off.x * AUTHORED_HEIGHT,
-          cy - mark.height / 2 + off.y * AUTHORED_HEIGHT
-        )
+        context.drawImage(mark.image, cx - mark.width / 2, cy - mark.height / 2)
         context.restore()
       }
 

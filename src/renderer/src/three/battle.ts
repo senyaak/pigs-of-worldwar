@@ -31,6 +31,7 @@ import {
   SIGHT_TOP,
   aimPhase,
   aimRadians,
+  clampAim,
   createAim,
   rampedStep,
   scrubsPose,
@@ -58,7 +59,7 @@ import { advanceFiring, beginFiring } from '../../../lib/game/shot'
 import type { Firing } from '../../../lib/game/shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from '../../../lib/game/aftermath'
 import type { Aftermath } from '../../../lib/game/aftermath'
-import { createWobble, resetWobble, updateWobble, wobblePitch, wobbleYaw } from '../../../lib/game/wobble'
+import { createWobble, resetWobble, wobbleStep } from '../../../lib/game/wobble'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../../../lib/game/zoom'
 import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createShots } from './shots'
@@ -160,15 +161,6 @@ export interface BattleScene {
   /** Whether the view is actually down the barrel — held AND holding a gun,
    * which is what the scope's ring is drawn over (ui/hud.ts). */
   scoped(): boolean
-  /**
-   * Where the scope's MARK sits, as a fraction of the view's height off centre.
-   *
-   * This is the tremor, and the tremor is the mark moving rather than the camera
-   * shaking — play named that mistake outright ("вместо того чтобы трясти прицел, ты
-   * тряс камеру?????"). The shot leaves along the same offset, so what the player
-   * sees is what they get (lib/game/wobble.ts).
-   */
-  reticle(): { x: number; y: number }
   /**
    * The three states the CONTROL SET turns on that only the scene knows
    * (`lib/game/controls.ts`) — asked for as a group rather than mirrored out one
@@ -397,6 +389,9 @@ export function buildBattle(
   /** `[0x4bd6c8]` — how far toward the hand the camera's HEIGHT moves in one
    * engine frame (0x4a3072). A third, and no more. */
   const EYE_LAG = 0.333
+  /** This frame's share of the tremor for the pig's TURN — the other half goes
+   * straight into `aim.angle` (lib/game/wobble.ts). */
+  let shivered = 0
   /** The eye as of the last ENGINE frame, and which frame that was. */
   let heldEye = { x: 0, y: 0, z: 0 }
   let eyeFrame = -1
@@ -600,14 +595,10 @@ export function buildBattle(
    * and one mid-swing from the side, which is the original's own camera mode
    * for a hand-to-hand attack and the only thing that uses it (three/chase).
    */
-  /**
-   * Where the shot goes: the player's angle, plus wherever the MARK has wandered to.
-   *
-   * The mark is what moves — not the camera — so this is not a lie, it is the
-   * definition: the bullet leaves along whatever the crosshair is sitting on
-   * (lib/game/wobble.ts, and `reticle` below is the same offset in screen terms).
-   */
-  const aimedAngle = (): number => aim.angle + wobblePitch(wobble)
+  /** Where the shot goes: `aim.angle`, which the tremor is already IN
+   * (lib/game/wobble.ts). One number, read by the camera, the barrel and the dial
+   * alike — nothing here can point anywhere the bullet will not go. */
+  const aimedAngle = (): number => aim.angle
 
   /**
    * Where the scope looks FROM: `SCOPE_MOUNT` in the hand bone's space, in
@@ -688,8 +679,8 @@ export function buildBattle(
       dropIn.riseOver(soldier),
       delta,
       view,
-      // The camera holds PERFECTLY STILL down the sights: what shakes is the mark
-      // on the glass, and the dashboard draws that (lib/game/wobble.ts).
+      // The camera looks along the AIM, tremor and all — the picture FOLLOWS the
+      // sight, which is what play asked for and what makes it honest.
       aimRadians(aim.angle),
       0,
       view === 'scope' ? scopeEye(soldier) : null
@@ -966,11 +957,17 @@ export function buildBattle(
     // The same arm turns the pig, off its own accumulator and the same
     // 1-to-16 ramp, so the two axes move together without the remake choosing
     // anything.
-    const swung = scoping
-      ? zoomsIn(holding)
-        ? zoomedStep(zoom, rampedStep(scopeTurn, turning, delta), SIGHT_RAMP)
-        : rampedStep(scopeTurn, turning, delta)
-      : 0
+    const swung =
+      (scoping
+        ? zoomsIn(holding)
+          ? zoomedStep(zoom, rampedStep(scopeTurn, turning, delta), SIGHT_RAMP)
+          : rampedStep(scopeTurn, turning, delta)
+        : 0) +
+      // …and the tremor's other axis turns the pig, which is where the exe puts it:
+      // the aim view's handler feeds one stick axis to `Pig::Aim` and the other to
+      // the turn. Going through the same accumulator means the camera, the model and
+      // the shot all read it off the heading and cannot disagree.
+      shivered
     if (!scoping) scopeTurn.rate = 0
 
     loco.x = active.pig.position.x
@@ -1027,8 +1024,8 @@ export function buildBattle(
       // Where the sights were actually pointing — the drift is part of the
       // aim, not a decoration over it.
       const away = isLobbed(holding)
-        ? grenades.throwOne(active, aimedAngle(), thrownWith, wobbleYaw(wobble))
-        : shots.fire(active, aimedAngle(), wobbleYaw(wobble))
+        ? grenades.throwOne(active, aimedAngle(), thrownWith)
+        : shots.fire(active, aimedAngle())
       if (!away) firing = null
       else {
         // `Pig::Attack` puts the weapon's own attack clip on at the same
@@ -1098,8 +1095,19 @@ export function buildBattle(
     // in the original the sights stop dead and the bullet leaves along exactly what
     // the player last saw. Zeroing it here is what made the shot look a second
     // stale. Lowering the sights for good is the only thing that clears it.
-    if (scoped) updateWobble(wobble, frames)
-    else if (!firing) resetWobble(wobble)
+    // THE TREMOR GOES INTO THE AIM. One number: the camera reads it, the barrel
+    // reads it, the dial shows it, so the picture follows the sight and the bullet
+    // goes where the picture points (lib/game/wobble.ts). While the sights are down
+    // — and through the whole fuse, where `Pig::Aim` is refused — nothing is added
+    // and the aim simply stays where the tremor left it.
+    if (scoped) {
+      const shiver = wobbleStep(wobble, frames)
+      aim.angle = clampAim(holding, aim.angle + shiver.pitch)
+      shivered = shiver.yaw
+    } else {
+      shivered = 0
+      if (!firing) resetWobble(wobble)
+    }
     updateZoom(zoom, frames, scoped && zoomsIn(holding))
     // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts
     // a field of view is the library's and the library is not in the install,
@@ -1240,21 +1248,6 @@ export function buildBattle(
       sighting = held && !sightingRefused
     },
     scoped: () => sighting && isGun(holding) && !dropIn.running(),
-    reticle() {
-      // The mark's offset as a FRACTION of the view's height, which is all the
-      // dashboard needs: it works in its own 480 units and multiplies.
-      //
-      // An angle over the field of view IS that fraction, and it is why the zoom
-      // needs no scaling of its own — a magnified view is fewer degrees tall, so the
-      // same tremor carries the mark further across the glass. Play asked for exactly
-      // that and it comes free: "чем ближе, тем больше расстояния проходит".
-      const across = (host.camera.fov * Math.PI) / 180
-      return {
-        // Up the screen is a NEGATIVE y on a canvas, and pitch up is positive.
-        x: aimRadians(wobbleYaw(wobble)) / across,
-        y: -aimRadians(wobblePitch(wobble)) / across
-      }
-    },
     beginTurn: () => game.beginTurn(),
     situation: () => ({
       starting: game.starting,
