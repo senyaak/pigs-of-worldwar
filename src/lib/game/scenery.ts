@@ -23,6 +23,7 @@ import { HEIGHT_SCALE } from './terrain'
 import type { Point } from './pose'
 import type { Pig } from './game'
 import type { MapObject } from '../formats/pog'
+import type { Emit } from './events'
 
 /**
  * Where a record's art stands, in game space.
@@ -38,7 +39,11 @@ export const restingPlaceOf = (object: MapObject): Point => ({
   z: object.z
 })
 
-/** A crate the acting pig has just walked into. */
+/**
+ * A crate the acting pig has just walked into, as the briefing bar needs it —
+ * the two events (`collected`, `refused`) carry the same fields and the view
+ * says one line for either (ui/battle.ts).
+ */
 export interface Collected {
   /** Skill id, or null on a health crate (lib/game/skills.ts). */
   skill: number | null
@@ -51,22 +56,6 @@ export interface Collected {
   result: GiveResult
   /** Who picked it up. */
   pig: Pig
-}
-
-export interface SceneryEvents {
-  /** Whether this record's art is on the map at all. */
-  shown: (id: number, visible: boolean) => void
-  /** …and this one is gone for good: collected. */
-  taken: (id: number) => void
-  /** Send this one down under a canopy from `fromY` (lib/game/airDrop.ts). */
-  drop: (id: number, fromY: number) => void
-  /** A crate the pig walked into — including one it had no room for. */
-  collected: (what: Collected) => void
-  /** The pig cheers: the exe plays 0x5E at its own position the moment the
-   * skill is in. */
-  gotCrate: () => void
-  /** …or it does not: "THIS LITTLE PIG ALREADY HAS TOO MANY TOYS". */
-  refusedCrate: () => void
 }
 
 export interface Scenery {
@@ -101,7 +90,11 @@ export function createScenery(
   training: boolean,
   /** Whose inventory a placed crate clears — the acting pig. */
   actingPig: () => Pig,
-  events: SceneryEvents
+  /** Send a record down under a canopy from `fromY` (lib/game/airDrop.ts).
+   * A domain call rather than an event: the descent is part of the game, and
+   * the battle waits on it. */
+  drop: (id: number, fromY: number) => void,
+  emit: Emit
 ): Scenery {
   const obstacles = new ObstacleField(objects)
   /** The crates that carry something. A collected one is spliced out, so the
@@ -117,7 +110,7 @@ export function createScenery(
   // Most of what CAMP carries is not on its ground at the start — eight
   // dummies, the second bridge, and every crate but the first three.
   for (const id of script.waiting()) {
-    events.shown(id, false)
+    emit({ kind: 'shown', id, visible: false })
     // Off the map means off it entirely: an invisible dummy is not something
     // to walk into either.
     obstacles.remove(id)
@@ -144,10 +137,10 @@ export function createScenery(
       if (one.parachute) {
         // The collision world waits for the landing; a crate still in the air
         // is not standing anywhere.
-        events.drop(one.id, fromY)
+        drop(one.id, fromY)
         continue
       }
-      events.shown(one.id, true)
+      emit({ kind: 'shown', id: one.id, visible: true })
       obstacles.restore(one.id)
     }
   }
@@ -158,7 +151,7 @@ export function createScenery(
     waiting: () => script.waiting(),
     advance,
     remove(id) {
-      events.taken(id)
+      emit({ kind: 'taken', id })
       obstacles.remove(id)
     },
     restingY: (id) => places.get(id)?.y ?? null,
@@ -182,23 +175,21 @@ export function createScenery(
           if (result === 'full') {
             if (!refused.has(pickup.id)) {
               refused.add(pickup.id)
-              events.refusedCrate()
-              events.collected({ skill: pickup.skill, amount: pickup.amount, given: 0, result, pig })
+              emit({ kind: 'refused', skill: pickup.skill, amount: pickup.amount, pig })
             }
             continue
           }
           given = amountOf(pig.carrying, pickup.skill)
         }
         pickups.splice(i, 1)
-        events.gotCrate()
-        events.taken(pickup.id)
+        emit({ kind: 'taken', id: pickup.id })
         // It was something to push against a frame ago; leaving it in the
         // collision world would leave an invisible crate behind.
         obstacles.remove(pickup.id)
         // A collected crate runs its own command — the exe does it from inside
         // the pickup class (0x464633).
         advance(pickup.id, places.get(pickup.id)?.y ?? 0)
-        events.collected({ skill: pickup.skill, amount: pickup.amount, given, result, pig })
+        emit({ kind: 'collected', skill: pickup.skill, amount: pickup.amount, given, pig })
       }
     }
   }

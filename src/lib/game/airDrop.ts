@@ -17,6 +17,7 @@
 import { DROP_HEIGHT, cutChute, updateDrop } from './parachute'
 import type { DropState } from './parachute'
 import type { Point } from './pose'
+import type { Emit } from './events'
 
 /** How long after the aeroplane the canopy opens. Play's ordering — the
  * plane is heard first — and the gap is eyework. */
@@ -38,15 +39,6 @@ export interface AirDropWorld {
   groundOf: (id: number) => number | null
   /** Where it stands, horizontally — the camera frames the descent there. */
   at: (id: number) => Point | null
-}
-
-export interface AirDropEvents {
-  /** It is on its way: the aeroplane, and a canopy to hang over it. */
-  sent: (id: number) => void
-  /** …and the canopy has opened, a beat later. */
-  chuted: (id: number) => void
-  /** Touchdown, and WHERE — a crate hitting the ground throws something up. */
-  landed: (id: number, at: Point) => void
 }
 
 export interface AirDrops {
@@ -78,7 +70,7 @@ export interface AirDrops {
   clear(): void
 }
 
-export function createAirDrops(world: AirDropWorld, events: AirDropEvents): AirDrops {
+export function createAirDrops(world: AirDropWorld, emit: Emit): AirDrops {
   const live: Descent[] = []
 
   return {
@@ -91,20 +83,20 @@ export function createAirDrops(world: AirDropWorld, events: AirDropEvents): AirD
         ground,
         chuteIn: CHUTE_DELAY
       })
-      events.sent(id)
+      emit({ kind: 'crateSent', id })
     },
     update(delta) {
       for (let i = live.length - 1; i >= 0; i--) {
         const one = live[i]
         if (one.chuteIn > 0) {
           one.chuteIn -= delta
-          if (one.chuteIn <= 0) events.chuted(one.id)
+          if (one.chuteIn <= 0) emit({ kind: 'crateChuted', id: one.id })
         }
         updateDrop(one.drop, one.ground, delta)
         if (!one.drop.landed) continue
         live.splice(i, 1)
         const at = world.at(one.id)
-        events.landed(one.id, { x: at?.x ?? 0, y: one.ground, z: at?.z ?? 0 })
+        emit({ kind: 'crateLanded', id: one.id, at: { x: at?.x ?? 0, y: one.ground, z: at?.z ?? 0 } })
       }
     },
     falling: () => live.length,

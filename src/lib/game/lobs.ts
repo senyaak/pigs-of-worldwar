@@ -40,6 +40,7 @@ import type { Pig } from './game'
 import type { Target } from './targets'
 import type { Obstruction } from './obstacles'
 import type { TerrainQuery } from './terrain'
+import type { Emit } from './events'
 
 /**
  * How far a grenade may move between collision tests, in game units — its own
@@ -77,24 +78,6 @@ export interface LobWorld {
   pose: Pose
 }
 
-/** What a grenade does that somebody else has to show. */
-export interface LobEvents {
-  /** It has met water, at the surface. Every water contact reports this before
-   * anything else — the exe's handler splashes before it looks at the speed
-   * (0x4377d0). */
-  splashed: (at: Point) => void
-  /** …and it was travelling fast enough to SKIP off it. */
-  skimmed: (at: Point) => void
-  /** …or it went in and is on its way down. It will not go off. */
-  doused: (at: Point) => void
-  /** It went off here. */
-  blasted: (at: Point) => void
-  /** Something took `amount` points here. */
-  damaged: (at: Point, amount: number) => void
-  killed: (pig: Pig) => void
-  broken: (target: Target) => void
-}
-
 export interface Lobs {
   /** Throw one from this pig at `aim`, with the gauge's `charge` behind it.
    * False if what it holds is not lobbed, or there is no hand to throw from. */
@@ -128,14 +111,14 @@ export interface Lobs {
   clear(): void
 }
 
-export function createLobs(world: LobWorld, events: LobEvents): Lobs {
+export function createLobs(world: LobWorld, emit: Emit): Lobs {
   const flying: Lobbed[] = []
   const standing = world.targets
 
   /** Everything within reach takes its share. */
   const detonate = (shot: Lobbed): void => {
     const where = { x: shot.x, y: shot.y, z: shot.z }
-    events.blasted(where)
+    emit({ kind: 'blasted', at: where })
     const row = lobOf(shot.skill)
     if (!row) return
     /** Points at the core, and the share a body this far out takes. */
@@ -148,8 +131,8 @@ export function createLobs(world: LobWorld, events: LobEvents): Lobs {
       const amount = took(body.x - shot.x, body.y - shot.y, body.z - shot.z)
       if (amount <= 0) continue
       const outcome = hurt(pig, amount, world.training)
-      events.damaged(body, amount)
-      if (outcome === 'died' || outcome === 'gibbed') events.killed(pig)
+      emit({ kind: 'damaged', at: body, amount })
+      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig })
     }
     for (let i = standing.length - 1; i >= 0; i--) {
       const dummy = standing[i]
@@ -157,10 +140,10 @@ export function createLobs(world: LobWorld, events: LobEvents): Lobs {
       const amount = took(dummy.x - shot.x, dummy.y - shot.y, dummy.z - shot.z)
       if (amount <= 0) continue
       hurt(dummy, amount, false)
-      events.damaged(dummy, amount)
+      emit({ kind: 'damaged', at: dummy, amount })
       if (isDead(dummy)) {
         standing.splice(i, 1)
-        events.broken(dummy)
+        emit({ kind: 'broke', target: dummy })
       }
     }
   }
@@ -183,7 +166,7 @@ export function createLobs(world: LobWorld, events: LobEvents): Lobs {
       const on = { x: shot.x, y: level, z: shot.z }
       // The splash happens either way — the handler does it before it looks at
       // the speed at all.
-      events.splashed(on)
+      emit({ kind: 'splashed', at: on })
       // FAST ALONG THE SURFACE: it SKIPS. The engine resolves the contact with
       // the tile's own material and then kicks the thing up by a fifth of the
       // in-plane speed (0x4A9260 at an angle of 0x400 — a quarter turn, straight
@@ -199,7 +182,7 @@ export function createLobs(world: LobWorld, events: LobEvents): Lobs {
           lobBounce(row)
         )
         skipOffWater(shot)
-        events.skimmed(on)
+        emit({ kind: 'skimmed', at: on })
         return true
       }
       // …or it goes in and DOWN, and it does not go off. The quiet flag is the
@@ -207,7 +190,7 @@ export function createLobs(world: LobWorld, events: LobEvents): Lobs {
       // "по-моему даже не взрываться" — and the couple of seconds of sinking are
       // the remake's, because there is nothing on these maps to sink through.
       douseInWater(shot)
-      events.doused(on)
+      emit({ kind: 'doused', at: on })
       return true
     }
     if (shot.y >= ground) {

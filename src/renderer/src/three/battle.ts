@@ -43,6 +43,8 @@ import { createEffectArt } from './effects'
 import { createAirDrops } from '../../../lib/game/airDrop'
 import { createAirDropArt } from './airDrop'
 import { createScenery } from '../../../lib/game/scenery'
+import { createBus, handling } from '../../../lib/game/events'
+import { createBattleAudio } from '../audio/battleAudio'
 import type { Collected } from '../../../lib/game/scenery'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBullets } from '../../../lib/game/bullets'
@@ -52,7 +54,7 @@ import { createGrenadeArt } from './grenades'
 import { createPigVoice } from '../audio/pigVoice'
 import { exposeBattleDebug } from './debug'
 import { SILENT, loadBank } from '../audio/bank'
-import { BARREL_SOUND, BATTLE_SOUNDS, createBattleSounds, playCue } from '../audio/battle'
+import { createBattleSounds } from '../audio/battle'
 import { createSoundConsole } from '../audio/console'
 import type { Bank } from '../audio/bank'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
@@ -195,18 +197,18 @@ export function buildBattle(
    * program: most of what CAMP carries is not on its ground at the start, and
    * each of them arrives when the thing it waits on has been finished off.
    */
+  /**
+   * The one stream everything the engine does is announced on
+   * (lib/game/events.ts). The scene subscribes for the ART; `audio/battleAudio`
+   * subscribes for the NOISE, and neither knows the other exists.
+   */
+  const bus = createBus()
   const scenery = createScenery(
     assets.objects,
     training,
     () => game.currentPig,
-    {
-      shown: (id, visible) => props.show(id, visible),
-      taken: (id) => props.take(id),
-      drop: (id, fromY) => airDrops.send(id, fromY),
-      collected: onCollected,
-      gotCrate: () => playCue(bank, BATTLE_SOUNDS.pickup),
-      refusedCrate: () => playCue(bank, BATTLE_SOUNDS.tooMany)
-    }
+    (id, fromY) => airDrops.send(id, fromY),
+    bus.emit
   )
   const obstacles = scenery.obstacles
   /** The canopy art a descent wears, and the record it lifts (three/airDrop). */
@@ -216,27 +218,7 @@ export function buildBattle(
    * engine's, because the beat after a blow waits on it (lib/game/airDrop.ts). */
   const airDrops = createAirDrops(
     { groundOf: (id) => scenery.restingY(id), at: (id) => scenery.at(id) },
-    {
-      sent: (id) => {
-        airDropArt.open(id)
-        // The aeroplane first, then the canopy a beat later. Neither was making
-        // any noise at all: the bank's `chute` had been decoded far enough to
-        // name and then never played (audio/battle.ts).
-        playCue(bank, BATTLE_SOUNDS.plane)
-      },
-      chuted: () => playCue(bank, BATTLE_SOUNDS.chute),
-      landed: (id, at) => {
-        airDropArt.cut(id)
-        playCue(bank, BATTLE_SOUNDS.land)
-        obstacles.restore(id)
-        // A crate arriving kicks something up. Play named it — "там ещё эффект
-        // от падения" — and this is the remake's own: nothing has been read that
-        // spawns an effect for a placed object. It takes row 0's SMOKE and not
-        // its fire, because a crate landing raises dust — and play saw what
-        // happened when it got the whole row ("коробка когда падает — искрит").
-        effects.dust(at)
-      }
-    }
+    bus.emit
   )
   // The battle's own sound bank, loaded beside the scene: silence until it
   // arrives, and silence for good if the install has no Audio folder.
@@ -249,6 +231,9 @@ export function buildBattle(
   // …and the console gets at it, because half the table is a name pick that
   // only play can settle: `pow.sfx.list()`, `pow.sfx.set('jump', …)`.
   if (window.pow) window.pow.sfx = createSoundConsole(() => bank)
+  /** The battle, HEARD. A listener like any other (audio/battleAudio.ts). */
+  const audio = createBattleAudio(() => bank)
+  bus.on(audio.listen)
 
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
   // The pose PORT: the one thing a blow cannot work out for itself. Everything
@@ -267,28 +252,48 @@ export function buildBattle(
   /** The opening drop — the ENGINE's phase, because nothing else in the battle
    * runs while it lasts (lib/game/dropIn.ts). A map with no canopy art stands
    * its squad on the markers instead, which is what an art-less `open` does. */
+  // …and the SCENE's own subscription: everything the engine announces that
+  // has to be drawn. Built before the drop-in, because lifting the squad is the
+  // first thing announced.
+  bus.on(
+    handling({
+      shown: ({ id, visible }) => props.show(id, visible),
+      taken: ({ id }) => props.take(id),
+      clip: ({ pig, index, once }) => (once ? anim.playOnce(pig, index) : anim.setClip(pig, index)),
+      killed: ({ pig }) => anim.playOnce(pig, ANIM.DYING),
+      damaged: ({ at, amount }) => numbers.show(at, amount),
+      struck: ({ skill, at }) => effects.hit(skill, at),
+      blasted: ({ at }) => effects.blast(at),
+      // The splash is drawn on the WATER LINE however deep it gets, because
+      // effect 0x0E snaps its own y there (0x488c19).
+      skimmed: ({ at }) => effects.splash(at),
+      doused: ({ at }) => effects.splash(at),
+      dropOpened: ({ pig }) => dropInArt.open(pig),
+      dropCut: ({ pig }) => dropInArt.cut(pig),
+      crateSent: ({ id }) => airDropArt.open(id),
+      crateLanded: ({ id, at }) => {
+        airDropArt.cut(id)
+        obstacles.restore(id)
+        // A crate arriving kicks something up. Play named it — "там ещё эффект
+        // от падения" — and this is the remake's own: nothing has been read that
+        // spawns an effect for a placed object. It takes row 0's SMOKE and not
+        // its fire, because a crate landing raises dust — and play saw what
+        // happened when it got the whole row ("коробка когда падает — искрит").
+        effects.dust(at)
+      },
+      canopiesCut: () => airDropArt.cutAll(),
+      cameraReset: () => chase.reset(),
+      bark: ({ player }) => voice.fire(player),
+      collected: (one) => onCollected({ ...one, result: 'taken' }),
+      refused: (one) => onCollected({ ...one, given: 0, result: 'full' })
+    })
+  )
   const dropIn = assets.canopy
-    ? createDropIn(
-        game.players.flatMap((player) => player.pigs),
-        query,
-        {
-          opened: (pig) => dropInArt.open(pig),
-          cut: (pig) => dropInArt.cut(pig),
-          clip: (pig, index, once) => {
-            const soldier = squad.of(pig)
-            if (once) anim.playOnce(pig, index)
-            else anim.setClip(pig, index)
-          },
-          landed: () => playCue(bank, BATTLE_SOUNDS.land)
-        }
-      )
+    ? createDropIn(game.players.flatMap((player) => player.pigs), query, bus.emit)
     : NO_DROP_IN
   // Up they go, before the first frame is drawn: the engine has already lifted
   // them, and a squad standing on its markers for one frame reads as a stutter.
   dropInArt.draw(dropIn.live())
-  /** Whether the canopies have been heard opening yet. The bank arrives a beat
-   * after the scene does, so they cannot simply be played on frame one. */
-  let chuteHeard = false
   const marker = buildMarker(root)
   const chase = createChase(host.camera, query, (x, y, z) => {
     // What the projectile camera swings around: the map's boxes, and the
@@ -340,9 +345,6 @@ export function buildBattle(
    * time, and its script step run twice.
    */
   const targets = targetsOf(assets.objects)
-  /** What every weapon does when a dummy comes apart — the ENGINE's, because
-   * the exe hangs it on the OBJECT rather than on the blow (lib/game/battle). */
-  const onBroken = (target: Target): void => battle.broke(target)
   /**
    * What a bayonet does when the fire key goes down — the ENGINE's, blade and
    * all (lib/game/strikes.ts). The aim angle is deliberately not in it.
@@ -359,18 +361,7 @@ export function buildBattle(
       pose,
       clips: assets.clips
     },
-    {
-      clip: (pig, index) => anim.playOnce(pig, index),
-      whoosh: () => playCue(bank, BATTLE_SOUNDS.whoosh),
-      landed: (skill, at) => {
-        const weapon = meleeOf(skill)
-        if (weapon) playCue(bank, BATTLE_SOUNDS[weapon.impact])
-        effects.hit(skill, at)
-      },
-      damaged: (at, amount) => numbers.show(at, amount),
-      killed: (pig) => anim.playOnce(pig, ANIM.DYING),
-      broken: onBroken
-    }
+    bus.emit
   )
   /**
    * What a GUN does when the fire key goes down — and it is the ENGINE's now
@@ -388,12 +379,7 @@ export function buildBattle(
       training,
       pose
     },
-    {
-      fired: (skill) => playCue(bank, BATTLE_SOUNDS[BARREL_SOUND[skill] ?? 'rifle']),
-      damaged: (at, amount) => numbers.show(at, amount),
-      killed: (pig) => anim.playOnce(pig, ANIM.DYING),
-      broken: onBroken
-    }
+    bus.emit
   )
   /** The spheres that show them (three/shots.ts). */
   const bulletArt = createBulletArt(root)
@@ -411,35 +397,10 @@ export function buildBattle(
       training,
       pose
     },
-    {
-      splashed: () => playCue(bank, BATTLE_SOUNDS.splash),
-      skimmed: (at) => {
-        playCue(bank, BATTLE_SOUNDS.skim)
-        effects.splash(at)
-      },
-      doused: (at) => {
-        // The splash is drawn on the WATER LINE however deep it gets, because
-        // effect 0x0E snaps its own y there (0x488c19).
-        effects.splash(at)
-        playCue(bank, BATTLE_SOUNDS.doused)
-      },
-      blasted: (at) => {
-        effects.blast(at)
-        playCue(bank, BATTLE_SOUNDS.blast)
-        // Stay on the spot for the beat the blow's own wait gives it, which is
-        // what makes the burst visible at all: the camera leaves the grenade the
-        // frame it stops existing (lib/game/aftermath.ts).
-        battle.blasted(at)
-      },
-      damaged: (at, amount) => numbers.show(at, amount),
-      killed: (pig) => anim.playOnce(pig, ANIM.DYING),
-      broken: onBroken
-    }
+    bus.emit
   )
   /** The models and the smoke behind them (three/grenades.ts). */
   const grenadeArt = createGrenadeArt(root)
-  /** Seconds left of the getting-it-out clip. The exe puts the model in the
-   * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig
   /**
    * Camera and marker onto a pig, wherever it happens to be standing — or
    * hanging: a pig still on its canopy is watched from the front, face on,
@@ -536,8 +497,7 @@ export function buildBattle(
    * The battle itself — the whole order of events in a frame, and none of it
    * here (lib/game/battle.ts). This file's job below is to READ what it did.
    */
-  const battle = createBattle(
-    {
+  const battle = createBattle({
       game,
       query,
       scenery,
@@ -550,17 +510,9 @@ export function buildBattle(
       numbers,
       airDrops,
       dropIn,
-      onChanged: onGameChanged
-    },
-    {
-      cameraReset: () => chase.reset(),
-      cutCanopies: () => airDropArt.cutAll(),
-      // There was no confirmation at all for SKIP TURN and play asked for one;
-      // the cue is a name pick and `audio/battle.ts` says which.
-      skillUsed: () => playCue(bank, BATTLE_SOUNDS.skillUsed),
-      bark: (player: number) => voice.fire(player)
-    }
-  )
+      onChanged: onGameChanged,
+      bus
+    })
 
   /** Take the battle to a pig, and the camera and marker with it. */
   const focus = (pig: Pig): void => {
@@ -583,12 +535,7 @@ export function buildBattle(
     // The squad coming down: each pig where its own descent has got to, and
     // the canopies heard the first frame the bank can play them.
     dropInArt.draw(dropIn.live())
-    if (dropIn.running()) {
-      if (!chuteHeard && bank.has(BATTLE_SOUNDS.chute.sound)) {
-        playCue(bank, BATTLE_SOUNDS.chute)
-        chuteHeard = true
-      }
-    }
+    audio.chuteOverhead(dropIn.running())
     const active = squad.of(game.currentPig)
     if (!active) return
     if (!dropIn.running() && !game.starting && !game.over) {

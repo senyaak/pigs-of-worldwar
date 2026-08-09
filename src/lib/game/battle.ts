@@ -40,19 +40,8 @@ import type { DamageNumbers } from './damage'
 import type { AirDrops } from './airDrop'
 import type { DropIn } from './dropIn'
 import type { Point } from './pose'
-
-/** The four things a frame does that cannot be read back off its state. */
-export interface BattlePresenter {
-  /** Put the camera behind the pig, now — a new turn, or the end of a flight.
-   * It TELEPORTS rather than flying home from wherever the bullet ended up. */
-  cameraReset(): void
-  /** Cut every canopy still up: the jump key during the beat after a blow. */
-  cutCanopies(): void
-  /** SKIP TURN was used — the confirmation the original gives it. */
-  skillUsed(): void
-  /** The acting pig says a firing line. Twelve in rotation, per squad. */
-  bark(playerIndex: number): void
-}
+import { handling } from './events'
+import type { BattleBus } from './events'
 
 /** Everything the battle drives. Each of these is the engine's too; they are
  * passed in because the scene builds them alongside the art that shows them. */
@@ -71,6 +60,9 @@ export interface BattleParts {
   dropIn: DropIn
   /** Called whenever the state changed this frame (a HUD refresh). */
   onChanged: () => void
+  /** The stream everything the battle does is announced on, and the one it
+   * hears its own weapons on (lib/game/events.ts). */
+  bus: BattleBus
 }
 
 /** What the renderer reads once the frame has run. */
@@ -138,25 +130,14 @@ export interface Battle {
   }
   /** End the beat at the top of a turn: any input does. */
   beginTurn(): void
-  /**
-   * Something on the map has been knocked down.
-   *
-   * The exe hangs this on the OBJECT rather than on the blow (0x48d750), which
-   * is why every weapon reports it here instead of each doing its own: the
-   * smoke, taking it off the map, stopping the turn, and the script step it
-   * owes — held back until it has finished coming apart.
-   */
-  broke(target: { id: number; x: number; y: number; z: number }): void
-  /** A grenade went off here: the camera stays on the spot for the beat, which
-   * is what makes the burst visible at all. */
-  blasted(at: Point): void
   /** Warp the acting pig — the debug surface the e2e suite drives through. */
   warp(x: number, z: number, heading: number): void
 }
 
-export function createBattle(parts: BattleParts, present: BattlePresenter): Battle {
+export function createBattle(parts: BattleParts): Battle {
   const { game, query, scenery, anim, shots, grenades, swings, effects, numbers } = parts
   const { airDrops, dropIn, onChanged } = parts
+  const emit = parts.bus.emit
 
   /** Every pig on the map, as bodies to walk into. */
   const everyone = (): Pig[] => game.players.flatMap((player) => player.pigs)
@@ -177,7 +158,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     swings,
     sights,
     anim,
-    bark: () => present.bark(game.players.indexOf(game.currentPlayer))
+    bark: () => emit({ kind: 'bark', player: game.players.indexOf(game.currentPlayer) })
   })
   /** The beat after a kill: the clock stops, the camera stays on the spot. */
   let aftermath: Aftermath | null = null
@@ -215,10 +196,33 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     grenades.live() > 0 ||
     shots.live().length > 0
 
-  /** What the map's own script owes something that has just broken. */
-  const oweScript = (id: number, y: number): void => {
-    pending = { id, y }
-  }
+  // The battle LISTENS to its own weapons for the two things that stop a turn.
+  // A blow does not decide that a turn ends; the OBJECT breaking does, which is
+  // where the exe hangs it too (0x48d750), and every weapon simply announces.
+  parts.bus.on(
+    handling({
+      broke: ({ target }) => {
+        // A different effect from the hit, and the one play remembers as smoke.
+        effects.broke(target)
+        scenery.remove(target.id)
+        // The turn stops here and the camera stays on the spot. What comes
+        // next — a crate under a canopy, most of the time — is watched from the
+        // same wait (lib/game/aftermath.ts).
+        aftermath = beginAftermath(target)
+        // …and its own command, which is the last thing the exe's break handler
+        // does (0x48d972). This is what drops the next crate in — but NOT YET:
+        // the dummy has to finish coming apart before the crate starts coming
+        // down, which is how the whole game is paced.
+        pending = { id: target.id, y: target.y }
+      },
+      // Stay on the spot for the beat the blow's own wait gives it, which is
+      // what makes the burst visible at all: the camera leaves the grenade the
+      // frame it stops existing.
+      blasted: ({ at }) => {
+        if (!aftermath) aftermath = beginAftermath(at)
+      }
+    })
+  )
 
   const focus = (pig: Pig): void => {
     loco = createLocomotion(query, pig.position.x, pig.position.z, pig.heading)
@@ -232,7 +236,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     pending = null
     sights.setHeld(false)
     swings.reset()
-    present.cameraReset()
+    emit({ kind: 'cameraReset' })
   }
 
   const update = (delta: number): void => {
@@ -307,7 +311,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     if (aftermath) {
       if (jumpRequested) {
         airDrops.cut()
-        present.cutCanopies()
+        emit({ kind: 'canopiesCut' })
       }
       jumpRequested = false
       attack.swallow()
@@ -351,7 +355,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
         airDrops.falling() > 0
       if (advanceAftermath(aftermath, delta, settling)) {
         aftermath = null
-        present.cameraReset()
+        emit({ kind: 'cameraReset' })
       } else {
         // Follow the crate down; a spot with nothing coming stays the spot.
         const crate = airDrops.watching()
@@ -369,7 +373,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     // answers (lib/game/attack.ts). SKIP TURN is the one answer this frame has
     // to act on itself, because ending a turn is the battle's business.
     if (attack.begin(acting, holding) === 'skip') {
-      present.skillUsed()
+      emit({ kind: 'skillUsed' })
       game.endTurn()
       focus(game.currentPig)
       onChanged()
@@ -436,7 +440,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     // …and the sequence is over when there is nothing left in the air. The
     // camera comes back off the bullet by TELEPORTING behind the pig rather
     // than flying home from wherever it ended up.
-    if (attack.settled()) present.cameraReset()
+    if (attack.settled()) emit({ kind: 'cameraReset' })
 
     // The weapon in hand, and where it points. Choosing one out of the menu is
     // what starts it: the exe plays the getting-it-out clip and only puts the
@@ -544,25 +548,6 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
       sights: layerSights(weaponLayer(game.currentPig.holding)) && !dropIn.running()
     }),
     beginTurn: () => game.beginTurn(),
-    broke(target) {
-      // The exe throws this off the object's own BREAK handler (0x48d750), not
-      // off the blow — a different effect from the hit, and the one play
-      // remembers as smoke.
-      effects.broke(target)
-      scenery.remove(target.id)
-      // The turn stops here and the camera stays on the spot. What comes next —
-      // a crate under a canopy, most of the time — is watched from the same
-      // wait (lib/game/aftermath.ts).
-      aftermath = beginAftermath(target)
-      // …and its own command, which is the last thing the exe's break handler
-      // does (0x48d972). This is what drops the next crate in — but NOT YET.
-      // One thing at a time: the dummy has to finish coming apart before the
-      // crate starts coming down, which is how the whole game is paced.
-      oweScript(target.id, target.y)
-    },
-    blasted(at) {
-      if (!aftermath) aftermath = beginAftermath(at)
-    },
     warp(x, z, heading) {
       swings.reset()
       effects.clear()

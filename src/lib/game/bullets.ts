@@ -23,6 +23,7 @@ import type { Point, Pose } from './pose'
 import type { Pig } from './game'
 import type { Target } from './targets'
 import type { TerrainQuery } from './terrain'
+import type { Emit } from './events'
 
 /**
  * Where the muzzle sits, per weapon: the row of 0x4d0ee0 the shot's own byte
@@ -72,18 +73,6 @@ export interface BulletWorld {
   pose: Pose
 }
 
-/** What a shot does that somebody else has to show. */
-export interface BulletEvents {
-  /** One left the barrel — the report, per weapon. */
-  fired: (skill: number) => void
-  /** Something took `amount` points here: the number that floats off it. */
-  damaged: (at: Point, amount: number) => void
-  /** This pig has just gone down. */
-  killed: (pig: Pig) => void
-  /** This dummy has just come apart — its script step follows. */
-  broken: (target: Target) => void
-}
-
 export interface Bullets {
   /**
    * Loose one from this pig, pointed at `aim` — the angle in the engine's
@@ -100,7 +89,7 @@ export interface Bullets {
   clear(): void
 }
 
-export function createBullets(world: BulletWorld, events: BulletEvents): Bullets {
+export function createBullets(world: BulletWorld, emit: Emit): Bullets {
   const flying: Shot[] = []
   const standing = world.targets
 
@@ -124,8 +113,8 @@ export function createBullets(world: BulletWorld, events: BulletEvents): Bullets
       if (!inside(shot, body)) continue
       const amount = damageOf(shot.skill)
       const outcome = hurt(pig, amount, world.training)
-      events.damaged(body, amount)
-      if (outcome === 'died' || outcome === 'gibbed') events.killed(pig)
+      emit({ kind: 'damaged', at: body, amount })
+      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig })
       return true
     }
     for (let i = standing.length - 1; i >= 0; i--) {
@@ -134,10 +123,10 @@ export function createBullets(world: BulletWorld, events: BulletEvents): Bullets
       if (!inside(shot, dummy)) continue
       const amount = damageOf(shot.skill)
       hurt(dummy, amount, false)
-      events.damaged(dummy, amount)
+      emit({ kind: 'damaged', at: dummy, amount })
       if (isDead(dummy)) {
         standing.splice(i, 1)
-        events.broken(dummy)
+        emit({ kind: 'broke', target: dummy })
       }
       return true
     }
@@ -155,7 +144,7 @@ export function createBullets(world: BulletWorld, events: BulletEvents): Bullets
       const shot = fireShot(skill, from, pig.heading, aim)
       if (!shot) return false
       flying.push(shot)
-      events.fired(skill)
+      emit({ kind: 'fired', skill })
       return true
     },
     update(delta) {

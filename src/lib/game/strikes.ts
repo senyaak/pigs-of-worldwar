@@ -23,6 +23,7 @@ import type { Point, Pose } from './pose'
 import { reached } from './targets'
 import type { Target } from './targets'
 import type { Pig } from './game'
+import type { Emit } from './events'
 
 /**
  * What the last strike actually measured — the ONE thing a miss cannot be
@@ -70,20 +71,6 @@ export interface StrikeWorld {
   clips: ClipTiming[]
 }
 
-export interface StrikeEvents {
-  /** Wear this clip, played through once: the swing owns the whole body while
-   * it lasts (`Pig::Attack` clears the weapon channel, 0x46971a). */
-  clip: (pig: Pig, index: number) => void
-  /** The blade going through the air. */
-  whoosh: () => void
-  /** It landed on this body: the weapon's own impact noise and its rings. */
-  landed: (skill: number, at: Point) => void
-  /** …and the points it took off. */
-  damaged: (at: Point, amount: number) => void
-  killed: (pig: Pig) => void
-  broken: (target: Target) => void
-}
-
 export interface Strikes {
   /**
    * Swing what the pig is holding. Refused — and says so — when it holds
@@ -105,7 +92,7 @@ export interface Strikes {
   reset(): void
 }
 
-export function createStrikes(world: StrikeWorld, events: StrikeEvents): Strikes {
+export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
   let state: SwingState | null = null
   /** Who this swing has already caught: the exe sets `[pig+0x1b0]` on a
    * struck pig and clears it on every pig at the last strike (event id 70),
@@ -156,14 +143,14 @@ export function createStrikes(world: StrikeWorld, events: StrikeEvents): Strikes
       if (!hit) continue
       already.add(target)
       const outcome = hurt(target, weapon.damage, world.training)
-      events.damaged(body, weapon.damage)
+      emit({ kind: 'damaged', at: body, amount: weapon.damage })
       // The exe throws the weapon's own effect on every body it catches
       // (0x476187, inside the same loop). WHERE exactly is not pinned — it
       // spawns off a point 0x44e8e0 writes into a stack local, which has not
       // been read — so this puts it on the body, which is where the damage
       // number goes too.
-      events.landed(skill, body)
-      if (outcome === 'died' || outcome === 'gibbed') events.killed(target)
+      emit({ kind: 'struck', skill, at: body })
+      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: target })
     }
 
     // …and the dummies, through the identical test. The exe runs it as a
@@ -180,11 +167,11 @@ export function createStrikes(world: StrikeWorld, events: StrikeEvents): Strikes
       if (!reached(blade, from, dummy)) continue
       // One point, so anything at all flattens it (lib/game/targets.ts).
       hurt(dummy, weapon.damage, false)
-      events.damaged(dummy, weapon.damage)
-      events.landed(skill, dummy)
+      emit({ kind: 'damaged', at: dummy, amount: weapon.damage })
+      emit({ kind: 'struck', skill, at: dummy })
       if (isDead(dummy)) {
         standing.splice(i, 1)
-        events.broken(dummy)
+        emit({ kind: 'broke', target: dummy })
       }
     }
   }
@@ -216,9 +203,9 @@ export function createStrikes(world: StrikeWorld, events: StrikeEvents): Strikes
           // whole training ground, never run down.
           spend(actor.carrying, skill)
           already = new Set()
-          events.clip(actor, swing.clip)
+          emit({ kind: 'clip', pig: actor, index: swing.clip, once: true })
         } else if (event === 'whoosh') {
-          events.whoosh()
+          emit({ kind: 'whoosh' })
         } else if (event === 'strike') {
           strike(actor, skill)
         } else if (event === 'release') {

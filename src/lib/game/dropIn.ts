@@ -17,6 +17,7 @@ import { createDrop, cutChute, updateDrop } from './parachute'
 import type { DropState } from './parachute'
 import type { Pig } from './game'
 import type { TerrainQuery } from './terrain'
+import type { Emit } from './events'
 
 /** What a spec sees of the drop — a canopy coming down is not something an
  * assertion can watch. */
@@ -32,17 +33,6 @@ export interface Arrival {
   /** Whether a canopy is still over it. */
   chute: boolean
   done: boolean
-}
-
-export interface DropInEvents {
-  /** Hang a canopy over this pig and put it in the parachute clip. */
-  opened: (pig: Pig) => void
-  /** Take the canopy away — the player cut it, or the ground did. */
-  cut: (pig: Pig) => void
-  /** Wear this clip; `once` means play it through and hold the last frame. */
-  clip: (pig: Pig, index: number, once: boolean) => void
-  /** Touchdown. */
-  landed: (pig: Pig) => void
 }
 
 export interface DropIn {
@@ -87,7 +77,7 @@ export const NO_DROP_IN: DropIn = {
 export function createDropIn(
   pigs: Pig[],
   query: TerrainQuery,
-  events: DropInEvents,
+  emit: Emit,
   spread: () => number = Math.random
 ): DropIn {
   const arriving = pigs.filter((pig) => pig.parachutes)
@@ -96,8 +86,8 @@ export function createDropIn(
   const arrivals: Arrival[] = arriving.map((pig) => {
     const drop = createDrop(restingY(query, pig.position.x, pig.position.z), spread())
     pig.position = { ...pig.position, y: drop.y }
-    events.opened(pig)
-    events.clip(pig, ANIM.PARACHUTE, false)
+    emit({ kind: 'dropOpened', pig })
+    emit({ kind: 'clip', pig, index: ANIM.PARACHUTE, once: false })
     return { pig, drop, chute: true, done: false }
   })
 
@@ -105,7 +95,7 @@ export function createDropIn(
   const furl = (arrival: Arrival): void => {
     if (!arrival.chute) return
     arrival.chute = false
-    events.cut(arrival.pig)
+    emit({ kind: 'dropCut', pig: arrival.pig })
   }
 
   return {
@@ -117,7 +107,7 @@ export function createDropIn(
           furl(arrival)
           // What 0x4678f0 plays: the flying clip, and it keeps it until
           // something stops the fall.
-          events.clip(arrival.pig, ANIM.JUMP_MIDDLE, false)
+          emit({ kind: 'clip', pig: arrival.pig, index: ANIM.JUMP_MIDDLE, once: false })
         }
       }
       let busy = false
@@ -134,8 +124,8 @@ export function createDropIn(
         // the start of the turn, exactly as a committed clip does anywhere
         // else, because the renderer will not let the walking cut it short.
         furl(arrival)
-        events.clip(arrival.pig, ANIM.LAND, true)
-        events.landed(arrival.pig)
+        emit({ kind: 'clip', pig: arrival.pig, index: ANIM.LAND, once: true })
+        emit({ kind: 'dropLanded', pig: arrival.pig })
         arrival.done = true
       }
       return busy
