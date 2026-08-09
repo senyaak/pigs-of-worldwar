@@ -17,30 +17,16 @@ import { ANIM, createLocomotion, updateLocomotion } from './locomotion'
 import type { LocomotionState } from './locomotion'
 import { withPigs } from './obstacles'
 import { isDead } from './health'
-import {
-  AIM_RAMP,
-  AIM_TOP,
-  SIGHT_RAMP,
-  SIGHT_TOP,
-  aimPhase,
-  aimRadians,
-  clampAim,
-  createAim,
-  scrubsPose,
-  rampedStep,
-  updateAim
-} from './aim'
-import type { AimState } from './aim'
-import { weaponOf } from './weapons'
+import { aimPhase, aimRadians, scrubsPose } from './aim'
 import { isGun } from './projectile'
+import { weaponOf } from './weapons'
 import { isLobbed } from './grenade'
 import { advanceFiring, beginFiring } from './shot'
 import type { Firing } from './shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
-import { createWobble, resetWobble, wobbleStep } from './wobble'
-import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from './zoom'
-import { EXE_FRAME_SECONDS, FRAME_SECONDS } from './ballistics'
+import { createSights } from './sights'
+import { EXE_FRAME_SECONDS } from './ballistics'
 import { beginGauge, chargeGauge, gaugeFraction } from './gauge'
 import type { Gauge } from './gauge'
 import { SKILL } from './skills'
@@ -191,33 +177,15 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
   /** What the gauge read when the button came up — the fuse carries it to the
    * throw, the way `Pig::Fire` parks it at `[pig+0x300]` (0x469371). */
   let thrownWith = 0
-  /** Which way the aim keys are pushing: -1 down, 0 nothing, +1 up. */
-  let aimIntent = 0
-  /** Whether the aim view is held down. */
-  let sighting = false
-  /**
-   * Whether the aim view has been REFUSED until the key is let go.
-   *
-   * Firing drops the sights, and they must not come back while G is still
-   * down — the exe holds mode 0x0E on the pad bit but gates it on
-   * `Pig::MayAct` (0x492df1), which is false from the press until the attack.
-   */
-  let sightingRefused = false
   /** What the acting pig had chosen last frame — a change is what brings a
    * weapon out. */
   let holding: number | null = null
-  /** Where it points (lib/game/aim.ts). */
-  let aimState: AimState = createAim(null)
-  /** The sideways ramp the scope borrows off the aim, so left and right move
-   * at the rate up and down do. */
-  const scopeTurn = { rate: 0 }
+  /** Where the weapon points, the tremor that rides it and the sniper's zoom —
+   * one thing, because they only ever move together (lib/game/sights.ts). */
+  const sights = createSights()
   /** This frame's share of the tremor for the pig's TURN — the other half goes
    * straight into the aim (lib/game/wobble.ts). */
   let shivered = 0
-  /** The drift the sights have while they are up. */
-  const wobble = createWobble()
-  /** The sniper's magnification, which creeps in on its own. */
-  const zoom = createZoom()
   /** The shot in progress: the ten-frame fuse and then the flight. */
   let firing: Firing | null = null
   /** The beat after a kill: the clock stops, the camera stays on the spot. */
@@ -275,7 +243,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
   const focus = (pig: Pig): void => {
     loco = createLocomotion(query, pig.position.x, pig.position.z, pig.heading)
     holding = pig.holding
-    aimState = createAim(pig.holding)
+    sights.rearm(pig.holding)
     readying = 0
     firing = null
     // A charge belongs to the pig that started it: a turn handed over mid-hold
@@ -284,7 +252,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     thrownWith = 0
     aftermath = null
     pending = null
-    sightingRefused = false
+    sights.setHeld(false)
     swings.reset()
     present.cameraReset()
   }
@@ -458,8 +426,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
           firing = beginFiring()
           // Out of the sights the moment the trigger goes, and they stay out
           // until G is actually let go.
-          sighting = false
-          sightingRefused = true
+          sights.refuse()
           present.bark(game.players.indexOf(game.currentPlayer))
         }
       } else swings.begin(acting)
@@ -471,29 +438,27 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     // не только прыжок, вообще всё."
     if (committed()) {
       jumpRequested = false
-      aimIntent = 0
+      sights.push(0)
     }
     const walking = committed() ? 0 : intent.walk
     const turning = committed() ? 0 : intent.turn
     // The SIGHTS are a different control set, not a locked one. The one thing
     // the aim view does take away is the JUMP: the exe routes input through its
     // own branch while the aim bit is down (0x4928dc).
-    if (sighting) jumpRequested = false
+    if (sights.scoped(holding)) jumpRequested = false
 
-    // Down the sights the two axes move together, which means running the turn
-    // through the aim's own ramp (lib/game/aim.ts).
-    const scoping = sighting && isGun(holding) && !firing
-    const swung =
-      (scoping
-        ? zoomsIn(holding)
-          ? zoomedStep(zoom, rampedStep(scopeTurn, turning, delta), SIGHT_RAMP)
-          : rampedStep(scopeTurn, turning, delta)
-        : 0) +
-      // …and the tremor's other axis turns the pig, which is where the exe puts
-      // it. Going through the same accumulator means the camera, the model and
-      // the shot all read it off the heading and cannot disagree.
-      shivered
-    if (!scoping) scopeTurn.rate = 0
+    // Down the sights the turn drives the SCOPE, and the tremor's other axis
+    // turns the pig — both come back out of the sights as one number, so the
+    // camera, the model and the shot read it off the heading and cannot
+    // disagree (lib/game/sights.ts).
+    const scoping = sights.scoped(holding) && firing === null
+    const swung = sights.turnStep({
+      holding,
+      committed: committed(),
+      firing: firing !== null,
+      turning,
+      delta
+    })
 
     loco.x = acting.position.x
     loco.z = acting.position.z
@@ -532,8 +497,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
         thrownWith = gauge.power
         gauge = null
         firing = beginFiring()
-        sighting = false
-        sightingRefused = true
+        sights.refuse()
         present.bark(game.players.indexOf(game.currentPlayer))
       }
     }
@@ -545,8 +509,8 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
       // Where the sights were actually pointing — the drift is part of the aim,
       // not a decoration over it.
       const away = isLobbed(holding)
-        ? grenades.throwOne(acting, aimState.angle, thrownWith)
-        : shots.fire(acting, aimState.angle)
+        ? grenades.throwOne(acting, sights.angle(), thrownWith)
+        : shots.fire(acting, sights.angle())
       if (!away) firing = null
       else {
         // `Pig::Attack` puts the weapon's own attack clip on at the same moment
@@ -569,46 +533,21 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
       holding = acting.holding
       // A weapon comes up pointing where its own record says: a rifle level, a
       // grenade already lobbing at 45°.
-      aimState = createAim(holding)
+      sights.rearm(holding)
       readying = weapon.readyClip > 0 ? clipSeconds(parts.clips[weapon.readyClip]) : 0
       if (readying > 0) anim.playOnce(acting, weapon.readyClip)
     }
     readying = Math.max(0, readying - delta)
 
-    // NOTHING moves the sights once the trigger is down. `Pig::Aim` (0x46a7f0)
-    // calls `Pig::MayAct` before it does anything and bails when it is false,
-    // and it is false from the press until the attack — play: "будто секунду в
-    // сторону движения прицела продолжал двигаться".
-    const sighted = sighting && isGun(holding)
-    updateAim(
-      aimState,
+    // The aim, the tremor and the zoom, at the END of the frame — so a shot
+    // fired above left along the angle the player last saw (lib/game/sights.ts).
+    sights.advance({
       holding,
-      committed() ? 0 : weapon.aims ? aimIntent : 0,
-      delta,
-      (step) => (zoomsIn(holding) ? zoomedStep(zoom, step, SIGHT_RAMP) : step),
-      // Down the sights the aim view's own arm drives it, and it is slower.
-      sighted ? SIGHT_RAMP : AIM_RAMP,
-      sighted ? SIGHT_TOP : AIM_TOP
-    )
-    // The sights drift while they are up and are steady the moment they are
-    // not. Both of these count ENGINE frames: the tremor steps once a frame at
-    // fifteen a second, which is what makes it a jitter rather than a glide.
-    //
-    // **It FREEZES for the fuse rather than being reset.** `Pig::Aim` is
-    // refused from the fire press until the attack, and the tremor arrives
-    // through it, so the sights stop dead and the bullet leaves along exactly
-    // what the player last saw. THE TREMOR GOES INTO THE AIM: one number, read
-    // by the camera, the barrel and the dial alike.
-    const frames = delta / FRAME_SECONDS
-    if (sighted) {
-      const shiver = wobbleStep(wobble, frames)
-      aimState.angle = clampAim(holding, aimState.angle + shiver.pitch)
-      shivered = shiver.yaw
-    } else {
-      shivered = 0
-      if (!firing) resetWobble(wobble)
-    }
-    updateZoom(zoom, frames, sighted && zoomsIn(holding))
+      committed: committed(),
+      firing: firing !== null,
+      turning,
+      delta
+    })
 
     // A committed clip — the jump's crouch, a landing's get-up — is started
     // once and left to play out; anything else is simply worn. Getting a weapon
@@ -632,7 +571,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     // frame its angle points at. A SECOND channel, not a replacement.
     const holdingUp =
       readying === 0 && !swings.swinging() && loco.airborne === null && scrubsPose(holding)
-    anim.overlay(acting, holdingUp ? weapon.aimClip : -1, aimPhase(aimState.angle))
+    anim.overlay(acting, holdingUp ? weapon.aimClip : -1, aimPhase(sights.angle()))
 
     // How long the pig has done nothing: what brings its name plate back.
     // Being driven, being in the air or being pushed all count as moving.
@@ -653,9 +592,9 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     focus,
     view: () => ({
       loco,
-      aimAngle: aimState.angle,
-      scoped: sighting && isGun(holding) && !dropIn.running(),
-      zoom: zoomFraction(zoom),
+      aimAngle: sights.angle(),
+      scoped: sights.scoped(holding) && !dropIn.running(),
+      zoom: sights.zoom(),
       readying,
       holding,
       still,
@@ -676,16 +615,10 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
       if (pressed) fireRequested = true
       fireHeld = held
     },
-    setAim(direction) {
-      aimIntent = direction
-    },
-    setSighting(held) {
-      // Letting go always clears the refusal; holding it down never lifts it.
-      if (!held) sightingRefused = false
-      sighting = held && !sightingRefused
-    },
+    setAim: sights.push,
+    setSighting: sights.setHeld,
     charging: showGauge,
-    aim: () => (weaponOf(holding).aims ? aimState.angle : null),
+    aim: () => (weaponOf(holding).aims ? sights.angle() : null),
     situation: () => ({
       starting: game.starting,
       // A gauge filling is its OWN control set rather than a hole in the lock,
