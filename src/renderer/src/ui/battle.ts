@@ -277,8 +277,14 @@ export function initBattle(onLeave: () => void): BattleView {
    * the one the game steps in.
    */
   const input = createBattleInput({
-    scene: () => scene,
+    // The ENGINE, not the scene: input drives the game and knows nothing about
+    // what is drawing it (lib/game/battle.ts).
+    battle: () => scene?.battle ?? null,
     game: () => game,
+    // …and what a control ANNOUNCES goes on the battle's own bus, so the noise
+    // of the inventory opening belongs to the audio bank like every other
+    // (lib/game/events.ts).
+    emit: (event) => scene?.battle.announce(event),
     skills: hud.skills,
     up: isBattleUp
   })

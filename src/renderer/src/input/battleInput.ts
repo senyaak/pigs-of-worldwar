@@ -30,16 +30,20 @@ import { controller } from './controller'
 import { modeOf, readControls, verbOf, wakes } from '../../../lib/game/controls'
 import type { ControlMode, Held } from '../../../lib/game/controls'
 import { SKILL } from '../../../lib/game/skills'
-import { BATTLE_SOUNDS } from '../audio/battle'
-import type { BattleScene } from '../three/battle'
+import type { Battle } from '../../../lib/game/battle'
+import type { Emit } from '../../../lib/game/events'
 import type { Game } from '../../../lib/game/game'
 import type { SkillMenu } from '../ui/skillMenu'
 
 export interface BattleInputHost {
-  /** The scene, or null between battles — it is rebuilt on every map swap, so
-   * this is asked for rather than held. */
-  scene(): BattleScene | null
+  /** The BATTLE, or null between them — it is rebuilt on every map swap, so
+   * this is asked for rather than held. Input drives the ENGINE and holds no
+   * reference to whatever is drawing it (lib/game/battle.ts). */
+  battle(): Battle | null
   game(): Game | null
+  /** Where a control announces itself: opening the inventory makes a noise, and
+   * which noise is the audio bank's business (lib/game/events.ts). */
+  emit: Emit
   /** The skill menu, which is one of the control sets. */
   skills: SkillMenu
   /** Whether the battle is the view on screen. */
@@ -130,7 +134,7 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
       // because it is the record in the pig's hands that decides. The key alone
       // is not enough: a set change drops the driving keys, so G with nothing
       // that points used to stop the pig for no reason at all.
-      const { sights, ...situation } = host.scene()?.situation() ?? blank
+      const { sights, ...situation } = host.battle()?.situation() ?? blank
       return modeOf({
         ...situation,
         inventory: host.skills.open(),
@@ -139,7 +143,7 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
     }
     let mode = ask()
     if (mode === 'starting' && woke) {
-      host.scene()?.beginTurn()
+      host.battle()?.beginTurn()
       mode = ask()
     }
     if (mode !== wasMode) {
@@ -177,7 +181,7 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
         // R opens what the pig is carrying — plus what it can always do. It
         // drives in from the right, with a noise.
         if (game && host.skills.toggle(game.currentPig.carrying)) {
-          host.scene()?.sound(BATTLE_SOUNDS.menuOpen.sound)
+          host.emit({ kind: 'menuOpened' })
         }
         return
       case 'closeInventory':
@@ -199,12 +203,12 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
         }
         return
       case 'jump':
-        host.scene()?.jump()
+        host.battle()?.jump()
         return
       case 'cutChute':
         // The scene owns the drop and reads the same jump request — passing it
         // on is all this has to do.
-        host.scene()?.jump()
+        host.battle()?.jump()
         return
       case 'beginTurn':
         // Unreachable: `liveMode` has already resolved the beat away, because a
@@ -222,8 +226,8 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
   }
 
   const poll = (): void => {
-    const scene = host.scene()
-    if (!scene || !host.up()) {
+    const battle = host.battle()
+    if (!battle || !host.up()) {
       // Nothing to act on and nothing to remember: a key pressed while the
       // battle is not up does not queue up for when it is.
       pending.length = 0
@@ -249,10 +253,10 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
     } else {
       stepped = { x: 0, y: 0 }
     }
-    scene.setIntent(intent.walk, intent.turn)
-    scene.setAim(intent.aim)
-    scene.setSighting(intent.sighting)
-    scene.setFiring(intent.firing, intent.fired)
+    battle.setIntent(intent.walk, intent.turn)
+    battle.setAim(intent.aim)
+    battle.setSighting(intent.sighting)
+    battle.setFiring(intent.firing, intent.fired)
   }
 
   return { poll }

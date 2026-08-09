@@ -72,6 +72,8 @@ export type BattleEvent =
   | { kind: 'cameraReset' }
   /** SKIP TURN was used. */
   | { kind: 'skillUsed' }
+  /** The pig's inventory came open — R, and it drives in from the right. */
+  | { kind: 'menuOpened' }
   /** The acting pig says a firing line, per squad. */
   | { kind: 'bark'; player: number }
 

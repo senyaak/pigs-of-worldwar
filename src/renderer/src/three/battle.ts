@@ -33,6 +33,7 @@ import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import { createStrikes } from '../../../lib/game/strikes'
 import { createBattle } from '../../../lib/game/battle'
+import type { Battle } from '../../../lib/game/battle'
 import { createBonePose } from './bonePose'
 import { createAnim } from '../../../lib/game/anim'
 import { createWear } from './wear'
@@ -85,6 +86,14 @@ export interface BattleAssets {
 }
 
 export interface BattleScene {
+  /**
+   * The battle this scene is drawing.
+   *
+   * Handed out rather than proxied: INPUT drives the engine directly
+   * (input/battleInput.ts), and every accessor this fasade used to mirror —
+   * `setIntent`, `situation`, `charging` — was the same method one level down.
+   */
+  readonly battle: Battle
   /** Point the camera at the active pig and park the marker over it. */
   focus(pig: Pig): void
   /** Whether the level's opening drop is still going: what the dashboard
@@ -100,61 +109,15 @@ export interface BattleScene {
   /** The damage numbers floating over the battle, projected into a view this
    * big — the dashboard draws them in the game's own letters. */
   numbers(width: number, height: number): FloatingNumber[]
-  /** Tank controls from the input layer: walk -1|0|1 (back/stop/forward),
-   * turn -1|0|1 (left/stop/right). */
-  setIntent(walk: number, turn: number): void
-  /** Ask the acting pig to jump (ignored mid-air, swimming or sliding). */
-  jump(): void
-  /**
-   * Whether the fire button is DOWN, and whether it went down THIS frame.
-   *
-   * Held, because the power gauge is what being held means: a weapon with one
-   * charges while it is and throws when it is not (lib/game/gauge.ts). Everything
-   * else goes off on the press — and the press arrives as its own flag rather
-   * than being worked out from `held` rising, because a control set that does not
-   * read the fire key reports it up while the player is holding it, and leaving
-   * that set would otherwise look like a fresh press (lib/game/controls.ts).
-   */
-  setFiring(held: boolean, pressed: boolean): void
   /** How full the power gauge is, 0..1 — or null when nothing is charging,
    * which is what the dashboard hides it on. */
   charging(): number | null
-  /** Point the weapon in hand: -1 down, 0 nothing held, +1 up. */
-  setAim(direction: number): void
-  /** Whether the aim view is being HELD. The original keeps camera mode 0x0E
-   * for exactly as long as its pad bit is down and puts the remembered mode
-   * back the frame it goes up (three/chase.ts). */
-  setSighting(held: boolean): void
   /** Whether the view is actually down the barrel — held AND holding a gun,
    * which is what the scope's ring is drawn over (ui/hud.ts). */
   scoped(): boolean
-  /**
-   * The three states the CONTROL SET turns on that only the scene knows
-   * (`lib/game/controls.ts`) — asked for as a group rather than mirrored out one
-   * accessor at a time.
-   */
-  situation(): {
-    starting: boolean
-    locked: boolean
-    charging: boolean
-    armed: boolean
-    /** Whether the aim view can be entered AT ALL — what is in hand has to be
-     * something that points. Without this the key hands over the sights whatever
-     * the pig is carrying, and since a change of set drops the driving keys, G
-     * with empty hands simply stopped the pig. Play: "нажатие g когда нельзя
-     * прицеливаться всё ещё отменяет движение". */
-    sights: boolean
-  }
-  /** End the beat at the top of a turn. The `starting` control set's whole rule:
-   * any input starts the turn, and the same input is then re-read in the set that
-   * follows (lib/game/controls.ts). */
-  beginTurn(): void
   /** Where the weapon in hand points, in the game's own angle units, or null
    * when the pig is holding nothing that aims (lib/game/aim.ts). */
   aim(): number | null
-  /** Play one of the battle's own effects by name — what the dashboard uses
-   * for the noises that belong to the game rather than to a pig. */
-  sound(name: string): void
   dispose(): void
 }
 
@@ -624,24 +587,15 @@ export function buildBattle(
   })
 
   return {
+    battle,
     focus,
     dropping: () => dropIn.running(),
     plates: (width, height, lift) => squad.plates(host.camera, width, height, lift),
     numbers: (width, height) => projectDamage(numbers.all(), host.camera, root, width, height),
     still: () => battle.view().still,
-    setIntent: battle.setIntent,
-    jump: battle.jump,
-    setFiring: battle.setFiring,
     charging: battle.charging,
-    setAim: battle.setAim,
-    setSighting: battle.setSighting,
     scoped: () => battle.view().scoped,
-    beginTurn: battle.beginTurn,
-    situation: battle.situation,
     aim: battle.aim,
-    sound(name) {
-      bank.play(name)
-    },
     dispose() {
       host.onFrame.delete(onFrame)
       host.scene.remove(root)

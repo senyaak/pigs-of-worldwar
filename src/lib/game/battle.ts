@@ -41,7 +41,7 @@ import type { AirDrops } from './airDrop'
 import type { DropIn } from './dropIn'
 import type { Point } from './pose'
 import { handling } from './events'
-import type { BattleBus } from './events'
+import type { BattleBus, Emit } from './events'
 
 /** Everything the battle drives. Each of these is the engine's too; they are
  * passed in because the scene builds them alongside the art that shows them. */
@@ -130,6 +130,14 @@ export interface Battle {
   }
   /** End the beat at the top of a turn: any input does. */
   beginTurn(): void
+  /**
+   * Say something on the battle's own bus.
+   *
+   * For the things a CONTROL announces rather than the game — opening the
+   * inventory is one — so input has somewhere to put them without holding the
+   * bus itself (lib/game/events.ts).
+   */
+  announce: Emit
   /** Warp the acting pig — the debug surface the e2e suite drives through. */
   warp(x: number, z: number, heading: number): void
 }
@@ -548,6 +556,7 @@ export function createBattle(parts: BattleParts): Battle {
       sights: layerSights(weaponLayer(game.currentPig.holding)) && !dropIn.running()
     }),
     beginTurn: () => game.beginTurn(),
+    announce: emit,
     warp(x, z, heading) {
       swings.reset()
       effects.clear()
