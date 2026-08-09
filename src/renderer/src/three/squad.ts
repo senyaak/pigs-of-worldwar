@@ -60,8 +60,6 @@ export interface Soldier {
    * keeps two animations on one pig (three/clips.ts, lib/game/aim.ts).
    */
   overlay(index: number, phase: number): void
-  /** Whether a committed animation is still running. */
-  animating(): boolean
   /** Put it where the game says it is: soles on the ground, sunk a little
    * when swimming. */
   settle(): void
@@ -134,7 +132,6 @@ export function fieldSquad(
       overlay(index, phase) {
         player.overlay(assets.clips[index] ?? null, phase)
       },
-      animating: () => player.running(),
       settle() {
         const { x, z } = pig.position
         soldier.place(x, restingY(query, x, z), z, pig.heading)

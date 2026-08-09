@@ -48,6 +48,8 @@ import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import { createStrikes } from '../../../lib/game/strikes'
 import { createBonePose } from './bonePose'
+import { createAnim } from '../../../lib/game/anim'
+import { createWear } from './wear'
 import { createDamageNumbers } from '../../../lib/game/damage'
 import { projectDamage } from './damageNumbers'
 import { createEffectField } from '../../../lib/game/effectField'
@@ -280,6 +282,12 @@ export function buildBattle(
   // that reaches for a bone — the blade, the muzzle, the scope's eye — goes
   // through this, so none of them holds a mesh (lib/game/pose.ts).
   const pose = createBonePose(squad, root)
+  /** What each pig is playing, and whether a committed clip has run out — the
+   * engine's, so the frame's order of events no longer asks a mixer
+   * (lib/game/anim.ts). */
+  const anim = createAnim(assets.clips)
+  /** …and the mixers being made to agree with it, once a frame. */
+  const wear = createWear(squad, anim)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
   const dropInArt = createDropInArt(squad, assets.canopy)
@@ -295,8 +303,8 @@ export function buildBattle(
           cut: (pig) => dropInArt.cut(pig),
           clip: (pig, index, once) => {
             const soldier = squad.of(pig)
-            if (once) soldier?.playOnce(index)
-            else soldier?.setClip(index)
+            if (once) anim.playOnce(pig, index)
+            else anim.setClip(pig, index)
           },
           landed: () => playCue(bank, BATTLE_SOUNDS.land)
         }
@@ -485,7 +493,7 @@ export function buildBattle(
       clips: assets.clips
     },
     {
-      clip: (pig, index) => squad.of(pig)?.playOnce(index),
+      clip: (pig, index) => anim.playOnce(pig, index),
       whoosh: () => playCue(bank, BATTLE_SOUNDS.whoosh),
       landed: (skill, at) => {
         const weapon = meleeOf(skill)
@@ -493,7 +501,7 @@ export function buildBattle(
         effects.hit(skill, at)
       },
       damaged: (at, amount) => numbers.show(at, amount),
-      killed: (pig) => squad.of(pig)?.playOnce(ANIM.DYING),
+      killed: (pig) => anim.playOnce(pig, ANIM.DYING),
       broken: onBroken
     }
   )
@@ -516,7 +524,7 @@ export function buildBattle(
     {
       fired: (skill) => playCue(bank, BATTLE_SOUNDS[BARREL_SOUND[skill] ?? 'rifle']),
       damaged: (at, amount) => numbers.show(at, amount),
-      killed: (pig) => squad.of(pig)?.playOnce(ANIM.DYING),
+      killed: (pig) => anim.playOnce(pig, ANIM.DYING),
       broken: onBroken
     }
   )
@@ -557,7 +565,7 @@ export function buildBattle(
         if (!aftermath) aftermath = beginAftermath(at)
       },
       damaged: (at, amount) => numbers.show(at, amount),
-      killed: (pig) => squad.of(pig)?.playOnce(ANIM.DYING),
+      killed: (pig) => anim.playOnce(pig, ANIM.DYING),
       broken: onBroken
     }
   )
@@ -764,8 +772,8 @@ export function buildBattle(
     // it as well — a second answer to the same question, and by the time input
     // was polled a dead one, since the set swallows every axis while it is live.
     if (game.starting) {
-      active.setClip(ANIM.IDLE)
-      active.overlay(-1, 0)
+      anim.setClip(active.pig, ANIM.IDLE)
+      anim.overlay(active.pig, -1, 0)
       watch(active, delta)
       onGameChanged()
       return
@@ -776,9 +784,9 @@ export function buildBattle(
       // and clamped, and standing it back up is exactly what this loop would
       // otherwise do every frame (three/swing.ts plays it).
       if (isDead(soldier.pig)) continue
-      soldier.setClip(ANIM.IDLE)
+      anim.setClip(soldier.pig, ANIM.IDLE)
       // Only the pig being driven holds its weapon up; the rest stand.
-      soldier.overlay(-1, 0)
+      anim.overlay(soldier.pig, -1, 0)
     }
 
     // Position and facing are the game's; everything else the frame needs —
@@ -827,7 +835,7 @@ export function buildBattle(
       // `busy()`, not `smoke() === 0`: the break effect's burst does not fire
       // until its third frame, so counting puffs said "finished" on the very
       // frame the dummy broke and the crate started down through the smoke.
-      if (pending && !swings.running() && !active.animating() && !effects.busy()) {
+      if (pending && !swings.running() && !anim.animating(active.pig) && !effects.busy()) {
         scenery.advance(pending.id, pending.y)
         pending = null
       }
@@ -839,7 +847,7 @@ export function buildBattle(
       const settling =
         pending !== null ||
         swings.running() ||
-        active.animating() ||
+        anim.animating(active.pig) ||
         effects.busy() ||
         shots.live().length > 0 ||
         grenades.live() > 0 ||
@@ -856,7 +864,7 @@ export function buildBattle(
         // same two guards the normal path uses (`swinging`, `animating`) —
         // asking for a clip is what CANCELS a committed one (three/clips.ts),
         // so this line unconditionally was the interruption.
-        if (!swings.swinging() && !active.animating()) active.setClip(ANIM.IDLE)
+        if (!swings.swinging() && !anim.animating(active.pig)) anim.setClip(active.pig, ANIM.IDLE)
         squad.update(delta)
         watch(active, delta)
         onGameChanged()
@@ -1020,7 +1028,7 @@ export function buildBattle(
         // moment (0x46971a), the way a swing's does — the record's fourth
         // column (lib/game/weapons.ts).
         const firearm = weaponOf(holding)
-        if (firearm.attackClip >= 0) active.playOnce(firearm.attackClip)
+        if (firearm.attackClip >= 0) anim.playOnce(active.pig, firearm.attackClip)
       }
     }
     // …and the sequence is over when there is nothing left in the air. The
@@ -1043,7 +1051,7 @@ export function buildBattle(
       // a grenade already lobbing at 45°.
       aim = createAim(holding)
       readying = weapon.readyClip > 0 ? clipSeconds(assets.clips[weapon.readyClip]) : 0
-      if (readying > 0) active.playOnce(weapon.readyClip)
+      if (readying > 0) anim.playOnce(active.pig, weapon.readyClip)
     }
     readying = Math.max(0, readying - delta)
     // …and the closer it is zoomed the finer the aim moves, which is the
@@ -1122,14 +1130,14 @@ export function buildBattle(
       // channel and clears the weapon one (0x46971a), so a bayonet is a
       // whole-body animation for as long as it lasts.
     } else if (loco.commit) {
-      if (!active.animating()) active.playOnce(loco.clip)
+      if (!anim.animating(active.pig)) anim.playOnce(active.pig, loco.clip)
     } else if (holding === SKILL.SKIP_TURN && loco.clip === ANIM.IDLE) {
       // A pig with SKIP TURN in hand stands there THINKING about it — clip 46 of
       // the fifty-nine the exe names, which play named too. It replaces the IDLE
       // only: a pig can still walk about with the skill in hand, and then it walks.
-      active.setClip(ANIM.THINKING)
+      anim.setClip(active.pig, ANIM.THINKING)
     } else {
-      active.setClip(loco.clip)
+      anim.setClip(active.pig, loco.clip)
     }
 
     // And over the top of it, the arms: the weapon's aiming clip held at the
@@ -1140,7 +1148,7 @@ export function buildBattle(
     // ends on exactly the frame a level angle asks for.
     const holdingUp =
       readying === 0 && !swings.swinging() && loco.airborne === null && scrubsPose(holding)
-    active.overlay(holdingUp ? weapon.aimClip : -1, aimPhase(aim.angle))
+    anim.overlay(active.pig, holdingUp ? weapon.aimClip : -1, aimPhase(aim.angle))
 
     // How long the pig has done nothing: what brings its name plate back.
     // Being driven, being in the air or being pushed all count as moving.
@@ -1162,6 +1170,10 @@ export function buildBattle(
   const onFrame = (delta: number): void => {
     time += delta
     update(delta)
+    // The engine's committed clips burn down, and every mixer is brought into
+    // line with what it now says (three/wear.ts).
+    anim.update(delta)
+    wear.apply()
     numbers.update(delta)
     effects.update(delta)
     shots.update(delta)
