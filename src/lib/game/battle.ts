@@ -18,19 +18,14 @@ import type { LocomotionState } from './locomotion'
 import { withPigs } from './obstacles'
 import { isDead } from './health'
 import { aimPhase, aimRadians, scrubsPose } from './aim'
-import { isGun } from './projectile'
 import { weaponOf } from './weapons'
-import { isLobbed } from './grenade'
-import { advanceFiring, beginFiring } from './shot'
 import type { Firing } from './shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
 import { createSights } from './sights'
-import { EXE_FRAME_SECONDS } from './ballistics'
-import { beginGauge, chargeGauge, gaugeFraction } from './gauge'
-import type { Gauge } from './gauge'
+import { createAttack } from './attack'
 import { SKILL } from './skills'
-import { layerFires, layerSights, weaponLayer } from './controls'
+import { layerSights, weaponLayer } from './controls'
 import { clipSeconds } from './clips'
 import type { ClipTiming } from './clips'
 import type { Game, Pig } from './game'
@@ -168,26 +163,22 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
 
   const intent = { walk: 0, turn: 0 }
   let jumpRequested = false
-  /** Whether the fire key went down since the last frame. */
-  let fireRequested = false
-  /** The fire button, last frame — the battle wants both edges of it. */
-  let fireHeld = false
-  /** The power gauge, while one is filling (lib/game/gauge.ts). */
-  let gauge: Gauge | null = null
-  /** What the gauge read when the button came up — the fuse carries it to the
-   * throw, the way `Pig::Fire` parks it at `[pig+0x300]` (0x469371). */
-  let thrownWith = 0
   /** What the acting pig had chosen last frame — a change is what brings a
    * weapon out. */
   let holding: number | null = null
   /** Where the weapon points, the tremor that rides it and the sniper's zoom —
    * one thing, because they only ever move together (lib/game/sights.ts). */
   const sights = createSights()
-  /** This frame's share of the tremor for the pig's TURN — the other half goes
-   * straight into the aim (lib/game/wobble.ts). */
-  let shivered = 0
-  /** The shot in progress: the ten-frame fuse and then the flight. */
-  let firing: Firing | null = null
+  /** The fire button and everything one press sets going: the gauge, the fuse
+   * and which weapon answers (lib/game/attack.ts). */
+  const attack = createAttack({
+    shots,
+    grenades,
+    swings,
+    sights,
+    anim,
+    bark: () => present.bark(game.players.indexOf(game.currentPlayer))
+  })
   /** The beat after a kill: the clock stops, the camera stays on the spot. */
   let aftermath: Aftermath | null = null
   /** A script step owed to something that has broken, and not run until it has
@@ -219,21 +210,10 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
    * выключаться должно когда выстрел нажал, не прицел."
    */
   const committed = (): boolean =>
-    gauge !== null ||
-    firing !== null ||
+    attack.busy() ||
     swings.running() ||
     grenades.live() > 0 ||
     shots.live().length > 0
-
-  /**
-   * What the dashboard shows: how full the gauge is, 0..1 — and **0 rather
-   * than null whenever the weapon in hand has one at all**, because that is
-   * when the original shows the thing.
-   */
-  const showGauge = (): number | null => {
-    if (gauge) return gaugeFraction(gauge)
-    return weaponOf(game.currentPig.holding).power ? 0 : null
-  }
 
   /** What the map's own script owes something that has just broken. */
   const oweScript = (id: number, y: number): void => {
@@ -245,11 +225,9 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     holding = pig.holding
     sights.rearm(pig.holding)
     readying = 0
-    firing = null
     // A charge belongs to the pig that started it: a turn handed over mid-hold
     // must not throw for whoever comes next.
-    gauge = null
-    thrownWith = 0
+    attack.reset()
     aftermath = null
     pending = null
     sights.setHeld(false)
@@ -265,7 +243,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     // for the first frame of the turn.
     if (dropIn.update(delta, jumpRequested)) {
       jumpRequested = false
-      fireRequested = false
+      attack.swallow()
       onChanged()
       return
     }
@@ -288,15 +266,14 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     // CHARGE, not at the throw: "при начинании зарядки броска таймер
     // останавливается — так как это уже атака началась."
     const blowInProgress =
-      firing !== null ||
-      gauge !== null ||
+      attack.busy() ||
       aftermath !== null ||
       swings.running() ||
       grenades.live() > 0
     if (!blowInProgress && (game.tick(delta) || isDead(game.currentPig))) {
       game.endTurn()
       jumpRequested = false
-      fireRequested = false
+      attack.swallow()
       focus(game.currentPig)
     }
 
@@ -333,7 +310,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
         present.cutCanopies()
       }
       jumpRequested = false
-      fireRequested = false
+      attack.swallow()
       // The world keeps going — the crate has to reach the ground for the wait
       // to end, and the smoke off the thing that broke is what is being
       // watched.
@@ -349,9 +326,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
       // that is what the wait is for.
       swings.update(delta, acting)
       // The shot that caused all this ends here rather than a frame late.
-      if (firing?.phase === 'flight' && shots.live().length === 0 && grenades.live() === 0) {
-        firing = null
-      }
+      attack.settled()
       // ONE THING AT A TIME. The script's next step waits for the thing that
       // triggered it to finish — play's rule for the whole game, "ждёшь конца
       // одной анимации и включаешь другую". `busy()`, not `smoke() === 0`: the
@@ -390,48 +365,16 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
       }
     }
 
-    // An EMPTY hand has nothing to fire, and that is the one layer that has
-    // not: SKIP TURN has no weapon behind it and F still uses it.
-    if (fireRequested && !layerFires(weaponLayer(acting.holding))) fireRequested = false
-
-    if (fireRequested) {
-      // A grenade already in the air answers the button before anything else
-      // does: a second press sets it off where it lies. Play's — nothing in the
-      // exe's fire handler has been read for it.
-      if (grenades.live() > 0) {
-        grenades.detonateNow()
-        fireRequested = false
-        // …asked of the PIG rather than of the cached `holding`, which is only
-        // synced further down the frame and is therefore a frame stale here.
-      } else if (acting.holding === SKILL.SKIP_TURN) {
-        // SKIP TURN is a skill taken in HAND and then used, like anything else
-        // — play: "пропуск хода должен применяться на стрелять, а не на
-        // выборе". Using it ends the turn, and it says so.
-        fireRequested = false
-        present.skillUsed()
-        game.endTurn()
-        focus(game.currentPig)
-        onChanged()
-        return
-      } else if (isLobbed(holding)) {
-        // A weapon with a gauge does not go off on the press at all. The press
-        // starts it CHARGING and the throw comes on the release, or on its own
-        // if it tops out first (0x493796, lib/game/gauge.ts).
-        if (!gauge && !firing) gauge = beginGauge()
-      } else if (isGun(holding)) {
-        // A gun is a SEQUENCE, and a press while one is running is refused —
-        // `Pig::MayAct` is false from `Pig::Fire` until `Pig::Attack`. That
-        // refusal is the whole of why a rifle is not a machine gun.
-        if (!firing) {
-          firing = beginFiring()
-          // Out of the sights the moment the trigger goes, and they stay out
-          // until G is actually let go.
-          sights.refuse()
-          present.bark(game.players.indexOf(game.currentPlayer))
-        }
-      } else swings.begin(acting)
+    // What the fire button set going — the whole of it, including WHICH weapon
+    // answers (lib/game/attack.ts). SKIP TURN is the one answer this frame has
+    // to act on itself, because ending a turn is the battle's business.
+    if (attack.begin(acting, holding) === 'skip') {
+      present.skillUsed()
+      game.endTurn()
+      focus(game.currentPig)
+      onChanged()
+      return
     }
-    fireRequested = false
 
     // **COMMITTED takes the whole of input, and it starts at the FIRE press.**
     // Play: "после нажатия стрелять должно отключаться полностью управление — а
@@ -451,11 +394,11 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     // turns the pig — both come back out of the sights as one number, so the
     // camera, the model and the shot read it off the heading and cannot
     // disagree (lib/game/sights.ts).
-    const scoping = sights.scoped(holding) && firing === null
+    const scoping = sights.scoped(holding) && attack.firing() === null
     const swung = sights.turnStep({
       holding,
       committed: committed(),
-      firing: firing !== null,
+      firing: attack.firing() !== null,
       turning,
       delta
     })
@@ -487,43 +430,13 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     // may put the weapon away on the way out — the last bayonet.
     swings.update(delta, acting)
 
-    // The gauge fills while the button is down. Both ways out of it end in the
-    // SAME ten-frame fuse a gun's press starts — `Pig::Fire` writes
-    // `[pig+0x231] = 0x0A` whatever is in hand — so the release does not throw,
-    // it arms (lib/game/shot.ts).
-    if (gauge) {
-      const topped = chargeGauge(gauge, delta / EXE_FRAME_SECONDS)
-      if (topped || !fireHeld) {
-        thrownWith = gauge.power
-        gauge = null
-        firing = beginFiring()
-        sights.refuse()
-        present.bark(game.players.indexOf(game.currentPlayer))
-      }
-    }
-
-    // The shot, after the pig has been placed for the same reason a swing is:
-    // the muzzle comes off the HAND bone. Ten frames between the press and the
-    // bullet, and the frame the fuse runs out is the frame it leaves.
-    if (firing && advanceFiring(firing, delta)) {
-      // Where the sights were actually pointing — the drift is part of the aim,
-      // not a decoration over it.
-      const away = isLobbed(holding)
-        ? grenades.throwOne(acting, sights.angle(), thrownWith)
-        : shots.fire(acting, sights.angle())
-      if (!away) firing = null
-      else {
-        // `Pig::Attack` puts the weapon's own attack clip on at the same moment
-        // (0x46971a), the way a swing's does.
-        const firearm = weaponOf(holding)
-        if (firearm.attackClip >= 0) anim.playOnce(acting, firearm.attackClip)
-      }
-    }
-    // …and the sequence is over when there is nothing left in the air.
-    if (firing?.phase === 'flight' && shots.live().length === 0 && grenades.live() === 0) {
-      firing = null
-      present.cameraReset()
-    }
+    // The gauge and the fuse, after the pig has been placed for the same reason
+    // a swing is: the muzzle comes off the HAND bone (lib/game/attack.ts).
+    attack.update(delta, acting, holding)
+    // …and the sequence is over when there is nothing left in the air. The
+    // camera comes back off the bullet by TELEPORTING behind the pig rather
+    // than flying home from wherever it ended up.
+    if (attack.settled()) present.cameraReset()
 
     // The weapon in hand, and where it points. Choosing one out of the menu is
     // what starts it: the exe plays the getting-it-out clip and only puts the
@@ -544,7 +457,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     sights.advance({
       holding,
       committed: committed(),
-      firing: firing !== null,
+      firing: attack.firing() !== null,
       turning,
       delta
     })
@@ -599,7 +512,7 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
       holding,
       still,
       driving: intent.walk !== 0 || intent.turn !== 0,
-      firing,
+      firing: attack.firing(),
       aftermath
     }),
     setIntent(walk, turn) {
@@ -612,18 +525,18 @@ export function createBattle(parts: BattleParts, present: BattlePresenter): Batt
     setFiring(held, pressed) {
       // The PRESS is what a gun and a blade answer to; the gauge wants the
       // whole hold, and the frame it ends.
-      if (pressed) fireRequested = true
-      fireHeld = held
+      if (pressed) attack.press()
+      attack.hold(held)
     },
     setAim: sights.push,
     setSighting: sights.setHeld,
-    charging: showGauge,
+    charging: () => attack.gauge(game.currentPig.holding),
     aim: () => (weaponOf(holding).aims ? sights.angle() : null),
     situation: () => ({
       starting: game.starting,
       // A gauge filling is its OWN control set rather than a hole in the lock,
       // which is what it was for a commit and what play corrected.
-      charging: gauge !== null && !gauge.spent,
+      charging: attack.charging(),
       // Something is still LIVE, and a second press of fire sets it off where
       // it lies — "пока граната летит, не могу взорвать её."
       armed: grenades.live() > 0,
