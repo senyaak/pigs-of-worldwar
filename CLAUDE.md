@@ -252,29 +252,48 @@ read a clip off `ANIM` in `lib/game/locomotion.ts` (each entry cites the
 site that plays it), never off the table. `animations/notes.md`
 and `parachute/notes.md`.
 
-## How the code is laid out
+## How the code is laid out — SEPARATE DOMAINS, and a check that says so
+
+`npm run boundaries` is the authority, not this list: one table of who may not
+import whom, run ahead of the e2e build. TypeScript never caught any of this —
+every breach the repo has had compiled cleanly.
 
 - `src/lib/formats/` — one pure reader per format (mad, tim, mgl, bmp, model,
-  hir, mcap, pmg, ptg, pog, srl). No fs, no Electron, no three: they take
-  bytes.
-- `src/lib/game/` — the rules (`Game`, `TerrainQuery`, `movement`,
-  `ballistics`). Pure too, so the domain specs drive them directly.
+  hir, mcap, pmg, ptg, pog, srl). Bytes in, structures out. May not know the
+  rules.
+- `src/lib/game/` — **the ENGINE**: the rules AND the battle. `battle.ts` is
+  one frame's order of events; `attack.ts` the fire button, the gauge and the
+  fuse; `sights.ts` the aim, the tremor and the zoom; `bullets.ts`, `lobs.ts`,
+  `strikes.ts` the weapons and every verdict about what they hit; `scenery.ts`
+  the crates, the map script and the collision world; `airDrop.ts`/`dropIn.ts`
+  the descents; `effectField.ts`, `damage.ts`, `anim.ts` the lists the battle
+  WAITS on. No three, no Electron, no DOM: it can be stepped headless.
+- `src/renderer/src/three/` — **graphics, and only that**. It reads
+  `battle.view()` once the frame has run and draws it. It may not import `ui/`
+  or `audio/` at all.
+- `src/renderer/src/audio/` — **sound, and only that**. `battleSound.ts`
+  assembles the domain and subscribes it to the bus; it knows nothing about
+  what is drawn.
+- `src/renderer/src/input/` — drives the ENGINE (`Battle`), never the scene,
+  and plays nothing.
+- `src/renderer/src/ui/` — one module per view, and `battle.ts` is the
+  COMPOSITION ROOT: it builds the bus and hangs the domains off it.
+- `src/renderer/src/contracts/` — the shapes two domains share, importing
+  nobody: `overlay.ts` what the scene projects for the dashboard, `sound.ts`
+  the two polls the scene owes sound.
 - `src/main/` — `index.ts` lifecycle only, `gameDir.ts` locating the install,
   `assets.ts` loading through the readers, `ipc.ts` the IPC surface.
-- `src/renderer/src/` — `ui/` one module per view, `audio/` the sound banks,
-  `input/` the controller, `three/` the scene. `main.ts` is composition only.
-- `three/battle.ts` is WIRING and the frame's order of events, nothing more.
-  The pieces are one file each: `squad.ts` the pigs (mesh, clip, placement,
-  name plates), `chase.ts` the camera — the only thing in the battle that
-  works in three's Y-up world — `dropIn.ts` the level's opening parachute
-  phase, `parachute.ts` the canopy art, `marker.ts` the pointer overhead,
-  `swing.ts` the hand-to-hand strike — the one piece that has to read a BONE —
-  `debug.ts` the `window.pow.debug` surface the e2e suite looks through, and
-  `terrain.ts`/`props.ts`/`pig.ts`/`clips.ts`/`modelMesh.ts` as before.
+
+**The engine ANNOUNCES; it does not show.** `lib/game/events.ts` is one bus,
+and the renderer and the audio bank are independent listeners on it — neither
+knows the other exists. Three things are deliberately NOT events, because the
+battle waits on them and a wait is a rule: the crate's descent, the pose port
+(`lib/game/pose.ts` — where a bone is, answered today by three, tomorrow by
+forward kinematics), and the two polls in `contracts/sound.ts`.
 
 Keep modules small and single-purpose; that split was an explicit request.
-`battle.ts` reached 600 lines doing four jobs and was broken up on sight —
-do that again rather than letting one file grow a second concern.
+`battle.ts` reached 1365 lines doing every job in the game and was taken apart
+— do that again rather than letting one file grow a second concern.
 
 ## Input goes through the controller — including tests
 
@@ -1812,8 +1831,9 @@ POLLED" above.
   of 36, and each one calls `Pig::HandToHandStrike` (0x475a00). Walking is
   refused from the button down to the clip's end and turning for the clip
   (0x46afd5, 0x46af43); the round is spent as the clip goes on, and a pig out
-  of them puts the weapon away. `lib/game/melee.ts` is the rules,
-  `three/swing.ts` the blade, `weapons/melee.md` the read.
+  of them puts the weapon away. `lib/game/melee.ts` is one weapon's reach and
+  one swing's timeline, `lib/game/strikes.ts` the swing HAPPENING, and
+  `weapons/melee.md` the read.
 
   A strike is THREE points off bone 5, the hand — the weapon's row of the
   table at 0x4d0ee0 in full, halved, and the bone itself — tested per AXIS
