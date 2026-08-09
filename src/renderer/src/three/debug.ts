@@ -12,7 +12,6 @@
 import type * as THREE from 'three'
 import type { Game } from '../../../lib/game/game'
 import type { TerrainQuery } from '../../../lib/game/terrain'
-import type { Bank } from '../audio/bank'
 import { controller } from '../input/controller'
 import type { DropIn } from '../../../lib/game/dropIn'
 import type { MapProps } from './props'
@@ -28,8 +27,9 @@ export interface DebugParts {
   /** How many .POG records the map carried, against how many were drawn. */
   objectCount: number
   camera: THREE.Camera
-  /** Asked for rather than held: the bank loads beside the scene. */
-  bank: () => Bank
+  /** Every sound the battle has played, in order — out of the sound domain
+   * (contracts/sound.ts), because a spec cannot listen. */
+  sounds: () => string[]
   /** Seconds the acting pig has stood still — what the name plates wait for,
    * and the only way a spec can tell why they are up. */
   still: () => number
@@ -148,7 +148,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       dropIn: () => dropIn.state(),
       /** Every sound the battle has played, in order — a spec cannot listen,
        * so this is what it asserts on instead. */
-      sounds: () => parts.bank().played(),
+      sounds: () => parts.sounds(),
       /** The squads as they were fielded — where each pig started, what class
        * the map called it, and which art it actually wears. */
       squads: () =>

@@ -44,20 +44,16 @@ import { createEffectArt } from './effects'
 import { createAirDrops } from '../../../lib/game/airDrop'
 import { createAirDropArt } from './airDrop'
 import { createScenery } from '../../../lib/game/scenery'
-import { createBus, handling } from '../../../lib/game/events'
-import { createBattleAudio } from '../audio/battleAudio'
+import { handling } from '../../../lib/game/events'
+import type { BattleBus } from '../../../lib/game/events'
+import type { SceneSound } from '../contracts/sound'
 import type { Collected } from '../../../lib/game/scenery'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBullets } from '../../../lib/game/bullets'
 import { createBulletArt } from './shots'
 import { createLobs } from '../../../lib/game/lobs'
 import { createGrenadeArt } from './grenades'
-import { createPigVoice } from '../audio/pigVoice'
 import { exposeBattleDebug } from './debug'
-import { SILENT, loadBank } from '../audio/bank'
-import { createBattleSounds } from '../audio/battle'
-import { createSoundConsole } from '../audio/console'
-import type { Bank } from '../audio/bank'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SceneHost } from './scene'
 
@@ -121,21 +117,32 @@ export interface BattleScene {
   dispose(): void
 }
 
-/** The battle's sound bank — 99 numbered effects (lib/formats/srl.ts). */
-const GAME_SOUNDS = 'Audio/sfxday.srl'
-
-export function buildBattle(
-  host: SceneHost,
-  assets: BattleAssets,
-  game: Game,
+/**
+ * What the scene needs that is not art.
+ *
+ * `sound` is passed IN rather than built here: sound is its own domain and this
+ * file may not import it at all (`npm run boundaries`). The scene asks it for
+ * two things only — the pig's own footfalls, which ride the locomotion state,
+ * and the canopy poll — and everything else it plays comes off the bus.
+ */
+export interface BattleSceneParts {
+  host: SceneHost
+  assets: BattleAssets
+  game: Game
   /** Called whenever the game state changed this frame (HUD refresh). */
-  onGameChanged: () => void,
+  onGameChanged: () => void
   /** Which map this is — the training ground hands out its crates on its own
    * terms (lib/game/pickups.ts). */
-  map: string,
+  map: string
   /** Called once per crate the acting pig walks into. */
   onCollected: (collected: Collected) => void
-): BattleScene {
+  /** The battle's own bus, already carrying whatever else listens. */
+  bus: BattleBus
+  sound: SceneSound
+}
+
+export function buildBattle(parts: BattleSceneParts): BattleScene {
+  const { host, assets, game, onGameChanged, map, onCollected, bus, sound: sounds } = parts
   // The per-texel water verdict rides on the same art the ground draws —
   // a pig stands on the painted dry half of a shore tile and swims one
   // step further, exactly where the water shows.
@@ -160,12 +167,6 @@ export function buildBattle(
    * program: most of what CAMP carries is not on its ground at the start, and
    * each of them arrives when the thing it waits on has been finished off.
    */
-  /**
-   * The one stream everything the engine does is announced on
-   * (lib/game/events.ts). The scene subscribes for the ART; `audio/battleAudio`
-   * subscribes for the NOISE, and neither knows the other exists.
-   */
-  const bus = createBus()
   const scenery = createScenery(
     assets.objects,
     training,
@@ -183,21 +184,6 @@ export function buildBattle(
     { groundOf: (id) => scenery.restingY(id), at: (id) => scenery.at(id) },
     bus.emit
   )
-  // The battle's own sound bank, loaded beside the scene: silence until it
-  // arrives, and silence for good if the install has no Audio folder.
-  let bank: Bank = SILENT
-  let sounds = createBattleSounds(bank)
-  void loadBank(GAME_SOUNDS).then((loaded) => {
-    bank = loaded
-    sounds = createBattleSounds(bank)
-  })
-  // …and the console gets at it, because half the table is a name pick that
-  // only play can settle: `pow.sfx.list()`, `pow.sfx.set('jump', …)`.
-  if (window.pow) window.pow.sfx = createSoundConsole(() => bank)
-  /** The battle, HEARD. A listener like any other (audio/battleAudio.ts). */
-  const audio = createBattleAudio(() => bank)
-  bus.on(audio.listen)
-
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
   // The pose PORT: the one thing a blow cannot work out for itself. Everything
   // that reaches for a bone — the blade, the muzzle, the scope's eye — goes
@@ -246,7 +232,6 @@ export function buildBattle(
       },
       canopiesCut: () => airDropArt.cutAll(),
       cameraReset: () => chase.reset(),
-      bark: ({ player }) => voice.fire(player),
       collected: (one) => onCollected({ ...one, result: 'taken' }),
       refused: (one) => onCollected({ ...one, given: 0, result: 'full' })
     })
@@ -295,9 +280,6 @@ export function buildBattle(
   const effectArt = createEffectArt(root)
   /** The field of view the camera had before anything magnified it. */
   const openFov = host.camera.fov
-  /** The pigs' own barks. The gun arm of `Pig::Fire` says one every shot,
-   * walking twelve lines in rotation (audio/pigVoice.ts). */
-  const voice = createPigVoice()
   /**
    * The training ground's dummies — the other thing a blow can land on, and
    * the only one that is not a pig (lib/game/targets.ts).
@@ -498,7 +480,7 @@ export function buildBattle(
     // The squad coming down: each pig where its own descent has got to, and
     // the canopies heard the first frame the bank can play them.
     dropInArt.draw(dropIn.live())
-    audio.chuteOverhead(dropIn.running())
+    sounds.chuteOverhead(dropIn.running())
     const active = squad.of(game.currentPig)
     if (!active) return
     if (!dropIn.running() && !game.starting && !game.over) {
@@ -563,7 +545,8 @@ export function buildBattle(
     props,
     objectCount: assets.objects.length,
     camera: host.camera,
-    bank: () => bank,
+    sounds: () => sounds.played(),
+    barks: () => sounds.spoken(),
     still: () => battle.view().still,
     strings: () => assets.strings,
     swinging: () => swings.running(),
@@ -577,7 +560,7 @@ export function buildBattle(
     grenades: () => grenades.at(),
     charging: () => battle.charging(),
     firing: () => battle.view().firing?.phase ?? null,
-    barks: () => voice.spoken(),
+
     aftermath: () => battle.view().aftermath !== null,
     warp: (x, z, heading) => {
       battle.warp(x, z, heading)
@@ -606,11 +589,9 @@ export function buildBattle(
       effectArt.dispose()
       bulletArt.dispose()
       grenadeArt.dispose()
-      voice.dispose()
       airDropArt.dispose()
       weapons.dispose()
       squad.dispose()
-      bank.dispose()
     }
   }
 }

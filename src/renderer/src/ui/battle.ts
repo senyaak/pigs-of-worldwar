@@ -24,6 +24,9 @@ import { controller } from '../input/controller'
 import { LAYOUT, createHud } from './hud'
 import { missionTitle } from './titleCard'
 import { createSpeech } from '../audio/speech'
+import { createBattleSound } from '../audio/battleSound'
+import type { BattleSound } from '../audio/battleSound'
+import { createBus } from '../../../lib/game/events'
 import { CLIP_FOR, clipForPickup, isTrainingGround, lineFor } from '../../../lib/game/tutorial'
 import type { Cue } from '../../../lib/game/tutorial'
 import { skillName } from '../../../lib/game/skills'
@@ -141,6 +144,8 @@ export function initBattle(onLeave: () => void): BattleView {
 
   let game: Game | null = null
   let scene: BattleScene | null = null
+  /** The battle's sound, hung off the same bus the scene listens to. */
+  let sound: BattleSound | null = null
   let query: TerrainQuery | null = null
   let map = DEFAULT_MAP
   /** What the opening card says on this map — null on a map the game names
@@ -402,9 +407,16 @@ export function initBattle(onLeave: () => void): BattleView {
     // asking for it again on every map swap registers it once.
     const host = ensureScene(canvasHost)
     host.onInput.add(input.poll)
-    scene = buildBattle(
+    // THE COMPOSITION. One bus, and the domains hung off it: the engine
+    // announces, sound listens, the scene listens and draws. Built here rather
+    // than inside any of them, because the moment one builds another they stop
+    // being separable — which is what `npm run boundaries` checks.
+    sound?.dispose()
+    const bus = createBus()
+    sound = createBattleSound(bus)
+    scene = buildBattle({
       host,
-      {
+      assets: {
         blocks: terrainResult.blocks,
         terrainTextures: terrainResult.textures,
         soldiers,
@@ -419,10 +431,12 @@ export function initBattle(onLeave: () => void): BattleView {
         canopy
       },
       game,
-      updateTileText,
-      name,
-      collected
-    )
+      onGameChanged: updateTileText,
+      map: name,
+      onCollected: collected,
+      bus,
+      sound
+    })
     map = name
     updateHud()
     if (frame === 0) frame = requestAnimationFrame(paint)
