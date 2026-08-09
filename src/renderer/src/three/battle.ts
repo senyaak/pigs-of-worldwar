@@ -11,7 +11,8 @@
 import * as THREE from 'three'
 import type { Bone, Clip, MapObject, MapProp, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
-import { buildQuery, createEngine } from '../../../lib/game/engine'
+import { createEngine } from '../../../lib/game/engine'
+import type { TerrainQuery } from '../../../lib/game/terrain'
 import { aimRadians } from '../../../lib/game/aim'
 import { weaponModelName } from '../../../lib/game/weapons'
 import { meleeOf } from '../../../lib/game/melee'
@@ -113,6 +114,9 @@ export interface BattleScene {
 export interface BattleSceneParts {
   host: SceneHost
   assets: BattleAssets
+  /** The map as the rules see it. Built by whoever mustered the squads, since
+   * a pig's starting height comes off the same ground (lib/game/muster.ts). */
+  query: TerrainQuery
   game: Game
   /** Called whenever the game state changed this frame (HUD refresh). */
   onGameChanged: () => void
@@ -127,12 +131,7 @@ export interface BattleSceneParts {
 }
 
 export function buildBattle(parts: BattleSceneParts): BattleScene {
-  const { host, assets, game, onGameChanged, map, onCollected, bus, sound: sounds } = parts
-  // The map, as the RULES see it — the per-texel water verdict included, so a
-  // pig stands on the painted dry half of a shore tile and swims one step
-  // further, exactly where the water shows. Built here rather than left to the
-  // engine to build for itself because the art below stands on the same ground.
-  const query = buildQuery(assets.blocks, assets.terrainTextures)
+  const { host, assets, query, game, onGameChanged, map, onCollected, bus, sound: sounds } = parts
   const root = new THREE.Group()
   root.rotation.x = Math.PI
 

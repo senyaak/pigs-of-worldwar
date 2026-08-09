@@ -2,20 +2,14 @@
 // squads — a turn HUD and an End Turn button over them. Assets come through
 // the same IPCs the debug viewers use; the rules live in lib/game.
 
-import { Game } from '../../../lib/game/game'
-import type { PigSpawn } from '../../../lib/game/game'
-import { TerrainQuery } from '../../../lib/game/terrain'
-import { buildWaterMask } from '../../../lib/game/watermask'
-import { battleSides } from '../../../lib/game/spawns'
+import type { Game } from '../../../lib/game/game'
+import { buildQuery } from '../../../lib/game/engine'
+import type { TerrainQuery } from '../../../lib/game/terrain'
+import { fielded, mapSquads, musterGame } from '../../../lib/game/muster'
 import { nations } from '../../../lib/game/teams'
-import { turnSecondsFor } from '../../../lib/game/turns'
-import type { Team } from '../../../lib/game/teams'
 import { artFor, classArt } from '../three/soldiers'
 import { bodyExtent } from '../../../lib/game/body'
-import type { BodyExtent } from '../../../lib/game/body'
-import { restingY } from '../../../lib/game/locomotion'
-import { existsForPlayers } from '../../../lib/formats/pog'
-import type { LoadModelResult, MapObject } from '../api'
+import type { LoadModelResult } from '../api'
 import { ensureScene } from '../three/scene'
 import { createBattleInput } from '../input/battleInput'
 import { buildBattle } from '../three/battle'
@@ -55,14 +49,6 @@ const normalizeMap = (name: string): string =>
     .replace(/\.pmg$/i, '')
     .toUpperCase()
 
-/**
- * How many sides a battle fields. The markers name up to six (FINAL uses
- * all of them), but there is no AI for the rest, so the first two the map
- * carries are the ones that play — and WHICH two is the map's own business:
- * a marker's side bit is the nation (lib/game/teams.ts).
- */
-const SIDES_FIELDED = 2
-
 /** `gtext 227`, "USE SHIFT BUTTON TO JUMP THE GAP." — a real tutorial line,
  * and a long enough one to scroll, which is what `pow.say()` shows. */
 const SAMPLE_LINE = 227
@@ -97,41 +83,6 @@ export interface BattleView {
    * MULTI-PLAYER screen asks for a two-sided one (ui/multiPlayer.ts). */
   open(name?: string): Promise<boolean>
   close(): void
-}
-
-interface Squad {
-  name: string
-  pigNames: string[]
-  spawns: PigSpawn[]
-}
-
-/**
- * The squads for a map, and ONLY what the map has: one side per set of
- * spawn markers, each pig standing on the marker that named its class.
- *
- * A skirmish arena fields four sides of five and a campaign map two, of
- * which the first two are taken. CAMP fields one side of one pig, because
- * the training ground is one pig — there is no filling in, and a map that
- * carries no markers cannot be played.
- */
-function mapSquads(objects: MapObject[], teams: Team[]): Squad[] {
-  return battleSides(objects, SIDES_FIELDED).map((side, index) => {
-    // The side bit the map set IS the nation; a map with a bit no nation
-    // answers to falls back on the order it was found in.
-    const team = teams[side[0]?.team] ?? teams[index]
-    const pigs = side.slice(0, team.pigNames.length)
-    return {
-      name: team.name,
-      pigNames: team.pigNames.slice(0, pigs.length),
-      spawns: pigs.map((at) => ({
-        x: at.x,
-        z: at.z,
-        heading: at.heading,
-        pigClass: at.pigClass,
-        parachutes: at.parachutes
-      }))
-    }
-  })
 }
 
 export function initBattle(onLeave: () => void): BattleView {
@@ -343,19 +294,14 @@ export function initBattle(onLeave: () => void): BattleView {
 
     if (!objectsResult.ok) console.log(`${name} without its objects: ${objectsResult.error}`)
 
-    // A map does not place the same things in every game: the low byte of a
-    // record's flags says which player counts it exists in, and the battle
-    // fields as many sides as there are squads to name. BOOM is the map
-    // that shows it — one-player snipers and multiplayer grunts on the very
-    // same spots (lib/formats/pog.ts).
-    const objects = (objectsResult.ok ? objectsResult.objects : []).filter((object) =>
-      existsForPlayers(object, SIDES_FIELDED)
-    )
+    // Only the records this many players get: a map does not place the same
+    // things in every game (lib/game/muster.ts).
+    const objects = fielded(objectsResult.ok ? objectsResult.objects : [])
 
-    query = new TerrainQuery(
-      terrainResult.blocks,
-      buildWaterMask(terrainResult.blocks, terrainResult.textures)
-    )
+    // The map as the rules see it, built ONCE and handed to the scene, which
+    // hands it to the engine — the water mask walks every texel of the ground
+    // and there was a second copy of it here (lib/game/engine.ts).
+    query = buildQuery(terrainResult.blocks, terrainResult.textures)
     const squads = mapSquads(objects, teams)
     if (squads.length === 0) return refuse(`${name} carries no spawn markers — nothing to field`)
 
@@ -379,27 +325,16 @@ export function initBattle(onLeave: () => void): BattleView {
       ? { model: canopyResult.model, textures: canopyResult.textures }
       : null
 
-    // A pig arrives KNOWING where it stands and how big it is: its soles on
-    // the ground its marker sits on, and its body measured off its own art
-    // (lib/game/body.ts). Both used to be the mesh's alone, which is what made
+    // The squads, standing (lib/game/muster.ts). All the renderer supplies is
+    // the MEASUREMENT — how big a pig of this class is, off its own art
+    // (lib/game/body.ts), which used to be the mesh's alone and is what made
     // every blow ask the renderer where a pig was.
-    const bodyOf = (pigClass: number): BodyExtent => {
-      const art = soldiers.find((one) => one.base === classArt(pigClass)) ?? soldiers[0]
-      return bodyExtent(art.model.positions)
-    }
-    const ground = query
-    game = new Game({
-      players: squads.map((squad) => ({ name: squad.name, pigNames: squad.pigNames })),
-      spawns: squads.flatMap((squad) =>
-        squad.spawns.map((at) => ({
-          ...at,
-          y: restingY(ground, at.x, at.z),
-          body: bodyOf(at.pigClass ?? 0)
-        }))
-      ),
-      // A turn's length is the LEVEL's, not a constant — 99 seconds on the
-      // training ground (lib/game/turns.ts).
-      turnSeconds: turnSecondsFor(name)
+    game = musterGame({
+      squads,
+      map: name,
+      ground: query,
+      bodyOf: (pigClass) =>
+        bodyExtent((soldiers.find((one) => one.base === classArt(pigClass)) ?? soldiers[0]).model.positions)
     })
 
     scene?.dispose()
@@ -416,6 +351,7 @@ export function initBattle(onLeave: () => void): BattleView {
     sound = createBattleSound(bus)
     scene = buildBattle({
       host,
+      query,
       assets: {
         blocks: terrainResult.blocks,
         terrainTextures: terrainResult.textures,

@@ -261,9 +261,11 @@ every breach the repo has had compiled cleanly.
 - `src/lib/formats/` — one pure reader per format (mad, tim, mgl, bmp, model,
   hir, mcap, pmg, ptg, pog, srl). Bytes in, structures out. May not know the
   rules.
-- `src/lib/game/` — **the ENGINE**: the rules AND the battle. `engine.ts`
-  BUILDS one — parsed map data in, a battle that steps with `update(delta)`
-  out — so a battle can be assembled with no scene to assemble it in;
+- `src/lib/game/` — **the ENGINE**: the rules AND the battle. `muster.ts` says
+  who a map fields and stands them on it; `engine.ts` BUILDS the battle —
+  parsed map data in, something that steps with `update(delta)` out — so a
+  battle can be assembled with no scene to assemble it in, which
+  `e2e/000/engine-headless.spec.ts` runs in plain Node to prove;
   `battle.ts` is one frame's order of events; `attack.ts` the fire button, the gauge and the
   fuse; `sights.ts` the aim, the tremor and the zoom; `bullets.ts`, `lobs.ts`,
   `strikes.ts` the weapons and every verdict about what they hit; `scenery.ts`
