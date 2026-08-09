@@ -11,12 +11,7 @@
 import * as THREE from 'three'
 import type { Bone, Clip, MapObject, MapProp, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
-import { TerrainQuery } from '../../../lib/game/terrain'
-import { buildWaterMask } from '../../../lib/game/watermask'
-import { ANIM } from '../../../lib/game/locomotion'
-import { isTrainingGround } from '../../../lib/game/tutorial'
-import { targetsOf } from '../../../lib/game/targets'
-import type { Target } from '../../../lib/game/targets'
+import { buildQuery, createEngine } from '../../../lib/game/engine'
 import { aimRadians } from '../../../lib/game/aim'
 import { weaponModelName } from '../../../lib/game/weapons'
 import { meleeOf } from '../../../lib/game/melee'
@@ -27,31 +22,21 @@ import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
 import { SCOPE_BONE, SCOPE_MAGNIFY, SCOPE_MOUNT, createChase } from './chase'
 import type { View } from './chase'
-import { NO_DROP_IN, createDropIn } from '../../../lib/game/dropIn'
 import { createDropInArt } from './dropIn'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
-import { createStrikes } from '../../../lib/game/strikes'
-import { createBattle } from '../../../lib/game/battle'
 import type { Battle } from '../../../lib/game/battle'
 import { createBonePose } from './bonePose'
-import { createAnim } from '../../../lib/game/anim'
 import { createWear } from './wear'
-import { createDamageNumbers } from '../../../lib/game/damage'
 import { projectDamage } from './damageNumbers'
-import { createEffectField } from '../../../lib/game/effectField'
 import { createEffectArt } from './effects'
-import { createAirDrops } from '../../../lib/game/airDrop'
 import { createAirDropArt } from './airDrop'
-import { createScenery } from '../../../lib/game/scenery'
 import { handling } from '../../../lib/game/events'
 import type { BattleBus } from '../../../lib/game/events'
 import type { SceneSound } from '../contracts/sound'
 import type { Collected } from '../../../lib/game/scenery'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
-import { createBullets } from '../../../lib/game/bullets'
 import { createBulletArt } from './shots'
-import { createLobs } from '../../../lib/game/lobs'
 import { createGrenadeArt } from './grenades'
 import { exposeBattleDebug } from './debug'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
@@ -143,10 +128,11 @@ export interface BattleSceneParts {
 
 export function buildBattle(parts: BattleSceneParts): BattleScene {
   const { host, assets, game, onGameChanged, map, onCollected, bus, sound: sounds } = parts
-  // The per-texel water verdict rides on the same art the ground draws —
-  // a pig stands on the painted dry half of a shore tile and swims one
-  // step further, exactly where the water shows.
-  const query = new TerrainQuery(assets.blocks, buildWaterMask(assets.blocks, assets.terrainTextures))
+  // The map, as the RULES see it — the per-texel water verdict included, so a
+  // pig stands on the painted dry half of a shore tile and swims one step
+  // further, exactly where the water shows. Built here rather than left to the
+  // engine to build for itself because the art below stands on the same ground.
+  const query = buildQuery(assets.blocks, assets.terrainTextures)
   const root = new THREE.Group()
   root.rotation.x = Math.PI
 
@@ -159,57 +145,42 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   // the training map the dummies and the gate.
   const props = buildMapProps(assets.objects, assets.props, assets.propTextures)
   root.add(props.group)
-  const training = isTrainingGround(map)
-
-  /**
-   * The crates, the map's SCRIPT and the collision world — all the engine's
-   * (lib/game/scenery.ts). Field 14 is an opcode and the objects are the
-   * program: most of what CAMP carries is not on its ground at the start, and
-   * each of them arrives when the thing it waits on has been finished off.
-   */
-  const scenery = createScenery(
-    assets.objects,
-    training,
-    () => game.currentPig,
-    (id, fromY) => airDrops.send(id, fromY),
-    bus.emit
-  )
-  const obstacles = scenery.obstacles
-  /** The canopy art a descent wears, and the record it lifts (three/airDrop). */
-  const airDropArt = createAirDropArt(props, assets.canopy)
-  /** Crates that come down under a canopy, because the script says they are
-   * pickups and the placer drops those from 0xC00 up — the DESCENT is the
-   * engine's, because the beat after a blow waits on it (lib/game/airDrop.ts). */
-  const airDrops = createAirDrops(
-    { groundOf: (id) => scenery.restingY(id), at: (id) => scenery.at(id) },
-    bus.emit
-  )
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
   // The pose PORT: the one thing a blow cannot work out for itself. Everything
   // that reaches for a bone — the blade, the muzzle, the scope's eye — goes
   // through this, so none of them holds a mesh (lib/game/pose.ts).
   const pose = createBonePose(squad, root)
-  /** What each pig is playing, and whether a committed clip has run out — the
-   * engine's, so the frame's order of events no longer asks a mixer
-   * (lib/game/anim.ts). */
-  const anim = createAnim(assets.clips)
-  /** …and the mixers being made to agree with it, once a frame. */
-  const wear = createWear(squad, anim)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
   const dropInArt = createDropInArt(squad, assets.canopy)
-  /** The opening drop — the ENGINE's phase, because nothing else in the battle
-   * runs while it lasts (lib/game/dropIn.ts). A map with no canopy art stands
-   * its squad on the markers instead, which is what an art-less `open` does. */
-  // …and the SCENE's own subscription: everything the engine announces that
-  // has to be drawn. Built before the drop-in, because lifting the squad is the
-  // first thing announced.
+  /** The canopy art a descent wears, and the record it lifts (three/airDrop). */
+  const airDropArt = createAirDropArt(props, assets.canopy)
+  const marker = buildMarker(root)
+  const chase = createChase(host.camera, query, (x, y, z) => {
+    // What the projectile camera swings around: the map's boxes, and the
+    // ground itself where it stands above the line. `surface` rather than
+    // `height` so a water sheet does not read as a wall (lib/game/terrain.ts).
+    if (obstacles.solid(x, y, z)) return true
+    // Y-DOWN, so underground is a LARGER y — and with a margin, because a
+    // grenade lying still sits exactly on the surface and must not read as
+    // buried in it.
+    return y - query.surface(x, z) > 100
+  })
+
+  /**
+   * The SCENE's subscription: everything the engine announces that has to be
+   * SHOWN, and nothing that has to be remembered.
+   *
+   * Hung BEFORE the engine is built, because the engine announces while it is
+   * still building — a record the map's script holds back is announced hidden
+   * inside `createScenery`, and a canopy opens inside `createDropIn`. A
+   * listener hung afterwards misses both, and the map comes up with the eight
+   * dummies standing on it that the script has not placed yet.
+   */
   bus.on(
     handling({
       shown: ({ id, visible }) => props.show(id, visible),
       taken: ({ id }) => props.take(id),
-      clip: ({ pig, index, once }) => (once ? anim.playOnce(pig, index) : anim.setClip(pig, index)),
-      killed: ({ pig }) => anim.playOnce(pig, ANIM.DYING),
       damaged: ({ at, amount }) => numbers.show(at, amount),
       struck: ({ skill, at }) => effects.hit(skill, at),
       blasted: ({ at }) => effects.blast(at),
@@ -222,7 +193,6 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       crateSent: ({ id }) => airDropArt.open(id),
       crateLanded: ({ id, at }) => {
         airDropArt.cut(id)
-        obstacles.restore(id)
         // A crate arriving kicks something up. Play named it — "там ещё эффект
         // от падения" — and this is the remake's own: nothing has been read that
         // spawns an effect for a placed object. It takes row 0's SMOKE and not
@@ -236,23 +206,39 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       refused: (one) => onCollected({ ...one, given: 0, result: 'full' })
     })
   )
-  const dropIn = assets.canopy
-    ? createDropIn(game.players.flatMap((player) => player.pigs), query, bus.emit)
-    : NO_DROP_IN
+  /**
+   * The battle itself, assembled: the terrain, the map's script, the
+   * projectiles, the effects, the drop-in and the frame's own order of events —
+   * every rule in it, and none of them here (lib/game/engine.ts).
+   *
+   * What this file does below is feed it art and READ what it did.
+   */
+  const engine = createEngine({
+    world: {
+      game,
+      blocks: assets.blocks,
+      terrainArt: assets.terrainTextures,
+      objects: assets.objects,
+      clips: assets.clips,
+      map,
+      // A map with no canopy art stands its squad on the markers instead: a pig
+      // hanging from nothing is worse than one that starts where it was going
+      // to end up (three/dropIn.ts).
+      parachutes: assets.canopy !== null
+    },
+    query,
+    pose,
+    onChanged: onGameChanged,
+    bus
+  })
+  const { battle, scenery, obstacles, anim, swings, shots, grenades, effects, numbers, airDrops, dropIn } =
+    engine
+  /** The mixers, brought into line once a frame with what the engine says each
+   * pig is wearing (three/wear.ts). */
+  const wear = createWear(squad, anim)
   // Up they go, before the first frame is drawn: the engine has already lifted
   // them, and a squad standing on its markers for one frame reads as a stutter.
   dropInArt.draw(dropIn.live())
-  const marker = buildMarker(root)
-  const chase = createChase(host.camera, query, (x, y, z) => {
-    // What the projectile camera swings around: the map's boxes, and the
-    // ground itself where it stands above the line. `surface` rather than
-    // `height` so a water sheet does not read as a wall (lib/game/terrain.ts).
-    if (obstacles.solid(x, y, z)) return true
-    // Y-DOWN, so underground is a LARGER y — and with a margin, because a
-    // grenade lying still sits exactly on the surface and must not read as
-    // buried in it.
-    return y - query.surface(x, z) > 100
-  })
 
   host.scene.add(root)
   host.camera.near = 10
@@ -270,81 +256,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   let settled = false
   /** The weapons in hand, one mesh per pig that has one out. */
   const weapons = createHeldWeapons()
-  /** The damage that floats off whatever was just hit — the original's own
-   * effect, showing points (three/damageNumbers.ts). */
-  const numbers = createDamageNumbers()
-  /** The rings a blow throws — the original's effect system, and the ENGINE's
-   * list of what is running (lib/game/effectField.ts). */
-  const effects = createEffectField()
-  /** …and the bands, puffs and sprites that show them (three/effects.ts). */
+  /** The bands, puffs and sprites that show what the engine's effect field is
+   * running (three/effects.ts). */
   const effectArt = createEffectArt(root)
   /** The field of view the camera had before anything magnified it. */
   const openFov = host.camera.fov
-  /**
-   * The training ground's dummies — the other thing a blow can land on, and
-   * the only one that is not a pig (lib/game/targets.ts).
-   *
-   * ONE list, shared by the blade and the barrel. Each of them splices a
-   * dummy out when it goes down, so two lists meant a dummy shot dead was
-   * still standing as far as the bayonet was concerned — killable a second
-   * time, and its script step run twice.
-   */
-  const targets = targetsOf(assets.objects)
-  /**
-   * What a bayonet does when the fire key goes down — the ENGINE's, blade and
-   * all (lib/game/strikes.ts). The aim angle is deliberately not in it.
-   */
-  const swings = createStrikes(
-    {
-      pigs: () => game.players.flatMap((player) => player.pigs),
-      targets,
-      // A dummy the script has not placed yet is not a target: the exe's own
-      // strike tests `[obj+0x30]`, the placed flag, before it will hit one
-      // (0x476319).
-      present: (id) => !scenery.absent(id),
-      training,
-      pose,
-      clips: assets.clips
-    },
-    bus.emit
-  )
-  /**
-   * What a GUN does when the fire key goes down — and it is the ENGINE's now
-   * (lib/game/bullets.ts): the flight, the substepping and every verdict about
-   * what was hit. This scene supplies the world it flies through and shows what
-   * it announces.
-   */
-  const shots = createBullets(
-    {
-      pigs: () => game.players.flatMap((player) => player.pigs),
-      targets,
-      present: (id) => !scenery.absent(id),
-      query,
-      obstacles,
-      training,
-      pose
-    },
-    bus.emit
-  )
-  /** The spheres that show them (three/shots.ts). */
+  /** The spheres that show the bullets (three/shots.ts). */
   const bulletArt = createBulletArt(root)
-  /**
-   * …and what a GRENADE does, which is a parabola rather than a line — also
-   * the engine's (lib/game/lobs.ts). Same dummy list, same reason.
-   */
-  const grenades = createLobs(
-    {
-      pigs: () => game.players.flatMap((player) => player.pigs),
-      targets,
-      present: (id) => !scenery.absent(id),
-      query,
-      obstacles,
-      training,
-      pose
-    },
-    bus.emit
-  )
-  /** The models and the smoke behind them (three/grenades.ts). */
+  /** The grenade models and the smoke behind them (three/grenades.ts). */
   const grenadeArt = createGrenadeArt(root)
   /**
    * Camera and marker onto a pig, wherever it happens to be standing — or
@@ -438,27 +357,6 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     soldier.node.visible = view !== 'scope'
   }
 
-  /**
-   * The battle itself — the whole order of events in a frame, and none of it
-   * here (lib/game/battle.ts). This file's job below is to READ what it did.
-   */
-  const battle = createBattle({
-      game,
-      query,
-      scenery,
-      anim,
-      clips: assets.clips,
-      shots,
-      grenades,
-      swings,
-      effects,
-      numbers,
-      airDrops,
-      dropIn,
-      onChanged: onGameChanged,
-      bus
-    })
-
   /** Take the battle to a pig, and the camera and marker with it. */
   const focus = (pig: Pig): void => {
     battle.focus(pig)
@@ -514,18 +412,13 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
 
   const onFrame = (delta: number): void => {
     time += delta
-    // ONE frame of the game, and then everything that shows it.
-    battle.update(delta)
-    // The engine's committed clips burn down, and every mixer is brought into
-    // line with what it now says (three/wear.ts).
-    anim.update(delta)
+    // ONE frame of the GAME — the order of events and everything running with
+    // it, the engine's own business from end to end (lib/game/engine.ts).
+    engine.update(delta)
+    // …and then everything that SHOWS it. Every mixer is brought into line with
+    // what the engine now says each pig wears (three/wear.ts).
     wear.apply()
     show(delta)
-    numbers.update(delta)
-    effects.update(delta)
-    shots.update(delta)
-    grenades.update(delta)
-    airDrops.update(delta)
     squad.update(delta)
     marker.bob(time)
     // …and what the engine says is in the air gets drawn where it now is. Once

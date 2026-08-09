@@ -261,16 +261,19 @@ every breach the repo has had compiled cleanly.
 - `src/lib/formats/` — one pure reader per format (mad, tim, mgl, bmp, model,
   hir, mcap, pmg, ptg, pog, srl). Bytes in, structures out. May not know the
   rules.
-- `src/lib/game/` — **the ENGINE**: the rules AND the battle. `battle.ts` is
-  one frame's order of events; `attack.ts` the fire button, the gauge and the
+- `src/lib/game/` — **the ENGINE**: the rules AND the battle. `engine.ts`
+  BUILDS one — parsed map data in, a battle that steps with `update(delta)`
+  out — so a battle can be assembled with no scene to assemble it in;
+  `battle.ts` is one frame's order of events; `attack.ts` the fire button, the gauge and the
   fuse; `sights.ts` the aim, the tremor and the zoom; `bullets.ts`, `lobs.ts`,
   `strikes.ts` the weapons and every verdict about what they hit; `scenery.ts`
   the crates, the map script and the collision world; `airDrop.ts`/`dropIn.ts`
   the descents; `effectField.ts`, `damage.ts`, `anim.ts` the lists the battle
   WAITS on. No three, no Electron, no DOM: it can be stepped headless.
-- `src/renderer/src/three/` — **graphics, and only that**. It reads
-  `battle.view()` once the frame has run and draws it. It may not import `ui/`
-  or `audio/` at all.
+- `src/renderer/src/three/` — **graphics, and only that**. It builds art around
+  an engine and reads `battle.view()` once the frame has run. It ticks nothing:
+  `engine.update(delta)` is the whole game frame. It may not import `ui/` or
+  `audio/` at all.
 - `src/renderer/src/audio/` — **sound, and only that**. `battleSound.ts`
   assembles the domain and subscribes it to the bus; it knows nothing about
   what is drawn.
