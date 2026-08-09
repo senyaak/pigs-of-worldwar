@@ -49,7 +49,7 @@ import type { View } from './chase'
 import { createDropIn } from './dropIn'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
-import { createSwings } from './swing'
+import { createStrikes } from '../../../lib/game/strikes'
 import { createBonePose } from './bonePose'
 import { createDamageNumbers } from './damageNumbers'
 import { createEffects } from './effects'
@@ -73,7 +73,7 @@ import { beginGauge, chargeGauge, gaugeFraction } from '../../../lib/game/gauge'
 import type { Gauge } from '../../../lib/game/gauge'
 import { createPigVoice } from '../audio/pigVoice'
 import { exposeBattleDebug } from './debug'
-import { clipSeconds } from './clips'
+import { clipSeconds } from '../../../lib/game/clips'
 import { SILENT, loadBank } from '../audio/bank'
 import { BARREL_SOUND, BATTLE_SOUNDS, createBattleSounds, playCue } from '../audio/battle'
 import { layerFires, layerSights, weaponLayer } from '../../../lib/game/controls'
@@ -532,24 +532,35 @@ export function buildBattle(
     // crate starts coming down, which is how the whole game is paced.
     pending = { id: target.id, y: target.y }
   }
-  /** What a bayonet does when the fire key goes down. It reads BONES, so it
-   * needs the squad and the root they hang in; the rules are pure next door
-   * (lib/game/melee.ts). The aim angle is deliberately NOT among them. */
-  const swings = createSwings({
-    squad,
-    clips: assets.clips,
-    bank: () => bank,
-    pose,
-    training,
-    targets,
-    // A dummy the script has not placed yet is not a target: the exe's own
-    // strike tests `[obj+0x30]`, the placed flag, before it will hit one
-    // (0x476319).
-    present: (id) => !script.absent(id),
-    numbers,
-    effects,
-    onBroken
-  })
+  /**
+   * What a bayonet does when the fire key goes down — the ENGINE's, blade and
+   * all (lib/game/strikes.ts). The aim angle is deliberately not in it.
+   */
+  const swings = createStrikes(
+    {
+      pigs: () => game.players.flatMap((player) => player.pigs),
+      targets,
+      // A dummy the script has not placed yet is not a target: the exe's own
+      // strike tests `[obj+0x30]`, the placed flag, before it will hit one
+      // (0x476319).
+      present: (id) => !script.absent(id),
+      training,
+      pose,
+      clips: assets.clips
+    },
+    {
+      clip: (pig, index) => squad.of(pig)?.playOnce(index),
+      whoosh: () => playCue(bank, BATTLE_SOUNDS.whoosh),
+      landed: (skill, at) => {
+        const weapon = meleeOf(skill)
+        if (weapon) playCue(bank, BATTLE_SOUNDS[weapon.impact])
+        effects.hit(skill, at)
+      },
+      damaged: (at, amount) => numbers.show(at, amount),
+      killed: (pig) => squad.of(pig)?.playOnce(ANIM.DYING),
+      broken: onBroken
+    }
+  )
   /**
    * What a GUN does when the fire key goes down — and it is the ENGINE's now
    * (lib/game/bullets.ts): the flight, the substepping and every verdict about
@@ -858,7 +869,7 @@ export function buildBattle(
       // of a 36-frame clip, so twenty-odd frames of it were thrown away, and
       // a gun's attack clip had only just started. The pig plays out what it
       // was doing INSIDE the wait — that is what the wait is for.
-      swings.update(delta, active)
+      swings.update(delta, active.pig)
       // The shot that caused all this ends here rather than a frame late.
       if (firing?.phase === 'flight' && shots.live().length === 0 && grenades.live() === 0) firing = null
       // ONE THING AT A TIME. The script's next step waits for the thing that
@@ -956,7 +967,7 @@ export function buildBattle(
           // (audio/pigVoice.ts).
           voice.fire(game.players.indexOf(game.currentPlayer))
         }
-      } else swings.begin(active)
+      } else swings.begin(active.pig)
     }
     fireRequested = false
     // **COMMITTED takes the whole of input, and it starts at the FIRE press.**
@@ -1029,7 +1040,7 @@ export function buildBattle(
     // off the HAND bone, so where the pig is standing has to be settled first
     // (three/swing.ts). It may put the weapon away on the way out — the last
     // bayonet — which the block below then picks up.
-    swings.update(delta, active)
+    swings.update(delta, active.pig)
 
     // The gauge fills while the button is down. Both ways out of it end in
     // the SAME ten-frame fuse a gun's press starts — `Pig::Fire` writes

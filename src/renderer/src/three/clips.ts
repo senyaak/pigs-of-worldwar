@@ -9,19 +9,10 @@
 import * as THREE from 'three'
 import type { Clip } from '../api'
 import type { Pig } from './pig'
+// The RATE is the domain's — a swing and a get-up are timed against it
+// (lib/game/clips.ts).
+import { CLIP_FPS, clipSeconds } from '../../../lib/game/clips'
 
-/**
- * The rate the clips play at.
- *
- * It is NOT the rate they would have to play at for the hooves to stay put:
- * the run clip's planted hoof sweeps about 38 units a frame, so at 25 it
- * carries a body some 960 units a second while the exe walks 1560, and the
- * pig slides by half as much again. Driving playback off the walking speed
- * instead was tried and read plainly WRONG in play — the legs whirl. So the
- * original slid its pigs too, and this stays a flat 25.
- * (`movement/stride.js` has the measurement.)
- */
-const CLIP_FPS = 25
 const BONE_COUNT = 15
 
 /**
@@ -79,10 +70,6 @@ const EULER_ORDER = 'XYZ' as const
 function decodeRotation(x: number, y: number, z: number, out: THREE.Quaternion): void {
   out.setFromEuler(new THREE.Euler(-x, -y, -z, EULER_ORDER))
 }
-
-/** How long a clip runs at `CLIP_FPS`, in seconds. */
-export const clipSeconds = (clip: Clip | null | undefined): number =>
-  clip ? clip.frameCount / CLIP_FPS : 0
 
 export interface Player {
   /** Apply one clip in a loop; null returns to the bind pose. */
