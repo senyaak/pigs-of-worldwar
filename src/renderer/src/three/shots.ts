@@ -23,6 +23,8 @@ import type { Shot } from '../../../lib/game/projectile'
 import { PIG_RADIUS } from '../../../lib/game/obstacles'
 import { hurt, isDead } from '../../../lib/game/health'
 import { originY } from '../../../lib/game/body'
+import { HAND_BONE } from '../../../lib/game/pose'
+import type { Pose } from '../../../lib/game/pose'
 import { ANIM } from '../../../lib/game/locomotion'
 import type { Target } from '../../../lib/game/targets'
 import type { Obstruction } from '../../../lib/game/obstacles'
@@ -31,9 +33,6 @@ import type { DamageNumbers } from './damageNumbers'
 import type { Soldier, Squad } from './squad'
 import { BATTLE_SOUNDS, playCue } from '../audio/battle'
 import type { Bank } from '../audio/bank'
-
-/** The bone a barrel hangs off — the hand, as everything else does. */
-const HAND = 5
 
 /**
  * Where the muzzle sits, per weapon: the row of 0x4d0ee0 the shot's own byte
@@ -85,6 +84,8 @@ export interface Shots {
 export interface ShotParts {
   squad: Squad
   root: THREE.Object3D
+  /** Where the muzzle is: the hand bone's pose (lib/game/pose.ts). */
+  pose: Pose
   bank: () => Bank
   training: boolean
   /** The ground, so a bullet cannot fly through a hill. */
@@ -113,7 +114,6 @@ export function createShots(parts: ShotParts): Shots {
   const live: Shot[] = []
   const bullets: THREE.Mesh[] = []
   const material = new THREE.MeshBasicMaterial({ color: 0xfff0b0, fog: false })
-  const at = new THREE.Vector3()
   /** Dummies not yet knocked down — literally the same array a swing splices
    * from (three/swing.ts). Two lists meant a dummy shot dead was still on the
    * blade's list, so it could be killed twice and run its script twice. */
@@ -191,19 +191,11 @@ export function createShots(parts: ShotParts): Shots {
       const skill = soldier.pig.holding
       if (skill === null || !projectileOf(skill)) return false
       const offset = MUZZLE[skill] ?? { x: 0, y: 0, z: 0 }
-      const bone = soldier.mesh.bones[HAND] ?? soldier.mesh.bones[0]
-      // The mixer wrote this frame's rotations; three would not fold them into
-      // the world matrices until it drew, and the shot leaves first.
-      bone.updateMatrixWorld(true)
-      at.set(offset.x, offset.y, offset.z)
-      bone.localToWorld(at)
-      parts.root.worldToLocal(at)
-      const shot = fireShot(
-        skill,
-        { x: at.x, y: at.y, z: at.z },
-        soldier.pig.heading,
-        aim
-      )
+      // Where the muzzle ended up, through the pose port — a gun that cannot
+      // find its own barrel does not go off (lib/game/pose.ts).
+      const from = parts.pose.boneToWorld(soldier.pig, HAND_BONE, offset)
+      if (!from) return false
+      const shot = fireShot(skill, from, soldier.pig.heading, aim)
       if (!shot) return false
       live.push(shot)
       playCue(parts.bank(), BATTLE_SOUNDS[BARREL_SOUND[skill] ?? 'rifle'])

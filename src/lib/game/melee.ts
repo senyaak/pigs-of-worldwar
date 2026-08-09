@@ -12,13 +12,9 @@
 // a bone ended up this frame.
 
 import { FRAME_SECONDS } from './ballistics'
+import type { Point } from './pose'
 
-/** A point in the game's own space (Y-down). */
-export interface Point {
-  x: number
-  y: number
-  z: number
-}
+export type { Point }
 
 /** Which of the bank's noises a weapon lands with. The exe names sound
  * INDICES; the names are in `renderer/audio/battle.ts`, as everywhere else. */

@@ -50,6 +50,7 @@ import { createDropIn } from './dropIn'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import { createSwings } from './swing'
+import { createBonePose } from './bonePose'
 import { createDamageNumbers } from './damageNumbers'
 import { createEffects } from './effects'
 import { createAirDrops } from './airDrop'
@@ -364,6 +365,10 @@ export function buildBattle(
   if (window.pow) window.pow.sfx = createSoundConsole(() => bank)
 
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
+  // The pose PORT: the one thing a blow cannot work out for itself. Everything
+  // that reaches for a bone — the blade, the muzzle, the scope's eye — goes
+  // through this, so none of them holds a mesh (lib/game/pose.ts).
+  const pose = createBonePose(squad, root)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
   const dropIn = createDropIn(squad, query, assets.canopy, () => bank)
@@ -385,8 +390,6 @@ export function buildBattle(
   host.camera.updateProjectionMatrix()
 
   let time = 0
-  /** Scratch for the scope's eye, so a camera placement allocates nothing. */
-  const eyeAt = new THREE.Vector3()
   /** `[0x4bd6c8]` — how far toward the hand the camera's HEIGHT moves in one
    * engine frame (0x4a3072). A third, and no more. */
   const EYE_LAG = 0.333
@@ -534,7 +537,7 @@ export function buildBattle(
     squad,
     clips: assets.clips,
     bank: () => bank,
-    root,
+    pose,
     training,
     targets,
     // A dummy the script has not placed yet is not a target: the exe's own
@@ -550,6 +553,7 @@ export function buildBattle(
   const shots = createShots({
     squad,
     root,
+    pose,
     bank: () => bank,
     training,
     query,
@@ -618,13 +622,7 @@ export function buildBattle(
     // A gap means the sights were down in between; start the lag afresh.
     if (frame > eyeFrame + 1) settled = false
     eyeFrame = frame
-    const bone = soldier.mesh.bones[SCOPE_BONE] ?? soldier.mesh.bones[0]
-    // The mixer wrote this frame's rotations; three folds them into the world
-    // matrices at draw time and the camera is placed first.
-    bone.updateMatrixWorld(true)
-    eyeAt.set(SCOPE_MOUNT.x, SCOPE_MOUNT.y, SCOPE_MOUNT.z)
-    bone.localToWorld(eyeAt)
-    root.worldToLocal(eyeAt)
+    const eyeAt = pose.boneToWorld(soldier.pig, SCOPE_BONE, SCOPE_MOUNT) ?? heldEye
     // …and the HEIGHT LAGS. The exe does not put the camera at the hand's y —
     // it moves a THIRD of the way there each frame and no further:
     //

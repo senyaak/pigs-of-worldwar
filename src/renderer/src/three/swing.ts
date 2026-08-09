@@ -10,10 +10,11 @@
 // through the battle's own converted root, so it can be compared with a pig's
 // position straight.
 
-import * as THREE from 'three'
 import type { Clip } from '../api'
 import { advanceSwing, beginSwing, caught, meleeOf, strikeGap, strikeOffsets } from '../../../lib/game/melee'
-import type { Point, StrikeGap, SwingState } from '../../../lib/game/melee'
+import type { StrikeGap, SwingState } from '../../../lib/game/melee'
+import { HAND_BONE } from '../../../lib/game/pose'
+import type { Point, Pose } from '../../../lib/game/pose'
 import { amountOf, spend } from '../../../lib/game/inventory'
 import { hurt, isDead } from '../../../lib/game/health'
 import { originY } from '../../../lib/game/body'
@@ -26,9 +27,6 @@ import { clipSeconds } from './clips'
 import type { Soldier, Squad } from './squad'
 import { BATTLE_SOUNDS, playCue } from '../audio/battle'
 import type { Bank } from '../audio/bank'
-
-/** The bone the blade hangs off: the hand (exe 0x475a26, dll 0x1000dbd1). */
-const HAND = 5
 
 /**
  * What the last strike actually measured — the ONE thing a miss cannot be
@@ -80,8 +78,9 @@ export interface SwingParts {
   clips: Clip[]
   /** Asked for rather than held: the bank loads beside the scene. */
   bank: () => Bank
-  /** The battle's game-space root — what a bone's world point converts into. */
-  root: THREE.Object3D
+  /** Where the blade is: the hand bone's pose, asked for rather than read
+   * (lib/game/pose.ts). */
+  pose: Pose
   /** Whether this is the training ground, where a PIG cannot be killed — the
    * exe floors it at one point (lib/game/health.ts). A dummy has no such
    * mercy: 0x48d990 has no training test in it at all. */
@@ -114,26 +113,21 @@ export function createSwings(parts: SwingParts): Swings {
    * dummies down (three/shots.ts) and there is one training ground. */
   const standing: Target[] = parts.targets
 
-  const at = new THREE.Vector3()
-
   /** The three points the blade is sampled at, in game space. */
   const points = (soldier: Soldier, skill: number): Point[] => {
     const weapon = meleeOf(skill)
     if (!weapon) return []
-    const bone = soldier.mesh.bones[HAND] ?? soldier.mesh.bones[0]
-    // The mixer wrote this frame's rotations; three would not fold them into
-    // the world matrices until it drew, and the strike happens first.
-    bone.updateMatrixWorld(true)
     // The bone carries the whole of it: where the pig stands, which way it
     // faces, and what this frame of the swing has done to its arm. The aim
     // angle is NOT in it, and that is the exe's behaviour, not a gap
-    // (lib/game/melee.ts).
-    return strikeOffsets(weapon).map((offset) => {
-      at.set(offset.x, offset.y, offset.z)
-      bone.localToWorld(at)
-      parts.root.worldToLocal(at)
-      return { x: at.x, y: at.y, z: at.z }
-    })
+    // (lib/game/melee.ts). WHERE the bone is comes through the pose port —
+    // this file no longer knows what is drawing the pig (lib/game/pose.ts).
+    const blade: Point[] = []
+    for (const offset of strikeOffsets(weapon)) {
+      const at = parts.pose.boneToWorld(soldier.pig, HAND_BONE, offset)
+      if (at) blade.push(at)
+    }
+    return blade
   }
 
   /** Resolve the blade against everyone standing about, once. */
