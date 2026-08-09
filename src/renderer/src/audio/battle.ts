@@ -146,6 +146,9 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    */
   pistol: { sound: 'L_PISTOL', volume: 100, pitch: 100 },
   rifle: { sound: 'L_RIFLE', volume: 100, pitch: 100 },
+  // …and which barrel makes which noise. Only the two above are decoded, and
+  // they are the two that matter; the rest borrow the rifle's and say so here
+  // rather than in the engine, because a sound NAME is this file's business.
   /**
    * A canopy opening. DECODED, and it settles a question this field used to
    * carry: `StartParachuting` calls `Sound::Play` directly at 0x471777 with
@@ -182,6 +185,9 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    */
   blast: { sound: 'E_1', volume: 100, pitch: 100 }
 }
+
+/** Which barrel makes which noise, by skill — see `pistol`/`rifle` above. */
+export const BARREL_SOUND: Record<number, 'pistol' | 'rifle'> = { 6: 'pistol' }
 
 /**
  * Play a cue the way the exe would: both scales are percentages of nominal,

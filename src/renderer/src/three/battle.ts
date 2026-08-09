@@ -63,7 +63,8 @@ import type { Aftermath } from '../../../lib/game/aftermath'
 import { createWobble, resetWobble, wobbleStep } from '../../../lib/game/wobble'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../../../lib/game/zoom'
 import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
-import { createShots } from './shots'
+import { createBullets } from '../../../lib/game/bullets'
+import { createBulletArt } from './shots'
 import { createGrenades } from './grenades'
 import { isLobbed } from '../../../lib/game/grenade'
 import { SKILL } from '../../../lib/game/skills'
@@ -73,7 +74,7 @@ import { createPigVoice } from '../audio/pigVoice'
 import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
 import { SILENT, loadBank } from '../audio/bank'
-import { BATTLE_SOUNDS, createBattleSounds, playCue } from '../audio/battle'
+import { BARREL_SOUND, BATTLE_SOUNDS, createBattleSounds, playCue } from '../audio/battle'
 import { layerFires, layerSights, weaponLayer } from '../../../lib/game/controls'
 import { createSoundConsole } from '../audio/console'
 import type { Bank } from '../audio/bank'
@@ -497,7 +498,7 @@ export function buildBattle(
     firing !== null ||
     swings.running() ||
     grenades.live() > 0 ||
-    shots.live() > 0
+    shots.live().length > 0
   /** The pigs' own barks. The gun arm of `Pig::Fire` says one every shot,
    * walking twelve lines in rotation (audio/pigVoice.ts). */
   const voice = createPigVoice()
@@ -548,21 +549,31 @@ export function buildBattle(
     effects,
     onBroken
   })
-  /** What a GUN does when the fire key goes down. It reads the same hand bone
-   * a swing does, and off the same table (three/shots.ts). */
-  const shots = createShots({
-    squad,
-    root,
-    pose,
-    bank: () => bank,
-    training,
-    query,
-    obstacles,
-    targets,
-    present: (id) => !script.absent(id),
-    numbers,
-    onBroken
-  })
+  /**
+   * What a GUN does when the fire key goes down — and it is the ENGINE's now
+   * (lib/game/bullets.ts): the flight, the substepping and every verdict about
+   * what was hit. This scene supplies the world it flies through and shows what
+   * it announces.
+   */
+  const shots = createBullets(
+    {
+      pigs: () => game.players.flatMap((player) => player.pigs),
+      targets,
+      present: (id) => !script.absent(id),
+      query,
+      obstacles,
+      training,
+      pose
+    },
+    {
+      fired: (skill) => playCue(bank, BATTLE_SOUNDS[BARREL_SOUND[skill] ?? 'rifle']),
+      damaged: (at, amount) => numbers.show(at, amount),
+      killed: (pig) => squad.of(pig)?.playOnce(ANIM.DYING),
+      broken: onBroken
+    }
+  )
+  /** The spheres that show them (three/shots.ts). */
+  const bulletArt = createBulletArt(root)
   /** …and what a GRENADE does, which is a parabola rather than a line
    * (three/grenades.ts). Same dummy list, same reason. */
   const grenades = createGrenades({
@@ -828,7 +839,7 @@ export function buildBattle(
       // was doing INSIDE the wait — that is what the wait is for.
       swings.update(delta, active)
       // The shot that caused all this ends here rather than a frame late.
-      if (firing?.phase === 'flight' && shots.live() === 0 && grenades.live() === 0) firing = null
+      if (firing?.phase === 'flight' && shots.live().length === 0 && grenades.live() === 0) firing = null
       // ONE THING AT A TIME. The script's next step waits for the thing that
       // triggered it to finish — play's rule for the whole game, "ждёшь конца
       // одной анимации и включаешь другую". Three separate things have to be
@@ -852,7 +863,7 @@ export function buildBattle(
         swings.running() ||
         active.animating() ||
         effects.busy() ||
-        shots.live() > 0 ||
+        shots.live().length > 0 ||
         grenades.live() > 0 ||
         numbers.live() > 0 ||
         airDrops.falling() > 0
@@ -1024,7 +1035,7 @@ export function buildBattle(
       // aim, not a decoration over it.
       const away = isLobbed(holding)
         ? grenades.throwOne(active, aimedAngle(), thrownWith)
-        : shots.fire(active, aimedAngle())
+        : shots.fire(active.pig, aimedAngle())
       if (!away) firing = null
       else {
         // `Pig::Attack` puts the weapon's own attack clip on at the same
@@ -1038,7 +1049,7 @@ export function buildBattle(
     // camera comes back off the bullet and the turn clock starts again — and it
     // comes back by TELEPORTING behind the pig rather than flying home from
     // wherever the bullet ended up (three/chase.ts, `reset`).
-    if (firing?.phase === 'flight' && shots.live() === 0 && grenades.live() === 0) {
+    if (firing?.phase === 'flight' && shots.live().length === 0 && grenades.live() === 0) {
       firing = null
       chase.reset()
     }
@@ -1180,6 +1191,9 @@ export function buildBattle(
     airDrops.update(delta)
     squad.update(delta)
     marker.bob(time)
+    // …and the engine's bullets get drawn where they now are. Once a frame,
+    // after everything that could have moved or spent one (three/shots.ts).
+    bulletArt.draw(shots.live())
   }
   host.onFrame.add(onFrame)
 
@@ -1200,7 +1214,7 @@ export function buildBattle(
     smoke: () => effects.smoke(),
     fire: () => effects.fire(),
     script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
-    shots: () => shots.live(),
+    shots: () => shots.live().length,
     aim: () => (weaponOf(game.currentPig.holding).aims ? aim.angle : null),
     grenades: () => grenades.at(),
     charging: () => showGauge(),
@@ -1286,7 +1300,7 @@ export function buildBattle(
       dropIn.dispose()
       marker.dispose()
       effects.dispose()
-      shots.dispose()
+      bulletArt.dispose()
       grenades.dispose()
       voice.dispose()
       airDrops.dispose()
