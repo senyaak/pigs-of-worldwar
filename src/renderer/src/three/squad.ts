@@ -19,8 +19,7 @@ import type { Pig as PigMesh } from './pig'
 import { createPlayer } from './clips'
 import type { Player as ClipPlayer } from './clips'
 import { classArt } from './soldiers'
-import { LAYOUT as HUD } from '../ui/hud'
-import type { PigPlate } from '../ui/hud'
+import type { PigPlate } from '../contracts/overlay'
 
 /** One dressed soldier model out of Chars/british.mad. */
 export interface SoldierArt {
@@ -77,8 +76,10 @@ export interface Squad {
   of(pig: Pig): Soldier | undefined
   /** Every pig but `except`, as bodies to walk into (lib/game/obstacles). */
   bodies(except: Soldier): { x: number; y: number; z: number }[]
-  /** Where each living pig's name hangs, in a view this big. */
-  plates(camera: THREE.Camera, width: number, height: number): PigPlate[]
+  /** Where each living pig's name hangs, in a view this big. `lift` is how far
+   * over the crown the name floats — the dashboard's own number, passed in
+   * rather than read, so this module owes `ui/` nothing. */
+  plates(camera: THREE.Camera, width: number, height: number, lift: number): PigPlate[]
   /** Advance every clip player. */
   update(delta: number): void
   dispose(): void
@@ -159,7 +160,7 @@ export function fieldSquad(
           z: soldier.pig.position.z,
           y: soldier.node.position.y + soldier.mesh.footOffset
         })),
-    plates(camera, width, height) {
+    plates(camera, width, height, lift) {
       const at = new THREE.Vector3()
       const out: PigPlate[] = []
       for (const soldier of members) {
@@ -167,10 +168,10 @@ export function fieldSquad(
         soldier.node.getWorldPosition(at)
         // World space is Y-up, so the plate hangs above by ADDING to y. The
         // node sits at the model's ORIGIN — the hip — so clear the rise to
-        // the crown and let LAYOUT say only how far over the head the name
-        // floats, which keeps meaning the same thing whatever the model's
-        // scale does.
-        at.y += soldier.mesh.crownRise + HUD.plate.lift
+        // the crown and let the caller's `lift` say only how far over the head
+        // the name floats, which keeps meaning the same thing whatever the
+        // model's scale does.
+        at.y += soldier.mesh.crownRise + lift
         at.project(camera)
         if (at.z > 1) continue // behind the camera
         out.push({

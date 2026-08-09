@@ -69,7 +69,6 @@ import { SKILL } from '../../../lib/game/skills'
 import { beginGauge, chargeGauge, gaugeFraction } from '../../../lib/game/gauge'
 import type { Gauge } from '../../../lib/game/gauge'
 import { createPigVoice } from '../audio/pigVoice'
-import type { FloatingNumber } from './damageNumbers'
 import { exposeBattleDebug } from './debug'
 import { clipSeconds } from './clips'
 import { SILENT, loadBank } from '../audio/bank'
@@ -77,7 +76,7 @@ import { BATTLE_SOUNDS, createBattleSounds, playCue } from '../audio/battle'
 import { layerFires, layerSights, weaponLayer } from '../../../lib/game/controls'
 import { createSoundConsole } from '../audio/console'
 import type { Bank } from '../audio/bank'
-import type { PigPlate } from '../ui/hud'
+import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SceneHost } from './scene'
 
 export type { SoldierArt } from './squad'
@@ -126,8 +125,10 @@ export interface BattleScene {
    * shows the mission's title card over. */
   dropping(): boolean
   /** Where each living pig's name hangs, in a view this big — the camera
-   * lives here, so the dashboard asks rather than guesses. */
-  plates(width: number, height: number): PigPlate[]
+   * lives here, so the dashboard asks rather than guesses. `lift` is the
+   * dashboard's own clearance over the pig's crown; the scene projects and
+   * does not decide it (contracts/overlay.ts). */
+  plates(width: number, height: number, lift: number): PigPlate[]
   /** Seconds the acting pig has stood still: the names come back with it. */
   still(): number
   /** The damage numbers floating over the battle, projected into a view this
@@ -1222,7 +1223,7 @@ export function buildBattle(
   return {
     focus,
     dropping: () => dropIn.running(),
-    plates: (width, height) => squad.plates(host.camera, width, height),
+    plates: (width, height, lift) => squad.plates(host.camera, width, height, lift),
     numbers: (width, height) => numbers.project(host.camera, root, width, height),
     still: () => still,
     setIntent(walk, turn) {

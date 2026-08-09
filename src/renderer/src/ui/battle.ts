@@ -18,7 +18,7 @@ import { createBattleInput } from '../input/battleInput'
 import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
 import { controller } from '../input/controller'
-import { createHud } from './hud'
+import { LAYOUT, createHud } from './hud'
 import { missionTitle } from './titleCard'
 import { createSpeech } from '../audio/speech'
 import { CLIP_FOR, clipForPickup, isTrainingGround, lineFor } from '../../../lib/game/tutorial'
@@ -232,7 +232,7 @@ export function initBattle(onLeave: () => void): BattleView {
     hud.draw({
       delta,
       seconds: game.timeLeft,
-      pigs: scene.plates(hudCanvas.clientWidth, hudCanvas.clientHeight),
+      pigs: scene.plates(hudCanvas.clientWidth, hudCanvas.clientHeight, LAYOUT.plate.lift),
       numbers: scene.numbers(hudCanvas.clientWidth, hudCanvas.clientHeight),
       still: scene.still(),
       strings: battleText,

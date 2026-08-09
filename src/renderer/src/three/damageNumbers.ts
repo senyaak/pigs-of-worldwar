@@ -17,6 +17,7 @@
 // the projection is the same one the name plates use (three/squad.ts).
 
 import * as THREE from 'three'
+import type { FloatingNumber } from '../contracts/overlay'
 
 /** How long one stays up. The exe's field is 0x3e8 and its unit is not
  * established — the turn clock counts hundredths, which would make it ten
@@ -27,16 +28,6 @@ export const NUMBER_SECONDS = 1
 /** How far it drifts up over that time, in world units — a pig is 320 tall,
  * so this is about half a body. The remake's own. */
 const RISE = 160
-
-export interface FloatingNumber {
-  /** Screen position, CSS pixels. */
-  x: number
-  y: number
-  /** The damage, in points — what the exe puts on the effect. */
-  value: number
-  /** 0 at the moment of the hit, 1 as it goes out. */
-  age: number
-}
 
 export interface DamageNumbers {
   /** Something took `value` points at this spot (game space, Y-down). */

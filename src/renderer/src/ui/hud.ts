@@ -30,7 +30,7 @@ import type { Sprite, SpriteSet } from './sprites'
 import { drawTitleCard } from './titleCard'
 import { createBriefingBar } from './briefingBar'
 import { createSkillMenu } from './skillMenu'
-import type { FloatingNumber } from '../three/damageNumbers'
+import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SkillMenu } from './skillMenu'
 
 const DASHBOARD = 'Language/Tims/dashtims.mad'
@@ -205,14 +205,6 @@ export const LAYOUT = {
 /** What the specs wait for; the console tweaks `LAYOUT.plate.delay`. */
 export const PLATE_DELAY = LAYOUT.plate.delay
 
-export interface PigPlate {
-  /** Screen position of the point the name hangs over, in CSS pixels. */
-  x: number
-  y: number
-  name: string
-  health: number
-}
-
 export interface HudState {
   /** Seconds since the last frame — the briefing bar's slide and scroll run
    * on it; nothing else on the dashboard moves by itself. */
@@ -222,7 +214,7 @@ export interface HudState {
   /** Every living pig, projected by the scene. */
   pigs: PigPlate[]
   /** The damage floating off whatever was just hit, projected by the scene
-   * (three/damageNumbers.ts). */
+   * (contracts/overlay.ts). */
   numbers: FloatingNumber[]
   /** How long the acting pig has stood still. */
   still: number
