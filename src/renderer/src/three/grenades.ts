@@ -36,6 +36,7 @@ import { weaponModelName } from '../../../lib/game/weapons'
 import { createLobArt } from './lobArt'
 import { createLobTrails } from './lobTrail'
 import { hurt, isDead } from '../../../lib/game/health'
+import { originY } from '../../../lib/game/body'
 import { ANIM } from '../../../lib/game/locomotion'
 import type { Target } from '../../../lib/game/targets'
 import type { Obstruction } from '../../../lib/game/obstacles'
@@ -184,7 +185,7 @@ export function createGrenades(parts: GrenadeParts): Grenades {
       if (isDead(soldier.pig)) continue
       const body = {
         x: soldier.pig.position.x,
-        y: soldier.node.position.y,
+        y: originY(soldier.pig.position.y, soldier.pig.body),
         z: soldier.pig.position.z
       }
       const amount = took(body.x - shot.x, body.y - shot.y, body.z - shot.z)

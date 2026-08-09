@@ -10,7 +10,10 @@ import { battleSides } from '../../../lib/game/spawns'
 import { nations } from '../../../lib/game/teams'
 import { turnSecondsFor } from '../../../lib/game/turns'
 import type { Team } from '../../../lib/game/teams'
-import { artFor } from '../three/soldiers'
+import { artFor, classArt } from '../three/soldiers'
+import { bodyExtent } from '../../../lib/game/body'
+import type { BodyExtent } from '../../../lib/game/body'
+import { restingY } from '../../../lib/game/locomotion'
 import { existsForPlayers } from '../../../lib/formats/pog'
 import type { LoadModelResult, MapObject } from '../api'
 import { ensureScene } from '../three/scene'
@@ -365,9 +368,24 @@ export function initBattle(onLeave: () => void): BattleView {
       ? { model: canopyResult.model, textures: canopyResult.textures }
       : null
 
+    // A pig arrives KNOWING where it stands and how big it is: its soles on
+    // the ground its marker sits on, and its body measured off its own art
+    // (lib/game/body.ts). Both used to be the mesh's alone, which is what made
+    // every blow ask the renderer where a pig was.
+    const bodyOf = (pigClass: number): BodyExtent => {
+      const art = soldiers.find((one) => one.base === classArt(pigClass)) ?? soldiers[0]
+      return bodyExtent(art.model.positions)
+    }
+    const ground = query
     game = new Game({
       players: squads.map((squad) => ({ name: squad.name, pigNames: squad.pigNames })),
-      spawns: squads.flatMap((squad) => squad.spawns),
+      spawns: squads.flatMap((squad) =>
+        squad.spawns.map((at) => ({
+          ...at,
+          y: restingY(ground, at.x, at.z),
+          body: bodyOf(at.pigClass ?? 0)
+        }))
+      ),
       // A turn's length is the LEVEL's, not a constant — 99 seconds on the
       // training ground (lib/game/turns.ts).
       turnSeconds: turnSecondsFor(name)

@@ -990,7 +990,7 @@ export function buildBattle(
       delta
     )
     sounds.follow(loco, query.isWater(loco.x, loco.z))
-    game.moveCurrentPig(loco.x, loco.z, loco.heading)
+    game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
     active.place(loco.x, loco.y, loco.z, loco.heading)
     // Walking INTO a crate is how one is collected; there is no button.
     collect(active.pig)
@@ -1210,10 +1210,12 @@ export function buildBattle(
     barks: () => voice.spoken(),
     aftermath: () => aftermath !== null,
     warp: (x, z, heading) => {
-      game.moveCurrentPig(x, z, heading)
       swings.reset()
       effects.clear()
+      // The landing height comes out of a fresh locomotion state, so the pig
+      // is moved once it is known — `place` is what writes the position now.
       loco = createLocomotion(query, x, z, heading)
+      game.moveCurrentPig(x, loco.y, z, heading)
       const soldier = squad.of(game.currentPig)
       if (!soldier) return
       soldier.place(x, loco.y, z, heading)

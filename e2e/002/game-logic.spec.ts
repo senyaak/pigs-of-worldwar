@@ -73,8 +73,8 @@ test('the turn clock ticks down, expires exactly once, and refills', () => {
   expect(game.timeLeft).toBe(6)
 
   // Movement is free while the clock runs — the clock IS the limit.
-  game.moveCurrentPig(100, 200, Math.PI / 2)
-  expect(game.currentPig.position).toEqual({ x: 100, z: 200 })
+  game.moveCurrentPig(100, -50, 200, Math.PI / 2)
+  expect(game.currentPig.position).toEqual({ x: 100, y: -50, z: 200 })
   expect(game.currentPig.heading).toBeCloseTo(Math.PI / 2)
   game.turnCurrentPig(1)
   expect(game.currentPig.heading).toBe(1)

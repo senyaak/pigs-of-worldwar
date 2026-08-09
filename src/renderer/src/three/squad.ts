@@ -137,9 +137,14 @@ export function fieldSquad(
       animating: () => player.running(),
       settle() {
         const { x, z } = pig.position
-        node.position.set(x, restingY(query, x, z) - mesh.footOffset, z)
+        soldier.place(x, restingY(query, x, z), z, pig.heading)
       },
       place(x, y, z, heading) {
+        // The PIG carries where it stands; the mesh follows it. Anything that
+        // can hit a pig reads the domain now, never this node
+        // (lib/game/body.ts).
+        pig.position = { x, y, z }
+        pig.heading = heading
         node.position.set(x, y - mesh.footOffset, z)
         node.rotation.y = heading + PIG_HEADING_OFFSET
       }
@@ -155,11 +160,7 @@ export function fieldSquad(
     bodies: (except) =>
       members
         .filter((soldier) => soldier !== except)
-        .map((soldier) => ({
-          x: soldier.pig.position.x,
-          z: soldier.pig.position.z,
-          y: soldier.node.position.y + soldier.mesh.footOffset
-        })),
+        .map((soldier) => ({ ...soldier.pig.position })),
     plates(camera, width, height, lift) {
       const at = new THREE.Vector3()
       const out: PigPlate[] = []

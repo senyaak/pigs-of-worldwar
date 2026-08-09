@@ -9,6 +9,7 @@
 import * as THREE from 'three'
 import type { Bone, Model, Texture } from '../api'
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import { bodyExtent } from '../../../lib/game/body'
 import { buildModelGeometry, buildTextureMaterials, disposeMesh } from './modelMesh'
 
 export interface Pig {
@@ -82,20 +83,16 @@ export function buildPig(model: Model, textures: Texture[], skeleton: Bone[]): P
   group.rotation.x = Math.PI
   group.add(mesh)
 
-  // Game Y-down: the largest Y is the soles, the smallest the crown.
-  let footOffset = 0
-  let crown = 0
-  for (let i = 1; i < model.positions.length; i += 3) {
-    if (model.positions[i] > footOffset) footOffset = model.positions[i]
-    if (model.positions[i] < crown) crown = model.positions[i]
-  }
+  // How tall the body is, measured off the art — a domain fact rather than a
+  // drawing one, so the measuring lives next to the rules (lib/game/body.ts).
+  const { footOffset, crownRise } = bodyExtent(model.positions)
 
   return {
     group,
     mesh,
     bones,
-    footOffset: footOffset * MODEL_SCALE,
-    crownRise: -crown * MODEL_SCALE,
+    footOffset,
+    crownRise,
     dispose: () => disposeMesh(geometry, materials)
   }
 }

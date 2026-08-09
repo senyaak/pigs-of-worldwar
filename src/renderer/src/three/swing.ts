@@ -16,6 +16,7 @@ import { advanceSwing, beginSwing, caught, meleeOf, strikeGap, strikeOffsets } f
 import type { Point, StrikeGap, SwingState } from '../../../lib/game/melee'
 import { amountOf, spend } from '../../../lib/game/inventory'
 import { hurt, isDead } from '../../../lib/game/health'
+import { originY } from '../../../lib/game/body'
 import { ANIM } from '../../../lib/game/locomotion'
 import { reached } from '../../../lib/game/targets'
 import type { Target } from '../../../lib/game/targets'
@@ -154,10 +155,12 @@ export function createSwings(parts: SwingParts): Swings {
     for (const target of parts.squad.members) {
       if (target === attacker) continue
       // A pig's body sits at the model's origin — the hip — which is exactly
-      // the position the exe compares (three/squad.ts places it there).
+      // the position the exe compares. The DOMAIN says where that is now
+      // (lib/game/body.ts); it used to be read off the mesh, which is what
+      // kept the strike tied to the renderer.
       const body = {
         x: target.pig.position.x,
-        y: target.node.position.y,
+        y: originY(target.pig.position.y, target.pig.body),
         z: target.pig.position.z
       }
       const gap = strikeGap(blade, from, body)

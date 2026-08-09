@@ -22,6 +22,7 @@ import { MODEL_SCALE } from '../../../lib/game/scale'
 import type { Shot } from '../../../lib/game/projectile'
 import { PIG_RADIUS } from '../../../lib/game/obstacles'
 import { hurt, isDead } from '../../../lib/game/health'
+import { originY } from '../../../lib/game/body'
 import { ANIM } from '../../../lib/game/locomotion'
 import type { Target } from '../../../lib/game/targets'
 import type { Obstruction } from '../../../lib/game/obstacles'
@@ -146,7 +147,7 @@ export function createShots(parts: ShotParts): Shots {
       if (isDead(soldier.pig)) continue
       const body = {
         x: soldier.pig.position.x,
-        y: soldier.node.position.y,
+        y: originY(soldier.pig.position.y, soldier.pig.body),
         z: soldier.pig.position.z
       }
       if (!inside(shot, body)) continue

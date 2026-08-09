@@ -8,10 +8,20 @@
 
 import type { Slot } from './inventory'
 import { isDead, maxHealthFor } from './health'
+import { NO_BODY } from './body'
+import type { BodyExtent } from './body'
 
 export interface PigSpawn {
   x: number
   z: number
+  /** Where the SOLES start, game space (Y-down). A marker does not carry one
+   * — the ground does — so whoever fields the squad drops the pig on the
+   * terrain and says where that was; without it a pig starts at zero and the
+   * first frame of its turn puts it right. */
+  y?: number
+  /** How big this pig's body is, measured off its own art (lib/game/body.ts).
+   * Absent where there is no art — the pure specs field squads with none. */
+  body?: BodyExtent
   /** Facing the map asked for; pigs start looking north without one. */
   heading?: number
   /** Class index — Grunt 0, Gunner 1, … The map's own spawn markers carry
@@ -43,7 +53,19 @@ export interface Pig {
    * takes its model in hand and aims it (lib/game/weapons.ts, aim.ts);
    * nothing FIRES it yet. */
   holding: number | null
-  position: { x: number; z: number }
+  /**
+   * Where it stands, game space (Y-DOWN) — and `y` is the SOLES, the same
+   * quantity `restingY` and the locomotion state carry.
+   *
+   * The body's ORIGIN, which is what a blow is measured against, sits
+   * `body.footOffset` above it: `originY`. Both used to live in the renderer's
+   * mesh, which is why anything that could hit a pig had to reach into the
+   * scene for it.
+   */
+  position: { x: number; y: number; z: number }
+  /** How big this pig's body is (lib/game/body.ts) — a measurement of the
+   * art, held here so the rules never have to ask the renderer. */
+  body: BodyExtent
   /** Facing, radians around Y in the game's own space. */
   heading: number
   /** Class index — what the pig is, before it is anywhere. */
@@ -131,7 +153,8 @@ export class Game {
             health: maxHealthFor(pigClass),
             carrying: [],
             holding: null,
-            position: { x: at.x, z: at.z },
+            position: { x: at.x, y: at.y ?? 0, z: at.z },
+            body: at.body ?? NO_BODY,
             heading: at.heading ?? 0,
             pigClass,
             parachutes: at.parachutes ?? false
@@ -191,16 +214,17 @@ export class Game {
   }
 
   /** Move the acting pig — the clock is the only movement limit, so this
-   * always succeeds; the caller validated the ground. */
-  moveCurrentPig(x: number, z: number, heading: number): void {
+   * always succeeds; the caller validated the ground. `y` is the soles, and
+   * comes from the locomotion state that worked the step out. */
+  moveCurrentPig(x: number, y: number, z: number, heading: number): void {
     const pig = this.currentPig
-    pig.position = { x, z }
+    pig.position = { x, y, z }
     pig.heading = heading
   }
 
   /** Involuntary displacement — sliding, knockback. */
-  displaceCurrentPig(x: number, z: number): void {
-    this.currentPig.position = { x, z }
+  displaceCurrentPig(x: number, y: number, z: number): void {
+    this.currentPig.position = { x, y, z }
   }
 
   /** Turn the acting pig on the spot. */
