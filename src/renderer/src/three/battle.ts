@@ -65,7 +65,8 @@ import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from '../..
 import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBullets } from '../../../lib/game/bullets'
 import { createBulletArt } from './shots'
-import { createGrenades } from './grenades'
+import { createLobs } from '../../../lib/game/lobs'
+import { createGrenadeArt } from './grenades'
 import { isLobbed } from '../../../lib/game/grenade'
 import { SKILL } from '../../../lib/game/skills'
 import { beginGauge, chargeGauge, gaugeFraction } from '../../../lib/game/gauge'
@@ -574,27 +575,47 @@ export function buildBattle(
   )
   /** The spheres that show them (three/shots.ts). */
   const bulletArt = createBulletArt(root)
-  /** …and what a GRENADE does, which is a parabola rather than a line
-   * (three/grenades.ts). Same dummy list, same reason. */
-  const grenades = createGrenades({
-    squad,
-    root,
-    training,
-    query,
-    obstacles,
-    targets,
-    present: (id) => !script.absent(id),
-    numbers,
-    effects,
-    bank: () => bank,
-    onBroken,
-    // Stay on the spot for the beat the blow's own wait gives it, which is what
-    // makes the burst visible at all: the camera leaves the grenade the frame it
-    // stops existing (lib/game/aftermath.ts).
-    onBlast: (at) => {
-      if (!aftermath) aftermath = beginAftermath(at)
+  /**
+   * …and what a GRENADE does, which is a parabola rather than a line — also
+   * the engine's (lib/game/lobs.ts). Same dummy list, same reason.
+   */
+  const grenades = createLobs(
+    {
+      pigs: () => game.players.flatMap((player) => player.pigs),
+      targets,
+      present: (id) => !script.absent(id),
+      query,
+      obstacles,
+      training,
+      pose
+    },
+    {
+      splashed: () => playCue(bank, BATTLE_SOUNDS.splash),
+      skimmed: (at) => {
+        playCue(bank, BATTLE_SOUNDS.skim)
+        effects.splash(at)
+      },
+      doused: (at) => {
+        // The splash is drawn on the WATER LINE however deep it gets, because
+        // effect 0x0E snaps its own y there (0x488c19).
+        effects.splash(at)
+        playCue(bank, BATTLE_SOUNDS.doused)
+      },
+      blasted: (at) => {
+        effects.blast(at)
+        playCue(bank, BATTLE_SOUNDS.blast)
+        // Stay on the spot for the beat the blow's own wait gives it, which is
+        // what makes the burst visible at all: the camera leaves the grenade the
+        // frame it stops existing (lib/game/aftermath.ts).
+        if (!aftermath) aftermath = beginAftermath(at)
+      },
+      damaged: (at, amount) => numbers.show(at, amount),
+      killed: (pig) => squad.of(pig)?.playOnce(ANIM.DYING),
+      broken: onBroken
     }
-  })
+  )
+  /** The models and the smoke behind them (three/grenades.ts). */
+  const grenadeArt = createGrenadeArt(root)
   /** Seconds left of the getting-it-out clip. The exe puts the model in the
    * hand only once that has run (`[pig+0x2fd]`, exe 0x4702c3), so the pig
    * reaches for the rifle and then has it. */
@@ -1034,7 +1055,7 @@ export function buildBattle(
       // Where the sights were actually pointing — the drift is part of the
       // aim, not a decoration over it.
       const away = isLobbed(holding)
-        ? grenades.throwOne(active, aimedAngle(), thrownWith)
+        ? grenades.throwOne(active.pig, aimedAngle(), thrownWith)
         : shots.fire(active.pig, aimedAngle())
       if (!away) firing = null
       else {
@@ -1191,9 +1212,10 @@ export function buildBattle(
     airDrops.update(delta)
     squad.update(delta)
     marker.bob(time)
-    // …and the engine's bullets get drawn where they now are. Once a frame,
-    // after everything that could have moved or spent one (three/shots.ts).
+    // …and what the engine says is in the air gets drawn where it now is. Once
+    // a frame, after everything that could have moved or spent one.
     bulletArt.draw(shots.live())
+    grenadeArt.draw(grenades.all(), delta)
   }
   host.onFrame.add(onFrame)
 
@@ -1301,7 +1323,7 @@ export function buildBattle(
       marker.dispose()
       effects.dispose()
       bulletArt.dispose()
-      grenades.dispose()
+      grenadeArt.dispose()
       voice.dispose()
       airDrops.dispose()
       weapons.dispose()
