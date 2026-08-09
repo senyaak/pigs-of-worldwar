@@ -1,141 +1,62 @@
-// A crate coming down under a canopy, because the map's script said so.
+// A crate's descent, DRAWN: the canopy over it and the record lifted to
+// wherever the engine says it has fallen to.
 //
-// The script places a waiting object by switching it on where it stands —
-// unless its BODY TYPE is 0x135b, which is what the pickup constructor writes
-// (exe 0x4641bd). Those the placer lifts **0xC00 above the thing that
-// signalled** and lets fall (0x4aa64a..0x4aa693). So a bridge appears and a
-// crate arrives, and which it is comes out of the record rather than out of a
-// choice made here. `script/notes.md`.
-//
-// 0xC00 is the same 3072 the level's own drop-in starts a pig at, so the
-// descent is the same one: `lib/game/parachute.ts`, canopy constants and all.
+// The descent itself is the engine's (`lib/game/airDrop.ts`) — the battle waits
+// on it, so it cannot live behind a renderer. What is left here is the canopy
+// art, which hangs off the crate's own mesh, and moving that mesh.
 //
 // Game space, Y-down, under the battle's converted root.
 
 import type * as THREE from 'three'
-import { DROP_HEIGHT, cutChute, updateDrop } from '../../../lib/game/parachute'
-import type { DropState } from '../../../lib/game/parachute'
+import type { Descent } from '../../../lib/game/airDrop'
 import type { Model, Texture } from '../api'
 import { buildCanopies } from './parachute'
 import type { Canopies } from './parachute'
 import type { MapProps } from './props'
-import { BATTLE_SOUNDS, playCue } from '../audio/battle'
-import type { Bank } from '../audio/bank'
 
-export interface AirDrops {
-  /**
-   * Send one record's art down. `fromY` is the y of whatever signalled — the
-   * exe reads the FINISHER's height and not the crate's own ground, so a
-   * dummy broken on a rise drops its crate from higher up.
-   */
-  send(id: number, fromY: number): void
-  /** One frame of every descent. */
-  update(delta: number): void
-  /** How many are still in the air. */
-  falling(): number
-  /**
-   * Where the first one still coming down is, for the camera to sit on — null
-   * when the sky is empty. Game space, Y-down.
-   */
-  watching(): { x: number; y: number; z: number } | null
-  /**
-   * Cut every canopy that is still up.
-   *
-   * Play's, and marked as such: a pig cuts its own with the jump key
-   * (`lib/game/parachute.ts`, `cutChute`) and the crate uses the same descent,
-   * so the same key ends it. The exe has not been read on whether it lets you.
-   */
-  cut(): void
+export interface AirDropArt {
+  /** Put a canopy over this record and show it. */
+  open(id: number): void
+  /** Take this one's canopy away — it has landed, or the player cut it. */
+  cut(id: number): void
+  /** …every one of them. */
+  cutAll(): void
+  /** Lift each record's art to where its descent has got to. Once a frame. */
+  draw(live: readonly Descent[]): void
   dispose(): void
 }
 
-/** How long after the aeroplane the canopy opens. Play's ordering — the
- * plane is heard first — and the gap is eyework. */
-const CHUTE_DELAY = 0.5
-
-interface Falling {
-  id: number
-  drop: DropState
-  ground: number
-  canopy: THREE.Mesh | null
-  /** Seconds until the canopy is heard, or 0 once it has been. */
-  chuteIn: number
-}
-
-export function createAirDrops(
+export function createAirDropArt(
   props: MapProps,
-  canopy: { model: Model; textures: Texture[] } | null,
-  /** Touchdown: the id that has arrived and WHERE, because a crate hitting
-   * the ground throws something up and the caller needs the spot for it. */
-  onLanded: (id: number, at: { x: number; y: number; z: number }) => void,
-  /** Asked for rather than held, like everywhere else the bank is used: it
-   * loads beside the scene. */
-  bank: () => Bank
-): AirDrops {
+  canopy: { model: Model; textures: Texture[] } | null
+): AirDropArt {
   // A map with no `WE_PARA` in its install still drops the crate; it simply
   // has nothing to hang over it. Same call the drop-in makes.
   const canopies: Canopies | null = canopy ? buildCanopies(canopy.model, canopy.textures) : null
-  const live: Falling[] = []
+  const worn = new Map<number, THREE.Mesh>()
+
+  const cut = (id: number): void => {
+    const one = worn.get(id)
+    if (one && canopies) canopies.cut(one)
+    worn.delete(id)
+  }
 
   return {
-    send(id, fromY) {
-      const ground = props.restingY(id)
-      if (ground === null) return
-      props.raise(id, fromY - DROP_HEIGHT)
+    open(id) {
       props.show(id, true)
       const mesh = props.meshOf(id)
-      live.push({
-        id,
-        drop: { y: fromY - DROP_HEIGHT, vy: 0, chute: true, landed: false },
-        ground,
-        canopy: canopies && mesh ? canopies.open(mesh) : null,
-        chuteIn: CHUTE_DELAY
-      })
-      // The aeroplane first, then the canopy a beat later. Neither was making
-      // any noise at all: the bank's `chute` had been decoded far enough to
-      // name and then never played (audio/battle.ts).
-      playCue(bank(), BATTLE_SOUNDS.plane)
+      const one = canopies && mesh ? canopies.open(mesh) : null
+      if (one) worn.set(id, one)
     },
-    update(delta) {
-      for (let i = live.length - 1; i >= 0; i--) {
-        const one = live[i]
-        if (one.chuteIn > 0) {
-          one.chuteIn -= delta
-          if (one.chuteIn <= 0) playCue(bank(), BATTLE_SOUNDS.chute)
-        }
-        updateDrop(one.drop, one.ground, delta)
-        props.raise(one.id, one.drop.y)
-        if (!one.drop.landed) continue
-        if (one.canopy && canopies) canopies.cut(one.canopy)
-        live.splice(i, 1)
-        playCue(bank(), BATTLE_SOUNDS.land)
-        const mesh = props.meshOf(one.id)
-        onLanded(one.id, {
-          x: mesh?.position.x ?? 0,
-          y: one.ground,
-          z: mesh?.position.z ?? 0
-        })
-      }
+    cut,
+    cutAll() {
+      for (const id of [...worn.keys()]) cut(id)
     },
-    falling: () => live.length,
-    watching() {
-      const first = live[0]
-      if (!first) return null
-      const mesh = props.meshOf(first.id)
-      if (!mesh) return null
-      return { x: mesh.position.x, y: first.drop.y, z: mesh.position.z }
-    },
-    cut() {
-      for (const one of live) {
-        if (!one.drop.chute) continue
-        cutChute(one.drop)
-        if (one.canopy && canopies) canopies.cut(one.canopy)
-        one.canopy = null
-      }
+    draw(live) {
+      for (const one of live) props.raise(one.id, one.drop.y)
     },
     dispose() {
-      for (const one of live) if (one.canopy && canopies) canopies.cut(one.canopy)
-      live.length = 0
+      for (const id of [...worn.keys()]) cut(id)
       canopies?.dispose()
     }
   }

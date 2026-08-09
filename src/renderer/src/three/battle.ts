@@ -55,7 +55,8 @@ import { createDamageNumbers } from '../../../lib/game/damage'
 import { projectDamage } from './damageNumbers'
 import { createEffectField } from '../../../lib/game/effectField'
 import { createEffectArt } from './effects'
-import { createAirDrops } from './airDrop'
+import { createAirDrops } from '../../../lib/game/airDrop'
+import { createAirDropArt } from './airDrop'
 import { createScript } from '../../../lib/game/script'
 import { isGun } from '../../../lib/game/projectile'
 import { advanceFiring, beginFiring } from '../../../lib/game/shot'
@@ -244,21 +245,40 @@ export function buildBattle(
    * been finished off.
    */
   const script = createScript(assets.objects)
+  /** The canopy art a descent wears, and the record it lifts (three/airDrop). */
+  const airDropArt = createAirDropArt(props, assets.canopy)
   /** Crates that come down under a canopy, because the script says they are
-   * pickups and the placer drops those from 0xC00 up (three/airDrop.ts). */
+   * pickups and the placer drops those from 0xC00 up — the DESCENT is the
+   * engine's, because the beat after a blow waits on it (lib/game/airDrop.ts). */
   const airDrops = createAirDrops(
-    props,
-    assets.canopy,
-    (id, at) => {
-      obstacles.restore(id)
-      // A crate arriving kicks something up. Play named it — "там ещё эффект
-      // от падения" — and this is the remake's own: nothing has been read that
-      // spawns an effect for a placed object. It takes row 0's SMOKE and not
-      // its fire, because a crate landing raises dust — and play saw what
-      // happened when it got the whole row ("коробка когда падает — искрит").
-      effects.dust(at)
+    {
+      groundOf: (id) => props.restingY(id),
+      at: (id) => {
+        const mesh = props.meshOf(id)
+        return mesh ? { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z } : null
+      }
     },
-    () => bank
+    {
+      sent: (id) => {
+        airDropArt.open(id)
+        // The aeroplane first, then the canopy a beat later. Neither was making
+        // any noise at all: the bank's `chute` had been decoded far enough to
+        // name and then never played (audio/battle.ts).
+        playCue(bank, BATTLE_SOUNDS.plane)
+      },
+      chuted: () => playCue(bank, BATTLE_SOUNDS.chute),
+      landed: (id, at) => {
+        airDropArt.cut(id)
+        playCue(bank, BATTLE_SOUNDS.land)
+        obstacles.restore(id)
+        // A crate arriving kicks something up. Play named it — "там ещё эффект
+        // от падения" — and this is the remake's own: nothing has been read that
+        // spawns an effect for a placed object. It takes row 0's SMOKE and not
+        // its fire, because a crate landing raises dust — and play saw what
+        // happened when it got the whole row ("коробка когда падает — искрит").
+        effects.dust(at)
+      }
+    }
   )
   for (const id of script.waiting()) {
     props.show(id, false)
@@ -856,7 +876,10 @@ export function buildBattle(
     // key is the exception, and it is the same exception the level's opening
     // drop makes: it cuts the canopy and brings the crate down now.
     if (aftermath) {
-      if (jumpRequested) airDrops.cut()
+      if (jumpRequested) {
+        airDrops.cut()
+        airDropArt.cutAll()
+      }
       jumpRequested = false
       fireRequested = false
       // The world keeps going — the crate has to reach the ground for the
@@ -1232,6 +1255,7 @@ export function buildBattle(
     bulletArt.draw(shots.live())
     grenadeArt.draw(grenades.all(), delta)
     effectArt.draw(effects.all())
+    airDropArt.draw(airDrops.live())
   }
   host.onFrame.add(onFrame)
 
@@ -1341,7 +1365,7 @@ export function buildBattle(
       bulletArt.dispose()
       grenadeArt.dispose()
       voice.dispose()
-      airDrops.dispose()
+      airDropArt.dispose()
       weapons.dispose()
       squad.dispose()
       bank.dispose()
