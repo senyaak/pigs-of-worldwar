@@ -46,7 +46,8 @@ import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
 import { SCOPE_BONE, SCOPE_MAGNIFY, SCOPE_MOUNT, createChase } from './chase'
 import type { View } from './chase'
-import { createDropIn } from './dropIn'
+import { NO_DROP_IN, createDropIn } from '../../../lib/game/dropIn'
+import { createDropInArt } from './dropIn'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import { createStrikes } from '../../../lib/game/strikes'
@@ -395,7 +396,32 @@ export function buildBattle(
   const pose = createBonePose(squad, root)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
-  const dropIn = createDropIn(squad, query, assets.canopy, () => bank)
+  const dropInArt = createDropInArt(squad, assets.canopy)
+  /** The opening drop — the ENGINE's phase, because nothing else in the battle
+   * runs while it lasts (lib/game/dropIn.ts). A map with no canopy art stands
+   * its squad on the markers instead, which is what an art-less `open` does. */
+  const dropIn = assets.canopy
+    ? createDropIn(
+        game.players.flatMap((player) => player.pigs),
+        query,
+        {
+          opened: (pig) => dropInArt.open(pig),
+          cut: (pig) => dropInArt.cut(pig),
+          clip: (pig, index, once) => {
+            const soldier = squad.of(pig)
+            if (once) soldier?.playOnce(index)
+            else soldier?.setClip(index)
+          },
+          landed: () => playCue(bank, BATTLE_SOUNDS.land)
+        }
+      )
+    : NO_DROP_IN
+  // Up they go, before the first frame is drawn: the engine has already lifted
+  // them, and a squad standing on its markers for one frame reads as a stutter.
+  dropInArt.draw(dropIn.live())
+  /** Whether the canopies have been heard opening yet. The bank arrives a beat
+   * after the scene does, so they cannot simply be played on frame one. */
+  let chuteHeard = false
   const marker = buildMarker(root)
   const chase = createChase(host.camera, query, (x, y, z) => {
     // What the projectile camera swings around: the map's boxes, and the
@@ -729,7 +755,7 @@ export function buildBattle(
       soldier.node.visible = true
       return
     }
-    const view: View = dropIn.underCanopy(soldier)
+    const view: View = dropIn.underCanopy(soldier.pig)
       ? 'face'
       : soldier === squad.of(game.currentPig) && swings.running()
         ? 'melee'
@@ -742,7 +768,7 @@ export function buildBattle(
     chase.follow(
       soldier.pig,
       soldier.node.position.y,
-      dropIn.riseOver(soldier),
+      dropInArt.riseOver(soldier.pig),
       delta,
       view,
       // The camera looks along the AIM, tremor and all — the picture FOLLOWS the
@@ -785,6 +811,13 @@ export function buildBattle(
     // canopies away — so `jumpRequested` is spent here rather than saved up
     // for the first frame of the turn.
     if (dropIn.update(delta, jumpRequested)) {
+      dropInArt.draw(dropIn.live())
+      // …and the canopies are heard the first frame the bank can play them,
+      // and only while there is still someone up.
+      if (!chuteHeard && bank.has(BATTLE_SOUNDS.chute.sound)) {
+        playCue(bank, BATTLE_SOUNDS.chute)
+        chuteHeard = true
+      }
       jumpRequested = false
       fireRequested = false
       const arriving = squad.of(game.currentPig)
@@ -1359,7 +1392,7 @@ export function buildBattle(
       host.scene.remove(root)
       terrain.dispose()
       props.dispose()
-      dropIn.dispose()
+      dropInArt.dispose()
       marker.dispose()
       effectArt.dispose()
       bulletArt.dispose()
