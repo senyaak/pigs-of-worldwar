@@ -21,6 +21,7 @@ import {
 } from './effects'
 import type { Effect } from './effects'
 import type { Point } from './pose'
+import type { Random } from './random'
 
 export interface EffectField {
   /** Something took a hand-to-hand hit here (game space, Y-down). */
@@ -63,7 +64,7 @@ export interface EffectField {
   clear(): void
 }
 
-export function createEffectField(): EffectField {
+export function createEffectField(random: Random = Math.random): EffectField {
   const live: Effect[] = []
 
   return {
@@ -77,7 +78,7 @@ export function createEffectField(): EffectField {
     dust: (at) => void live.push(beginEffect(DUST_EFFECT, at)),
     splash: (at) => void live.push(beginEffect(SPLASH_EFFECT, at)),
     update(delta) {
-      for (const effect of live) advanceEffect(effect, delta)
+      for (const effect of live) advanceEffect(effect, delta, random)
       for (let i = live.length - 1; i >= 0; i--) if (spent(live[i])) live.splice(i, 1)
     },
     all: () => live,

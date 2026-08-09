@@ -43,7 +43,7 @@ interface Built {
   heard: BattleEvent[]
 }
 
-async function buildHeadless(): Promise<Built> {
+async function buildHeadless(seed?: number): Promise<Built> {
   const maps = path.join(GAME_DIR, 'Maps')
   const chars = path.join(GAME_DIR, 'Chars')
   const terrain = await loadTerrain(path.join(maps, `${MAP}.PMG`))
@@ -81,11 +81,28 @@ async function buildHeadless(): Promise<Built> {
       parachutes: true
     },
     query,
+    seed,
     onChanged: () => {},
     bus
   })
   return { engine, game, heard }
 }
+
+/** Everything about the battle that two machines have to agree on. */
+const stateOf = ({ engine, game }: Built): string =>
+  JSON.stringify({
+    pigs: game.players.flatMap((player) =>
+      player.pigs.map((pig) => [
+        Math.round(pig.position.x),
+        Math.round(pig.position.y),
+        Math.round(pig.position.z),
+        pig.heading.toFixed(6),
+        pig.health
+      ])
+    ),
+    waiting: engine.scenery.waiting(),
+    falling: engine.airDrops.falling()
+  })
 
 test('the rules build a battle out of real map data — no renderer in the graph', async () => {
   if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
@@ -106,6 +123,59 @@ test('the rules build a battle out of real map data — no renderer in the graph
   // The map's script is holding records back — the training ground's dummies
   // and most of its crates arrive when something else has been finished off.
   expect(engine.scenery.waiting().length, 'records the script has not placed').toBeGreaterThan(0)
+})
+
+/**
+ * The same inputs, twice, and both battles must be the same battle.
+ *
+ * This is what lockstep rests on: the step is a fixed quantum (STEP_SECONDS)
+ * and every roll comes out of one seeded stream (lib/game/random.ts), so two
+ * machines that agree on the seed and exchange nothing but INPUTS end up
+ * holding identical state. Nothing here is networked — this is the property
+ * the network would rely on, tested where it actually lives.
+ */
+function drive(built: Built): void {
+  const { engine, game } = built
+  while (engine.dropIn.running()) engine.update(FRAME)
+  game.beginTurn()
+  const script: [number, number][] = [
+    [1, 0],
+    [1, -1],
+    [0, 1],
+    [-1, 0],
+    [1, 1]
+  ]
+  for (const [walk, turn] of script) {
+    built.engine.battle.setIntent(walk, turn)
+    for (let frame = 0; frame < 20; frame++) engine.update(FRAME)
+  }
+  built.engine.battle.setIntent(0, 0)
+  built.engine.battle.jump()
+  for (let frame = 0; frame < 30; frame++) engine.update(FRAME)
+}
+
+test('the same seed and the same inputs give the same battle — twice over', async () => {
+  if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
+    test.skip(true, `no game install at ${GAME_DIR}`)
+  }
+  const one = await buildHeadless(7)
+  const two = await buildHeadless(7)
+  drive(one)
+  drive(two)
+  expect(stateOf(two)).toBe(stateOf(one))
+
+  // …and the seed is doing something. Where it shows is DURING the drop: the
+  // stagger is a roll (`rand & 0x1ff` as a fraction, lib/game/dropIn.ts), so
+  // two seeds put the squad at two different heights on the same step. Once
+  // everyone is down they are down in the same place, which is why the check
+  // above is not enough on its own.
+  const early = async (seed: number): Promise<number> => {
+    const built = await buildHeadless(seed)
+    for (let step = 0; step < 6; step++) built.engine.update(FRAME)
+    return built.game.currentPig.position.y
+  }
+  expect(await early(8)).not.toBe(await early(7))
+  expect(await early(7), 'and the same seed is the same drop').toBe(await early(7))
 })
 
 test('it steps: the drop lands, the clock runs, and the pig walks where it is told', async () => {

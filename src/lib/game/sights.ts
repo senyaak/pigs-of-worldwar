@@ -21,6 +21,7 @@ import {
 } from './aim'
 import type { AimState } from './aim'
 import { createWobble, resetWobble, wobbleStep } from './wobble'
+import type { Random } from './random'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from './zoom'
 import { FRAME_SECONDS } from './ballistics'
 import { isGun } from './projectile'
@@ -74,7 +75,7 @@ export interface Sights {
   zoom(): number
 }
 
-export function createSights(): Sights {
+export function createSights(random: Random = Math.random): Sights {
   /** Whether the aim view is held down. */
   let held = false
   /**
@@ -157,7 +158,7 @@ export function createSights(): Sights {
       // it is what made the shot look a second stale.
       const frames = delta / FRAME_SECONDS
       if (sighted) {
-        const shiver = wobbleStep(wobble, frames)
+        const shiver = wobbleStep(wobble, frames, random)
         aim.angle = clampAim(holding, aim.angle + shiver.pitch)
         shivered = shiver.yaw
       } else {

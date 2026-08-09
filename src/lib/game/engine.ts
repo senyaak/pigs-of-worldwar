@@ -40,6 +40,7 @@ import { createDamageNumbers } from './damage'
 import type { DamageNumbers } from './damage'
 import { createBattle } from './battle'
 import type { Battle } from './battle'
+import { DEFAULT_SEED, seeded } from './random'
 import { NO_POSE } from './pose'
 import type { Pose } from './pose'
 import { handling } from './events'
@@ -97,6 +98,12 @@ export interface EngineParts {
    * builds its own from `world`. */
   query?: TerrainQuery
   /**
+   * What this battle rolls from (lib/game/random.ts). Two machines that agree
+   * on the seed and step the same inputs get the same battle; left out, every
+   * battle is the same battle, which is what a suite wants.
+   */
+  seed?: number
+  /**
    * Where a bone is, in the world — the one thing a blow cannot work out for
    * itself (lib/game/pose.ts). Left out, nothing that reaches for a bone finds
    * one, which is what a battle stepped with no skeleton to pose gets.
@@ -104,13 +111,57 @@ export interface EngineParts {
   pose?: Pose
 }
 
+/**
+ * The simulation's quantum: how much time ONE step of the rules is.
+ *
+ * A step has to be fixed. Two machines stepping the same inputs by whatever
+ * their monitors happened to hand them do not get the same battle, and neither
+ * does one machine replaying itself — which is what lockstep and a replay both
+ * need (`net play is lockstep`).
+ *
+ * WHY a sixtieth, when the exe's own engine frame is a thirtieth
+ * (`EXE_FRAME_SECONDS`, and `FRAME_SECONDS`'s 1/15 is a unit conversion rather
+ * than a rate)? Because this is the rate the remake already integrates at: the
+ * scene has been handing the rules its render delta, ~1/60, since the first
+ * frame it drew. Fixing the number changes nothing anybody can see, and every
+ * trajectory play has looked at stays exactly where it was. Anything coarser
+ * moves the picture in visible jumps and cannot land until the renderer
+ * interpolates between steps — a separate piece of work, and the thing that
+ * would let this drop to the engine's own frame.
+ */
+export const STEP_SECONDS = 1 / 60
+
+/**
+ * The most steps one call will run.
+ *
+ * A window that was minimised, a breakpoint, a slow load — the delta comes back
+ * enormous and the rules would try to catch up all of it, which takes longer
+ * than the frame it is catching up and never ends. Time past this is DROPPED:
+ * the battle runs slow for an instant rather than freezing. (A networked
+ * battle cannot drop steps — there the step count comes off the wire and not
+ * off a clock, which is the same accumulator with a different source.)
+ */
+const MAX_CATCHUP = 8
+
 /** A built battle, and the parts of it worth reading from outside. */
 export interface Engine {
   /**
-   * ONE frame of the game — the battle's own order of events, and then
-   * everything that burns down alongside it.
+   * Advance by however much real time has passed — in whole STEPS, of which
+   * this runs as many as the time buys. Returns how many it ran, which is 0
+   * on a frame that arrived early.
+   *
+   * `beforeStep` is called just before each one: where a renderer takes the
+   * snapshot it will interpolate FROM, so that a call which runs two steps
+   * still leaves it holding the state one step back rather than two.
    */
-  update(delta: number): void
+  update(delta: number, beforeStep?: () => void): number
+  /**
+   * How far into the step that has NOT run yet the clock stands, 0..1.
+   *
+   * What a renderer drawing faster than the rules step interpolates with. It
+   * is 0 whenever a step has just landed.
+   */
+  alpha(): number
   readonly battle: Battle
   readonly query: TerrainQuery
   readonly scenery: Scenery
@@ -132,6 +183,8 @@ export function createEngine(parts: EngineParts): Engine {
   const { world, bus, onChanged, pose = NO_POSE } = parts
   const { game, objects } = world
   const pigs = (): Pig[] => game.players.flatMap((player) => player.pigs)
+  /** One stream, and everything that rolls draws from it (lib/game/random.ts). */
+  const random = seeded(parts.seed ?? DEFAULT_SEED)
 
   const query = parts.query ?? buildQuery(world.blocks, world.terrainArt)
   const training = isTrainingGround(world.map)
@@ -139,7 +192,7 @@ export function createEngine(parts: EngineParts): Engine {
   /** What each pig is playing, and whether a committed clip has run out. */
   const anim = createAnim(world.clips)
   /** The rings a blow throws, and the numbers that float off it. */
-  const effects = createEffectField()
+  const effects = createEffectField(random)
   const numbers = createDamageNumbers()
 
   // The engine hears its OWN announcements before anything is built that can
@@ -214,7 +267,7 @@ export function createEngine(parts: EngineParts): Engine {
 
   /** The level's opening. A map whose squad has no canopy stands on its markers
    * instead, which is what `NO_DROP_IN` is. */
-  const dropIn = world.parachutes ? createDropIn(pigs(), query, bus.emit) : NO_DROP_IN
+  const dropIn = world.parachutes ? createDropIn(pigs(), query, bus.emit, random) : NO_DROP_IN
 
   const battle = createBattle({
     game,
@@ -230,22 +283,41 @@ export function createEngine(parts: EngineParts): Engine {
     airDrops,
     dropIn,
     onChanged,
-    bus
+    bus,
+    random
   })
 
+  /** One STEP of the rules: the frame's own order of events first — it reads
+   * the lists below to decide what the turn is still waiting on — and then
+   * everything running burns down by the same amount. */
+  const step = (): void => {
+    battle.update(STEP_SECONDS)
+    anim.update(STEP_SECONDS)
+    numbers.update(STEP_SECONDS)
+    effects.update(STEP_SECONDS)
+    shots.update(STEP_SECONDS)
+    grenades.update(STEP_SECONDS)
+    airDrops.update(STEP_SECONDS)
+  }
+
+  /** Real time that has arrived and not been stepped yet. */
+  let carry = 0
+
   return {
-    update(delta) {
-      // The frame's own order of events first — it reads the lists below to
-      // decide what the turn is still waiting on…
-      battle.update(delta)
-      // …and then everything running burns down by the same delta.
-      anim.update(delta)
-      numbers.update(delta)
-      effects.update(delta)
-      shots.update(delta)
-      grenades.update(delta)
-      airDrops.update(delta)
+    update(delta, beforeStep) {
+      carry += delta
+      let steps = 0
+      while (carry >= STEP_SECONDS && steps < MAX_CATCHUP) {
+        beforeStep?.()
+        step()
+        carry -= STEP_SECONDS
+        steps++
+      }
+      // Whatever is left after the cap is time the battle will never run.
+      if (carry >= STEP_SECONDS) carry = 0
+      return steps
     },
+    alpha: () => carry / STEP_SECONDS,
     battle,
     query,
     scenery,

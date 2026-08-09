@@ -60,11 +60,11 @@ export interface Soldier {
    * keeps two animations on one pig (three/clips.ts, lib/game/aim.ts).
    */
   overlay(index: number, phase: number): void
-  /** Put it where the game says it is: soles on the ground, sunk a little
-   * when swimming. */
-  settle(): void
-  /** Stand it at a height worked out elsewhere — the drop-in's, mid-air, and
-   * the acting pig's, from the locomotion state. `y` is the FEET. */
+  /**
+   * DRAW it standing here — the drop-in's height mid-air, the acting pig's off
+   * the locomotion state, or a point interpolated between two steps of it.
+   * `y` is the FEET. Moves the mesh and nothing else.
+   */
   place(x: number, y: number, z: number, heading: number): void
 }
 
@@ -132,16 +132,12 @@ export function fieldSquad(
       overlay(index, phase) {
         player.overlay(assets.clips[index] ?? null, phase)
       },
-      settle() {
-        const { x, z } = pig.position
-        soldier.place(x, restingY(query, x, z), z, pig.heading)
-      },
       place(x, y, z, heading) {
-        // The PIG carries where it stands; the mesh follows it. Anything that
-        // can hit a pig reads the domain now, never this node
-        // (lib/game/body.ts).
-        pig.position = { x, y, z }
-        pig.heading = heading
+        // DRAWING, and only that. The pig's own position is the engine's and
+        // is written by the rules that move it — this used to write it back
+        // from here, which meant the renderer decided where a pig was every
+        // frame and nothing interpolated could be drawn without lying to the
+        // battle about it.
         node.position.set(x, y - mesh.footOffset, z)
         node.rotation.y = heading + PIG_HEADING_OFFSET
       }

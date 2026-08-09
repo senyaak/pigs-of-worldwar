@@ -289,6 +289,15 @@ every breach the repo has had compiled cleanly.
 - `src/main/` — `index.ts` lifecycle only, `gameDir.ts` locating the install,
   `assets.ts` loading through the readers, `ipc.ts` the IPC surface.
 
+**The engine steps in FIXED quanta, and rolls from ONE stream.**
+`engine.update(delta)` accumulates real time and runs whole `STEP_SECONDS`
+steps, returning how many; `alpha()` is how far into the next one the clock
+stands, which is what the scene draws the acting pig between. Chance is a port
+like any other — `lib/game/random.ts`, seeded per battle, threaded to the drop's
+stagger, the sights' tremor and the smoke. Both together are what lockstep
+needs: same seed, same inputs, same battle, proved in
+`e2e/000/engine-headless.spec.ts`. Never reach for `Math.random` in `lib/game`.
+
 **The engine ANNOUNCES; it does not show.** `lib/game/events.ts` is one bus,
 and the renderer and the audio bank are independent listeners on it — neither
 knows the other exists. Three things are deliberately NOT events, because the

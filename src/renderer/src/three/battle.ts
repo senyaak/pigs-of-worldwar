@@ -359,10 +359,49 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   /** Take the battle to a pig, and the camera and marker with it. */
   const focus = (pig: Pig): void => {
     battle.focus(pig)
+    // A different pig is not a movement: both ends of the tween become where
+    // this one is standing.
+    settle()
     sounds.reset()
     marker.moveTo(pig.position.x, query.height(pig.position.x, pig.position.z), pig.position.z)
     const soldier = squad.of(pig)
     if (soldier) watch(soldier, null)
+  }
+
+  /** Where the acting pig stood at a step boundary — the two the picture is
+   * drawn between. */
+  interface Stance {
+    x: number
+    y: number
+    z: number
+    heading: number
+    /** Whose stance it is: the battle hands the turn on inside a step, and one
+     * pig's place is not the next one's to be drawn between. */
+    pig: Pig
+  }
+  const stanceNow = (): Stance => {
+    const { x, y, z, heading } = battle.view().loco
+    return { x, y, z, heading, pig: game.currentPig }
+  }
+  let before: Stance = stanceNow()
+  let after: Stance = before
+  /** A jump in the state is not a movement to draw: a new turn, a warp, the
+   * moment the squad lands. Both ends become the same place, so nothing is
+   * tweened across the map. */
+  const settle = (): void => {
+    after = stanceNow()
+    before = after
+  }
+  /** Where to draw it, `alpha` of the way from the one to the other. Heading
+   * takes the SHORT way round, or a pig crossing north spins the long way. */
+  const tween = (alpha: number): Omit<Stance, 'pig'> => {
+    const turn = ((after.heading - before.heading + Math.PI) % (2 * Math.PI)) - Math.PI
+    return {
+      x: before.x + (after.x - before.x) * alpha,
+      y: before.y + (after.y - before.y) * alpha,
+      z: before.z + (after.z - before.z) * alpha,
+      heading: before.heading + turn * alpha
+    }
   }
 
   /**
@@ -389,8 +428,13 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         delta
       )
       sounds.follow(now.loco, query.isWater(now.loco.x, now.loco.z))
-      active.place(now.loco.x, now.loco.y, now.loco.z, now.loco.heading)
-      marker.moveTo(now.loco.x, query.height(now.loco.x, now.loco.z), now.loco.z)
+      // BETWEEN the last two steps. The rules move in fixed quanta and the
+      // screen does not, so what is drawn is the pig partway from where it
+      // stood to where it now stands (lib/game/engine.ts, STEP_SECONDS). The
+      // pig itself is not moved by this — `place` draws (three/squad.ts).
+      const at = tween(engine.alpha())
+      active.place(at.x, at.y, at.z, at.heading)
+      marker.moveTo(at.x, query.height(at.x, at.z), at.z)
       // The model is not in the hand until the getting-it-out clip has run.
       for (const soldier of squad.members) {
         const reaching = soldier === active && now.readying > 0
@@ -411,9 +455,17 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
 
   const onFrame = (delta: number): void => {
     time += delta
-    // ONE frame of the GAME — the order of events and everything running with
-    // it, the engine's own business from end to end (lib/game/engine.ts).
-    engine.update(delta)
+    // The GAME, in whole steps — the order of events and everything running
+    // with it, the engine's own business from end to end. A step that is about
+    // to run leaves behind where the pig stood, which is what the picture is
+    // drawn from (lib/game/engine.ts).
+    const steps = engine.update(delta, () => {
+      before = stanceNow()
+    })
+    if (steps > 0) {
+      after = stanceNow()
+      if (before.pig !== after.pig) before = after
+    }
     // …and then everything that SHOWS it. Every mixer is brought into line with
     // what the engine now says each pig wears (three/wear.ts).
     wear.apply()
@@ -456,6 +508,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     aftermath: () => battle.view().aftermath !== null,
     warp: (x, z, heading) => {
       battle.warp(x, z, heading)
+      settle()
       const pig = game.currentPig
       squad.of(pig)?.place(pig.position.x, pig.position.y, pig.position.z, pig.heading)
     }

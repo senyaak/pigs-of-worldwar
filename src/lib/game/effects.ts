@@ -11,6 +11,7 @@
 // scene's job (`three/effects.ts`).
 
 import { EXE_FRAME_SECONDS } from './ballistics'
+import type { Random } from './random'
 import { advanceCloud, cloudSpent, spawnCloud } from './cloud'
 import type { Cloud, CloudStage } from './cloud'
 
@@ -390,7 +391,7 @@ export const spent = (effect: Effect): boolean =>
  * Same argument as the fuse and the gauge, and this is the fourth place to
  * need it.
  */
-export function advanceEffect(effect: Effect, delta: number): void {
+export function advanceEffect(effect: Effect, delta: number, random: Random = Math.random): void {
   effect.carry += delta / EXE_FRAME_SECONDS
   while (effect.carry >= 1) {
     effect.carry -= 1
@@ -424,7 +425,7 @@ export function advanceEffect(effect: Effect, delta: number): void {
         // Fanned round the horizontal, each one a random nudge off its share
         // — the exe steps a whole 0x648 per particle and divides by the
         // count, so the fan closes on a circle however many there are.
-        const turn = (n * BURST_SPREAD) / stage.count + Math.random() * BURST_WOBBLE
+        const turn = (n * BURST_SPREAD) / stage.count + random() * BURST_WOBBLE
         const angle = turn * 2 * Math.PI
         effect.smoke.push({
           x: effect.at.x,
@@ -433,7 +434,7 @@ export function advanceEffect(effect: Effect, delta: number): void {
           dx: Math.cos(angle) * stage.out * 3,
           // Upward, so negative here, and anywhere from nothing to three
           // times the row's own figure: `rand()%100 * p * 3 / 100`.
-          dy: -((Math.floor(Math.random() * 100) * stage.up * 3) / 100),
+          dy: -((Math.floor(random() * 100) * stage.up * 3) / 100),
           dz: Math.sin(angle) * stage.out * 3,
           age: 0,
           step: stage.step,
@@ -448,7 +449,7 @@ export function advanceEffect(effect: Effect, delta: number): void {
       // The gate is the count itself: `param(base+0)` of zero and 0x48bff0
       // builds nothing at all (0x48c017).
       if (stage.count <= 0) continue
-      effect.clouds.push(spawnCloud(stage, effect.at))
+      effect.clouds.push(spawnCloud(stage, effect.at, random))
     }
     // 0x48a840, in its own order: the age first, then the width, then the
     // radius, and the growth last off its own second difference.

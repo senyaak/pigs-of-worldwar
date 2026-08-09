@@ -40,6 +40,7 @@ import type { DamageNumbers } from './damage'
 import type { AirDrops } from './airDrop'
 import type { DropIn } from './dropIn'
 import type { Point } from './pose'
+import type { Random } from './random'
 import { handling } from './events'
 import type { BattleBus, Emit } from './events'
 
@@ -63,6 +64,8 @@ export interface BattleParts {
   /** The stream everything the battle does is announced on, and the one it
    * hears its own weapons on (lib/game/events.ts). */
   bus: BattleBus
+  /** Every roll this battle makes — the tremor's among them (lib/game/random.ts). */
+  random: Random
 }
 
 /** What the renderer reads once the frame has run. */
@@ -157,7 +160,7 @@ export function createBattle(parts: BattleParts): Battle {
   let holding: number | null = null
   /** Where the weapon points, the tremor that rides it and the sniper's zoom —
    * one thing, because they only ever move together (lib/game/sights.ts). */
-  const sights = createSights()
+  const sights = createSights(parts.random)
   /** The fire button and everything one press sets going: the gauge, the fuse
    * and which weapon answers (lib/game/attack.ts). */
   const attack = createAttack({
