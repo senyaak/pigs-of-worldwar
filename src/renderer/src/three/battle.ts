@@ -51,7 +51,8 @@ import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import { createStrikes } from '../../../lib/game/strikes'
 import { createBonePose } from './bonePose'
-import { createDamageNumbers } from './damageNumbers'
+import { createDamageNumbers } from '../../../lib/game/damage'
+import { projectDamage } from './damageNumbers'
 import { createEffectField } from '../../../lib/game/effectField'
 import { createEffectArt } from './effects'
 import { createAirDrops } from './airDrop'
@@ -1275,7 +1276,7 @@ export function buildBattle(
     focus,
     dropping: () => dropIn.running(),
     plates: (width, height, lift) => squad.plates(host.camera, width, height, lift),
-    numbers: (width, height) => numbers.project(host.camera, root, width, height),
+    numbers: (width, height) => projectDamage(numbers.all(), host.camera, root, width, height),
     still: () => still,
     setIntent(walk, turn) {
       intent.walk = walk
