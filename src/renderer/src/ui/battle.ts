@@ -28,7 +28,7 @@ import { CLIP_FOR, clipForPickup, isTrainingGround, lineFor } from '../../../lib
 import type { Cue } from '../../../lib/game/tutorial'
 import { skillName } from '../../../lib/game/skills'
 import { UNLIMITED } from '../../../lib/game/inventory'
-import type { Collected } from '../three/battle'
+import type { Collected } from '../../../lib/game/scenery'
 import { give } from '../../../lib/game/inventory'
 import { byId } from './dom'
 

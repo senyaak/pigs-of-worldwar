@@ -15,13 +15,9 @@ import { TerrainQuery } from '../../../lib/game/terrain'
 import { buildWaterMask } from '../../../lib/game/watermask'
 import { ANIM, createLocomotion, updateLocomotion } from '../../../lib/game/locomotion'
 import type { LocomotionState } from '../../../lib/game/locomotion'
-import { ObstacleField, withPigs } from '../../../lib/game/obstacles'
-import { pickupsOf, reached, worthOf } from '../../../lib/game/pickups'
-import type { Pickup } from '../../../lib/game/pickups'
-import { amountOf, clearSlots, give } from '../../../lib/game/inventory'
-import type { GiveResult } from '../../../lib/game/inventory'
+import { withPigs } from '../../../lib/game/obstacles'
 import { isTrainingGround } from '../../../lib/game/tutorial'
-import { heal, isDead } from '../../../lib/game/health'
+import { isDead } from '../../../lib/game/health'
 import { targetsOf } from '../../../lib/game/targets'
 import type { Target } from '../../../lib/game/targets'
 import {
@@ -58,7 +54,8 @@ import { createEffectField } from '../../../lib/game/effectField'
 import { createEffectArt } from './effects'
 import { createAirDrops } from '../../../lib/game/airDrop'
 import { createAirDropArt } from './airDrop'
-import { createScript } from '../../../lib/game/script'
+import { createScenery } from '../../../lib/game/scenery'
+import type { Collected } from '../../../lib/game/scenery'
 import { isGun } from '../../../lib/game/projectile'
 import { advanceFiring, beginFiring } from '../../../lib/game/shot'
 import type { Firing } from '../../../lib/game/shot'
@@ -108,21 +105,6 @@ export interface BattleAssets {
    * under. Null is fine: a map whose squad parachutes simply stands instead
    * of dropping under nothing (three/dropIn.ts). */
   canopy: { model: Model; textures: Texture[] } | null
-}
-
-/** A crate the acting pig has just walked into. */
-export interface Collected {
-  /** Skill id, or null on a health crate (lib/game/skills.ts). */
-  skill: number | null
-  /** What the crate held — the map's own count, before the training ground
-   * makes it unlimited. */
-  amount: number
-  /** What the pig actually got: its slot's new amount, or the health. */
-  given: number
-  /** Whether the pig had room for it (lib/game/inventory.ts). */
-  result: GiveResult
-  /** Who picked it up. */
-  pig: Pig
 }
 
 export interface BattleScene {
@@ -230,35 +212,35 @@ export function buildBattle(
   // the training map the dummies and the gate.
   const props = buildMapProps(assets.objects, assets.props, assets.propTextures)
   root.add(props.group)
-  // The same records, as things to walk into. Static for the map's life —
-  // only the pigs move, and they join per frame.
-  const obstacles = new ObstacleField(assets.objects)
-  // The crates that carry something. A collected one is spliced out, so the
-  // list is what is still on the ground.
-  const pickups: Pickup[] = pickupsOf(assets.objects)
   const training = isTrainingGround(map)
 
   /**
-   * The map's SCRIPT: field 14 is an opcode and the objects are the program
-   * (lib/game/script.ts). Most of what CAMP carries is not on its ground at
-   * the start — eight dummies, the second bridge, and every crate but the
-   * first three — and each of them arrives when the thing it waits on has
-   * been finished off.
+   * The crates, the map's SCRIPT and the collision world — all the engine's
+   * (lib/game/scenery.ts). Field 14 is an opcode and the objects are the
+   * program: most of what CAMP carries is not on its ground at the start, and
+   * each of them arrives when the thing it waits on has been finished off.
    */
-  const script = createScript(assets.objects)
+  const scenery = createScenery(
+    assets.objects,
+    training,
+    () => game.currentPig,
+    {
+      shown: (id, visible) => props.show(id, visible),
+      taken: (id) => props.take(id),
+      drop: (id, fromY) => airDrops.send(id, fromY),
+      collected: onCollected,
+      gotCrate: () => playCue(bank, BATTLE_SOUNDS.pickup),
+      refusedCrate: () => playCue(bank, BATTLE_SOUNDS.tooMany)
+    }
+  )
+  const obstacles = scenery.obstacles
   /** The canopy art a descent wears, and the record it lifts (three/airDrop). */
   const airDropArt = createAirDropArt(props, assets.canopy)
   /** Crates that come down under a canopy, because the script says they are
    * pickups and the placer drops those from 0xC00 up — the DESCENT is the
    * engine's, because the beat after a blow waits on it (lib/game/airDrop.ts). */
   const airDrops = createAirDrops(
-    {
-      groundOf: (id) => props.restingY(id),
-      at: (id) => {
-        const mesh = props.meshOf(id)
-        return mesh ? { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z } : null
-      }
-    },
+    { groundOf: (id) => scenery.restingY(id), at: (id) => scenery.at(id) },
     {
       sent: (id) => {
         airDropArt.open(id)
@@ -281,102 +263,6 @@ export function buildBattle(
       }
     }
   )
-  for (const id of script.waiting()) {
-    props.show(id, false)
-    // Off the map means off it entirely: an invisible dummy is not something
-    // to walk into either.
-    obstacles.remove(id)
-  }
-
-  /**
-   * Something has been finished — a crate collected, a dummy broken — so run
-   * its command and put on the map whatever was waiting on it.
-   *
-   * `fromY` is the FINISHER's height, because that is what the exe measures a
-   * canopy drop from rather than the crate's own ground (0x4aa755).
-   */
-  const advanceScript = (id: number, fromY: number): void => {
-    const placed = script.finish(id)
-    // Putting a CRATE down takes everything off the acting pig: the exe calls
-    // `Pig::ClearInventory` (0x468f50) from the placement arms — but only on
-    // the pickup branch, the one that drops the thing in under a canopy
-    // (0x4aa6cb; the dummy branch jumps clean over it at 0x4aa659). That is
-    // why the bayonet goes missing the moment the first dummy falls: the step
-    // is over, the rifle is on its way down, and the tutorial hands you one
-    // weapon at a time (lib/game/inventory.ts).
-    //
-    // Clearing what it HOLDS is the remake's own line: the exe leaves
-    // `[pig+0x2f4]` pointing at a weapon the pig no longer owns, and here the
-    // model in its hands hangs off exactly that.
-    if (placed.some((one) => one.parachute)) {
-      clearSlots(game.currentPig.carrying)
-      game.currentPig.holding = null
-    }
-    for (const one of placed) {
-      if (one.parachute) {
-        // The collision world waits for the landing; a crate still in the air
-        // is not standing anywhere.
-        airDrops.send(one.id, fromY)
-        continue
-      }
-      props.show(one.id, true)
-      obstacles.restore(one.id)
-    }
-  }
-
-  /** Crates a full pig has already been told it cannot carry: the refusal
-   * is said once, not once a frame while it stands there. */
-  const refused = new Set<number>()
-
-  /**
-   * Hand over any crate the acting pig is standing in. The exe's own order:
-   * the pickup gives the pig its contents (`Pig::GiveSkill`, 0x465425) and
-   * then goes away — a health crate straight into the pig's health, a skill
-   * crate into a slot, and on the training ground both on the training
-   * ground's terms (lib/game/pickups.ts).
-   */
-  const collect = (pig: Pig): void => {
-    for (let i = pickups.length - 1; i >= 0; i--) {
-      const pickup = pickups[i]
-      // A crate the script has not placed yet is not there to be walked into.
-      if (script.absent(pickup.id)) continue
-      if (!reached(pickup, pig.position.x, pig.position.z)) continue
-      const worth = worthOf(pickup, training)
-      let result: GiveResult = 'taken'
-      let given = worth
-      if (pickup.skill === null) {
-        // No ceiling: the original's heal adds and stops (lib/game/health.ts).
-        heal(pig, worth)
-        given = pig.health
-      } else {
-        result = give(pig.carrying, pickup.skill, worth)
-        // A pig with fifteen skills already leaves the crate where it is —
-        // "THIS LITTLE PIG ALREADY HAS TOO MANY TOYS TO PLAY WITH".
-        if (result === 'full') {
-          if (!refused.has(pickup.id)) {
-            refused.add(pickup.id)
-            playCue(bank, BATTLE_SOUNDS.tooMany)
-            onCollected({ skill: pickup.skill, amount: pickup.amount, given: 0, result, pig })
-          }
-          continue
-        }
-        given = amountOf(pig.carrying, pickup.skill)
-      }
-      pickups.splice(i, 1)
-      // The pig cheers: the exe plays 0x5E at its own position the moment
-      // the skill is in (audio/battle.ts).
-      playCue(bank, BATTLE_SOUNDS.pickup)
-      props.take(pickup.id)
-      // It was something to push against a frame ago; leaving it in the
-      // collision world would leave an invisible crate behind.
-      obstacles.remove(pickup.id)
-      // A collected crate runs its own command — the exe does it from inside
-      // the pickup class (0x464633).
-      advanceScript(pickup.id, props.restingY(pickup.id) ?? 0)
-      onCollected({ skill: pickup.skill, amount: pickup.amount, given, result, pig })
-    }
-  }
-
   // The battle's own sound bank, loaded beside the scene: silence until it
   // arrives, and silence for good if the install has no Audio folder.
   let bank: Bank = SILENT
@@ -593,7 +479,7 @@ export function buildBattle(
       // A dummy the script has not placed yet is not a target: the exe's own
       // strike tests `[obj+0x30]`, the placed flag, before it will hit one
       // (0x476319).
-      present: (id) => !script.absent(id),
+      present: (id) => !scenery.absent(id),
       training,
       pose,
       clips: assets.clips
@@ -621,7 +507,7 @@ export function buildBattle(
     {
       pigs: () => game.players.flatMap((player) => player.pigs),
       targets,
-      present: (id) => !script.absent(id),
+      present: (id) => !scenery.absent(id),
       query,
       obstacles,
       training,
@@ -644,7 +530,7 @@ export function buildBattle(
     {
       pigs: () => game.players.flatMap((player) => player.pigs),
       targets,
-      present: (id) => !script.absent(id),
+      present: (id) => !scenery.absent(id),
       query,
       obstacles,
       training,
@@ -942,7 +828,7 @@ export function buildBattle(
       // until its third frame, so counting puffs said "finished" on the very
       // frame the dummy broke and the crate started down through the smoke.
       if (pending && !swings.running() && !active.animating() && !effects.busy()) {
-        advanceScript(pending.id, pending.y)
+        scenery.advance(pending.id, pending.y)
         pending = null
       }
       // Everything play named that this scene can answer for: a projectile
@@ -1094,7 +980,7 @@ export function buildBattle(
     game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
     active.place(loco.x, loco.y, loco.z, loco.heading)
     // Walking INTO a crate is how one is collected; there is no button.
-    collect(active.pig)
+    scenery.collect(active.pig)
 
     // The swing, after the pig has been placed: the blade's own points come
     // off the HAND bone, so where the pig is standing has to be settled first
@@ -1308,7 +1194,7 @@ export function buildBattle(
     effects: () => effects.rings(),
     smoke: () => effects.smoke(),
     fire: () => effects.fire(),
-    script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
+    script: () => ({ absent: scenery.waiting(), falling: airDrops.falling() }),
     shots: () => shots.live().length,
     aim: () => (weaponOf(game.currentPig.holding).aims ? aim.angle : null),
     grenades: () => grenades.at(),
