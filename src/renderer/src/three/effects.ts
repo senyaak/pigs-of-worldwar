@@ -1,7 +1,13 @@
-// The effects on the map: bands of light thrown off a blow.
+// The effects on the map, DRAWN: bands of light thrown off a blow, the smoke
+// after it and the fireball inside it.
 //
-// The rules are pure and next door (`lib/game/effects.ts`); what this file
-// adds is the geometry. The original draws a ring as `[ring+0x84]` quads —
+// The rules are pure and next door (`lib/game/effects.ts`), and so is the LIST
+// of what is running (`lib/game/effectField.ts`) — this file adds the geometry
+// and nothing else. It used to hold the list too, which meant "is anything
+// still coming apart" was a question only a renderer could answer, and the
+// aftermath, the map script and the turn all ask it.
+//
+// The original draws a ring as `[ring+0x84]` quads —
 // thirty-two — spanning the previous angle to the current one, outer radius
 // `[+0x86]` and inner `[+0x86] - [+0x8C]`, both in the **XZ plane** at the
 // effect's own y. It is a shockwave on the horizontal, not a billboard, and
@@ -11,20 +17,7 @@
 // the same as the pigs and the props.
 
 import * as THREE from 'three'
-import {
-  BLAST_EFFECT,
-  BREAK_EFFECT,
-  DUST_EFFECT,
-  SPLASH_EFFECT,
-  RING_DEAD,
-  RING_SEGMENTS,
-  RING_SWEEP,
-  advanceEffect,
-  beginEffect,
-  hitEffectOf,
-  ringColour,
-  spent
-} from '../../../lib/game/effects'
+import { RING_DEAD, RING_SEGMENTS, RING_SWEEP, ringColour } from '../../../lib/game/effects'
 import type { Effect, Particle, Ring } from '../../../lib/game/effects'
 import { cloudChannel, cloudSize } from '../../../lib/game/cloud'
 import type { Blob, Cloud } from '../../../lib/game/cloud'
@@ -89,45 +82,10 @@ const BLOB_ALPHA = 0.4
 /** A point in game space, Y-down. */
 type Spot = { x: number; y: number; z: number }
 
-export interface Effects {
-  /** Something took a hand-to-hand hit here (game space, Y-down). */
-  hit(skill: number, at: { x: number; y: number; z: number }): void
-  /** …and something came APART here — a dummy knocked down, and by the look
-   * of the exe's handler anything else that breaks. A different effect
-   * entirely from a hit: smoke, and not a ring in it. */
-  broke(at: { x: number; y: number; z: number }): void
-  /** …and something EXPLODED here. The same parameter row as a breaking, and
-   * that is the exe's own doing: both ids land on the same init arm. */
-  blast(at: { x: number; y: number; z: number }): void
-  /** …and something heavy LANDED here. Row 0's smoke without its fire, so a
-   * crate arriving raises dust rather than going off (lib/game/effects.ts). */
-  dust(at: { x: number; y: number; z: number }): void
-  /** …and something went into WATER here. Effect 0x0E, row 2: three bright
-   * rings and a white cloud. Pass the WATER LINE, not where the thing is — the
-   * engine's own arm snaps its y to the surface (lib/game/effects.ts). */
-  splash(at: { x: number; y: number; z: number }): void
-  /** Step them; call once a frame. */
-  update(delta: number): void
-  /** How many rings are alive — what a spec can see of an effect, since its
-   * pixels are a colour on a transparent quad. */
-  live(): number
-  /** …and how many puffs of smoke. */
-  smoke(): number
-  /** …and how many sprites the fireball has up. A spec cannot see a
-   * transparent quad any more than it can see a ring. */
-  fire(): number
-  /**
-   * Whether ANY effect is still running.
-   *
-   * Not the same as "there is smoke on screen": row 0's bursts do not fire
-   * until its second and third frames, so a count of puffs is zero for the
-   * first tenth of a second and reads as finished before it has begun.
-   * Whatever waits for a thing to come apart has to wait on THIS
-   * (three/battle.ts).
-   */
-  busy(): boolean
-  /** Drop the lot: a new battle, or a warp. */
-  clear(): void
+export interface EffectArt {
+  /** Shape exactly what the engine says is running, and hide the rest. Once a
+   * frame (lib/game/effectField.ts). */
+  draw(live: readonly Effect[]): void
   dispose(): void
 }
 
@@ -214,8 +172,7 @@ function buildPuffTexture(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(canvas)
 }
 
-export function createEffects(root: THREE.Object3D): Effects {
-  const live: Effect[] = []
+export function createEffectArt(root: THREE.Object3D): EffectArt {
   /** One band per ring on screen, kept and reused: a hit makes two or three
    * and a battle never has many at once. */
   const bands: Band[] = []
@@ -337,7 +294,7 @@ export function createEffects(root: THREE.Object3D): Effects {
       BLOB_ALPHA * Math.min(1, (RING_DEAD - one.age) / (RING_DEAD * 0.1))
   }
 
-  const redraw = (): void => {
+  const redraw = (live: readonly Effect[]): void => {
     let i = 0
     let p = 0
     let b = 0
@@ -367,40 +324,7 @@ export function createEffects(root: THREE.Object3D): Effects {
   }
 
   return {
-    hit(skill, at) {
-      const effect = hitEffectOf(skill)
-      if (!effect) return
-      live.push(beginEffect(effect, at))
-    },
-    broke(at) {
-      live.push(beginEffect(BREAK_EFFECT, at))
-    },
-    blast(at) {
-      live.push(beginEffect(BLAST_EFFECT, at))
-    },
-    dust(at) {
-      live.push(beginEffect(DUST_EFFECT, at))
-    },
-    splash(at) {
-      live.push(beginEffect(SPLASH_EFFECT, at))
-    },
-    update(delta) {
-      for (const effect of live) advanceEffect(effect, delta)
-      for (let i = live.length - 1; i >= 0; i--) if (spent(live[i])) live.splice(i, 1)
-      redraw()
-    },
-    live: () => live.reduce((n, effect) => n + effect.rings.length, 0),
-    smoke: () => live.reduce((n, effect) => n + effect.smoke.length, 0),
-    fire: () =>
-      live.reduce(
-        (n, effect) => n + effect.clouds.reduce((m, cloud) => m + cloud.blobs.length, 0),
-        0
-      ),
-    busy: () => live.length > 0,
-    clear() {
-      live.length = 0
-      redraw()
-    },
+    draw: redraw,
     dispose() {
       for (const band of bands) {
         root.remove(band.mesh)
@@ -415,7 +339,6 @@ export function createEffects(root: THREE.Object3D): Effects {
       bands.length = 0
       puffs.length = 0
       blobs.length = 0
-      live.length = 0
     }
   }
 }

@@ -52,7 +52,8 @@ import { createHeldWeapons } from './heldWeapon'
 import { createStrikes } from '../../../lib/game/strikes'
 import { createBonePose } from './bonePose'
 import { createDamageNumbers } from './damageNumbers'
-import { createEffects } from './effects'
+import { createEffectField } from '../../../lib/game/effectField'
+import { createEffectArt } from './effects'
 import { createAirDrops } from './airDrop'
 import { createScript } from '../../../lib/game/script'
 import { isGun } from '../../../lib/game/projectile'
@@ -445,9 +446,11 @@ export function buildBattle(
   /** The damage that floats off whatever was just hit — the original's own
    * effect, showing points (three/damageNumbers.ts). */
   const numbers = createDamageNumbers()
-  /** The rings a blow throws — the original's effect system, of which the
-   * hand-to-hand hit is the first piece built (three/effects.ts). */
-  const effects = createEffects(root)
+  /** The rings a blow throws — the original's effect system, and the ENGINE's
+   * list of what is running (lib/game/effectField.ts). */
+  const effects = createEffectField()
+  /** …and the bands, puffs and sprites that show them (three/effects.ts). */
+  const effectArt = createEffectArt(root)
   /** The drift the sights have while they are up — the engine's own random
    * walk, borrowed off a body slipping on ice (lib/game/wobble.ts). */
   const wobble = createWobble()
@@ -1227,6 +1230,7 @@ export function buildBattle(
     // a frame, after everything that could have moved or spent one.
     bulletArt.draw(shots.live())
     grenadeArt.draw(grenades.all(), delta)
+    effectArt.draw(effects.all())
   }
   host.onFrame.add(onFrame)
 
@@ -1243,7 +1247,7 @@ export function buildBattle(
     strings: () => assets.strings,
     swinging: () => swings.running(),
     strike: () => swings.lastStrike(),
-    effects: () => effects.live(),
+    effects: () => effects.rings(),
     smoke: () => effects.smoke(),
     fire: () => effects.fire(),
     script: () => ({ absent: script.waiting(), falling: airDrops.falling() }),
@@ -1332,7 +1336,7 @@ export function buildBattle(
       props.dispose()
       dropIn.dispose()
       marker.dispose()
-      effects.dispose()
+      effectArt.dispose()
       bulletArt.dispose()
       grenadeArt.dispose()
       voice.dispose()
