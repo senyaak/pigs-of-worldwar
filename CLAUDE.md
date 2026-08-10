@@ -1586,14 +1586,18 @@ half of it, and the only reading under which this file's own sentence about the 
     the surface at the box's own EDGE, where the pig will be standing when it
     touches (`rampLeadsTo`). What it costs is that a pig walks THROUGH the
     pillars under a bridge.
-  - **standing on a walkway is open footing.** CAMP's bridge crosses tiles the
-    map flags WALL — the plateau's own edge — so `freeY` measured off the
-    terrain refused the last step onto the plateau, the wedge counter threw
-    the pig off the deck after 25 frames, and the scrabble clip played the
-    whole way across. All three now ask what the pig is standing on
-    (`standing` in `lib/game/locomotion.ts`).
+  - **standing on a walkway is open footing, and it is not the ground.** CAMP's
+    bridge crosses tiles the map flags WALL — the plateau's own edge — so
+    `freeY` measured off the terrain refused the last step onto the plateau,
+    the wedge counter threw the pig off the deck after 25 frames, and the
+    scrabble clip played the whole way across. ISLAND's spans are all over
+    open WATER, so a pig on the deck swam: the swim clip, the 16-a-frame cap
+    and the waterline for a resting height, forty feet up. Every one of those
+    now asks what the pig is standing on (`standing` in
+    `lib/game/locomotion.ts`).
 
-  `e2e/002/ramp.spec.ts` walks CAMP's own bridge end to end, 1216 to 2240.
+  `e2e/002/ramp.spec.ts` walks CAMP's own bridge end to end, 1216 to 2240,
+  and ISLAND's from the beach onto a deck over water.
 - **The FIRST bridge still cannot be got onto**, and it is a different shape of
   problem: `BRIDGE_S` is a flat-topped abutment, bodiless like every other
   shape-kind-1 piece and not a ramp, so there is nothing to step onto at either

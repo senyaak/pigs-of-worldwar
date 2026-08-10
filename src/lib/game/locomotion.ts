@@ -480,12 +480,15 @@ function ground(
   }
   state.commit = state.getUp > 0
 
-  const swimming = query.isWater(state.x, state.z)
   /** The footing every reach is measured from — where the feet are NOW. */
   const footY = state.y
   /** …and whether that footing is a WALKWAY rather than the ground, which is
    * what stops the tiles under a bridge counting against the pig. */
   const onWalkway = standing(state, obstruction)
+  // A pig on a bridge is not in the water it crosses. ISLAND's spans are all
+  // over water, and without this the pig swims along the deck — the swim clip,
+  // the 16-a-frame cap and the waterline for a resting height, forty feet up.
+  const swimming = !onWalkway && query.isWater(state.x, state.z)
   // Backwards is half as fast on land and the same in water, because the
   // exe's clamp lands differently either side of it: -32 scaled by the class
   // is 26 walking, and the water cap of 16 swallows both directions.

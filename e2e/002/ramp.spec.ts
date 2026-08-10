@@ -230,6 +230,28 @@ test('a pig walks up the ramp and onto the deck', () => {
   expect(-bare.y, 'the bare terrain is 1024 lower').toBeLessThan(deckTop - 512)
 })
 
+test('a pig on a bridge is not in the water it crosses', () => {
+  // ISLAND's spans are all over open water, so the deck is the case CAMP has
+  // not got: everything the engine asks the LANDSCAPE says water, and the pig
+  // is forty feet above it.
+  const ISLAND = parsePog(mapFile('ISLAND.POG'))
+  const query = new TerrainQuery(parsePmg(mapFile('ISLAND.PMG')))
+  const field = new ObstacleField(ISLAND)
+  // Ramp #6 at (6912, −6400) climbs +z, and the shore at its foot is exactly
+  // its own low end — so this is a walk from the beach onto the bridge.
+  const state = createLocomotion(query, 6912, -6900, 0)
+  const frames = Math.round(1.8 / FRAME_SECONDS)
+  for (let i = 0; i < frames; i++) {
+    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS, field)
+  }
+  expect(query.isWater(state.x, state.z), 'over water').toBe(true)
+  expect(near(-state.y, 640, ART), `on the deck at ${-state.y}`).toBe(true)
+  // Running, not swimming — the swim clip and its 16-a-frame cap belong to the
+  // pig that is actually in the water.
+  expect(state.clip, 'running').toBe(0)
+  expect(state.z, 'and it got a walk’s worth of distance').toBeGreaterThan(-6000)
+})
+
 test("ISLAND's ramps all climb to their own deck's surface", () => {
   // Six of them, at both ends of two bridges, and the yaw is what picks which
   // way each climbs — so this is the sign of the tilt as much as its size.
