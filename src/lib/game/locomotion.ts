@@ -307,6 +307,23 @@ export interface LocomotionState {
 export const restingY = (query: TerrainQuery, x: number, z: number): number =>
   query.isWater(x, z) ? query.surface(x, z) + SWIM_SINK : query.height(x, z)
 
+/**
+ * Whether a pig with its FEET here is in the water — asked of a pig that is not
+ * being driven, and every bit as careful as `swimming` above.
+ *
+ * There is water under CAMP's bridge and under every one of ISLAND's spans, and
+ * a pig on the deck is not in it. The driven pig settles that by asking the
+ * obstacles (`standing`); anything else has only its own position, and that is
+ * enough: a swimming pig's feet are AT the waterline by `restingY`, and a deck
+ * holds them above it (game space is Y-DOWN, so above is a smaller y).
+ *
+ * Play found the missing half of this the hard way — "кончился ход, я провалился
+ * на мосту в текстуры", which is what happens when the end-of-turn beat decides a
+ * pig standing on a bridge needs swimming to shore (lib/game/walkAway.ts).
+ */
+export const inWater = (query: TerrainQuery, x: number, z: number, footY: number): boolean =>
+  query.isWater(x, z) && footY >= query.surface(x, z)
+
 export function createLocomotion(
   query: TerrainQuery,
   x: number,

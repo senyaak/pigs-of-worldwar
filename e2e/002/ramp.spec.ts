@@ -24,7 +24,7 @@ import { parseArchive } from '../../src/lib/formats/mad'
 import { parseModel } from '../../src/lib/formats/model'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { STEP_SECONDS } from '../../src/lib/game/engine'
-import { createLocomotion, updateLocomotion } from '../../src/lib/game/locomotion'
+import { createLocomotion, inWater, updateLocomotion } from '../../src/lib/game/locomotion'
 import { ObstacleField, PIG_RADIUS } from '../../src/lib/game/obstacles'
 import { RAMP_TILT, isRamp } from '../../src/lib/game/ramps'
 import { MODEL_SCALE } from '../../src/lib/game/scale'
@@ -328,6 +328,30 @@ test('a pig on a bridge is not in the water it crosses', () => {
   // pig that is actually in the water.
   expect(state.clip, 'running').toBe(0)
   expect(state.z, 'and it got a walk’s worth of distance').toBeGreaterThan(-6000)
+})
+
+test('…and NOTHING may take it for a swimmer, not just the pig being driven', () => {
+  // The same deck, asked the way a pig NOBODY is driving has to be asked. The
+  // driven one settles it against the obstacles (`swimming` above); the water's
+  // damage and the end-of-turn swim have only a position, and `inWater` is that
+  // rule — the feet against the waterline.
+  //
+  // Play found the hole: "кончился ход, я провалился на мосту в текстуры". Asking
+  // the LANDSCAPE alone, the beat took a pig standing on the deck for a swimmer
+  // and dropped it to the waterline (lib/game/walkAway.ts, drowning.ts).
+  const query = new TerrainQuery(parsePmg(mapFile('ISLAND.PMG')))
+  const field = new ObstacleField(parsePog(mapFile('ISLAND.POG')))
+  const state = createLocomotion(query, 6912, -6900, 0)
+  const frames = Math.round(1.8 / STEP_SECONDS)
+  for (let i = 0; i < frames; i++) {
+    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS, field)
+  }
+  expect(query.isWater(state.x, state.z), 'the tile under it is water').toBe(true)
+  expect(inWater(query, state.x, state.z, state.y), 'the pig is not in it').toBe(false)
+  // …and a pig that really is gets the same answer as the driven one does.
+  const swimming = createLocomotion(query, state.x, state.z, 0)
+  expect(swimming.swimming || query.isWater(swimming.x, swimming.z)).toBe(true)
+  expect(inWater(query, swimming.x, swimming.z, swimming.y), 'in the drink').toBe(true)
 })
 
 test("ISLAND's ramps all climb to their own deck's surface", () => {

@@ -33,6 +33,7 @@
 
 import { FRAME_SECONDS } from './ballistics'
 import { hurt, isDead } from './health'
+import { inWater } from './locomotion'
 import type { Emit } from './events'
 import type { Pig } from './game'
 import type { TerrainQuery } from './terrain'
@@ -117,7 +118,7 @@ export function createDrowning(
         const dry =
           isDead(pig) ||
           (pig === acting && aloft) ||
-          !world.query.isWater(pig.position.x, pig.position.z)
+          !inWater(world.query, pig.position.x, pig.position.z, pig.position.y)
         if (dry) {
           wet.delete(pig.id)
           continue

@@ -38,7 +38,7 @@
 // Pure: pigs, a terrain query and a clock in, positions out.
 
 import { FRAME_SECONDS } from './ballistics'
-import { ANIM, SWIM_SPEED, TURN_SPEED, restingY } from './locomotion'
+import { ANIM, SWIM_SPEED, TURN_SPEED, inWater, restingY } from './locomotion'
 import { isDead } from './health'
 import { WORLD_LIMIT, clampToWorld } from './terrain'
 import { TILE_STEP } from '../formats/pmg'
@@ -199,7 +199,11 @@ export function beginWalkAway(world: {
           going.delete(pig.id)
           continue
         }
-        if (!world.query.isWater(pig.position.x, pig.position.z)) {
+        // A pig on a BRIDGE is not in the water it crosses, whatever the tile
+        // under it says (`inWater`). Without that test this beat took a pig
+        // standing on CAMP's deck for a swimmer and dropped it to the waterline
+        // — play: "кончился ход, я провалился на мосту в текстуры".
+        if (!inWater(world.query, pig.position.x, pig.position.z, pig.position.y)) {
           // Out of it: the target is spent, and the pig stands about like every
           // other one the battle is not driving.
           if (going.delete(pig.id)) world.wear(pig, ANIM.IDLE)

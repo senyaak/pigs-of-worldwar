@@ -13,7 +13,7 @@
 //
 // Game space (Y-down) throughout.
 
-import { ANIM, createLocomotion, updateLocomotion } from './locomotion'
+import { ANIM, createLocomotion, inWater, updateLocomotion } from './locomotion'
 import type { LocomotionState } from './locomotion'
 import { withPigs } from './obstacles'
 import { isDead } from './health'
@@ -346,7 +346,9 @@ export function createBattle(parts: BattleParts): Battle {
       loco.y = game.currentPig.position.y
       loco.z = game.currentPig.position.z
       loco.heading = game.currentPig.heading
-      loco.swimming = query.isWater(loco.x, loco.z)
+      // The same careful test the driven pig uses: a deck over water is not
+      // water (lib/game/locomotion.ts).
+      loco.swimming = inWater(query, loco.x, loco.z, loco.y)
       if (done) {
         walkAway = null
         game.endTurn()
