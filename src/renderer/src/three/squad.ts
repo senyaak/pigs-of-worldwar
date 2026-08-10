@@ -53,7 +53,7 @@ export interface Soldier {
    * — because where a bone ends up is what a blade sweeps through and where a
    * muzzle points. This writes it onto three's bones and lets the GPU skin.
    */
-  pose(turns: readonly Quat[]): void
+  pose(turns: readonly Quat[], root: { x: number; y: number; z: number }): void
   /**
    * DRAW it standing here — the drop-in's height mid-air, the acting pig's off
    * the locomotion state, or a point interpolated between two steps of it.
@@ -102,18 +102,28 @@ export function fieldSquad(
     // already, so only the mesh moves across.
     const node = mesh.group.children[0]
     root.add(node)
+    /** Where the ROOT bone sits in the bind pose — the body's own per-frame
+     * offset is added to this rather than replacing it (pig.HIR gives the pig's
+     * own root (0,0,0), but nothing here should depend on that). */
+    const bind0 = mesh.bones[0]?.position.clone() ?? new THREE.Vector3()
 
     const soldier: Soldier = {
       pig,
       mesh,
       node,
       art: art.base,
-      pose(turns) {
+      pose(turns, root) {
         const count = Math.min(turns.length, mesh.bones.length)
         for (let bone = 0; bone < count; bone++) {
           const { x, y, z, w } = turns[bone]
           mesh.bones[bone].quaternion.set(x, y, z, w)
         }
+        // The body's own offset goes on the ROOT bone, on top of its bind place,
+        // which is what the library does with it (`_d3d.dll` 0x1001223f writes
+        // the primary channel's own root record beside the bones). Every bone is
+        // its child, so the whole pig carries it.
+        const root0 = mesh.bones[0]
+        if (root0) root0.position.set(bind0.x + root.x, bind0.y + root.y, bind0.z + root.z)
       },
       place(x, y, z, heading) {
         // DRAWING, and only that. The pig's own position is the engine's and

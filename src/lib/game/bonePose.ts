@@ -11,7 +11,7 @@
 // snapshot (three/wear.ts), so where the blade swings and where the blade is
 // drawn cannot drift apart.
 
-import { poseTurns } from './clipPose'
+import { poseTurns, rootAt } from './clipPose'
 import type { ClipFrames } from './clipPose'
 import { clipSeconds } from './clips'
 import { jointToWorld, poseSkeleton } from './skeleton'
@@ -64,8 +64,14 @@ export function createBonePose(parts: BonePoseParts): BonePose {
     })
   }
 
-  const jointsOf = (pig: Pig): Joint[] =>
-    poseSkeleton(skeleton, turnsOf(pig, anim.wornBy(pig).elapsed))
+  const jointsOf = (pig: Pig): Joint[] => {
+    const worn = anim.wornBy(pig)
+    const clip = framesOf(worn.index)
+    // The body's own offset rides on the root, so the blade and the muzzle bob
+    // with the pig exactly as the drawn model does (lib/game/clipPose.ts).
+    const lift = rootAt(clip, cursorOf(clip, Math.max(0, worn.elapsed), worn.once))
+    return poseSkeleton(skeleton, turnsOf(pig, worn.elapsed), lift)
+  }
 
   return {
     boneToWorld(pig: Pig, bone: number, offset: Point): Point | null {

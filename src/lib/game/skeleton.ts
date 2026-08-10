@@ -41,12 +41,19 @@ export interface Joint {
  * Parents come before children in the file (verified: pig.HIR), so one pass
  * down the list is enough — the root's parent is the model itself.
  */
-export function poseSkeleton(bones: Bone[], turns: Quat[]): Joint[] {
+export function poseSkeleton(
+  bones: Bone[],
+  turns: Quat[],
+  /** The body's own offset this frame, model units — the keyframe head, which is
+   * the gait's bob (lib/game/clipPose.ts, `rootAt`). It lands on the ROOT, so
+   * every joint carries it. */
+  root: Point = { x: 0, y: 0, z: 0 }
+): Joint[] {
   const joints: Joint[] = []
   bones.forEach((bone, index) => {
     const own = turns[index] ?? turns[turns.length - 1]
     if (index === 0) {
-      joints.push({ at: { x: bone.x, y: bone.y, z: bone.z }, facing: own })
+      joints.push({ at: { x: bone.x + root.x, y: bone.y + root.y, z: bone.z + root.z }, facing: own })
       return
     }
     const parent = joints[bone.parentIndex]

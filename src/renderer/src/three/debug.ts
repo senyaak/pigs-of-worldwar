@@ -77,6 +77,9 @@ export interface DebugParts {
   pose: () => {
     clip: number | null
     elapsed: number
+    /** What the keyframe head is lifting the whole body by, model units — the
+     * gait's bob, on the root bone. */
+    lift: number
     /** Every bone the MESH is wearing, HIR order — 0 the hip, 1 the torso, 2 the
      * head, 9..14 the legs. */
     bones: [number, number, number, number][]

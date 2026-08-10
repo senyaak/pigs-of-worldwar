@@ -584,6 +584,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       return {
         clip: worn?.clip ?? null,
         elapsed: worn?.clipElapsed ?? 0,
+        // What the keyframe head is doing to the whole body — the bob, on the
+        // root bone (lib/game/clipPose.ts).
+        lift: bones[0]?.position.y ?? 0,
         bones: bones.map(
           (one) =>
             [one.quaternion.x, one.quaternion.y, one.quaternion.z, one.quaternion.w] as [

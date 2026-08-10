@@ -33,6 +33,7 @@ import { startGame } from '../menu'
 type Pose = {
   clip: number | null
   elapsed: number
+  lift: number
   bones: [number, number, number, number][]
   foot: [number, number, number] | null
   drawn: [number, number, number, number] | null
@@ -101,6 +102,10 @@ test('walking moves the bones, in the sampler and on the mesh alike', async ({ a
   // asked of the mesh.
   expect(swing, 'the sampler swings the leg').toBeGreaterThan(20)
   expect(drawn, 'and the mesh wears the swing').toBeGreaterThan(0.05)
+  // …and the whole BODY rises and falls with the gait: the keyframe head's own
+  // offset, which is the one motion the rump has (lib/game/clipPose.ts). 21
+  // model units over a stride, halved by `MODEL_SCALE` on the way to the world.
+  expect(spread(samples.map((one) => one.lift)), 'the body bobs').toBeGreaterThan(4)
   // The TORSO too, which is the half play was asking about — with EMPTY HANDS.
   // Take something in them and the weapon channel owns bones 0..8 and holds them
   // still, which is the exe's own split and not a fault (lib/game/clipPose.ts).

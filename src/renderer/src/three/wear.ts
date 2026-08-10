@@ -12,7 +12,7 @@
 // engine's own cursor stands — the same tween everything else on screen gets
 // (three/tween.ts).
 
-import { poseTurns } from '../../../lib/game/clipPose'
+import { poseTurns, rootAt } from '../../../lib/game/clipPose'
 import type { ClipFrames } from '../../../lib/game/clipPose'
 import { clipSeconds } from '../../../lib/game/clips'
 import { STEP_SECONDS } from '../../../lib/game/engine'
@@ -40,17 +40,22 @@ export function createWear(squad: Squad, clips: ClipFrames[]): Wear {
         const clip = framesOf(one.clip)
         const seconds = Math.max(0, one.clipElapsed + ahead)
         const runs = clip ? clipSeconds(clip) : 0
+        // A committed clip HOLDS its last frame — the exe's repeat count of one,
+        // and the reason a get-up does not snap back to frame 0. A looping one
+        // wraps (lib/game/bonePose.ts says the same thing for the pose the rules
+        // measure).
+        const at = one.clipOnce || runs <= 0 ? seconds : seconds % runs
         soldier.pose(
           poseTurns({
             clip,
-            // A committed clip HOLDS its last frame — the exe's repeat count of
-            // one, and the reason a get-up does not snap back to frame 0. A
-            // looping one wraps (lib/game/bonePose.ts says the same thing for
-            // the pose the rules measure).
-            seconds: one.clipOnce || runs <= 0 ? seconds : seconds % runs,
+            seconds: at,
             overlay: framesOf(one.overlay),
             phase: one.overlayPhase
-          })
+          }),
+          // …and the whole BODY's own offset, off the keyframe's head: the gait's
+          // bob, which the engine's own sampler puts on the same root
+          // (lib/game/clipPose.ts).
+          rootAt(clip, at)
         )
       }
     }

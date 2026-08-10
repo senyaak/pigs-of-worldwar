@@ -33,6 +33,39 @@ export const BONE_COUNT = 15
 export interface ClipFrames extends ClipTiming {
   /** frameCount × 15 × 3 floats: per-bone euler angles, radians. */
   rotations: Float32Array
+  /** frameCount × 3: the body's own offset per frame, model units
+   * (lib/formats/mcap.ts). Absent on a clip built by hand in a spec. */
+  roots?: Float32Array
+}
+
+/**
+ * Where the whole BODY sits this far into a clip, in model units — the head of
+ * the keyframe, interpolated the way the library interpolates it (as integers,
+ * `_d3d.dll` 0x1001228f).
+ *
+ * This is the animator's own offset of the root, and the only live component in
+ * the shipped clips is y: 21 units of it over a stride in the run cycle, which is
+ * the pig's BOB. Play asked three times for the part of the body that carries it
+ * — "жёпка так и не вертится… там именно та часть тела не шевелится вообще" —
+ * and nothing here was reading it: the rump has 4.9° of pitch off its own bone
+ * and NOTHING else, so without this it is the one piece of the pig that holds
+ * still (`animations/notes.md`).
+ */
+export function rootAt(clip: ClipFrames | null, seconds: number): { x: number; y: number; z: number } {
+  if (!clip?.roots || clip.frameCount <= 0) return { x: 0, y: 0, z: 0 }
+  const { first, second, between } = cursor(clip, seconds)
+  const at = (frame: number, axis: number): number => clip.roots![frame * 3 + axis] ?? 0
+  // AGAINST THE CLIP'S OWN FIRST FRAME, and that half is the remake's own
+  // decision rather than a reading. The head's y is about −100 on every clip —
+  // a hundred model units UP, since model space is Y-down — and the original
+  // adds the whole of it to a body it has placed its own way. This engine stands
+  // a pig by the foot offset it measured off the ART (lib/game/body.ts), so
+  // adding the constant on top would lift every pig half its own hip height off
+  // the ground. What is left is what MOVES: 21 units of bob over a stride in the
+  // run cycle, 15 walking backwards, 2 standing about.
+  const lerp = (axis: number): number =>
+    at(first, axis) + (at(second, axis) - at(first, axis)) * between - at(0, axis)
+  return { x: lerp(0), y: lerp(1), z: lerp(2) }
 }
 
 /**

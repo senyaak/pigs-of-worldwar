@@ -194,6 +194,9 @@ export interface DebugHooks {
   pose(): {
     clip: number | null
     elapsed: number
+    /** What the keyframe head lifts the whole body by — the gait's BOB, which is
+     * the only motion the rump has of its own (lib/game/clipPose.ts). */
+    lift: number
     /** Every bone the MESH wears, HIR order: 0 the hip and the tail with it,
      * 1 the torso where the run cycle's swing lives, 9..14 the legs. */
     bones: [number, number, number, number][]

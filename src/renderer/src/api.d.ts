@@ -59,9 +59,9 @@ export interface Clip {
   frameCount: number
   /** frameCount × 15 × 3 euler radians. */
   rotations: Float32Array
-  /** frameCount × 10 × 3 branch-bone positions. */
-  positions: Float32Array
-  unknowns: Uint16Array
+  /** frameCount × 3: the whole body's own offset per frame, model units — the
+   * gait's BOB (lib/formats/mcap.ts). */
+  roots: Float32Array
 }
 
 export type LoadClipsResult = { ok: true; clips: Clip[] } | { ok: false; error: string }
