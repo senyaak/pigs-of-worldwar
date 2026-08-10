@@ -406,8 +406,27 @@ function fly(
     }
   }
   const to = clampToWorld(state.x + a.vx * delta, state.z + a.vz * delta)
-  state.x = to.x
-  state.z = to.z
+  // A body in the air is STILL A BODY. The exe's own sweep (0x406AD0) has two
+  // callers: the walking dispatch (0x478e73, whose result word of 1 — "only the
+  // landscape was hit" — is the successful step) and the physics library's own
+  // integration of a live body (0x40a0dd, the same `[body+0x4C]` proxy, which
+  // then walks the hit list it comes back with). The pig is a live body for the
+  // whole flight — its movement update is skipped outright in state 5
+  // (0x46b205) — so an object's box stops a JUMP the way it stops a step, and
+  // this engine, whose obstacles were only ever consulted while walking, flew
+  // straight through the training ground's dummies and its barbed wire.
+  //
+  // No step-up reach in the air: a box whose top is above the feet is a wall,
+  // and one below them is what `standOn` lands on further down. Stopping the
+  // horizontal dead is the remake's own — the exe resolves it as a contact with
+  // the box's own material, and that solver is not read (movement/notes.md).
+  if (obstruction.blocks(to.x, to.z, state.y, 0)) {
+    a.vx = 0
+    a.vz = 0
+  } else {
+    state.x = to.x
+    state.z = to.z
+  }
   // Towards the terminal velocity rather than away from rest, with the
   // integrator's own drag on top — and the horizontal bleeds by the same
   // two, because the force's target has no sideways component.
