@@ -283,12 +283,46 @@ export function createBattle(parts: BattleParts): Battle {
     // second, and nothing may hand the turn over inside it (lib/game/mines.ts).
     mines.live() > 0 ||
     // …and a pig still in the AIR, which is what a blast leaves behind
-    // (lib/game/tumble.ts). The acting pig's own flight is `loco.airborne` and is
-    // not in here: the turn has always been allowed to end with the pig it
-    // belongs to mid-jump, and the beat that ends it walks everybody home anyway.
+    // (lib/game/tumble.ts) — the acting pig's own flight among them. Play watched
+    // what leaving it out costs: "динамит не толкает", because TNT's six-second
+    // fuse runs out inside the beat that ends the turn, and a beat that does not
+    // wait for the flight hands the turn on before the pig has moved a unit.
     tumbles.live() > 0 ||
+    loco.airborne !== null ||
     numbers.live() > 0 ||
     airDrops.falling() > 0
+
+  /**
+   * The acting pig's own FLIGHT, advanced wherever the frame happens to be.
+   *
+   * Its walk lives at the bottom of `update`, past three branches that return
+   * early — the beat after a blow, the beat that ends the turn, and the turn a
+   * weapon has spent — and a blast can throw the pig inside any of them. Play saw
+   * both halves of that: "сначала взрыв… а потом толчёк" (the flight frozen for
+   * the length of the beat, then finished afterwards) and "динамит не толкает" (a
+   * charge whose fuse runs out during the end-of-turn beat, where the flight was
+   * dropped outright).
+   *
+   * Nothing is DRIVEN here — no walk, no turn, no jump — which is the same rule
+   * `tumble` follows for everybody else and the exe's own (0x46b205).
+   */
+  const flyOn = (delta: number): void => {
+    if (loco.airborne === null) return
+    updateLocomotion(
+      loco,
+      query,
+      { walk: 0, turn: 0, jump: false },
+      delta,
+      withPigs(
+        scenery.obstacles,
+        everyone()
+          .filter((pig) => pig !== game.currentPig && !isDead(pig))
+          .map((pig) => ({ ...pig.position }))
+      )
+    )
+    game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
+    if (!anim.animating(game.currentPig)) anim.setClip(game.currentPig, loco.clip)
+  }
 
   /**
    * Finish the turn the way the exe finishes one: into the WALK AWAY beat, and
@@ -410,12 +444,18 @@ export function createBattle(parts: BattleParts): Battle {
       // Everything that runs on its own runs on: the engine's step advances all
       // of it after this call (lib/game/engine.ts). All this beat does is watch.
       const done = walkAway.update(delta, settling())
+      // A pig thrown by the charge it planted is still in the air, and the beat is
+      // waiting for it (`settling`). Its flight owns its position for as long as it
+      // lasts; the walk home is what the beat does with pigs on the ground.
+      flyOn(delta)
       // The beat moves pigs itself and the one whose turn it was is one of them,
       // so the state the scene draws THAT one out of has to follow it.
-      loco.x = game.currentPig.position.x
-      loco.y = game.currentPig.position.y
-      loco.z = game.currentPig.position.z
-      loco.heading = game.currentPig.heading
+      if (loco.airborne === null) {
+        loco.x = game.currentPig.position.x
+        loco.y = game.currentPig.position.y
+        loco.z = game.currentPig.position.z
+        loco.heading = game.currentPig.heading
+      }
       // The same careful test the driven pig uses: a deck over water is not
       // water (lib/game/locomotion.ts).
       loco.swimming = inWater(query, loco.x, loco.z, loco.y)
@@ -502,6 +542,10 @@ export function createBattle(parts: BattleParts): Battle {
       // 36-frame clip. The pig plays out what it was doing INSIDE the wait —
       // that is what the wait is for.
       swings.update(delta, acting)
+      // …and if the blow THREW it, the flight is one of the things it plays out.
+      // Frozen here, a pig hung in the air for the length of the beat and only
+      // then moved, which is what play watched: "сначала взрыв… а потом толчёк."
+      flyOn(delta)
       // The shot that caused all this ends here rather than a frame late.
       attack.settled()
       // ONE THING AT A TIME. The script's next step waits for the thing that

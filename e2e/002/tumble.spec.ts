@@ -16,8 +16,9 @@ import path from 'node:path'
 import { GAME_DIR } from '../launch'
 import { parsePmg, TILE_MINE, TILE_STEP } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
-import { createMines } from '../../src/lib/game/mines'
-import { BLAST_FLING, burst } from '../../src/lib/game/blast'
+import { MINE_DAMAGE, createMines } from '../../src/lib/game/mines'
+import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
+import { FLING_CAP, FLING_PER_POINT, burst, flingSpeed } from '../../src/lib/game/blast'
 import { PITCH, createTumbles, flingVelocity } from '../../src/lib/game/tumble'
 import { NO_OBSTACLES } from '../../src/lib/game/obstacles'
 import { blastReach, blastShare } from '../../src/lib/game/grenade'
@@ -115,7 +116,15 @@ test('a fling is 45° UP along its bearing — the engine\'s own pitch', () => {
   expect(east.vx).toBeGreaterThan(0)
   expect(east.vz).toBeCloseTo(0, 6)
 
-  expect(BLAST_FLING, 'the blast throws with 0x40 a frame').toBeCloseTo(fromExeSpeed(0x40), 6)
+  // …and how HARD: four times the damage in points, capped at the cattle prod's
+  // 200 a frame, which is the hardest knock anything in the exe hands out. Play:
+  // "толчёк очень мелкий" — the first attempt used a flat 0x40, which is less than
+  // a punch. The two ends land on the engine's own numbers.
+  expect(FLING_PER_POINT).toBe(4)
+  expect(flingSpeed(30), "a grenade's core is 0x78").toBeCloseTo(fromExeSpeed(0x78), 6)
+  expect(flingSpeed(50), "TNT's core is the prod's 200").toBeCloseTo(fromExeSpeed(200), 6)
+  expect(flingSpeed(20), "a mine's core is above a bayonet's 75").toBeGreaterThan(fromExeSpeed(75))
+  expect(flingSpeed(500), 'nothing throws harder than the cap').toBe(FLING_CAP)
 })
 
 test('a mine THROWS the pig that trod on it — off the ground and down again', () => {
@@ -134,7 +143,8 @@ test('a mine THROWS the pig that trod on it — off the ground and down again', 
   expect(tumbles.has(pig)).toBe(true)
   const launch = tumbles.at()[0]
   expect(launch.vy, 'it was not thrown upward').toBeLessThan(0)
-  expect(Math.hypot(launch.vx, launch.vy, launch.vz)).toBeCloseTo(BLAST_FLING, 4)
+  // Twenty points at the core, so four times that a frame.
+  expect(Math.hypot(launch.vx, launch.vy, launch.vz)).toBeCloseTo(flingSpeed(20), 4)
 
   // …and then it FLIES. Game space is Y-down, so off the ground is a smaller y.
   let highest = pig.position.y
@@ -178,14 +188,15 @@ test('…and the pig NEXT to it is thrown too, away from the blast and less hard
   // doing: the one under it keeps the whole impulse.
   const share = blastShare(apart, blastReach(1024))
   expect(share).toBeLessThan(1)
-  const flat = BLAST_FLING * share
+  // The impulse rides the DAMAGE, and the damage is already the share for the
+  // distance — so the far pig is thrown by four times whatever it lost. Under
+  // the flat-distance figure, because the falloff is measured in three dimensions
+  // from the blast to the body's own origin, which stands above the soles
+  // (lib/game/body.ts).
+  const flat = flingSpeed(Math.round((MINE_DAMAGE * share) / DAMAGE_UNIT))
   const got = Math.hypot(other.vx, other.vy, other.vz)
-  // Within a percent of the share the flat distance gives, and UNDER it — the
-  // falloff is measured in three dimensions from the blast to the body's own
-  // origin, which stands above the soles (lib/game/body.ts), so the real gap is
-  // always a little more than the two pigs' spacing.
-  expect(got).toBeLessThan(flat)
-  expect(got / flat).toBeGreaterThan(0.99)
+  expect(got).toBeLessThanOrEqual(flat)
+  expect(got / flat).toBeGreaterThan(0.9)
   expect(Math.hypot(one.vx, one.vy, one.vz)).toBeGreaterThan(
     Math.hypot(other.vx, other.vy, other.vz)
   )

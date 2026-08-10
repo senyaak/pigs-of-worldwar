@@ -264,6 +264,25 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
           if (sunkAway(shot)) flying.splice(i, 1)
           continue
         }
+        // **A PLACED CHARGE DOES NOT MOVE.** Play: "динамит катится по склону."
+        // It did, and stepping it at all was the mistake: gravity pulled it into
+        // the hillside, the contact reflected the normal part away and — by the
+        // rule this file already got right for grenades — carried the whole
+        // slope-parallel part on, so a bundle standing on a slope slid down it for
+        // as long as its fuse lasted.
+        //
+        // Nothing has to fall for a charge to be PUT somewhere (`plant` above), so
+        // its fuse is the only thing about it that runs. The exe has a REST state
+        // for a body and it is not decoded (`movement/notes.md`); this is that
+        // state for the one thing that is born in it.
+        if (shot.resting) {
+          shot.fuse -= delta
+          if (shot.fuse <= 0) {
+            detonate(shot)
+            flying.splice(i, 1)
+          }
+          continue
+        }
         const speed = Math.hypot(shot.vx, shot.vy, shot.vz)
         const steps = Math.max(1, Math.ceil((speed * delta) / LOB_STEP))
         let spent = false

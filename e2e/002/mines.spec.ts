@@ -461,11 +461,40 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
   await page.waitForTimeout(600)
   expect((await thrown(page)).length, 'a second charge went down').toBe(1)
 
+  // **AND IT STAYS WHERE IT WAS PUT.** Play: "динамит катится по склону." It did:
+  // it was stepped like anything else in the air, so gravity pressed it into the
+  // ground and the contact carried the whole slope-parallel part of the bounce on
+  // (lib/game/lobs.ts). A placed charge is not simulated at all now — only its
+  // fuse runs.
+  const laid = (await thrown(page))[0]
+  await page.waitForTimeout(1500)
+  const still = (await thrown(page))[0]
+  expect(still, 'it went off early').toBeTruthy()
+  expect(Math.hypot(still.x - laid.x, still.y - laid.y, still.z - laid.z), 'it moved').toBeLessThan(
+    1
+  )
+
   // Its fuse outlasts the run: the clock goes first, and the beat the turn ends
   // through waits for the charge rather than handing over on top of it
   // (lib/game/walkAway.ts).
+  const waiting = await debugState(page)
   await expect.poll(async () => (await thrown(page)).length, { timeout: 15000 }).toBe(0)
   expect((await sounds(page)).slice(quiet), 'it went off').toContain('E_1')
+
+  // …**AND IT THROWS THE PIG THAT PLANTED IT**, inside that beat. Play: "динамит
+  // не толкает" — right, and the charge was never the problem: TNT's six-second
+  // fuse runs out after the four the turn hands back, so the blast lands during
+  // the beat that ends the turn, and that beat used to drop the flight on the floor
+  // (lib/game/battle.ts `flyOn`).
+  await expect
+    .poll(
+      async () => {
+        const now = await debugState(page)
+        return Math.hypot(now.x - waiting.x, now.z - waiting.z)
+      },
+      { timeout: 6000, message: 'the charge to throw the pig that planted it' }
+    )
+    .toBeGreaterThan(100)
 
   expect(app.errors()).toEqual([])
 })

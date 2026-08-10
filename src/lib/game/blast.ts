@@ -52,28 +52,43 @@ export interface BlastWorld {
 }
 
 /**
- * **What a blast THROWS with.** 0x40 — sixty-four units a frame — at the core,
- * falling off with the same share the damage does.
+ * **What a blast THROWS with: four times the damage it did, in points.**
  *
  * The exe's whole vocabulary for shoving a pig is one call,
- * `0x4a9100(speed, 0x200, bearing, 0)`, and every site that makes it uses a speed
- * of **0x40** or 0x78: a pig shoved by another body (0x477695, 0x477842), the
- * melee's own knockback (0x4786c1, which passes the weapon's number instead), and
- * the map object at 0x44050c which sweeps up every pig around it, pushes each one
- * at `(0x40, 0x200, bearing)` and makes it squeal. 0x40 is the one attached to
- * something going off, so 0x40 is what a blast gets.
+ * `0x4a9100(speed, 0x200, bearing, 0)`, and the speeds at its six sites are the
+ * scale everything here is measured against: **0x40** for a pig shoved by another
+ * body (0x477695, 0x477842) or by a building going off (0x44050c), **0x78** for
+ * types 0x1358/0x135A, and for the melee the weapon's own `knockback` —
+ * **75 for a bayonet, 100 for a trotter, 150 for a sword, 200 for the cattle
+ * prod** (`weapons/melee.md`).
  *
- * **What is NOT read:** `Pig::OnHit`'s own blast arm (0x477c22) carries no impulse
- * at all — it takes the falloff damage through `[vtbl+0x34]`, adds twice it to the
- * tally at `[pig+0x1b8]`, raises the reeling counter at `[pig+0x1b4]` and squeals.
- * So the original throws a pig with a blast through something this pass did not
- * find, and the likeliest candidate is the physics: the blast effect has a BODY —
- * a sphere of radius 35 (`weapons/fire.md`) — and the solver resolves it against
- * the pig's. That contact's impulse is not decoded. What stands here is play's
- * rule ("не отбрасывают") wearing the engine's own numbers, and the FALLOFF is the
- * remake's: it is the one thing that makes standing back matter.
+ * That last row is what the first attempt got wrong. It used 0x40 flat, which is
+ * **less than a punch** for a charge going off under a pig's trotters, and play
+ * said so at once: "толчёк очень мелкий." So the magnitude scales with the damage
+ * instead, and the two ends of it land on the engine's own numbers: a grenade's
+ * thirty points at the core come to **120 = 0x78**, and TNT's fifty to the cattle
+ * prod's **200**, which is the hardest knock anything in the exe hands out — hence
+ * the cap. A mine's twenty come to 80, above a bayonet and below a trotter.
+ *
+ * The FALLOFF is free: the damage is already the share for the distance, so
+ * standing back saves your footing along with your health.
+ *
+ * The four, and the cap, are the REMAKE's — play's word standing in for a read
+ * that came up empty. `Pig::OnHit`'s own blast arm (0x477c22) carries no impulse at
+ * all: it takes the falloff damage through `[vtbl+0x34]`, adds **twice it** to the
+ * tally at `[pig+0x1b8]` — which is where the melee's knockback goes too, in
+ * another scale — raises the reeling counter at `[pig+0x1b4]` and squeals. So the
+ * original throws a pig through something this pass did not find, most likely the
+ * physics: the blast effect has a BODY, a sphere of radius 35 (`weapons/fire.md`),
+ * and that contact's impulse is not decoded.
  */
-export const BLAST_FLING = fromExeSpeed(0x40)
+export const FLING_PER_POINT = 4
+/** …and no harder than the hardest knock in the engine: the cattle prod's. */
+export const FLING_CAP = fromExeSpeed(200)
+
+/** How hard a blast that took `points` off a pig throws it. */
+export const flingSpeed = (points: number): number =>
+  Math.min(FLING_CAP, fromExeSpeed(FLING_PER_POINT * points))
 
 /**
  * Set one off at `at`: announce it, and hurt everything within reach.
@@ -97,16 +112,16 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit):
     emit({ kind: 'damaged', at: body, amount })
     if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id })
     // …AND IT GOES FLYING. Away from the blast — the bearing from the centre to
-    // the pig — and by the same share the damage took, so standing back saves
-    // your footing as well as your health. A corpse flies too: the exe throws
-    // bodies about, and a pig killed by the blast is a body from that instant.
+    // the pig — as hard as the damage it just took (`flingSpeed`), which is what
+    // makes standing back save your footing as well as your health. A corpse flies
+    // too: the exe throws bodies about, and a pig killed by the blast is a body
+    // from that instant.
     //
     // A charge that went off UNDER the trotters has no direction to give (both
     // legs of the bearing are nil), and the pitch is fixed at 45° — so it throws
     // the pig the way it was facing rather than the way +Z happens to point.
-    const share = blastShare(Math.hypot(dx, body.y - at.y, dz), charge.reach)
     const away = Math.hypot(dx, dz) < 1 ? pig.heading : Math.atan2(dx, dz)
-    world.fling?.(pig, BLAST_FLING * share, away)
+    world.fling?.(pig, flingSpeed(amount), away)
   }
   const standing = world.targets
   for (let i = standing.length - 1; i >= 0; i--) {
