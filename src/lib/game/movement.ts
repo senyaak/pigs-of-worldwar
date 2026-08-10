@@ -62,13 +62,16 @@ export const WALK_REQUEST = 64
  * came back wrong for the same reason. A walk-only factor is what was actually
  * asked for.
  *
- * 4/3 is by eye and nothing else: 52 units a frame at 1/15 is 780 a second, and
- * this makes it 1040 — two tiles. The exe's own 52 is untouched underneath, and
+ * The value is by eye and nothing else: 52 units a frame at 1/15 is 780 a
+ * second, and 5/3 makes it 1300 — two and a half tiles. Play walked it up in
+ * two goes: 4/3 (1040) first, then this, which is the same walking speed the
+ * 1/25 experiment had and the point of the exercise — "может теперь норм будет
+ * когда вся игра не увеличина". The exe's own 52 is untouched underneath, and
  * so is every relation that hangs off the stride: the running jump leaves
  * faster because `Pig::Walk`'s own `|nDist|/2` says it does, and `LOOK_AHEAD`
  * grows with the step because the original checks one step ahead.
  */
-export const WALK_SCALE = 4 / 3
+export const WALK_SCALE = 5 / 3
 
 /**
  * How fast a pig walks, world units per second — the exe's, not a taste.
