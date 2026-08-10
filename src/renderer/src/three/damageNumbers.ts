@@ -33,7 +33,8 @@ export function projectDamage(
       x: (at.x * 0.5 + 0.5) * width,
       y: (-at.y * 0.5 + 0.5) * height,
       value: one.value,
-      age: one.age
+      age: one.age,
+      style: one.style
     })
   }
   return out

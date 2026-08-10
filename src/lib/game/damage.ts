@@ -25,16 +25,30 @@ export const NUMBER_SECONDS = 1
  * so this is about half a body. The remake's own. */
 export const NUMBER_RISE = 160
 
+/**
+ * Which of the two a number is — the exe's own fifth argument to 0x487B90, and
+ * the only difference between a hit's number and a heal's.
+ *
+ * Style 0 builds its colour out of the 16-byte record per team at 0x4CF1E0
+ * (0x487c33); style 1 takes the fixed word 0x6405 (0x487c19). Read as r in the
+ * high five bits that is (25, 0, 5) of 31 — a hot pink-red, which is what play
+ * remembers of a heal: "сердечки рядом с цифрами, покрашено всё в розовый цвет".
+ */
+export type NumberStyle = 'damage' | 'heal'
+
 export interface FloatingDamage extends Point {
   /** The damage, in points — what the exe puts on the effect. */
   value: number
   /** 0 at the moment of the hit, 1 as it goes out. */
   age: number
+  /** Whether points came off or went back on. */
+  style: NumberStyle
 }
 
 export interface DamageNumbers {
-  /** Something took `value` points at this spot. */
-  show(at: Point, value: number): void
+  /** Something took `value` points at this spot — or got them back, which is
+   * the same number in the exe with one argument changed. */
+  show(at: Point, value: number, style?: NumberStyle): void
   /** Age them; call once a frame. */
   update(delta: number): void
   /** Every one still floating, oldest first — what a renderer projects. */
@@ -50,9 +64,9 @@ export function createDamageNumbers(): DamageNumbers {
   let live: FloatingDamage[] = []
 
   return {
-    show(where, value) {
+    show(where, value, style = 'damage') {
       if (value <= 0) return
-      live.push({ x: where.x, y: where.y, z: where.z, value, age: 0 })
+      live.push({ x: where.x, y: where.y, z: where.z, value, age: 0, style })
     },
     update(delta) {
       for (const one of live) one.age += delta / NUMBER_SECONDS

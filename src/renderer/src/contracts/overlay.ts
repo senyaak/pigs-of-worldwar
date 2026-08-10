@@ -33,4 +33,7 @@ export interface FloatingNumber {
   value: number
   /** 0 at the moment of the hit, 1 as it goes out. */
   age: number
+  /** Which of the exe's two number STYLES it is: a hit takes its colour from the
+   * team, a heal a fixed pink and a heart beside it (lib/game/damage.ts). */
+  style: 'damage' | 'heal'
 }

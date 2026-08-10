@@ -263,7 +263,7 @@ export function createEngine(parts: EngineParts): Engine {
       damaged: ({ at, amount }) => numbers.show(at, amount),
       // A heal shows the same number a hit does — one spawner, one style
       // argument apart (lib/game/scenery.ts).
-      healed: ({ at, amount }) => numbers.show(at, amount),
+      healed: ({ at, amount }) => numbers.show(at, amount, 'heal'),
       struck: ({ skill, at }) => effects.hit(skill, at),
       blasted: ({ at }) => effects.blast(at),
       // The splash is drawn on the WATER LINE however deep it gets, because

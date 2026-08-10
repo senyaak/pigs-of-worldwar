@@ -190,6 +190,18 @@ export const LAYOUT = {
   plate: {
     /** Seconds a pig must have stood still before its name comes back. */
     delay: 2,
+    /**
+     * …and seconds it is shown for after its number went DOWN, whatever it is
+     * doing.
+     *
+     * Play: "хп должно показываться когда уменьшается — иначе не видно", and it
+     * is the water that needs it: that damage spawns no number and plays no
+     * sound at all (lib/game/drowning.ts), so the plate is the only report. The
+     * exe agrees in its own terms — every `TakeDamage` raises the
+     * dashboard-stale flag `[0x537FC0]` (0x467c10), the water's own bite
+     * included (0x47000d).
+     */
+    hurt: 2,
     /** Between the name and the health line under it. */
     gap: 2,
     /** How far the name floats over the pig's CROWN, in GAME units — the
@@ -288,10 +300,17 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
   const skills = createSkillMenu()
   let art: SpriteSet | null = null
   let font: Font | null = null
+  /** The same letters painted the heal's own colour — the pink a heal's number
+   * comes up in (lib/game/damage.ts). */
+  let healFont: Font | null = null
   let digits: Sprite[] = []
   let fans: Sprite[] = []
   let heart: Sprite | null = null
   let loaded = false
+  /** Seconds of plate still owed to a pig that has just been hurt, and what
+   * every pig's number was last frame — the only way to see it fall. */
+  let hurtFor = 0
+  const wasHealth = new Map<string, number>()
   /** Which colours the tints were baked with, so a console change to them
    * repaints instead of being quietly ignored. */
   let painted = ''
@@ -304,6 +323,9 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     painted = wanted
     fans = await Promise.all(white.fans.map((wedge) => tinted(wedge, LAYOUT.dial.green)))
     heart = await tinted(white.heart, LAYOUT.plate.heart.colour)
+    // The heal's letters take the same colour its heart does, so nudging one in
+    // the console moves both.
+    healFont = await loadFont(PLATE_FONT, LAYOUT.plate.heart.colour)
   }
 
   const resize = (): boolean => {
@@ -545,15 +567,34 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       if (state.numbers.length > 0) {
         context.save()
         context.scale(scale, scale)
+        const healHeart = {
+          width: heart.width * PLATE.heart.scale,
+          height: heart.height * PLATE.heart.scale
+        }
+        const space = font.measure(' ')
         for (const number of state.numbers) {
+          // A HEAL comes up pink with a heart beside it, laid out the way the
+          // plate's own health line is. Play: "сердечки рядом с цифрами, и
+          // покрашено всё в розовый цвет" — and the exe carries exactly this
+          // distinction, one argument of the number's own spawner
+          // (lib/game/damage.ts).
+          const healing = number.style === 'heal'
+          const letters = healing ? (healFont ?? font) : font
           const text = String(number.value)
+          const wide = letters.measure(text) + (healing ? healHeart.width + space : 0)
+          const left = Math.round(number.x / scale - wide / 2)
+          const top = Math.round(number.y / scale - letters.height)
           context.globalAlpha = Math.max(0, 1 - number.age)
-          font.draw(
-            context,
-            text,
-            Math.round(number.x / scale - font.measure(text) / 2),
-            Math.round(number.y / scale - font.height)
-          )
+          if (healing) {
+            context.drawImage(
+              heart.image,
+              left,
+              top + Math.round((letters.height - healHeart.height) / 2),
+              healHeart.width,
+              healHeart.height
+            )
+          }
+          letters.draw(context, text, healing ? left + healHeart.width + space : left, top)
         }
         context.restore()
       }
@@ -561,7 +602,17 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       // A pig's name, and its health beside a heart under it — once it has
       // stood still long enough. Drawn in the widget's own units, with the
       // scene's screen positions brought back into them.
-      if (state.still < PLATE.delay) return
+      //
+      // …or the moment anybody's number goes DOWN, standing still or not: the
+      // water hurts silently and invisibly, and without this nothing on screen
+      // says so (`PLATE.hurt`).
+      hurtFor = Math.max(0, hurtFor - state.delta)
+      for (const plate of state.pigs) {
+        const before = wasHealth.get(plate.name)
+        if (before !== undefined && plate.health < before) hurtFor = PLATE.hurt
+        wasHealth.set(plate.name, plate.health)
+      }
+      if (state.still < PLATE.delay && hurtFor <= 0) return
       const line = font.height
       const gap = font.measure(' ')
       context.save()

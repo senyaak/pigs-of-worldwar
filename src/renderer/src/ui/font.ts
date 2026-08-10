@@ -58,13 +58,42 @@ function makeFont(name: string, atlas: CanvasImageSource, table: GlyphTable): Fo
   }
 }
 
-/** Load one FEText font. Rejects when the install has no such font. */
-export async function loadFont(name: string): Promise<Font> {
+/**
+ * PAINT an atlas one colour, keeping only the glyph shapes.
+ *
+ * `source-in` and not a multiply (`ui/sprites.ts`, which is right for the white
+ * map markers): a letter arrives with its own colour baked in, and the point
+ * here is to override that rather than shade it.
+ */
+async function painted(
+  atlas: ImageData,
+  colour: [number, number, number]
+): Promise<ImageBitmap> {
+  const canvas = new OffscreenCanvas(atlas.width, atlas.height)
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('no 2d context to paint the letters with')
+  context.putImageData(atlas, 0, 0)
+  context.globalCompositeOperation = 'source-in'
+  context.fillStyle = `rgb(${colour[0]}, ${colour[1]}, ${colour[2]})`
+  context.fillRect(0, 0, atlas.width, atlas.height)
+  return createImageBitmap(canvas)
+}
+
+/**
+ * Load one FEText font. Rejects when the install has no such font.
+ *
+ * `colour` paints every glyph it, which is how the same letters serve a second
+ * purpose: the exe's own floating numbers are not letters at all but effect
+ * particles with a colour on them, and a heal's is the fixed one
+ * (lib/game/damage.ts). Nothing else recolours text.
+ */
+export async function loadFont(name: string, colour?: [number, number, number]): Promise<Font> {
   const result = await window.api.loadFont(name)
   if (!result.ok) throw new Error(result.error)
   const { atlas, table } = result.font
   const pixels = new Uint8ClampedArray(atlas.rgba.byteLength)
   pixels.set(atlas.rgba)
-  const bitmap = await createImageBitmap(new ImageData(pixels, atlas.width, atlas.height))
+  const image = new ImageData(pixels, atlas.width, atlas.height)
+  const bitmap = colour ? await painted(image, colour) : await createImageBitmap(image)
   return makeFont(result.font.name, bitmap, table)
 }
