@@ -970,6 +970,16 @@ and nothing has been read that spawns one for a placed object, so borrowing
 the engine's own ground-impact burst is the remake's, flagged at the call.
 `airDrop.ts`'s `onLanded` carries the spot for it.
 
+**And a landed crate is put back ON its spot.** Play: "коробки падают но
+зависают чуть выше земли", and it was 29.9 units, measured. A descent leaves the
+engine's list on the step it lands, so the last frame that DREW it drew it in
+the air — at a height tweened between the two steps before it — and nothing
+afterwards ever moved that mesh again. `props.restingY` had been carrying the
+answer since the descent was built and nobody called it; `airDropArt.land`
+does, and `e2e/002/strike.spec.ts` now checks every crate against its record's
+own resting place. The record's y is exact, to within a unit of the terrain on
+every crate CAMP carries, so there was never anything wrong with the placement.
+
 And **`SETTLE` is half a second, not one**, which is the same fifteen frames.
 `FRAME_SECONDS` here is 1/15, deliberately stretched from the engine's rate so
 the walk reads right against half-scale models — so every timer taken off the

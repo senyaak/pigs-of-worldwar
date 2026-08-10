@@ -19,6 +19,7 @@ import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { pickupsOf } from '../../src/lib/game/pickups'
+import { restingPlaceOf } from '../../src/lib/game/scenery'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 /** 3 BAYONET — the training ground's first weapon (lib/game/skills.ts). */
@@ -35,7 +36,7 @@ interface Debug {
   script(): { absent: number[]; falling: number }
   aftermath(): boolean
   hud(): { seconds: number }
-  props(): { at: { name: string; x: number; z: number }[] }
+  props(): { at: { name: string; x: number; y: number; z: number }[] }
 }
 
 type Page = import('@playwright/test').Page
@@ -51,6 +52,7 @@ const look = (
   dummies: number
   strike: unknown
   effects: number
+  props: { name: string; x: number; y: number; z: number }[]
 }> =>
   page.evaluate(() => {
     const pow = (window as unknown as { pow?: { debug?: Debug } }).pow
@@ -61,7 +63,8 @@ const look = (
       swinging: pow.debug.swinging(),
       dummies: pow.debug.props().at.filter((each) => each.name === 'DUMMY').length,
       strike: pow.debug.strike(),
-      effects: pow.debug.effects()
+      effects: pow.debug.effects(),
+      props: pow.debug.props().at
     }
   })
 
@@ -204,4 +207,22 @@ test('a bayonet swung at a dummy knocks it down', async ({ app }) => {
   const after = await look(page)
   expect(after.strike, 'the swing never resolved a strike at all').not.toBeNull()
   expect(after.dummies, `no dummy went down — ${JSON.stringify(after.strike)}`).toBe(before - 1)
+
+  // The crate is ON the ground, and this is a measurement rather than a guess:
+  // it used to be left 29.9 units above it. A descent leaves the engine's list
+  // on the step it lands, so the last frame that drew it drew it in the AIR at
+  // a tweened height, and nothing afterwards moved the mesh again — play saw
+  // it as crates hanging just off the ground. `airDropArt.land` puts the art
+  // back on the record's own resting place (three/airDrop.ts).
+  for (const one of after.props) {
+    if (!one.name.startsWith('CRATE')) continue
+    const record = CAMP.find(
+      (r) => r.name === one.name && Math.abs(r.x - one.x) < 2 && Math.abs(r.z - one.z) < 2
+    )
+    if (!record) continue
+    expect(one.y, `${one.name} #${record.id} is off its own spot`).toBeCloseTo(
+      restingPlaceOf(record).y,
+      3
+    )
+  }
 })

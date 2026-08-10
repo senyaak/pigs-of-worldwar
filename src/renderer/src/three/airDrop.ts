@@ -17,8 +17,19 @@ import type { MapProps } from './props'
 export interface AirDropArt {
   /** Put a canopy over this record and show it. */
   open(id: number): void
-  /** Take this one's canopy away — it has landed, or the player cut it. */
+  /** Take this one's canopy away — the player cut it. */
   cut(id: number): void
+  /**
+   * It is DOWN: the canopy goes, and the art goes back on its own spot.
+   *
+   * That second half is not a flourish. The descent leaves the engine's list
+   * on the step it lands, so the last frame that drew it drew it in the AIR —
+   * at a tweened height between the two steps before, which is a few units
+   * short — and nothing afterwards ever moves the mesh again. A crate left
+   * hanging just off the ground is exactly that residue, and `props.restingY`
+   * has been carrying the answer since the descent was built.
+   */
+  land(id: number): void
   /** …every one of them. */
   cutAll(): void
   /** Lift each record's art to where its descent has got to. Once a frame, and
@@ -52,6 +63,11 @@ export function createAirDropArt(
       if (one) worn.set(id, one)
     },
     cut,
+    land(id) {
+      cut(id)
+      const y = props.restingY(id)
+      if (y !== null) props.raise(id, y)
+    },
     cutAll() {
       for (const id of [...worn.keys()]) cut(id)
     },

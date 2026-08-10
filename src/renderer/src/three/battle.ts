@@ -181,7 +181,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       dropOpened: ({ pig }) => dropInArt.open(pig),
       dropCut: ({ pig }) => dropInArt.cut(pig),
       crateSent: ({ id }) => airDropArt.open(id),
-      crateLanded: ({ id }) => airDropArt.cut(id),
+      crateLanded: ({ id }) => airDropArt.land(id),
       canopiesCut: () => airDropArt.cutAll(),
       cameraReset: () => chase.reset(),
       collected: (one) => onCollected({ ...one, result: 'taken' }),
