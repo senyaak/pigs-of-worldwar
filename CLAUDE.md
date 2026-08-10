@@ -2220,6 +2220,40 @@ thing: `Lobs.thrown()` is the count without the planted ones, and `live()` stays
 what the end of a turn waits for. So a TNT charge cannot be set off by a second
 press either — which would otherwise have been one button away from suicide.
 
+### ONE BLOW A TURN, and an animation nobody may walk out of
+
+Play's second pass over the charges, four reports in one line, and three of them
+were the same hole: "не дожидается окончания анимации и можно идти в ней в последнюю
+секунду", "можно ставить много тнт подряд — а после первого нельзя использовать
+оружие", "когда таймер кончился — анимация свина не возвращается обратно в идл",
+"тнт ложится в пол — а надо чтобы стояло".
+
+- **The lay clip holds the pig to its END, not to the frame that places the
+  charge.** `laying` carries two numbers now: `untilDown` (phase 1314) and
+  `untilDone` (the whole clip), and `attack.busy()` is the second one. The clock does
+  not run inside it either — a blow in progress stops it — so the four seconds a
+  charge gives back are four seconds of RUNNING.
+- **One weapon use a turn.** `struck` in `lib/game/battle.ts`, and the fire key is
+  swallowed for anything but SKIP TURN once it is up. It is the same rule the turn
+  ending already was, seen from the side of the two skills that do not end it: the
+  charges kept the turn and so kept the trigger, which meant a pig could carpet its
+  own feet in TNT.
+- **The turn ending puts everyone back to IDLE.** `endTurnBeat` dresses every pig
+  before `beginWalkAway`, which then puts the swimmers into their own clip on top of
+  it. The beat only ever dressed the swimmers, so a pig that ran out of clock
+  mid-stride kept the run cycle for the whole handover.
+- **A planted charge is lifted by its OWN half-height** and not by a grenade's
+  radius, and nothing pitches it: it was drawn half-buried, and it has no velocity
+  to point along.
+
+**And the once-clip rule wanted a qualifier the specs caught.** "A committed clip
+plays out" on its own broke the walk cycle: a pig that lands on the run was still
+getting up, which `002/walkcycle.spec.ts` failed on within the same run. The exe has
+the qualifier — the animation picker asks 0x472320 for a gait and that request
+zeroes the committed clip outright, so a DRIVEN pig's gait wins and a standing pig's
+clip finishes (`animations/notes.md`). The branch is `anim.animating(acting) &&
+loco.clip === ANIM.IDLE`, which is both halves in one line.
+
 ### A MINE IS HIDDEN, and that part is play's rule
 
 Play: "мины скрыты — текстуры видны только тем кто рядом и то только тем у кого
@@ -2245,7 +2279,17 @@ says so at the field. "Whoever placed it" is not modelled because laying a mine 
 not — there is no owner to remember yet.
 
 The eyes are the caller's: the scene asks with `game.currentPlayer.pigs`, so an
-enemy engineer walking past does not light the field up for the player.
+enemy engineer walking past does not light the field up for the player. A mine that
+has been TRODDEN on is drawn for everybody — by then it is nobody's secret.
+
+**Play knows more about this than the binary does, and it is written here for the
+pass that does it**: "инженеры и командос с героем видят жёлто-чёрные текстуры там
+где есть мины", and mines are hidden on the MINIMAP for the enemy. So the original's
+reveal is a TEXTURE SWAP on the tile — the hazard stripes CAMP's four mine textures
+almost certainly are — for three classes rather than the engineer family alone, and
+`DETECT_RANGE` belongs to the map view rather than to the ground. None of that is
+built: play said "но ладно это потом", and the marker model stands in meanwhile.
+Still to do beside it: the EXCLAMATION MARK over a mine the moment it is trodden on.
 
 ### What is still not read
 

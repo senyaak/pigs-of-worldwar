@@ -207,6 +207,17 @@ export function createBattle(parts: BattleParts): Battle {
   /** Whether the weapon in hand has been USED, and so the turn is over as soon
    * as the world it disturbed goes quiet (lib/game/spend.ts). */
   let spent = false
+  /**
+   * …and whether a weapon has been used AT ALL this turn.
+   *
+   * **ONE BLOW A TURN.** Play, of the charges: "можно ставить много тнт подряд — а
+   * после первого нельзя использовать оружие." It is the same rule the turn ending
+   * is, seen from the side of the two skills that do NOT end it (lib/game/spend.ts):
+   * a pig gets one use, and a planted charge spends it without handing the turn
+   * over — the four seconds it gives back are for RUNNING, not for a second
+   * charge. SKIP TURN is not a weapon and is never refused.
+   */
+  let struck = false
   /** Seconds left of the getting-it-out clip. */
   let readying = 0
   /** Seconds the acting pig has stood still, and where it stood. */
@@ -269,6 +280,12 @@ export function createBattle(parts: BattleParts): Battle {
    * (lib/game/walkAway.ts).
    */
   const endTurnBeat = (): void => {
+    // Nobody is being driven from here on, so nobody is mid-stride. Play: "когда
+    // таймер кончился — анимация свина не возвращается обратно в идл" — the walk
+    // cycle the pig was wearing when the clock ran out played on through the whole
+    // beat, because the beat only ever dressed the SWIMMERS. Before
+    // `beginWalkAway`, which puts those back into their own clip on top of this.
+    for (const pig of everyone()) if (!isDead(pig)) anim.setClip(pig, ANIM.IDLE)
     walkAway = beginWalkAway({
       pigs: everyone,
       query,
@@ -326,6 +343,7 @@ export function createBattle(parts: BattleParts): Battle {
     aftermath = null
     pending = null
     spent = false
+    struck = false
     sights.setHeld(false)
     swings.reset()
     emit({ kind: 'cameraReset' })
@@ -515,6 +533,12 @@ export function createBattle(parts: BattleParts): Battle {
       return
     }
 
+    // ONE BLOW A TURN: a pig that has already used a weapon answers the fire key
+    // with nothing at all. Everything that ENDS the turn takes care of itself —
+    // the beat is running by then and swallows the press anyway — so this is here
+    // for the charges, which keep the turn and must not be planted twice.
+    if (struck && acting.holding !== SKILL.SKIP_TURN) attack.swallow()
+
     // What the fire button set going — the whole of it, including WHICH weapon
     // answers (lib/game/attack.ts). SKIP TURN is the one answer this frame has
     // to act on itself, because ending a turn is the battle's business.
@@ -533,6 +557,7 @@ export function createBattle(parts: BattleParts): Battle {
     // `holding`, which is only synced further down the frame and is a frame stale
     // here.
     if (answered === 'used') {
+      struck = true
       if (endsTurn(acting.holding)) spent = true
       // A PLANTED charge keeps the turn and takes the clock down to four seconds
       // instead: enough to get clear of the thing, and not enough to do anything
@@ -669,17 +694,19 @@ export function createBattle(parts: BattleParts): Battle {
       // channel and clears the weapon one (0x46971a).
     } else if (loco.commit) {
       if (!anim.animating(acting)) anim.playOnce(acting, loco.clip)
-    } else if (anim.animating(acting)) {
-      // **A ONCE-CLIP PLAYS OUT.** Play, of the charge going down: "ТНТ ставится
-      // на землю — с анимацией", and there was none: `setClip` below replaces a
-      // committed clip the very next frame — that is what it is FOR, since the
-      // walk has to be able to interrupt the idle — so every weapon's attack clip
-      // was being wiped one frame after `playOnce` started it. The swing was the
-      // only one that survived, because `swings.swinging()` above holds it.
+    } else if (anim.animating(acting) && loco.clip === ANIM.IDLE) {
+      // **A ONCE-CLIP PLAYS OUT — while the pig is STANDING.** Play, of the charge
+      // going down: "ТНТ ставится на землю — с анимацией", and there was none:
+      // `setClip` below replaces a committed clip the very next frame, so every
+      // weapon's attack clip was being wiped one frame after `playOnce` started it.
+      // The swing was the only survivor, because `swings.swinging()` holds it a
+      // branch earlier — which is why nothing had noticed.
       //
-      // The exe's own rule, and it is the same one: `[pig+0x2FF]` is up from
-      // `Pig::Attack` until the animation is spent, and the picker at 0x467ec0
-      // does not ask for a clip while it is (`animations/notes.md`).
+      // And the STANDING half is the exe's own rule rather than a hedge: the
+      // animation picker (0x467ec0) reads the speed band and asks 0x472320 for a
+      // gait, and that request zeroes the committed clip outright — so a pig that
+      // lands on the run does not get up, and a pig left alone does
+      // (`animations/notes.md`). A driven pig's gait wins; nothing else does.
     } else if (holding === SKILL.SKIP_TURN && loco.clip === ANIM.IDLE) {
       // A pig with SKIP TURN in hand stands there THINKING about it — clip 46,
       // which play named. It replaces the IDLE only.

@@ -111,9 +111,16 @@ export function createAttack(parts: AttackParts): Attack {
   let thrownWith = 0
   /** The ten-frame fuse and then the flight. */
   let firing: Firing | null = null
-  /** Seconds until the laying clip reaches the frame that puts the charge down,
-   * or null when nothing is being laid (lib/game/grenade.ts). */
-  let laying: number | null = null
+  /**
+   * A charge being LAID: seconds until the clip's own frame puts it down, and
+   * seconds until the clip is spent (lib/game/grenade.ts `PLANT_PHASE`).
+   *
+   * Two numbers and not one, because they answer different questions. Play:
+   * "не дожидается окончания анимации и можно идти в ней в последнюю секунду" —
+   * the charge appears a third of the way in, and the pig is HELD until the
+   * animation is over.
+   */
+  let laying: { untilDown: number; untilDone: number } | null = null
 
   /** Both ways out of a gauge end in the SAME fuse a gun's press starts —
    * `Pig::Fire` writes `[pig+0x231] = 0x0A` whatever is in hand — so a release
@@ -198,11 +205,12 @@ export function createAttack(parts: AttackParts): Attack {
       // decoration over it — the clip's own key-frame event is what puts it down
       // (`PLANT_PHASE`, lib/game/grenade.ts).
       if (laying !== null) {
-        laying -= delta
-        if (laying <= 0) {
-          laying = null
-          grenades.plant(acting)
-        }
+        const was = laying.untilDown
+        laying.untilDown -= delta
+        laying.untilDone -= delta
+        if (was > 0 && laying.untilDown <= 0) grenades.plant(acting)
+        // …and the pig is its own again only when the clip has run out.
+        if (laying.untilDone <= 0) laying = null
       }
       // Ten frames between the press and the bullet, and the frame the fuse
       // runs out is the frame it leaves.
@@ -212,8 +220,8 @@ export function createAttack(parts: AttackParts): Attack {
         // starts the clip either way (0x46971a); what a gun does at that moment,
         // a charge waits for its clip's own event to do.
         if (isPlanted(holding)) {
-          const clip = parts.clips[firearm.attackClip]
-          laying = (clipSeconds(clip) * PLANT_PHASE) / PHASE_UNITS
+          const whole = clipSeconds(parts.clips[firearm.attackClip])
+          laying = { untilDown: (whole * PLANT_PHASE) / PHASE_UNITS, untilDone: whole }
           anim.playOnce(acting, firearm.attackClip)
           // Nothing was loosed, so the sequence has nothing left to watch: the
           // charge itself is what holds the pig now.

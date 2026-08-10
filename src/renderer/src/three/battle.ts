@@ -537,7 +537,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // The minefield, through the eyes of whoever's turn it is: a buried mine is
     // shown to the side that has somebody near it who can see one, and to nobody
     // else (lib/game/mines.ts).
-    mineArt.draw(mines.revealed(game.currentPlayer.pigs))
+    // …plus every one that has been TRODDEN ON: play asked for the mine to show
+    // itself the moment a foot finds it, and by then it is nobody's secret.
+    mineArt.draw([...mines.revealed(game.currentPlayer.pigs), ...mines.at()])
     effectArt.draw(now.effects)
     airDropArt.draw(now.crates, (one) => drawnAt(`crate:${one.id}`, { x: 0, y: one.y, z: 0 }).y)
   }

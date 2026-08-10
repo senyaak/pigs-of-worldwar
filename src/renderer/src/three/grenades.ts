@@ -14,6 +14,7 @@ import { LOB_STEP } from '../../../lib/game/lobs'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import type { Point } from '../../../lib/game/pose'
 import { weaponModelName } from '../../../lib/game/weapons'
+import { isPlanted } from '../../../lib/game/grenade'
 import { createLobArt } from './lobArt'
 import { createLobTrails } from './lobTrail'
 
@@ -37,6 +38,16 @@ export interface GrenadeArt {
   trail(): number
   clear(): void
   dispose(): void
+}
+
+/** How far to lift THIS mesh so it sits ON the ground rather than half in it —
+ * its own half-height for anything planted, and a grenade's own radius for the
+ * things that are in the air most of the time anyway. */
+const liftOf = (mesh: THREE.Mesh, skill: number): number => {
+  if (!isPlanted(skill)) return MESH_LIFT
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
+  const box = mesh.geometry.boundingBox
+  return box ? (box.max.y - box.min.y) / 2 : MESH_LIFT
 }
 
 export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
@@ -86,12 +97,20 @@ export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
         const mesh = meshAt(i, weaponModelName(shot.skill))
         if (!mesh) continue
         const at = where(shot)
-        // Y-DOWN, so lifting is subtracting.
-        mesh.position.set(at.x, at.y - MESH_LIFT * MODEL_SCALE, at.z)
+        // Y-DOWN, so lifting is subtracting. A PLANTED charge is lifted by its
+        // OWN half-height instead of a grenade's radius: play saw the TNT sunk
+        // into the ground ("тнт ложится в пол — а надо чтобы стояло"), which is
+        // what a bundle as tall as a pig's knee does when it is lifted by the 35
+        // a ball wants. The model's origin is taken to be its middle, as the
+        // grenade's is.
+        mesh.position.set(at.x, at.y - liftOf(mesh, shot.skill) * MODEL_SCALE, at.z)
         // It POINTS along its flight, nose down as it falls. Nothing has been
         // read about a projectile's orientation — the constructor hands the
         // body a yaw and a pitch and the drawing half is not decoded — so this
         // is the remake's, and it is the same pair the launch was built from.
+        // A charge that was PUT somewhere stands as it was put: no velocity to
+        // point along, and nothing to pitch.
+        if (isPlanted(shot.skill)) continue
         mesh.rotation.y = Math.atan2(shot.vx, shot.vz) + Math.PI
         mesh.rotation.x = Math.atan2(shot.vy, Math.hypot(shot.vx, shot.vz))
         // Nothing special for a SINKING one: the water sheet is see-through, so

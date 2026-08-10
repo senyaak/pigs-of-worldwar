@@ -383,12 +383,33 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
   expect(planted.turn, 'the same turn').toBe(before.turn)
   expect(planted.starting, 'and it is still being played').toBe(false)
 
-  // **AND IT CAN RUN.** Which is the whole point of the four seconds: a charge
+  // …but not YET: the animation holds the pig to the end of itself, which play
+  // caught — "не дожидается окончания анимации и можно идти в ней в последнюю
+  // секунду". A press inside the clip moves nothing.
+  await hold(page, 'walkForward', 400)
+  const during = await debugState(page)
+  expect(Math.hypot(during.x - where.x, during.z - where.z), 'it walked mid-clip').toBeLessThan(1)
+
+  // **AND THEN IT CAN RUN.** Which is the whole point of the four seconds: a charge
   // lying at the pig's feet must not lock it the way a grenade in the air does
-  // (lib/game/lobs.ts `thrown`).
+  // (lib/game/lobs.ts `thrown`), and the clock does not run inside the clip either
+  // — the seconds are for running, not for bending over.
+  await expect.poll(async () => wearing(page), { timeout: 5000 }).not.toBe(LAY_CLIP)
+  expect((await hud(page)).seconds, 'the four seconds survived the clip').toBeGreaterThan(2)
   await hold(page, 'walkForward', 700)
   const ran = await debugState(page)
   expect(Math.hypot(ran.x - where.x, ran.z - where.z), 'it got away from it').toBeGreaterThan(50)
+
+  // …and it cannot plant a SECOND one: one blow a turn (lib/game/battle.ts).
+  await page.evaluate(() => {
+    const c = (
+      window as unknown as { pow: { controller: { press(a: string): void; release(a: string): void } } }
+    ).pow.controller
+    c.press('fire')
+    c.release('fire')
+  })
+  await page.waitForTimeout(600)
+  expect((await thrown(page)).length, 'a second charge went down').toBe(1)
 
   // Its fuse outlasts the run: the clock goes first, and the beat the turn ends
   // through waits for the charge rather than handing over on top of it
