@@ -83,9 +83,10 @@ IS the rule. This number is not the walking speed; it is the rate of everything
 counted in frames, so turning it up takes the turn, the jump's hang, the swing's
 wind-up, the aim's ramp, the parachute and the wedge counter with it. **A walk
 that reads slow is the WALK's own number**, and it has one now: `WALK_SCALE` in
-`lib/game/movement.ts`, on the forward and back speeds only — 4/3 by eye first
-and now 5/3, which is 1300 a second: the same walk the 1/25 experiment had,
-without the rest of the game coming with it. The
+`lib/game/movement.ts`, on the forward and back speeds only, and it is **4/3 —
+1040 a second, two tiles**. Play looked at 5/3 (1300, the walk the 1/25
+experiment had, once the rest of the game was no longer coming with it) and came
+back to 4/3. Both ends have been seen now; do not re-propose either. The
 exe's 52 a frame is untouched underneath, and every relation that hangs off the
 stride still does — the running jump leaves faster because `Pig::Walk`'s own
 `|nDist|/2` says so, and `LOOK_AHEAD` grows with the step because the original

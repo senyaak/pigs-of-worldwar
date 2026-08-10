@@ -63,15 +63,19 @@ export const WALK_REQUEST = 64
  * asked for.
  *
  * The value is by eye and nothing else: 52 units a frame at 1/15 is 780 a
- * second, and 5/3 makes it 1300 — two and a half tiles. Play walked it up in
- * two goes: 4/3 (1040) first, then this, which is the same walking speed the
- * 1/25 experiment had and the point of the exercise — "может теперь норм будет
- * когда вся игра не увеличина". The exe's own 52 is untouched underneath, and
- * so is every relation that hangs off the stride: the running jump leaves
- * faster because `Pig::Walk`'s own `|nDist|/2` says it does, and `LOOK_AHEAD`
- * grows with the step because the original checks one step ahead.
+ * second, and 4/3 makes it 1040 — two tiles. Play walked the two candidates and
+ * settled here: 5/3 (1300, the same walk the 1/25 experiment had, tried once the
+ * rest of the game was no longer coming along for the ride) went back down to
+ * this one. **Both ends of it have now been seen in play, so do not re-propose
+ * either** — 1/15 with a walk-only 4/3 is the answer, arrived at four ways.
+ *
+ * The exe's own 52 is untouched underneath, and so is every relation that hangs
+ * off the stride: the running jump leaves faster because `Pig::Walk`'s own
+ * `|nDist|/2` says it does — apex 271 against a pig 320 tall, where 5/3 put it
+ * at a full 326 — and `LOOK_AHEAD` grows with the step because the original
+ * checks one step ahead.
  */
-export const WALK_SCALE = 5 / 3
+export const WALK_SCALE = 4 / 3
 
 /**
  * How fast a pig walks, world units per second — the exe's, not a taste.
