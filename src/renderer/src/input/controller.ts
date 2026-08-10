@@ -194,9 +194,9 @@ export interface DebugHooks {
   pose(): {
     clip: number | null
     elapsed: number
-    /** The TORSO's quaternion on the mesh — where the run cycle's own body
-     * swing lives, and the first bone a held weapon takes over. */
-    torso: [number, number, number, number] | null
+    /** Every bone the MESH wears, HIR order: 0 the hip and the tail with it,
+     * 1 the torso where the run cycle's swing lives, 9..14 the legs. */
+    bones: [number, number, number, number][]
     foot: [number, number, number] | null
     drawn: [number, number, number, number] | null
   }

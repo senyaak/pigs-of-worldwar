@@ -11,8 +11,20 @@
 //
 // `pow.debug.pose()` reports both, which is what makes this a measurement rather
 // than a guess: `foot` is the ankle relative to the hip out of the sampler, so
-// the pig's own travel is out of it, and `drawn` is that bone's quaternion on the
-// skinned mesh.
+// the pig's own travel is out of it, and `bones` is every bone's quaternion on
+// the skinned mesh.
+//
+// **What it answers, and it is not a fault of ours.** Play again: "там именно та
+// часть тела не шевелится вообще." Over a second of held W, the per-bone travel
+// on the mesh comes out
+//
+//     0:0.041  1:0.300  2:0.439  3:0.469  4:0.365  5:0.006  6:0.663  7:0.409
+//     8:0.075  9:0.508 10:0.768 11:0.285 12:0.574 13:0.516 14:0.390
+//
+// so every one of the fifteen is being driven — and bone 0, the hip with the TAIL
+// on it, is the smallest by a factor of seven because the shipped clip gives it
+// 4.9° of PITCH and no yaw at all, on any of the three run cycles
+// (`animations/notes.md`). The part moves; the data barely moves it.
 
 import { expect, test } from '../app'
 import { beginTurn } from '../controller'
@@ -21,7 +33,7 @@ import { startGame } from '../menu'
 type Pose = {
   clip: number | null
   elapsed: number
-  torso: [number, number, number, number] | null
+  bones: [number, number, number, number][]
   foot: [number, number, number] | null
   drawn: [number, number, number, number] | null
 }
@@ -62,14 +74,22 @@ test('walking moves the bones, in the sampler and on the mesh alike', async ({ a
   const worn = samples
     .map((one) => one.drawn)
     .filter((one): one is [number, number, number, number] => one !== null)
-  const spine = samples
-    .map((one) => one.torso)
-    .filter((one): one is [number, number, number, number] => one !== null)
   const swing = Math.max(...[0, 1, 2].map((axis) => spread(ankle.map((one) => one[axis]))))
   const drawn = Math.max(...[0, 1, 2, 3].map((axis) => spread(worn.map((one) => one[axis]))))
-  const body = Math.max(...[0, 1, 2, 3].map((axis) => spread(spine.map((one) => one[axis]))))
+  /** How much bone `index` moved on the mesh over the whole sample. */
+  const moved = (index: number): number =>
+    Math.max(
+      ...[0, 1, 2, 3].map((axis) => spread(samples.map((one) => one.bones[index]?.[axis] ?? 0)))
+    )
+  const body = moved(1)
   console.log('clips', clips, 'cursor spread', elapsed.toFixed(3))
-  console.log('ankle spread', swing.toFixed(1), 'leg drawn', drawn.toFixed(4), 'torso drawn', body.toFixed(4))
+  console.log('ankle spread', swing.toFixed(1), 'leg drawn', drawn.toFixed(4))
+  // EVERY bone, because "that part of the body does not move at all" is a
+  // question about which of them are dead.
+  console.log(
+    'per bone',
+    samples[0].bones.map((_, index) => `${index}:${moved(index).toFixed(3)}`).join(' ')
+  )
 
   // The RUN cycle is what a pig walking forward wears (lib/game/locomotion.ts).
   expect(clips, 'the walk asks for the run cycle').toContain(0)

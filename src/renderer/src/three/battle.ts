@@ -576,24 +576,23 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       const worn = now.pigs.find((one) => one.id === pig.id)
       const hip = engine.pose.boneToWorld(pig, 0, { x: 0, y: 0, z: 0 })
       const ankle = engine.pose.boneToWorld(pig, 11, { x: 0, y: 0, z: 0 })
-      const bones = squad.of(pig.id)?.mesh.bones
-      const bone = bones?.[11]
-      // …and the TORSO, bone 1, which is the one play asked about: it is where
-      // the run cycle's ±19.6° of yaw lives, and it is also the first bone the
-      // WEAPON channel takes over (lib/game/clipPose.ts), so a pig with
-      // something in its hands is meant to be still above the waist.
-      const spine = bones?.[1]
+      // …and EVERY bone the mesh is wearing, in HIR order, because "that part of
+      // the body does not move at all" is a question about which bones are dead
+      // and no summary answers it.
+      const bones = squad.of(pig.id)?.mesh.bones ?? []
+      const bone = bones[11]
       return {
         clip: worn?.clip ?? null,
         elapsed: worn?.clipElapsed ?? 0,
-        torso: spine
-          ? ([spine.quaternion.x, spine.quaternion.y, spine.quaternion.z, spine.quaternion.w] as [
+        bones: bones.map(
+          (one) =>
+            [one.quaternion.x, one.quaternion.y, one.quaternion.z, one.quaternion.w] as [
               number,
               number,
               number,
               number
-            ])
-          : null,
+            ]
+        ),
         foot:
           hip && ankle
             ? ([ankle.x - hip.x, ankle.y - hip.y, ankle.z - hip.z] as [number, number, number])

@@ -77,7 +77,9 @@ export interface DebugParts {
   pose: () => {
     clip: number | null
     elapsed: number
-    torso: [number, number, number, number] | null
+    /** Every bone the MESH is wearing, HIR order — 0 the hip, 1 the torso, 2 the
+     * head, 9..14 the legs. */
+    bones: [number, number, number, number][]
     foot: [number, number, number] | null
     drawn: [number, number, number, number] | null
   }
