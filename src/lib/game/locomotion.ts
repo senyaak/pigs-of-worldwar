@@ -28,7 +28,7 @@ import {
   groundMaterial
 } from './ballistics'
 import type { Bounciness } from './ballistics'
-import { FALL_SPEED_FACTOR, WALK_BACK_SPEED, WALK_SPEED, step } from './movement'
+import { FALL_SPEED_FACTOR, STEP_DOWN, WALK_BACK_SPEED, WALK_SPEED, step } from './movement'
 import { MODEL_SCALE } from './scale'
 import { clampToWorld, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
@@ -532,7 +532,26 @@ function ground(
     // fall; a wall is entered as far as the envelope reaches and scraped
     // along past that, while the wedge counter runs toward the throw.
     const move = step(query, state.x, state.z, state.heading, speed * delta * intent.walk)
-    if (move.outcome === 'falling') {
+    // The look-ahead that turns a step into a FALL is the LANDSCAPE's, and a
+    // pig on a walkway is not on the landscape. It gets the drop wrong both
+    // ways round, and CAMP's first bridge shows both: crossing the ditch, the
+    // ground falls away under every step and the pig launched itself off a drop
+    // it was standing over; walking off the far END of the deck, the ground
+    // below reads level and the pig snapped 650 units down into the water
+    // without ever leaving its feet. So what is under the STEP decides.
+    let outcome = move.outcome
+    if (onWalkway) {
+      const ahead = obstruction.standOn(move.x, move.z, footY, WALL_CLIMB)
+      if (outcome === 'falling' && ahead !== null) outcome = 'moved'
+      else if (
+        outcome === 'moved' &&
+        ahead === null &&
+        restingY(query, move.x, move.z) - footY > STEP_DOWN
+      ) {
+        outcome = 'falling'
+      }
+    }
+    if (outcome === 'falling') {
       state.x = move.x
       state.z = move.z
       state.airborne = {
@@ -545,7 +564,7 @@ function ground(
       state.clip = ANIM.JUMP_MIDDLE
       return
     }
-    if (move.outcome === 'moved') {
+    if (outcome === 'moved') {
       let pressing = false
       if (inReach(state, query, obstruction, footY, move.x, move.z)) {
         state.x = move.x
@@ -628,7 +647,15 @@ function inReach(
   x: number,
   z: number
 ): boolean {
-  if (obstruction.blocks(x, z, footY, WALL_CLIMB)) return false
+  // The envelope is measured from where the step ENDS, not from where the pig
+  // is standing now — but never from lower than its own feet, or a pig on a
+  // walkway would be measured against the ditch under it. Walking UP a bank
+  // toward something level with the crest, the two differ by the slope times
+  // the pig's own radius, and on CAMP's first bridge that was 65 units against
+  // an envelope of 64: the abutment at the end of the bank read as a wall by
+  // ONE unit and the pig stopped dead in front of it.
+  const from = Math.min(footY, query.height(x, z))
+  if (obstruction.blocks(x, z, from, WALL_CLIMB)) return false
   if (query.walkable(x, z)) return true
   // Game space is Y-down: higher ground is a SMALLER height value.
   return state.freeY - query.height(x, z) <= WALL_CLIMB

@@ -103,11 +103,18 @@ test('what counts as solid at all', () => {
   expect(isSolid(record({ ...crate, contents: null }))).toBe(true)
   // A spawn marker is a pig, not scenery.
   expect(isSolid(record({ name: 'GR_ME', box: { x: 640, y: 640, z: 640 } }))).toBe(false)
-  // And the exe's own first word on it: shape kind 1 builds no collider at
-  // all, which is what every bridge and step piece carries.
-  expect(isSolid(record({ name: 'BRIDGE_S', shape: 1, box: { x: 1024, y: 1024, z: 1024 } }))).toBe(
-    false
-  )
+  // The exe's own first word on shape kind 1 is that it builds no collider at
+  // all, and that is what every bridge and step piece carries — so a piece of
+  // one is solid here only because the REMAKE walks bridges, and only for the
+  // six models whose box is the surface their art draws (lib/game/ramps.ts).
+  const bodiless = { shape: 1, box: { x: 1024, y: 1024, z: 1024 } }
+  expect(isSolid(record({ ...bodiless, name: 'BRIDGE_S' })), 'an abutment').toBe(true)
+  expect(isSolid(record({ ...bodiless, name: 'BRID2_S' })), 'a ramp').toBe(true)
+  // …and the three ARCH bridges are not among them: their deck is 198.5 units
+  // below the box, so nothing here can carry them.
+  expect(isSolid(record({ ...bodiless, name: 'STR06PPP' })), 'an arch').toBe(false)
+  // Anything else bodiless stays out on the exe's word alone.
+  expect(isSolid(record({ ...bodiless, name: 'TREEP' })), 'not a walkway at all').toBe(false)
 })
 
 test('a tall object refuses the step, and the pig scrapes along it', () => {

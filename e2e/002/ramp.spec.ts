@@ -1,15 +1,17 @@
-// PHASE 002 — the RAMP pieces, and the tilt nothing in the record asks for.
+// PHASE 002 — the BRIDGE and STEP pieces: the tilt nothing in the record asks
+// for, and walking on them.
 //
 // Pure: the shipped CAMP and ISLAND files, read through the readers, with the
 // same composition `three/props.ts` builds — the yaw about the vertical,
 // outside a −45° turn about the model's own z (lib/game/ramps.ts).
 //
-// What it pins is the MEASUREMENT the rule rests on, because the mechanism in
-// the exe is not found: which of the nine bodiless models are drawn lying down
-// (their own collision box says, and it is not close), and that tilted,
-// CAMP's second bridge and ISLAND's twelve ramps land on their decks and on
-// the ground to the unit — where untilted they sit 256 below the deck and
-// overlap each other by 213.
+// What it pins is the MEASUREMENT the rules rest on, because the exe puts none
+// of these in its collision world and applies no tilt on any path read so far:
+// which of the nine bodiless models are drawn lying down (their own collision
+// box says, and it is not close), that tilted, CAMP's second bridge and
+// ISLAND's twelve ramps land on their decks and on the ground to the unit, and
+// that a pig then walks the whole of both bridges — up 1024 of ramp, over a
+// ditch, over water, and into the gap the tutorial says to jump.
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -228,6 +230,41 @@ test('a pig walks up the ramp and onto the deck', () => {
     updateLocomotion(bare, query, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
   }
   expect(-bare.y, 'the bare terrain is 1024 lower').toBeLessThan(deckTop - 512)
+})
+
+test("CAMP's first bridge is walked over, and the gap in it is not", () => {
+  // The bridge the tutorial says JUMP THE GAP at. Its abutments are `BRIDGE_S`
+  // — flat-topped, bodiless, and walkable by the same rule the ramps are
+  // (lib/game/ramps.ts, `isWalkway`) — and there is a 512 hole between its two
+  // deck sections that no piece covers at all.
+  const CAMP = parsePog(mapFile('CAMP.POG'))
+  const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
+  const field = new ObstacleField(CAMP)
+  // The FIRST bridge only — the second one's pieces are the BRID2_ family.
+  const run = CAMP.filter((one) => /^BRID/.test(one.name) && !/^BRID2/.test(one.name)).sort(
+    (a, b) => b.x - a.x
+  )
+  expect(run.map((one) => one.name)).toEqual(['BRIDGE_S', 'BRIDGE_C', 'BRIDG_C2', 'BRIDGE_S'])
+
+  // From the bank on the +x side, walking west onto the bridge. The bank climbs
+  // to 1728 and the abutment's own top is 1724, so this is a walk ON, not up.
+  const state = createLocomotion(query, 800, run[0].z, -Math.PI / 2)
+  const deck = 1728
+  let onDeck = 0
+  let fell = false
+  for (let i = 0; i < Math.round(2.5 / FRAME_SECONDS); i++) {
+    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS, field)
+    // Over the ditch, at deck height, on its feet: that is being ON the bridge.
+    if (near(-query.height(state.x, state.z), 1216, ART) && near(-state.y, deck, 8)) onDeck++
+    if (state.airborne !== null) fell = true
+  }
+  // It crossed the near deck — 1024 units of it at 52 a frame is 20 frames —
+  // without once dropping to the ditch floor.
+  expect(onDeck, 'frames spent walking over the ditch').toBeGreaterThan(15)
+  // …and then the GAP took it: nothing covers x −1536..−1024, so the far side
+  // is a jump and the walk ends in the air.
+  expect(fell, 'the gap let it walk straight across').toBe(true)
+  expect(-state.y, 'and it went down the ditch, not through the deck').toBeLessThan(deck)
 })
 
 test('a pig on a bridge is not in the water it crosses', () => {

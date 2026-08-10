@@ -1608,13 +1608,38 @@ half of it, and the only reading under which this file's own sentence about the 
 
   `e2e/002/ramp.spec.ts` walks CAMP's own bridge end to end, 1216 to 2240,
   and ISLAND's from the beach onto a deck over water.
-- **The FIRST bridge still cannot be got onto**, and it is a different shape of
-  problem: `BRIDGE_S` is a flat-topped abutment, bodiless like every other
-  shape-kind-1 piece and not a ramp, so there is nothing to step onto at either
-  end while its deck sections are boxes 256 above the ground. Whether the flat
-  pieces belong in the collision world too wants play against it — the tutorial
-  reaches that bridge by asking for a JUMP over the gap in it (`gtext` clip 18,
-  `tutorial/notes.md`), which may be the whole point of it.
+- **A BRIDGE is walked over too**, and the same measurement says which pieces
+  carry it. For six of the nine bodiless models the box's upper face is exactly
+  the face the ART draws (+256 on both, off by 0.0); for the three ARCH bridges
+  the deck is 198.5 units below the box's own face. So the six join the
+  collision world on their own box — the four ramps sloped, `BRIDGE_S` and
+  `D_BRID` flat, which is what makes them the abutments at a bridge's ends
+  (CAMP: tops of 1724 and 1733 against deck sections at 1728). Play found this
+  the way it finds everything: "мост который идёт дальше после рампы — без
+  коллизии, проваливаюсь под него." Three more things followed, and all three
+  were the same mistake once more — asking the LANDSCAPE about a pig that is
+  not on it:
+  - **the step-up envelope is measured from where the step ENDS**, never lower
+    than the pig's own feet. Walking up a bank at something level with the crest
+    the two differ by the slope times the pig's radius, and CAMP's abutment came
+    out 65 against an envelope of 64 — a wall by one unit.
+  - **what holds a pig up is under its FEET**, so `standOn` takes no radius at
+    all. With one, a pig's cylinder still overlaps a deck 160 units past the
+    edge and it walked half its own width out over the gap before falling.
+  - **the FALL look-ahead is the landscape's**, and it is wrong both ways over a
+    bridge: crossing the ditch the ground falls away under every step and the
+    pig launched itself off a drop it was standing over, while walking off the
+    far end the ground below reads level and it snapped 650 units down into the
+    water without leaving its feet. What is under the STEP decides.
+- **The three ARCH bridges are still fallen through** — `STR06PPP` on MASHED,
+  `W1R06PPP` on BAY, `SNR05PPP` on DEMO2 and ICEFLOW. Their collider is 198.5
+  above the deck they draw, so walking them on the box would hold a pig in the
+  air; what they want is a surface taken off the ART. Nobody has played those
+  maps yet to say what else is wrong with them first.
+- **The GAP in CAMP's first bridge is real and stays.** Nothing covers
+  x −1536..−1024 between its two deck sections, so the walk ends in the air —
+  which is what the tutorial's own JUMP THE GAP line is for (`gtext` clip 18,
+  `tutorial/notes.md`).
 - **Two sides, though a map offers up to six.** The spawn markers name six
   (FINAL uses all of them, the arenas four); the battle fields the first two
   it finds, because there is no AI for the rest. There is no filling in

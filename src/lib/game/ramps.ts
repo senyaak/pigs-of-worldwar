@@ -1,4 +1,10 @@
-// The RAMP pieces, and the one thing that is special about them: they are
+// The bridge and step pieces — the 94 records that carry collision shape kind
+// ONE, which is the exe building mass properties and no collider at all. Two
+// things about them live here, and both are measurements off the shipped maps
+// rather than reads: which of them are drawn TILTED (below), and which of them
+// a pig can WALK on (`isWalkway`, at the end).
+//
+// The RAMPS first, and the one thing that is special about them: they are
 // drawn TILTED half a right angle, and no field in the record says so.
 //
 // A ramp's art is authored lying down. `BRID2_S` — CAMP's second bridge, the
@@ -88,3 +94,33 @@ const TILTED = new Set([
 
 /** Whether this model's art is authored lying down and drawn tilted. */
 export const isRamp = (name: string): boolean => TILTED.has(name.toUpperCase())
+
+/**
+ * The bodiless pieces a pig can WALK on, by the same kind of measurement.
+ *
+ * Nothing in the exe puts these in its collision world — kind 1 is no collider
+ * — so a remake that wants a bridge walked over has to say which face is the
+ * walkway. The record's box is the obvious candidate and it turns out to be
+ * exactly right for six of the nine, and exactly wrong for the other three.
+ * Per model, the top of the box against the top of the ART, both measured up
+ * from the record's own y:
+ *
+ *     BRID2_S  M1S_ST01  STS_ST01  BRR02PPP  BRIDGE_S  D_BRID    +256 / +256
+ *     STR06PPP  W1R06PPP  SNR05PPP                              +57.5 / +256
+ *
+ * So the six are pieces whose collider IS the surface they draw, and the box
+ * can be walked on as it stands — the four ramps with a top that climbs across
+ * it (`isRamp`), `BRIDGE_S` and `D_BRID` flat, which is what makes them the
+ * ABUTMENTS at a bridge's ends: their top lands within 4 units of the deck
+ * sections beside them (CAMP: 1724 and 1733 against 1728).
+ *
+ * **The three that are left are ARCH bridges and are still fallen through.**
+ * Their deck is 198.5 units BELOW the box's own face, so walking them on the
+ * box would hold a pig in the air over the arch. What they want is a collider
+ * taken off the art rather than off the record, and nobody has played MASHED,
+ * BAY or ICEFLOW to say what else is wrong with them first.
+ */
+const WALKWAYS = new Set([...TILTED, 'BRIDGE_S', 'D_BRID'])
+
+/** Whether this bodiless piece's own box is the surface it draws. */
+export const isWalkway = (name: string): boolean => WALKWAYS.has(name.toUpperCase())
