@@ -154,6 +154,28 @@ const PLANTED = new Set([35, 36, 37, 38])
 export const isPlanted = (skill: number | null): boolean =>
   skill !== null && PLANTED.has(skill)
 
+/**
+ * WHEN in the laying animation the charge actually appears — phase **1314** of
+ * 4096, near enough a third of the way through.
+ *
+ * Play: "ТНТ ставится на землю — с анимацией." It is not a decoration over the
+ * placing: the clip's own key-frame EVENT is what places it. All four planted
+ * skills carry attack clip **77** (the record's +0x20), the clip is "Lay Mine",
+ * and its event list — `afGetKeyFrameList`, `_d3d.dll` 0x1002c778 + clip*88, the
+ * same table the bayonet's four strikes come out of (`weapons/melee.md`) — is
+ *
+ * ```
+ *  584  id 2     ; a footstep, sound 0x2d
+ * 1314  id 65    ; -> Pig::Shoot (0x479f60) -- THE CHARGE GOES DOWN
+ * 3796  id 2     ; ...and the other foot
+ * ```
+ *
+ * Event 65's arm is three instructions (0x474da8) and the middle one is the shot
+ * itself, so a planted charge appears when the pig has bent over — not when the
+ * button was pressed, and not when the clip ends.
+ */
+export const PLANT_PHASE = 1314
+
 /** What this skill lobs, or null for everything that does not lob. */
 export const lobOf = (skill: number | null): Lob | null =>
   skill === null ? null : (LOBS[skill] ?? null)

@@ -193,6 +193,7 @@ export function createBattle(parts: BattleParts): Battle {
     swings,
     sights,
     anim,
+    clips: parts.clips,
     bark: () => emit({ kind: 'bark', player: game.players.indexOf(game.currentPlayer) })
   })
   /** The beat after a kill: the clock stops, the camera stays on the spot. */
@@ -234,7 +235,9 @@ export function createBattle(parts: BattleParts): Battle {
   const committed = (): boolean =>
     attack.busy() ||
     swings.running() ||
-    grenades.live() > 0 ||
+    // THROWN, not planted: a charge lying at the pig's feet is exactly what it
+    // has to be able to run away from (lib/game/lobs.ts `thrown`).
+    grenades.thrown() > 0 ||
     shots.live().length > 0
 
   /**
@@ -398,11 +401,14 @@ export function createBattle(parts: BattleParts): Battle {
     // what it did. Play's rule, and `Pig::MayAct` agrees. …and it starts at the
     // CHARGE, not at the throw: "при начинании зарядки броска таймер
     // останавливается — так как это уже атака началась."
+    // A PLANTED charge is not in it: the four seconds the turn hands back are
+    // seconds the CLOCK has to spend, or the pig would stand next to the thing
+    // for ever (lib/game/spend.ts).
     const blowInProgress =
       attack.busy() ||
       aftermath !== null ||
       swings.running() ||
-      grenades.live() > 0
+      grenades.thrown() > 0
     if (!blowInProgress && (game.tick(delta) || isDead(game.currentPig))) {
       // …and the turn does not hand over on the spot. `Game::EndTurn` goes into
       // mode 13 first — the beat above, which the next step runs.
@@ -663,6 +669,17 @@ export function createBattle(parts: BattleParts): Battle {
       // channel and clears the weapon one (0x46971a).
     } else if (loco.commit) {
       if (!anim.animating(acting)) anim.playOnce(acting, loco.clip)
+    } else if (anim.animating(acting)) {
+      // **A ONCE-CLIP PLAYS OUT.** Play, of the charge going down: "ТНТ ставится
+      // на землю — с анимацией", and there was none: `setClip` below replaces a
+      // committed clip the very next frame — that is what it is FOR, since the
+      // walk has to be able to interrupt the idle — so every weapon's attack clip
+      // was being wiped one frame after `playOnce` started it. The swing was the
+      // only one that survived, because `swings.swinging()` above holds it.
+      //
+      // The exe's own rule, and it is the same one: `[pig+0x2FF]` is up from
+      // `Pig::Attack` until the animation is spent, and the picker at 0x467ec0
+      // does not ask for a clip while it is (`animations/notes.md`).
     } else if (holding === SKILL.SKIP_TURN && loco.clip === ANIM.IDLE) {
       // A pig with SKIP TURN in hand stands there THINKING about it — clip 46,
       // which play named. It replaces the IDLE only.
@@ -731,7 +748,7 @@ export function createBattle(parts: BattleParts): Battle {
       charging: attack.charging(),
       // Something is still LIVE, and a second press of fire sets it off where
       // it lies — "пока граната летит, не могу взорвать её."
-      armed: grenades.live() > 0,
+      armed: grenades.thrown() > 0,
       // …and the beat at the END of a turn takes control away too: mode 13 is
       // not a mode anybody drives in (lib/game/walkAway.ts). So does a turn a
       // weapon has SPENT: the blow is over, the handover has not happened yet,

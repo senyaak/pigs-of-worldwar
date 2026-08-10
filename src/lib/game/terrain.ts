@@ -293,6 +293,8 @@ export class TerrainQuery {
   readonly waterElevation: number | null
   /** Per-cell region water levels (elevation units), null where dry. */
   private readonly waterLevels: (number | null)[][]
+  /** Every mine tile, worked out on the first ask (`mineTiles`). */
+  private mines: { x: number; z: number; col: number; row: number }[] | null = null
 
   constructor(
     private readonly blocks: TerrainBlock[],
@@ -488,6 +490,32 @@ export class TerrainQuery {
   hasMine(x: number, z: number): boolean {
     const tile = this.tileAt(x, z)
     return tile !== null && (tile.type & TILE_MINE) !== 0
+  }
+
+  /**
+   * Every mine-flagged tile on the map, as its own centre — walked ONCE and
+   * kept, because a minefield is a hundred tiles on CAMP and a thousand on BUTE
+   * and whoever is drawing them asks every frame (lib/game/mines.ts).
+   */
+  mineTiles(): readonly { x: number; z: number; col: number; row: number }[] {
+    if (this.mines === null) {
+      const found: { x: number; z: number; col: number; row: number }[] = []
+      for (const block of this.blocks) {
+        block.tiles.forEach((tile, i) => {
+          if ((tile.type & TILE_MINE) === 0) return
+          const x = block.x + (i % TILES_PER_SIDE) * TILE_STEP + TILE_STEP / 2
+          const z = block.z + Math.floor(i / TILES_PER_SIDE) * TILE_STEP + TILE_STEP / 2
+          found.push({
+            x,
+            z,
+            col: Math.floor((x - this.minX) / TILE_STEP),
+            row: Math.floor((z - this.minZ) / TILE_STEP)
+          })
+        })
+      }
+      this.mines = found
+    }
+    return this.mines
   }
 
   /**

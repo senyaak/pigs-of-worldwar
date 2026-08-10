@@ -2181,6 +2181,72 @@ Three shapes worth keeping:
   going off sets its neighbours off, and `[game+0x534]`, the counter the mines'
   four-second override tests.
 
+### A charge is PLACED, by its own animation — and a once-clip must play out
+
+Play: "ТНТ ставится на землю — с анимацией." Three things were wrong under that
+one sentence.
+
+**The animation was being wiped one frame after it started.** Every weapon's
+attack clip goes on through `anim.playOnce`, and the clip chain's last line —
+`anim.setClip(acting, loco.clip)` — ran every frame for a pig that was neither
+swinging nor mid-jump. `setClip` deliberately does NOT keep a once-clip (the walk
+has to be able to interrupt an idle), so it replaced the attack clip on the very
+next frame. **The swing survived only because `swings.swinging()` holds it a branch
+earlier**, which is why nothing had noticed: the bayonet is the one weapon whose
+animation anybody had watched. There is now a branch for "a once-clip is running,
+leave the pig alone", which is also the exe's own rule — `[pig+0x2FF]` is up from
+`Pig::Attack` until the animation is spent and the picker does not ask for a clip
+while it is.
+
+**The charge appears when the pig has BENT OVER, and that is data.** All four
+planted skills carry attack clip 77, the archive's "Lay Mine", and the clip's own
+key-frame events are in the DLL rather than the exe: `afGetKeyFrameList`,
+`_d3d.dll` 0x1002c778 + clip*88, six `(phase, id, id)` triples — the same table
+`melee.md` hand-read the bayonet's four strikes out of, which is what confirms the
+layout. Clip 77 carries a footstep at 584, **event 65 at phase 1314** and another
+footstep at 3796, and event 65's arm is three instructions whose middle one is
+`Pig::Shoot`. So `PLANT_PHASE = 1314` of 4096 is where the thing is placed: a third
+of the way in, by the animation, not by the press.
+
+**And it goes down at the FEET.** `Lobs.plant` puts it at `pig.position` — the
+soles — instead of the hand bone a throw comes off, which falls out of the exe
+twice over: `speed * charge >> 12` of 50 and a charge of one is nothing, and the
+clip's event fires with the pig bent over its own trotters.
+
+**A planted charge must not lock the pig**, or the four seconds the turn hands back
+are four seconds of standing next to it. `grenades.live()` was what said "the pig is
+committed" and "the fire key is a detonator", and both of those are about a THROWN
+thing: `Lobs.thrown()` is the count without the planted ones, and `live()` stays
+what the end of a turn waits for. So a TNT charge cannot be set off by a second
+press either — which would otherwise have been one button away from suicide.
+
+### A MINE IS HIDDEN, and that part is play's rule
+
+Play: "мины скрыты — текстуры видны только тем кто рядом и то только тем у кого
+есть класс специальный — и наверно ещё тем кто поставил."
+
+**The exe has no per-viewer visibility in it at all**, and this pass chased every
+reader of the mine bit to be sure: the pig's own trigger, the projectile's, the
+AI's passability map, and eight copies of a tile walk that refuse a mined tile.
+None is in the renderer. What the ORIGINAL shows is what the map's ART shows, and
+the shipped maps disagree on purpose — CAMP paints its 99 mine tiles with four
+textures no other tile uses, and BOOM's 628 sit on the same ground as everything
+around them. So "hidden" is a design rule and the marker is the remake's own: the
+game's own `WE_MINE` model, drawn on the ground by `three/mineArt.ts` for exactly
+the mines `mines.revealed(watchers)` returns.
+
+**Which class sees them is DERIVED and not picked.** The 128-byte class record at
+0x4d02e0 carries each class's own kit as `(skill, amount)` pairs, and 35 MINE
+appears in three of the twelve: 5, 6 and 7, the engineer and its two promotions. A
+pig that lays mines for a living knows where one is. The other candidate is the
+espionage family (8, 9, 10 — `55 CONCEAL`, `54 PICK POCKET`), and it is one line in
+`mines.ts` if play says otherwise; `DETECT_RANGE` of 1024 is invented outright and
+says so at the field. "Whoever placed it" is not modelled because laying a mine is
+not — there is no owner to remember yet.
+
+The eyes are the caller's: the scene asks with `game.currentPlayer.pigs`, so an
+enemy engineer walking past does not light the field up for the player.
+
 ### What is still not read
 
 - **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's

@@ -15,8 +15,11 @@ import type { Gauge } from './gauge'
 import { advanceFiring, beginFiring } from './shot'
 import type { Firing } from './shot'
 import { isGun } from './projectile'
-import { isLobbed } from './grenade'
+import { PLANT_PHASE, isLobbed, isPlanted } from './grenade'
 import { weaponOf } from './weapons'
+import { PHASE_UNITS } from './melee'
+import { clipSeconds } from './clips'
+import type { ClipTiming } from './clips'
 import { layerFires, weaponLayer } from './controls'
 import { SKILL } from './skills'
 import { EXE_FRAME_SECONDS } from './ballistics'
@@ -49,6 +52,10 @@ export interface AttackParts {
   /** Firing drops the sights, and the aim it leaves is what the shot takes. */
   sights: Sights
   anim: Anim
+  /** How long every clip runs: a planted charge appears at a PHASE of its own
+   * laying clip, which is a fraction of that clip's length
+   * (lib/game/grenade.ts `PLANT_PHASE`). */
+  clips: ClipTiming[]
   /** The pig says a line — the gun arm of `Pig::Fire` does it every shot. */
   bark: () => void
 }
@@ -104,6 +111,9 @@ export function createAttack(parts: AttackParts): Attack {
   let thrownWith = 0
   /** The ten-frame fuse and then the flight. */
   let firing: Firing | null = null
+  /** Seconds until the laying clip reaches the frame that puts the charge down,
+   * or null when nothing is being laid (lib/game/grenade.ts). */
+  let laying: number | null = null
 
   /** Both ways out of a gauge end in the SAME fuse a gun's press starts —
    * `Pig::Fire` writes `[pig+0x231] = 0x0A` whatever is in hand — so a release
@@ -134,8 +144,10 @@ export function createAttack(parts: AttackParts): Attack {
       requested = false
       // A grenade already in the air answers the button before anything else
       // does: a second press sets it off where it lies. Play's — nothing in the
-      // exe's fire handler has been read for it.
-      if (grenades.live() > 0) {
+      // exe's fire handler has been read for it. THROWN ones only: a charge lying
+      // where the pig planted it is not something a second press blows up, or
+      // "plant it and run" would be one button away from suicide.
+      if (grenades.thrown() > 0) {
         grenades.detonateNow()
         return 'none'
       }
@@ -143,7 +155,7 @@ export function createAttack(parts: AttackParts): Attack {
       // synced further down the frame and is therefore a frame stale here.
       if (acting.holding === SKILL.SKIP_TURN) return 'skip'
       if (isLobbed(holding)) {
-        if (gauge || firing) return 'none'
+        if (gauge || firing || laying !== null) return 'none'
         // **A GAUGE IS THE WEAPON'S, not the throw's.** The record's +0x14 is
         // what says whether one fills (`weapons/fire.md`, and it is 1 on the
         // grenades and 0 on TNT), and the split at 0x493796 goes by that byte:
@@ -181,20 +193,41 @@ export function createAttack(parts: AttackParts): Attack {
           arm()
         }
       }
+      // A CHARGE BEING LAID: the clip is running and the thing is owed. Play:
+      // "ТНТ ставится на землю — с анимацией", and the animation is not a
+      // decoration over it — the clip's own key-frame event is what puts it down
+      // (`PLANT_PHASE`, lib/game/grenade.ts).
+      if (laying !== null) {
+        laying -= delta
+        if (laying <= 0) {
+          laying = null
+          grenades.plant(acting)
+        }
+      }
       // Ten frames between the press and the bullet, and the frame the fuse
       // runs out is the frame it leaves.
       if (firing && advanceFiring(firing, delta)) {
-        // Where the sights were actually pointing — the drift is part of the
-        // aim, not a decoration over it.
-        const away = isLobbed(holding)
-          ? grenades.throwOne(acting, sights.angle(), thrownWith)
-          : shots.fire(acting, sights.angle())
-        if (!away) firing = null
-        else {
+        const firearm = weaponOf(holding)
+        // A PLANTED charge is the one thing the fuse does not loose. `Pig::Attack`
+        // starts the clip either way (0x46971a); what a gun does at that moment,
+        // a charge waits for its clip's own event to do.
+        if (isPlanted(holding)) {
+          const clip = parts.clips[firearm.attackClip]
+          laying = (clipSeconds(clip) * PLANT_PHASE) / PHASE_UNITS
+          anim.playOnce(acting, firearm.attackClip)
+          // Nothing was loosed, so the sequence has nothing left to watch: the
+          // charge itself is what holds the pig now.
+          firing = null
+        } else {
+          // Where the sights were actually pointing — the drift is part of the
+          // aim, not a decoration over it.
+          const away = isLobbed(holding)
+            ? grenades.throwOne(acting, sights.angle(), thrownWith)
+            : shots.fire(acting, sights.angle())
+          if (!away) firing = null
           // `Pig::Attack` puts the weapon's own attack clip on at the same
           // moment (0x46971a), the way a swing's does.
-          const firearm = weaponOf(holding)
-          if (firearm.attackClip >= 0) anim.playOnce(acting, firearm.attackClip)
+          else if (firearm.attackClip >= 0) anim.playOnce(acting, firearm.attackClip)
         }
       }
     },
@@ -210,12 +243,15 @@ export function createAttack(parts: AttackParts): Attack {
       if (gauge) return gaugeFraction(gauge)
       return weaponOf(holding).power ? 0 : null
     },
-    busy: () => gauge !== null || firing !== null,
+    // …and a charge being laid holds the pig for the whole of its clip: the exe's
+    // own `[pig+0x2FF]` is up from `Pig::Attack` until the animation is spent.
+    busy: () => gauge !== null || firing !== null || laying !== null,
     reset() {
       requested = false
       gauge = null
       thrownWith = 0
       firing = null
+      laying = null
     }
   }
 }

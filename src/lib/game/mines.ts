@@ -2,10 +2,11 @@
 //
 // Play: "мины тут на карте должны быть." They are, and they have been in every
 // shipped map's data all along: **bit 6 of a tile's type byte** (`TILE_MINE`,
-// lib/formats/pmg.ts), 99 tiles of it on CAMP and 997 on BUTE. Nothing is drawn
-// for one and nothing needs to be — the tile's own texture is what warns you,
+// lib/formats/pmg.ts), 99 tiles of it on CAMP and 997 on BUTE. The original draws
+// nothing for one — the tile's own texture is the whole of what a player sees,
 // which is why the training ground can say "FOLLOW THE PATH THROUGH THE
-// MINEFIELD" about a patch of ground with nothing standing on it.
+// MINEFIELD" about a patch of ground with nothing standing on it. What the remake
+// draws, and for whom, is `revealed` below.
 //
 // The exe, end to end, and every step of it was read this pass:
 //
@@ -37,6 +38,8 @@ import { FUSE_JITTER, blastReach } from './grenade'
 import { burst } from './blast'
 import type { BlastWorld } from './blast'
 import { fromExeFrames } from './ballistics'
+import { isDead } from './health'
+import type { Pig } from './game'
 import type { Random } from './random'
 import type { TerrainQuery } from './terrain'
 import type { Emit } from './events'
@@ -61,6 +64,45 @@ export const MINE_BLAST = 1024
  * tenths of a second between the trigger and the bang.
  */
 export const MINE_FUSE_FRAMES = 12
+
+/**
+ * **A MINE IS HIDDEN.** Play: "мины скрыты — текстуры видны только тем кто рядом
+ * и то только тем у кого есть класс специальный — и наверно ещё тем кто
+ * поставил."
+ *
+ * Play's rule, and NOT a reading: the exe's terrain draw never looks at the mine
+ * bit at all. Every one of its readers was chased this pass — the pig's trigger,
+ * the projectile's, the AI's own passability map (0x461f60) and the eight copies
+ * of a tile walk in 0x447xxx-0x453xxx — and none of them is in the renderer. What
+ * the ORIGINAL shows is whatever the map's art shows: CAMP paints its 99 mine
+ * tiles with four textures no other tile uses, and BOOM's 628 sit on ordinary
+ * ground. So a shipped minefield is visible exactly when the map's author painted
+ * one, and there is nothing per-viewer in it.
+ *
+ * The marker this reveals is therefore the remake's own: the game's own `WE_MINE`
+ * model, put on the ground where a pig who KNOWS about mines can see it. Both
+ * numbers below are inventions and say so.
+ */
+export const DETECT_RANGE = 1024
+
+/**
+ * Which classes see them — the ones whose OWN KIT is mines, read off the
+ * 128-byte class record at 0x4d02e0 rather than picked by name.
+ *
+ * The record's pairs after the health and the walk grant are `(skill, amount)`,
+ * and 35 MINE appears in exactly three of the twelve: classes **5, 6 and 7**,
+ * which are the ENGINEER and its two promotions — 5 carries `1 ∞, 12 ∞, 35 ×3,
+ * 37 ×1`, and 6 and 7 the same with more of it. A pig that lays mines for a living
+ * is a pig that knows where one is. The whole table is in `weapons/mines.md`.
+ *
+ * Which class play meant by "специальный" is not settled — the ESPIONAGE family
+ * (8, 9, 10: `55 CONCEAL` and `54 PICK POCKET`) is the other candidate, and one
+ * line here moves it.
+ */
+const DETECTORS = new Set([5, 6, 7])
+
+/** Whether a pig of this class can see what is buried. */
+export const detectsMines = (pigClass: number): boolean => DETECTORS.has(pigClass)
 
 /** One mine that has been trodden on and has not gone off yet. */
 export interface Tripped {
@@ -98,6 +140,15 @@ export interface Mines {
   /** Whether a mine is still buried here: the map's bit, less the ones already
    * spent. */
   buried(x: number, z: number): boolean
+  /**
+   * Which buried mines these eyes can SEE — every unspent one within
+   * `DETECT_RANGE` of a watcher whose class detects them.
+   *
+   * The caller says whose eyes: the side whose turn it is, so an enemy engineer
+   * walking past does not light the field up for the player (three/battle.ts).
+   * Points on the ground, ready to draw.
+   */
+  revealed(watchers: readonly Pig[]): { x: number; y: number; z: number }[]
   clear(): void
 }
 
@@ -139,6 +190,20 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
         counting.splice(i, 1)
         burst(mine, { damage: MINE_DAMAGE, reach: blastReach(MINE_BLAST) }, world, emit)
       }
+    },
+    revealed(watchers) {
+      const seeing = watchers.filter((pig) => detectsMines(pig.pigClass) && !isDead(pig))
+      if (seeing.length === 0) return []
+      const out: { x: number; y: number; z: number }[] = []
+      for (const tile of query.mineTiles()) {
+        if (spent.has(key(tile.col, tile.row))) continue
+        const near = seeing.some(
+          (pig) =>
+            Math.hypot(pig.position.x - tile.x, pig.position.z - tile.z) <= DETECT_RANGE
+        )
+        if (near) out.push({ x: tile.x, y: query.height(tile.x, tile.z), z: tile.z })
+      }
+      return out
     },
     live: () => counting.length,
     at: () => counting,

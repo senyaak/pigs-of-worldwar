@@ -14,15 +14,17 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { GAME_DIR } from '../launch'
-import { hud, warp } from '../controller'
+import { debugState, hold, hud, warp } from '../controller'
 import { startGame } from '../menu'
 import { parsePmg, TILE_MINE, TILE_STEP } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import {
+  DETECT_RANGE,
   MINE_BLAST,
   MINE_DAMAGE,
   MINE_FUSE_FRAMES,
-  createMines
+  createMines,
+  detectsMines
 } from '../../src/lib/game/mines'
 import { FUSE_JITTER, fuseSeconds, isPlanted, lobOf } from '../../src/lib/game/grenade'
 import { fromExeFrames } from '../../src/lib/game/ballistics'
@@ -35,6 +37,9 @@ import { createBus } from '../../src/lib/game/events'
 import type { BattleEvent } from '../../src/lib/game/events'
 
 const TNT = 37
+/** Clip 77 of `Chars/mcap.mad` — the record's attack clip for all four planted
+ * skills, and the archive's own "Lay Mine" (lib/game/grenade.ts). */
+const LAY_CLIP = 77
 const MINE = 35
 const GRENADE = 19
 
@@ -178,6 +183,43 @@ test('TNT is PLANTED: no gauge, no aim view, and a fuse longer than the run', ()
   expect(weaponLayer(GRENADE), 'a grenade still lobs').toBe('lob')
 })
 
+test('a mine is HIDDEN, and only a nearby pig of the right class sees it', () => {
+  const at = minefield()[0]
+  const { game, mines } = fielded(at)
+  const pig = game.currentPig
+  // The pig standing ON the field is a GRUNT, and a grunt sees nothing at all.
+  expect(pig.pigClass).toBe(0)
+  expect(detectsMines(0)).toBe(false)
+  expect(mines.revealed([pig]), 'a grunt is standing on it and cannot see it').toEqual([])
+  // Nor does anybody at all, when nobody is looking.
+  expect(mines.revealed([])).toEqual([])
+
+  // The three ENGINEER classes do — the ones whose own kit is mines, read off the
+  // class record rather than picked by name (lib/game/mines.ts).
+  for (const pigClass of [5, 6, 7]) expect(detectsMines(pigClass)).toBe(true)
+  for (const pigClass of [0, 1, 2, 3, 4, 8, 9, 10, 11]) {
+    expect(detectsMines(pigClass), `class ${pigClass}`).toBe(false)
+  }
+
+  const engineer = { ...pig, pigClass: 5 }
+  const seen = mines.revealed([engineer])
+  expect(seen.length, 'standing on the field it sees its own tile and its neighbours')
+    .toBeGreaterThan(0)
+  expect(seen.some((one) => one.x === at.x && one.z === at.z), 'its own tile among them').toBe(true)
+  // …and nothing further off than the range: it is what is NEAR that shows.
+  for (const one of seen) {
+    expect(Math.hypot(one.x - at.x, one.z - at.z)).toBeLessThanOrEqual(DETECT_RANGE)
+  }
+
+  // Walk it well away and the field goes dark again.
+  const away = { ...engineer, position: { x: at.x + 8000, y: 0, z: at.z + 8000 } }
+  expect(mines.revealed([away])).toEqual([])
+
+  // A mine already SPENT is not revealed either — there is nothing there.
+  mines.tread(at.x, at.z)
+  expect(mines.revealed([engineer]).some((one) => one.x === at.x && one.z === at.z)).toBe(false)
+})
+
 test('planting one keeps the turn and cuts the clock to four seconds', () => {
   // The two halves of "plant it and run", and they are the same record's two
   // fields: no WALK AWAY flag, and a wait of 400 hundredths (lib/game/spend.ts).
@@ -223,15 +265,33 @@ const counting = (page: Page): Promise<{ x: number; y: number; z: number; fuse: 
     ).pow.debug.mines()
   )
 
-const thrown = (page: Page): Promise<{ fuse: number }[]> =>
+const thrown = (page: Page): Promise<{ x: number; y: number; z: number; fuse: number }[]> =>
   page.evaluate(() =>
-    (window as unknown as { pow: { debug: { grenades(): { fuse: number }[] } } }).pow.debug.grenades()
+    (
+      window as unknown as {
+        pow: { debug: { grenades(): { x: number; y: number; z: number; fuse: number }[] } }
+      }
+    ).pow.debug.grenades()
   )
 
 const give = (page: Page, skill: number): Promise<boolean> =>
   page.evaluate(
     (s) => (window as unknown as { pow: { give(x: number): boolean } }).pow.give(s),
     skill
+  )
+
+/** How many mine markers the scene is drawing for the side whose turn it is. */
+const markers = (page: Page): Promise<number> =>
+  page.evaluate(() =>
+    (window as unknown as { pow: { debug: { mineMarkers(): number } } }).pow.debug.mineMarkers()
+  )
+
+/** What the acting pig is WEARING, out of the engine's own sampler. */
+const wearing = (page: Page): Promise<number | null> =>
+  page.evaluate(
+    () =>
+      (window as unknown as { pow: { debug: { pose(): { clip: number | null } } } }).pow.debug.pose()
+        .clip
   )
 
 /** A mine on CAMP a pig can actually be standing on: dry, and not inside a
@@ -273,6 +333,10 @@ test('a pig that walks onto a MINE hears it and then loses twenty points', async
   await page.waitForTimeout(600)
   expect((await counting(page)).length, 'it did not go off twice').toBe(0)
 
+  // …and NOTHING was ever drawn for the field it walked into: CAMP fields one
+  // grunt, and a grunt cannot see a mine even standing on it (lib/game/mines.ts).
+  expect(await markers(page), 'a grunt sees no mines').toBe(0)
+
   expect(app.errors()).toEqual([])
 })
 
@@ -297,15 +361,34 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
     c.release('fire')
   })
 
+  // FIRST THE ANIMATION. Play: "ТНТ ставится на землю — с анимацией", and the
+  // clip is not a decoration over the placing — its own key-frame event is what
+  // puts the charge down, a third of the way in (lib/game/grenade.ts
+  // `PLANT_PHASE`), so the pig is wearing clip 77 before anything exists.
+  await expect.poll(async () => wearing(page), { timeout: 4000 }).toBe(LAY_CLIP)
+  expect((await thrown(page)).length, 'nothing is down until the pig has bent over').toBe(0)
+
   // It is on the ground, and the pig still has the controls: the turn was NOT
   // spent, it was HURRIED (lib/game/spend.ts).
   await expect.poll(async () => (await thrown(page)).length, { timeout: 4000 }).toBe(1)
+  // AT ITS FEET, not dropped from the hand: the pig's own position, to the unit
+  // in the plane and within a body's height of the soles.
+  const where = await debugState(page)
+  const charge = (await thrown(page))[0]
+  expect(Math.hypot(charge.x - where.x, charge.z - where.z), 'under the pig').toBeLessThan(32)
   await expect.poll(async () => (await hud(page)).seconds, { timeout: 4000 }).toBeLessThanOrEqual(
     PLANTED_SECONDS
   )
   const planted = await hud(page)
   expect(planted.turn, 'the same turn').toBe(before.turn)
   expect(planted.starting, 'and it is still being played').toBe(false)
+
+  // **AND IT CAN RUN.** Which is the whole point of the four seconds: a charge
+  // lying at the pig's feet must not lock it the way a grenade in the air does
+  // (lib/game/lobs.ts `thrown`).
+  await hold(page, 'walkForward', 700)
+  const ran = await debugState(page)
+  expect(Math.hypot(ran.x - where.x, ran.z - where.z), 'it got away from it').toBeGreaterThan(50)
 
   // Its fuse outlasts the run: the clock goes first, and the beat the turn ends
   // through waits for the charge rather than handing over on top of it

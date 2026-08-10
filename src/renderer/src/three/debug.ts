@@ -61,10 +61,12 @@ export interface DebugParts {
   /** How many grenades are in the air or lying about (three/grenades.ts). */
   grenades: () => { x: number; y: number; z: number; fuse: number }[]
   /** Mines that have been trodden on and are counting down. Nothing is DRAWN for
-   * a minefield — it is a bit in the ground and the tile's own texture is the
-   * warning — so this is the only way a spec can see one at all
-   * (lib/game/mines.ts). */
+   * a buried one unless somebody can SEE it, so this is the only way a spec can
+   * find one at all (lib/game/mines.ts). */
   mines: () => { x: number; y: number; z: number; fuse: number }[]
+  /** How many mine MARKERS are on the scene — what the side whose turn it is can
+   * see of the field (three/mineArt.ts). */
+  mineMarkers: () => number
   /** How full the power gauge is, 0..1, or null when nothing charges. */
   charging: () => number | null
   /** Where the shot SEQUENCE has got to: the fuse, the flight, or nothing at
@@ -167,6 +169,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
       grenades: () => parts.grenades(),
       /** Every mine counting down under somebody's feet (lib/game/mines.ts). */
       mines: () => parts.mines(),
+      /** …and how many BURIED ones are being drawn for the side whose turn it is:
+       * a mine is hidden unless a pig near it has the class to see one. */
+      mineMarkers: () => parts.mineMarkers(),
       charging: () => parts.charging(),
       /** Where the shot sequence is: 'fuse' while the ten frames run down,
        * 'flight' while the camera rides the bullet, null when the pig is its

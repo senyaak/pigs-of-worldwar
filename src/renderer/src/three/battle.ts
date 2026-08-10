@@ -41,6 +41,7 @@ import type { Collected } from '../../../lib/game/scenery'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBulletArt } from './shots'
 import { createGrenadeArt } from './grenades'
+import { createMineArt } from './mineArt'
 import { exposeBattleDebug } from './debug'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SceneHost } from './scene'
@@ -247,6 +248,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const bulletArt = createBulletArt(root)
   /** The grenade models and the smoke behind them (three/grenades.ts). */
   const grenadeArt = createGrenadeArt(root)
+  /** …and the mines a pig who KNOWS about them can see (three/mineArt.ts). */
+  const mineArt = createMineArt(root)
   /**
    * Camera and marker onto a pig, wherever it happens to be standing — or
    * hanging: a pig still on its canopy is watched from the front, face on,
@@ -531,6 +534,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // a frame, after everything that could have moved or spent one.
     bulletArt.draw(now.bullets, (shot) => drawnAt(`shot:${shot.id}`, shot))
     grenadeArt.draw(now.lobs, delta, (lob) => drawnAt(`lob:${lob.id}`, lob))
+    // The minefield, through the eyes of whoever's turn it is: a buried mine is
+    // shown to the side that has somebody near it who can see one, and to nobody
+    // else (lib/game/mines.ts).
+    mineArt.draw(mines.revealed(game.currentPlayer.pigs))
     effectArt.draw(now.effects)
     airDropArt.draw(now.crates, (one) => drawnAt(`crate:${one.id}`, { x: 0, y: one.y, z: 0 }).y)
   }
@@ -558,6 +565,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     aim: () => battle.aim(),
     grenades: () => grenades.at(),
     mines: () => mines.at().map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
+    mineMarkers: () => mineArt.shown(),
     charging: () => battle.charging(),
     firing: () => battle.view().firing?.phase ?? null,
 
@@ -641,6 +649,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       effectArt.dispose()
       bulletArt.dispose()
       grenadeArt.dispose()
+      mineArt.dispose()
       airDropArt.dispose()
       weapons.dispose()
       squad.dispose()

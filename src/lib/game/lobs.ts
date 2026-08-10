@@ -23,6 +23,7 @@ import {
   douseInWater,
   lob,
   lobBounce,
+  isPlanted,
   lobOf,
   sinkLob,
   skipOffWater,
@@ -83,6 +84,16 @@ export interface Lobs {
   /** Throw one from this pig at `aim`, with the gauge's `charge` behind it.
    * False if what it holds is not lobbed, or there is no hand to throw from. */
   throwOne(pig: Pig, aim: number, charge: number): boolean
+  /**
+   * PUT one down instead: at the pig's own feet, on the ground, not moving.
+   *
+   * A charge is not a throw with the gauge left alone — it leaves the pig at a
+   * different PLACE. The exe gets there by arithmetic (`speed * charge >> 12` of
+   * 50 and a charge of one is nothing) and by the laying clip's own event, and
+   * both come out as "it is where the pig is standing" (lib/game/grenade.ts).
+   * False when what it holds is not something a pig plants.
+   */
+  plant(pig: Pig): boolean
   /** One frame of every grenade in the air or rolling. */
   update(delta: number): void
   /**
@@ -96,11 +107,19 @@ export interface Lobs {
   detonateNow(): void
   /**
    * How many are LIVE — which a sinking one is not. It cannot be set off, it
-   * cannot hurt anybody, and it must not hold the turn: this count is what says
-   * the pig is committed, what keeps the shot sequence open, and what turns the
-   * fire key into a detonator.
+   * cannot hurt anybody, and it must not hold the turn: this is what keeps the
+   * shot sequence open and what the end of a turn waits for.
    */
   live(): number
+  /**
+   * …and how many of those were THROWN rather than planted.
+   *
+   * The difference is the whole of "plant it and run": a grenade in the air holds
+   * the pig still and turns the fire key into a detonator, and a charge lying at
+   * its feet must do neither, or the four seconds the turn hands back are four
+   * seconds of standing next to it (lib/game/spend.ts).
+   */
+  thrown(): number
   /** Every one that exists, sinking ones included — what a renderer draws. */
   all(): readonly Lobbed[]
   /** Where each one is and how long it has left — what a spec measures a miss
@@ -218,6 +237,20 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       flying.push(shot)
       return true
     },
+    plant(pig) {
+      const skill = pig.holding
+      if (skill === null || !isPlanted(skill) || !lobOf(skill)) return false
+      // The FEET, which is `pig.position` — the soles, and so the ground it is
+      // standing on — with no charge behind it and nothing to aim.
+      const shot = lob(skill, pig.position, pig.heading, 0, 0, world.random)
+      if (!shot) return false
+      shot.id = named++
+      // It is DOWN, not landing: nothing has to fall for a charge to be placed,
+      // and a resting lob is what the renderer draws lying still.
+      shot.resting = true
+      flying.push(shot)
+      return true
+    },
     update(delta) {
       for (let i = flying.length - 1; i >= 0; i--) {
         const shot = flying[i]
@@ -261,6 +294,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       }
     },
     live: () => flying.filter((one) => !one.doused).length,
+    thrown: () => flying.filter((one) => !one.doused && !isPlanted(one.skill)).length,
     all: () => flying,
     at: () => flying.map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     head: () => flying[0] ?? null,

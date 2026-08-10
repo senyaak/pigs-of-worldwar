@@ -172,9 +172,11 @@ export interface DebugHooks {
   aim(): number | null
   /** How many grenades are in the air or lying about (three/grenades.ts). */
   grenades(): { x: number; y: number; z: number; fuse: number }[]
-  /** Mines that have been trodden on and are counting down — the only view of a
-   * minefield there is, since nothing draws one (lib/game/mines.ts). */
+  /** Mines that have been trodden on and are counting down (lib/game/mines.ts). */
   mines(): { x: number; y: number; z: number; fuse: number }[]
+  /** How many buried mines are being DRAWN for the side whose turn it is — a
+   * marker only a nearby pig of the right class gets (three/mineArt.ts). */
+  mineMarkers(): number
   /** How full the power gauge is, 0..1, or null when nothing is charging
    * (lib/game/gauge.ts). */
   charging(): number | null
