@@ -1977,6 +1977,70 @@ something has a still torso by design. The only clip that yaws the rump alone is
 27, Standing around, by 4.9°. Full measurement in `animations/notes.md`; there is
 nothing in the data to turn on.
 
+### The BATTLE MODEL is `_me`, and a keyframe has a HEAD
+
+Two format-level things behind one report, and play had to make it three times
+before the search left the pose and went to the assets: "жёпка так и не вертится…
+именно та часть тела не шевелится вообще… должно двигаться вместе с туловищем а не
+стоять колом."
+
+**`Chars/british.mad` ships THREE models per class and only two of them are rigged
+for the animation.** Measured across all twenty-seven: `pcXXX_hi` (627..668
+vertices) hangs 30..35 vertices off bone 0 — the ROOT — and its bone 1 stops short
+of the hip, so the whole pelvis is welded to a bone the shipped clips barely move
+(4.9° of pitch, no yaw at all). `pcXXX_me` (457..496) and the short `XX_hi`
+(168..201) put 6..8 there — the tail — and carry the hip band on bone 1, the
+torso, where the run cycle's ±19.6° of swing lives. So on `_hi` the behind cannot
+follow the body: it is not attached to it. `three/soldiers.ts` dresses a battle pig
+in `_me`, and two things agree on that — a rig that matches the animation, and
+`_ME` being the suffix the map's own spawn markers wear (`GR_ME`, `HV_ME`).
+`pcXXX_hi` is for whatever shows a pig close up and standing still.
+
+**An MCAP keyframe's first 32 bytes are TWO int32 vec3s, not an u16 and ten s8
+triples.** how-doc's reading was wrong and nothing had ever consumed it. The
+library settles it (`_d3d.dll` 0x1001228f): after the fifteen bone rotations it
+reads dwords at +0x00/+0x04/+0x08 and +0x10/+0x14/+0x18, interpolates each between
+the two keyframes as an INTEGER and ftols it into its own root record — two
+16-byte slots, three live components each, which is also why the rotations start
+at +0x20. The first slot is the body's own offset and its y MOVES: 21 units over
+the run cycle's stride, two dips, one per footfall — the BOB. The second is zero
+in all 93 shipped clips. `lib/formats/mcap.ts` reads it, `rootAt` samples it, and
+it lands on the root of both the engine's skeleton and the drawn one.
+
+Only the VARIATION is applied, against the clip's own first frame, and that half
+is the remake's: the constant is about −100 on every clip and the original adds all
+of it to a body it places its own way, while this engine stands a pig by the foot
+offset measured off the art. Both would double up.
+
+Found on the way and worth knowing: the model struct carries FOUR clip/frame pairs
+— current and previous for each of the two channels, 0xFFFF for none — so **the
+original CROSSFADES one clip into the next** where this engine cuts. Not modelled.
+
+### A landing on a WALL tile settles, and only the get-up is refused
+
+Play: "соскользнул с подьема и попал в бесконечный цыкл — туда сюда скользит на 1м
+месте", with the tile's own address (CAMP 43,17 — type 0x85, a wall over terrain
+type 5). The landing had two conditions where the exe has one: its impact handler
+compares the ARRIVAL SPEED with 25 a frame (`cmp di,19h`, 0x4711d8) and that alone
+picks the bounce (0x471247) or `0x471350`, which zeroes the velocity. What
+`Map::IsBlocked` gates is the GETTING UP. Read as "a pig in a wall never lands", a
+pig on that tile kept 99% of its slope-parallel speed off `WALL_MATERIAL` every
+frame and the wedge counter relaunched it every 25 for ever. `002/wedge.spec.ts`
+pins it; `002/locomotion.spec.ts` had the old reading as an assertion while its own
+comment described the right rule.
+
+### And a pig ON A BRIDGE is not in the water it crosses — for EVERYTHING
+
+The rule was already written down for the driven pig, and the two things added
+this pass — the water's damage and the end-of-turn swim — both asked
+`query.isWater(position)` and nothing else. So a pig standing on CAMP's deck when
+its turn ended counted as a swimmer and the beat "rescued" it: `restingY` put its
+feet on the waterline, which is a drop through the deck. `inWater(query, x, z,
+footY)` in `lib/game/locomotion.ts` is the rule for anything that is not driving —
+the tile has to be water AND the feet at or below the waterline — and a swimming
+pig's feet are on that line by `restingY`'s own definition, so the two cannot
+disagree.
+
 ### What is still not read
 
 - **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's
