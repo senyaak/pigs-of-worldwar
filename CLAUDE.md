@@ -2395,6 +2395,61 @@ so `three/props.ts` gives every record its own — the map's own order, fixed fo
 good. It costs the material batching across props, which for a hundred-odd objects
 is nothing.
 
+### THE SECOND PASS over the throw: how hard, and through which BEATS
+
+Play watched the first attempt and named three separate things: "сначала взрыв —
+даже 2 мины — а потом толчёк", "толчёк очень мелкий", and "динамит не толкает".
+Three causes, and only one of them was the blast.
+
+**1. HOW HARD.** The magnitude was a flat 0x40 borrowed from the building's own
+push, and 0x40 is **less than a punch**: the melee's knockbacks are 75 (bayonet),
+100 (trotter), 125 (knife), 150 (sword), **200 (cattle prod)**, all through the
+same `0x4a9100`. So it scales with the DAMAGE now — four times the points, capped
+at the prod's 200 — and the two ends land on the engine's own numbers: a grenade's
+thirty come to 120 = 0x78, TNT's fifty to the 200 cap, a mine's twenty to 80. The
+falloff is free, because the damage already carries it (`lib/game/blast.ts`
+`flingSpeed`). The four and the cap are the remake's.
+
+**2. THE BEATS.** The acting pig's walk lives at the bottom of `battle.update`,
+past three branches that return early — the beat after a blow, the beat that ends
+the turn, and the turn a weapon has spent. A blast can throw the pig inside any of
+them, and the flight was simply not advanced there: frozen for the length of the
+beat and finished afterwards ("а потом толчёк"), or dropped outright, which is the
+whole of "динамит не толкает" — TNT's six-second fuse runs out AFTER the four
+seconds the turn hands back, so its blast always lands inside the end-of-turn beat.
+`flyOn` advances it wherever the frame is, and `settling()` now counts the acting
+pig's own flight so the beat waits for the landing.
+
+**3. A PLACED CHARGE DOES NOT MOVE.** Play: "динамит катится по склону." It was
+stepped like anything else in the air, so gravity pressed it into the hillside and
+the contact carried the whole slope-parallel part on — the very rule this engine
+got right for grenades. Nothing has to fall for a charge to be PUT somewhere, so
+only its fuse runs now (`lib/game/lobs.ts`). The exe has a rest state for a body
+and it is not decoded; this is that state for the one thing born in it.
+
+### THE SHELTER: a collider 96 units too wide, and no way in by design
+
+Play: "у бомбоубежища силовое поле — моделька больше чем текстуры — с лицевой
+стороны и задней нельзя подойти вплотную." Measured over every shipped map: of the
+1113 box-shaped records whose extents ARE their model's own footprint, all but
+sixteen match as stored — and **fourteen of those sixteen are the SHELTER**. Every
+SHELTER in the game, at all four yaws, carries 832×640 for art that measures
+640×832. So the collider hung 96 units past the art on two faces and fell 96 short
+on the other two, which is exactly the pair play could walk into.
+`TRANSPOSED_BOX` in `lib/game/obstacles.ts` is that one name, and it says why.
+
+**Getting INSIDE is a missing FEATURE, not a bug.** The SHELTER is a closed
+twelve-triangle box — there is no interior to walk into, in the remake or in the
+original. What the original has is the IN/OUT family: skills **61 IN-OUT, 62 PBOX,
+64 GET OUT**, and the taxonomy's own GUN_BARRELS group (BIGBAR, BUNKGUN, PILLBAR,
+AMPHGUN, B_GUN, TANBAR) beside the BUILDINGS a pig climbs into to fire them
+(45 `pillbhmg`, 46 `pillbfla` are the pillbox's weapons). None of that is built.
+
+**And the props are UNLIT at last.** `three/modelMesh.ts` has said since it was
+written that a map's props must not be lit — a third of their NO2 entries are
+garbage floats and the faces reference them — and no caller ever passed the flag.
+`three/props.ts` does now, which puts them on the same footing as the ground.
+
 ### PLAY'S OPEN LIST — what is still open (2026-08-10)
 
 Four of the seven are fixed and are written up above: the charge that stands
@@ -2421,6 +2476,18 @@ flickered. Written down here rather than in a chat that scrolls away.
 3. **`002/effects.spec.ts:161` is flaky** — one fireball sprite's outward bearing can
    roll near-vertical and the assertion is on blob 0 alone. Seed the roll or assert
    over all of them; it failed once in a full run and passes alone.
+4. **`PIG_RADIUS` has no witness in the exe, and play can feel it.** It is 160 —
+   half the spawn marker's own 5×5×5 — and the loader **skips the collider entirely
+   for a pig**: `if ([obj+0x38] == 0x1357) goto` past the box build (0x4a61ad), so
+   that 5×5×5 is never a collider in the original at all. A pig therefore stops 160
+   units short of every wall in the remake on a number nothing supports, which is
+   the general half of "нельзя подойти вплотную". What the pig's own body IS comes
+   out of its class's constructor and has not been read. Worth a measured pass:
+   it moves every wall in the game, so it is not a number to guess twice.
+5. **A record can carry its OWN health in field 12** — `[esi+0x38] != 0xFF` writes
+   `field12 << 7` into both `[+0x4c]` and `[+0xa8]` (0x4a6179–0x4a61ad), overriding
+   the table `lib/game/breakable.ts` transcribes. Shipped records are 255 nearly
+   everywhere; the day one is not, this is where it belongs.
 
 ### What is still not read
 
