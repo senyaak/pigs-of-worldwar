@@ -97,6 +97,8 @@ export interface HudState {
   pig: string
   health: number
   seconds: number
+  /** Whether the acting pig is IN the water — its feet against the waterline,
+   * so a pig on a bridge over water is not (lib/game/locomotion.ts). */
   swimming: boolean
   /** Seconds the acting pig has stood still: what the name plates wait for. */
   still: number

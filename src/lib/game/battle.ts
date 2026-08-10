@@ -278,7 +278,14 @@ export function createBattle(parts: BattleParts): Battle {
   )
 
   const focus = (pig: Pig): void => {
-    loco = createLocomotion(query, pig.position.x, pig.position.z, pig.heading)
+    // WHERE THE PIG ALREADY IS, and not just where the ground under it is: a
+    // turn that starts on a bridge starts on the DECK. The pig's own y plus the
+    // objects is what settles that (lib/game/locomotion.ts `Footing`) — the
+    // squad is not in it, because a pig is never something to stand on.
+    loco = createLocomotion(query, pig.position.x, pig.position.z, pig.heading, {
+      y: pig.position.y,
+      obstruction: scenery.obstacles
+    })
     holding = pig.holding
     sights.rearm(pig.holding)
     readying = 0

@@ -2041,6 +2041,31 @@ the tile has to be water AND the feet at or below the waterline — and a swimmi
 pig's feet are on that line by `restingY`'s own definition, so the two cannot
 disagree.
 
+**And it came back one pass later, through the OTHER half of the same
+question — where the feet are at all.** Play: "если начинаю ход на мосту, нажимаю
+любую кнопку и он проваливается." `createLocomotion` took the pig's height off
+the landscape, and a turn builds that state fresh for the pig that comes up
+(`focus`, `lib/game/battle.ts`), so a turn starting on a deck started 652 units
+below it — invisibly, because the scene draws the pig out of its own position
+while "press any key" is up and out of the locomotion state once the turn is
+being played. The first press was the drop. It now takes an optional `Footing` —
+the pig's own y and the obstacles — and keeps the surface it is actually standing
+on, `freeY` and `swimming` with it. The frame-by-frame walk had the rule all
+along; only the FIRST frame had nothing to measure from.
+
+Two lessons, and the second is the general one:
+
+- **A state built from a POSITION needs the whole position.** `x, z` and the
+  landscape is not where a pig is on a map with walkways on it. Anything else
+  that rebuilds locomotion from a spot — `warp` today, a save file tomorrow —
+  has the same hole, and `warp` is left with it deliberately: it names a spot
+  and has no pig to ask.
+- **A debug accessor that lies is how a bug family survives being fixed.**
+  `pow.debug.hud().swimming` was `query.isWater(pig)`, so the spec written
+  against it was told a pig standing on the bridge was in the water — the first
+  version of the app test above failed on that and not on the bug. It asks
+  `inWater` now. The e2e window is not exempt from the rules the engine keeps.
+
 ### What is still not read
 
 - **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's

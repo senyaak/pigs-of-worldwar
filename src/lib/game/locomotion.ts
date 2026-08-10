@@ -325,20 +325,72 @@ export const restingY = (query: TerrainQuery, x: number, z: number): number =>
 export const inWater = (query: TerrainQuery, x: number, z: number, footY: number): boolean =>
   query.isWater(x, z) && footY >= query.surface(x, z)
 
+/**
+ * What a pig is ALREADY standing on, for the state that is about to be built
+ * around it: where its feet are, and the world to ask about them.
+ *
+ * Optional because most of what builds a locomotion state has no such
+ * knowledge — a warp names a spot and nothing else — and the answer without it
+ * is the landscape's, which is what it always was.
+ */
+export interface Footing {
+  /** The feet, game Y-DOWN — the pig's own current height. */
+  y: number
+  obstruction: Obstruction
+}
+
+/**
+ * Where the feet rest when the pig is ALREADY somewhere: the surface it is
+ * standing on where that is an object, and `restingY` otherwise.
+ *
+ * `standOn` with no reach answers about tops at or below the feet, so the one
+ * that comes back LEVEL with them is what is holding the pig up — the same test
+ * `standing` makes once a frame. Anything else (a deck far below, an object the
+ * pig is falling past) is not what it is on, and the landscape answers.
+ */
+const footingY = (
+  query: TerrainQuery,
+  x: number,
+  z: number,
+  footing: Footing | undefined
+): number | null => {
+  if (!footing) return null
+  const on = footing.obstruction.standOn(x, z, footing.y, 0)
+  return on !== null && Math.abs(on - footing.y) < 1 ? on : null
+}
+
 export function createLocomotion(
   query: TerrainQuery,
   x: number,
   z: number,
-  heading: number
+  heading: number,
+  footing?: Footing
 ): LocomotionState {
+  // **A TURN STARTING ON A BRIDGE used to begin by falling off it.** This state
+  // is built fresh for every turn (lib/game/battle.ts `focus`), and it asked the
+  // LANDSCAPE where the pig's feet were — which under CAMP's deck is the ditch
+  // floor 650 units down. The beat at the top of the turn hid it, because the
+  // scene draws the pig out of its own position while "press any key" is up and
+  // out of THIS while the turn is played; the first frame the player drove, the
+  // pig was written back to the ground under the bridge. Play: "если начинаю ход
+  // на мосту — нажимаю любую кнопку и он проваливается."
+  //
+  // The frame-by-frame walk had the rule already (`ground` measures its step-up
+  // from the feet and finds the deck within the envelope); it was only ever the
+  // FIRST frame that had nothing to measure from.
+  const on = footingY(query, x, z, footing)
+  const y = on ?? restingY(query, x, z)
   return {
     x,
     z,
-    y: restingY(query, x, z),
+    y,
     heading,
     airborne: null,
     wedgedSeconds: 0,
-    freeY: query.height(x, z),
+    // Standing on something is open footing, and its top is where the feet are
+    // — the step-up allowance is measured from there and not from the ground
+    // under the deck, which is the same rule `ground` applies at its tail.
+    freeY: on ?? query.height(x, z),
     sidestep: 0,
     jumpReadyIn: 0,
     windUp: 0,
@@ -347,7 +399,10 @@ export function createLocomotion(
     commit: false,
     bounciness: FREE,
     clip: ANIM.IDLE,
-    swimming: query.isWater(x, z)
+    // …and a pig on a deck over water is not in the water, on the frame the
+    // turn starts as much as on any other (`inWater`, and the whole of the bug
+    // above is this question asked in a second place).
+    swimming: inWater(query, x, z, y)
   }
 }
 

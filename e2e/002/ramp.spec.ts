@@ -1,9 +1,11 @@
 // PHASE 002 — the BRIDGE and STEP pieces: the tilt nothing in the record asks
 // for, and walking on them.
 //
-// Pure: the shipped CAMP and ISLAND files, read through the readers, with the
-// same composition `three/props.ts` builds — the yaw about the vertical,
-// outside a −45° turn about the model's own z (lib/game/ramps.ts).
+// Pure, all but the last one: the shipped CAMP and ISLAND files, read through
+// the readers, with the same composition `three/props.ts` builds — the yaw about
+// the vertical, outside a −45° turn about the model's own z (lib/game/ramps.ts).
+// The last test drives the APP, because the bug it is about was fixed purely
+// once already and came back through a second place that builds the same state.
 //
 // What it pins is the MEASUREMENT the rules rest on, because the exe puts none
 // of these in its collision world and applies no tilt on any path read so far:
@@ -18,6 +20,8 @@ import path from 'node:path'
 
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
+import { beginTurn, debugState, hold, hud, releaseAll, skipTurn, tap, warp } from '../controller'
+import { startGame } from '../menu'
 import { BOX_UNIT, modelRotationY, parsePog } from '../../src/lib/formats/pog'
 import type { MapObject } from '../../src/lib/formats/pog'
 import { parseArchive } from '../../src/lib/formats/mad'
@@ -352,6 +356,97 @@ test('…and NOTHING may take it for a swimmer, not just the pig being driven', 
   const swimming = createLocomotion(query, state.x, state.z, 0)
   expect(swimming.swimming || query.isWater(swimming.x, swimming.z)).toBe(true)
   expect(inWater(query, swimming.x, swimming.z, swimming.y), 'in the drink').toBe(true)
+})
+
+test('a turn that STARTS on a bridge does not start by falling off it', () => {
+  // Play, after the end-of-turn half of this was fixed: "если начинаю ход на
+  // мосту — нажимаю любую кнопку и он проваливается."
+  //
+  // A turn builds the acting pig's locomotion state from scratch (`focus`,
+  // lib/game/battle.ts) and that state used to take its height off the
+  // LANDSCAPE, which under a deck is the ditch floor. The beat at the top of the
+  // turn hides it — the scene draws the pig out of its own position while "press
+  // any key" is up — so the drop landed on the first frame the player drove.
+  const CAMP = parsePog(mapFile('CAMP.POG'))
+  const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
+  const field = new ObstacleField(CAMP)
+  const run = CAMP.filter((one) => /^BRID/.test(one.name) && !/^BRID2/.test(one.name)).sort(
+    (a, b) => b.x - a.x
+  )
+  const deck = 1728
+
+  // Walk on from the +x bank and stop the moment the pig is over the ditch at
+  // deck height — the same "on the bridge" test the crossing above makes.
+  const walked = createLocomotion(query, 800, run[0].z, -Math.PI / 2)
+  let over = false
+  for (let i = 0; i < Math.round(3 / STEP_SECONDS) && !over; i++) {
+    updateLocomotion(walked, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS, field)
+    over = near(-query.height(walked.x, walked.z), 1216, ART) && near(-walked.y, deck, 8)
+  }
+  expect(over, `never got onto the deck (${-walked.y} over ${-query.height(walked.x, walked.z)})`).toBe(true)
+
+  // The turn hands over and the next one starts right there: `focus`'s own call,
+  // the pig's position and the objects under it.
+  const started = createLocomotion(query, walked.x, walked.z, walked.heading, {
+    y: walked.y,
+    obstruction: field
+  })
+  expect(near(-started.y, -walked.y, 1), `started at ${-started.y}, standing at ${-walked.y}`).toBe(true)
+  expect(started.swimming, 'and not in the ditch').toBe(false)
+  // …and the first frame the player drives leaves it on the deck. THAT is the
+  // frame play watched it disappear on.
+  updateLocomotion(started, query, { walk: 0, turn: 1, jump: false }, STEP_SECONDS, field)
+  expect(near(-started.y, deck, 8), `still on the deck at ${-started.y}`).toBe(true)
+  expect(started.airborne, 'on its feet').toBeNull()
+
+  // Asked the way it used to be — the landscape alone — the very same spot is
+  // the ditch, which is the drop play fell down.
+  const blind = createLocomotion(query, walked.x, walked.z, walked.heading)
+  expect(-blind.y, `the ground under the deck is at ${-blind.y}`).toBeLessThan(deck - 256)
+})
+
+test('…and the APP hands the turn over on the deck, which is where play watched it fail', async ({
+  app
+}) => {
+  // The one test in this file that runs the game, and it is here because the
+  // pure half of this bug was fixed BEFORE — "кончился ход, я провалился на
+  // мосту" — and came straight back in the next thing that built a locomotion
+  // state (lib/game/battle.ts `focus`). What has to hold is the whole chain: the
+  // walk onto the deck, the handover, the beat, and the first press after it.
+  const { page } = app
+  // Measured with the walk above: the near deck's z, and 1.4 s of walking west
+  // from the bank puts the pig well onto it and well short of the gap.
+  const onto = { x: 800, z: 7424, heading: -Math.PI / 2 }
+  await startGame(page)
+  await warp(page, onto.x, onto.z, onto.heading)
+  await beginTurn(page)
+  await hold(page, 'walkForward', 1400)
+
+  // Where it is standing — the DRAWN height, which is what play was looking at.
+  const deck = await debugState(page)
+  expect(deck.x, 'it walked onto the bridge').toBeLessThan(256)
+  expect((await hud(page)).swimming, 'on the deck, not in the ditch').toBe(false)
+
+  // Hand the turn over. CAMP fields one pig, so the pig that comes up next is
+  // this one, standing exactly here — which is `focus` rebuilding its state.
+  await skipTurn(page)
+  await expect.poll(async () => (await hud(page)).starting).toBe(true)
+  const waiting = await debugState(page)
+  expect(Math.abs(waiting.nodeY - deck.nodeY), 'the beat left it where it stood').toBeLessThan(32)
+
+  // ANY BUTTON. The beat ends and the turn is played, and this is the frame the
+  // pig used to be written back to the ground under the bridge — 512 down.
+  await tap(page, 'turnRight')
+  await expect.poll(async () => (await hud(page)).starting).toBe(false)
+  const driven = await debugState(page)
+  expect(
+    Math.abs(driven.nodeY - deck.nodeY),
+    `dropped ${Math.abs(driven.nodeY - deck.nodeY)} on the first press`
+  ).toBeLessThan(32)
+  expect((await hud(page)).swimming, 'and it is still not in the ditch').toBe(false)
+
+  await releaseAll(page)
+  expect(app.errors()).toEqual([])
 })
 
 test("ISLAND's ramps all climb to their own deck's surface", () => {

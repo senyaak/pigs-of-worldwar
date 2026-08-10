@@ -13,6 +13,7 @@ import type * as THREE from 'three'
 import type { Game } from '../../../lib/game/game'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { controller } from '../input/controller'
+import { inWater } from '../../../lib/game/locomotion'
 import type { DropIn } from '../../../lib/game/dropIn'
 import type { MapProps } from './props'
 import type { Squad } from './squad'
@@ -108,7 +109,18 @@ export function exposeBattleDebug(parts: DebugParts): void {
         pig: game.currentPig.name,
         health: game.currentPig.health,
         seconds: Math.max(0, Math.ceil(game.timeLeft)),
-        swimming: query.isWater(game.currentPig.position.x, game.currentPig.position.z),
+        // IN the water, not merely OVER it — the pig's feet against the
+        // waterline (lib/game/locomotion.ts `inWater`), which is the same
+        // question the water's damage and the end-of-turn swim ask. Asking the
+        // landscape alone, this said a pig standing on CAMP's bridge was
+        // swimming, and a spec written against it would have been told the bug
+        // play reported was working as intended.
+        swimming: inWater(
+          query,
+          game.currentPig.position.x,
+          game.currentPig.position.z,
+          game.currentPig.position.y
+        ),
         still: parts.still(),
         starting: game.starting
       }),
