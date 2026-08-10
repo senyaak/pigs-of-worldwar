@@ -473,9 +473,23 @@ export const WATER_DOUSE_SPEED = fromExeSpeed(0x96)
  */
 export const WATER_SKIP_KICK = 5
 
-/** How fast it has to be travelling ALONG the water to skip off it. */
-export const skipsOnWater = (shot: Lobbed): boolean =>
-  Math.hypot(shot.vx, shot.vz) >= WATER_DOUSE_SPEED
+/**
+ * How fast it has to be travelling ALONG the water to skip off it — **and it has
+ * to be going along faster than it is going down.**
+ *
+ * The second half is play's, from watching one skip that should not have: "щас
+ * одна граната под навесом отскочила от воды. я думаю если вертикальная скорость
+ * выше горизонтальной — прожектайл тонет." It is the same reading as above rather
+ * than a new rule — the scalar the engine gates on is taken to be the IN-PLANE
+ * speed, and a thing coming down steeply has its speed in the NORMAL — but the
+ * in-plane test alone lets a fast, steep throw skip, because 150 in the plane is
+ * cheap when the fall has twice that in it. The comparison is what play's own
+ * description of the original always said: a stone SKIMS, a bomb goes in.
+ */
+export const skipsOnWater = (shot: Lobbed): boolean => {
+  const along = Math.hypot(shot.vx, shot.vz)
+  return along >= WATER_DOUSE_SPEED && along > Math.abs(shot.vy)
+}
 
 /** …and if it does not, water douses it: no blast, no damage. */
 export const dousedByWater = (shot: Lobbed): boolean => !skipsOnWater(shot)

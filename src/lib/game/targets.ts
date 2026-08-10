@@ -73,17 +73,36 @@ export interface Target {
 export function targetsOf(objects: MapObject[]): Target[] {
   const out: Target[] = []
   for (const object of objects) {
-    const health = breakableHealth(object.name)
-    if (health === null) continue
+    const fromTable = breakableHealth(object.name)
+    if (fromTable === null) continue
     out.push({
       id: object.id,
       x: object.x,
       y: -object.y * HEIGHT_SCALE,
       z: object.z,
-      health
+      health: ownHealth(object) ?? fromTable
     })
   }
   return out
+}
+
+/**
+ * **A RECORD'S OWN HEALTH, which beats the table** — field 12, and it is read.
+ *
+ * Play: "у дома кажется сильно много хп — по крайней мере в игре с 1-го взрыва
+ * дверь ломается." Right, and the door says so itself: CAMP's record 46 is the
+ * `STW04_D2` door piece and its field 12 is **50**, exactly TNT's fifty points at
+ * the core, where the wall pieces around it leave the field at 255 and take the
+ * table's sixty. One charge takes the door and not the wall.
+ *
+ * The exe reads it in the loader's common tail (0x4a6179): not 0xFF and it writes
+ * `field12 << 7` — the same 128ths — into `[+0x4c]`, and for the breakable class
+ * into `[+0xa8]`, the maximum, as well. 0xFF means "use the table", and 5479 of
+ * the 6322 shipped records say exactly that.
+ */
+const ownHealth = (object: MapObject): number | null => {
+  const stored = object.fields[12]
+  return stored === 0xff || stored <= 0 ? null : stored
 }
 
 /**

@@ -25,12 +25,30 @@ import { isSpawnMarker } from './spawns'
 import { HEIGHT_SCALE } from './terrain'
 
 /**
- * The pig's collision box, from the spawn markers' own 5×5×5. Used as a
- * CYLINDER of that width: a box would have to be turned with the pig, and
- * the original's own solver rounds a walking body's contact off anyway —
- * what a square pig buys is corners that catch.
+ * **The pig's own body: a SPHERE of radius 0xAA = 170, and it is READ.**
+ *
+ * This was half the spawn marker's 5×5×5 — a guess, and one the loader
+ * contradicts: `if ([obj+0x38] == 0x1357) goto` past the box build (0x4a61ad)
+ * means a pig NEVER takes a collider from its record, so that 5×5×5 is not a
+ * collider anywhere in the original.
+ *
+ * What a body's shape actually is comes off the type-keyed table at 0x4a90cc,
+ * entered at 0x4a8ece with `type - 0x1357`. Slot 0 is the pig:
+ *
+ * ```
+ * 4a8f02  edx = 2        ; shape kind 2 -- a sphere
+ * 4a8f07  esi = 0xAA     ; ...of radius 170
+ * ```
+ *
+ * The same table's slot 7 gives the blast effect the radius 35 this engine
+ * already uses (`weapons/fire.md`), which is the check that the units are the
+ * world's.
+ *
+ * Used as a CYLINDER of that radius rather than a sphere: the vertical is the
+ * step-up's business, and a walking body's contact is rounded off in the
+ * original's solver anyway.
  */
-export const PIG_RADIUS = (5 * BOX_UNIT) / 2
+export const PIG_RADIUS = 0xaa
 export const PIG_HEIGHT = 5 * BOX_UNIT
 
 /**
@@ -58,16 +76,26 @@ export const isPickup = (object: MapObject): boolean =>
   CRATE_TYPES.has(object.type) && object.contents !== null
 
 /**
- * The smallest box that is allowed to stop a pig, per horizontal side.
+ * **What is too small to stop a pig — measured on the FOOTPRINT, not on the
+ * thinnest side.**
  *
- * Which records are in the exe's collision world is NOT decoded — the test
- * itself (0x406bb0) is still an open thread — so this is the remake's own
- * line, and it is drawn where the data draws one: grass, flowers and the
- * swimming fish all carry a box exactly one unit across, an eighth of the
- * pig's own width, while the smallest real structure is three. Anything a
- * fifth of a pig wide is scenery to walk through.
+ * Play: "дом бестелесен." He could walk through the house, and this line was
+ * why: it asked that BOTH horizontal extents reach two box units, and every wall
+ * piece in the game is **one unit thick** (STW04PPP is 64×512×512, STW07PWW
+ * 64×512×2048). A wall is thin — that is what a wall is.
+ *
+ * So the test is now on the footprint as a whole: a box stops a pig unless it is
+ * a single unit square, which over the shipped data is exactly the tufts and the
+ * livestock — GRASS, GRASS1, GRASS2, FLOWERS, FLOWERS2 all 64×128×64, FISH
+ * 64×64×64, LAMP 64×320×64, CHIM 64×128×64 — while everything with any real
+ * footprint keeps its collider, down to a SIGN's 64×512×256 and a DUMMY's
+ * 128×512×256.
+ *
+ * Which records are in the exe's collision world is still NOT decoded — the test
+ * itself (0x406bb0) is an open thread — so the line is the remake's own, drawn
+ * where the data draws one.
  */
-export const MIN_SOLID = 2 * BOX_UNIT
+export const MIN_SOLID = BOX_UNIT
 
 /**
  * Whether a record is something a pig can run into at all.
@@ -92,7 +120,10 @@ export function isSolid(object: MapObject): boolean {
   if (isSpawnMarker(object)) return false
   if (isPickup(object)) return false
   if (object.shape !== SHAPE_BOX && !isWalkway(object.name)) return false
-  return object.box.x >= MIN_SOLID && object.box.z >= MIN_SOLID && object.box.y > 0
+  // A single unit SQUARE is scenery to walk through; anything longer than it is
+  // wide in either direction is not.
+  if (object.box.y <= 0) return false
+  return object.box.x > MIN_SOLID || object.box.z > MIN_SOLID
 }
 
 /** One thing in the way — an oriented box, game space, Y-down. */

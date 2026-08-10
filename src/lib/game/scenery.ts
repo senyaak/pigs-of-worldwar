@@ -166,6 +166,18 @@ export function createScenery(
         const worth = worthOf(pickup, training)
         let result: GiveResult = 'taken'
         let given = worth
+        // **A CRATE TAKES WHAT YOU WERE CARRYING.** Play, asked twice and
+        // answered plainly: "тнт не забирается когда аптечку в доме подбираешь…
+        // должен." So it is not only the parachute drop that empties a pig — every
+        // crate collected does, and what it hands over is all the pig then has.
+        //
+        // The exe's own `Pig::ClearInventory` (0x468f50) is called from the
+        // PLACEMENT arm (0x4aa6cb, and the dummy branch jumps over it at
+        // 0x4aa659), which is the half `advance` below already does. That a
+        // COLLECTION does it too is play's word, and it is the tutorial's whole
+        // shape: one weapon at a time.
+        clearSlots(pig.carrying)
+        pig.holding = null
         if (pickup.skill === null) {
           // No ceiling: the original's heal adds and stops (lib/game/health.ts).
           heal(pig, worth)

@@ -108,16 +108,27 @@ test('CAMP\'s HOUSE is breakable too, and a charge is what it takes', () => {
   expect(house.length, 'CAMP has a house').toBeGreaterThan(10)
   const pieces = targets.filter((target) => house.some((part) => part.id === target.id))
   expect(pieces, 'every piece of it is breakable').toHaveLength(house.length)
-  expect(pieces.every((piece) => piece.health === 60)).toBe(true)
   expect(breakableHealth('STW04PPP')).toBe(60)
 
-  // …and the numbers say what play will see: fifty points at TNT's core leaves a
-  // wall standing with ten, and the second charge brings it down. A grenade's
-  // thirty needs two as well.
-  const wall = pieces[0]
-  expect(hurt(wall, lobOf(37)!.damage / DAMAGE_UNIT, false)).toBe('hurt')
+  // **AND THE DOOR IS THE RECORD'S OWN NUMBER.** Play: "у дома кажется сильно
+  // много хп — по крайней мере в игре с 1-го взрыва дверь ломается." CAMP's record
+  // 46 is the `STW04_D2` door and its field 12 is FIFTY, where every wall round it
+  // leaves the field at 255 and takes the table's sixty (lib/game/targets.ts
+  // `ownHealth`). Fifty is exactly TNT's fifty at the core, so one charge takes
+  // the door — and the wall beside it survives with ten.
+  const door = CAMP.find((object) => object.name === 'STW04_D2')!
+  expect(door.fields[12], 'the door carries its own health').toBe(50)
+  const doorTarget = pieces.find((piece) => piece.id === door.id)!
+  expect(doorTarget.health).toBe(50)
+  const charge = lobOf(37)!.damage / DAMAGE_UNIT
+  expect(charge).toBe(50)
+  expect(hurt(doorTarget, charge, false), 'one charge takes the door').toBe('died')
+
+  const wall = pieces.find((piece) => piece.id !== door.id)!
+  expect(wall.health, 'a wall takes the table figure').toBe(60)
+  expect(hurt(wall, charge, false)).toBe('hurt')
   expect(wall.health).toBe(10)
-  expect(hurt(wall, lobOf(37)!.damage / DAMAGE_UNIT, false)).toBe('died')
+  expect(hurt(wall, charge, false)).toBe('died')
   expect(isDead(wall)).toBe(true)
 
   // The 85 firs are eighty points and the dummies one, out of the same table —

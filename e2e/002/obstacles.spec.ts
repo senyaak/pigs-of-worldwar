@@ -94,10 +94,22 @@ const flat = (): TerrainQuery => terrain(() => 0)
 test('what counts as solid at all', () => {
   // A structure does.
   expect(isSolid(record({ box: { x: 384, y: 1024, z: 384 } }))).toBe(true)
-  // Grass, flowers and the swimming fish carry a box one unit across —
-  // an eighth of the pig's own width, and scenery to walk through.
-  expect(isSolid(record({ box: { x: 64, y: 128, z: 64 } }))).toBe(false)
-  expect(MIN_SOLID).toBe(128)
+  // Grass, flowers and the swimming fish carry a box one unit SQUARE — that is
+  // the whole of what walks through, and the test is on the FOOTPRINT rather than
+  // on the thinnest side. Play found what the old line cost: "дом бестелесен",
+  // because every wall piece in the game is one unit thick and the line asked for
+  // two on both axes.
+  expect(isSolid(record({ box: { x: 64, y: 128, z: 64 } })), 'a tuft of grass').toBe(false)
+  expect(isSolid(record({ box: { x: 64, y: 64, z: 64 } })), 'a fish').toBe(false)
+  expect(isSolid(record({ box: { x: 64, y: 320, z: 64 } })), 'a lamp post').toBe(false)
+  expect(MIN_SOLID).toBe(64)
+  // …and a WALL is thin. STW04PPP is 64×512×512 and STW07PWW 64×512×2048: one
+  // unit through, and eight or thirty-two long.
+  expect(isSolid(record({ box: { x: 64, y: 512, z: 512 } })), 'a house wall').toBe(true)
+  expect(isSolid(record({ box: { x: 64, y: 512, z: 2048 } })), 'a long wall').toBe(true)
+  expect(isSolid(record({ box: { x: 1024, y: 64, z: 1024 } })), 'a floor').toBe(true)
+  // A SIGN is 64×512×256 and stops a pig; nothing with a real footprint does not.
+  expect(isSolid(record({ box: { x: 64, y: 512, z: 256 } })), 'a sign').toBe(true)
   // A crate with something in it is collected by walking into it, so it
   // cannot be a blocker — and an EMPTY one is scenery, which is the whole
   // difference between the crates that are picked up and the ones that are
