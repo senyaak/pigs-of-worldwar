@@ -102,6 +102,10 @@ export const damageOf = (skill: number | null): number =>
 /** A bullet in flight. Position is game space (Y-down); velocity is units a
  * SECOND, like every other speed in the remake. */
 export interface Shot {
+  /** What names it outside the engine — the tween holds a bullet's last two
+   * places by this, and a list that splices must not shift one into another
+   * (three/tween.ts). Handed out by `createBullets`. */
+  id: number
   skill: number
   x: number
   y: number
@@ -141,6 +145,7 @@ export function fireShot(
   const speed = fromExeSpeed(kind.speed)
   const flat = Math.cos(pitch) * speed
   return {
+    id: 0,
     skill,
     x: from.x,
     y: from.y,

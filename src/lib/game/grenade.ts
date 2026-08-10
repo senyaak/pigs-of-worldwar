@@ -240,6 +240,9 @@ export const lobSurface = (tileType: number): Bounciness =>
 
 /** A grenade in the air, or rolling. Game space, Y-down; velocity a second. */
 export interface Lobbed {
+  /** What names it outside the engine (lib/game/projectile.ts says why). Handed
+   * out by `createLobs`. */
+  id: number
   skill: number
   x: number
   y: number
@@ -285,6 +288,7 @@ export function lob(
   const pitch = (aim / AIM_UNITS) * 2 * Math.PI
   const flat = Math.cos(pitch) * speed
   return {
+    id: 0,
     skill,
     x: from.x,
     y: from.y,

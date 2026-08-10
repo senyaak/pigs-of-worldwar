@@ -7,9 +7,9 @@
 // by posing a skinned mesh and reading a bone off it, so a battle nobody was
 // drawing could not fire a shot.
 //
-// The renderer now asks for the SAME pose to draw with (`poseOf`), which is
-// the point: one pose, computed once, so where the blade swings and where the
-// blade is drawn cannot drift apart.
+// The renderer draws from the SAME sampler over the same four numbers off the
+// snapshot (three/wear.ts), so where the blade swings and where the blade is
+// drawn cannot drift apart.
 
 import { poseTurns } from './clipPose'
 import type { ClipFrames } from './clipPose'
@@ -31,19 +31,7 @@ export interface BonePoseParts {
   anim: Anim
 }
 
-/** The pose the RENDERER writes onto its bones — the same turns the rules just
- * measured a blade against. */
-export interface PosedPig {
-  /** One parent-relative turn per bone, in HIR order. */
-  turns: Quat[]
-}
-
-export interface BonePose extends Pose {
-  /** What this pig is turned into right now. `seconds` may run ahead of the
-   * engine's own cursor by up to a step: the picture is drawn between steps
-   * and the animation has to be tweened with everything else. */
-  poseOf(pig: Pig, seconds: number): PosedPig
-}
+export type BonePose = Pose
 
 export function createBonePose(parts: BonePoseParts): BonePose {
   const { skeleton, clips, anim } = parts
@@ -90,7 +78,6 @@ export function createBonePose(parts: BonePoseParts): BonePose {
         heading: pig.heading,
         footOffset: pig.body.footOffset
       })
-    },
-    poseOf: (pig, seconds) => ({ turns: turnsOf(pig, seconds) })
+    }
   }
 }

@@ -43,6 +43,7 @@ import type { Battle } from './battle'
 import { DEFAULT_SEED, seeded } from './random'
 import { createBonePose } from './bonePose'
 import type { BonePose } from './bonePose'
+import type { BattleSnapshot, DescentShot, FlightShot, PigShot } from './snapshot'
 import type { ClipFrames } from './clipPose'
 import type { Pose } from './pose'
 import type { Bone } from '../formats/hir'
@@ -173,6 +174,15 @@ export interface Engine {
    * is 0 whenever a step has just landed.
    */
   alpha(): number
+  /**
+   * The whole battle as DATA, as of the last step that ran
+   * (lib/game/snapshot.ts).
+   *
+   * What a renderer draws. Nothing on it is a live object, so it crosses a port
+   * unchanged — which is the difference between hosting this engine somewhere
+   * else and rewriting it.
+   */
+  snapshot(): BattleSnapshot
   readonly battle: Battle
   readonly query: TerrainQuery
   readonly scenery: Scenery
@@ -237,7 +247,25 @@ export function createEngine(parts: EngineParts): Engine {
       },
       // A crate on the ground is something to walk into again. Collision, not
       // art — the canopy coming off is the scene's half of the same event.
-      crateLanded: ({ id }) => obstacles.restore(id)
+      crateLanded: ({ id, at }) => {
+        obstacles.restore(id)
+        // A crate arriving kicks something up. Play named it — "там ещё эффект
+        // от падения" — and this is the remake's own: nothing has been read that
+        // spawns an effect for a placed object. It takes row 0's SMOKE and not
+        // its fire, because a crate landing raises dust — and play saw what
+        // happened when it got the whole row ("коробка когда падает — искрит").
+        effects.dust(at)
+      },
+      // The effect field and the floating damage are the ENGINE's — the beat
+      // after a blow waits on both (lib/game/effectField.ts, damage.ts) — so
+      // they are started here and not by whoever happens to be drawing.
+      damaged: ({ at, amount }) => numbers.show(at, amount),
+      struck: ({ skill, at }) => effects.hit(skill, at),
+      blasted: ({ at }) => effects.blast(at),
+      // The splash is drawn on the WATER LINE however deep it gets, because
+      // effect 0x0E snaps its own y there (0x488c19).
+      skimmed: ({ at }) => effects.splash(at),
+      doused: ({ at }) => effects.splash(at)
     })
   )
 
@@ -332,6 +360,50 @@ export function createEngine(parts: EngineParts): Engine {
 
   /** Real time that has arrived and not been stepped yet. */
   let carry = 0
+  /** How many steps have run. The number a lockstep peer agrees on. */
+  let stepped = 0
+
+  const flightOf = (one: {
+    id: number
+    skill: number
+    x: number
+    y: number
+    z: number
+    vx: number
+    vy: number
+    vz: number
+  }): FlightShot => ({
+    id: one.id,
+    skill: one.skill,
+    x: one.x,
+    y: one.y,
+    z: one.z,
+    vx: one.vx,
+    vy: one.vy,
+    vz: one.vz
+  })
+
+  const pigShotOf = (pig: Pig): PigShot => {
+    const worn = anim.wornBy(pig)
+    const over = anim.overlayOf(pig)
+    return {
+      id: pig.id,
+      name: pig.name,
+      health: pig.health,
+      x: pig.position.x,
+      y: pig.position.y,
+      z: pig.position.z,
+      heading: pig.heading,
+      holding: pig.holding,
+      clip: worn.index,
+      clipOnce: worn.once,
+      clipElapsed: worn.elapsed,
+      overlay: over.index,
+      overlayPhase: over.phase,
+      underCanopy: dropIn.underCanopy(pig),
+      arriving: dropIn.live().some((one) => one.pig === pig)
+    }
+  }
 
   return {
     update(delta, beforeStep) {
@@ -340,6 +412,7 @@ export function createEngine(parts: EngineParts): Engine {
       while (carry >= STEP_SECONDS && steps < MAX_CATCHUP) {
         beforeStep?.()
         step()
+        stepped++
         carry -= STEP_SECONDS
         steps++
       }
@@ -348,6 +421,35 @@ export function createEngine(parts: EngineParts): Engine {
       return steps
     },
     alpha: () => carry / STEP_SECONDS,
+    snapshot() {
+      const view = battle.view()
+      return {
+        step: stepped,
+        turn: game.turn,
+        player: game.currentPlayer.name,
+        timeLeft: game.timeLeft,
+        starting: game.starting,
+        over: game.over,
+        acting: game.currentPig.id,
+        pigs: pigs().map(pigShotOf),
+        loco: view.loco,
+        aimAngle: view.aimAngle,
+        scoped: view.scoped,
+        zoom: view.zoom,
+        readying: view.readying,
+        still: view.still,
+        driving: view.driving,
+        firing: view.firing,
+        aftermath: view.aftermath,
+        swinging: swings.running(),
+        dropping: dropIn.running(),
+        bullets: shots.live().map(flightOf),
+        lobs: grenades.all().map(flightOf),
+        crates: airDrops.live().map((one): DescentShot => ({ id: one.id, y: one.drop.y })),
+        effects: [...effects.all()],
+        numbers: [...numbers.all()]
+      }
+    },
     battle,
     query,
     scenery,

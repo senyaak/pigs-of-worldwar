@@ -35,6 +35,7 @@ const ROW = lobOf(GRENADE)!
 const UP = { x: 0, y: -1, z: 0 }
 
 const dropped = (vy: number, vx = 0): Lobbed => ({
+  id: 0,
   skill: GRENADE,
   x: 0,
   y: 0,

@@ -302,6 +302,14 @@ stagger, the sights' tremor and the smoke. Both together are what lockstep
 needs: same seed, same inputs, same battle, proved in
 `e2e/000/engine-headless.spec.ts`. Never reach for `Math.random` in `lib/game`.
 
+**The renderer draws a SNAPSHOT, not the engine.** `engine.snapshot()` is one
+flat reading of the battle — numbers, strings and arrays of those, nothing live
+(`lib/game/snapshot.ts`). Everything with an identity carries an id: pigs,
+bullets, grenades, crates. The pose is NOT on it — the four numbers that say
+which clip and how far into it are, and `three/wear.ts` works the bones out
+with the engine's own sampler. The debug surface still reads the engine
+directly; it is test-only and in-process.
+
 **The engine ANNOUNCES; it does not show.** `lib/game/events.ts` is one bus,
 and the renderer and the audio bank are independent listeners on it — neither
 knows the other exists. Three things are deliberately NOT events, because the

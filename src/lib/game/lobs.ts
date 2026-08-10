@@ -118,6 +118,8 @@ export interface Lobs {
 
 export function createLobs(world: LobWorld, emit: Emit): Lobs {
   const flying: Lobbed[] = []
+  /** Named in the order they were thrown (lib/game/bullets.ts). */
+  let named = 0
   const standing = world.targets
 
   /** Everything within reach takes its share. */
@@ -228,6 +230,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       if (!from) return false
       const shot = lob(skill, from, pig.heading, aim, charge, world.random)
       if (!shot) return false
+      shot.id = named++
       flying.push(shot)
       return true
     },

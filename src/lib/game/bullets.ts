@@ -91,6 +91,9 @@ export interface Bullets {
 
 export function createBullets(world: BulletWorld, emit: Emit): Bullets {
   const flying: Shot[] = []
+  /** Names them in the order they were fired, which is the same on any machine
+   * stepping the same battle. */
+  let named = 0
   const standing = world.targets
 
   /** Whether this bullet is inside that body. */
@@ -143,6 +146,7 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       if (!from) return false
       const shot = fireShot(skill, from, pig.heading, aim)
       if (!shot) return false
+      shot.id = named++
       flying.push(shot)
       emit({ kind: 'fired', skill })
       return true

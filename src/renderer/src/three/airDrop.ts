@@ -8,7 +8,7 @@
 // Game space, Y-down, under the battle's converted root.
 
 import type * as THREE from 'three'
-import type { Descent } from '../../../lib/game/airDrop'
+import type { DescentShot } from '../../../lib/game/snapshot'
 import type { Model, Texture } from '../api'
 import { buildCanopies } from './parachute'
 import type { Canopies } from './parachute'
@@ -25,7 +25,7 @@ export interface AirDropArt {
    * at the height it is DRAWN at — between the engine's last two steps
    * (three/tween.ts), or a crate coming down steps and the camera watching it
    * shakes. */
-  draw(live: readonly Descent[], heightOf: (one: Descent) => number): void
+  draw(live: readonly DescentShot[], heightOf: (one: DescentShot) => number): void
   dispose(): void
 }
 

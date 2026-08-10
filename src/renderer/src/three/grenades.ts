@@ -9,7 +9,7 @@
 // Game space (Y-down), under the battle's converted root.
 
 import * as THREE from 'three'
-import type { Lobbed } from '../../../lib/game/grenade'
+import type { FlightShot } from '../../../lib/game/snapshot'
 import { LOB_STEP } from '../../../lib/game/lobs'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import type { Point } from '../../../lib/game/pose'
@@ -32,7 +32,7 @@ export interface GrenadeArt {
   /** Show exactly these, and lay their smoke. Once a frame. */
   /** `where` is where to DRAW one — between the last two steps
    * (three/tween.ts); the lob's own x/y/z is where the rules have it. */
-  draw(live: readonly Lobbed[], delta: number, where: (shot: Lobbed) => Point): void
+  draw(live: readonly FlightShot[], delta: number, where: (shot: FlightShot) => Point): void
   /** How many puffs the trails have up (lib/game/trail.ts). */
   trail(): number
   clear(): void
@@ -75,7 +75,7 @@ export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
       // The trail follows what is still up; anything gone stops laying and its
       // last six fade out on their own. Keyed by the lob itself and laid at the
       // point being DRAWN, or the puffs would come off a stepping position.
-      for (const shot of live) trails.follow(shot, where(shot))
+      for (const shot of live) trails.follow(shot.id, where(shot))
       trails.update(delta)
       // Index-aligned with the engine's list, and a splice shifts everything
       // after it, so the simplest correct thing is to rebuild rather than track

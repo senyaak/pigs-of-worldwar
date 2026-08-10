@@ -30,6 +30,7 @@ import type { Battle } from '../../../lib/game/battle'
 import { createTween } from './tween'
 import { createWear } from './wear'
 import type { Point } from '../../../lib/game/pose'
+import type { PigShot } from '../../../lib/game/snapshot'
 import { projectDamage } from './damageNumbers'
 import { createEffectArt } from './effects'
 import { createAirDropArt } from './airDrop'
@@ -177,25 +178,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     handling({
       shown: ({ id, visible }) => props.show(id, visible),
       taken: ({ id }) => props.take(id),
-      damaged: ({ at, amount }) => numbers.show(at, amount),
-      struck: ({ skill, at }) => effects.hit(skill, at),
-      blasted: ({ at }) => effects.blast(at),
-      // The splash is drawn on the WATER LINE however deep it gets, because
-      // effect 0x0E snaps its own y there (0x488c19).
-      skimmed: ({ at }) => effects.splash(at),
-      doused: ({ at }) => effects.splash(at),
       dropOpened: ({ pig }) => dropInArt.open(pig),
       dropCut: ({ pig }) => dropInArt.cut(pig),
       crateSent: ({ id }) => airDropArt.open(id),
-      crateLanded: ({ id, at }) => {
-        airDropArt.cut(id)
-        // A crate arriving kicks something up. Play named it — "там ещё эффект
-        // от падения" — and this is the remake's own: nothing has been read that
-        // spawns an effect for a placed object. It takes row 0's SMOKE and not
-        // its fire, because a crate landing raises dust — and play saw what
-        // happened when it got the whole row ("коробка когда падает — искрит").
-        effects.dust(at)
-      },
+      crateLanded: ({ id }) => airDropArt.cut(id),
       canopiesCut: () => airDropArt.cutAll(),
       cameraReset: () => chase.reset(),
       collected: (one) => onCollected({ ...one, result: 'taken' }),
@@ -231,10 +217,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     engine
   /** The mixers, brought into line once a frame with what the engine says each
    * pig is wearing (three/wear.ts). */
-  const wear = createWear(squad, anim, engine.pose)
+  const wear = createWear(squad, assets.clips)
   // Up they go, before the first frame is drawn: the engine has already lifted
   // them, and a squad standing on its markers for one frame reads as a stutter.
-  dropInArt.draw(dropIn.live(), (one) => one.pig.position)
+  dropInArt.draw(engine.snapshot().pigs.filter((one) => one.arriving), (one) => one)
 
   host.scene.add(root)
   host.camera.near = 10
@@ -306,39 +292,44 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   }
 
   const watch = (soldier: Soldier, delta: number | null): void => {
-    const now = battle.view()
+    const acting = soldier.pig.id === now.acting
     // A bullet in the air takes the camera off the pig altogether: the shot's
     // own tail hands the camera the projectile and asks for mode 1
     // (0x47ad99). Only the acting pig's shot does this, and only while there
-    // is something left to watch.
-    const bullet = now.firing?.phase === 'flight' ? (shots.head() ?? grenades.head()) : null
-    if (bullet && soldier === squad.of(game.currentPig.id)) {
-      chase.ride(drawnAt(bullet, bullet), Math.atan2(bullet.vx, bullet.vz), delta)
+    // is something left to watch. The NEWEST is the one it rides.
+    const flying = now.bullets.length > 0 ? now.bullets : now.lobs
+    const bullet = now.firing?.phase === 'flight' ? (flying[flying.length - 1] ?? null) : null
+    if (bullet && acting) {
+      chase.ride(
+        drawnAt(`${now.bullets.length > 0 ? 'shot' : 'lob'}:${bullet.id}`, bullet),
+        Math.atan2(bullet.vx, bullet.vz),
+        delta
+      )
       soldier.node.visible = true
       return
     }
     // …and so does what the blow left behind. Mode 0 on the crate, which is
     // the ordinary chase rig with something other than a pig in it
     // (0x4661c2).
-    if (now.aftermath && soldier === squad.of(game.currentPig.id)) {
-      chase.ride(drawnAt(now.aftermath, now.aftermath.at), soldier.pig.heading, delta)
+    if (now.aftermath && acting) {
+      chase.ride(drawnAt('aftermath', now.aftermath.at), soldier.pig.heading, delta)
       soldier.node.visible = true
       return
     }
-    const view: View = dropIn.underCanopy(soldier.pig)
+    const view: View = pigShot(soldier.pig.id)?.underCanopy
       ? 'face'
-      : soldier === squad.of(game.currentPig.id) && swings.running()
+      : acting && now.swinging
         ? 'melee'
         : // The aim view, held, and only for something that shoots — the exe
           // picks mode 0x0E by WEAPON (0x492dfa) and gates it on the same test
           // the melee camera is gated on, which is false through a swing.
-          soldier === squad.of(game.currentPig.id) && now.scoped
+          acting && now.scoped
           ? 'scope'
           : 'chase'
     chase.follow(
       drawnStance(soldier),
       soldier.node.position.y,
-      dropInArt.riseOver(soldier.pig),
+      dropInArt.riseOver(soldier.pig.id),
       delta,
       view,
       // The camera looks along the AIM, tremor and all — the picture FOLLOWS the
@@ -365,6 +356,17 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     if (soldier) watch(soldier, null)
   }
 
+  /**
+   * The last reading of the battle, and the ONLY thing below draws from it
+   * (lib/game/snapshot.ts).
+   *
+   * Held rather than asked for again: the dashboard asks for plates and numbers
+   * between frames, and two readings of one frame would be two different
+   * pictures.
+   */
+  let now = engine.snapshot()
+  const pigShot = (id: number): PigShot | undefined => now.pigs.find((one) => one.id === id)
+
   /** Where the acting pig stood at a step boundary — the two the picture is
    * drawn between. */
   interface Stance {
@@ -374,11 +376,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     heading: number
     /** Whose stance it is: the battle hands the turn on inside a step, and one
      * pig's place is not the next one's to be drawn between. */
-    pig: Pig
+    pig: number
   }
   const stanceNow = (): Stance => {
-    const { x, y, z, heading } = battle.view().loco
-    return { x, y, z, heading, pig: game.currentPig }
+    const at = engine.snapshot()
+    const { x, y, z, heading } = at.loco
+    return { x, y, z, heading, pig: at.acting }
   }
   let before: Stance = stanceNow()
   let after: Stance = before
@@ -398,15 +401,16 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    */
   const tween = createTween()
   const marks = (): [unknown, Point][] => {
-    const at: [unknown, Point][] = []
-    for (const shot of shots.live()) at.push([shot, shot])
-    for (const lob of grenades.all()) at.push([lob, lob])
+    const at = engine.snapshot()
+    const out: [unknown, Point][] = []
+    for (const shot of at.bullets) out.push([`shot:${shot.id}`, shot])
+    for (const lob of at.lobs) out.push([`lob:${lob.id}`, lob])
     // A crate only moves DOWN, and `raise` is the only thing that reads it.
-    for (const one of airDrops.live()) at.push([one, { x: 0, y: one.drop.y, z: 0 }])
-    for (const one of dropIn.live()) at.push([one, one.pig.position])
-    const beat = battle.view().aftermath
-    if (beat) at.push([beat, beat.at])
-    return at
+    for (const one of at.crates) out.push([`crate:${one.id}`, { x: 0, y: one.y, z: 0 }])
+    for (const one of at.pigs) if (one.arriving) out.push([`drop:${one.id}`, one])
+    // There is only ever one beat, so it needs no number of its own.
+    if (at.aftermath) out.push(['aftermath', at.aftermath.at])
+    return out
   }
   /** Where to DRAW something the engine moves. */
   const drawnAt = (key: unknown, now: Point): Point => tween.at(key, now, engine.alpha())
@@ -420,14 +424,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * anything else is standing exactly where it stands.
    */
   const drawnStance = (soldier: Soldier): { x: number; y: number; z: number; heading: number } => {
-    const arriving = dropIn.live().find((one) => one.pig === soldier.pig)
-    if (arriving) {
-      const at = drawnAt(arriving, soldier.pig.position)
-      return { ...at, heading: soldier.pig.heading }
+    const shot = pigShot(soldier.pig.id)
+    if (shot?.arriving) {
+      const at = drawnAt(`drop:${shot.id}`, shot)
+      return { ...at, heading: shot.heading }
     }
-    if (soldier === squad.of(game.currentPig.id)) return stanceAt(engine.alpha())
-    const { x, y, z } = soldier.pig.position
-    return { x, y, z, heading: soldier.pig.heading }
+    if (soldier.pig.id === now.acting) return stanceAt(engine.alpha())
+    const at = shot ?? soldier.pig.position
+    return { x: at.x, y: at.y, z: at.z, heading: shot?.heading ?? soldier.pig.heading }
   }
 
   /** Where to draw it, `alpha` of the way from the one to the other. Heading
@@ -450,14 +454,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * camera is placed once here rather than at each of the engine's own exits.
    */
   const show = (delta: number): void => {
-    const now = battle.view()
+    const arriving = now.pigs.filter((one) => one.arriving)
     // The squad coming down: each pig where its own descent has got to, and
     // the canopies heard the first frame the bank can play them.
-    dropInArt.draw(dropIn.live(), (one) => drawnAt(one, one.pig.position))
-    sounds.chuteOverhead(dropIn.running())
-    const active = squad.of(game.currentPig.id)
+    dropInArt.draw(arriving, (one) => drawnAt(`drop:${one.id}`, one))
+    sounds.chuteOverhead(now.dropping)
+    const active = squad.of(now.acting)
     if (!active) return
-    if (!dropIn.running() && !game.starting && !game.over) {
+    if (!now.dropping && !now.starting && !now.over) {
       // The acting pig stands where the locomotion state says, and the camera
       // stops holding the moment the player drives (three/chase.ts).
       chase.hold(
@@ -476,7 +480,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       // The model is not in the hand until the getting-it-out clip has run.
       for (const soldier of squad.members) {
         const reaching = soldier === active && now.readying > 0
-        weapons.show(soldier.mesh, reaching ? null : weaponModelName(soldier.pig.holding))
+        const held = pigShot(soldier.pig.id)?.holding ?? null
+        weapons.show(soldier.mesh, reaching ? null : weaponModelName(held))
       }
     }
     // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts a
@@ -501,6 +506,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       before = stanceNow()
       tween.from(marks())
     })
+    // ONE reading of the battle, and everything below draws from it
+    // (lib/game/snapshot.ts).
+    now = engine.snapshot()
     if (steps > 0) {
       after = stanceNow()
       if (before.pig !== after.pig) before = after
@@ -508,15 +516,15 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     }
     // …and then everything that SHOWS it. Every mixer is brought into line with
     // what the engine now says each pig wears (three/wear.ts).
-    wear.apply(engine.alpha())
+    wear.apply(now.pigs, engine.alpha())
     show(delta)
     marker.bob(time)
     // …and what the engine says is in the air gets drawn where it now is. Once
     // a frame, after everything that could have moved or spent one.
-    bulletArt.draw(shots.live(), (shot) => drawnAt(shot, shot))
-    grenadeArt.draw(grenades.all(), delta, (lob) => drawnAt(lob, lob))
-    effectArt.draw(effects.all())
-    airDropArt.draw(airDrops.live(), (one) => drawnAt(one, { x: 0, y: one.drop.y, z: 0 }).y)
+    bulletArt.draw(now.bullets, (shot) => drawnAt(`shot:${shot.id}`, shot))
+    grenadeArt.draw(now.lobs, delta, (lob) => drawnAt(`lob:${lob.id}`, lob))
+    effectArt.draw(now.effects)
+    airDropArt.draw(now.crates, (one) => drawnAt(`crate:${one.id}`, { x: 0, y: one.y, z: 0 }).y)
   }
   host.onFrame.add(onFrame)
 
@@ -556,12 +564,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   return {
     battle,
     focus,
-    dropping: () => dropIn.running(),
+    dropping: () => now.dropping,
     plates: (width, height, lift) => squad.plates(host.camera, width, height, lift),
-    numbers: (width, height) => projectDamage(numbers.all(), host.camera, root, width, height),
-    still: () => battle.view().still,
+    numbers: (width, height) => projectDamage(now.numbers, host.camera, root, width, height),
+    still: () => now.still,
     charging: battle.charging,
-    scoped: () => battle.view().scoped,
+    scoped: () => now.scoped,
     aim: battle.aim,
     dispose() {
       host.onFrame.delete(onFrame)

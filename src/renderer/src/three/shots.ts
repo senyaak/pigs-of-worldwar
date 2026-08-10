@@ -14,7 +14,7 @@
 
 import * as THREE from 'three'
 import { bulletSize, projectileOf } from '../../../lib/game/projectile'
-import type { Shot } from '../../../lib/game/projectile'
+import type { FlightShot } from '../../../lib/game/snapshot'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import type { Point } from '../../../lib/game/pose'
 
@@ -26,7 +26,7 @@ export interface BulletArt {
    * does not, so what is drawn is the point between the last two steps
    * (three/tween.ts). The shot's own x/y/z is where the RULES have it.
    */
-  draw(live: readonly Shot[], where: (shot: Shot) => Point): void
+  draw(live: readonly FlightShot[], where: (shot: FlightShot) => Point): void
   dispose(): void
 }
 

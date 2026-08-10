@@ -33,10 +33,12 @@ const PUFF_SIZE = 90 * MODEL_SCALE
 const PUFF_ALPHA = 0.45
 
 export interface LobTrails {
-  /** Follow one grenade. Keyed by the grenade OBJECT rather than by its index,
-   * because the scene splices its list and an index does not survive that. Call
-   * once a frame per live grenade, with where it is now. */
-  follow(who: object, at: { x: number; y: number; z: number }): void
+  /** Follow one grenade. Keyed by its ID rather than by its place in the list,
+   * because the engine splices that list and an index does not survive it — and
+   * rather than by the object, because a snapshot is a fresh object every step
+   * (lib/game/snapshot.ts). Call once a frame per live grenade, with where it
+   * is now. */
+  follow(who: number, at: { x: number; y: number; z: number }): void
   /** Anything not followed this frame keeps fading and then goes. Call after
    * every `follow` for the frame. */
   update(delta: number): void
@@ -71,7 +73,7 @@ function buildTexture(): THREE.CanvasTexture {
 
 export function createLobTrails(root: THREE.Object3D): LobTrails {
   /** One trail per live grenade, keyed by the grenade itself. */
-  const trails = new Map<object, Trail>()
+  const trails = new Map<number, Trail>()
   const sprites: THREE.Sprite[] = []
   const texture = buildTexture()
   /** Fractional frames carried over: the engine lays these per FRAME, at its own
@@ -111,7 +113,7 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
   }
 
   /** Where each followed grenade is this frame, held until the frame ticks. */
-  const where = new Map<object, { x: number; y: number; z: number }>()
+  const where = new Map<number, { x: number; y: number; z: number }>()
 
   return {
     follow(who, at) {
