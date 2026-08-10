@@ -5,6 +5,8 @@
 import { test, expect } from '@playwright/test'
 
 import { DEFAULT_TURN_SECONDS, Game, TURN_START_SECONDS } from '../../src/lib/game/game'
+import { endsTurn } from '../../src/lib/game/spend'
+import { SKILL } from '../../src/lib/game/skills'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { readFileSync } from 'node:fs'
@@ -87,6 +89,26 @@ test('the turn clock ticks down, expires exactly once, and refills', () => {
   expect(game.timeLeft).toBe(10)
 
   expect(new Game(config).timeLeft).toBe(DEFAULT_TURN_SECONDS)
+})
+
+test('using a weapon ENDS the turn, and thirteen skills are the exception', () => {
+  // Everything this engine models is a blow, and a blow spends the turn: the
+  // five blades, the twelve guns, the nine grenades (lib/game/spend.ts).
+  for (const skill of [1, 2, 3, 4, 5, 6, 7, 11, 17, 19, 24, 27]) {
+    expect(endsTurn(skill), `skill ${skill} spends the turn`).toBe(true)
+  }
+  // SKIP TURN is NOT one of the exceptions, and its record says so — ending the
+  // turn is the whole of what it does.
+  expect(endsTurn(SKILL.SKIP_TURN)).toBe(true)
+
+  // The exceptions, off the exe's own records: the explosives a pig plants and
+  // walks away from, and the skills that are not blows at all.
+  for (const skill of [35, 36, 37, 38, 52, 54, 60, 61, 62, 63, 64, 66]) {
+    expect(endsTurn(skill), `skill ${skill} leaves the turn alone`).toBe(false)
+  }
+  // Empty hands spend nothing, and 0 NONE is the same answer by the other route.
+  expect(endsTurn(null)).toBe(false)
+  expect(endsTurn(SKILL.NONE)).toBe(false)
 })
 
 test('a game refuses mismatched spawns, but one player is a game', () => {

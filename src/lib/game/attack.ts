@@ -33,6 +33,14 @@ export type Answered =
   | 'none'
   /** SKIP TURN was used, and the caller has to end the turn. */
   | 'skip'
+  /**
+   * A WEAPON was used — the blade began its swing, the gun's fuse was lit, the
+   * gauge started filling. Which is what SPENDS the turn (lib/game/spend.ts), so
+   * it has to be told apart from a press that came to nothing: a second press
+   * inside a shot is refused, and a press that only sets off a grenade already
+   * lying about is not a fresh use of anything.
+   */
+  | 'used'
 
 export interface AttackParts {
   shots: Bullets
@@ -138,14 +146,21 @@ export function createAttack(parts: AttackParts): Attack {
         // A weapon with a gauge does not go off on the press at all. The press
         // starts it CHARGING and the throw comes on the release, or on its own
         // if it tops out first (0x493796, lib/game/gauge.ts).
-        if (!gauge && !firing) gauge = beginGauge()
-      } else if (isGun(holding)) {
+        if (gauge || firing) return 'none'
+        gauge = beginGauge()
+        return 'used'
+      }
+      if (isGun(holding)) {
         // A gun is a SEQUENCE, and a press while one is running is refused —
         // `Pig::MayAct` is false from `Pig::Fire` until `Pig::Attack`. That
         // refusal is the whole of why a rifle is not a machine gun.
-        if (!firing) arm()
-      } else swings.begin(acting)
-      return 'none'
+        if (firing) return 'none'
+        arm()
+        return 'used'
+      }
+      // A blade, and it is the one that can refuse on its own account: a swing
+      // already running, or nothing in hand that swings.
+      return swings.begin(acting) ? 'used' : 'none'
     },
     update(delta, acting, holding) {
       if (gauge) {

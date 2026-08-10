@@ -11,7 +11,7 @@ import { GAME_DIR } from '../launch'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { beginTurn, chooseSkill, warp } from '../controller'
+import { beginTurn, chooseSkill, nextTurn, warp } from '../controller'
 import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
@@ -115,6 +115,10 @@ test('a rifle shot knocks a dummy down from across the yard', async ({ app }) =>
   await expect
     .poll(async () => (await look(page)).carrying, { timeout: 9000 })
     .not.toContain(RIFLE)
+  // …but the bayonet SPENT the turn, and nothing is collected in the beats
+  // between two of them (lib/game/spend.ts). So the crate is walked into on the
+  // pig's NEXT turn, which is what a player would have to do as well.
+  await nextTurn(page)
   await warp(page, rifleCrate.x, rifleCrate.z, 0)
   await expect.poll(async () => (await look(page)).carrying, { timeout: 9000 }).toContain(RIFLE)
   expect(await chooseSkill(page, RIFLE)).toBe(true)

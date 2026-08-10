@@ -2066,6 +2066,58 @@ Two lessons, and the second is the general one:
   version of the app test above failed on that and not on the bug. It asks
   `inWater` now. The e2e window is not exempt from the rules the engine keeps.
 
+### USING A WEAPON ends the turn — and the exception list is MEASURED
+
+Play: "использование оружия заканчивает ход — у нас нет." The engine had every
+piece of the ending — the beat after a blow, the WALK AWAY beat, the handover —
+and nothing that spent the turn but the clock and SKIP TURN, so a pig could empty
+a rifle into a yard of dummies on one clock.
+
+The exe does not hang this on the weapon's behaviour at all. It is a byte in the
+skill's own 80-byte record at **0x4d7300**: `+0x1c` goes into `[game+0x517]`, and
+that flag is the mode machine's "go to WALK AWAY" (`turns/notes.md`). Read off the
+shipped exe over all 67 records, `+0x1c` is **1 on everything but thirteen**:
+
+| | |
+| - | - |
+| 0 | NONE |
+| 35, 36 | MINE, ANTI-P MINE |
+| 37, 38 | TNT, FIRECRACKER — and these two alone carry `+0x18` = 400, four seconds of ordinary play instead of a handover: plant it and run |
+| 52, 54 | HEALING HANDS, PICKPOCKET |
+| 60, 61, 62 | the vehicle skills (`in-out`, `pbox`, `getout`) |
+| 63, 64 | MAP VIEW, BINOCULARS |
+| 66 | SURRENDER |
+
+Two families and nothing else — the explosives a pig PLANTS, and the skills that
+are not blows. **65 SKIP TURN is not among them**, which is the check that the
+reading is the right way round. `lib/game/spend.ts` is that set and one predicate;
+the four-second wait is not modelled, because neither TNT nor the firecracker is a
+weapon in this engine yet and a timer nothing can start is a guess with no way to
+be wrong.
+
+**The turn ends on the QUIET, not on the press.** The exe reaches mode 13 through
+the same wait the beat after a blow is — `0x495316` → `0x494570` → WALK AWAY — so
+the bullet flies, the swing plays out, the dummy comes apart and its crate lands
+first, and only then does the turn go. In `lib/game/battle.ts` that is one `spent`
+flag, cashed below the aftermath block against `!committed() &&
+!anim.animating(acting) && !settling()`: the world quiet AND the pig's own clip
+finished, which is the exe's own `0x47D800` ("no pig is still busy"). The few
+frames between the blow and the handover are LOCKED — they are not a last chance
+to walk.
+
+Two things this pass turned up that are worth keeping:
+
+- **`settling()` is now one function.** The same five-term list — effects, shots,
+  grenades, damage numbers, falling crates — was written out twice and this rule
+  wanted it a third time. All three waits ask the same question; a fourth copy
+  would have been the one that drifted.
+- **A rule that ends turns rewrites the SPECS' idea of a turn.** `002/shoot.spec.ts`
+  broke on the honest thing: it broke a dummy with the bayonet and then waited for
+  the pig to walk into the crate that dropped — and nothing is collected in the
+  beats between two turns, so it sat there for the whole ten-second "press any
+  key". `nextTurn(page)` in `e2e/controller.ts` is the handover a spec now has to
+  take, and a spec that fires twice on one clock is a spec that is wrong.
+
 ### What is still not read
 
 - **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's

@@ -24,6 +24,7 @@ import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
 import { beginWalkAway } from './walkAway'
 import type { WalkAway } from './walkAway'
+import { endsTurn } from './spend'
 import { createSights } from './sights'
 import { createAttack } from './attack'
 import { SKILL } from './skills'
@@ -198,6 +199,9 @@ export function createBattle(parts: BattleParts): Battle {
   /** A script step owed to something that has broken, and not run until it has
    * finished breaking. One animation at a time. */
   let pending: { id: number; y: number } | null = null
+  /** Whether the weapon in hand has been USED, and so the turn is over as soon
+   * as the world it disturbed goes quiet (lib/game/spend.ts). */
+  let spent = false
   /** Seconds left of the getting-it-out clip. */
   let readying = 0
   /** Seconds the acting pig has stood still, and where it stood. */
@@ -228,6 +232,23 @@ export function createBattle(parts: BattleParts): Battle {
     swings.running() ||
     grenades.live() > 0 ||
     shots.live().length > 0
+
+  /**
+   * Whether the WORLD is still doing something — what every one of the exe's
+   * waits is waiting for (`0x415420`'s fifteen QUIET frames, lib/game/aftermath.ts).
+   *
+   * Play named the set: a projectile still in the air, damage still landing, a
+   * body still coming apart, a crate still under its canopy. Whatever the battle
+   * can answer for goes in here, and all three waits — the beat after a blow, the
+   * beat at the end of a turn, and the turn a weapon has SPENT — ask the same
+   * question, which is why it is one function and not three copies of a list.
+   */
+  const settling = (): boolean =>
+    effects.busy() ||
+    shots.live().length > 0 ||
+    grenades.live() > 0 ||
+    numbers.live() > 0 ||
+    airDrops.falling() > 0
 
   /**
    * Finish the turn the way the exe finishes one: into the WALK AWAY beat, and
@@ -294,6 +315,7 @@ export function createBattle(parts: BattleParts): Battle {
     attack.reset()
     aftermath = null
     pending = null
+    spent = false
     sights.setHeld(false)
     swings.reset()
     emit({ kind: 'cameraReset' })
@@ -340,13 +362,7 @@ export function createBattle(parts: BattleParts): Battle {
       attack.swallow()
       // Everything that runs on its own runs on: the engine's step advances all
       // of it after this call (lib/game/engine.ts). All this beat does is watch.
-      const settling =
-        effects.busy() ||
-        shots.live().length > 0 ||
-        grenades.live() > 0 ||
-        numbers.live() > 0 ||
-        airDrops.falling() > 0
-      const done = walkAway.update(delta, settling)
+      const done = walkAway.update(delta, settling())
       // The beat moves pigs itself and the one whose turn it was is one of them,
       // so the state the scene draws THAT one out of has to follow it.
       loco.x = game.currentPig.position.x
@@ -447,20 +463,12 @@ export function createBattle(parts: BattleParts): Battle {
         scenery.advance(pending.id, pending.y)
         pending = null
       }
-      // Everything play named that this battle can answer for: a projectile
-      // still in the air, damage still landing, a body still coming apart, a
-      // crate still under its canopy. A pig swimming for the shore is on the
-      // list too and is not modelled — nothing knocks one into the water yet.
-      const settling =
-        pending !== null ||
-        swings.running() ||
-        anim.animating(acting) ||
-        effects.busy() ||
-        shots.live().length > 0 ||
-        grenades.live() > 0 ||
-        numbers.live() > 0 ||
-        airDrops.falling() > 0
-      if (advanceAftermath(aftermath, delta, settling)) {
+      // The world, plus the three things only this wait knows about: the script
+      // step it owes, the blow's own animation, and the pig playing it out. A pig
+      // swimming for the shore is on the exe's list too and is not modelled —
+      // nothing knocks one into the water yet.
+      const held = pending !== null || swings.running() || anim.animating(acting) || settling()
+      if (advanceAftermath(aftermath, delta, held)) {
         aftermath = null
         emit({ kind: 'cameraReset' })
       } else {
@@ -476,10 +484,29 @@ export function createBattle(parts: BattleParts): Battle {
       }
     }
 
+    // **AND USING A WEAPON HAS ENDED THE TURN.** Play: "использование оружия
+    // заканчивает ход — у нас нет."
+    //
+    // Not on the press — on the QUIET after it. The exe reaches mode 13 through
+    // the same wait the beat after a blow is (0x495316 -> 0x494570 -> WALK AWAY),
+    // so the bullet flies, the swing plays out, the dummy comes apart and the
+    // crate lands first; this sits below the aftermath block because that beat is
+    // part of the wait rather than something that happens after it.
+    //
+    // `anim.animating` is the pig's own half of it — the exe asks the same thing
+    // (`0x47D800`, no pig still busy) — so a bayonet's 36-frame swing is finished
+    // before the turn is taken away.
+    if (spent && !committed() && !anim.animating(acting) && !settling()) {
+      endTurnBeat()
+      onChanged()
+      return
+    }
+
     // What the fire button set going — the whole of it, including WHICH weapon
     // answers (lib/game/attack.ts). SKIP TURN is the one answer this frame has
     // to act on itself, because ending a turn is the battle's business.
-    if (attack.begin(acting, holding) === 'skip') {
+    const answered = attack.begin(acting, holding)
+    if (answered === 'skip') {
       emit({ kind: 'skillUsed' })
       // Through the same beat the clock running out goes through: a skipped turn
       // is still a turn ending.
@@ -487,6 +514,12 @@ export function createBattle(parts: BattleParts): Battle {
       onChanged()
       return
     }
+    // …and a weapon that WENT OFF spends the turn, unless it is one of the
+    // thirteen that do not — the planted explosives and the skills that are not
+    // blows (lib/game/spend.ts). Asked of the PIG rather than of the cached
+    // `holding`, which is only synced further down the frame and is a frame stale
+    // here.
+    if (answered === 'used' && endsTurn(acting.holding)) spent = true
 
     // **COMMITTED takes the whole of input, and it starts at the FIRE press.**
     // Play: "после нажатия стрелять должно отключаться полностью управление — а
@@ -672,8 +705,10 @@ export function createBattle(parts: BattleParts): Battle {
       // it lies — "пока граната летит, не могу взорвать её."
       armed: grenades.live() > 0,
       // …and the beat at the END of a turn takes control away too: mode 13 is
-      // not a mode anybody drives in (lib/game/walkAway.ts).
-      locked: committed() || aftermath !== null || walkAway !== null,
+      // not a mode anybody drives in (lib/game/walkAway.ts). So does a turn a
+      // weapon has SPENT: the blow is over, the handover has not happened yet,
+      // and those few frames are not a last chance to walk (lib/game/spend.ts).
+      locked: committed() || spent || aftermath !== null || walkAway !== null,
       sights: layerSights(weaponLayer(game.currentPig.holding)) && !dropIn.running()
     }),
     beginTurn: () => game.beginTurn(),

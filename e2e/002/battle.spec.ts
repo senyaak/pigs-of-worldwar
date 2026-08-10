@@ -68,6 +68,31 @@ function wallAboveASlope(): { x: number; z: number; query: TerrainQuery } {
 /** A scene reading as the (x, z) pair the terrain query takes. */
 const positionOf = (at: { x: number; z: number }): [number, number] => [at.x, at.z]
 
+/** 7 RIFLE — the training ground's second weapon, and a crate's walk away, which
+ * is why this spec takes it from the console instead (ui/battle.ts). */
+const RIFLE = 7
+
+type Page = import('@playwright/test').Page
+
+const give = (page: Page, skill: number): Promise<boolean> =>
+  page.evaluate(
+    (s) => (window as unknown as { pow: { give(x: number): boolean } }).pow.give(s),
+    skill
+  )
+
+const holdingOf = (page: Page): Promise<number | null> =>
+  page.evaluate(
+    () => (window as unknown as { pow: { debug: { holding(): number | null } } }).pow.debug.holding()
+  )
+
+/** Whether the beat at the END of a turn is running — mode 13, WALK AWAY. */
+const handingOver = (page: Page): Promise<boolean> =>
+  page.evaluate(
+    () =>
+      (window as unknown as { pow: { debug: { walkAway(): unknown } } }).pow.debug.walkAway() !==
+      null
+  )
+
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
     throw new Error('phase 002 starts from the .env phase 000 saves вЂ” run the whole suite, not this spec alone')
@@ -190,6 +215,35 @@ test('a turn waits a beat before it starts, and any input cuts it short', async 
   // ten seconds of watching a still screen.
   await skipTurn(page)
   await expect.poll(async () => (await hud(page)).starting).toBe(true)
+
+  expect(app.errors()).toEqual([])
+})
+
+test('USING A WEAPON ends the turn — one shot and the pig hands over', async ({ app }) => {
+  const { page } = app
+  await startGame(page)
+  const before = await hud(page)
+  // The clock is not what ends this turn: CAMP gives 99 seconds and the whole
+  // test spends about three (lib/game/turns.ts).
+  expect(before.seconds, 'the clock had plenty left').toBeGreaterThan(50)
+
+  expect(await give(page, RIFLE)).toBe(true)
+  await expect.poll(async () => holdingOf(page)).toBe(RIFLE)
+  // Getting it out is a clip of its own and the pig is held for it, so the shot
+  // waits for the rifle to be in the hand rather than on the way to it.
+  await page.waitForTimeout(800)
+
+  // ONE press. Play: "использование оружия заканчивает ход — у нас нет."
+  await press(page, 'fire')
+  await release(page, 'fire')
+
+  // Not on the press — the bullet flies first, and then the turn goes the way
+  // every other turn goes: through the beat at the end of one, which is the
+  // exe's own route out of a used skill (lib/game/spend.ts).
+  await expect.poll(async () => handingOver(page), { timeout: 9000 }).toBe(true)
+  await expect.poll(async () => (await hud(page)).turn, { timeout: 9000 }).toBe(before.turn + 1)
+  // …and the next turn opens on its own beat, waiting to be started.
+  expect((await hud(page)).starting).toBe(true)
 
   expect(app.errors()).toEqual([])
 })

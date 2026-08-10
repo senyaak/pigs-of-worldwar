@@ -212,6 +212,22 @@ export const beginTurn = (page: Page): Promise<void> =>
     pow.debug.beginTurn()
   })
 
+/**
+ * Wait out a turn that ended BY ITSELF, and get the next one running.
+ *
+ * Using a weapon ends a turn now (`lib/game/spend.ts`), so a spec that fires and
+ * then wants to carry on — walk into a crate, take something else in hand — is a
+ * spec that has to come through here first. Both beats are cut the way `skipTurn`
+ * cuts them: the WALK AWAY at the end, then the "press any key" at the top.
+ *
+ * `ms` is how long the blow itself is given to finish; a dummy coming apart and a
+ * crate coming down under a canopy is several seconds of it.
+ */
+export async function nextTurn(page: Page, ms = 9000): Promise<void> {
+  await cutTurnBeat(page, ms)
+  await beginTurn(page)
+}
+
 /** Put the acting pig somewhere specific, facing somewhere specific. Not a
  * player move — the scene exposes it purely so a spec can set up a situation
  * (three/battle.ts). */
