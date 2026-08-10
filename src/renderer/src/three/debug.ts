@@ -72,6 +72,9 @@ export interface DebugParts {
   /** The beat at the END of a turn, and how many pigs are still in the water
    * (lib/game/walkAway.ts). Null while a turn is being played. */
   walkAway: () => { swimming: number } | null
+  /** End that beat now — what a spec does so it is not paying for one it is not
+   * testing (lib/game/battle.ts). */
+  cutTurnBeat: () => void
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -205,7 +208,12 @@ export function exposeBattleDebug(parts: DebugParts): void {
         }
       },
       warp: parts.warp,
-      beginTurn: () => game.beginTurn()
+      beginTurn: () => game.beginTurn(),
+      /** Hand the turn over NOW, cutting the beat at the end of it short. The
+       * player has no way to do this — a turn ending is not something anybody
+       * hurries — so it is here for the specs that are not about the beat, the
+       * same as `beginTurn` (lib/game/walkAway.ts). */
+      cutTurnBeat: () => parts.cutTurnBeat()
     }
   }
 }

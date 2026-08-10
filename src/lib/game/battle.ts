@@ -144,6 +144,15 @@ export interface Battle {
   /** End the beat at the top of a turn: any input does. */
   beginTurn(): void
   /**
+   * End the beat at the END of a turn now, handing over on the spot.
+   *
+   * The debug path a spec takes so it does not pay a second a turn for a beat it
+   * is not testing — the same reason `beginTurn` exists, and there is no player
+   * input for it: a turn ending is not something the player can hurry
+   * (lib/game/walkAway.ts). Nothing when no beat is running.
+   */
+  cutTurnBeat(): void
+  /**
    * Say something on the battle's own bus.
    *
    * For the things a CONTROL announces rather than the game — opening the
@@ -641,6 +650,12 @@ export function createBattle(parts: BattleParts): Battle {
       sights: layerSights(weaponLayer(game.currentPig.holding)) && !dropIn.running()
     }),
     beginTurn: () => game.beginTurn(),
+    cutTurnBeat() {
+      if (walkAway === null) return
+      walkAway = null
+      game.endTurn()
+      focus(game.currentPig)
+    },
     announce: emit,
     warp(x, z, heading) {
       swings.reset()

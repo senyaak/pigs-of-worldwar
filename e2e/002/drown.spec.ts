@@ -20,7 +20,7 @@ import path from 'node:path'
 
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
-import { beginTurn, hud, skipTurn, warp } from '../controller'
+import { beginTurn, hud, press, release, tap, warp } from '../controller'
 import { startGame } from '../menu'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
@@ -28,6 +28,20 @@ import { TRAINING_FLOOR } from '../../src/lib/game/health'
 import { WALK_AWAY_QUIET } from '../../src/lib/game/walkAway'
 
 type Page = import('@playwright/test').Page
+
+/**
+ * End the turn as a player must — SKIP TURN in hand, then FIRE — and LEAVE THE
+ * BEAT RUNNING.
+ *
+ * `skipTurn` in `e2e/controller.ts` cuts it short, because most specs end a turn
+ * to get somewhere rather than to watch the handover. This spec IS the handover,
+ * so it drives the same keys itself.
+ */
+const endTurn = async (page: Page): Promise<void> => {
+  await tap(page, 'endTurn')
+  await press(page, 'fire')
+  await release(page, 'fire')
+}
 
 /** The middle of CAMP's pond, and a dry spot well away from it — both off the
  * map's own water flags, the same way `sink.spec.ts` finds them. */
@@ -48,7 +62,7 @@ const camp = (): { wet: { x: number; z: number }; dry: { x: number; z: number } 
     Math.hypot(one.x - mid.x, one.z - mid.z) < Math.hypot(best.x - mid.x, best.z - mid.z) ? one : best
   )
   // Dry, walkable, and a good way from the water so the beat has nobody to wait
-  // for — the pig's own spawn is exactly that.
+  // for.
   let dry: { x: number; z: number } | null = null
   for (let x = -8000; x <= 8000 && dry === null; x += 256) {
     for (let z = -8000; z <= 8000; z += 256) {
@@ -129,7 +143,7 @@ test('the turn ends with a BEAT, and it swims a pig out of the water first', asy
   await beginTurn(page)
   expect((await hud(page)).swimming, 'the dry spot is dry').toBe(false)
   const watching = beatSeconds(page)
-  await skipTurn(page)
+  await endTurn(page)
   const dryBeat = await watching
   expect(dryBeat, 'a turn does not hand over on the spot').toBeGreaterThan(WALK_AWAY_QUIET * 0.75)
   expect(dryBeat, 'and it does not hang about either').toBeLessThan(WALK_AWAY_QUIET + 3)
@@ -141,7 +155,7 @@ test('the turn ends with a BEAT, and it swims a pig out of the water first', asy
   await warp(page, at.wet.x, at.wet.z, 0)
   expect((await hud(page)).swimming).toBe(true)
   const swimming = beatSeconds(page)
-  await skipTurn(page)
+  await endTurn(page)
   const wetBeat = await swimming
   expect(wetBeat, 'the beat waited for the swim').toBeGreaterThan(dryBeat)
   expect((await hud(page)).swimming, 'and it reached dry land').toBe(false)

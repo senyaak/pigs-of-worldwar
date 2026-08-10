@@ -562,6 +562,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
 
     aftermath: () => battle.view().aftermath !== null,
     walkAway: () => battle.view().walkAway,
+    cutTurnBeat: () => battle.cutTurnBeat(),
     warp: (x, z, heading) => {
       battle.warp(x, z, heading)
       settle()

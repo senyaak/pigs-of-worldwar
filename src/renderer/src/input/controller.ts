@@ -226,6 +226,10 @@ export interface DebugHooks {
    * pig, and a spec that wanted a running clock would have to move first and
    * measure after. This is that press without the pig moving. */
   beginTurn(): void
+  /** …and the beat at the END of one, cut short the same way and for the same
+   * reason: there is no player input for it at all, and a spec that is not about
+   * the beat should not spend a second a turn on it (lib/game/walkAway.ts). */
+  cutTurnBeat(): void
 }
 
 /** How a spec reads a frontend screen: the frontend draws on a canvas, so

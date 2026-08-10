@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs'
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
 import {
+  cutTurnBeat,
   debugState,
   hold,
   hud,
@@ -140,6 +141,10 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
     .poll(() => hud(page))
     .toMatchObject({ turn: 1, side: 'GARLIC GRUNTS', pig: 'BASTILLE' })
   await page.locator('#battle-end-turn').click()
+  // The dashboard's button does not come through `skipTurn`, so the beat at the
+  // end of the turn is cut here instead — this spec is about the ROTATION, and
+  // 002/drown.spec.ts is the one that watches the handover (e2e/controller.ts).
+  await cutTurnBeat(page)
   await expect
     .poll(() => hud(page))
     .toMatchObject({ turn: 2, side: "TOMMY'S TROTTERS", pig: 'GINGER' })

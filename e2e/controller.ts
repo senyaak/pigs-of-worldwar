@@ -269,8 +269,49 @@ export async function chooseSkill(page: Page, skill: number, cells = 12): Promis
  * The `endTurn` action still exists as the dashboard button's own path, and all it
  * does is put the skill in hand; the press-and-release after it is what applies it.
  */
-export async function skipTurn(page: Page): Promise<void> {
+export async function skipTurn(page: Page, options: { beat?: boolean } = {}): Promise<void> {
   await tap(page, 'endTurn')
   await press(page, 'fire')
   await release(page, 'fire')
+  // …and then the BEAT at the end of the turn is cut short, unless the caller
+  // wants it. A turn now hands over through the exe's mode 13 — a second of
+  // WALK AWAY, longer if anybody has to swim out of the water
+  // (lib/game/walkAway.ts) — and a spec that ends four turns to get somewhere
+  // should not be paying for four of them. `002/drown.spec.ts` is the one that
+  // is about the beat, and it drives the keys itself instead of coming here.
+  if (options.beat !== true) await cutTurnBeat(page)
 }
+
+/**
+ * Cut the end-of-turn beat, once it is running.
+ *
+ * Polled rather than fired blind: the press above only reaches the rules on the
+ * next engine step, so the beat may not have started yet when this is called.
+ * A beat that never appears is left alone — the caller's own assertions are what
+ * should fail then, not this.
+ */
+export const cutTurnBeat = (page: Page, ms = 3000): Promise<void> =>
+  page.evaluate((limit) => {
+    const pow = (
+      window as unknown as {
+        pow?: { debug?: { walkAway(): unknown; cutTurnBeat(): void } }
+      }
+    ).pow
+    if (!pow?.debug) throw new Error('no battle scene is up — window.pow.debug is missing')
+    return new Promise<void>((resolve) => {
+      const deadline = performance.now() + limit
+      const sample = (): void => {
+        if (pow.debug!.walkAway() !== null) {
+          pow.debug!.cutTurnBeat()
+          resolve()
+          return
+        }
+        if (performance.now() >= deadline) {
+          resolve()
+          return
+        }
+        requestAnimationFrame(sample)
+      }
+      requestAnimationFrame(sample)
+    })
+  }, ms)
