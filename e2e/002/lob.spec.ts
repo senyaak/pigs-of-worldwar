@@ -11,6 +11,7 @@
 import { test, expect } from '@playwright/test'
 
 import { BOUNCE_CUTOFF, TILE_MATERIALS } from '../../src/lib/game/ballistics'
+import { STEP_SECONDS } from '../../src/lib/game/engine'
 import {
   WATER_DOUSE_SPEED,
   WATER_SINK_SECONDS,
@@ -151,10 +152,20 @@ test('the hops RUN DOWN, and a spent grenade cannot cross a pond', () => {
   // friction, 0.10 restitution — measured over CAMP, BAY and ARCHI, every wet
   // sample), a grenade brings 0.30/0.80, and each hop pays a fifth of its travel
   // for the kick that lifts it.
-  const shot = dropped(0, 4000)
+  // The throw is stated against the speed at which a bounce STOPS being one,
+  // because that is what the hops run down to — and both ride `FRAME_SECONDS`,
+  // which play moves (ballistics.ts). A flat 4000 here counted three hops at
+  // 1/15 and two at 1/20, purely because the cutoff had moved under it.
+  const shot = dropped(0, BOUNCE_CUTOFF * 11)
   const hops: number[] = []
-  for (let frame = 0; frame < 400 && hops.length < 40; frame++) {
-    advanceLob(shot, 1 / 30)
+  // At the ENGINE's step, not a hand-written 1/30. A grenade's path in world
+  // units does not care what `FRAME_SECONDS` is — speed rides 1/F and gravity
+  // 1/F², so the range cancels — but the TIME does, so a fixed delta integrates
+  // it more coarsely the faster the rate is set and hops start merging. Play
+  // moves that number (ballistics.ts); a spec should drive at the rate the
+  // engine runs at instead of guessing one.
+  for (let frame = 0; frame < 1600 && hops.length < 40; frame++) {
+    advanceLob(shot, STEP_SECONDS)
     if (shot.y < 0) continue
     if (skipsOnWater(shot)) {
       bounceLob(shot, 0, UP, 4, false, lobBounce(ROW))

@@ -87,11 +87,41 @@ export const RESTITUTION_MIN = 0xcc / FIXED
  * It was 30 Hz, which put a grunt at 1560 units a second. Against a pig
  * 640 units wide that reads as a walk; against the 320 the engine's own
  * half scale makes it (`lib/game/scale.ts`) the same number is a sprint,
- * and play says so. Halving the rate is the whole correction — the same
+ * and play says so. Halving the rate to 15 was the correction — the same
  * factor 2 the model moved by, applied to the one number that is free.
  * Everything else is per-FRAME and untouched: the jump still costs 15
  * frames and the wedge counter still 25, they simply last as long as they
  * always did in frames.
+ *
+ * **Then play said the walk was slightly SLOW**, and asked the right question
+ * back: is the real rate not in the engine somewhere? It is not — the exe
+ * imports `timeGetTime` and reaches it the same indirect way it reaches the
+ * animation library, so no call site says how long a frame is. But it leaves
+ * three ROUND durations behind, and they all point at **25 Hz**:
+ *
+ *  - the turn clock is authored in HUNDREDTHS — a table of whole seconds
+ *    times 100 (`lea eax,[eax+eax*4]` twice then `shl eax,2`, 0x4309fb) — so a
+ *    per-frame decrement has to divide 100. That is 4 at 25 Hz and 3.33 at 30;
+ *  - the crush counter is 250 frames (`cmp eax,0FAh`), exactly ten seconds;
+ *  - the wedge counter is 25 (`cmp eax,19h`) and the jump's own bail is 25 more
+ *    (0x46e95d), exactly one second each.
+ *
+ * 25 is also the rate the clips are drawn at (`three/clips.ts`) and the PAL
+ * field rate halved, this being a PlayStation port. All of which makes 25 Hz
+ * the best guess at the original's own rate — and none of it makes it a READ,
+ * because no call site says so.
+ *
+ * **It is 1/15 all the same, and moving it is the WRONG lever — play walked
+ * both ends of that.** 1/25 came back "всё таки както быстро", 1/20 came back
+ * "и вообще сама игра будто быстрее стала — это не что надо было", and the
+ * second is the whole lesson: this number is not the walking speed, it is the
+ * rate of EVERYTHING counted in frames. Turning it up takes the turn, the
+ * jump's hang, the swing's wind-up, the aim's ramp, the parachute and the
+ * wedge counter with it. What play wanted was a slightly quicker WALK, and
+ * that has its own knob now — `WALK_SCALE` in `lib/game/movement.ts`.
+ *
+ * So: leave this alone. If a per-frame duration reads wrong, it is that
+ * duration's own number that is wrong.
  */
 export const FRAME_SECONDS = 1 / 15
 /** Frames wedged in a wall before the pig is thrown out (exe `cmp eax,19h`). */

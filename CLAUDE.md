@@ -69,14 +69,45 @@ what a prop's does. Not an open question.
 not overlooked — the size and the turn are right (`formats/pog.ts`,
 `game/obstacles.ts`) but the behaviour is not, and it is its own job.
 
-**`FRAME_SECONDS` is 1/15, and it is the only free number in the speed
-chain.** The request is 64, `Pig::Walk` takes `sar eax,4` of it times the
+**`FRAME_SECONDS` is 1/15, and moving it is the WRONG lever.** The request is 64, `Pig::Walk` takes `sar eax,4` of it times the
 class's 13 for 52 units a frame, and a tile is 512 — all read off the exe.
-The rate is not in the disassembly at all. It was 1/30; against a pig at
-half scale that walk is a sprint, so it halved. Everything else counts
-FRAMES and is untouched. Cost: the jump hangs twice as long in seconds, and
+The rate is not in the disassembly at all: the exe imports `timeGetTime` and
+reaches it the same indirect way it reaches the animation library, so no call
+site says how long a frame is. It was 1/30 and halved because against a pig at
+half scale that walk read as a sprint.
+
+Play then said the walk was slightly slow, and this is where it went wrong: both
+1/20 and 1/25 were tried and both came back — "всё таки както быстро", then "и
+вообще сама игра будто быстрее стала — это не что надо было". That second line
+IS the rule. This number is not the walking speed; it is the rate of everything
+counted in frames, so turning it up takes the turn, the jump's hang, the swing's
+wind-up, the aim's ramp, the parachute and the wedge counter with it. **A walk
+that reads slow is the WALK's own number**, and it has one now: `WALK_SCALE` in
+`lib/game/movement.ts`, 4/3 by eye, on the forward and back speeds only. The
+exe's 52 a frame is untouched underneath, and every relation that hangs off the
+stride still does — the running jump leaves faster because `Pig::Walk`'s own
+`|nDist|/2` says so, and `LOOK_AHEAD` grows with the step because the original
+looks one step ahead. If a per-frame DURATION reads wrong, it is that duration's
+own number that is wrong. Everything else counts
+FRAMES and is untouched. Cost: the jump hangs longer in seconds, and
 `JUMP_RISE = √MODEL_SCALE` in `locomotion.ts` is the remake's own correction
 so a hop stays the same fraction of a pig it always was.
+
+**Do not write a wall-clock duration into a spec that drives a walk.** Every
+figure of the "three seconds, not 1.5" kind goes stale the next time this number
+moves, and it goes stale QUIETLY: `e2e/002/obstacles.spec.ts` kept passing a pig
+that had already scraped round the corner it was meant to be stopped at. Size a
+drive by the DISTANCE it has to cover (`APPROACH`, `AROUND` there).
+
+**25 Hz is an INFERENCE, and this is the whole of it.** Three durations come out
+round at 25 and awkward at anything else: the turn clock is authored in
+HUNDREDTHS (a table of whole seconds ×100 at 0x4309fb), which wants a per-frame
+decrement dividing 100 — 4 at 25 Hz, 3.33 at 30; the crush counter's 250 frames
+is exactly ten seconds; the wedge counter's 25 and the jump's own 25-frame bail
+(0x46e95d) are exactly one. 25 is also the rate the clips are drawn at and the
+PAL field rate halved, this being a PlayStation port. What is NOT read is any
+call site: the exe reaches `timeGetTime` the same indirect way it reaches the
+animation library.
 
 **Model UVs do NOT flip V.** They used to, "because TIM rows are top-down" —
 but the texture uploads with `flipY = false`, so data row 0 is already v = 0

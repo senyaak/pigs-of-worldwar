@@ -51,6 +51,26 @@ export const PIG_CLASS_SPEED = 13
 export const WALK_REQUEST = 64
 
 /**
+ * How much quicker than that a pig actually walks here — the remake's own, and
+ * the ONLY thing in the chain that is.
+ *
+ * Play asked for a slightly faster walk, and the obvious lever was the wrong
+ * one: `FRAME_SECONDS` is the rate of everything counted in frames, so turning
+ * it up took the turn, the jump's hang, the swing's wind-up, the aim's ramp and
+ * the parachute with it — "и вообще сама игра будто быстрее стала — это не что
+ * надо было". Both ends of that were tried in play (1/20 and 1/25) and both
+ * came back wrong for the same reason. A walk-only factor is what was actually
+ * asked for.
+ *
+ * 4/3 is by eye and nothing else: 52 units a frame at 1/15 is 780 a second, and
+ * this makes it 1040 — two tiles. The exe's own 52 is untouched underneath, and
+ * so is every relation that hangs off the stride: the running jump leaves
+ * faster because `Pig::Walk`'s own `|nDist|/2` says it does, and `LOOK_AHEAD`
+ * grows with the step because the original checks one step ahead.
+ */
+export const WALK_SCALE = 4 / 3
+
+/**
  * How fast a pig walks, world units per second — the exe's, not a taste.
  *
  * `Pig::Walk` (0x46aa10) turns the request into the per-frame distance that
@@ -65,7 +85,8 @@ export const WALK_REQUEST = 64
  * a fifth of its life. Nothing damages a pig here yet, so full speed it is —
  * this is where the wounded limp goes when there is damage to feel it with.
  */
-export const WALK_SPEED = fromExeSpeed((WALK_REQUEST * PIG_CLASS_SPEED) / 16)
+export const WALK_SPEED = fromExeSpeed((WALK_REQUEST * PIG_CLASS_SPEED) / 16) * WALK_SCALE
+
 
 /**
  * Backwards is exactly half, and it is not the class that halves it:
@@ -73,7 +94,7 @@ export const WALK_SPEED = fromExeSpeed((WALK_REQUEST * PIG_CLASS_SPEED) / 16)
  * BEFORE the class scale sees it, so the -64 the player asks for arrives as
  * -32 and a grunt backs up at 26 units a frame.
  */
-export const WALK_BACK_SPEED = fromExeSpeed((32 * PIG_CLASS_SPEED) / 16)
+export const WALK_BACK_SPEED = fromExeSpeed((32 * PIG_CLASS_SPEED) / 16) * WALK_SCALE
 
 /** Drop the feet this far looking for ground before declaring a fall
  * (exe 0x4bd340, in its own vertical scale — see `fromExeY`). */

@@ -109,18 +109,21 @@ export const GRAVITY = TERMINAL_FALL / FALL_TAU
  * One more gate is not decoded: bit 0x10 of the intent byte at `pig+0x318`
  * also forces the crouch, whatever the step (0x46c224).
  *
- * **The launch rides `JUMP_RISE`, and that is the remake's own.** The exe's
- * 0x30 puts the apex at 62 world units standing and 131 running, and those
- * are absolute — they know nothing about how big the body is. The model is
- * drawn at half size (`lib/game/scale.ts`) and the ground it falls back to
- * did not change with it, so the same hop became twice the pig's height.
- * Gravity here is the terrain's and is left alone, and under a fixed pull
- * the apex goes as the SQUARE of the launch — so the square root of the
- * model scale is what keeps a hop the same fraction of a pig it always was.
- * Corrected against play, not derived: the exe cannot say how high a pig
- * should jump relative to itself, only how high in units.
+ * **`JUMP_RISE` was the remake's own, and play has taken it back out.** It
+ * damped the launch by √½ on the argument that a model drawn at half size
+ * against ground that did not shrink with it turned the same hop into twice the
+ * pig's height. Play says the opposite — "прыжёк не долетел — может высота ниже
+ * чем должна быть?" — and the measurement agrees with play: damped, the running
+ * apex is 114 units against a grunt 325 tall, a third of its own height and a
+ * feeble thing to look at; at the exe's own 0x30 it is 220, about two thirds,
+ * and the reach goes from 303 to 430. The premise was wrong somewhere, and an
+ * invented number loses to what the game looks like.
+ *
+ * It stays as a named 1 rather than being deleted, because the argument is
+ * worth keeping next to the number: if a hop ever reads too big again, this is
+ * the knob, and NOT the exe's 0x30 or the gravity underneath it.
  */
-export const JUMP_RISE = Math.sqrt(MODEL_SCALE)
+export const JUMP_RISE = 1
 export const JUMP_SPEED = fromExeSpeed(0x30) * JUMP_RISE
 export const JUMP_PUSH = fromExeSpeed(0x30)
 export const JUMP_PUSH_DELAY = 3 * FRAME_SECONDS

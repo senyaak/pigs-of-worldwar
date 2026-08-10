@@ -38,7 +38,7 @@ import {
   updateLocomotion
 } from '../../src/lib/game/locomotion'
 import type { Intent, LocomotionState } from '../../src/lib/game/locomotion'
-import { WALK_BACK_SPEED, WALK_SPEED } from '../../src/lib/game/movement'
+import { WALK_BACK_SPEED, WALK_SCALE, WALK_SPEED } from '../../src/lib/game/movement'
 import { EJECT_SECONDS, FRAME_SECONDS, RESTITUTION_FREE } from '../../src/lib/game/ballistics'
 import type { TerrainQuery } from '../../src/lib/game/terrain'
 import { terrain } from './fixture'
@@ -69,6 +69,18 @@ const wallFace = (): TerrainQuery =>
     (_x, z) => (z >= 1024 ? { type: 0x80, slip: 0 } : {})
   )
 
+/**
+ * Where to stand so that ONE step ends INSIDE the face, and inside the part of
+ * it the step-up envelope allows.
+ *
+ * The face rises 2 units per unit of z, so the reachable band is `WALL_CLIMB`
+ * over 2 — 32 units deep — and a pig that steps clean over it is refused and
+ * never wedges at all. That is not a rate to hard-code a start position
+ * against: `WALK_SCALE` and `FRAME_SECONDS` both move the stride, and the tell
+ * was two wedge specs going quiet the moment the walk sped up.
+ */
+const lipOf = (): number => 1024 - WALK_SPEED * FRAME_SECONDS + WALL_CLIMB / 4
+
 test('walking is kinematic: pinned to the ground, straight, at walking speed', () => {
   const hill = terrain((_x, z) => Math.max(0, z) * 0.5)
   const s = createLocomotion(hill, 0, -400, NORTH)
@@ -86,16 +98,21 @@ test('walking is kinematic: pinned to the ground, straight, at walking speed', (
 // to a grunt, and the backward request clamped to -32 before that scale.
 test('the walking speeds are the exe’s: 52 units a frame, half that back', () => {
   const flat = terrain(() => 0)
-  expect(WALK_SPEED * FRAME_SECONDS).toBeCloseTo(52, 6)
-  expect(WALK_BACK_SPEED * FRAME_SECONDS).toBeCloseTo(26, 6)
+  // The exe's own two numbers are still exactly there — under one declared
+  // factor that is play's and says so (`WALK_SCALE` in game/movement.ts). Take
+  // it back out and the frame's step is 52 forward and 26 back.
+  expect((WALK_SPEED * FRAME_SECONDS) / WALK_SCALE).toBeCloseTo(52, 6)
+  expect((WALK_BACK_SPEED * FRAME_SECONDS) / WALK_SCALE).toBeCloseTo(26, 6)
+  // …and back is exactly half of forward however the factor moves.
+  expect(WALK_BACK_SPEED * 2).toBeCloseTo(WALK_SPEED, 6)
 
   const s = createLocomotion(flat, 0, 0, NORTH)
   updateLocomotion(s, flat, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
-  expect(s.z).toBeCloseTo(52, 6)
+  expect(s.z).toBeCloseTo(52 * WALK_SCALE, 6)
   expect(s.clip).toBe(ANIM.RUN)
 
   updateLocomotion(s, flat, { walk: -1, turn: 0, jump: false }, FRAME_SECONDS)
-  expect(s.z).toBeCloseTo(52 - 26, 6)
+  expect(s.z).toBeCloseTo((52 - 26) * WALK_SCALE, 6)
   expect(s.clip).toBe(ANIM.WALK_BACK)
 })
 
@@ -166,7 +183,7 @@ test('a wall is scraped along, not oscillated at: the sidestep remembers its sid
 
 test('out of the wall, the counter forgets', () => {
   const face = wallFace()
-  const s = createLocomotion(face, 0, 1024 - 30, NORTH)
+  const s = createLocomotion(face, 0, lipOf(), NORTH)
   run(s, face, { walk: 1 }, 4 * FRAME_SECONDS)
   expect(s.wedgedSeconds).toBeGreaterThan(0)
   run(s, face, { walk: -1 }, 8 * FRAME_SECONDS)
@@ -194,7 +211,7 @@ test('a landing inside a wall never rests — the pig stays a body until it is o
 
 test('wedged, the pig grows bouncier; free, it recovers only on landing', () => {
   const face = wallFace()
-  const s = createLocomotion(face, 0, 1024 - 30, NORTH)
+  const s = createLocomotion(face, 0, lipOf(), NORTH)
   run(s, face, { walk: 1 }, 6 * FRAME_SECONDS)
   expect(s.bounciness.restitution).toBeGreaterThan(RESTITUTION_FREE)
 })

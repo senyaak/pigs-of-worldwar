@@ -217,12 +217,14 @@ test('a pig walks up the ramp and onto the deck', () => {
   const state = createLocomotion(query, foot.x, foot.z, -Math.PI / 2)
   expect(near(-state.y, -query.height(foot.x, foot.z), ART), 'starts on the ground').toBe(true)
 
-  // Long enough to cover the two ramps' 1024 and step onto the deck.
-  const frames = Math.round(2 / STEP_SECONDS)
+  // Driven by DISTANCE, not by a clock: the two ramps are 1024 of run and the
+  // deck 512 more, and how long that takes is `WALK_SPEED`'s business — which
+  // play moves. Stop on the deck rather than walking off the plateau behind it.
   let highest = state.y
-  for (let i = 0; i < frames; i++) {
+  for (let i = 0; i < 4000; i++) {
     updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS, field)
     highest = Math.min(highest, state.y)
+    if (state.x < deck.x) break
   }
   // It got up, it got ALL the way up, and it is standing on the deck rather
   // than hanging in the air over it.
@@ -234,7 +236,7 @@ test('a pig walks up the ramp and onto the deck', () => {
   // …and without the ramps it cannot: the same walk against the terrain alone
   // stops at the foot of a 1024-unit face.
   const bare = createLocomotion(query, foot.x, foot.z, -Math.PI / 2)
-  for (let i = 0; i < frames; i++) {
+  for (let i = 0; i < 4000 && bare.x > deck.x; i++) {
     updateLocomotion(bare, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS)
   }
   expect(-bare.y, 'the bare terrain is 1024 lower').toBeLessThan(deckTop - 512)

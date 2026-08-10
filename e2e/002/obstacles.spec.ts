@@ -16,7 +16,12 @@ import { test, expect } from '@playwright/test'
 
 import { FRAME_SECONDS } from '../../src/lib/game/ballistics'
 import { WALK_SPEED } from '../../src/lib/game/movement'
-import { WALL_CLIMB, createLocomotion, updateLocomotion } from '../../src/lib/game/locomotion'
+import {
+  SIDESTEP_SPEED,
+  WALL_CLIMB,
+  createLocomotion,
+  updateLocomotion
+} from '../../src/lib/game/locomotion'
 import type { Intent, LocomotionState } from '../../src/lib/game/locomotion'
 import {
   MIN_SOLID,
@@ -190,10 +195,21 @@ test('a box is oriented, so its long side stops a pig its short side lets by', (
   // out — the far side of 900 units of difference. A stop lands within one
   // walking step of the face and never past it.
   const stride = WALK_SPEED * FRAME_SECONDS
+  /**
+   * How long the approach takes, in DISTANCE rather than in seconds.
+   *
+   * `FRAME_SECONDS` is the one free number in the speed chain and play moves
+   * it: every wall-clock figure written here went stale the first time it did,
+   * and the tell was this spec passing a pig that had already scraped round the
+   * corner it was supposed to be stopped at.
+   */
+  const APPROACH = 2048 / WALK_SPEED
+  /** …and the scrape it takes to round the turned box: 128 of box plus a pig. */
+  const AROUND = (128 + PIG_RADIUS) / SIDESTEP_SPEED
   const stopsAt = (yaw: number, face: number): void => {
-    // Three seconds, not 1.5: a pig covers half the ground per second it
-    // used to (ballistics.ts, FRAME_SECONDS) and has 2048 to walk.
-    const state = walk(yaw, 3)
+    // Long enough to arrive and be refused, and nowhere near long enough to
+    // scrape round the end.
+    const state = walk(yaw, APPROACH + AROUND / 4)
     // The refusal lands on a FRAME boundary, and a frame now carries the pig
     // twice as far (ballistics.ts, FRAME_SECONDS), so the last step before
     // the stop can leave it a shade inside its own radius.
@@ -204,12 +220,9 @@ test('a box is oriented, so its long side stops a pig its short side lets by', (
   stopsAt(QUARTER, 2048 - 1024 - PIG_RADIUS)
 
   // And a stop is not the end of it: the sidestep scrapes along until the
-  // box runs out, and the turned one is only 256 thick — so given long
-  // enough the pig walks round its end and carries on north. Eight seconds,
-  // not four: a pig covers half the ground per second it used to
-  // (ballistics.ts, FRAME_SECONDS), and this one has to scrape 1024 sideways
-  // before it can turn the corner.
-  expect(walk(QUARTER, 8).z).toBeGreaterThan(2048)
+  // box runs out, and the turned one is only 256 thick — so given the approach,
+  // the scrape and a walk on top, the pig rounds its end and carries on north.
+  expect(walk(QUARTER, APPROACH * 2 + AROUND * 2).z).toBeGreaterThan(2048)
 })
 
 test('a pig is in the way of another pig', () => {
