@@ -39,6 +39,7 @@ import type { EffectField } from './effectField'
 import type { DamageNumbers } from './damage'
 import type { AirDrops } from './airDrop'
 import type { DropIn } from './dropIn'
+import type { Drowning } from './drowning'
 import type { Point } from './pose'
 import type { Random } from './random'
 import { handling } from './events'
@@ -59,6 +60,9 @@ export interface BattleParts {
   numbers: DamageNumbers
   airDrops: AirDrops
   dropIn: DropIn
+  /** What being in the water costs, for every pig on the map
+   * (lib/game/drowning.ts). */
+  drowning: Drowning
   /** Called whenever the state changed this frame (a HUD refresh). */
   onChanged: () => void
   /** The stream everything the battle does is announced on, and the one it
@@ -147,7 +151,7 @@ export interface Battle {
 
 export function createBattle(parts: BattleParts): Battle {
   const { game, query, scenery, anim, shots, grenades, swings, effects, numbers } = parts
-  const { airDrops, dropIn, onChanged } = parts
+  const { airDrops, dropIn, drowning, onChanged } = parts
   const emit = parts.bus.emit
 
   /** Every pig on the map, as bodies to walk into. */
@@ -269,6 +273,19 @@ export function createBattle(parts: BattleParts): Battle {
       onChanged()
       return
     }
+
+    // WATER, before any of the branches below: it is the tail of the exe's own
+    // per-pig ground update and that runs in every mode, so a pig goes on
+    // drowning through the beat at the top of a turn and through the beat after
+    // a blow alike (lib/game/drowning.ts). Every pig on the map, not just the
+    // one being driven — and the one being driven pays twice.
+    drowning.update(delta, {
+      acting: game.currentPig,
+      // Nothing takes the doubling off yet: the exe's mode 13 is the beat at
+      // the END of a turn, and this engine has no such phase.
+      walkAway: false,
+      aloft: loco.airborne !== null
+    })
 
     // The turn clock runs regardless of what anyone does — except that it does
     // not start at once: `tick` burns the beat at the top of the turn first. A

@@ -13,6 +13,7 @@ import * as THREE from 'three'
 import type { Bone, Model, Texture } from '../api'
 import type { Pig } from '../../../lib/game/game'
 import { restingY } from '../../../lib/game/locomotion'
+import { isDead } from '../../../lib/game/health'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { buildPig } from './pig'
 import type { Pig as PigMesh } from './pig'
@@ -139,7 +140,7 @@ export function fieldSquad(
       const at = new THREE.Vector3()
       const out: PigPlate[] = []
       for (const soldier of members) {
-        if (soldier.pig.health <= 0) continue
+        if (isDead(soldier.pig)) continue
         soldier.node.getWorldPosition(at)
         // World space is Y-up, so the plate hangs above by ADDING to y. The
         // node sits at the model's ORIGIN — the hip — so clear the rise to
@@ -153,7 +154,11 @@ export function fieldSquad(
           x: (at.x * 0.5 + 0.5) * width,
           y: (-at.y * 0.5 + 0.5) * height,
           name: soldier.pig.name,
-          health: soldier.pig.health
+          // WHOLE points, the way the dashboard's own number is: the exe hands
+          // its plate `health >> 7` and drops the 128ths. Water takes fractions
+          // of a point (lib/game/drowning.ts), so without this the plate would
+          // read 43.7265625.
+          health: Math.floor(soldier.pig.health)
         })
       }
       return out

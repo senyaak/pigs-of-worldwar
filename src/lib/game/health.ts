@@ -42,6 +42,17 @@ export const maxHealthFor = (pigClass: number): number =>
 export const GIB_BELOW = -60
 
 /**
+ * Dead is BELOW ONE WHOLE POINT, not at zero: the exe's test is
+ * `health <= 0x7f` (0x467d15) and 0x80 is a point.
+ *
+ * It used to be written as `<= 0` here, which is the same thing while every
+ * amount in the game is a whole number of points — and one is not. Water takes
+ * as little as a hundred-and-twenty-eighth of a point at a time
+ * (lib/game/drowning.ts), so the fraction has to be where the exe put it.
+ */
+export const DEAD_BELOW = 1
+
+/**
  * What the training ground floors a pig at (0x467c85 writes 0x80, one point).
  *
  * The same flag that makes every skill unlimited there (lib/game/pickups.ts)
@@ -84,7 +95,7 @@ export function hurt(body: Body, damage: number, training: boolean): HitOutcome 
     body.health = 0
     return 'gibbed'
   }
-  if (body.health <= 0) {
+  if (body.health < DEAD_BELOW) {
     body.health = 0
     return 'died'
   }
@@ -104,6 +115,6 @@ export function heal(body: Body, amount: number): void {
   body.health += amount
 }
 
-/** Whether a body is out of it. The exe's own test is `<= 0x7f` — under one
- * whole point — which over points is this. */
-export const isDead = (body: Body): boolean => body.health <= 0
+/** Whether a body is out of it — under one whole point, which is the exe's own
+ * `<= 0x7f` (see `DEAD_BELOW`). */
+export const isDead = (body: Body): boolean => body.health < DEAD_BELOW

@@ -37,6 +37,7 @@ import type { Lobs } from './lobs'
 import { createEffectField } from './effectField'
 import type { EffectField } from './effectField'
 import { createDamageNumbers } from './damage'
+import { createDrowning } from './drowning'
 import type { DamageNumbers } from './damage'
 import { createBattle } from './battle'
 import type { Battle } from './battle'
@@ -330,6 +331,11 @@ export function createEngine(parts: EngineParts): Engine {
    * instead, which is what `NO_DROP_IN` is. */
   const dropIn = world.parachutes ? createDropIn(pigs(), query, bus.emit, random) : NO_DROP_IN
 
+  /** What the water costs whoever stands in it (lib/game/drowning.ts). Its own
+   * domain because it is nobody's turn in particular: the exe runs it over the
+   * whole pig list, every frame, in every mode. */
+  const drowning = createDrowning({ pigs, query, training }, bus.emit)
+
   const battle = createBattle({
     game,
     query,
@@ -343,6 +349,7 @@ export function createEngine(parts: EngineParts): Engine {
     numbers,
     airDrops,
     dropIn,
+    drowning,
     onChanged,
     bus,
     random
