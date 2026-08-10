@@ -2302,6 +2302,43 @@ the range applies to the GROUND and to the map view alike ("к земле тож
 enemy simply not shown them on the minimap. None of that is built: play said "но ладно это потом", and the marker model stands in meanwhile.
 Still to do beside it: the EXCLAMATION MARK over a mine the moment it is trodden on.
 
+### PLAY'S OPEN LIST — reported, reproduced, NOT fixed (2026-08-10)
+
+Six things play named while the mines and the charges were going in. Each is real
+and each was left alone deliberately, because none of them is a line: they are
+about knockback, destructible buildings, the terrain renderer and the battle font.
+Written down here rather than in a chat that scrolls away.
+
+1. **A blast does not THROW anything.** "мины не отбрасывают — как и тнт." The
+   impulse is decoded for hand-to-hand and deliberately not applied — 45° up along
+   the bearing, `0x4a9100`, and `MeleeWeapon.knockback` carries the number
+   (lib/game/melee.ts) — because **only the acting pig has a locomotion state**.
+   That is the real work: something to put a velocity ON for a pig that is not being
+   driven. `blast.ts` is where the blast would push from, and it already has every
+   body and its distance in hand.
+2. **TNT does not damage a HOUSE.** `burst` hurts pigs and the map's dummies
+   (`targets.ts`), and a house is scenery with collision and no health. What makes a
+   record breakable, and whether the houses carry it, is `lib/game/scenery.ts` and
+   the POG's own fields — the dummy is the only thing that has ever been broken.
+3. **A house's textures FLICKER.** "дом имеет мерцающие текстуры." Nothing to do
+   with mines: the props renderer (`three/props.ts`) or the model reader. Z-fighting
+   between coincident faces is the first thing to measure.
+4. **A trodden mine wants an EXCLAMATION MARK over it.** "когда наступил — мина
+   появляется с восклицательным знаком над ней." The mine's own model appears now
+   (`three/mineArt.ts` draws `mines.at()` too); the glyph needs the battle font —
+   GameChars, which `002/hud.spec.ts` already proves has letters — or a sprite out
+   of the effect art.
+5. **The reveal is a TEXTURE SWAP, and for three classes.** "инженеры и командос с
+   героем видят жёлто-чёрные текстуры там где есть мины", the range applies to the
+   ground AND the map view ("к земле тоже"), and the enemy simply is not shown them
+   on the minimap. What is built instead: the `WE_MINE` model for the engineer family
+   (5, 6, 7) inside 1024 on the ground. Play said "но ладно это потом" — so the swap,
+   the third class and the minimap are all still open, and the hazard stripes are
+   almost certainly CAMP's four mine-only textures.
+6. **`002/effects.spec.ts:161` is flaky** — one fireball sprite's outward bearing can
+   roll near-vertical and the assertion is on blob 0 alone. Seed the roll or assert
+   over all of them; it failed once in a full run and passes alone.
+
 ### What is still not read
 
 - **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's
