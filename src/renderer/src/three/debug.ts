@@ -60,6 +60,10 @@ export interface DebugParts {
   aim: () => number | null
   /** How many grenades are in the air or lying about (three/grenades.ts). */
   grenades: () => { x: number; y: number; z: number; fuse: number }[]
+  /** How each PLANTED charge is drawn: which way its fuse points, and the y of
+   * its lowest corner (three/grenades.ts). Standing on its end is a fact about
+   * the mesh, so the engine's list cannot answer for it. */
+  charges: () => { fuse: { x: number; y: number; z: number }; base: number }[]
   /** Mines that have been trodden on and are counting down. Nothing is DRAWN for
    * a buried one unless somebody can SEE it, so this is the only way a spec can
    * find one at all (lib/game/mines.ts). */
@@ -167,6 +171,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
       shots: () => parts.shots(),
       aim: () => parts.aim(),
       grenades: () => parts.grenades(),
+      /** How the planted charges STAND — the fuse's world direction and the
+       * ground under each one (three/grenades.ts). */
+      charges: () => parts.charges(),
       /** Every mine counting down under somebody's feet (lib/game/mines.ts). */
       mines: () => parts.mines(),
       /** …and how many BURIED ones are being drawn for the side whose turn it is:
@@ -225,7 +232,11 @@ export function exposeBattleDebug(parts: DebugParts): void {
           name: mesh.name,
           x: mesh.position.x,
           y: mesh.position.y,
-          z: mesh.position.z
+          z: mesh.position.z,
+          // …and WHEN it is drawn. Not decoration: CAMP's house has twelve pairs
+          // of coplanar wall faces, and a FIXED draw order is the whole of why
+          // they stop flickering (three/props.ts).
+          order: mesh.renderOrder
         }))
       }),
       /** Where the chase camera actually is, world space — the only way a

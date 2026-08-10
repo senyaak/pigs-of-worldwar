@@ -36,6 +36,8 @@ import { createLobs } from './lobs'
 import type { Lobs } from './lobs'
 import { createMines } from './mines'
 import type { Mines } from './mines'
+import { createTumbles } from './tumble'
+import type { Tumbles } from './tumble'
 import { createEffectField } from './effectField'
 import type { EffectField } from './effectField'
 import { createDamageNumbers } from './damage'
@@ -199,6 +201,9 @@ export interface Engine {
   readonly grenades: Lobs
   /** The minefields, and what has been trodden on (lib/game/mines.ts). */
   readonly mines: Mines
+  /** Pigs still in the air because something blew up under them
+   * (lib/game/tumble.ts). */
+  readonly tumbles: Tumbles
   readonly swings: Strikes
   readonly effects: EffectField
   readonly numbers: DamageNumbers
@@ -325,13 +330,24 @@ export function createEngine(parts: EngineParts): Engine {
     { pigs, targets, present, query, obstacles, training, pose },
     bus.emit
   )
+  /**
+   * Pigs a blast has THROWN (lib/game/tumble.ts) — and the seam that decides
+   * whose state a throw lands on.
+   *
+   * The acting pig has one already and the battle drives it, so its impulse goes
+   * there; `battle` is built further down and `fling` is only ever called from
+   * inside a step, by which time it exists.
+   */
+  const tumbles = createTumbles({ query, pigs, obstacles }, bus.emit)
+  const fling = (pig: Pig, speed: number, bearing: number): void =>
+    battle.fling(pig, speed, bearing)
   /** What is already buried in the ground: the map's MINEFIELDS, which are a bit
    * in a tile rather than anything anybody put there (lib/game/mines.ts). Before
    * the grenades, because a thrown thing sets one off the same way a foot does. */
-  const mines = createMines({ pigs, targets, present, query, training, random }, bus.emit)
+  const mines = createMines({ pigs, targets, present, query, training, random, fling }, bus.emit)
   /** …and what a GRENADE does, which is a parabola rather than a line. */
   const grenades = createLobs(
-    { pigs, targets, present, query, obstacles, training, pose, random, mines },
+    { pigs, targets, present, query, obstacles, training, pose, random, mines, fling },
     bus.emit
   )
 
@@ -354,6 +370,7 @@ export function createEngine(parts: EngineParts): Engine {
     grenades,
     mines,
     swings,
+    tumbles,
     effects,
     numbers,
     airDrops,
@@ -375,6 +392,10 @@ export function createEngine(parts: EngineParts): Engine {
     shots.update(STEP_SECONDS)
     grenades.update(STEP_SECONDS)
     mines.update(STEP_SECONDS)
+    // …and every pig a blast threw, which is a flight of its own for each of them
+    // (lib/game/tumble.ts). After the mines, because a mine going off this step is
+    // what launched them.
+    tumbles.update(STEP_SECONDS)
     airDrops.update(STEP_SECONDS)
   }
 
@@ -480,6 +501,7 @@ export function createEngine(parts: EngineParts): Engine {
     shots,
     grenades,
     mines,
+    tumbles,
     effects,
     numbers,
     airDrops,

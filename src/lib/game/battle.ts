@@ -38,6 +38,8 @@ import type { Scenery } from './scenery'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
 import type { Mines } from './mines'
+import type { Tumbles } from './tumble'
+import { flingVelocity } from './tumble'
 import type { Strikes } from './strikes'
 import type { EffectField } from './effectField'
 import type { DamageNumbers } from './damage'
@@ -63,6 +65,9 @@ export interface BattleParts {
    * (lib/game/mines.ts). */
   mines: Mines
   swings: Strikes
+  /** Pigs a blast has THROWN — every pig but the one being driven
+   * (lib/game/tumble.ts). */
+  tumbles: Tumbles
   effects: EffectField
   numbers: DamageNumbers
   airDrops: AirDrops
@@ -165,13 +170,22 @@ export interface Battle {
    * bus itself (lib/game/events.ts).
    */
   announce: Emit
+  /**
+   * Throw a pig — WHICH pig decides where the velocity goes.
+   *
+   * The acting one takes it on the locomotion state the battle is already driving,
+   * which is the very same flight a jump gets; everybody else takes one of their
+   * own (lib/game/tumble.ts). Two states over one pig would fight over its
+   * position, and this is the seam that keeps there being one.
+   */
+  fling(pig: Pig, speed: number, bearing: number): void
   /** Warp the acting pig — the debug surface the e2e suite drives through. */
   warp(x: number, z: number, heading: number): void
 }
 
 export function createBattle(parts: BattleParts): Battle {
   const { game, query, scenery, anim, shots, grenades, mines, swings, effects, numbers } = parts
-  const { airDrops, dropIn, drowning, onChanged } = parts
+  const { tumbles, airDrops, dropIn, drowning, onChanged } = parts
   const emit = parts.bus.emit
 
   /** Every pig on the map, as bodies to walk into. */
@@ -268,6 +282,11 @@ export function createBattle(parts: BattleParts): Battle {
     // A mine that has been trodden on and has not gone off yet: four tenths of a
     // second, and nothing may hand the turn over inside it (lib/game/mines.ts).
     mines.live() > 0 ||
+    // …and a pig still in the AIR, which is what a blast leaves behind
+    // (lib/game/tumble.ts). The acting pig's own flight is `loco.airborne` and is
+    // not in here: the turn has always been allowed to end with the pig it
+    // belongs to mid-jump, and the beat that ends it walks everybody home anyway.
+    tumbles.live() > 0 ||
     numbers.live() > 0 ||
     airDrops.falling() > 0
 
@@ -650,6 +669,9 @@ export function createBattle(parts: BattleParts): Battle {
     for (const pig of everyone()) {
       if (isDead(pig)) continue
       if (pig === acting && loco.airborne !== null) continue
+      // …nor does a pig a blast has THROWN find one in mid-air: the tile under a
+      // flying pig is not the tile it is standing on (lib/game/tumble.ts).
+      if (tumbles.has(pig)) continue
       if (mines.tread(pig.position.x, pig.position.z)) {
         emit({ kind: 'mineTripped', at: { ...pig.position } })
       }
@@ -799,6 +821,17 @@ export function createBattle(parts: BattleParts): Battle {
       focus(game.currentPig)
     },
     announce: emit,
+    fling(pig, speed, bearing) {
+      if (pig !== game.currentPig) {
+        tumbles.fling(pig, speed, bearing)
+        return
+      }
+      // The acting pig's flight is `loco`'s, and `bouncing` is what tells the
+      // clip chain it was thrown rather than jumped (lib/game/locomotion.ts).
+      const { vx, vy, vz } = flingVelocity(speed, bearing)
+      loco.airborne = { vx, vy, vz, bouncing: true, pushIn: null }
+      loco.getUp = 0
+    },
     warp(x, z, heading) {
       swings.reset()
       effects.clear()

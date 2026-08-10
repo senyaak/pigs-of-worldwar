@@ -285,6 +285,21 @@ const holdingOf = (page: Page): Promise<number | null> =>
     () => (window as unknown as { pow: { debug: { holding(): number | null } } }).pow.debug.holding()
   )
 
+/** How the planted charges are DRAWN — the fuse's direction and the ground under
+ * each one (three/grenades.ts). */
+const standing = (
+  page: Page
+): Promise<{ fuse: { x: number; y: number; z: number }; base: number }[]> =>
+  page.evaluate(() =>
+    (
+      window as unknown as {
+        pow: {
+          debug: { charges(): { fuse: { x: number; y: number; z: number }; base: number }[] }
+        }
+      }
+    ).pow.debug.charges()
+  )
+
 /** How many mine markers the scene is drawing for the side whose turn it is. */
 const markers = (page: Page): Promise<number> =>
   page.evaluate(() =>
@@ -334,9 +349,24 @@ test('a pig that walks onto a MINE hears it and then loses twenty points', async
   expect((await sounds(page)).slice(quiet)).toContain('E_1')
   await expect.poll(async () => (await hud(page)).health, { timeout: 4000 }).toBe(30)
 
-  // The tile is spent, so standing on it is now safe — the pig is still there.
-  await page.waitForTimeout(600)
-  expect((await counting(page)).length, 'it did not go off twice').toBe(0)
+  // **AND IT IS THROWN OFF THE SPOT.** Play: "мины не отбрасывают — как и тнт",
+  // and then "это общая проблемма." The acting pig takes its flight on the state
+  // the battle is already driving, the same one a jump uses (lib/game/battle.ts
+  // `fling`, lib/game/tumble.ts).
+  //
+  // Whether it is still ON a mine where it lands is not asserted and cannot be:
+  // CAMP's field is 99 tiles and a pig thrown across it may well find another,
+  // which is what a minefield is for. That a tile is ONE-SHOT is the pure spec's
+  // above.
+  await expect
+    .poll(
+      async () => {
+        const now = await debugState(page)
+        return Math.hypot(now.x - at.x, now.z - at.z)
+      },
+      { timeout: 5000, message: 'the blast to throw the pig off the tile' }
+    )
+    .toBeGreaterThan(50)
 
   // …and NOTHING was ever drawn for the field it walked into: CAMP fields one
   // grunt, and a grunt cannot see a mine even standing on it (lib/game/mines.ts).
@@ -381,6 +411,18 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
   const where = await debugState(page)
   const charge = (await thrown(page))[0]
   expect(Math.hypot(charge.x - where.x, charge.z - where.z), 'under the pig').toBeLessThan(32)
+
+  // **AND IT STANDS, FUSE UP.** Play: "тнт лежит боком на земле — должна стоять
+  // фитилём вверх." The fuse is the model's own −X (the black stub out of the
+  // bundle's end, three/grenades.ts), and up is −Y, so pointing straight up is
+  // the y of the drawn direction being −1 and nothing left over in the plane.
+  const [drawn] = await standing(page)
+  expect(drawn, 'the charge is not being drawn at all').toBeTruthy()
+  expect(drawn.fuse.y, 'the fuse is not up').toBeCloseTo(-1, 3)
+  expect(Math.hypot(drawn.fuse.x, drawn.fuse.z), 'the bundle is lying over').toBeLessThan(0.001)
+  // …ON the ground rather than in it: its lowest corner is the surface it was
+  // planted on, which lying down it was buried a third into.
+  expect(Math.abs(drawn.base - charge.y), 'the bundle is not sitting on the ground').toBeLessThan(1)
   await expect.poll(async () => (await hud(page)).seconds, { timeout: 4000 }).toBeLessThanOrEqual(
     PLANTED_SECONDS
   )

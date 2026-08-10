@@ -13,6 +13,7 @@
 
 import { blastShare } from './grenade'
 import { DAMAGE_UNIT } from './projectile'
+import { fromExeSpeed } from './ballistics'
 import { hurt, isDead } from './health'
 import { originY } from './body'
 import type { Point } from './pose'
@@ -38,7 +39,41 @@ export interface BlastWorld {
   /** Whether the map SCRIPT has placed this dummy yet (lib/game/script.ts). */
   present: (id: number) => boolean
   training: boolean
+  /**
+   * Throw a pig: `speed` game units a second along `bearing`, 45° up
+   * (lib/game/tumble.ts). WHERE the velocity goes is the caller's business — the
+   * acting pig has a locomotion state of its own and everybody else has one made
+   * for the flight (lib/game/battle.ts).
+   *
+   * Optional, and a blast without it only hurts: the pure specs that measure
+   * damage have no bodies to move and no ground to land on.
+   */
+  fling?: (pig: Pig, speed: number, bearing: number) => void
 }
+
+/**
+ * **What a blast THROWS with.** 0x40 — sixty-four units a frame — at the core,
+ * falling off with the same share the damage does.
+ *
+ * The exe's whole vocabulary for shoving a pig is one call,
+ * `0x4a9100(speed, 0x200, bearing, 0)`, and every site that makes it uses a speed
+ * of **0x40** or 0x78: a pig shoved by another body (0x477695, 0x477842), the
+ * melee's own knockback (0x4786c1, which passes the weapon's number instead), and
+ * the map object at 0x44050c which sweeps up every pig around it, pushes each one
+ * at `(0x40, 0x200, bearing)` and makes it squeal. 0x40 is the one attached to
+ * something going off, so 0x40 is what a blast gets.
+ *
+ * **What is NOT read:** `Pig::OnHit`'s own blast arm (0x477c22) carries no impulse
+ * at all — it takes the falloff damage through `[vtbl+0x34]`, adds twice it to the
+ * tally at `[pig+0x1b8]`, raises the reeling counter at `[pig+0x1b4]` and squeals.
+ * So the original throws a pig with a blast through something this pass did not
+ * find, and the likeliest candidate is the physics: the blast effect has a BODY —
+ * a sphere of radius 35 (`weapons/fire.md`) — and the solver resolves it against
+ * the pig's. That contact's impulse is not decoded. What stands here is play's
+ * rule ("не отбрасывают") wearing the engine's own numbers, and the FALLOFF is the
+ * remake's: it is the one thing that makes standing back matter.
+ */
+export const BLAST_FLING = fromExeSpeed(0x40)
 
 /**
  * Set one off at `at`: announce it, and hurt everything within reach.
@@ -54,11 +89,24 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit):
   for (const pig of world.pigs()) {
     if (isDead(pig)) continue
     const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
-    const amount = took(body.x - at.x, body.y - at.y, body.z - at.z)
+    const dx = body.x - at.x
+    const dz = body.z - at.z
+    const amount = took(dx, body.y - at.y, dz)
     if (amount <= 0) continue
     const outcome = hurt(pig, amount, world.training)
     emit({ kind: 'damaged', at: body, amount })
     if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id })
+    // …AND IT GOES FLYING. Away from the blast — the bearing from the centre to
+    // the pig — and by the same share the damage took, so standing back saves
+    // your footing as well as your health. A corpse flies too: the exe throws
+    // bodies about, and a pig killed by the blast is a body from that instant.
+    //
+    // A charge that went off UNDER the trotters has no direction to give (both
+    // legs of the bearing are nil), and the pitch is fixed at 45° — so it throws
+    // the pig the way it was facing rather than the way +Z happens to point.
+    const share = blastShare(Math.hypot(dx, body.y - at.y, dz), charge.reach)
+    const away = Math.hypot(dx, dz) < 1 ? pig.heading : Math.atan2(dx, dz)
+    world.fling?.(pig, BLAST_FLING * share, away)
   }
   const standing = world.targets
   for (let i = standing.length - 1; i >= 0; i--) {

@@ -172,6 +172,9 @@ export interface DebugHooks {
   aim(): number | null
   /** How many grenades are in the air or lying about (three/grenades.ts). */
   grenades(): { x: number; y: number; z: number; fuse: number }[]
+  /** How each planted charge STANDS: its fuse's world direction — (0, −1, 0) is
+   * straight up, game space being Y-down — and the y of its lowest corner. */
+  charges(): { fuse: { x: number; y: number; z: number }; base: number }[]
   /** Mines that have been trodden on and are counting down (lib/game/mines.ts). */
   mines(): { x: number; y: number; z: number; fuse: number }[]
   /** How many buried mines are being DRAWN for the side whose turn it is — a
@@ -229,7 +232,7 @@ export interface DebugHooks {
   props(): {
     placed: number
     objects: number
-    at: { name: string; x: number; y: number; z: number }[]
+    at: { name: string; x: number; y: number; z: number; order: number }[]
   }
   /** The level's opening drop: who is still coming down under a canopy, and
    * how far up. `running` false is what says the battle has begun — nothing

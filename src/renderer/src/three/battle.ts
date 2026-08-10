@@ -566,6 +566,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     shots: () => shots.live().length,
     aim: () => battle.aim(),
     grenades: () => grenades.at(),
+    charges: () => grenadeArt.charges(),
     mines: () => mines.at().map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     mineMarkers: () => mineArt.shown(),
     charging: () => battle.charging(),
