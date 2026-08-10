@@ -16,7 +16,7 @@ import path from 'node:path'
 
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
-import { beginTurn, press, release, warp } from '../controller'
+import { beginTurn, hold, warp } from '../controller'
 import { startGame } from '../menu'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
@@ -24,10 +24,18 @@ import { WATER_SINK_SECONDS, WATER_SINK_SPEED } from '../../src/lib/game/grenade
 
 const GRENADE = 19
 
-/** The middle of CAMP's pond, off the map's own water flags. */
-const pond = (): { x: number; z: number } => {
-  const blocks = parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG')))
-  const query = new TerrainQuery(blocks)
+/**
+ * Where to stand and which way to face to put a grenade in CAMP's pond: the dry
+ * walkable spot nearest the middle of it, looking at that middle.
+ *
+ * **Not standing IN it, which this spec used to do.** The water takes a pig's
+ * weapon away and does not give it back until it is out (lib/game/battle.ts,
+ * play's own rule), so a swimming pig cannot throw anything at all — the throw
+ * has to come off the bank. Measured: from 786 units out, a 600 ms hold on the
+ * gauge carries it into the water, a 250 ms one lands it on the mud.
+ */
+const bank = (): { x: number; z: number; heading: number } => {
+  const query = new TerrainQuery(parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG'))))
   const wet: { x: number; z: number }[] = []
   for (let x = -16000; x < 16000; x += 128) {
     for (let z = -16000; z < 16000; z += 128) {
@@ -35,17 +43,24 @@ const pond = (): { x: number; z: number } => {
     }
   }
   if (wet.length === 0) throw new Error('CAMP has no water — the map is not what this spec thinks')
-  // The most central wet sample, so the thing cannot land on a shore tile.
   const mid = {
     x: wet.reduce((sum, one) => sum + one.x, 0) / wet.length,
     z: wet.reduce((sum, one) => sum + one.z, 0) / wet.length
   }
-  return wet.reduce((best, one) =>
-    Math.hypot(one.x - mid.x, one.z - mid.z) < Math.hypot(best.x - mid.x, best.z - mid.z)
-      ? one
-      : best
-  )
+  let best = { x: 0, z: 0, away: Infinity }
+  for (let x = -16000; x < 16000; x += 64) {
+    for (let z = -16000; z < 16000; z += 64) {
+      if (query.isWater(x, z) || !query.walkable(x, z)) continue
+      const away = Math.hypot(x - mid.x, z - mid.z)
+      if (away < best.away) best = { x, z, away }
+    }
+  }
+  if (best.away === Infinity) throw new Error('CAMP has no dry ground by its pond')
+  return { x: best.x, z: best.z, heading: Math.atan2(mid.x - best.x, mid.z - best.z) }
 }
+
+/** How long the gauge is held to clear the rim — measured, see `bank`. */
+const OVER_THE_RIM = 600
 
 type Page = import('@playwright/test').Page
 
@@ -72,10 +87,10 @@ test('dropped in the drink it SINKS, for a couple of seconds, and never goes off
   app
 }) => {
   const { page } = app
-  const at = pond()
+  const at = bank()
   await startGame(page)
-  // Standing IN it, so what leaves the hand lands in water and nowhere else.
-  await warp(page, at.x, at.z, 0)
+  // On the bank, LOOKING at the water — see `bank` for why not in it.
+  await warp(page, at.x, at.z, at.heading)
   await beginTurn(page)
   expect(
     await page.evaluate(() => {
@@ -92,11 +107,10 @@ test('dropped in the drink it SINKS, for a couple of seconds, and never goes off
     )
     .toBe(GRENADE)
 
-  // The lightest throw there is: a tap of the fire key charges the gauge for one
-  // frame, so it drops at the pig's own feet.
+  // Over the rim and into the water — the measured hold, and not a tap: a tap
+  // drops it at the pig's own feet, which is now dry ground and a blast.
   const quiet = (await sounds(page)).length
-  await press(page, 'fire')
-  await release(page, 'fire')
+  await hold(page, 'fire', OVER_THE_RIM)
 
   // It arrives, and once it does its y only ever GROWS: game space is Y-down, so
   // sinking is downward and there is nothing to stop it — not the bed, which is the
