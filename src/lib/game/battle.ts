@@ -212,19 +212,19 @@ export function createBattle(parts: BattleParts): Battle {
   // where the exe hangs it too (0x48d750), and every weapon simply announces.
   parts.bus.on(
     handling({
-      broke: ({ target }) => {
+      broke: ({ target, at }) => {
         // A different effect from the hit, and the one play remembers as smoke.
-        effects.broke(target)
-        scenery.remove(target.id)
+        effects.broke(at)
+        scenery.remove(target)
         // The turn stops here and the camera stays on the spot. What comes
         // next — a crate under a canopy, most of the time — is watched from the
         // same wait (lib/game/aftermath.ts).
-        aftermath = beginAftermath(target)
+        aftermath = beginAftermath(at)
         // …and its own command, which is the last thing the exe's break handler
         // does (0x48d972). This is what drops the next crate in — but NOT YET:
         // the dummy has to finish coming apart before the crate starts coming
         // down, which is how the whole game is paced.
-        pending = { id: target.id, y: target.y }
+        pending = { id: target, y: at.y }
       },
       // Stay on the spot for the beat the blow's own wait gives it, which is
       // what makes the burst visible at all: the camera leaves the grenade the

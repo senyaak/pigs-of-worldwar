@@ -92,7 +92,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
         still: parts.still(),
         starting: game.starting
       }),
-      currentNodeY: () => squad.of(game.currentPig)?.node.position.y ?? 0,
+      currentNodeY: () => squad.of(game.currentPig.id)?.node.position.y ?? 0,
       /** What the acting pig is carrying, in the order it picked things up:
        * the skill's id, its name, and how many (−1 is unlimited, which is
        * everything on the training ground). */
@@ -157,7 +157,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
           pigs: player.pigs.map((pig) => ({
             name: pig.name,
             pigClass: pig.pigClass,
-            art: squad.of(pig)?.art ?? '',
+            art: squad.of(pig.id)?.art ?? '',
             x: pig.position.x,
             z: pig.position.z,
             heading: pig.heading

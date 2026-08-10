@@ -55,7 +55,7 @@ export interface Collected {
   /** Whether the pig had room for it (lib/game/inventory.ts). */
   result: GiveResult
   /** Who picked it up. */
-  pig: Pig
+  pig: number
 }
 
 export interface Scenery {
@@ -175,7 +175,7 @@ export function createScenery(
           if (result === 'full') {
             if (!refused.has(pickup.id)) {
               refused.add(pickup.id)
-              emit({ kind: 'refused', skill: pickup.skill, amount: pickup.amount, pig })
+              emit({ kind: 'refused', skill: pickup.skill, amount: pickup.amount, pig: pig.id })
             }
             continue
           }
@@ -189,7 +189,7 @@ export function createScenery(
         // A collected crate runs its own command — the exe does it from inside
         // the pickup class (0x464633).
         advance(pickup.id, places.get(pickup.id)?.y ?? 0)
-        emit({ kind: 'collected', skill: pickup.skill, amount: pickup.amount, given, pig })
+        emit({ kind: 'collected', skill: pickup.skill, amount: pickup.amount, given, pig: pig.id })
       }
     }
   }

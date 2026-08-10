@@ -312,7 +312,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // (0x47ad99). Only the acting pig's shot does this, and only while there
     // is something left to watch.
     const bullet = now.firing?.phase === 'flight' ? (shots.head() ?? grenades.head()) : null
-    if (bullet && soldier === squad.of(game.currentPig)) {
+    if (bullet && soldier === squad.of(game.currentPig.id)) {
       chase.ride(drawnAt(bullet, bullet), Math.atan2(bullet.vx, bullet.vz), delta)
       soldier.node.visible = true
       return
@@ -320,19 +320,19 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // …and so does what the blow left behind. Mode 0 on the crate, which is
     // the ordinary chase rig with something other than a pig in it
     // (0x4661c2).
-    if (now.aftermath && soldier === squad.of(game.currentPig)) {
+    if (now.aftermath && soldier === squad.of(game.currentPig.id)) {
       chase.ride(drawnAt(now.aftermath, now.aftermath.at), soldier.pig.heading, delta)
       soldier.node.visible = true
       return
     }
     const view: View = dropIn.underCanopy(soldier.pig)
       ? 'face'
-      : soldier === squad.of(game.currentPig) && swings.running()
+      : soldier === squad.of(game.currentPig.id) && swings.running()
         ? 'melee'
         : // The aim view, held, and only for something that shoots — the exe
           // picks mode 0x0E by WEAPON (0x492dfa) and gates it on the same test
           // the melee camera is gated on, which is false through a swing.
-          soldier === squad.of(game.currentPig) && now.scoped
+          soldier === squad.of(game.currentPig.id) && now.scoped
           ? 'scope'
           : 'chase'
     chase.follow(
@@ -361,7 +361,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     settle()
     sounds.reset()
     marker.moveTo(pig.position.x, query.height(pig.position.x, pig.position.z), pig.position.z)
-    const soldier = squad.of(pig)
+    const soldier = squad.of(pig.id)
     if (soldier) watch(soldier, null)
   }
 
@@ -425,7 +425,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       const at = drawnAt(arriving, soldier.pig.position)
       return { ...at, heading: soldier.pig.heading }
     }
-    if (soldier === squad.of(game.currentPig)) return stanceAt(engine.alpha())
+    if (soldier === squad.of(game.currentPig.id)) return stanceAt(engine.alpha())
     const { x, y, z } = soldier.pig.position
     return { x, y, z, heading: soldier.pig.heading }
   }
@@ -455,7 +455,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // the canopies heard the first frame the bank can play them.
     dropInArt.draw(dropIn.live(), (one) => drawnAt(one, one.pig.position))
     sounds.chuteOverhead(dropIn.running())
-    const active = squad.of(game.currentPig)
+    const active = squad.of(game.currentPig.id)
     if (!active) return
     if (!dropIn.running() && !game.starting && !game.over) {
       // The acting pig stands where the locomotion state says, and the camera
@@ -549,7 +549,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       battle.warp(x, z, heading)
       settle()
       const pig = game.currentPig
-      squad.of(pig)?.place(pig.position.x, pig.position.y, pig.position.z, pig.heading)
+      squad.of(pig.id)?.place(pig.position.x, pig.position.y, pig.position.z, pig.heading)
     }
   })
 

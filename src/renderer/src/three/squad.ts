@@ -63,8 +63,9 @@ export interface Soldier {
 
 export interface Squad {
   readonly members: Soldier[]
-  /** The soldier drawing this pig, if it is on this map. */
-  of(pig: Pig): Soldier | undefined
+  /** The soldier drawing this pig, by the pig's own id — what the bus carries
+   * and what a snapshot will (lib/game/events.ts). */
+  of(pig: number): Soldier | undefined
   /** Every pig but `except`, as bodies to walk into (lib/game/obstacles). */
   bodies(except: Soldier): { x: number; y: number; z: number }[]
   /** Where each living pig's name hangs, in a view this big. `lift` is how far
@@ -129,7 +130,7 @@ export function fieldSquad(
 
   return {
     members,
-    of: (pig) => members.find((soldier) => soldier.pig === pig),
+    of: (id) => members.find((soldier) => soldier.pig.id === id),
     bodies: (except) =>
       members
         .filter((soldier) => soldier !== except)

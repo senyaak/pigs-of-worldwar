@@ -13,9 +13,17 @@
 //
 // Positions are game space (Y-down).
 
-import type { Pig } from './game'
 import type { Point } from './pose'
-import type { Target } from './targets'
+
+/**
+ * A pig, as it travels: its id and nothing else (lib/game/game.ts).
+ *
+ * Everything on this bus is DATA. It used to carry `Pig` and `Target` objects,
+ * which is free in one process and impossible across a port — and the moment
+ * one listener held a live object it could reach past what it was told and
+ * change the battle.
+ */
+export type PigId = number
 
 export type BattleEvent =
   // ——— weapons ———
@@ -28,7 +36,7 @@ export type BattleEvent =
   /** Something took points here — the number that floats off it. */
   | { kind: 'damaged'; at: Point; amount: number }
   /** This pig has just gone down. */
-  | { kind: 'killed'; pig: Pig }
+  | { kind: 'killed'; pig: PigId }
   /** A grenade went off here. */
   | { kind: 'blasted'; at: Point }
   /** …or met water: every water contact reports this first, and then which of
@@ -39,15 +47,15 @@ export type BattleEvent =
 
   // ——— the map ———
   /** Something on it has been knocked down. */
-  | { kind: 'broke'; target: Target }
+  | { kind: 'broke'; target: number; at: Point }
   /** Whether a record's art is on the map at all. */
   | { kind: 'shown'; id: number; visible: boolean }
   /** …and this one is gone for good: collected. */
   | { kind: 'taken'; id: number }
   /** A crate the pig walked into — `given` is what it actually got. */
-  | { kind: 'collected'; skill: number | null; amount: number; given: number; pig: Pig }
+  | { kind: 'collected'; skill: number | null; amount: number; given: number; pig: PigId }
   /** …or had no room for: "THIS LITTLE PIG ALREADY HAS TOO MANY TOYS". */
-  | { kind: 'refused'; skill: number | null; amount: number; pig: Pig }
+  | { kind: 'refused'; skill: number | null; amount: number; pig: PigId }
 
   // ——— things coming down ———
   /** A crate is on its way: the aeroplane, and a canopy to hang over it. */
@@ -57,17 +65,17 @@ export type BattleEvent =
   /** …and it is down. */
   | { kind: 'crateLanded'; id: number; at: Point }
   /** A pig arrives by parachute: hang one over it. */
-  | { kind: 'dropOpened'; pig: Pig }
+  | { kind: 'dropOpened'; pig: PigId }
   /** …cut, by the ground or by the player. */
-  | { kind: 'dropCut'; pig: Pig }
+  | { kind: 'dropCut'; pig: PigId }
   /** …and it has touched down. */
-  | { kind: 'dropLanded'; pig: Pig }
+  | { kind: 'dropLanded'; pig: PigId }
   /** Every canopy still up goes now: the jump key. */
   | { kind: 'canopiesCut' }
 
   // ——— the frame ———
   /** Wear this clip; `once` plays it through and holds the last frame. */
-  | { kind: 'clip'; pig: Pig; index: number; once: boolean }
+  | { kind: 'clip'; pig: PigId; index: number; once: boolean }
   /** Put the camera behind the pig NOW — it teleports rather than flying. */
   | { kind: 'cameraReset' }
   /** SKIP TURN was used. */

@@ -86,8 +86,8 @@ export function createDropIn(
   const arrivals: Arrival[] = arriving.map((pig) => {
     const drop = createDrop(restingY(query, pig.position.x, pig.position.z), spread())
     pig.position = { ...pig.position, y: drop.y }
-    emit({ kind: 'dropOpened', pig })
-    emit({ kind: 'clip', pig, index: ANIM.PARACHUTE, once: false })
+    emit({ kind: 'dropOpened', pig: pig.id })
+    emit({ kind: 'clip', pig: pig.id, index: ANIM.PARACHUTE, once: false })
     return { pig, drop, chute: true, done: false }
   })
 
@@ -95,7 +95,7 @@ export function createDropIn(
   const furl = (arrival: Arrival): void => {
     if (!arrival.chute) return
     arrival.chute = false
-    emit({ kind: 'dropCut', pig: arrival.pig })
+    emit({ kind: 'dropCut', pig: arrival.pig.id })
   }
 
   return {
@@ -107,7 +107,7 @@ export function createDropIn(
           furl(arrival)
           // What 0x4678f0 plays: the flying clip, and it keeps it until
           // something stops the fall.
-          emit({ kind: 'clip', pig: arrival.pig, index: ANIM.JUMP_MIDDLE, once: false })
+          emit({ kind: 'clip', pig: arrival.pig.id, index: ANIM.JUMP_MIDDLE, once: false })
         }
       }
       let busy = false
@@ -124,8 +124,8 @@ export function createDropIn(
         // the start of the turn, exactly as a committed clip does anywhere
         // else, because the renderer will not let the walking cut it short.
         furl(arrival)
-        emit({ kind: 'clip', pig: arrival.pig, index: ANIM.LAND, once: true })
-        emit({ kind: 'dropLanded', pig: arrival.pig })
+        emit({ kind: 'clip', pig: arrival.pig.id, index: ANIM.LAND, once: true })
+        emit({ kind: 'dropLanded', pig: arrival.pig.id })
         arrival.done = true
       }
       return busy

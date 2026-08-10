@@ -114,7 +114,7 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       const amount = damageOf(shot.skill)
       const outcome = hurt(pig, amount, world.training)
       emit({ kind: 'damaged', at: body, amount })
-      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig })
+      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id })
       return true
     }
     for (let i = standing.length - 1; i >= 0; i--) {
@@ -126,7 +126,7 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       emit({ kind: 'damaged', at: dummy, amount })
       if (isDead(dummy)) {
         standing.splice(i, 1)
-        emit({ kind: 'broke', target: dummy })
+        emit({ kind: 'broke', target: dummy.id, at: { x: dummy.x, y: dummy.y, z: dummy.z } })
       }
       return true
     }

@@ -150,7 +150,7 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
       // been read — so this puts it on the body, which is where the damage
       // number goes too.
       emit({ kind: 'struck', skill, at: body })
-      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: target })
+      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: target.id })
     }
 
     // …and the dummies, through the identical test. The exe runs it as a
@@ -171,7 +171,7 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
       emit({ kind: 'struck', skill, at: dummy })
       if (isDead(dummy)) {
         standing.splice(i, 1)
-        emit({ kind: 'broke', target: dummy })
+        emit({ kind: 'broke', target: dummy.id, at: { x: dummy.x, y: dummy.y, z: dummy.z } })
       }
     }
   }
@@ -203,7 +203,7 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
           // whole training ground, never run down.
           spend(actor.carrying, skill)
           already = new Set()
-          emit({ kind: 'clip', pig: actor, index: swing.clip, once: true })
+          emit({ kind: 'clip', pig: actor.id, index: swing.clip, once: true })
         } else if (event === 'whoosh') {
           emit({ kind: 'whoosh' })
         } else if (event === 'strike') {

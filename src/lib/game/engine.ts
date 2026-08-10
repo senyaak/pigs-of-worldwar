@@ -197,6 +197,9 @@ export function createEngine(parts: EngineParts): Engine {
   const { world, bus, onChanged } = parts
   const { game, objects } = world
   const pigs = (): Pig[] => game.players.flatMap((player) => player.pigs)
+  /** The bus carries ids, not pigs (lib/game/events.ts) — this is the engine's
+   * own way back. Nothing outside it needs one. */
+  const pigOf = (id: number): Pig | undefined => pigs().find((pig) => pig.id === id)
   /** One stream, and everything that rolls draws from it (lib/game/random.ts). */
   const random = seeded(parts.seed ?? DEFAULT_SEED)
 
@@ -222,8 +225,16 @@ export function createEngine(parts: EngineParts): Engine {
     handling({
       // What a pig WEARS is the engine's: the renderer is told what is playing,
       // it does not decide it (lib/game/anim.ts).
-      clip: ({ pig, index, once }) => (once ? anim.playOnce(pig, index) : anim.setClip(pig, index)),
-      killed: ({ pig }) => anim.playOnce(pig, ANIM.DYING),
+      clip: ({ pig, index, once }) => {
+        const one = pigOf(pig)
+        if (!one) return
+        if (once) anim.playOnce(one, index)
+        else anim.setClip(one, index)
+      },
+      killed: ({ pig }) => {
+        const one = pigOf(pig)
+        if (one) anim.playOnce(one, ANIM.DYING)
+      },
       // A crate on the ground is something to walk into again. Collision, not
       // art — the canopy coming off is the scene's half of the same event.
       crateLanded: ({ id }) => obstacles.restore(id)

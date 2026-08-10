@@ -15,10 +15,10 @@ import type { Canopies } from './parachute'
 import type { Squad } from './squad'
 
 export interface DropInArt {
-  /** Hang a canopy over this pig. */
-  open(pig: Pig): void
+  /** Hang a canopy over this pig, by id (lib/game/events.ts). */
+  open(pig: number): void
   /** Take it away. */
-  cut(pig: Pig): void
+  cut(pig: number): void
   /** How much hangs above this pig that the camera must clear. */
   riseOver(pig: Pig): number
   /**
@@ -56,18 +56,20 @@ export function createDropInArt(
     open(pig) {
       const soldier = squad.of(pig)
       if (!soldier) return
-      worn.set(pig, canopies.open(soldier.node))
+      worn.set(soldier.pig, canopies.open(soldier.node))
     },
     cut(pig) {
-      const one = worn.get(pig)
+      const soldier = squad.of(pig)
+      if (!soldier) return
+      const one = worn.get(soldier.pig)
       if (one) canopies.cut(one)
-      worn.delete(pig)
+      worn.delete(soldier.pig)
     },
     riseOver: (pig) => (worn.has(pig) ? canopies.rise : 0),
     draw(live, where) {
       for (const one of live) {
         const at = where(one)
-        squad.of(one.pig)?.place(at.x, at.y, at.z, one.pig.heading)
+        squad.of(one.pig.id)?.place(at.x, at.y, at.z, one.pig.heading)
       }
     },
     dispose() {

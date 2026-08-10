@@ -135,6 +135,10 @@ export function initBattle(onLeave: () => void): BattleView {
    * PROVISIONS!" for a health crate, and `gtext 171` for a pig that already
    * has fifteen skills.
    */
+  /** A pig by the id the bus named it with (lib/game/events.ts). */
+  const nameOf = (id: number): string =>
+    game?.players.flatMap((player) => player.pigs).find((pig) => pig.id === id)?.name ?? ''
+
   const collected = ({ skill, amount, given, result, pig }: Collected): void => {
     if (result === 'full') {
       hud.say(battleText[TOO_MANY_TOYS] ?? '')
@@ -151,7 +155,7 @@ export function initBattle(onLeave: () => void): BattleView {
       }
     }
     if (skill === null) {
-      hud.say((battleText[FOUND_PROVISIONS] ?? '').replace('>S', pig.name))
+      hud.say((battleText[FOUND_PROVISIONS] ?? '').replace('>S', nameOf(pig)))
       return
     }
     const name = skillName(battleText, skill)

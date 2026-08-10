@@ -35,6 +35,16 @@ export interface PigSpawn {
 export const GRUNT = 0
 
 export interface Pig {
+  /**
+   * What NAMES this pig anywhere but in memory.
+   *
+   * Flat across the whole battle and handed out as the squads are built, so it
+   * survives a trip through anything that cannot carry an object reference —
+   * the event bus first (lib/game/events.ts), and a port to another process
+   * next. Nothing in the rules looks a pig up by it; everything that leaves
+   * the engine is named by it.
+   */
+  id: number
   name: string
   /** Index into the player's squad. */
   index: number
@@ -139,6 +149,7 @@ export class Game {
       throw new Error(`${pigCount} pigs need ${pigCount} spawns, got ${config.spawns.length}`)
     }
     let spawn = 0
+    let id = 0
     this.players = config.players.map((player) => {
       if (player.pigNames.length === 0) throw new Error(`${player.name} has no pigs`)
       return {
@@ -148,6 +159,7 @@ export class Game {
           const at = config.spawns[spawn++]
           const pigClass = at.pigClass ?? GRUNT
           return {
+            id: id++,
             name,
             index,
             health: maxHealthFor(pigClass),
