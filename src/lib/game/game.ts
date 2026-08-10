@@ -209,6 +209,18 @@ export class Game {
   }
 
   /**
+   * Cut the clock to `seconds`, and keep the turn.
+   *
+   * What a PLANTED charge does instead of ending one: the exe re-stamps the
+   * turn's deadline out of the skill's own wait and hands control straight back
+   * (0x4945a5, lib/game/spend.ts). A SET rather than a bonus — ninety seconds
+   * left becomes four — so plant it and run.
+   */
+  hurryTurn(seconds: number): void {
+    this.timeLeftSeconds = seconds
+  }
+
+  /**
    * Advance the turn clock. Returns true exactly when this tick ran the
    * clock out — the caller ends the turn (and owns whatever ceremony that
    * involves).

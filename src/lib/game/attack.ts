@@ -143,10 +143,20 @@ export function createAttack(parts: AttackParts): Attack {
       // synced further down the frame and is therefore a frame stale here.
       if (acting.holding === SKILL.SKIP_TURN) return 'skip'
       if (isLobbed(holding)) {
-        // A weapon with a gauge does not go off on the press at all. The press
-        // starts it CHARGING and the throw comes on the release, or on its own
-        // if it tops out first (0x493796, lib/game/gauge.ts).
         if (gauge || firing) return 'none'
+        // **A GAUGE IS THE WEAPON'S, not the throw's.** The record's +0x14 is
+        // what says whether one fills (`weapons/fire.md`, and it is 1 on the
+        // grenades and 0 on TNT), and the split at 0x493796 goes by that byte:
+        // no gauge means the press writes a charge of ONE and fires now. Which
+        // for a planted charge is the whole point — `speed * charge >> 12` is
+        // nothing, so it goes down at the pig's feet (lib/game/grenade.ts).
+        if (!weaponOf(holding).power) {
+          thrownWith = 1
+          arm()
+          return 'used'
+        }
+        // The press starts it CHARGING and the throw comes on the release, or on
+        // its own if it tops out first (0x493b39, lib/game/gauge.ts).
         gauge = beginGauge()
         return 'used'
       }

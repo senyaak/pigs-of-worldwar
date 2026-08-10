@@ -19,7 +19,6 @@
 import {
   advanceLob,
   blastRange,
-  blastShare,
   bounceLob,
   douseInWater,
   lob,
@@ -31,9 +30,9 @@ import {
   sunkAway
 } from './grenade'
 import type { Lobbed } from './grenade'
-import { DAMAGE_UNIT } from './projectile'
-import { hurt, isDead } from './health'
-import { originY } from './body'
+import { burst } from './blast'
+import type { Mines } from './mines'
+import type { BlastWorld } from './blast'
 import { HAND_BONE } from './pose'
 import type { Point, Pose } from './pose'
 import type { Random } from './random'
@@ -63,18 +62,15 @@ export const LOB_STEP = 35
  */
 const THROW_FROM: Point = { x: 0, y: 0, z: 0 }
 
-/** The world a grenade bounces around in. */
-export interface LobWorld {
-  /** Everyone a blast can catch. */
-  pigs: () => Pig[]
-  /** The map's dummies — the SAME array the blade and the bullets splice from,
-   * or a dummy dies twice (lib/game/targets.ts). */
-  targets: Target[]
-  /** Whether the map SCRIPT has placed this dummy yet (lib/game/script.ts). */
-  present: (id: number) => boolean
+/** The world a grenade bounces around in — everything a BLAST needs (the pigs,
+ * the dummies and the training rule, lib/game/blast.ts) plus the ground it
+ * bounces off on the way there. */
+export interface LobWorld extends BlastWorld {
   query: TerrainQuery
   obstacles: Obstruction
-  training: boolean
+  /** What is buried in the ground: a thrown thing sets a mine off the same way a
+   * foot does (lib/game/mines.ts). */
+  mines: Mines
   /** Where the hand is (lib/game/pose.ts). */
   pose: Pose
   /** The battle's own stream (lib/game/random.ts). The fuse is thrown with a
@@ -120,39 +116,19 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
   const flying: Lobbed[] = []
   /** Named in the order they were thrown (lib/game/bullets.ts). */
   let named = 0
-  const standing = world.targets
 
-  /** Everything within reach takes its share. */
+  /** Everything within reach takes its share (lib/game/blast.ts). */
   const detonate = (shot: Lobbed): void => {
-    const where = { x: shot.x, y: shot.y, z: shot.z }
-    emit({ kind: 'blasted', at: where })
     const row = lobOf(shot.skill)
+    // No row and there is nothing to announce either: a lob without one cannot
+    // have been thrown in the first place (`throwOne` refuses).
     if (!row) return
-    /** Points at the core, and the share a body this far out takes. */
-    const reach = blastRange(row)
-    const took = (dx: number, dy: number, dz: number): number =>
-      Math.round((row.damage * blastShare(Math.hypot(dx, dy, dz), reach)) / DAMAGE_UNIT)
-    for (const pig of world.pigs()) {
-      if (isDead(pig)) continue
-      const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
-      const amount = took(body.x - shot.x, body.y - shot.y, body.z - shot.z)
-      if (amount <= 0) continue
-      const outcome = hurt(pig, amount, world.training)
-      emit({ kind: 'damaged', at: body, amount })
-      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id })
-    }
-    for (let i = standing.length - 1; i >= 0; i--) {
-      const dummy = standing[i]
-      if (!world.present(dummy.id)) continue
-      const amount = took(dummy.x - shot.x, dummy.y - shot.y, dummy.z - shot.z)
-      if (amount <= 0) continue
-      hurt(dummy, amount, false)
-      emit({ kind: 'damaged', at: dummy, amount })
-      if (isDead(dummy)) {
-        standing.splice(i, 1)
-        emit({ kind: 'broke', target: dummy.id, at: { x: dummy.x, y: dummy.y, z: dummy.z } })
-      }
-    }
+    burst(
+      { x: shot.x, y: shot.y, z: shot.z },
+      { damage: row.damage, reach: blastRange(row) },
+      world,
+      emit
+    )
   }
 
   /** Put it back on whatever it went into. False when it met nothing. */
@@ -162,12 +138,12 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
     const row = lobOf(shot.skill)
     if (!row) return false
     // WATER FIRST, and it is ONE contact — the surface and the bed are the same
-    // plane. `Projectile::OnHitLandscape` (0x4377d0) is the whole of it: over a
-    // water-flagged tile it puts a splash at the water height and plays sound
-    // 0x28 at 100/100, and then the arm splits on the contact scalar — under 150
-    // it douses (0x437bfb), over it the thing is kicked up and skips (0x437e5d).
-    // The shipped maps' water is 0 to 48 units deep, so where the water is and
-    // where the ground is are the same place.
+    // plane. `Projectile::OnHitLandscape` (0x4377d0) splits on the contact scalar:
+    // under 150 it douses (0x437bfb, gated on the water test `0x4A6FA0`), over it
+    // the thing is kicked up and skips (0x437e5d). The shipped maps' water is 0 to
+    // 48 units deep, so where the water is and where the ground is are the same
+    // place. (The `Sound::Play(0x28)` this used to name here belongs to the
+    // MINEFIELD arm of the same handler — see the correction in `grenade.ts`.)
     if (world.query.isWater(shot.x, shot.z) && shot.y >= world.query.surface(shot.x, shot.z)) {
       const level = world.query.surface(shot.x, shot.z)
       const on = { x: shot.x, y: level, z: shot.z }
@@ -201,6 +177,14 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       return true
     }
     if (shot.y >= ground) {
+      // A MINEFIELD is set off by anything that touches it, not only by a foot:
+      // the projectile's landscape handler tests the same tile bit the pig's
+      // ground update does and spawns the same blast (0x437a50, lib/game/mines.ts).
+      // On CONTACT rather than at rest — a grenade that bounces once on a mine
+      // and rolls off has still trodden on it.
+      if (world.mines.tread(shot.x, shot.z)) {
+        emit({ kind: 'mineTripped', at: { x: shot.x, y: ground, z: shot.z } })
+      }
       bounceLob(
         shot,
         ground,

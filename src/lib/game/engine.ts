@@ -34,6 +34,8 @@ import { createBullets } from './bullets'
 import type { Bullets } from './bullets'
 import { createLobs } from './lobs'
 import type { Lobs } from './lobs'
+import { createMines } from './mines'
+import type { Mines } from './mines'
 import { createEffectField } from './effectField'
 import type { EffectField } from './effectField'
 import { createDamageNumbers } from './damage'
@@ -195,6 +197,8 @@ export interface Engine {
   readonly targets: Target[]
   readonly shots: Bullets
   readonly grenades: Lobs
+  /** The minefields, and what has been trodden on (lib/game/mines.ts). */
+  readonly mines: Mines
   readonly swings: Strikes
   readonly effects: EffectField
   readonly numbers: DamageNumbers
@@ -321,9 +325,13 @@ export function createEngine(parts: EngineParts): Engine {
     { pigs, targets, present, query, obstacles, training, pose },
     bus.emit
   )
+  /** What is already buried in the ground: the map's MINEFIELDS, which are a bit
+   * in a tile rather than anything anybody put there (lib/game/mines.ts). Before
+   * the grenades, because a thrown thing sets one off the same way a foot does. */
+  const mines = createMines({ pigs, targets, present, query, training, random }, bus.emit)
   /** …and what a GRENADE does, which is a parabola rather than a line. */
   const grenades = createLobs(
-    { pigs, targets, present, query, obstacles, training, pose, random },
+    { pigs, targets, present, query, obstacles, training, pose, random, mines },
     bus.emit
   )
 
@@ -344,6 +352,7 @@ export function createEngine(parts: EngineParts): Engine {
     clips: world.clips,
     shots,
     grenades,
+    mines,
     swings,
     effects,
     numbers,
@@ -365,6 +374,7 @@ export function createEngine(parts: EngineParts): Engine {
     effects.update(STEP_SECONDS)
     shots.update(STEP_SECONDS)
     grenades.update(STEP_SECONDS)
+    mines.update(STEP_SECONDS)
     airDrops.update(STEP_SECONDS)
   }
 
@@ -469,6 +479,7 @@ export function createEngine(parts: EngineParts): Engine {
     targets,
     shots,
     grenades,
+    mines,
     effects,
     numbers,
     airDrops,

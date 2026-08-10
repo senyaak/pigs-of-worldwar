@@ -39,6 +39,10 @@ export type BattleEvent =
   | { kind: 'killed'; pig: PigId }
   /** A grenade went off here. */
   | { kind: 'blasted'; at: Point }
+  /** A pig has just found a MINE with its foot. The CLICK, not the bang — the
+   * blast is four tenths of a second behind it and arrives as `blasted` like any
+   * other (lib/game/mines.ts). */
+  | { kind: 'mineTripped'; at: Point }
   /** …or met water: every water contact reports this first, and then which of
    * the two it was (`Projectile::OnHitLandscape`, 0x4377d0). */
   | { kind: 'splashed'; at: Point }

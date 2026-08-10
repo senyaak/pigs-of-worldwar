@@ -2118,6 +2118,69 @@ Two things this pass turned up that are worth keeping:
   key". `nextTurn(page)` in `e2e/controller.ts` is the handover a spec now has to
   take, and a spec that fires twice on one clock is a spec that is wrong.
 
+### MINEFIELDS are a TILE BIT, and the sound bank is what proved it
+
+Play: "мины тут на карте должны быть — а тнт уже берётся с ящика но ничего не
+делает." Both were sitting in the shipped data.
+
+**A minefield is bit 6 of a tile's type byte** — 99 tiles of it on CAMP, 997 on
+BUTE — and there is nothing to draw for one: the tile's own texture is the whole
+warning, which is why the training ground can say "FOLLOW THE PATH THROUGH THE
+MINEFIELD" about a patch of empty ground. A pig with its feet down on such a tile
+plays `L_MINETR`, spawns the blast **at the tile's centre** (the exe builds the
+position out of the tile indices and never looks at the foot), and the bit is
+CLEARED — one shot per tile, for ever. Twelve frames of fuse, twenty points at the
+core over a grenade's own 1024 of reach. `lib/game/mines.ts`, and
+`weapons/mines.md` has every address.
+
+**A misreading died here, and it had been load-bearing.** Bit 6 was written down
+as WATER two passes ago, with 0x437a50 filed as the splash — `Sound::Play(0x28)`,
+"the water HEIGHT", `WATER_SPLASH_SOUND`. Every piece of that is a mine: bit 5 is
+water (`IsInWater` 0x4a6fa0 tests 5, and 0x4a7000 tests 7 for the wall, which pins
+the byte end to end), 0x4A5140 is `Map::SampleHeight`, and **index 40 of
+`Audio/sfxday.srl` is `L_MINETR`**. The story held together for two passes because
+"a splash at a height, on a flag next to the water flag" is a plausible thing to
+read. The BANK is what broke it — the file has NAMES in it, and a sound index is
+worth resolving before a behaviour is built on top of one.
+
+So the rule the engine was missing is not only "walk onto a mine": **anything
+thrown sets one off too**, out of the same handler, on contact rather than at rest.
+It is six lines in `lobs.ts` because `mines.tread` is the same call the foot makes.
+
+**TNT is a lobbed projectile with no gauge**, which is the distinction the fire
+button did not have: `isLobbed` was deciding both "throws an arc" and "charges on a
+held key", and the record's +0x14 is what actually decides the second (1 on the
+grenades, 0 on TNT). With no gauge the press writes a charge of ONE, and a
+constructor speed of `50 * 1 >> 12` is nothing — **that is what "planted" means
+mechanically: it goes down at the pig's own feet.** Fifty frames of arming under a
+125-frame fuse is near enough six seconds, fifty points at the core, twice a
+grenade's reach.
+
+And using one does not spend the turn — it HURRIES it. The skill record's +0x18 is
+400 hundredths, which raises `[game+0x516]` and takes the mode machine back to
+NORMAL with the turn's deadline re-stamped (0x4945a5): four seconds, as a SET and
+not a bonus, so ninety-eight seconds becomes four. The fuse outlasts it on purpose
+— the clock runs out first, and the beat the turn ends through waits for the charge
+rather than handing over on top of it, because a live lob is in `settling()`.
+
+Three shapes worth keeping:
+
+- **`blast.ts` exists because a mine wanted what a grenade had.** The burst — who
+  is inside it, what each takes, the dummies spliced out of the shared array — was
+  the body of `lobs.ts`, and the honest way to give a second caller it was to stop
+  the grenade owning it. One blast, two callers, and the falloff stays in
+  `grenade.ts` beside the exe reading behind it.
+- **A layer, not a special case.** TNT gets `weaponLayer` = `charge`: fires, no aim
+  view, no gauge. The four planted skills (35, 36, 37, 38) are a real family with
+  two witnesses in the exe, and 35/36 answer for it already even though they have
+  no row yet — so the control set is right the day laying a mine lands.
+- **The mine WEAPON is the same mechanic from the other end** and is deliberately
+  not built: skills 35/36 drop a projectile that, on touching the ground, writes the
+  map's own bit (`Map::SetMine(col, row, 1, flavour)`, 0x4374cf) and leaves it
+  there. `mines.ts` is where it would plant. What is NOT read: whether one mine
+  going off sets its neighbours off, and `[game+0x534]`, the counter the mines'
+  four-second override tests.
+
 ### What is still not read
 
 - **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's

@@ -213,7 +213,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     onChanged: onGameChanged,
     bus
   })
-  const { battle, scenery, obstacles, anim, swings, shots, grenades, effects, numbers, airDrops, dropIn } =
+  const { battle, scenery, obstacles, anim, swings, shots, grenades, mines, effects, numbers, airDrops, dropIn } =
     engine
   /** The mixers, brought into line once a frame with what the engine says each
    * pig is wearing (three/wear.ts). */
@@ -557,6 +557,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     shots: () => shots.live().length,
     aim: () => battle.aim(),
     grenades: () => grenades.at(),
+    mines: () => mines.at().map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     charging: () => battle.charging(),
     firing: () => battle.view().firing?.phase ?? null,
 

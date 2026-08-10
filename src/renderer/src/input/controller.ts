@@ -172,6 +172,9 @@ export interface DebugHooks {
   aim(): number | null
   /** How many grenades are in the air or lying about (three/grenades.ts). */
   grenades(): { x: number; y: number; z: number; fuse: number }[]
+  /** Mines that have been trodden on and are counting down — the only view of a
+   * minefield there is, since nothing draws one (lib/game/mines.ts). */
+  mines(): { x: number; y: number; z: number; fuse: number }[]
   /** How full the power gauge is, 0..1, or null when nothing is charging
    * (lib/game/gauge.ts). */
   charging(): number | null

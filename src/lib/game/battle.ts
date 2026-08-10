@@ -24,7 +24,7 @@ import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
 import { beginWalkAway } from './walkAway'
 import type { WalkAway } from './walkAway'
-import { endsTurn } from './spend'
+import { endsTurn, hurryFor } from './spend'
 import { createSights } from './sights'
 import { createAttack } from './attack'
 import { SKILL } from './skills'
@@ -37,6 +37,7 @@ import type { Anim } from './anim'
 import type { Scenery } from './scenery'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
+import type { Mines } from './mines'
 import type { Strikes } from './strikes'
 import type { EffectField } from './effectField'
 import type { DamageNumbers } from './damage'
@@ -58,6 +59,9 @@ export interface BattleParts {
   clips: ClipTiming[]
   shots: Bullets
   grenades: Lobs
+  /** What is buried in the ground, and what has been trodden on
+   * (lib/game/mines.ts). */
+  mines: Mines
   swings: Strikes
   effects: EffectField
   numbers: DamageNumbers
@@ -166,7 +170,7 @@ export interface Battle {
 }
 
 export function createBattle(parts: BattleParts): Battle {
-  const { game, query, scenery, anim, shots, grenades, swings, effects, numbers } = parts
+  const { game, query, scenery, anim, shots, grenades, mines, swings, effects, numbers } = parts
   const { airDrops, dropIn, drowning, onChanged } = parts
   const emit = parts.bus.emit
 
@@ -247,6 +251,9 @@ export function createBattle(parts: BattleParts): Battle {
     effects.busy() ||
     shots.live().length > 0 ||
     grenades.live() > 0 ||
+    // A mine that has been trodden on and has not gone off yet: four tenths of a
+    // second, and nothing may hand the turn over inside it (lib/game/mines.ts).
+    mines.live() > 0 ||
     numbers.live() > 0 ||
     airDrops.falling() > 0
 
@@ -519,7 +526,14 @@ export function createBattle(parts: BattleParts): Battle {
     // blows (lib/game/spend.ts). Asked of the PIG rather than of the cached
     // `holding`, which is only synced further down the frame and is a frame stale
     // here.
-    if (answered === 'used' && endsTurn(acting.holding)) spent = true
+    if (answered === 'used') {
+      if (endsTurn(acting.holding)) spent = true
+      // A PLANTED charge keeps the turn and takes the clock down to four seconds
+      // instead: enough to get clear of the thing, and not enough to do anything
+      // else with. TNT's own fuse is nearer six, so it goes off in the beat the
+      // turn ends through (lib/game/walkAway.ts waits for it).
+      else if (hurryFor(acting.holding) > 0) game.hurryTurn(hurryFor(acting.holding))
+    }
 
     // **COMMITTED takes the whole of input, and it starts at the FIRE press.**
     // Play: "после нажатия стрелять должно отключаться полностью управление — а
@@ -582,11 +596,25 @@ export function createBattle(parts: BattleParts): Battle {
     // A WEAPON, and only a weapon: SKIP TURN and its neighbours go in the hands
     // the same way but are not something a pig could drop in the water, and
     // taking one away mid-swim would leave the turn unendable.
-    const armed = ['melee', 'gun', 'lob'].includes(weaponLayer(acting.holding))
+    const armed = ['melee', 'gun', 'lob', 'charge'].includes(weaponLayer(acting.holding))
     if (loco.swimming && armed && !committed()) acting.holding = null
     game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
     // Walking INTO a crate is how one is collected; there is no button.
     scenery.collect(acting)
+
+    // …and walking onto a MINE is how one is found. Every pig, not just the one
+    // being driven — the exe asks it in the per-pig ground update — and only with
+    // its feet DOWN: the tile under a pig in the air is not the tile it is
+    // standing on (`[pig+0x382]`, lib/game/mines.ts). The trigger is one-shot, so
+    // standing on the spot is safe once it has gone off, and the noise is the
+    // whole warning the player gets.
+    for (const pig of everyone()) {
+      if (isDead(pig)) continue
+      if (pig === acting && loco.airborne !== null) continue
+      if (mines.tread(pig.position.x, pig.position.z)) {
+        emit({ kind: 'mineTripped', at: { ...pig.position } })
+      }
+    }
 
     // The swing, after the pig has been placed: the blade's own points come off
     // the HAND bone, so where the pig is standing has to be settled first. It

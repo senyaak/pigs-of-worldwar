@@ -67,6 +67,14 @@ export interface Lob {
    * little.
    */
   fuse: number
+  /**
+   * Row **+0x14** — the frames of state 0 the thing spends before its fuse
+   * starts, and it is per-row rather than the constant this used to be: three
+   * for every grenade, **fifty for TNT and the firecracker**. Row +0x14 is also
+   * the switch: nil sends the constructor straight into the fuse, which is what
+   * a tripped mine does (lib/game/mines.ts).
+   */
+  arming: number
   /** Row +0x0C — what the blast takes off at its CORE, in 128ths of a point.
    * 3840 for the plain grenade, which is thirty points against a grunt's
    * fifty (`projectile.ts` has the whole ladder and the read). */
@@ -102,18 +110,49 @@ export interface Lob {
 const LOBS: Record<number, Lob> = {
   /** 19 GRENADE — the plain one. Friction 0.30, restitution 0.80, so 0.12 and
    * 0.32 against grass: a few hops and then a long roll. */
-  19: { id: 412, kind: 24, speed: 300, fuse: 150, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
-  20: { id: 413, kind: 25, speed: 300, fuse: 150, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
-  21: { id: 414, kind: 26, speed: 300, fuse: 150, damage: 2560, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
-  22: { id: 415, kind: 27, speed: 300, fuse: 150, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
-  23: { id: 416, kind: 28, speed: 300, fuse: 150, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
-  24: { id: 417, kind: 29, speed: 300, fuse: 150, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED },
-  25: { id: 418, kind: 30, speed: 300, fuse: 150, damage: 3840, blast: 1024, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  19: { id: 412, kind: 24, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
+  20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
+  21: { id: 414, kind: 26, speed: 300, fuse: 150, arming: 3, damage: 2560, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  22: { id: 415, kind: 27, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  23: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  24: { id: 417, kind: 29, speed: 300, fuse: 150, arming: 3, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  25: { id: 418, kind: 30, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 2048 / FIXED, restitution: 3276 / FIXED },
   /** 26 is the odd one twice over: half the row's +0x04 and no +0x08, and a
    * material of 0.001 on both — it STICKS where it lands. */
-  26: { id: 419, kind: 31, speed: 300, fuse: 150, damage: 5120, blast: 1024, friction: 4 / FIXED, restitution: 4 / FIXED },
-  27: { id: 420, kind: 32, speed: 300, fuse: 150, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED }
+  26: { id: 419, kind: 31, speed: 300, fuse: 150, arming: 3, damage: 5120, blast: 1024, friction: 4 / FIXED, restitution: 4 / FIXED },
+  27: { id: 420, kind: 32, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
+  /**
+   * **37 TNT — PLANTED, not thrown**, and its row says so in three places: a
+   * speed of 50 where a grenade has 300 and no power gauge to multiply it by, so
+   * `speed * charge >> 12` with the charge of 1 a press hands over
+   * (`weapons/fire.md`) is nothing at all — it goes down at the pig's own feet.
+   * A material of 0.0999 on both halves, so it does not roll off. And fifty
+   * frames of arming under a 125-frame fuse: **near enough six seconds**, against
+   * the four the turn gives you to get clear (lib/game/spend.ts).
+   *
+   * Fifty points at the core over 2048 of blast — twice a grenade's reach, and
+   * enough to kill a grunt outright where a grenade takes thirty off it.
+   */
+  37: { id: 441, kind: 53, speed: 50, fuse: 125, arming: 50, damage: 6400, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED }
 }
+
+/**
+ * The explosives a pig PLANTS rather than throws — 35 MINE, 36 ANTI-PERSONNEL
+ * MINE, 37 TNT, 38 FIRECRACKER.
+ *
+ * A real family with two witnesses in the exe rather than a convenience: they
+ * are the four skills whose record clears the "go into WALK AWAY" flag, and the
+ * two that carry a WAIT are among them (lib/game/spend.ts). None of the four
+ * charges, none of them aims, and what each leaves behind stays where the pig
+ * put it. **35 and 36 are here without a row above**: they leave a bit in the
+ * ground instead of a thing with a fuse (lib/game/mines.ts), and this answers for
+ * them so the control set is right the day they land.
+ */
+const PLANTED = new Set([35, 36, 37, 38])
+
+/** Whether this skill is planted at the pig's feet. */
+export const isPlanted = (skill: number | null): boolean =>
+  skill !== null && PLANTED.has(skill)
 
 /** What this skill lobs, or null for everything that does not lob. */
 export const lobOf = (skill: number | null): Lob | null =>
@@ -123,8 +162,6 @@ export const lobOf = (skill: number | null): Lob | null =>
  * the gauge both ask. */
 export const isLobbed = (skill: number | null): boolean => lobOf(skill) !== null
 
-/** The three frames of state 0 before the fuse proper starts — row +0x14. */
-export const ARMING_FRAMES = 3
 /** `rand() & 7` on top of the row's figure, once, in the constructor. */
 export const FUSE_JITTER = 7
 
@@ -137,7 +174,7 @@ export const FUSE_JITTER = 7
  * `random` is injectable so a spec can pin the jitter.
  */
 export const fuseSeconds = (row: Lob, random: () => number = Math.random): number =>
-  fromExeFrames(ARMING_FRAMES + row.fuse + Math.floor(random() * (FUSE_JITTER + 1)))
+  fromExeFrames(row.arming + row.fuse + Math.floor(random() * (FUSE_JITTER + 1)))
 
 /**
  * The blast, DECODED end to end — `0x48CBA0`, which `Pig::OnHit`'s
@@ -179,9 +216,13 @@ export const BLAST_CORE = 512
  */
 export const BLAST_BIAS = 512
 
-/** How far the falloff runs, for this row — the exe's divisor without the
- * struck body's own unread term. */
-export const blastRange = (row: Lob): number => Math.max(0, row.blast - BLAST_BIAS)
+/** How far the falloff runs for a blast of this size — the exe's divisor
+ * without the struck body's own unread term. A MINE has a blast and no row
+ * (lib/game/mines.ts), which is why the number comes in on its own. */
+export const blastReach = (blast: number): number => Math.max(0, blast - BLAST_BIAS)
+
+/** …and the same, for a row that carries one. */
+export const blastRange = (row: Lob): number => blastReach(row.blast)
 
 /** The share of the core damage a body at this distance takes, 0..1 — and it
  * never falls below a quarter inside the range. */
@@ -305,31 +346,23 @@ export function lob(
   }
 }
 
-/**
- * Water is not a surface for a thrown thing: it GOES IN.
- *
- * **And the engine says so outright, which took a proper look to find.** Water
- * is bit **6** of the tile byte — not the 0x80 the wall uses — and the
- * projectile's own handler for it is at 0x437a57:
- *
- * ```
- * 437a57  cl = [map + tile*4 + 0x13B0E]
- * 437a5e  cl >>= 6 ; cl &= 1            ; the WATER bit
- * 437a6a  if (!water) -> 0x437BE9        ; nothing
- * 437aa8  0x4A5140(x, z)                 ; the water HEIGHT, into the y
- * 437ad2  Sound::Play(0x28, 100, 100)    ; the splash
- * 437ae4  the tile's bit 15 picks id 0x1AD or 0x1AC
- * 437b46  0x431F00(...)                  ; a SPLASH projectile at the surface
- * ```
- *
- * There is no bounce anywhere in it, no material, and nothing that stops the
- * thrown thing: the engine drops a splash at the water line and the grenade
- * carries on down. So `SKIPS_ON_WATER` and `WATER_BOUNCE` are both gone — the
- * skip play asked for is a LAND behaviour, which falls out of 0.12 friction on a
- * flat throw, and water is what play has been shouting for: "граната НЕ ТОНЕТ В
- * ВОДЕ, должна прям тонуть и идти вниз."
- */
-export const WATER_SPLASH_SOUND = 0x28
+// WATER IS NOT A SURFACE for a thrown thing: it GOES IN. There is no bounce
+// anywhere in the water arm, no material, and nothing that stops the thrown
+// thing, which is why `SKIPS_ON_WATER` and `WATER_BOUNCE` are both gone — the
+// skip play asked for is a LAND behaviour, out of 0.12 friction on a flat throw,
+// and water is what play has been shouting for: "граната НЕ ТОНЕТ В ВОДЕ,
+// должна прям тонуть и идти вниз."
+//
+// **CORRECTION, and it cost this file a constant.** The block that used to sit
+// here — 0x437a57, "water is bit 6 of the tile byte", `Sound::Play(0x28)` "the
+// splash", `WATER_SPLASH_SOUND` — is not about water at all. Bit 6 is the
+// MINEFIELD flag; bit 5 is water (`0x4A6FA0` below tests 5, and 0x4a7000 tests 7
+// for the wall, which settles the byte end to end); sound 0x28 is index 40 of
+// `Audio/sfxday.srl`, **`L_MINETR`**; and what that block spawns is a mine going
+// off. A grenade landing in a minefield sets it off — a rule this engine did not
+// have (lib/game/mines.ts). The misreading survived a whole pass because "a
+// splash at a height, on a flag next to the water flag" is a story that holds
+// together. The BANK is what broke it.
 
 /**
  * …and once it is in and slow, it is DOUSED — and does not go off.

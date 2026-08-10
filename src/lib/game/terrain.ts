@@ -1,7 +1,7 @@
 // Terrain queries for the game: ground height at a world position and spawn
 // picking. Pure — works on the parsed PMG blocks (lib/formats/pmg.ts).
 
-import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP, TILE_WALL, TILE_WATER, VERTS_PER_SIDE } from '../formats/pmg'
+import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_MINE, TILE_STEP, TILE_WALL, TILE_WATER, VERTS_PER_SIDE } from '../formats/pmg'
 import type { TerrainBlock, TerrainTile } from '../formats/pmg'
 import type { PigSpawn } from './game'
 
@@ -475,6 +475,39 @@ export class TerrainQuery {
    * 0x0b and the far more common 0x2b alike. */
   isClimbing(x: number, z: number): boolean {
     return this.tileType(x, z) === CLIMBING_TILE
+  }
+
+  /**
+   * Is a MINE buried here? Bit 6 of the type byte, and it is the whole of what
+   * a minefield is — there is no object to see (lib/game/mines.ts).
+   *
+   * Whether one is still there is not this class's business: the exe CLEARS the
+   * bit when the mine goes off (`Map::SetMine` 0x4a6f00) and the map data a
+   * query reads is what the file said. `Mines` keeps the difference.
+   */
+  hasMine(x: number, z: number): boolean {
+    const tile = this.tileAt(x, z)
+    return tile !== null && (tile.type & TILE_MINE) !== 0
+  }
+
+  /**
+   * The middle of the tile a point is on, and which tile that is.
+   *
+   * A mine goes off at the TILE's centre rather than under the foot that found
+   * it: the exe builds the position out of the tile indices alone
+   * (`col << 9 − 0x3f00`, 0x46c022), which is the centre of a 512 tile. Null off
+   * the map.
+   */
+  tileCentre(x: number, z: number): { x: number; z: number; col: number; row: number } | null {
+    if (this.tileAt(x, z) === null) return null
+    const col = Math.floor((x - this.minX) / TILE_STEP)
+    const row = Math.floor((z - this.minZ) / TILE_STEP)
+    return {
+      x: this.minX + col * TILE_STEP + TILE_STEP / 2,
+      z: this.minZ + row * TILE_STEP + TILE_STEP / 2,
+      col,
+      row
+    }
   }
 
   /**

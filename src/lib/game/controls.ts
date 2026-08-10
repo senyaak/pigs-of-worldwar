@@ -17,7 +17,7 @@
 // is HELD and says what it means.
 
 import { meleeOf } from './melee'
-import { isLobbed } from './grenade'
+import { isLobbed, isPlanted } from './grenade'
 import { isGun } from './projectile'
 
 /**
@@ -117,7 +117,7 @@ export interface Situation {
  * angle to zero for skills 3 BAYONET and 5 CATTLE PROD, so there is nothing for an
  * aim view to show. A blade is `movement + melee` and no more.
  */
-export type WeaponLayer = 'none' | 'skill' | 'melee' | 'gun' | 'lob'
+export type WeaponLayer = 'none' | 'skill' | 'melee' | 'gun' | 'lob' | 'charge'
 
 /** Whether this layer has an aim view — a set where the walk POINTS instead. */
 export const layerSights = (layer: WeaponLayer): boolean => layer === 'gun' || layer === 'lob'
@@ -143,6 +143,11 @@ export const layerFires = (layer: WeaponLayer): boolean => layer !== 'none'
 export function weaponLayer(skill: number | null): WeaponLayer {
   if (skill === null) return 'none'
   if (meleeOf(skill)) return 'melee'
+  // A PLANTED charge before a thrown one: TNT is a lobbed projectile in every
+  // respect but the two that decide the control set — it has no gauge to hold and
+  // no aim view to enter, because it goes at the pig's own feet
+  // (lib/game/grenade.ts `isPlanted`). Its own layer is `movement + plant`.
+  if (isPlanted(skill)) return 'charge'
   if (isLobbed(skill)) return 'lob'
   if (isGun(skill)) return 'gun'
   // A skill with no weapon behind it is still IN THE HANDS, and F uses it: SKIP

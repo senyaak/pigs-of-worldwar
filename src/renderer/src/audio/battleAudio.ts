@@ -47,6 +47,10 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
         if (weapon) playCue(bank(), BATTLE_SOUNDS[weapon.impact])
       },
       blasted: () => playCue(bank(), BATTLE_SOUNDS.blast),
+      // The CLICK under the foot. It is the only warning there is — a minefield
+      // has nothing standing on it — and the bang is four tenths of a second
+      // behind it (lib/game/mines.ts).
+      mineTripped: () => playCue(bank(), BATTLE_SOUNDS.mine),
       // Every water contact splashes before the engine looks at the speed at
       // all, and then it is either a skip or a dousing.
       splashed: () => playCue(bank(), BATTLE_SOUNDS.splash),

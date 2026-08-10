@@ -39,13 +39,33 @@
  */
 const KEEPS_TURN = new Set([0, 35, 36, 37, 38, 52, 54, 60, 61, 62, 63, 64, 66])
 
-/**
- * Whether USING this skill spends the turn. Empty hands spend nothing.
- *
- * The four-second wait TNT and FIRECRACKER carry is not modelled: neither is a
- * weapon in this engine yet — there is no row for either in `grenade.ts` or
- * `projectile.ts` — and a timer nothing can start would be a guess with no way
- * to be wrong. The number is in `turns/notes.md` for when one of them lands.
- */
+/** Whether USING this skill spends the turn. Empty hands spend nothing. */
 export const endsTurn = (skill: number | null): boolean =>
   skill !== null && !KEEPS_TURN.has(skill)
+
+/**
+ * **PLANT IT AND RUN**: the seconds the clock is cut to instead of the turn
+ * ending, `+0x18` of the record over a hundred.
+ *
+ * 400 hundredths on TNT and the firecracker and nil on everything else, and the
+ * mode machine spends it the same way for both: a wait above zero raises
+ * `[game+0x516]`, which is the arm at 0x4945a5 — back to NORMAL mode with the
+ * turn's deadline re-stamped, so the pig keeps the controls and has four seconds
+ * to be somewhere else. Zero here and the flags decide alone (`endsTurn`).
+ *
+ * It is a SET and not a bonus: the exe writes the deadline rather than adding to
+ * it (0x4945d9), so a pig with ninety seconds left has four the moment the charge
+ * goes down.
+ *
+ * **The MINES have their own arm and it is not this one.** 0x4942e6 tests for
+ * skills 35 and 36 by number and gives them the same four seconds *only* when
+ * `[game+0x534] >= 2` or the turn has less than four seconds left; otherwise
+ * laying one costs nothing at all. `[game+0x534]` is undecoded — it is written to
+ * 2 there and nowhere this pass read — and neither mine is a weapon in this engine
+ * yet, so the arm is recorded rather than implemented.
+ */
+export const hurryFor = (skill: number | null): number =>
+  skill === 37 || skill === 38 ? PLANTED_SECONDS : 0
+
+/** `+0x18` = 400 hundredths — four seconds, on the two charges that carry one. */
+export const PLANTED_SECONDS = 4

@@ -191,7 +191,19 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * 12 with a pitch of `0x54 + (rand & 0x20)`, so some of the family jitter
    * it; kind 24's is flat.
    */
-  blast: { sound: 'E_1', volume: 100, pitch: 100 }
+  blast: { sound: 'E_1', volume: 100, pitch: 100 },
+  /**
+   * A MINE found by a foot. DECODED, mix and all, and the bank NAMES it: the
+   * trigger plays index **0x28 at 100/100** (0x46c072, and the same call from the
+   * two other things that set one off), and index 40 of `Audio/sfxday.srl` is
+   * **`L_MINETR`** — mine trigger. Which is also what settled the tile bit it
+   * hangs off: a note had 0x40 down as water and this file's own splash was the
+   * first thing to disagree (lib/game/mines.ts).
+   *
+   * What goes off afterwards is `blast` above — the mine's own destructor arm
+   * funnels into the very same `E_1` a grenade plays (0x433d1a → 0x435375).
+   */
+  mine: { sound: 'L_MINETR', volume: 100, pitch: 100 }
 }
 
 /** Which barrel makes which noise, by skill — see `pistol`/`rifle` above. */
