@@ -27,7 +27,6 @@ import { createDropInArt } from './dropIn'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import type { Battle } from '../../../lib/game/battle'
-import { createBonePose } from './bonePose'
 import { createTween } from './tween'
 import { createWear } from './wear'
 import type { Point } from '../../../lib/game/pose'
@@ -147,10 +146,6 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const props = buildMapProps(assets.objects, assets.props, assets.propTextures)
   root.add(props.group)
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
-  // The pose PORT: the one thing a blow cannot work out for itself. Everything
-  // that reaches for a bone — the blade, the muzzle, the scope's eye — goes
-  // through this, so none of them holds a mesh (lib/game/pose.ts).
-  const pose = createBonePose(squad, root)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
   const dropInArt = createDropInArt(squad, assets.canopy)
@@ -221,6 +216,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       terrainArt: assets.terrainTextures,
       objects: assets.objects,
       clips: assets.clips,
+      skeleton: assets.skeleton,
       map,
       // A map with no canopy art stands its squad on the markers instead: a pig
       // hanging from nothing is worse than one that starts where it was going
@@ -228,7 +224,6 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       parachutes: assets.canopy !== null
     },
     query,
-    pose,
     onChanged: onGameChanged,
     bus
   })
@@ -236,7 +231,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     engine
   /** The mixers, brought into line once a frame with what the engine says each
    * pig is wearing (three/wear.ts). */
-  const wear = createWear(squad, anim)
+  const wear = createWear(squad, anim, engine.pose)
   // Up they go, before the first frame is drawn: the engine has already lifted
   // them, and a squad standing on its markers for one frame reads as a stutter.
   dropInArt.draw(dropIn.live(), (one) => one.pig.position)
@@ -289,7 +284,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // A gap means the sights were down in between; start the lag afresh.
     if (frame > eyeFrame + 1) settled = false
     eyeFrame = frame
-    const eyeAt = pose.boneToWorld(soldier.pig, SCOPE_BONE, SCOPE_MOUNT) ?? heldEye
+    const eyeAt = engine.pose.boneToWorld(soldier.pig, SCOPE_BONE, SCOPE_MOUNT) ?? heldEye
     // …and the HEIGHT LAGS. The exe does not put the camera at the hand's y —
     // it moves a THIRD of the way there each frame and no further:
     //
@@ -513,9 +508,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     }
     // …and then everything that SHOWS it. Every mixer is brought into line with
     // what the engine now says each pig wears (three/wear.ts).
-    wear.apply()
+    wear.apply(engine.alpha())
     show(delta)
-    squad.update(delta)
     marker.bob(time)
     // …and what the engine says is in the air gets drawn where it now is. Once
     // a frame, after everything that could have moved or spent one.

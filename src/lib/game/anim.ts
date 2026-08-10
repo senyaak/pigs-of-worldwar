@@ -34,6 +34,12 @@ export interface WornClip {
   revision: number
   /** Seconds left of a committed clip; 0 when nothing is committed. */
   left: number
+  /**
+   * Seconds since it STARTED, and the reason this state is enough to pose a
+   * pig with: the cursor was the mixer's, so the pose only existed once
+   * something drew it (lib/game/clipPose.ts).
+   */
+  elapsed: number
 }
 
 /** The upper-body clip laid over the worn one — the weapon channel
@@ -45,7 +51,7 @@ export interface WornOverlay {
   phase: number
 }
 
-const NOTHING: WornClip = { index: null, once: false, revision: 0, left: 0 }
+const NOTHING: WornClip = { index: null, once: false, revision: 0, left: 0, elapsed: 0 }
 const NO_OVERLAY: WornOverlay = { index: -1, phase: 0 }
 
 export interface Anim {
@@ -80,7 +86,8 @@ export function createAnim(clips: ClipTiming[]): Anim {
       index,
       once,
       revision,
-      left: once && index !== null ? clipSeconds(clips[index]) : 0
+      left: once && index !== null ? clipSeconds(clips[index]) : 0,
+      elapsed: 0
     })
   }
 
@@ -103,6 +110,7 @@ export function createAnim(clips: ClipTiming[]): Anim {
     animating: (pig) => (worn.get(pig)?.left ?? 0) > 0,
     update(delta) {
       for (const one of worn.values()) {
+        one.elapsed += delta
         if (one.left > 0) one.left = Math.max(0, one.left - delta)
       }
     },

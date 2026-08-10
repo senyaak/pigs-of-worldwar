@@ -10,14 +10,13 @@
 // arriving leaks into the thing that stands and walks.
 
 import * as THREE from 'three'
-import type { Bone, Clip, Model, Texture } from '../api'
+import type { Bone, Model, Texture } from '../api'
 import type { Pig } from '../../../lib/game/game'
 import { restingY } from '../../../lib/game/locomotion'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { buildPig } from './pig'
 import type { Pig as PigMesh } from './pig'
-import { createPlayer } from './clips'
-import type { Player as ClipPlayer } from './clips'
+import type { Quat } from '../../../lib/game/quaternion'
 import { classArt } from './soldiers'
 import type { PigPlate } from '../contracts/overlay'
 
@@ -29,9 +28,11 @@ export interface SoldierArt {
   textures: Texture[]
 }
 
-// The model's own forward axis — chosen so a pig FACES where it walks
-// (π had them strolling sideways like crabs; π/2 had them moonwalking).
-export const PIG_HEADING_OFFSET = -Math.PI / 2
+// The model's own forward axis. It belongs to the RULES now — a bone's world
+// position depends on it (lib/game/skeleton.ts) — and is re-exported here
+// because everything that stands a pig up reads it from this module.
+import { PIG_HEADING_OFFSET } from '../../../lib/game/skeleton'
+export { PIG_HEADING_OFFSET }
 
 /** One pig, drawn. */
 export interface Soldier {
@@ -44,22 +45,14 @@ export interface Soldier {
    * class had no art of its own. */
   readonly art: string
   /**
-   * Wear a looping clip, or the bind pose. Repeating the one already on is
-   * free, and asking for a different one CANCELS a committed animation —
-   * which is the original's own model: a movement clip request resets the
-   * cursor outright (0x472320), so landing on the run replaces the get-up on
-   * the next frame. Who decides is the domain, not this.
+   * Wear this pose: one parent-relative turn per bone, in HIR order.
+   *
+   * The ENGINE works it out — which clip, how far into it, the weapon channel
+   * laid over the top and every convention behind them (lib/game/bonePose.ts)
+   * — because where a bone ends up is what a blade sweeps through and where a
+   * muzzle points. This writes it onto three's bones and lets the GPU skin.
    */
-  setClip(index: number | null): void
-  /** Commit to a clip played through once, holding its last frame. */
-  playOnce(index: number): void
-  /**
-   * Lay a clip's upper body over whatever is worn, held at `phase` (0..1
-   * through it); -1 clears it. This is aiming — the pig runs, walks or idles
-   * underneath while its arms hold the weapon, which is how the original
-   * keeps two animations on one pig (three/clips.ts, lib/game/aim.ts).
-   */
-  overlay(index: number, phase: number): void
+  pose(turns: readonly Quat[]): void
   /**
    * DRAW it standing here — the drop-in's height mid-air, the acting pig's off
    * the locomotion state, or a point interpolated between two steps of it.
@@ -78,8 +71,6 @@ export interface Squad {
    * over the crown the name floats — the dashboard's own number, passed in
    * rather than read, so this module owes `ui/` nothing. */
   plates(camera: THREE.Camera, width: number, height: number, lift: number): PigPlate[]
-  /** Advance every clip player. */
-  update(delta: number): void
   dispose(): void
 }
 
@@ -88,7 +79,6 @@ export interface SquadAssets {
    * is the fallback for a class nothing loaded art for. */
   soldiers: SoldierArt[]
   skeleton: Bone[]
-  clips: Clip[]
 }
 
 /**
@@ -103,16 +93,12 @@ export function fieldSquad(
   const artFor = (pigClass: number): SoldierArt =>
     assets.soldiers.find((art) => art.base === classArt(pigClass)) ?? assets.soldiers[0]
 
-  // The clip player is the one piece a caller never touches, so it stays
-  // beside the soldier rather than on it.
-  const drawn = pigs.map((pig) => {
+  const members = pigs.map((pig) => {
     const art = artFor(pig.pigClass)
     const mesh = buildPig(art.model, art.textures, assets.skeleton)
     // buildPig wraps the mesh in its own converted group; the battle has one
     // already, so only the mesh moves across.
     const node = mesh.group.children[0]
-    const player: ClipPlayer = createPlayer(mesh)
-    let clip: number | null = null
     root.add(node)
 
     const soldier: Soldier = {
@@ -120,17 +106,12 @@ export function fieldSquad(
       mesh,
       node,
       art: art.base,
-      setClip(index) {
-        if (clip === index) return
-        clip = index
-        player.play(index === null ? null : (assets.clips[index] ?? null))
-      },
-      playOnce(index) {
-        clip = index
-        player.playOnce(assets.clips[index] ?? null)
-      },
-      overlay(index, phase) {
-        player.overlay(assets.clips[index] ?? null, phase)
+      pose(turns) {
+        const count = Math.min(turns.length, mesh.bones.length)
+        for (let bone = 0; bone < count; bone++) {
+          const { x, y, z, w } = turns[bone]
+          mesh.bones[bone].quaternion.set(x, y, z, w)
+        }
       },
       place(x, y, z, heading) {
         // DRAWING, and only that. The pig's own position is the engine's and
@@ -143,9 +124,8 @@ export function fieldSquad(
       }
     }
     soldier.place(pig.position.x, restingY(query, pig.position.x, pig.position.z), pig.position.z, pig.heading)
-    return { soldier, player }
+    return soldier
   })
-  const members = drawn.map((each) => each.soldier)
 
   return {
     members,
@@ -176,9 +156,6 @@ export function fieldSquad(
         })
       }
       return out
-    },
-    update(delta) {
-      for (const { player } of drawn) player.update(delta)
     },
     dispose() {
       for (const { mesh } of members) mesh.dispose()

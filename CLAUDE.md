@@ -261,7 +261,10 @@ every breach the repo has had compiled cleanly.
 - `src/lib/formats/` — one pure reader per format (mad, tim, mgl, bmp, model,
   hir, mcap, pmg, ptg, pog, srl). Bytes in, structures out. May not know the
   rules.
-- `src/lib/game/` — **the ENGINE**: the rules AND the battle. `muster.ts` says
+- `src/lib/game/` — **the ENGINE**: the rules AND the battle, poses included —
+  `clipPose.ts` samples a clip, `skeleton.ts` walks the bone chain and
+  `bonePose.ts` answers where the muzzle, the blade and the scope's eye are,
+  so nothing has to pose a mesh to find out. `muster.ts` says
   who a map fields and stands them on it; `engine.ts` BUILDS the battle —
   parsed map data in, something that steps with `update(delta)` out — so a
   battle can be assembled with no scene to assemble it in, which
@@ -273,9 +276,10 @@ every breach the repo has had compiled cleanly.
   the descents; `effectField.ts`, `damage.ts`, `anim.ts` the lists the battle
   WAITS on. No three, no Electron, no DOM: it can be stepped headless.
 - `src/renderer/src/three/` — **graphics, and only that**. It builds art around
-  an engine and reads `battle.view()` once the frame has run. It ticks nothing:
-  `engine.update(delta)` is the whole game frame. It may not import `ui/` or
-  `audio/` at all.
+  an engine and reads `battle.view()` once the frame has run. It ticks nothing
+  (`engine.update(delta)` is the whole game frame) and it ANIMATES nothing: the
+  pose is the engine's and `wear.ts` writes it onto the bones. It may not
+  import `ui/` or `audio/` at all.
 - `src/renderer/src/audio/` — **sound, and only that**. `battleSound.ts`
   assembles the domain and subscribes it to the bus; it knows nothing about
   what is drawn.
@@ -569,7 +573,7 @@ stand it back up every frame.
 decrements it where the clip's own cursor wraps (0x46e27f..0x46e2cb), so a
 count of 1 means "play it through once". Two clips are asked for that way:
 the jump's crouch (the launch waits for it, 0x46e8e2) and a landing's get-up
-(0x470944, and the parachute's 0x4717f5). `three/clips.ts` plays those with
+(0x470944, and the parachute's 0x4717f5). `lib/game/clipPose.ts` samples those with
 `LoopOnce` and CLAMPS the last frame.
 
 **And BOTH belong to a pig that is not being driven.** The crouch is the
@@ -785,7 +789,7 @@ decoded outright.
 
 **The eye is SAMPLED ONCE AN ENGINE FRAME**, and that turned out to matter
 more than the tremor did. Measured in play, the scope camera moved on 267 of
-289 rendered frames — the mount is on a bone the mixer interpolates, so the
+289 rendered frames — the mount is on a bone the pose interpolates, so the
 breath glided however the drift was shaped. Holding the eye between engine
 frames (`three/battle.ts`, `scopeEye`) inverts it: 259 of 290 frames now hold
 perfectly still and the rest jump, biggest step 2.16 against a mean of 0.13.
@@ -930,7 +934,7 @@ Play, again: "всё ещё анимация сброса ящика сильн�
 анимацию." The gate was not the problem — `effects.busy()` is the right test
 for the break. The problem was one line further down: the aftermath block put
 `ANIM.IDLE` on the pig on every frame of the wait, and **asking for a clip
-cancels a committed one** (`three/clips.ts`). A bayonet strikes on frames 11
+cancels a committed one** (`lib/game/anim.ts`). A bayonet strikes on frames 11
 to 14 of a 36-frame clip, so the swing was thrown away with most of a second
 still to run, and a gun's attack clip was killed the frame after it started.
 The wait also never called `swings.update`, so nothing was advancing anyway.
@@ -1427,9 +1431,9 @@ half of it, and the only reading under which this file's own sentence about the 
 - **The pig slides, and that stays.** The walking clips carry a body about
   855 units a second at 25 fps; the exe walks 1560, so the feet skate about
   2×. Driving playback off the walking speed to close that (a `gait.ts` that
-  scaled the mixer) was built and rejected on sight — the legs whirl, and
+  scaled playback) was built and rejected on sight — the legs whirl, and
   the run clip is not foot-locked to begin with, its two hooves disagreeing
-  by 40%. `three/clips.ts` plays everything at a flat 25;
+  by 40%. `lib/game/clips.ts` plays everything at a flat 25;
   `movement/stride.js` is the measurement.
 - **Contact softening is not modelled.** The original lets a body penetrate
   and pushes it out by a decaying bias (0.2 → 0.02); a landing here pins to
@@ -1680,7 +1684,7 @@ Seven jobs are open and play named all seven. In the order they were named:
 
 **1. A PIG DOES NOT MOVE while it walks.** Play: "свиньи ещё не двигаются при
 ходьбе." Written down and not chased. Worth knowing before starting: the clips
-themselves play (`three/clips.ts` runs everything at a flat 25 fps and the walk is
+themselves play (`lib/game/clips.ts` runs everything at a flat 25 fps and the walk is
 clip 0/3), the pig SLIDES by design and that is its own divergence above, and only
 the ACTING pig is driven — every other one is put on `ANIM.IDLE` every frame by the
 scene's own loop, which is the first place to look.
@@ -1933,8 +1937,8 @@ POLLED" above.
   0x471f50 an identical one beside it — and the weapon's clips go on the
   second while running, walking and idling go on underneath. `mcap.mad` has
   no armed run cycle at all; a pig charging with a bayonet is the ordinary
-  run with the weapon channel over its arms. `three/clips.ts` does that with
-  a bone overlay applied AFTER the mixer.
+  run with the weapon channel over its arms. `lib/game/clipPose.ts` does that
+  with a bone overlay composed into the pose.
 
   Two things there are the remake's own: WHERE a weapon hangs, and which
   bones the overlay takes (spine, head, both arms). The first is play's word

@@ -1,37 +1,35 @@
-// Making the mixers agree with what the engine says each pig is playing.
+// Wearing the engine's pose.
 //
-// The engine owns the clip and whether it has finished (`lib/game/anim.ts`);
-// this walks the squad once a frame and applies it. Immediate mode on purpose:
-// there is no event to miss and no way for the two to drift apart.
+// The renderer used to keep an animation mixer per pig and a clock to drive it
+// — a second source of truth for something the rules measure blades and
+// muzzles against. The pose is the ENGINE's now (lib/game/bonePose.ts), turn
+// by turn, and this walks the squad once a frame and writes it onto the bones.
 //
-// `revision` is the whole trick. A clip that is merely STILL RUNNING must not
-// be restarted every frame, and one that is asked for AGAIN must be — a second
-// bayonet swing plays the same index twice and has to start over. The engine
-// bumps the number whenever a clip starts, so applying it once is exactly
-// right.
+// `alpha` is what keeps it smooth: the rules step in fixed quanta and the
+// screen does not, so the clip is sampled part of a step ahead of where the
+// engine's own cursor stands — the same tween everything else on screen gets
+// (three/tween.ts).
 
+import { STEP_SECONDS } from '../../../lib/game/engine'
 import type { Anim } from '../../../lib/game/anim'
+import type { BonePose } from '../../../lib/game/bonePose'
 import type { Squad } from './squad'
 
 export interface Wear {
-  /** Apply the engine's animation state to every pig drawn. Once a frame. */
-  apply(): void
+  /** Pose every pig drawn, `alpha` of the way into the step that has not run
+   * yet. Once a frame. */
+  apply(alpha: number): void
 }
 
-export function createWear(squad: Squad, anim: Anim): Wear {
-  const applied = new Map<object, number>()
-
+export function createWear(squad: Squad, anim: Anim, pose: BonePose): Wear {
   return {
-    apply() {
+    apply(alpha) {
+      // Where the clip stands ON SCREEN: the engine's cursor is the boundary
+      // that has already run, so the picture is that much of a step further on.
+      const ahead = Math.max(0, Math.min(1, alpha)) * STEP_SECONDS
       for (const soldier of squad.members) {
         const worn = anim.wornBy(soldier.pig)
-        if (applied.get(soldier.pig) !== worn.revision) {
-          applied.set(soldier.pig, worn.revision)
-          if (worn.once && worn.index !== null) soldier.playOnce(worn.index)
-          else soldier.setClip(worn.index)
-        }
-        const over = anim.overlayOf(soldier.pig)
-        soldier.overlay(over.index, over.phase)
+        soldier.pose(pose.poseOf(soldier.pig, worn.elapsed + ahead).turns)
       }
     }
   }

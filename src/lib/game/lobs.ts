@@ -36,6 +36,7 @@ import { hurt, isDead } from './health'
 import { originY } from './body'
 import { HAND_BONE } from './pose'
 import type { Point, Pose } from './pose'
+import type { Random } from './random'
 import type { Pig } from './game'
 import type { Target } from './targets'
 import type { Obstruction } from './obstacles'
@@ -76,6 +77,10 @@ export interface LobWorld {
   training: boolean
   /** Where the hand is (lib/game/pose.ts). */
   pose: Pose
+  /** The battle's own stream (lib/game/random.ts). The fuse is thrown with a
+   * jitter of up to seven frames and that decides when it goes off, so it is
+   * a roll the whole battle has to agree on. */
+  random: Random
 }
 
 export interface Lobs {
@@ -221,7 +226,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       if (skill === null || !lobOf(skill)) return false
       const from = world.pose.boneToWorld(pig, HAND_BONE, THROW_FROM)
       if (!from) return false
-      const shot = lob(skill, from, pig.heading, aim, charge)
+      const shot = lob(skill, from, pig.heading, aim, charge, world.random)
       if (!shot) return false
       flying.push(shot)
       return true

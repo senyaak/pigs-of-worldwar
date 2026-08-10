@@ -1,13 +1,13 @@
 // The model viewer panel: loads a model + its clips over IPC, hands the data
-// to the three layer (pig.ts, clips.ts, scene.ts), and owns the stats line
+// to the three layer (pig.ts, clipViewer.ts, scene.ts), and owns the stats line
 // and the animation dropdown.
 
 import type { Clip } from '../api'
 import { ensureScene } from '../three/scene'
 import { buildPig } from '../three/pig'
 import type { Pig } from '../three/pig'
-import { createPlayer } from '../three/clips'
-import type { Player } from '../three/clips'
+import { createPlayer } from '../three/clipViewer'
+import type { Player } from '../three/clipViewer'
 import { byId } from './dom'
 
 export interface ModelViewer {

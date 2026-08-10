@@ -22,6 +22,7 @@ import { fielded, mapSquads, musterGame } from '../../src/lib/game/muster'
 import { buildQuery, createEngine } from '../../src/lib/game/engine'
 import { createBus } from '../../src/lib/game/events'
 import { bodyExtent } from '../../src/lib/game/body'
+import { give } from '../../src/lib/game/inventory'
 import { restingY } from '../../src/lib/game/locomotion'
 import type { BattleEvent } from '../../src/lib/game/events'
 import type { Engine } from '../../src/lib/game/engine'
@@ -36,6 +37,10 @@ const FRAME = 1 / 15
 /** The default dress. WHICH art a class wears is the renderer's table
  * (three/soldiers.ts); all the engine wants is the MEASUREMENT off it. */
 const GRUNT = 'pcgru_hi'
+
+/** Skill 7, the rifle — and its muzzle is 350 units down the barrel
+ * (lib/game/bullets.ts). */
+const RIFLE = 7
 
 interface Built {
   engine: Engine
@@ -77,6 +82,7 @@ async function buildHeadless(seed?: number): Promise<Built> {
       terrainArt: terrain.textures,
       objects,
       clips,
+      skeleton: art.skeleton,
       map: MAP,
       parachutes: true
     },
@@ -176,6 +182,44 @@ test('the same seed and the same inputs give the same battle — twice over', as
   }
   expect(await early(8)).not.toBe(await early(7))
   expect(await early(7), 'and the same seed is the same drop').toBe(await early(7))
+})
+
+test('a gun finds its own barrel — the engine poses the skeleton itself', async () => {
+  if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
+    test.skip(true, `no game install at ${GAME_DIR}`)
+  }
+  const { engine, game, heard } = await buildHeadless()
+  while (engine.dropIn.running()) engine.update(FRAME)
+  game.beginTurn()
+
+  const pig = game.currentPig
+  give(pig.carrying, RIFLE, 5)
+  pig.holding = RIFLE
+  // Getting it out takes a clip, and nothing fires until it has run.
+  for (let frame = 0; frame < 45; frame++) engine.update(FRAME)
+
+  engine.battle.setFiring(true, true)
+  engine.update(FRAME)
+  engine.battle.setFiring(false, false)
+
+  // THE point of the whole exercise. A shot starts at the MUZZLE, which is an
+  // offset in the hand bone's frame — and until the engine could pose a
+  // skeleton of its own it had to ask a renderer for it, so a battle nobody
+  // was drawing could not fire at all (lib/game/bonePose.ts).
+  let up: { x: number; y: number; z: number } | null = null
+  for (let frame = 0; frame < 45 && !up; frame++) {
+    engine.update(FRAME)
+    const flying = engine.shots.live()[0]
+    if (flying) up = { x: flying.x, y: flying.y, z: flying.z }
+  }
+  expect(heard.some((event) => event.kind === 'fired'), 'the gun went off').toBe(true)
+  expect(up, 'a bullet is in the air').not.toBeNull()
+
+  // …and it came off a POSED skeleton, not off the pig's own origin: the
+  // barrel is 350 units out and a hand's height up, and where that lands
+  // depends on what the arm is doing.
+  const reach = Math.hypot(up!.x - pig.position.x, up!.z - pig.position.z)
+  expect(reach, 'it left from the barrel, not from the hip').toBeGreaterThan(20)
 })
 
 test('it steps: the drop lands, the clock runs, and the pig walks where it is told', async () => {

@@ -41,8 +41,11 @@ import type { DamageNumbers } from './damage'
 import { createBattle } from './battle'
 import type { Battle } from './battle'
 import { DEFAULT_SEED, seeded } from './random'
-import { NO_POSE } from './pose'
+import { createBonePose } from './bonePose'
+import type { BonePose } from './bonePose'
+import type { ClipFrames } from './clipPose'
 import type { Pose } from './pose'
+import type { Bone } from '../formats/hir'
 import { handling } from './events'
 import type { BattleBus } from './events'
 import type { ObstacleField } from './obstacles'
@@ -62,8 +65,13 @@ export interface BattleWorld {
   terrainArt: TerrainArt[]
   /** The map's .POG records: the crates, the boxes, the script. */
   objects: MapObject[]
-  /** How long each clip runs, which is all the rules need of one. */
-  clips: ClipTiming[]
+  /** Every clip, with its rotations: how long one runs times a swing, and the
+   * rotations POSE the pig — the muzzle, the blade and the scope's eye are all
+   * points in a bone's frame (lib/game/bonePose.ts). */
+  clips: ClipFrames[]
+  /** The HIR chain the models bind to. Empty and nothing can be posed, which
+   * is a battle whose blows all miss — see `pose` below. */
+  skeleton: Bone[]
   /** Which map this is — the training ground hands out its crates on its own
    * terms (lib/game/pickups.ts). */
   map: string
@@ -104,9 +112,12 @@ export interface EngineParts {
    */
   seed?: number
   /**
-   * Where a bone is, in the world — the one thing a blow cannot work out for
-   * itself (lib/game/pose.ts). Left out, nothing that reaches for a bone finds
-   * one, which is what a battle stepped with no skeleton to pose gets.
+   * Where a bone is, in the world (lib/game/pose.ts).
+   *
+   * The engine works this out for ITSELF now — forward kinematics over the
+   * skeleton and the clip each pig is wearing — and hands the same pose back
+   * for the renderer to draw with (`Engine.pose`). This is here for a caller
+   * that wants to answer it some other way, and for the pure specs.
    */
   pose?: Pose
 }
@@ -167,6 +178,9 @@ export interface Engine {
   readonly scenery: Scenery
   readonly obstacles: ObstacleField
   readonly anim: Anim
+  /** The pose the rules measured this frame — bone turns and all, for whoever
+   * is drawing (lib/game/bonePose.ts). */
+  readonly pose: BonePose
   readonly targets: Target[]
   readonly shots: Bullets
   readonly grenades: Lobs
@@ -180,7 +194,7 @@ export interface Engine {
 }
 
 export function createEngine(parts: EngineParts): Engine {
-  const { world, bus, onChanged, pose = NO_POSE } = parts
+  const { world, bus, onChanged } = parts
   const { game, objects } = world
   const pigs = (): Pig[] => game.players.flatMap((player) => player.pigs)
   /** One stream, and everything that rolls draws from it (lib/game/random.ts). */
@@ -189,8 +203,13 @@ export function createEngine(parts: EngineParts): Engine {
   const query = parts.query ?? buildQuery(world.blocks, world.terrainArt)
   const training = isTrainingGround(world.map)
 
-  /** What each pig is playing, and whether a committed clip has run out. */
+  /** What each pig is playing, how far into it, and whether a committed clip
+   * has run out. */
   const anim = createAnim(world.clips)
+  /** …and where that puts its bones. The blade, the muzzle and the scope's eye
+   * are the same question, asked of the engine now (lib/game/bonePose.ts). */
+  const bones = createBonePose({ skeleton: world.skeleton, clips: world.clips, anim })
+  const pose: Pose = parts.pose ?? bones
   /** The rings a blow throws, and the numbers that float off it. */
   const effects = createEffectField(random)
   const numbers = createDamageNumbers()
@@ -261,7 +280,7 @@ export function createEngine(parts: EngineParts): Engine {
   )
   /** …and what a GRENADE does, which is a parabola rather than a line. */
   const grenades = createLobs(
-    { pigs, targets, present, query, obstacles, training, pose },
+    { pigs, targets, present, query, obstacles, training, pose, random },
     bus.emit
   )
 
@@ -323,6 +342,7 @@ export function createEngine(parts: EngineParts): Engine {
     scenery,
     obstacles,
     anim,
+    pose: bones,
     targets,
     shots,
     grenades,
