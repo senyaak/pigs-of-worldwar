@@ -73,18 +73,18 @@ test('a marker carries the class, and the class picks the art', () => {
 
   // Each class group has its own model in Chars/british.mad.
   expect(first.map((at) => classArt(at.pigClass))).toEqual([
-    'pcsab_hi',
-    'pcleg_hi',
-    'pcgru_hi',
-    'pcgru_hi',
-    'pcgru_hi'
+    'pcsab_me',
+    'pcleg_me',
+    'pcgru_me',
+    'pcgru_me',
+    'pcgru_me'
   ])
   expect(second.map((at) => classArt(at.pigClass))).toEqual([
-    'pcspy_hi',
-    'pcspy_hi',
-    'pchvy_hi',
-    'pcspy_hi',
-    'pcspy_hi'
+    'pcspy_me',
+    'pcspy_me',
+    'pchvy_me',
+    'pcspy_me',
+    'pcspy_me'
   ])
 })
 
@@ -99,7 +99,7 @@ test('the battle fields the map’s own squads, dressed by class', async ({ app 
   expect(onCamp.map((squad) => squad.pigs.length)).toEqual([1])
   const trainee = mapSpawns(pog('CAMP'))[0]
   expect(onCamp[0].pigs[0]).toMatchObject({
-    art: 'pcgru_hi',
+    art: 'pcgru_me',
     pigClass: trainee.pigClass,
     x: trainee.x,
     z: trainee.z
@@ -109,11 +109,11 @@ test('the battle fields the map’s own squads, dressed by class', async ({ app 
   const squads = await page.evaluate(() => window.pow!.debug!.squads())
   expect(squads.map((squad) => squad.pigs.length)).toEqual([5, 5])
   expect(squads[0].pigs.map((pig) => pig.art)).toEqual([
-    'pcsab_hi',
-    'pcleg_hi',
-    'pcgru_hi',
-    'pcgru_hi',
-    'pcgru_hi'
+    'pcsab_me',
+    'pcleg_me',
+    'pcgru_me',
+    'pcgru_me',
+    'pcgru_me'
   ])
 
   // Every pig stands on the marker that named it — position and facing.

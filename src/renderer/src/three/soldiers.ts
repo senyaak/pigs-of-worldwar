@@ -15,24 +15,42 @@
 // Two gaps, both honest: CO_ME's class 4 has no family of its own in the
 // archive, and six classes never appear on any shipped marker. Both fall
 // back to the grunt.
+//
+// **And the variant is `_me`, not `_hi` — because the RIG says so.** Every family
+// ships three models: `pcXXX_hi` (627..668 vertices), `pcXXX_me` (457..496) and
+// the short `XX_hi` (168..201). Measured across all twenty-seven, the `pcXXX_hi`
+// ones are the odd set out: they hang 30..35 vertices off bone 0, the ROOT, and
+// bone 1 stops short of the hip — so the whole pelvis is welded to a bone the
+// shipped clips barely move (4.9° of pitch, no yaw at all: `animations/notes.md`).
+// The `_me` and the short models put 6..8 vertices on the root — the tail — and
+// carry the hip band on bone 1, the torso, which is where the run cycle's ±19.6°
+// of swing lives.
+//
+// Play reported the consequence three times, and the third time exactly: "жёпа не
+// шевелится… должно двигаться вместе с туловищем, а не стоять колом." It was the
+// MODEL, not the pose: with `pcgru_hi` the behind cannot follow the body, because
+// it is not attached to it. Two things point the same way — a rig that agrees with
+// the animation, and `_ME` being the suffix the map's own spawn markers wear for a
+// battle pig (`GR_ME`, `HV_ME`) — so the battle wears `_me` and `pcXXX_hi` is left
+// for whatever wants a close-up standing still.
 
 /** The default dress — and the fallback for a class no marker names. */
-export const GRUNT_ART = 'pcgru_hi'
+export const GRUNT_ART = 'pcgru_me'
 
 const BY_CLASS: Record<number, string> = {
   0: GRUNT_ART, // GR_ME
-  1: 'pchvy_hi', // HV_ME
-  2: 'pchvy_hi',
-  3: 'pchvy_hi',
-  5: 'pcsap_hi', // SA_ME
-  8: 'pcsni_hi', // SN_ME
-  9: 'pcspy_hi', // SP_ME
-  10: 'pcsab_hi', // SB_ME
-  11: 'pcmed_hi', // ME_ME
-  12: 'pcmed_hi',
-  13: 'pcmed_hi',
-  14: 'pcleg_hi', // LE_ME
-  16: 'pcace_hi' // AC_ME
+  1: 'pchvy_me', // HV_ME
+  2: 'pchvy_me',
+  3: 'pchvy_me',
+  5: 'pcsap_me', // SA_ME
+  8: 'pcsni_me', // SN_ME
+  9: 'pcspy_me', // SP_ME
+  10: 'pcsab_me', // SB_ME
+  11: 'pcmed_me', // ME_ME
+  12: 'pcmed_me',
+  13: 'pcmed_me',
+  14: 'pcleg_me', // LE_ME
+  16: 'pcace_me' // AC_ME
 }
 
 /** The archive base name that dresses `pigClass`. */

@@ -36,7 +36,7 @@ const FRAME = 1 / 15
 
 /** The default dress. WHICH art a class wears is the renderer's table
  * (three/soldiers.ts); all the engine wants is the MEASUREMENT off it. */
-const GRUNT = 'pcgru_hi'
+const GRUNT = 'pcgru_me'
 
 /** Skill 7, the rifle — and its muzzle is 350 units down the barrel
  * (lib/game/bullets.ts). */
