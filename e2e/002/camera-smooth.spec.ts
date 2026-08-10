@@ -23,11 +23,12 @@ import path from 'node:path'
 import { beginTurn, press, release, warp } from '../controller'
 import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
-import { targetsOf } from '../../src/lib/game/targets'
+import { DUMMY_MODEL, targetsOf } from '../../src/lib/game/targets'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const GRENADE = 19
-const FIRST = targetsOf(CAMP)[0]
+const DUMMIES = CAMP.filter((object) => object.name.toUpperCase() === DUMMY_MODEL)
+const FIRST = targetsOf(DUMMIES)[0]
 
 type Page = import('@playwright/test').Page
 

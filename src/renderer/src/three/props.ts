@@ -85,6 +85,26 @@ export function buildMapProps(
     // and a prop shrinks about its own origin — which the POG puts at the
     // model's CENTRE, so it stays where it was placed.
     mesh.scale.setScalar(MODEL_SCALE)
+    // **A FIXED DRAW ORDER, and that is what stops the house flickering.**
+    //
+    // Play: "дом имеет мерцающие текстуры." Measured, and it is the MAP's own
+    // art: CAMP's house is eighteen wall, floor and roof pieces, and at every
+    // corner two wall pieces overlap by exactly 64 units — the wall's own
+    // thickness — so their big faces are COPLANAR. Twelve such pairs, each
+    // 64×512×64 (the same measurement over the AABBs of the placed models).
+    //
+    // The original never minded, because it has no depth buffer to fight over: a
+    // PSX-style renderer sorts its polygons and draws them in that order, so the
+    // second of two coplanar faces simply lands on the first. Three.js keeps a
+    // z-buffer and `LessEqualDepth`, so at equal depth the LAST one drawn wins —
+    // and its opaque sort falls back to distance from the camera, which reorders
+    // the pair as the camera moves. That flip, once a frame, IS the flicker.
+    //
+    // `renderOrder` is the first key of that sort, ahead of the material and the
+    // distance, so one distinct value per record makes the order the map's own
+    // and fixes which face wins for good. It costs the material batching across
+    // props, which for a map's hundred-odd objects is nothing.
+    mesh.renderOrder = object.id
     group.add(mesh)
     placed++
   }

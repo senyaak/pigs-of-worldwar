@@ -23,9 +23,12 @@ import { parsePmg } from '../../src/lib/formats/pmg'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
 import { ObstacleField, PIG_RADIUS } from '../../src/lib/game/obstacles'
 import { WALL_CLIMB } from '../../src/lib/game/locomotion'
-import { DUMMY_HEALTH, targetsOf } from '../../src/lib/game/targets'
+import { DUMMY_HEALTH, DUMMY_MODEL, targetsOf } from '../../src/lib/game/targets'
+import { BREAKABLE_COUNT, breakableHealth } from '../../src/lib/game/breakable'
 import { hurt, isDead } from '../../src/lib/game/health'
 import { meleeOf } from '../../src/lib/game/melee'
+import { lobOf } from '../../src/lib/game/grenade'
+import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
 
 
 const mapFile = (name: string): Buffer => readFileSync(path.join(GAME_DIR, 'Maps', name))
@@ -77,18 +80,61 @@ test('CAMP.POG: the record layout, and z exactly as stored', () => {
 
 test('every dummy CAMP carries is a target, and one point flattens it', () => {
   const targets = targetsOf(CAMP)
-  // The same eleven the record layout above counts, by name.
-  expect(targets).toHaveLength(11)
-  expect(targets.every((target) => target.health === DUMMY_HEALTH)).toBe(true)
+  const dummies = targets.filter((target) => target.health === DUMMY_HEALTH)
+  // The same eleven the record layout above counts, by name — and they are the
+  // only things on the map with one point.
+  expect(dummies).toHaveLength(11)
   expect(DUMMY_HEALTH).toBe(1)
+  expect(
+    CAMP.filter((object) => object.name.toUpperCase() === DUMMY_MODEL),
+    'the one-pointers are the dummies'
+  ).toHaveLength(11)
   // Anything that swings at all is enough: the weakest of the five carries
   // ten (lib/game/melee.ts), and a dummy has one.
-  const target = targets[0]
+  const target = dummies[0]
   expect(hurt(target, meleeOf(3)!.damage, false)).toBe('died')
   expect(isDead(target)).toBe(true)
   // Every target keeps its record's id, which is how the broken one is taken
   // off the map and out of the collision world.
   expect(new Set(targets.map((each) => each.id)).size).toBe(targets.length)
+})
+
+test('CAMP\'s HOUSE is breakable too, and a charge is what it takes', () => {
+  // Play: "тнт не дамажит дом." A house is not one object — CAMP builds it out of
+  // eighteen wall, floor and roof pieces of the ST set — and every one of them is
+  // sixty points out of the exe's own table (lib/game/breakable.ts).
+  const targets = targetsOf(CAMP)
+  const house = CAMP.filter((object) => /^ST[FRWS]/.test(object.name.toUpperCase()))
+  expect(house.length, 'CAMP has a house').toBeGreaterThan(10)
+  const pieces = targets.filter((target) => house.some((part) => part.id === target.id))
+  expect(pieces, 'every piece of it is breakable').toHaveLength(house.length)
+  expect(pieces.every((piece) => piece.health === 60)).toBe(true)
+  expect(breakableHealth('STW04PPP')).toBe(60)
+
+  // …and the numbers say what play will see: fifty points at TNT's core leaves a
+  // wall standing with ten, and the second charge brings it down. A grenade's
+  // thirty needs two as well.
+  const wall = pieces[0]
+  expect(hurt(wall, lobOf(37)!.damage / DAMAGE_UNIT, false)).toBe('hurt')
+  expect(wall.health).toBe(10)
+  expect(hurt(wall, lobOf(37)!.damage / DAMAGE_UNIT, false)).toBe('died')
+  expect(isDead(wall)).toBe(true)
+
+  // The 85 firs are eighty points and the dummies one, out of the same table —
+  // which is the whole of what made a dummy special.
+  const firs = targets.filter((target) =>
+    CAMP.some((object) => object.id === target.id && object.name.toUpperCase() === 'TREEP')
+  )
+  expect(firs).toHaveLength(85)
+  expect(firs.every((fir) => fir.health === 80)).toBe(true)
+  // Nothing that is not scenery got one: the crates, the spawn marker and the
+  // SHELTER (a BUILDING, which is another class in the exe) are not targets.
+  const named = (name: string): boolean =>
+    targets.some((target) => CAMP.some((o) => o.id === target.id && o.name === name))
+  expect(named('CRATE1'), 'a crate is not something you break').toBe(false)
+  expect(named('GR_ME'), 'nor is a spawn marker').toBe(false)
+  expect(named('SHELTER'), 'nor is a building, yet').toBe(false)
+  expect(BREAKABLE_COUNT, 'the whole table was transcribed').toBe(349)
 })
 
 test('a prop stands on the ground it was placed over', () => {
@@ -212,6 +258,18 @@ test('the battle draws the map objects where the file puts them', async ({ app }
   // Nothing is left at the origin — the failure mode when a name misses its
   // model and the record is placed anyway.
   expect(drawn.at.filter((at) => at.x === 0 && at.z === 0)).toHaveLength(0)
+
+  // **AND EVERY ONE HAS ITS OWN DRAW ORDER**, which is what stops the house
+  // flickering. Play: "дом имеет мерцающие текстуры" — CAMP's house overlaps its
+  // own wall pieces at every corner (measured: twelve pairs sharing a 64×512×64
+  // column, the wall's own thickness), so their faces are coplanar and the LAST
+  // one drawn wins the depth test. Three sorts opaque meshes by distance when
+  // nothing else separates them, so the winner used to flip as the camera moved.
+  // Distinct render orders make it the map's own order, once and for all
+  // (three/props.ts).
+  const orders = drawn.at.map((at) => at.order)
+  expect(new Set(orders).size, 'two props share a draw order').toBe(orders.length)
+  expect(Math.min(...orders), 'the order is the record id, which is 1-based').toBe(1)
 
   expect(app.errors()).toEqual([])
 })

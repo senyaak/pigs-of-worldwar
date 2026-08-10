@@ -1,20 +1,23 @@
-// The training ground's dummies: the one thing on a map that is not a pig and
-// can still be knocked down.
+// Everything on a map that is not a pig and can still be knocked down: the
+// training ground's dummies, and the whole of a map's SCENERY beside them.
 //
-// In the original they are their own class — vtable 0x4bd440, constructor
-// 0x48d020, the list at `[0x537df0]` — and they answer the SAME virtual slot
-// a pig does, `[vtbl+0x34]`, so the melee strike hits them through exactly
-// the same call it hits a body with (0x476723).
+// In the original they are all ONE class — vtable 0x4bd440, constructor
+// 0x48d000, the list at `[0x537df0]` — and they answer the SAME virtual slot a
+// pig does, `[vtbl+0x34]`, so the melee strike hits them through exactly the
+// same call it hits a body with (0x476723).
 //
-// **One point, and any hit at all destroys them.** The constructor reads the
-// health out of a table at 0x4d6d18 indexed by the record's type, and every
-// type the strike answers to — 0x43, 0x44, 0x45, 0x4b — is 128 of the engine's
-// 128ths: one whole point (`weapons/melee.md`). Play said
-// so before the disassembly did.
+// **A dummy is not a special case; it is the cheapest row of a table.** The
+// constructor reads the health out of 0x4d6d18 by the record's kind, and every
+// dummy type is 128 of the engine's 128ths — one whole point (`weapons/melee.md`),
+// which play said before the disassembly did. A house wall is 60 points out of
+// the same table, and the reason "тнт не дамажит дом" was that this file only
+// ever built targets for the one name it had seen break
+// (lib/game/breakable.ts).
 //
 // Pure: records in, targets out, plus the reach test the melee shares.
 
 import type { MapObject } from '../formats/pog'
+import { breakableHealth } from './breakable'
 import { caught, strikeGap } from './melee'
 import type { Point } from './melee'
 import { HEIGHT_SCALE } from './terrain'
@@ -23,14 +26,17 @@ import { HEIGHT_SCALE } from './terrain'
 export const DUMMY_MODEL = 'DUMMY'
 
 /**
- * What one is worth in health — the table at 0x4d6d18 says one point for
- * every dummy type, so the weakest thing that swings still flattens it.
+ * What a DUMMY is worth in health — one point, so the weakest thing that swings
+ * still flattens it.
  *
- * A dummy is hurt through `hurt` in lib/game/health.ts, which is the PIG's
- * rule. Two of its branches do not belong to a dummy and neither can fire
- * here: the training floor is not passed (0x48d990 has no such test — the
- * training ground kills dummies, that is what they are for), and the gib
- * needs sixty points past dead, which nothing that swings comes near.
+ * Named here because the whole training ground rests on it; every other
+ * breakable's number comes out of `breakableHealth`.
+ *
+ * A target is hurt through `hurt` in lib/game/health.ts, which is the PIG's
+ * rule. Two of its branches do not belong to one and neither can fire here: the
+ * training floor is not passed (0x48d990 has no such test — the training ground
+ * kills dummies, that is what they are for), and the gib needs sixty points past
+ * dead, which nothing that swings comes near.
  */
 export const DUMMY_HEALTH = 1
 
@@ -56,23 +62,28 @@ export interface Target {
 }
 
 /**
- * Every dummy a map stands on its ground.
+ * Everything a map stands on its ground that can be knocked down.
  *
- * Matched by MODEL NAME, which is how a record is paired to its geometry
- * anyway. CAMP carries eleven, all but the first tagged with the script's own
- * field-14 value of 23 and paired off by field 15 — see below for who decides
- * which are on the ground.
+ * Matched by MODEL NAME through the exe's own table, which is how a record is
+ * paired to its geometry anyway (lib/game/breakable.ts). CAMP's eleven dummies
+ * come out of it at one point each; so do its 85 firs at eighty, and the eighteen
+ * wall, floor and roof pieces its house is built out of at sixty — which is what
+ * makes a charge next to a house do something at last.
  */
 export function targetsOf(objects: MapObject[]): Target[] {
-  return objects
-    .filter((object) => object.name.toUpperCase() === DUMMY_MODEL)
-    .map((object) => ({
+  const out: Target[] = []
+  for (const object of objects) {
+    const health = breakableHealth(object.name)
+    if (health === null) continue
+    out.push({
       id: object.id,
       x: object.x,
       y: -object.y * HEIGHT_SCALE,
       z: object.z,
-      health: DUMMY_HEALTH
-    }))
+      health
+    })
+  }
+  return out
 }
 
 /**

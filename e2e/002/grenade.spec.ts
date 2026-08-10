@@ -19,15 +19,20 @@ import path from 'node:path'
 import { beginTurn, press, release, warp } from '../controller'
 import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
-import { targetsOf } from '../../src/lib/game/targets'
+import { DUMMY_MODEL, targetsOf } from '../../src/lib/game/targets'
 import { GAUGE_SECONDS } from '../../src/lib/game/gauge'
 import { BLAST_CORE } from '../../src/lib/game/grenade'
 import { AIM_LOB } from '../../src/lib/game/aim'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const GRENADE = 19
-/** The one dummy CAMP has standing before the map script does anything. */
-const FIRST = targetsOf(CAMP)[0]
+/** The one dummy CAMP has standing before the map script does anything.
+ *
+ * Filtered by NAME first, because every scenery record on the map is a target
+ * now — the house's walls and the 85 firs among them (lib/game/breakable.ts) —
+ * and the first of those in file order is a tree. */
+const DUMMIES = CAMP.filter((object) => object.name.toUpperCase() === DUMMY_MODEL)
+const FIRST = targetsOf(DUMMIES)[0]
 
 type Page = import('@playwright/test').Page
 
