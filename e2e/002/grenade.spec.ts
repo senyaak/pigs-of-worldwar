@@ -111,6 +111,32 @@ test('the gauge fills while F is held and the throw comes on the release', async
   await expect.poll(async () => (await look(page)).live.length, { timeout: 12000 }).toBe(0)
 })
 
+test('a SECOND press sets it off where it lies', async ({ app }) => {
+  const { page } = app
+  await armed(page, 900)
+
+  // Throw one, and catch it while it is still live: five seconds of fuse is a
+  // long time to be standing next to something.
+  await press(page, 'fire')
+  await release(page, 'fire')
+  await expect
+    .poll(async () => (await look(page)).live.length, { timeout: 4000 })
+    .toBeGreaterThan(0)
+  const left = (await look(page)).live[0].fuse
+  expect(left, 'it has seconds to run').toBeGreaterThan(2)
+
+  // Play's own rule — "при повторном нажатии f граната должна взрываться" — and it
+  // survived being broken once: ONE BLOW A TURN swallowed the press before the
+  // detonator could see it (lib/game/battle.ts), which is exactly the kind of thing
+  // that stays broken quietly. Setting off what is already in the air is the END of
+  // a blow, not a second one.
+  await press(page, 'fire')
+  await release(page, 'fire')
+  await expect.poll(async () => (await look(page)).live.length, { timeout: 3000 }).toBe(0)
+
+  expect(app.errors()).toEqual([])
+})
+
 test('a grenade comes up lobbing, and Q and E move it', async ({ app }) => {
   const { page } = app
   await armed(page, 900)

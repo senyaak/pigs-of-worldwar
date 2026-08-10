@@ -2234,7 +2234,13 @@ were the same hole: "не дожидается окончания анимаци
   not run inside it either — a blow in progress stops it — so the four seconds a
   charge gives back are four seconds of RUNNING.
 - **One weapon use a turn.** `struck` in `lib/game/battle.ts`, and the fire key is
-  swallowed for anything but SKIP TURN once it is up. It is the same rule the turn
+  swallowed for anything but SKIP TURN once it is up — **except while something the
+  pig THREW is still live.** Play caught that one within the hour: "ты сломал
+  взрывание гранаты — больше нельзя нажать F чтобы подорвать по желанию." The
+  hand-detonator lives inside `attack.begin`, so swallowing the press took the
+  grenade's own second use with it. Setting off what is already in the air is the END
+  of a blow, not a second one, and `002/grenade.spec.ts` now presses F twice so it
+  cannot go quiet again. It is the same rule the turn
   ending already was, seen from the side of the two skills that do not end it: the
   charges kept the turn and so kept the trigger, which meant a pig could carpet its
   own feet in TNT.

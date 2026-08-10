@@ -537,7 +537,15 @@ export function createBattle(parts: BattleParts): Battle {
     // with nothing at all. Everything that ENDS the turn takes care of itself —
     // the beat is running by then and swallows the press anyway — so this is here
     // for the charges, which keep the turn and must not be planted twice.
-    if (struck && acting.holding !== SKILL.SKIP_TURN) attack.swallow()
+    //
+    // **Except while something it THREW is still live.** Play: "ты сломал взрывание
+    // гранаты — больше нельзя нажать F чтобы подорвать по желанию." Right: the
+    // hand-detonator lives inside `attack.begin`, so swallowing the press took the
+    // grenade's own second use with it. Setting off what is already in the air is
+    // not a second blow — it is the end of the first one.
+    if (struck && acting.holding !== SKILL.SKIP_TURN && grenades.thrown() === 0) {
+      attack.swallow()
+    }
 
     // What the fire button set going — the whole of it, including WHICH weapon
     // answers (lib/game/attack.ts). SKIP TURN is the one answer this frame has
