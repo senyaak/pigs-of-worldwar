@@ -21,6 +21,9 @@ import type { MapObject } from '../../src/lib/formats/pog'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseModel } from '../../src/lib/formats/model'
 import { parsePmg } from '../../src/lib/formats/pmg'
+import { FRAME_SECONDS } from '../../src/lib/game/ballistics'
+import { createLocomotion, updateLocomotion } from '../../src/lib/game/locomotion'
+import { ObstacleField } from '../../src/lib/game/obstacles'
 import { RAMP_TILT, isRamp } from '../../src/lib/game/ramps'
 import { MODEL_SCALE } from '../../src/lib/game/scale'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
@@ -184,6 +187,47 @@ test("CAMP's second bridge is one 45° ramp from the deck to the ground", () => 
     expect(leg.x.lo).toBeGreaterThanOrEqual(shape[0].x.lo - ART)
     expect(leg.x.hi).toBeLessThanOrEqual(shape[0].x.hi + ART)
   }
+})
+
+test('a pig walks up the ramp and onto the deck', () => {
+  // The other half of what play asked for, and the reason the geometry had to
+  // be right first: a ramp is field-11 shape 1, so nothing about it is a
+  // collider in the original and terrain height is all a pig is pinned to.
+  // The remake gives it the record's own box with a sloped top
+  // (lib/game/obstacles.ts) and the ordinary step-up envelope does the rest.
+  const CAMP = parsePog(mapFile('CAMP.POG'))
+  const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
+  const field = new ObstacleField(CAMP)
+  const ramps = CAMP.filter((one) => one.name === 'BRID2_S').sort((a, b) => a.x - b.x)
+  const deck = CAMP.find((one) => one.name === 'BRID2_C')!
+
+  // At the foot of the lower ramp, facing up it: the run is along −x, so the
+  // heading whose forward is (sin h, cos h) = (−1, 0).
+  const foot = { x: 4160, z: ramps[1].z }
+  const state = createLocomotion(query, foot.x, foot.z, -Math.PI / 2)
+  expect(near(-state.y, -query.height(foot.x, foot.z), ART), 'starts on the ground').toBe(true)
+
+  // Long enough to cover the two ramps' 1024 and step onto the deck.
+  const frames = Math.round(2 / FRAME_SECONDS)
+  let highest = state.y
+  for (let i = 0; i < frames; i++) {
+    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS, field)
+    highest = Math.min(highest, state.y)
+  }
+  // It got up, it got ALL the way up, and it is standing on the deck rather
+  // than hanging in the air over it.
+  const deckTop = span(placed(deck, vertices('CAMP', 'BRID2_C')).map((p) => p.elevation)).hi
+  expect(near(-highest, deckTop, ART), `climbed to ${-highest} of ${deckTop}`).toBe(true)
+  expect(state.x, 'and it is past the ramps').toBeLessThan(ramps[0].x - 256 + ART)
+  expect(state.airborne, 'on its feet').toBeNull()
+
+  // …and without the ramps it cannot: the same walk against the terrain alone
+  // stops at the foot of a 1024-unit face.
+  const bare = createLocomotion(query, foot.x, foot.z, -Math.PI / 2)
+  for (let i = 0; i < frames; i++) {
+    updateLocomotion(bare, query, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
+  }
+  expect(-bare.y, 'the bare terrain is 1024 lower').toBeLessThan(deckTop - 512)
 })
 
 test("ISLAND's ramps all climb to their own deck's surface", () => {

@@ -351,7 +351,13 @@ export function updateLocomotion(
   // Wedged is about where the pig IS — the original asks `Map::IsBlocked`
   // once a frame at its own feet — and nothing else. Nothing refuses the
   // step in the first place, so there is no shoving to detect.
-  const wedged = !query.walkable(state.x, state.z)
+  //
+  // Except that a pig on a WALKWAY is not in the ground it happens to be
+  // over. CAMP's second bridge crosses tiles the map flags as wall — the
+  // plateau's own edge — so a pig standing on the deck was wedged from the
+  // moment it got there, and the counter threw it off after 25 frames. What
+  // it is standing on decides (lib/game/obstacles.ts).
+  const wedged = !query.walkable(state.x, state.z) && !standing(state, obstruction)
   if (!wedged) state.wedgedSeconds = 0
   else {
     state.wedgedSeconds += delta
@@ -477,6 +483,9 @@ function ground(
   const swimming = query.isWater(state.x, state.z)
   /** The footing every reach is measured from — where the feet are NOW. */
   const footY = state.y
+  /** …and whether that footing is a WALKWAY rather than the ground, which is
+   * what stops the tiles under a bridge counting against the pig. */
+  const onWalkway = standing(state, obstruction)
   // Backwards is half as fast on land and the same in water, because the
   // exe's clamp lands differently either side of it: -32 scaled by the class
   // is 26 walking, and the water cap of 16 swallows both directions.
@@ -484,7 +493,7 @@ function ground(
   const forwardX = Math.sin(state.heading)
   const forwardZ = Math.cos(state.heading)
 
-  if (intent.jump && !swimming && state.jumpReadyIn <= 0 && query.walkable(state.x, state.z)) {
+  if (intent.jump && !swimming && state.jumpReadyIn <= 0 && (onWalkway || query.walkable(state.x, state.z))) {
     // A jump is committed, not steered: it leaves the ground FORWARDS
     // whatever the keys say and lands where that put it. `TryJump` also
     // refuses it from inside a wall — the jump-ladder up a cliff face is
@@ -551,7 +560,7 @@ function ground(
       // clip that reads as it. A deliberate remake choice, not a
       // transcription: refused by the envelope, or driving into blocked
       // ground, the pig wears it.
-      if (!swimming && (pressing || !query.walkable(state.x, state.z))) {
+      if (!swimming && (pressing || (!query.walkable(state.x, state.z) && !onWalkway))) {
         state.clip = ANIM.SCRAMBLE
       }
     }
@@ -567,15 +576,34 @@ function ground(
   // The step-up allowance is measured from the last footing on OPEN ground;
   // inside a wall the reference stays frozen, which is what caps the climb.
   if (query.walkable(state.x, state.z)) state.freeY = query.height(state.x, state.z)
+  // Standing on something is open footing too, and its top is where the feet
+  // ARE. Without this a pig that has walked up a ramp measures its next step
+  // from the ground a thousand units below and is refused at the top of it —
+  // which is exactly where CAMP's bridge lands, on the plateau's wall-flagged
+  // edge.
+  if (on !== null && on <= state.y) state.freeY = on
 
   // Scramble is the GROUND, not a movement state: the flag the exe raises
-  // on masked type 11 makes the picker play clip 11 in every band.
-  if (!swimming && query.isClimbing(state.x, state.z)) state.clip = ANIM.SCRAMBLE
+  // on masked type 11 makes the picker play clip 11 in every band — and the
+  // ground is not what a pig on a walkway is on.
+  if (!swimming && !onWalkway && query.isClimbing(state.x, state.z)) state.clip = ANIM.SCRAMBLE
 
   // The get-up outlasts whatever standing about would have picked — and it
   // only ever gets this far because nothing is driving the pig, which is the
   // one case where the original's picker asks for no clip at all.
   if (state.getUp > 0) state.clip = ANIM.LAND
+}
+
+/**
+ * Whether an OBJECT is what the pig's feet are on, rather than the ground.
+ *
+ * `standOn` with no reach answers about tops at or below the feet and takes
+ * the highest, so the one that comes back level with them is the surface the
+ * pig is standing on.
+ */
+function standing(state: LocomotionState, obstruction: Obstruction): boolean {
+  const on = obstruction.standOn(state.x, state.z, state.y, 0)
+  return on !== null && Math.abs(on - state.y) < 1
 }
 
 /**

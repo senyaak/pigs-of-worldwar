@@ -20,6 +20,7 @@
 
 import { BOX_UNIT, SHAPE_BOX, modelRotationY } from '../formats/pog'
 import type { MapObject } from '../formats/pog'
+import { isRamp } from './ramps'
 import { isSpawnMarker } from './spawns'
 import { HEIGHT_SCALE } from './terrain'
 
@@ -76,11 +77,20 @@ export const MIN_SOLID = 2 * BOX_UNIT
  * collider — and the 94 records carrying it are every bridge and step piece
  * on every map, which is exactly why the original lets a pig over a bridge
  * instead of walling it off.
+ *
+ * A RAMP is the exception, and it is the remake's own — flagged as such
+ * because it is the only line here that a record does not draw. A ramp is
+ * shape kind 1, so in the original nothing about it is a collider; but play
+ * says plainly that you walk UP one, and terrain height is all the exe pins a
+ * pig to, so something has to carry the slope. Whatever the original does
+ * (`lib/game/ramps.ts` has where that was looked for), the shape it needs is
+ * already in the record: the box's y extent IS the rise and its x extent the
+ * run, so the ramp is that box with a top that climbs across it.
  */
 export function isSolid(object: MapObject): boolean {
-  if (object.shape !== SHAPE_BOX) return false
   if (isSpawnMarker(object)) return false
   if (isPickup(object)) return false
+  if (object.shape !== SHAPE_BOX && !isRamp(object.name)) return false
   return object.box.x >= MIN_SOLID && object.box.z >= MIN_SOLID && object.box.y > 0
 }
 
@@ -100,6 +110,13 @@ export interface Obstacle {
    * stored yaw, which is the SAME turn the art gets. The model's +x then
    * points along `(cos turn, −sin turn)` in game (x, z). */
   turn: number
+  /**
+   * A RAMP's upper face is not level: it climbs from `bottom` at the box's
+   * local −x end to `top` at its +x end, which is the way the art's own slope
+   * runs once it is tilted (lib/game/ramps.ts). False everywhere else, where
+   * `top` is the whole face.
+   */
+  sloped: boolean
 }
 
 /** What locomotion asks about the things in its way. */
@@ -159,8 +176,58 @@ export function boxOf(object: MapObject): Obstacle {
     bottom: centre + object.box.y / 2,
     halfX: object.box.x / 2,
     halfZ: object.box.z / 2,
-    turn: modelRotationY(object.yaw)
+    turn: modelRotationY(object.yaw),
+    sloped: isRamp(object.name)
   }
+}
+
+/** Where a point falls in the box's own frame — the axes the art is on. */
+function local(obstacle: Obstacle, x: number, z: number): { x: number; z: number } {
+  const dx = x - obstacle.x
+  const dz = z - obstacle.z
+  const cos = Math.cos(obstacle.turn)
+  const sin = Math.sin(obstacle.turn)
+  return { x: dx * cos - dz * sin, z: dx * sin + dz * cos }
+}
+
+/**
+ * The upper face at (x, z), game Y-down — `top` on a box, and on a RAMP the
+ * height of the slope over that spot.
+ *
+ * Clamped to the box, so a pig whose radius reaches the low end before its
+ * centre does gets the ramp's own foot rather than a level off the end of it.
+ */
+export function topAt(obstacle: Obstacle, x: number, z: number): number {
+  if (!obstacle.sloped) return obstacle.top
+  const along = local(obstacle, x, z).x
+  const climbed = (Math.max(-obstacle.halfX, Math.min(obstacle.halfX, along)) + obstacle.halfX) / (2 * obstacle.halfX)
+  return obstacle.bottom + (obstacle.top - obstacle.bottom) * climbed
+}
+
+/**
+ * How wide the pig is against THIS obstacle: its own radius, and NOTHING on a
+ * ramp — a slope holds up and stops the pig by where its FEET are.
+ *
+ * Measured, on CAMP's own bridge: with the cylinder, a pig climbing the lower
+ * ramp stalls 212 units short of the join. Its body reaches 160 ahead, so at
+ * x 3744 it touches the upper ramp's footprint while still below the low end
+ * of it — and a clamped top 212 above the feet is a WALL by the envelope. The
+ * same reach would also LIFT it there, `standOn` taking the higher of the two
+ * tops, which is a 212-unit pop onto a surface the pig is not over. Both go
+ * away by asking about the one point the feet are actually on, and neither is
+ * a slope's fault: a ramp has no side to be shouldered into. Walk at the high
+ * side of one and the envelope still refuses it, off the centre.
+ */
+const reachOf = (obstacle: Obstacle): number => (obstacle.sloped ? 0 : PIG_RADIUS)
+
+/** The point of this box nearest (x, z) — in the world, not its own frame. */
+function nearestOn(obstacle: Obstacle, x: number, z: number): { x: number; z: number } {
+  const point = local(obstacle, x, z)
+  const nearX = Math.max(-obstacle.halfX, Math.min(obstacle.halfX, point.x))
+  const nearZ = Math.max(-obstacle.halfZ, Math.min(obstacle.halfZ, point.z))
+  const cos = Math.cos(obstacle.turn)
+  const sin = Math.sin(obstacle.turn)
+  return { x: obstacle.x + nearX * cos + nearZ * sin, z: obstacle.z - nearX * sin + nearZ * cos }
 }
 
 /** How near the pig's centre comes to a box, in its own frame. */
@@ -170,17 +237,11 @@ export function penetrates(
   z: number,
   radius: number
 ): boolean {
-  const dx = x - obstacle.x
-  const dz = z - obstacle.z
-  // Into the box's frame: the same axes three/props.ts turns the art onto.
-  const cos = Math.cos(obstacle.turn)
-  const sin = Math.sin(obstacle.turn)
-  const localX = dx * cos - dz * sin
-  const localZ = dx * sin + dz * cos
-  const nearX = Math.max(-obstacle.halfX, Math.min(obstacle.halfX, localX))
-  const nearZ = Math.max(-obstacle.halfZ, Math.min(obstacle.halfZ, localZ))
-  const gapX = localX - nearX
-  const gapZ = localZ - nearZ
+  const point = local(obstacle, x, z)
+  const nearX = Math.max(-obstacle.halfX, Math.min(obstacle.halfX, point.x))
+  const nearZ = Math.max(-obstacle.halfZ, Math.min(obstacle.halfZ, point.z))
+  const gapX = point.x - nearX
+  const gapZ = point.z - nearZ
   return gapX * gapX + gapZ * gapZ <= radius * radius
 }
 
@@ -242,31 +303,63 @@ export class ObstacleField implements Obstruction {
   standOn(x: number, z: number, footY: number, reach: number): number | null {
     let best: number | null = null
     for (const obstacle of this.near(x, z)) {
-      if (obstacle.top < footY - reach) continue // too tall to step onto
-      if (!penetrates(obstacle, x, z, PIG_RADIUS)) continue
-      if (best === null || obstacle.top < best) best = obstacle.top
+      const top = topAt(obstacle, x, z)
+      if (top < footY - reach) continue // too tall to step onto
+      if (!penetrates(obstacle, x, z, reachOf(obstacle))) continue
+      if (best === null || top < best) best = top
     }
     return best
   }
 
   blocks(x: number, z: number, footY: number, reach: number): boolean {
-    for (const obstacle of this.near(x, z)) {
-      if (obstacle.top >= footY - reach) continue // a step, not a wall
+    const here = this.near(x, z)
+    for (const obstacle of here) {
+      if (topAt(obstacle, x, z) >= footY - reach) continue // a step, not a wall
       if (obstacle.bottom <= footY - PIG_HEIGHT) continue // the pig walks under
-      if (penetrates(obstacle, x, z, PIG_RADIUS)) return true
+      if (!penetrates(obstacle, x, z, reachOf(obstacle))) continue
+      if (rampLeadsTo(here, obstacle, x, z)) continue
+      return true
     }
     return false
   }
+
+  /**
+   * Whether a RAMP over this spot delivers the pig to that box's top — in
+   * which case the box is where the ramp GOES and not a wall across it.
+   *
+   * The envelope is measured from the pig's feet, and a pig on a slope has its
+   * feet PIG_RADIUS behind its own body: 160 further up a 45° ramp is 160
+   * higher, which no step-up allows. So everything flush with a ramp reads as
+   * a wall from a stride away — measured on CAMP, a pig stalls 96 units short
+   * of the join between the two ramp pieces and again 204 short of the deck at
+   * the top, both times against something exactly level with the ramp under
+   * its own feet. The test is therefore the surface at the box's own EDGE,
+   * where the pig will be standing when it touches: level with the box's top
+   * or above it, and the box is the end of the climb.
+   *
+   * What it costs is written down: a pig can walk through the pillars UNDER a
+   * bridge, since their tops are under the same walkway. Nothing in the exe
+   * has been read either way — a ramp is bodiless there and this whole surface
+   * is the remake's (lib/game/ramps.ts).
+   */
 
   solid(x: number, y: number, z: number): boolean {
     for (const obstacle of this.near(x, z)) {
       // Y counts DOWN, so inside is between the top and the bottom that way
       // round. A point has no radius of its own.
-      if (y < obstacle.top || y > obstacle.bottom) continue
+      if (y < topAt(obstacle, x, z) || y > obstacle.bottom) continue
       if (penetrates(obstacle, x, z, 0)) return true
     }
     return false
   }
+}
+
+function rampLeadsTo(near: Obstacle[], box: Obstacle, x: number, z: number): boolean {
+  if (box.sloped) return false
+  const edge = nearestOn(box, x, z)
+  return near.some(
+    (ramp) => ramp.sloped && penetrates(ramp, x, z, 0) && topAt(ramp, edge.x, edge.z) <= box.top
+  )
 }
 
 /** Where another pig is standing — a cylinder of the pig's own box. */
