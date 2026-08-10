@@ -188,6 +188,9 @@ export interface DebugHooks {
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }
+  /** Where it is LOOKING, as a unit vector — the rig eases its position and
+   * not its aim, so a shake in the view lives here (three/debug.ts). */
+  facing(): { x: number; y: number; z: number }
   /** Every sound the battle has played, in order. */
   sounds(): string[]
   /** The squads as fielded: where each pig started, the class the map gave

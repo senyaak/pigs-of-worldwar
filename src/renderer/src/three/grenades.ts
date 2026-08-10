@@ -12,6 +12,7 @@ import * as THREE from 'three'
 import type { Lobbed } from '../../../lib/game/grenade'
 import { LOB_STEP } from '../../../lib/game/lobs'
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import type { Point } from '../../../lib/game/pose'
 import { weaponModelName } from '../../../lib/game/weapons'
 import { createLobArt } from './lobArt'
 import { createLobTrails } from './lobTrail'
@@ -29,7 +30,9 @@ const MESH_LIFT = LOB_STEP
 
 export interface GrenadeArt {
   /** Show exactly these, and lay their smoke. Once a frame. */
-  draw(live: readonly Lobbed[], delta: number): void
+  /** `where` is where to DRAW one — between the last two steps
+   * (three/tween.ts); the lob's own x/y/z is where the rules have it. */
+  draw(live: readonly Lobbed[], delta: number, where: (shot: Lobbed) => Point): void
   /** How many puffs the trails have up (lib/game/trail.ts). */
   trail(): number
   clear(): void
@@ -68,10 +71,11 @@ export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
   }
 
   return {
-    draw(live, delta) {
+    draw(live, delta, where) {
       // The trail follows what is still up; anything gone stops laying and its
-      // last six fade out on their own.
-      for (const shot of live) trails.follow(shot, shot)
+      // last six fade out on their own. Keyed by the lob itself and laid at the
+      // point being DRAWN, or the puffs would come off a stepping position.
+      for (const shot of live) trails.follow(shot, where(shot))
       trails.update(delta)
       // Index-aligned with the engine's list, and a splice shifts everything
       // after it, so the simplest correct thing is to rebuild rather than track
@@ -81,8 +85,9 @@ export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
         const shot = live[i]
         const mesh = meshAt(i, weaponModelName(shot.skill))
         if (!mesh) continue
+        const at = where(shot)
         // Y-DOWN, so lifting is subtracting.
-        mesh.position.set(shot.x, shot.y - MESH_LIFT * MODEL_SCALE, shot.z)
+        mesh.position.set(at.x, at.y - MESH_LIFT * MODEL_SCALE, at.z)
         // It POINTS along its flight, nose down as it falls. Nothing has been
         // read about a projectile's orientation — the constructor hands the
         // body a yaw and a pitch and the drawing half is not decoded — so this

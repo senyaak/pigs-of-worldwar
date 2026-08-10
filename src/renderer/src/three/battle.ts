@@ -28,7 +28,9 @@ import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import type { Battle } from '../../../lib/game/battle'
 import { createBonePose } from './bonePose'
+import { createTween } from './tween'
 import { createWear } from './wear'
+import type { Point } from '../../../lib/game/pose'
 import { projectDamage } from './damageNumbers'
 import { createEffectArt } from './effects'
 import { createAirDropArt } from './airDrop'
@@ -237,7 +239,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const wear = createWear(squad, anim)
   // Up they go, before the first frame is drawn: the engine has already lifted
   // them, and a squad standing on its markers for one frame reads as a stutter.
-  dropInArt.draw(dropIn.live())
+  dropInArt.draw(dropIn.live(), (one) => one.pig.position)
 
   host.scene.add(root)
   host.camera.near = 10
@@ -316,7 +318,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // is something left to watch.
     const bullet = now.firing?.phase === 'flight' ? (shots.head() ?? grenades.head()) : null
     if (bullet && soldier === squad.of(game.currentPig)) {
-      chase.ride(bullet, Math.atan2(bullet.vx, bullet.vz), delta)
+      chase.ride(drawnAt(bullet, bullet), Math.atan2(bullet.vx, bullet.vz), delta)
       soldier.node.visible = true
       return
     }
@@ -324,7 +326,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // the ordinary chase rig with something other than a pig in it
     // (0x4661c2).
     if (now.aftermath && soldier === squad.of(game.currentPig)) {
-      chase.ride(now.aftermath.at, soldier.pig.heading, delta)
+      chase.ride(drawnAt(now.aftermath, now.aftermath.at), soldier.pig.heading, delta)
       soldier.node.visible = true
       return
     }
@@ -339,7 +341,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
           ? 'scope'
           : 'chase'
     chase.follow(
-      soldier.pig,
+      drawnStance(soldier),
       soldier.node.position.y,
       dropInArt.riseOver(soldier.pig),
       delta,
@@ -392,9 +394,50 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     after = stanceNow()
     before = after
   }
+  /**
+   * …and everything else the engine moves that has an IDENTITY: what is in the
+   * air, what is coming down under a canopy, and the spot a blow left behind
+   * (three/tween.ts). The camera rides these, and it eases where it stands but
+   * not what it looks at — so a stepping target goes almost entirely into the
+   * aim, which is the shake play reported.
+   */
+  const tween = createTween()
+  const marks = (): [unknown, Point][] => {
+    const at: [unknown, Point][] = []
+    for (const shot of shots.live()) at.push([shot, shot])
+    for (const lob of grenades.all()) at.push([lob, lob])
+    // A crate only moves DOWN, and `raise` is the only thing that reads it.
+    for (const one of airDrops.live()) at.push([one, { x: 0, y: one.drop.y, z: 0 }])
+    for (const one of dropIn.live()) at.push([one, one.pig.position])
+    const beat = battle.view().aftermath
+    if (beat) at.push([beat, beat.at])
+    return at
+  }
+  /** Where to DRAW something the engine moves. */
+  const drawnAt = (key: unknown, now: Point): Point => tween.at(key, now, engine.alpha())
+
+  /**
+   * Where a pig is being DRAWN — which is what the camera frames, never the
+   * engine's own numbers.
+   *
+   * Three ways a pig gets a position, and each has its own history: one still
+   * on a canopy is coming down under it, the acting one is walking, and
+   * anything else is standing exactly where it stands.
+   */
+  const drawnStance = (soldier: Soldier): { x: number; y: number; z: number; heading: number } => {
+    const arriving = dropIn.live().find((one) => one.pig === soldier.pig)
+    if (arriving) {
+      const at = drawnAt(arriving, soldier.pig.position)
+      return { ...at, heading: soldier.pig.heading }
+    }
+    if (soldier === squad.of(game.currentPig)) return stanceAt(engine.alpha())
+    const { x, y, z } = soldier.pig.position
+    return { x, y, z, heading: soldier.pig.heading }
+  }
+
   /** Where to draw it, `alpha` of the way from the one to the other. Heading
    * takes the SHORT way round, or a pig crossing north spins the long way. */
-  const tween = (alpha: number): Omit<Stance, 'pig'> => {
+  const stanceAt = (alpha: number): Omit<Stance, 'pig'> => {
     const turn = ((after.heading - before.heading + Math.PI) % (2 * Math.PI)) - Math.PI
     return {
       x: before.x + (after.x - before.x) * alpha,
@@ -415,7 +458,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     const now = battle.view()
     // The squad coming down: each pig where its own descent has got to, and
     // the canopies heard the first frame the bank can play them.
-    dropInArt.draw(dropIn.live())
+    dropInArt.draw(dropIn.live(), (one) => drawnAt(one, one.pig.position))
     sounds.chuteOverhead(dropIn.running())
     const active = squad.of(game.currentPig)
     if (!active) return
@@ -432,7 +475,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       // screen does not, so what is drawn is the pig partway from where it
       // stood to where it now stands (lib/game/engine.ts, STEP_SECONDS). The
       // pig itself is not moved by this — `place` draws (three/squad.ts).
-      const at = tween(engine.alpha())
+      const at = stanceAt(engine.alpha())
       active.place(at.x, at.y, at.z, at.heading)
       marker.moveTo(at.x, query.height(at.x, at.z), at.z)
       // The model is not in the hand until the getting-it-out clip has run.
@@ -461,10 +504,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // drawn from (lib/game/engine.ts).
     const steps = engine.update(delta, () => {
       before = stanceNow()
+      tween.from(marks())
     })
     if (steps > 0) {
       after = stanceNow()
       if (before.pig !== after.pig) before = after
+      tween.to(marks())
     }
     // …and then everything that SHOWS it. Every mixer is brought into line with
     // what the engine now says each pig wears (three/wear.ts).
@@ -474,10 +519,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     marker.bob(time)
     // …and what the engine says is in the air gets drawn where it now is. Once
     // a frame, after everything that could have moved or spent one.
-    bulletArt.draw(shots.live())
-    grenadeArt.draw(grenades.all(), delta)
+    bulletArt.draw(shots.live(), (shot) => drawnAt(shot, shot))
+    grenadeArt.draw(grenades.all(), delta, (lob) => drawnAt(lob, lob))
     effectArt.draw(effects.all())
-    airDropArt.draw(airDrops.live())
+    airDropArt.draw(airDrops.live(), (one) => drawnAt(one, { x: 0, y: one.drop.y, z: 0 }).y)
   }
   host.onFrame.add(onFrame)
 

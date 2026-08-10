@@ -21,8 +21,11 @@ export interface AirDropArt {
   cut(id: number): void
   /** …every one of them. */
   cutAll(): void
-  /** Lift each record's art to where its descent has got to. Once a frame. */
-  draw(live: readonly Descent[]): void
+  /** Lift each record's art to where its descent has got to. Once a frame, and
+   * at the height it is DRAWN at — between the engine's last two steps
+   * (three/tween.ts), or a crate coming down steps and the camera watching it
+   * shakes. */
+  draw(live: readonly Descent[], heightOf: (one: Descent) => number): void
   dispose(): void
 }
 
@@ -52,8 +55,8 @@ export function createAirDropArt(
     cutAll() {
       for (const id of [...worn.keys()]) cut(id)
     },
-    draw(live) {
-      for (const one of live) props.raise(one.id, one.drop.y)
+    draw(live, heightOf) {
+      for (const one of live) props.raise(one.id, heightOf(one))
     },
     dispose() {
       for (const id of [...worn.keys()]) cut(id)

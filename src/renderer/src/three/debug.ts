@@ -178,6 +178,25 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** Where the chase camera actually is, world space — the only way a
        * spec can tell "swimming" from "the view has gone under the water". */
       camera: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
+      /**
+       * Where the camera is LOOKING, as a unit vector.
+       *
+       * The rig eases its position and does not ease what it points at, so a
+       * shake in the view shows up here and barely shows up in `camera()` —
+       * which is how play could feel the camera tremble while every position
+       * reading looked calm.
+       */
+      facing: () => {
+        // -Z through the camera's rotation, worked out by hand: this module
+        // imports three for its TYPES only and a `new Vector3` here would drag
+        // the library in for one debug reading.
+        const { x, y, z, w } = camera.quaternion
+        return {
+          x: -2 * (x * z + w * y),
+          y: -2 * (y * z - w * x),
+          z: -(1 - 2 * (x * x + y * y))
+        }
+      },
       warp: parts.warp,
       beginTurn: () => game.beginTurn()
     }

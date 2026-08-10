@@ -16,10 +16,17 @@ import * as THREE from 'three'
 import { bulletSize, projectileOf } from '../../../lib/game/projectile'
 import type { Shot } from '../../../lib/game/projectile'
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import type { Point } from '../../../lib/game/pose'
 
 export interface BulletArt {
-  /** Show exactly these, and hide whatever the last frame left over. */
-  draw(live: readonly Shot[]): void
+  /**
+   * Show exactly these, and hide whatever the last frame left over.
+   *
+   * `where` says where to put one: the engine steps in quanta and the screen
+   * does not, so what is drawn is the point between the last two steps
+   * (three/tween.ts). The shot's own x/y/z is where the RULES have it.
+   */
+  draw(live: readonly Shot[], where: (shot: Shot) => Point): void
   dispose(): void
 }
 
@@ -40,13 +47,14 @@ export function createBulletArt(root: THREE.Object3D): BulletArt {
   }
 
   return {
-    draw(live) {
+    draw(live, where) {
       let i = 0
       for (const shot of live) {
         const mesh = meshAt(i++)
         const kind = projectileOf(shot.skill)
+        const at = where(shot)
         mesh.visible = true
-        mesh.position.set(shot.x, shot.y, shot.z)
+        mesh.position.set(at.x, at.y, at.z)
         mesh.scale.setScalar((kind ? bulletSize(kind) : 35) * MODEL_SCALE)
       }
       for (let rest = i; rest < meshes.length; rest++) meshes[rest].visible = false

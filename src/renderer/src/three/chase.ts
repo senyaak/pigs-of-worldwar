@@ -126,6 +126,15 @@ export const SCOPE_MAGNIFY = 4
 /** The bone it hangs off. The same one a barrel and a blade do. */
 export const SCOPE_BONE = 5
 
+/** Where a pig is being drawn, and which way it faces. Not the pig itself: the
+ * rig frames what is on SCREEN (three/tween.ts). */
+export interface Stance {
+  x: number
+  y: number
+  z: number
+  heading: number
+}
+
 /** Which way the rig is pointing at the pig from. */
 export type View =
   /** Over the shoulder — the ordinary battle camera. */
@@ -144,9 +153,14 @@ export interface Chase {
    * Point at a pig standing at `nodeY` (game space, the model's origin).
    * `delta` null snaps rather than glides — a new acting pig, not a frame.
    * `rise` is anything hanging ABOVE the pig that has to stay in shot.
+   *
+   * `at` is where the pig is being DRAWN — between the engine's last two steps
+   * (three/tween.ts) — and not where the rules have it. The rig eases where it
+   * stands but points straight at what it is given, so a subject read off the
+   * engine's own quanta puts the whole stutter into the aim.
    */
   follow(
-    pig: Pig,
+    at: Stance,
     nodeY: number,
     rise: number,
     delta: number | null,
@@ -218,8 +232,8 @@ export function createChase(
    * height it frames cancels it exactly: the swap happens on the frame the
    * pig sinks, so the two moves annihilate and the view never moves at all.
    */
-  const framedY = (pig: Pig, nodeY: number): number =>
-    nodeY - (query.isWater(pig.position.x, pig.position.z) ? SWIM_SINK : 0)
+  const framedY = (at: Stance, nodeY: number): number =>
+    nodeY - (query.isWater(at.x, at.z) ? SWIM_SINK : 0)
 
   /**
    * Where the rig wants to be: behind the pig's shoulders, clamped above the
@@ -241,7 +255,7 @@ export function createChase(
    * its zoom is not yet turned into a field of view.
    */
   const want = (
-    pig: Pig,
+    at: Stance,
     nodeY: number,
     rise: number,
     view: View,
@@ -255,7 +269,7 @@ export function createChase(
       // exe builds the direction from the pig's own yaw and the aim angle
       // (0x4a310c onwards), so a breathing hand shifts the view without
       // steering it.
-      const facing = pig.heading + yaw
+      const facing = at.heading + yaw
       const position = new THREE.Vector3(eye.x, -eye.y, -eye.z)
       const ahead = Math.cos(aim)
       const reach = 4096
@@ -267,13 +281,13 @@ export function createChase(
       return { position, target }
     }
     const face = view === 'face'
-    const waterline = -query.surface(pig.position.x, pig.position.z)
+    const waterline = -query.surface(at.x, at.z)
     // Looking a pig in the face means looking at the PIG: the canopy over it
     // is out of frame on purpose, so `rise` is ignored on this side.
     const target = new THREE.Vector3(
-      pig.position.x,
-      Math.max(-framedY(pig, nodeY), waterline) + GAZE + (face ? 0 : rise / 2),
-      -pig.position.z
+      at.x,
+      Math.max(-framedY(at, nodeY), waterline) + GAZE + (face ? 0 : rise / 2),
+      -at.z
     )
     // The pull-back that fits `rise` more height at this vertical field of
     // view — half the extra height over the tangent of half the angle. The
@@ -289,9 +303,9 @@ export function createChase(
         : view === 'rifle'
           ? back * RIFLE_CLOSE
           : back
-    const from = view === 'melee' ? pig.heading + MELEE_TURN : pig.heading
-    const behindX = pig.position.x - Math.sin(from) * reach
-    const behindZ = pig.position.z - Math.cos(from) * reach
+    const from = view === 'melee' ? at.heading + MELEE_TURN : at.heading
+    const behindX = at.x - Math.sin(from) * reach
+    const behindZ = at.z - Math.cos(from) * reach
     const terrainAtCamera = -query.surface(behindX, behindZ)
     const position = new THREE.Vector3(
       behindX,
@@ -302,8 +316,8 @@ export function createChase(
   }
 
   return {
-    follow(pig, nodeY, rise, delta, view, aim = 0, yaw = 0, eye = null) {
-      const { position, target } = want(pig, nodeY, rise, view, aim, yaw, eye)
+    follow(stance, nodeY, rise, delta, view, aim = 0, yaw = 0, eye = null) {
+      const { position, target } = want(stance, nodeY, rise, view, aim, yaw, eye)
       // The scope SNAPS. Easing a first-person view is motion sickness: the
       // whole point of it is that the barrel and the frame are the same thing.
       if (delta === null || !snapped || view === 'scope') {

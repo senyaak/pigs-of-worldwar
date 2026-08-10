@@ -9,6 +9,7 @@ import type * as THREE from 'three'
 import type { Model, Texture } from '../api'
 import type { Pig } from '../../../lib/game/game'
 import type { Arrival } from '../../../lib/game/dropIn'
+import type { Point } from '../../../lib/game/pose'
 import { buildCanopies } from './parachute'
 import type { Canopies } from './parachute'
 import type { Squad } from './squad'
@@ -20,10 +21,15 @@ export interface DropInArt {
   cut(pig: Pig): void
   /** How much hangs above this pig that the camera must clear. */
   riseOver(pig: Pig): number
-  /** Stand every arriving pig where the engine says it now is. Once a frame —
-   * a pig whose canopy has been cut is still coming down and still on the
-   * list. */
-  draw(live: readonly Arrival[]): void
+  /**
+   * Stand every arriving pig where it is being DRAWN. Once a frame — a pig
+   * whose canopy has been cut is still coming down and still on the list.
+   *
+   * `where` rather than the pig's own position: the descent moves in the
+   * engine's quanta and the screen does not, and the camera is watching it
+   * come down (three/tween.ts).
+   */
+  draw(live: readonly Arrival[], where: (one: Arrival) => Point): void
   dispose(): void
 }
 
@@ -58,9 +64,10 @@ export function createDropInArt(
       worn.delete(pig)
     },
     riseOver: (pig) => (worn.has(pig) ? canopies.rise : 0),
-    draw(live) {
-      for (const { pig } of live) {
-        squad.of(pig)?.place(pig.position.x, pig.position.y, pig.position.z, pig.heading)
+    draw(live, where) {
+      for (const one of live) {
+        const at = where(one)
+        squad.of(one.pig)?.place(at.x, at.y, at.z, one.pig.heading)
       }
     },
     dispose() {
