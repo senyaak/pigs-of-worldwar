@@ -17,6 +17,7 @@
 // Derivations and addresses: movement/notes.md.
 
 import {
+  BOUNCE_CUTOFF,
   EJECT_PITCH,
   EJECT_SECONDS,
   FRAME_SECONDS,
@@ -466,31 +467,47 @@ function fly(
   // so a hillside landing keeps its speed and goes on down. Wedged pigs come
   // down bouncier than free ones, which is what makes coming off a wall read
   // as a bounce and not a step.
+  const blocked = !query.walkable(state.x, state.z)
+  const normal = query.normal(state.x, state.z)
   const hit = bounceOff(
     { x: a.vx, y: a.vy, z: a.vz },
     state.bounciness,
-    groundMaterial(query.tileType(state.x, state.z), !query.walkable(state.x, state.z)),
-    query.normal(state.x, state.z)
+    groundMaterial(query.tileType(state.x, state.z), blocked),
+    normal
   )
   state.y = floor
-  // A landing is binary in the original: over the threshold it bounces,
-  // under it the body is STOPPED outright (`0x471350` zeroes the velocity)
-  // and the pig stands up — unless it is inside a wall, and then the impact
-  // handler refuses to: the stand-up is gated on `IsBlocked` saying no. A
-  // pig in a wall never lands; it stays a body on a friction-0.01,
-  // restitution-0.99 floor until it slides or is thrown out.
-  if (-hit.y > 0 || !query.walkable(state.x, state.z)) {
+  /**
+   * A landing is binary in the original, and the test is the ARRIVAL SPEED and
+   * nothing else: the impact handler compares it with 25 a frame (`cmp di,19h`,
+   * 0x4711d8), sends anything at or over that to the bounce at 0x471247 and
+   * anything under it to `0x471350`, which zeroes the velocity.
+   *
+   * **Being in a WALL refuses the GETTING UP, and only that** — the stand-up is
+   * what `Map::IsBlocked` gates. This used to read it as "never lands at all",
+   * and play found what that costs: "соскользнул с подъема и попал в бесконечный
+   * цыкл — туда сюда скользит на 1м месте", on a tile whose type byte is 0x85 —
+   * a WALL over terrain type 5. Landing on one, the pig kept 99% of its
+   * slope-parallel speed off `WALL_MATERIAL`, never settled, and the wedge
+   * counter relaunched it every 25 frames for ever. Now it comes down, and the
+   * counter throws it out downhill from a standstill, which is the exit that was
+   * always meant to be there.
+   */
+  if (-(a.vx * normal.x + a.vy * normal.y + a.vz * normal.z) >= BOUNCE_CUTOFF) {
     state.airborne = { ...a, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true }
-  } else {
-    state.airborne = null
-    // Down for good, so the pig gets up: clip 10, which is what the landing
-    // handler asks for (0x470944) whatever the fall was. It runs down in
-    // `ground` and any input throws it away, so a pig that lands running
-    // never shows it.
-    state.getUp = GET_UP
-    state.clip = ANIM.LAND
-    state.commit = true
+    return
   }
+  state.airborne = null
+  // …and in a wall it does not get up: the exe's stand-up is gated on
+  // `IsBlocked`, so the pig lies there as a body until the wedge counter ejects
+  // it (`updateLocomotion`'s own tail).
+  if (blocked) return
+  // Down for good, so the pig gets up: clip 10, which is what the landing
+  // handler asks for (0x470944) whatever the fall was. It runs down in
+  // `ground` and any input throws it away, so a pig that lands running
+  // never shows it.
+  state.getUp = GET_UP
+  state.clip = ANIM.LAND
+  state.commit = true
 }
 
 /** Walking, swimming, jumping off — the kinematic, pinned-to-ground state. */
