@@ -80,8 +80,12 @@ export const MINE_FUSE_FRAMES = 12
  * one, and there is nothing per-viewer in it.
  *
  * The marker this reveals is therefore the remake's own: the game's own `WE_MINE`
- * model, put on the ground where a pig who KNOWS about mines can see it. Both
- * numbers below are inventions and say so.
+ * model, put on the ground where a pig who KNOWS about mines can see it.
+ *
+ * **The range is a GROUND range** — play, asked: "к земле тоже". So what a detector
+ * gets is the field around it lit up where it walks, and the same rule hides mines
+ * from the enemy on the MAP VIEW when there is one to hide them on. The 1024 is
+ * invented; the rule is play's.
  */
 export const DETECT_RANGE = 1024
 

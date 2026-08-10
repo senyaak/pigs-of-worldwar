@@ -22,6 +22,7 @@ import { clipSeconds } from './clips'
 import type { ClipTiming } from './clips'
 import { layerFires, weaponLayer } from './controls'
 import { SKILL } from './skills'
+import { spend } from './inventory'
 import { EXE_FRAME_SECONDS } from './ballistics'
 import type { Pig } from './game'
 import type { Bullets } from './bullets'
@@ -208,7 +209,18 @@ export function createAttack(parts: AttackParts): Attack {
         const was = laying.untilDown
         laying.untilDown -= delta
         laying.untilDone -= delta
-        if (was > 0 && laying.untilDown <= 0) grenades.plant(acting)
+        if (was > 0 && laying.untilDown <= 0 && grenades.plant(acting)) {
+          // **AND THE HANDS ARE EMPTY.** Play: "когда поставил тнт — руки после
+          // пустые — а ты ещё держишь тнт." A charge is not a weapon you keep: it
+          // left the trotters and it is on the ground. The round goes with it, the
+          // way `Pig::Attack` spends one as the clip runs (0x46975e) — and the
+          // holster is the same one the last bayonet gets, `ReadyWeapon(0)` when
+          // the rounds are out (0x46e3ee); play's rule is that a planted charge
+          // does it whether the slot ran down or not, which on the training ground
+          // is the only way it ever could.
+          spend(acting.carrying, holding ?? -1)
+          acting.holding = null
+        }
         // …and the pig is its own again only when the clip has run out.
         if (laying.untilDone <= 0) laying = null
       }

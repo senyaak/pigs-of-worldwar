@@ -2245,6 +2245,11 @@ were the same hole: "не дожидается окончания анимаци
 - **A planted charge is lifted by its OWN half-height** and not by a grenade's
   radius, and nothing pitches it: it was drawn half-buried, and it has no velocity
   to point along.
+- **And the hands are EMPTY afterwards.** Play: "должны быть — а ты ещё держишь
+  тнт." A charge is not a weapon a pig keeps: the round is spent as the clip runs
+  (the exe does the same at 0x46975e) and the hand is emptied whether the slot ran
+  down or not, which on the training ground — where every slot is unlimited — is the
+  only way it ever could.
 
 **And the once-clip rule wanted a qualifier the specs caught.** "A committed clip
 plays out" on its own broke the walk cycle: a pig that lands on the run was still
@@ -2287,8 +2292,8 @@ pass that does it**: "инженеры и командос с героем ви�
 где есть мины", and mines are hidden on the MINIMAP for the enemy. So the original's
 reveal is a TEXTURE SWAP on the tile — the hazard stripes CAMP's four mine textures
 almost certainly are — for three classes rather than the engineer family alone, and
-`DETECT_RANGE` belongs to the map view rather than to the ground. None of that is
-built: play said "но ладно это потом", and the marker model stands in meanwhile.
+the range applies to the GROUND and to the map view alike ("к земле тоже"), with the
+enemy simply not shown them on the minimap. None of that is built: play said "но ладно это потом", and the marker model stands in meanwhile.
 Still to do beside it: the EXCLAMATION MARK over a mine the moment it is trodden on.
 
 ### What is still not read

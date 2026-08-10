@@ -280,6 +280,11 @@ const give = (page: Page, skill: number): Promise<boolean> =>
     skill
   )
 
+const holdingOf = (page: Page): Promise<number | null> =>
+  page.evaluate(
+    () => (window as unknown as { pow: { debug: { holding(): number | null } } }).pow.debug.holding()
+  )
+
 /** How many mine markers the scene is drawing for the side whose turn it is. */
 const markers = (page: Page): Promise<number> =>
   page.evaluate(() =>
@@ -399,6 +404,9 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
   await hold(page, 'walkForward', 700)
   const ran = await debugState(page)
   expect(Math.hypot(ran.x - where.x, ran.z - where.z), 'it got away from it').toBeGreaterThan(50)
+
+  // …and the HANDS ARE EMPTY: the charge left them, and the round went with it.
+  expect(await holdingOf(page), 'it is still holding the thing it put down').toBeNull()
 
   // …and it cannot plant a SECOND one: one blow a turn (lib/game/battle.ts).
   await page.evaluate(() => {
