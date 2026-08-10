@@ -5,16 +5,18 @@
 // outside a −45° turn about the model's own z (lib/game/ramps.ts).
 //
 // What it pins is the MEASUREMENT the rule rests on, because the mechanism in
-// the exe is not found: tilted, CAMP's second bridge and ISLAND's six ramps
-// land on their decks and on the ground to the unit; untilted they miss by
-// 256 and overlap each other.
+// the exe is not found: which of the nine bodiless models are drawn lying down
+// (their own collision box says, and it is not close), and that tilted,
+// CAMP's second bridge and ISLAND's twelve ramps land on their decks and on
+// the ground to the unit — where untilted they sit 256 below the deck and
+// overlap each other by 213.
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
-import { modelRotationY, parsePog } from '../../src/lib/formats/pog'
+import { BOX_UNIT, modelRotationY, parsePog } from '../../src/lib/formats/pog'
 import type { MapObject } from '../../src/lib/formats/pog'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseModel } from '../../src/lib/formats/model'
@@ -82,25 +84,56 @@ const ART = 4
 const PLACED = 16
 const near = (a: number, b: number, slack: number): boolean => Math.abs(a - b) <= slack
 
-test('the ramp family is exactly the art that is off its own origin', () => {
-  // The rule's own witness: a prop's stored y is its model's CENTRE (all 6322
-  // shipped records, objects/notes.md), so a model whose vertical extent does
-  // not straddle its origin is drawn in some other orientation. On CAMP that
-  // is BRID2_S and nothing else — the abutment BRIDGE_S and the deck sections
-  // are centred as they stand.
-  const centre = (map: string, name: string): number => {
-    const ys = vertices(map, name).map(([, y]) => y)
-    const { lo, hi } = span(ys)
-    return (lo + hi) / 2
+test("the record's own collision box says which art is drawn lying down", () => {
+  // The witness the rule rests on. Fields 8-10 are the collider's extents, in
+  // the order (z, y, x) and counts of BOX_UNIT (formats/pog.ts), and the exe
+  // reads them at 0x4a6236 — so the box is the game's own statement about how
+  // big the piece is. For every one of the nine shape-1 models it matches ONE
+  // orientation of the art and misses the other by about 360 units.
+  const check = (map: string, name: string, ramp: boolean): void => {
+    const record = parsePog(mapFile(`${map}.POG`)).find((one) => one.name === name)
+    expect(record, `${name} on ${map}`).toBeDefined()
+    const model = vertices(map, name)
+    const at = (tilt: number): number[] => {
+      const points = model.map(([mx, my, mz]) => [
+        mx * Math.cos(tilt) - my * Math.sin(tilt),
+        mx * Math.sin(tilt) + my * Math.cos(tilt),
+        mz
+      ])
+      return [0, 1, 2].map((axis) => {
+        const { lo, hi } = span(points.map((p) => p[axis]))
+        return (hi - lo) * MODEL_SCALE
+      })
+    }
+    // The HEIGHT is what decides, because a 45° turn is what moves it most:
+    // the box's y extent lands on the drawn orientation within the art's own
+    // few units of noise, and 300 or more off the other one. (The x and z
+    // extents agree, but a collider is not the art — a tree's box is its
+    // trunk — so they are allowed their slack and this is not.)
+    const flat = Math.abs(at(0)[1] - record!.box.y)
+    const tilted = Math.abs(at(RAMP_TILT)[1] - record!.box.y)
+    const [near_, far] = ramp ? [tilted, flat] : [flat, tilted]
+    expect(isRamp(name), `${name} is in the family`).toBe(ramp)
+    expect(near_, `${name}: ${near_} off as drawn`).toBeLessThanOrEqual(ART)
+    // …and the other way round it is out by more than a whole BOX_UNIT: 105
+    // at the closest (BRR02PPP), 297 at the furthest.
+    expect(far, `${name}: only ${far} off the other way`).toBeGreaterThan(BOX_UNIT)
   }
-  expect(Math.abs(centre('CAMP', 'BRIDGE_S'))).toBeLessThan(8)
-  expect(Math.abs(centre('CAMP', 'BRIDGE_C'))).toBeLessThan(8)
-  expect(centre('CAMP', 'BRID2_S')).toBeGreaterThan(300)
-  expect(isRamp('BRID2_S')).toBe(true)
-  expect(isRamp('BRIDGE_S')).toBe(false)
+  check('CAMP', 'BRID2_S', true)
+  check('ICEFLOW', 'M1S_ST01', true)
+  check('RIDGE', 'STS_ST01', true)
+  check('RUMBLE', 'BRR02PPP', true)
+  check('CAMP', 'BRIDGE_S', false)
+  check('MASHED', 'D_BRID', false)
+  // The three long ones are ARCH bridges, deck at the origin and the arch
+  // hanging below — which is why their art is off its own centre without
+  // being tilted, and why the centre alone is not the test.
+  check('MASHED', 'STR06PPP', false)
+  check('BAY', 'W1R06PPP', false)
+  check('ICEFLOW', 'SNR05PPP', false)
 
-  // …and the tilt is what centres it, at half a right angle exactly: the art
-  // is 1451 model units across and 1451/√2 is the 725 that halves to 512.
+  // The turn is half a right angle exactly: the art is 1451 model units
+  // across and 1451/√2 is the 725 that halves to the box's 512.
   const origin = { name: 'BRID2_S', yaw: 0, x: 0, y: 0, z: 0 } as MapObject
   const tilted = span(placed(origin, vertices('CAMP', 'BRID2_S')).map((p) => p.elevation))
   expect(near((tilted.lo + tilted.hi) / 2, 0, ART)).toBe(true)

@@ -1549,15 +1549,22 @@ half of it, and the only reading under which this file's own sentence about the 
   `lib/game/ramps.ts`: `Map::Load` reads field 5 and no other angle (ten
   sites read `[record+0x2A]`, none `+0x28`/`+0x2C`), and the ramps and the
   abutments that must NOT tilt share one constructor arm. So the rule is
-  MEASURED, four ways, and `e2e/002/ramp.spec.ts` pins all four: the family
-  is exactly the seven models whose art sits off its own origin (against
-  6322 records saying the stored y IS the model's centre); only −45° centres
-  the three that are not symmetric; CAMP's second bridge then runs
+  MEASURED, and what decides it is the record's OWN COLLISION BOX: over every
+  shape-kind-1 record on all 61 maps the box's y extent lands within 4 units
+  of one orientation of the art and 105 or more off the other, with nothing
+  in between. Four models come out tilted — `BRID2_S`, `M1S_ST01`,
+  `STS_ST01`, `BRR02PPP` — and for each the box's y IS the rise and its x the
+  run, so the collider a ramp wants is that box with a sloped top. The five
+  that stay flat are the abutments `BRIDGE_S` and `D_BRID` and three ARCH
+  bridges (`STR06PPP`, `W1R06PPP`, `SNR05PPP`), whose deck is at the origin
+  with the arch hanging below — which is why "art off its own centre" is NOT
+  the test, though it looks like one. The SIGN is the unfaced side going
+  underground, and the maps agree twice: CAMP's second bridge runs
   2240 → 1728 → 1216 onto its own ground with its four `M1S_SU03` legs
-  filling 1216..1728 under exactly the first piece; and ISLAND's six ramps
+  filling 1216..1728 under exactly the first piece, and ISLAND's twelve ramps
   each top out at their deck's own walking surface with the yaw picking which
   way they climb. Untilted the pieces are 725 across a 512 spacing, overlap
-  each other, and sit 256 BELOW the deck.
+  by 213, and sit 256 BELOW the deck. `e2e/002/ramp.spec.ts` pins all of it.
 - **A pig still cannot get ONTO a bridge or up a ramp.** The deck sections are
   boxes and the shape-kind-1 pieces are bodiless — a 94-record set that is
   every bridge and step piece, so they are not in the original's collision
