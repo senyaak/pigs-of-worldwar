@@ -1861,8 +1861,10 @@ not built yet.
 **3. A pig that cannot SWIM goes under, and stays visible down there.** From the
 same screenshot: the pig is below the surface with its name plate and health still
 up. `SWIM_SINK` puts a swimming pig's eyes at the waterline; a class that cannot
-swim should sink past it. Which classes cannot is not read, and neither is what
-happens to one that has — play asked for it written down and left.
+swim should sink past it. WHICH classes is now read, from the other end — the
+water's own damage exempts class 4 and 14..16 and nothing else
+(`lib/game/drowning.ts`) — but what the exe does to a non-swimmer's HEIGHT is
+still not, and the sink is unchanged.
 
 **4. There are no FOOTSTEP sounds.** Deliberate so far and written up under the
 sound section: they want the hoof-contact frames `anim/audio-events.md`
@@ -1913,6 +1915,67 @@ turn out ("модельки отрисованы криво, −45 градус�
 exactly that, to the unit), and it can be walked up now. Both are written up
 among the divergences above. What is NOT done is the first bridge, which is
 its own shape of problem and has an entry of its own.
+
+### WATER hurts, a turn ends with a BEAT, and the modes have names
+
+Four of play's reports in one pass, and three of them turned out to be the same
+piece of the exe — its MODE MACHINE, which now has a decoded name for every
+number (`turns/notes.md`; the table is at 0x4d72b0 and NORMAL landing on 6 pins
+it). Two answers fall straight out: **the beat at the top of a turn is mode 4**,
+which was an open question since the turn clock landed, and **mode 13 is WALK AWAY
+— the beat at the END of one**, which nothing here knew existed.
+
+**Water takes health, and it RAMPS.** `lib/game/drowning.ts`: the bite is the
+frame counter itself in 128ths of a point, capped at half a point a frame, so a
+grunt's fifty last about nine seconds — and **the pig whose turn it is pays
+twice**, except during the beat at the end of a turn, which is the exe's own
+exemption. It is deliberately SILENT and invisible: the floating number is gated
+above 0x7f and the cap is 0x40, so nothing is drawn and nothing is played, and the
+health plate is the whole of the feedback. **Class 4 and 14..16 take nothing at
+all** — the commando and the top tier by the spawn markers — and that is gated on
+a ONE-PLAYER game, which is what `PLAYERS` in that file says and why it is not
+`SIDES_FIELDED`. Two consequences worth knowing: `DEAD_BELOW` in `health.ts` is
+now 1 rather than 0 because the exe's death test is "under one whole point" and
+water is the first thing that deals fractions, and the name plate floors its
+number the way the exe's own does.
+
+**A turn does not hand over on the spot.** `lib/game/walkAway.ts` is mode 13:
+control is locked, the clock is stopped, and anyone still in the water makes for
+the nearest shore — eight compass rays, sixteen tiles each, nearest by dx²+dz²,
+and a pig with nowhere to go drowns where it stands. It holds until they are all
+out and the world has been quiet for a second, which is both the exe's fifteen
+quiet frames and exactly what play asked for ("хотя бы секунду задержки между
+ходами"). The exe calls its shore search for the ACTING pig ONLY in this mode, so
+the swim out is a property of the handover and not of being in water.
+
+`pow.debug.cutTurnBeat()` ends it, and `skipTurn` in `e2e/controller.ts` uses that
+by default — a spec that ends four turns to get somewhere should not pay four
+seconds for a beat it is not testing. `e2e/002/drown.spec.ts` is the one that IS
+about it.
+
+**A health crate shows something now.** `Pig::Heal` was read to the end and does
+three things: the same floating number a hit does (one spawner, and the fifth
+argument is the style — a hit takes the team's colour, a heal a fixed one), sound
+0x53 P_SIGH at nominal, and it CLEARS the status bitfield. Only the third is not
+built, because nothing here models statuses. `damage/notes.md`.
+
+**A jump no longer walks through a dummy.** The obstacle field was consulted from
+the walking branch alone, and `airborne` clamped its step to the world and read
+objects only as a roof to land on. In the exe the block is in the PHYSICS layer:
+the same sweep the walk uses (0x406AD0) is also called from the library's own
+integration of a live body, and a pig in the air is a live body for the whole
+flight. Reach is 0 up there, so a box whose top is above the feet is a wall and
+one below them is still something to land on.
+
+**And the pig's rump does NOT wag — that one is a measurement, not a fix.** Play
+asked for the pelvis to turn while walking. The skeleton is fifteen bones with no
+tail among them, the tail geometry hangs off the ROOT bone, and the root's yaw is
+exactly zero on every frame of every run cycle (and of the backwards walk). What
+swings is bone 1, the torso: ±19.6° of yaw and 22° of roll, which this engine
+already wears — and the weapon channel owns bones 0..8, so a pig carrying
+something has a still torso by design. The only clip that yaws the rump alone is
+27, Standing around, by 4.9°. Full measurement in `animations/notes.md`; there is
+nothing in the data to turn on.
 
 ### What is still not read
 
