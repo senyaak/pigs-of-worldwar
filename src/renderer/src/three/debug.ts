@@ -69,6 +69,9 @@ export interface DebugParts {
   barks: () => string[]
   /** Whether the beat after a blow is still running. */
   aftermath: () => boolean
+  /** The beat at the END of a turn, and how many pigs are still in the water
+   * (lib/game/walkAway.ts). Null while a turn is being played. */
+  walkAway: () => { swimming: number } | null
   warp: (x: number, z: number, heading: number) => void
 }
 
@@ -138,6 +141,10 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** True while the turn is held on what the blow left behind — the clock
        * is stopped and the camera is off the pig (lib/game/aftermath.ts). */
       aftermath: () => parts.aftermath(),
+      /** True while the turn is ENDING: the exe's mode 13, WALK AWAY. Nobody
+       * can drive, the clock is stopped and `swimming` is how many pigs are
+       * still making for the shore (lib/game/walkAway.ts). */
+      walkAway: () => parts.walkAway(),
       /** Every pig's health, side by side — what a bayonet is measured by. */
       health: () =>
         game.players.flatMap((player) =>

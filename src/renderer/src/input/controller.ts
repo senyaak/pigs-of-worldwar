@@ -184,7 +184,12 @@ export interface DebugHooks {
    * stopped and the camera is on the spot or on the crate coming down
    * (lib/game/aftermath.ts). */
   aftermath(): boolean
-  /** Every pig's health, in turn order. */
+  /** The beat at the END of a turn — the exe's mode 13, WALK AWAY — and how
+   * many pigs it is still waiting to see out of the water. Null while a turn is
+   * being played (lib/game/walkAway.ts). */
+  walkAway(): { swimming: number } | null
+  /** Every pig's health, in turn order. Water takes FRACTIONS of a point
+   * (lib/game/drowning.ts), so this is not always whole. */
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }

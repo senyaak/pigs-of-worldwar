@@ -561,6 +561,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     firing: () => battle.view().firing?.phase ?? null,
 
     aftermath: () => battle.view().aftermath !== null,
+    walkAway: () => battle.view().walkAway,
     warp: (x, z, heading) => {
       battle.warp(x, z, heading)
       settle()

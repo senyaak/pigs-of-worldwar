@@ -22,6 +22,8 @@ import { weaponOf } from './weapons'
 import type { Firing } from './shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
+import { beginWalkAway } from './walkAway'
+import type { WalkAway } from './walkAway'
 import { createSights } from './sights'
 import { createAttack } from './attack'
 import { SKILL } from './skills'
@@ -96,6 +98,10 @@ export interface BattleView {
   firing: Firing | null
   /** The beat after a blow, and the spot it is watching. */
   aftermath: Aftermath | null
+  /** The beat at the END of a turn, and how many pigs it is still waiting to
+   * see out of the water (lib/game/walkAway.ts). Null when a turn is being
+   * played. */
+  walkAway: { swimming: number } | null
 }
 
 export interface Battle {
@@ -177,6 +183,9 @@ export function createBattle(parts: BattleParts): Battle {
   })
   /** The beat after a kill: the clock stops, the camera stays on the spot. */
   let aftermath: Aftermath | null = null
+  /** …and the beat at the END of a turn: the exe's mode 13, WALK AWAY. Nobody
+   * is driving and anyone in the water is swimming out (lib/game/walkAway.ts). */
+  let walkAway: WalkAway | null = null
   /** A script step owed to something that has broken, and not run until it has
    * finished breaking. One animation at a time. */
   let pending: { id: number; y: number } | null = null
@@ -210,6 +219,26 @@ export function createBattle(parts: BattleParts): Battle {
     swings.running() ||
     grenades.live() > 0 ||
     shots.live().length > 0
+
+  /**
+   * Finish the turn the way the exe finishes one: into the WALK AWAY beat, and
+   * only out the far side of it to the next pig.
+   *
+   * `Game::EndTurn` (0x494430) does not advance anybody — it sets mode 13 and
+   * lets that mode's own wait decide when the handover happens
+   * (lib/game/walkAway.ts).
+   */
+  const endTurnBeat = (): void => {
+    walkAway = beginWalkAway({
+      pigs: everyone,
+      query,
+      soaked: drowning.soaked,
+      wear: (pig, clip) => anim.setClip(pig, clip),
+      emit
+    })
+    jumpRequested = false
+    attack.swallow()
+  }
 
   // The battle LISTENS to its own weapons for the two things that stop a turn.
   // A blow does not decide that a turn ends; the OBJECT breaking does, which is
@@ -278,14 +307,45 @@ export function createBattle(parts: BattleParts): Battle {
     // per-pig ground update and that runs in every mode, so a pig goes on
     // drowning through the beat at the top of a turn and through the beat after
     // a blow alike (lib/game/drowning.ts). Every pig on the map, not just the
-    // one being driven — and the one being driven pays twice.
+    // one being driven — and the one being driven pays twice, except in the
+    // beat at the end of a turn, which is the exe's own exemption.
     drowning.update(delta, {
       acting: game.currentPig,
-      // Nothing takes the doubling off yet: the exe's mode 13 is the beat at
-      // the END of a turn, and this engine has no such phase.
-      walkAway: false,
+      walkAway: walkAway !== null,
       aloft: loco.airborne !== null
     })
+
+    // The beat at the END of a turn: mode 13, WALK AWAY. Nobody is driving, the
+    // clock does not run, and everyone still in the water makes for the nearest
+    // shore (lib/game/walkAway.ts). It holds until they are all out and the
+    // world has been quiet for a second.
+    if (walkAway) {
+      jumpRequested = false
+      attack.swallow()
+      // Everything that runs on its own runs on: the engine's step advances all
+      // of it after this call (lib/game/engine.ts). All this beat does is watch.
+      const settling =
+        effects.busy() ||
+        shots.live().length > 0 ||
+        grenades.live() > 0 ||
+        numbers.live() > 0 ||
+        airDrops.falling() > 0
+      const done = walkAway.update(delta, settling)
+      // The beat moves pigs itself and the one whose turn it was is one of them,
+      // so the state the scene draws THAT one out of has to follow it.
+      loco.x = game.currentPig.position.x
+      loco.y = game.currentPig.position.y
+      loco.z = game.currentPig.position.z
+      loco.heading = game.currentPig.heading
+      loco.swimming = query.isWater(loco.x, loco.z)
+      if (done) {
+        walkAway = null
+        game.endTurn()
+        focus(game.currentPig)
+      }
+      onChanged()
+      return
+    }
 
     // The turn clock runs regardless of what anyone does — except that it does
     // not start at once: `tick` burns the beat at the top of the turn first. A
@@ -303,10 +363,11 @@ export function createBattle(parts: BattleParts): Battle {
       swings.running() ||
       grenades.live() > 0
     if (!blowInProgress && (game.tick(delta) || isDead(game.currentPig))) {
-      game.endTurn()
-      jumpRequested = false
-      attack.swallow()
-      focus(game.currentPig)
+      // …and the turn does not hand over on the spot. `Game::EndTurn` goes into
+      // mode 13 first — the beat above, which the next step runs.
+      endTurnBeat()
+      onChanged()
+      return
     }
 
     const acting = game.currentPig
@@ -402,8 +463,9 @@ export function createBattle(parts: BattleParts): Battle {
     // to act on itself, because ending a turn is the battle's business.
     if (attack.begin(acting, holding) === 'skip') {
       emit({ kind: 'skillUsed' })
-      game.endTurn()
-      focus(game.currentPig)
+      // Through the same beat the clock running out goes through: a skipped turn
+      // is still a turn ending.
+      endTurnBeat()
       onChanged()
       return
     }
@@ -545,7 +607,8 @@ export function createBattle(parts: BattleParts): Battle {
       still,
       driving: intent.walk !== 0 || intent.turn !== 0,
       firing: attack.firing(),
-      aftermath
+      aftermath,
+      walkAway: walkAway === null ? null : { swimming: walkAway.swimming() }
     }),
     setIntent(walk, turn) {
       intent.walk = walk
@@ -572,7 +635,9 @@ export function createBattle(parts: BattleParts): Battle {
       // Something is still LIVE, and a second press of fire sets it off where
       // it lies — "пока граната летит, не могу взорвать её."
       armed: grenades.live() > 0,
-      locked: committed() || aftermath !== null,
+      // …and the beat at the END of a turn takes control away too: mode 13 is
+      // not a mode anybody drives in (lib/game/walkAway.ts).
+      locked: committed() || aftermath !== null || walkAway !== null,
       sights: layerSights(weaponLayer(game.currentPig.holding)) && !dropIn.running()
     }),
     beginTurn: () => game.beginTurn(),
