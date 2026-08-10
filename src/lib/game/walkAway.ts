@@ -82,6 +82,15 @@ export const SOAK_BEFORE_SHORE = 5 * FRAME_SECONDS
 export const WALK_AWAY_QUIET = 1
 
 /**
+ * How nearly the pig has to be facing its shore before it swims at all: one of
+ * the exe's OWN turning steps, 32/4096 of a circle — 2.8°.
+ *
+ * The rule behind it is play's — turn, then go — and the tolerance has to be at
+ * least one step or the pig would stall a frame short of lined up.
+ */
+export const FACING = TURN_SPEED * FRAME_SECONDS
+
+/**
  * The nearest dry land, or null if there is none within reach.
  *
  * Eight rays, a tile at a time: a wall ends a ray, water carries it on, and the
@@ -159,22 +168,27 @@ export function beginWalkAway(world: {
 
   const swim = (pig: Pig, target: { x: number; z: number }, delta: number): void => {
     const want = Math.atan2(target.x - pig.position.x, target.z - pig.position.z)
-    // Turn toward it at the pig's own rate, then swim along the heading — the
-    // exe hands the target to the ordinary walking machinery (state 2) and this
-    // is the remake's own straight line to it. The ray it came off is water all
-    // the way, so there is nothing in between to walk round.
+    // The SHORTER way round, always: the difference is brought into ±π before
+    // anything turns by it.
     let turn = want - pig.heading
     while (turn > Math.PI) turn -= 2 * Math.PI
     while (turn < -Math.PI) turn += 2 * Math.PI
     const swept = Math.min(Math.abs(turn), TURN_SPEED * delta) * Math.sign(turn)
     pig.heading += swept
+    world.wear(pig, ANIM.SWIM)
+    // **TURN FIRST, THEN GO.** Play: "выплывает не по кратчайшему пути из-за
+    // поворота — надо выбирать куда поворачиваться чтобы было короче, то есть
+    // сначала поворот а потом вперёд, не одновременно плыть и поворачиваться."
+    // Doing both at once curves the path, and a curve is longer than the
+    // straight line the shore search measured — the search compares candidates
+    // by dx²+dz², so the pig has to travel the distance it was picked for.
+    if (Math.abs(turn) > FACING) return
     const stride = SWIM_SPEED * delta
     const to = clampToWorld(
       pig.position.x + Math.sin(pig.heading) * stride,
       pig.position.z + Math.cos(pig.heading) * stride
     )
     pig.position = { x: to.x, y: restingY(world.query, to.x, to.z), z: to.z }
-    world.wear(pig, ANIM.SWIM)
   }
 
   return {

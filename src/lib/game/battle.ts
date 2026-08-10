@@ -524,6 +524,24 @@ export function createBattle(parts: BattleParts): Battle {
       )
     )
     jumpRequested = false
+    // **IN THE WATER THE WEAPON GOES AWAY.** Play: "в воде оружие убирается пока
+    // не вылезешь — у нас нет." Play's rule and NOT a reading: the holster proper
+    // is `Pig::HoldWeapon(0)` (0x469090, whose refusal prints "Forced holstering
+    // cos pig not in normal mode"), and none of its nine callers tests the water
+    // — nor does `Pig::MayAct`, nor anything else on the weapon path, which has
+    // no `IsInWater` call in it at all. So this is where play's word stands in
+    // for a read that came up empty.
+    //
+    // It is not put BACK: swimming out leaves the pig empty-handed and choosing
+    // again is the player's business, which is what "пока не вылезешь" asks for.
+    // A blow already in flight is left alone — clearing the hand mid-shot would
+    // strand the sequence that is holding the turn open.
+    //
+    // A WEAPON, and only a weapon: SKIP TURN and its neighbours go in the hands
+    // the same way but are not something a pig could drop in the water, and
+    // taking one away mid-swim would leave the turn unendable.
+    const armed = ['melee', 'gun', 'lob'].includes(weaponLayer(acting.holding))
+    if (loco.swimming && armed && !committed()) acting.holding = null
     game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
     // Walking INTO a crate is how one is collected; there is no button.
     scenery.collect(acting)
