@@ -282,6 +282,17 @@ export interface LocomotionState {
   bounciness: Bounciness
   /** Which clip this frame wants on the pig. */
   clip: number
+  /**
+   * Whether the pig is IN the water, which is not the same question as whether
+   * there is water under it: a pig on a bridge is over the ditch and not in it.
+   *
+   * It lives here because two other domains were asking the LANDSCAPE instead
+   * and both got it wrong at the edge of CAMP's bridge — the sound played a
+   * splash the moment the deck crossed the water line, and the camera dropped
+   * its subject by SWIM_SINK and lurched. One number, and the picture and the
+   * bank read the same one.
+   */
+  swimming: boolean
 }
 
 /**
@@ -314,7 +325,8 @@ export function createLocomotion(
     getUp: 0,
     commit: false,
     bounciness: FREE,
-    clip: ANIM.IDLE
+    clip: ANIM.IDLE,
+    swimming: query.isWater(x, z)
   }
 }
 
@@ -374,6 +386,8 @@ function fly(
   delta: number
 ): void {
   const a = state.airborne as Airborne
+  // Nothing in the air is in the water, whatever is under it.
+  state.swimming = false
   state.clip = a.ejected ? ANIM.EJECTED : a.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE
   // Flight clips cycle; only the landing below commits to one.
   state.commit = false
@@ -489,6 +503,7 @@ function ground(
   // over water, and without this the pig swims along the deck — the swim clip,
   // the 16-a-frame cap and the waterline for a resting height, forty feet up.
   const swimming = !onWalkway && query.isWater(state.x, state.z)
+  state.swimming = swimming
   // Backwards is half as fast on land and the same in water, because the
   // exe's clamp lands differently either side of it: -32 scaled by the class
   // is 26 walking, and the water cap of 16 swallows both directions.

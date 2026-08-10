@@ -1623,9 +1623,21 @@ half of it, and the only reading under which this file's own sentence about the 
     than the pig's own feet. Walking up a bank at something level with the crest
     the two differ by the slope times the pig's radius, and CAMP's abutment came
     out 65 against an envelope of 64 — a wall by one unit.
-  - **what holds a pig up is under its FEET**, so `standOn` takes no radius at
-    all. With one, a pig's cylinder still overlaps a deck 160 units past the
-    edge and it walked half its own width out over the gap before falling.
+  - **what holds a pig up is its own BOX resting on something** — the 320 the
+    spawn markers give it — so it is held while any part of it is over the edge,
+    the way a box on a ledge is. That was tried the other way, by the feet
+    alone, and the TUTORIAL says no: the gap is 512, a running jump carries 303,
+    and by the feet the step is impossible at any launch the exe gives, while by
+    the box it is 512 less 160 either side. The cost is that a pig stands up to
+    160 out over a drop before it falls, which is what a box on a ledge does in
+    a solver that cannot tip it. A RAMP is still held by the feet — see
+    `wallReachOf`.
+  - **whether a pig is IN the water is the ENGINE's to say**, not the tile's.
+    Two other domains were asking the landscape and both got it wrong the moment
+    CAMP's deck crossed the water line: the bank played a SPLASH and the camera
+    dropped its subject by `SWIM_SINK` and lurched. `swimming` is one field on
+    the locomotion state now, and `three/chase.ts` and `audio/battle.ts` read
+    that one number.
   - **the FALL look-ahead is the landscape's**, and it is wrong both ways over a
     bridge, so `step` takes a `supported` predicate now (`lib/game/movement.ts`)
     and the walk-off case is `locomotion`'s. Crossing the ditch the ground falls
@@ -1647,10 +1659,18 @@ half of it, and the only reading under which this file's own sentence about the 
   above the deck they draw, so walking them on the box would hold a pig in the
   air; what they want is a surface taken off the ART. Nobody has played those
   maps yet to say what else is wrong with them first.
-- **The GAP in CAMP's first bridge is real and stays.** Nothing covers
-  x −1536..−1024 between its two deck sections, so the walk ends in the air —
-  which is what the tutorial's own JUMP THE GAP line is for (`gtext` clip 18,
-  `tutorial/notes.md`).
+- **The GAP in CAMP's first bridge is real, stays, and is JUMPABLE.** Nothing
+  covers x −1536..−1024 between its two deck sections, so the walk ends in the
+  air — which is what the tutorial's own JUMP THE GAP line is for (`gtext`
+  clip 18, `tutorial/notes.md`). It has to be taken from the lip: the spec walks
+  to −1163, jumps, and lands at −1504 on the far deck.
+
+  **The jump's own numbers are not the problem and were re-read to be sure.**
+  The forward impulse fires ONCE, on frame three exactly — `[esi+0x20C]` counts
+  the frames of the fall and `cmp eax,3; jne` skips every other one (0x46e93e),
+  then `0x4A9260(0x30, 0, heading, 0)` is one kick along the facing. So a
+  running jump carries 303 units and a standing one 167, and no reading of the
+  exe makes it 512. What makes the gap possible is being held up by the box.
 - **Two sides, though a map offers up to six.** The spawn markers name six
   (FINAL uses all of them, the arenas four); the battle fields the first two
   it finds, because there is no AI for the rest. There is no filling in

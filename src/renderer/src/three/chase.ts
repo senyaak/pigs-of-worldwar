@@ -133,6 +133,9 @@ export interface Stance {
   y: number
   z: number
   heading: number
+  /** Whether the pig is IN the water — the ENGINE's answer, not the tile's
+   * (lib/game/locomotion.ts). A pig on a bridge is over water and not in it. */
+  swimming: boolean
 }
 
 /** Which way the rig is pointing at the pig from. */
@@ -231,9 +234,14 @@ export function createChase(
    * camera followed the drop and lurched. Taking the same sink back off the
    * height it frames cancels it exactly: the swap happens on the frame the
    * pig sinks, so the two moves annihilate and the view never moves at all.
+   *
+   * It asks the ENGINE whether the pig is swimming rather than asking the
+   * water where the pig is standing. Those differ over a BRIDGE, and the
+   * difference is a 280-unit lurch the moment the deck crosses the water line
+   * — which is what it used to do on CAMP's first bridge.
    */
   const framedY = (at: Stance, nodeY: number): number =>
-    nodeY - (query.isWater(at.x, at.z) ? SWIM_SINK : 0)
+    nodeY - (at.swimming ? SWIM_SINK : 0)
 
   /**
    * Where the rig wants to be: behind the pig's shoulders, clamped above the

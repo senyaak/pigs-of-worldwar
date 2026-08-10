@@ -25,7 +25,7 @@ import { parseModel } from '../../src/lib/formats/model'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { STEP_SECONDS } from '../../src/lib/game/engine'
 import { createLocomotion, updateLocomotion } from '../../src/lib/game/locomotion'
-import { ObstacleField } from '../../src/lib/game/obstacles'
+import { ObstacleField, PIG_RADIUS } from '../../src/lib/game/obstacles'
 import { RAMP_TILT, isRamp } from '../../src/lib/game/ramps'
 import { MODEL_SCALE } from '../../src/lib/game/scale'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
@@ -260,7 +260,7 @@ test("CAMP's first bridge is walked over, and the gap in it is not", () => {
   const deck = 1728
   let onDeck = 0
   let fell = false
-  for (let i = 0; i < Math.round(2.5 / STEP_SECONDS); i++) {
+  for (let i = 0; i < Math.round(3 / STEP_SECONDS); i++) {
     updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS, field)
     // Over the ditch, at deck height, on its feet: that is being ON the bridge.
     if (near(-query.height(state.x, state.z), 1216, ART) && near(-state.y, deck, 8)) onDeck++
@@ -273,6 +273,37 @@ test("CAMP's first bridge is walked over, and the gap in it is not", () => {
   // is a jump and the walk ends in the air.
   expect(fell, 'the gap let it walk straight across').toBe(true)
   expect(-state.y, 'and it went down the ditch, not through the deck').toBeLessThan(deck)
+})
+
+test("…and the gap IS jumpable, which is what settles how a pig is held up", () => {
+  // The tutorial says JUMP THE GAP, so the step has to be possible — and that
+  // is the whole argument for holding a pig up by its own BOX rather than by
+  // its feet (lib/game/obstacles.ts). The gap is 512 and a running jump
+  // carries 303: by the feet it cannot be done at any launch the exe gives,
+  // and by the box it is 512 less 160 either side, which the jump clears.
+  const CAMP = parsePog(mapFile('CAMP.POG'))
+  const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
+  const field = new ObstacleField(CAMP)
+  const far = CAMP.find((one) => one.name === 'BRIDG_C2')!
+  const state = createLocomotion(query, 800, far.z, -Math.PI / 2)
+  let jumped = false
+  let flew = false
+  for (let i = 0; i < 220; i++) {
+    // Run west and jump at the lip — as late as the pig is still held up.
+    const wantJump = !jumped && state.x < -1150 && state.airborne === null
+    if (wantJump) jumped = true
+    updateLocomotion(state, query, { walk: 1, turn: 0, jump: wantJump }, STEP_SECONDS, field)
+    if (state.airborne !== null) flew = true
+    if (jumped && flew && state.airborne === null) break
+  }
+  expect(jumped, 'it never reached the lip').toBe(true)
+  expect(flew, 'it never left the ground').toBe(true)
+  // Down on the FAR deck, at deck height, past the gap's far edge.
+  expect(near(-state.y, 1728, 8), `landed at ${-state.y}`).toBe(true)
+  // Standing ON it means its own box is over it, which is the rule under test:
+  // the deck's near edge plus a pig's half-width.
+  expect(state.x, `landed at x ${state.x}`).toBeLessThan(far.x + far.box.x / 2 + PIG_RADIUS)
+  expect(state.swimming, 'it did not go in the ditch').toBe(false)
 })
 
 test('a pig on a bridge is not in the water it crosses', () => {

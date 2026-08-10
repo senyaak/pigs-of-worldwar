@@ -377,11 +377,13 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     /** Whose stance it is: the battle hands the turn on inside a step, and one
      * pig's place is not the next one's to be drawn between. */
     pig: number
+    /** The engine's own word on whether it is in the water (three/chase.ts). */
+    swimming: boolean
   }
   const stanceNow = (): Stance => {
     const at = engine.snapshot()
-    const { x, y, z, heading } = at.loco
-    return { x, y, z, heading, pig: at.acting }
+    const { x, y, z, heading, swimming } = at.loco
+    return { x, y, z, heading, swimming, pig: at.acting }
   }
   let before: Stance = stanceNow()
   let after: Stance = before
@@ -423,15 +425,19 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * on a canopy is coming down under it, the acting one is walking, and
    * anything else is standing exactly where it stands.
    */
-  const drawnStance = (soldier: Soldier): { x: number; y: number; z: number; heading: number } => {
+  const drawnStance = (soldier: Soldier): Omit<Stance, 'pig'> => {
+    // Only the acting pig is DRIVEN, so only it has a locomotion state to ask
+    // whether it is in the water; nothing else is followed closely enough for
+    // the swim framing to matter (three/chase.ts).
+    const swimming = soldier.pig.id === now.acting && now.loco.swimming
     const shot = pigShot(soldier.pig.id)
     if (shot?.arriving) {
       const at = drawnAt(`drop:${shot.id}`, shot)
-      return { ...at, heading: shot.heading }
+      return { ...at, heading: shot.heading, swimming }
     }
     if (soldier.pig.id === now.acting) return stanceAt(engine.alpha())
     const at = shot ?? soldier.pig.position
-    return { x: at.x, y: at.y, z: at.z, heading: shot?.heading ?? soldier.pig.heading }
+    return { x: at.x, y: at.y, z: at.z, heading: shot?.heading ?? soldier.pig.heading, swimming }
   }
 
   /** Where to draw it, `alpha` of the way from the one to the other. Heading
@@ -442,7 +448,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       x: before.x + (after.x - before.x) * alpha,
       y: before.y + (after.y - before.y) * alpha,
       z: before.z + (after.z - before.z) * alpha,
-      heading: before.heading + turn * alpha
+      heading: before.heading + turn * alpha,
+      // Not a thing to interpolate: it is where the pig ENDED the step.
+      swimming: after.swimming
     }
   }
 
@@ -469,7 +477,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         now.driving,
         delta
       )
-      sounds.follow(now.loco, query.isWater(now.loco.x, now.loco.z))
+      sounds.follow(now.loco, now.loco.swimming)
       // BETWEEN the last two steps. The rules move in fixed quanta and the
       // screen does not, so what is drawn is the pig partway from where it
       // stood to where it now stands (lib/game/engine.ts, STEP_SECONDS). The

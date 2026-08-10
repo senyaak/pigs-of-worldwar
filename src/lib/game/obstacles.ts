@@ -300,20 +300,27 @@ export class ObstacleField implements Obstruction {
   }
 
   /**
-   * What holds the pig UP is under its FEET, and nothing wider.
+   * What holds the pig up is its OWN BOX resting on something, which is the
+   * 320 the spawn markers give it — so a pig is held while any part of it is
+   * over the edge, the way a box on a ledge is.
    *
-   * A radius here is what let a pig stand on air: its cylinder still overlaps
-   * a box 160 units past the edge, so it walked half its own width out over
-   * the gap in CAMP's first bridge before it fell. Being STOPPED is the other
-   * way round — a body cannot be inside a wall — which is `blocks` and its own
-   * reach.
+   * That was tried the other way, by the feet alone, and the tutorial says no:
+   * the GAP in CAMP's first bridge is 512 and a running jump carries 303, so
+   * the only way over it is to walk out to the edge of one's own width and
+   * catch the far side by it — 512 less the 160 either side is 192, which a
+   * jump clears easily. Held by the feet, the step is impossible. The cost is
+   * that a pig stands up to 160 units out over a drop before it falls, and
+   * that is what a box on a ledge does in a solver that cannot tip it.
+   *
+   * A RAMP still gets none of it — see `wallReachOf` for why a slope has to
+   * hold a pig by its feet.
    */
   standOn(x: number, z: number, footY: number, reach: number): number | null {
     let best: number | null = null
     for (const obstacle of this.near(x, z)) {
       const top = topAt(obstacle, x, z)
       if (top < footY - reach) continue // too tall to step onto
-      if (!penetrates(obstacle, x, z, 0)) continue
+      if (!penetrates(obstacle, x, z, wallReachOf(obstacle))) continue
       if (best === null || top < best) best = top
     }
     return best
