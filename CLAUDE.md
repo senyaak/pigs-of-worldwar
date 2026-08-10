@@ -2302,40 +2302,123 @@ the range applies to the GROUND and to the map view alike ("к земле тож
 enemy simply not shown them on the minimap. None of that is built: play said "но ладно это потом", and the marker model stands in meanwhile.
 Still to do beside it: the EXCLAMATION MARK over a mine the moment it is trodden on.
 
-### PLAY'S OPEN LIST — reported, reproduced, NOT fixed (2026-08-10)
+### A PLANTED CHARGE STANDS, fuse up — and the model is what says which way
 
-Six things play named while the mines and the charges were going in. Each is real
-and each was left alone deliberately, because none of them is a line: they are
-about knockback, destructible buildings, the terrain renderer and the battle font.
-Written down here rather than in a chat that scrolls away.
+Play: "тнт лежит боком на земле — должна стоять фитилём вверх." Which way is up for
+it is the MODEL'S own fact, and it was measured out of `Chars/WEAPONS.MAD` rather
+than guessed: `WE_TNT` is forty vertices in two boxes — the bundle from x −64..77
+(with its two end caps as flat planes of their own, AMMO002 and AMMO003) and a
+thinner stub from x −148..−64 wearing AMMO001. The bundle's texture corners average
+rgb 181,82,0 — orange sticks — and the stub's average **0,0,0**. A black stub out of
+the end of a bundle of dynamite is the fuse, so **the fuse points along model −X**,
+and the whole thing is authored lying down because a hand is what holds it.
 
-1. **A blast does not THROW anything.** "мины не отбрасывают — как и тнт." The
-   impulse is decoded for hand-to-hand and deliberately not applied — 45° up along
-   the bearing, `0x4a9100`, and `MeleeWeapon.knockback` carries the number
-   (lib/game/melee.ts) — because **only the acting pig has a locomotion state**.
-   That is the real work: something to put a velocity ON for a pig that is not being
-   driven. `blast.ts` is where the blast would push from, and it already has every
-   body and its distance in hand.
-2. **TNT does not damage a HOUSE.** `burst` hurts pigs and the map's dummies
-   (`targets.ts`), and a house is scenery with collision and no health. What makes a
-   record breakable, and whether the houses carry it, is `lib/game/scenery.ts` and
-   the POG's own fields — the dummy is the only thing that has ever been broken.
-3. **A house's textures FLICKER.** "дом имеет мерцающие текстуры." Nothing to do
-   with mines: the props renderer (`three/props.ts`) or the model reader. Z-fighting
-   between coincident faces is the first thing to measure.
-4. **A trodden mine wants an EXCLAMATION MARK over it.** "когда наступил — мина
+Game space is Y-DOWN, so up is −Y and a turn of +π/2 about Z takes model −X there
+(`three/grenades.ts` `STAND`). The yaw the pool hands out then only spins it about
+the vertical, which is why it can stay. And the LIFT is measured FROM the pose — the
+lowest corner of the model as posed — so it cannot drift from it: standing, the
+bundle's deepest point is the far end (model x 77) rather than the 32 its half-height
+gave it lying down.
+
+`window.pow.debug.charges()` is how a spec sees it: the fuse's world direction and
+the y of the lowest corner. Standing on its end is a fact about the MESH, and the
+engine's list of lobs cannot answer for it.
+
+### A BLAST THROWS, and a pig NOBODY drives needed somewhere to put a velocity
+
+Play: "мины не отбрасывают — как и тнт", and then the diagnosis in the same
+breath — "также мины и думаю гранаты тоже не отбрасывают — так что это общая
+проблемма." Exactly right. Nothing was wrong with the blasts: this engine had ONE
+locomotion state, the acting pig's, so there was nowhere for anybody else's
+velocity to live. `lib/game/tumble.ts` is that somewhere, and it owns no physics —
+a thrown pig is a pig in the AIR, which `updateLocomotion` has always known how to
+be, down to the bounce, the landing and the get-up. The exe agrees the two are one
+state: `UpdateMovement` returns at once when the pig's state is 5 (0x46b205), so a
+pig in the air is not driven and the physics owns it.
+
+**The seam is `battle.fling`**: the ACTING pig takes the impulse on the state the
+battle already drives (`loco.airborne`, the same flight a jump takes) and everybody
+else takes one of their own. Two states over one pig would fight over its position.
+
+The impulse's SHAPE is the exe's, its magnitude is borrowed and its falloff is the
+remake's, and `lib/game/blast.ts` says so at the field. Every knock-about in the
+original is one call — `0x4a9100(speed, 0x200, bearing, 0)`, and 0x200 of 4096 is
+**45° up** — at six sites, five of which use that pitch and speeds of 0x40 or 0x78.
+`Pig::OnHit`'s own blast arm (0x477c22) carries **no impulse at all**: it damages,
+tallies twice the damage at `[pig+0x1b8]`, raises the reeling counter at
+`[pig+0x1b4]` and squeals. So the original's toss comes from the physics — the blast
+effect HAS a body, a sphere of radius 35 — and that contact is not decoded. The
+whole chase is in `weapons/fire.md`.
+
+A pig in the air does not find a MINE, which is the exe's `[pig+0x382]` gate; and
+the turn cannot be handed over while anybody is still up (`settling`).
+
+### EVERYTHING IS BREAKABLE, and a dummy is just the cheapest row
+
+Play: "тнт не дамажит дом." It did not, and a house was never anything in this
+engine: `targets.ts` built targets for the one model name the remake had ever seen
+break. The original has no special case for a dummy at all — a dummy, a tree and a
+house wall are the SAME class (vtable 0x4bd440, ctor 0x48d000, body type 0x135A),
+with a different number out of one table.
+
+The loader dispatches on the model NAME through a table of 466 strings at 0x4d9680
+that names its own groups, and **every SCENERY record (indices 28..379, less the two
+birds) is breakable**, with health at `[0x4d6d18 + (kind - 0x1c) * 4]` in the usual
+128ths. `lib/game/breakable.ts` is that table, all 349 names of it, and
+`../pigs-disasm/objects/notes.md` has the taxonomy.
+
+What it means in play: CAMP's house is eighteen 60-point pieces of the `ST` set, so
+one TNT charge (fifty at the core) leaves a wall standing with ten and the second
+brings it down; its 85 firs are eighty each; the dummies keep their one point. A
+CRATE is not breakable — CRATE4 is in the table twice and the PICKUPS entry wins.
+
+**A BUILDING still is not.** Indices 1..6 (BIG_GUN, M_TENT1, M_TENT2, PILLBOX,
+SHELTER, TENT_S — CAMP has one SHELTER) are a different class, 0x4bc5d0, body type
+0x1359, and its own trick is that going off it sweeps up every pig around it and
+throws each one at `(0x40, 0x200, bearing)` with a squeal.
+
+### THE HOUSE FLICKERED because the map overlaps its own walls
+
+Play: "дом имеет мерцающие текстуры." Measured rather than guessed: CAMP's house
+overlaps its wall pieces at every corner by exactly 64 units — the wall's own
+thickness — twelve pairs of them, each a 64×512×64 column, so their big faces are
+COPLANAR. (Measured over the AABBs of the placed models, not the collision boxes.)
+
+The original never minded because it has no depth buffer to fight over: a PSX-style
+renderer sorts its polygons and the second of two coplanar faces simply lands on the
+first. Three.js keeps a z-buffer with `LessEqualDepth`, so the LAST face drawn wins
+— and its opaque sort falls back to distance from the camera, which reorders the
+pair as the camera moves. That flip, once a frame, is the flicker.
+
+`renderOrder` is the first key of that sort, ahead of the material and the distance,
+so `three/props.ts` gives every record its own — the map's own order, fixed for
+good. It costs the material batching across props, which for a hundred-odd objects
+is nothing.
+
+### PLAY'S OPEN LIST — what is still open (2026-08-10)
+
+Four of the seven are fixed and are written up above: the charge that stands
+fuse-up, the blast that throws, the house that takes damage, the textures that
+flickered. Written down here rather than in a chat that scrolls away.
+
+1. **A trodden mine wants an EXCLAMATION MARK over it.** "когда наступил — мина
    появляется с восклицательным знаком над ней." The mine's own model appears now
    (`three/mineArt.ts` draws `mines.at()` too); the glyph needs the battle font —
-   GameChars, which `002/hud.spec.ts` already proves has letters — or a sprite out
-   of the effect art.
-5. **The reveal is a TEXTURE SWAP, and for three classes.** "инженеры и командос с
+   GameChars, which `002/hud.spec.ts` already proves has letters, and which nothing
+   in the renderer draws with yet — or the game's own art. **Where to look first:**
+   the two mine rows spawn projectiles 428/429, identical but for their EFFECT ids,
+   0x4c against 0x55, and the remake has neither. One of those two is the likeliest
+   place the original's mark lives. Their arms are a two-level dispatch (a byte at
+   `0x489680 + id - 1` gives the slot, 51 and 56, and the slot indexes a jump table
+   that was not untangled this pass).
+2. **The reveal is a TEXTURE SWAP, and for three classes.** "инженеры и командос с
    героем видят жёлто-чёрные текстуры там где есть мины", the range applies to the
    ground AND the map view ("к земле тоже"), and the enemy simply is not shown them
    on the minimap. What is built instead: the `WE_MINE` model for the engineer family
    (5, 6, 7) inside 1024 on the ground. Play said "но ладно это потом" — so the swap,
    the third class and the minimap are all still open, and the hazard stripes are
    almost certainly CAMP's four mine-only textures.
-6. **`002/effects.spec.ts:161` is flaky** — one fireball sprite's outward bearing can
+3. **`002/effects.spec.ts:161` is flaky** — one fireball sprite's outward bearing can
    roll near-vertical and the assertion is on blob 0 alone. Seed the roll or assert
    over all of them; it failed once in a full run and passes alone.
 
