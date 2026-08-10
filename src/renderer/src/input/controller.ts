@@ -188,6 +188,18 @@ export interface DebugHooks {
    * many pigs it is still waiting to see out of the water. Null while a turn is
    * being played (lib/game/walkAway.ts). */
   walkAway(): { swimming: number } | null
+  /** The acting pig's pose from both ends of the chain — the engine's sampler
+   * and the bone the mesh wears — for telling a frozen clip from a renderer that
+   * is not applying one (three/battle.ts). */
+  pose(): {
+    clip: number | null
+    elapsed: number
+    /** The TORSO's quaternion on the mesh — where the run cycle's own body
+     * swing lives, and the first bone a held weapon takes over. */
+    torso: [number, number, number, number] | null
+    foot: [number, number, number] | null
+    drawn: [number, number, number, number] | null
+  }
   /** Every pig's health, in turn order. Water takes FRACTIONS of a point
    * (lib/game/drowning.ts), so this is not always whole. */
   health(): { name: string; health: number }[]

@@ -561,6 +561,53 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     firing: () => battle.view().firing?.phase ?? null,
 
     aftermath: () => battle.view().aftermath !== null,
+    /**
+     * The acting pig's POSE, from BOTH ends of the chain.
+     *
+     * Play: "реально не двигается у нас" — the body does not move while it walks,
+     * and there is no way to tell by eye which half is at fault. `foot` is the
+     * engine's own sampler (lib/game/bonePose.ts) reading the ankle relative to
+     * the hip, so the pig's own travel is out of it; `drawn` is the quaternion
+     * that same bone is actually WEARING on the skinned mesh. If `foot` moves and
+     * `drawn` does not, it is the renderer; if neither moves, it is the clip.
+     */
+    pose: () => {
+      const pig = game.currentPig
+      const worn = now.pigs.find((one) => one.id === pig.id)
+      const hip = engine.pose.boneToWorld(pig, 0, { x: 0, y: 0, z: 0 })
+      const ankle = engine.pose.boneToWorld(pig, 11, { x: 0, y: 0, z: 0 })
+      const bones = squad.of(pig.id)?.mesh.bones
+      const bone = bones?.[11]
+      // …and the TORSO, bone 1, which is the one play asked about: it is where
+      // the run cycle's ±19.6° of yaw lives, and it is also the first bone the
+      // WEAPON channel takes over (lib/game/clipPose.ts), so a pig with
+      // something in its hands is meant to be still above the waist.
+      const spine = bones?.[1]
+      return {
+        clip: worn?.clip ?? null,
+        elapsed: worn?.clipElapsed ?? 0,
+        torso: spine
+          ? ([spine.quaternion.x, spine.quaternion.y, spine.quaternion.z, spine.quaternion.w] as [
+              number,
+              number,
+              number,
+              number
+            ])
+          : null,
+        foot:
+          hip && ankle
+            ? ([ankle.x - hip.x, ankle.y - hip.y, ankle.z - hip.z] as [number, number, number])
+            : null,
+        drawn: bone
+          ? ([bone.quaternion.x, bone.quaternion.y, bone.quaternion.z, bone.quaternion.w] as [
+              number,
+              number,
+              number,
+              number
+            ])
+          : null
+      }
+    },
     walkAway: () => battle.view().walkAway,
     cutTurnBeat: () => battle.cutTurnBeat(),
     warp: (x, z, heading) => {

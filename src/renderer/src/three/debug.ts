@@ -72,6 +72,15 @@ export interface DebugParts {
   /** The beat at the END of a turn, and how many pigs are still in the water
    * (lib/game/walkAway.ts). Null while a turn is being played. */
   walkAway: () => { swimming: number } | null
+  /** The acting pig's pose from both ends: the engine's sampler and the bone the
+   * mesh is wearing (three/battle.ts). */
+  pose: () => {
+    clip: number | null
+    elapsed: number
+    torso: [number, number, number, number] | null
+    foot: [number, number, number] | null
+    drawn: [number, number, number, number] | null
+  }
   /** End that beat now — what a spec does so it is not paying for one it is not
    * testing (lib/game/battle.ts). */
   cutTurnBeat: () => void
@@ -148,6 +157,11 @@ export function exposeBattleDebug(parts: DebugParts): void {
        * can drive, the clock is stopped and `swimming` is how many pigs are
        * still making for the shore (lib/game/walkAway.ts). */
       walkAway: () => parts.walkAway(),
+      /** Whether the pig's own body is MOVING, and which half of the chain is
+       * responsible when it is not: `foot` is the ankle relative to the hip out
+       * of the engine's sampler, `drawn` the quaternion that bone wears on the
+       * mesh. Neither should hold still while a walk clip runs. */
+      pose: () => parts.pose(),
       /** Every pig's health, side by side — what a bayonet is measured by. */
       health: () =>
         game.players.flatMap((player) =>
