@@ -54,6 +54,10 @@ export type BattleEvent =
   | { kind: 'taken'; id: number }
   /** A crate the pig walked into — `given` is what it actually got. */
   | { kind: 'collected'; skill: number | null; amount: number; given: number; pig: PigId }
+  /** …and points went BACK in: the number floats off the pig and it sighs.
+   * `Pig::Heal` (0x467fd0) is not silent — it shows the same floating number a
+   * hit does and plays a sound of its own (damage/notes.md). */
+  | { kind: 'healed'; at: Point; amount: number; pig: PigId }
   /** …or had no room for: "THIS LITTLE PIG ALREADY HAS TOO MANY TOYS". */
   | { kind: 'refused'; skill: number | null; amount: number; pig: PigId }
 

@@ -58,6 +58,9 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       // skill is in.
       collected: () => playCue(bank(), BATTLE_SOUNDS.pickup),
       refused: () => playCue(bank(), BATTLE_SOUNDS.tooMany),
+      // …and a health crate sighs instead, which is the heal's own sound and
+      // arrives beside the cheer the crate already made.
+      healed: () => playCue(bank(), BATTLE_SOUNDS.healed),
       skillUsed: () => playCue(bank(), BATTLE_SOUNDS.skillUsed),
       menuOpened: () => bank().play(BATTLE_SOUNDS.menuOpen.sound),
 

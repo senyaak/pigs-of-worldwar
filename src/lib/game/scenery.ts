@@ -19,6 +19,7 @@ import { ObstacleField } from './obstacles'
 import { amountOf, clearSlots, give } from './inventory'
 import type { GiveResult } from './inventory'
 import { heal } from './health'
+import { originY } from './body'
 import { HEIGHT_SCALE } from './terrain'
 import type { Point } from './pose'
 import type { Pig } from './game'
@@ -169,6 +170,20 @@ export function createScenery(
           // No ceiling: the original's heal adds and stops (lib/game/health.ts).
           heal(pig, worth)
           given = pig.health
+          // …and it is not silent. `Pig::Heal` converts the pig's own position
+          // and hands it to 0x487B90 — the SAME floating-number spawner
+          // `Pig::TakeDamage` uses (0x468081, against 0x467b73) — then plays
+          // sound 0x53 at 100/100 (0x468089). The only difference is the
+          // spawner's fifth argument: a hit passes 0 and takes the team's
+          // colour out of the records at 0x4CF1E0, a heal passes 1 and gets the
+          // fixed 0x6405 (0x487c19). Nothing here carries a colour, because the
+          // number is drawn in the game's own letters (ui/hud.ts).
+          emit({
+            kind: 'healed',
+            at: { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z },
+            amount: worth,
+            pig: pig.id
+          })
         } else {
           result = give(pig.carrying, pickup.skill, worth)
           // A pig with fifteen skills already leaves the crate where it is.

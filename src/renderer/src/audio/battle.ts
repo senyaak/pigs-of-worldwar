@@ -104,6 +104,14 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    */
   pickup: { sound: 'P_WHOOPE', volume: 50, pitch: 100 },
   tooMany: { sound: 'P_OWW', volume: 50, pitch: 100 },
+  /**
+   * Points going back IN — a health crate. DECODED, mix and all: `Pig::Heal`
+   * (0x467fd0) ends by playing index **0x53 at volume 100 and pitch 100** at
+   * the pig's own position (0x46809f, through the same 0x43A9D0), and index 83
+   * of `Audio/sfxday.srl` is **P_SIGH**. The pig sighs with relief; it does not
+   * cheer the way collecting a weapon does (damage/notes.md).
+   */
+  healed: { sound: 'P_SIGH', volume: 100, pitch: 100 },
   /** The skill menu driving in. A name pick, like the movement ones: the
    * bank's own S_OPEN sits beside S_SELECT and S_CLOCK, which is the family
    * of interface noises, and the exe's menu mode is not decoded far enough
