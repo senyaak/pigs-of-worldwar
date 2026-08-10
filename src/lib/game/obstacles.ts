@@ -169,18 +169,41 @@ export function boxOf(object: MapObject): Obstacle {
   // half-height straddles it. Collision has to be the surface that is drawn:
   // `three/props.ts` scales the same way, and the two must not drift.
   const centre = -object.y * HEIGHT_SCALE
+  const across = TRANSPOSED_BOX.has(object.name.toUpperCase())
   return {
     id: object.id,
     x: object.x,
     z: object.z,
     top: centre - object.box.y / 2,
     bottom: centre + object.box.y / 2,
-    halfX: object.box.x / 2,
-    halfZ: object.box.z / 2,
+    halfX: (across ? object.box.z : object.box.x) / 2,
+    halfZ: (across ? object.box.x : object.box.z) / 2,
     turn: modelRotationY(object.yaw),
     sloped: isRamp(object.name)
   }
 }
+
+/**
+ * **Models whose stored extents lie ACROSS their own art**, so the footprint has
+ * to be transposed to match what the player can see.
+ *
+ * Play: "моделька больше чем текстуры — с лицевой стороны и задней силовое поле —
+ * нельзя подойти вплотную." Measured over every shipped map: of the 1113
+ * box-shaped records whose extents ARE their model's own footprint, all but
+ * sixteen match as stored — and **fourteen of those sixteen are the SHELTER**.
+ * Every SHELTER in the game, at all four yaws (CAMP 270°, MASHED 0°, KEEP 180°,
+ * HILLBASE 90°, …), carries 832×640 for art that measures 640×832. So it is not
+ * the turn and it is not the reading: this one model's record data is the other
+ * way round, in all fourteen places it is used.
+ *
+ * What play felt is the arithmetic: 96 units of collider hanging past the art on
+ * two faces (an invisible wall you stop 96 further out from, on top of the pig's
+ * own radius) and 96 units SHORT on the other two, which is the pair you could
+ * walk into.
+ *
+ * A named exception rather than a rule, because the measurement says it is one.
+ */
+const TRANSPOSED_BOX = new Set(['SHELTER'])
 
 /** Where a point falls in the box's own frame — the axes the art is on. */
 function local(obstacle: Obstacle, x: number, z: number): { x: number; z: number } {

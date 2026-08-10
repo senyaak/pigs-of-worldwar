@@ -54,7 +54,15 @@ export function buildMapProps(
   for (const prop of props) {
     built.set(prop.name, {
       geometry: buildModelGeometry(prop.model, textures),
-      materials: buildTextureMaterials(prop.model, textures)
+      // **UNLIT, and that was written down long before it was done.**
+      // `modelMesh.ts` says why in full: a THIRD of the props' NO2 entries are
+      // not unit vectors at all but garbage floats (TREEP 12 of 37, IRONGATE 5
+      // of 12, DUMMY 20 of 66), and the faces reference them, so lighting them
+      // can only speckle — a fir shredded into grey shards. The option was added
+      // with that finding and never passed; this is the call site catching up,
+      // and it puts the props on the same footing as the ground, which has
+      // always been unlit because the art carries its own light.
+      materials: buildTextureMaterials(prop.model, textures, { lit: false })
     })
   }
 

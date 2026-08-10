@@ -21,7 +21,7 @@ import { BOX_UNIT, POG_RECORD_SIZE, modelRotationY, parsePog } from '../../src/l
 import type { MapObject } from '../../src/lib/formats/pog'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
-import { ObstacleField, PIG_RADIUS } from '../../src/lib/game/obstacles'
+import { ObstacleField, PIG_RADIUS, boxOf } from '../../src/lib/game/obstacles'
 import { WALL_CLIMB } from '../../src/lib/game/locomotion'
 import { DUMMY_HEALTH, DUMMY_MODEL, targetsOf } from '../../src/lib/game/targets'
 import { BREAKABLE_COUNT, breakableHealth } from '../../src/lib/game/breakable'
@@ -239,6 +239,42 @@ test('the collision box is turned the way the art is', () => {
   // so the gate's 20-count length is 1280 and reaches 640 either way.
   expect(at(along, 500), 'along the gate').toBe(true)
   expect(at(across, 500), 'across the gate').toBe(false)
+})
+
+test("the SHELTER's box is the shelter, not 96 units of thin air round it", () => {
+  // Play: "моделька больше чем текстуры — с лицевой стороны и задней силовое поле
+  // — нельзя подойти вплотную." Every SHELTER in the game carries 832×640 where
+  // its art measures 640×832 (lib/game/obstacles.ts `TRANSPOSED_BOX`), so the
+  // collider used to hang 96 units past the art on two faces and fall 96 short on
+  // the other two.
+  const shelter = CAMP.find((object) => object.name === 'SHELTER')!
+  expect(shelter.box.x, 'the record says 832 across').toBe(832)
+  expect(shelter.box.z, '…and 640 along').toBe(640)
+
+  const box = boxOf(shelter)
+  // Transposed: the half-extents come back the way the ART is, 320 × 416.
+  expect(box.halfX).toBe(320)
+  expect(box.halfZ).toBe(416)
+
+  // …and the wall is where the art is. The box's own frame, so `local`'s axes:
+  // along its x the art ends at 320, along its z at 416, and a pig may stand
+  // one radius outside either.
+  const field = new ObstacleField(CAMP)
+  const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
+  const phi = modelRotationY(shelter.yaw)
+  const across = { x: Math.cos(phi), z: -Math.sin(phi) }
+  const along = { x: Math.sin(phi), z: Math.cos(phi) }
+  const blocked = (dir: { x: number; z: number }, distance: number): boolean => {
+    const x = shelter.x + dir.x * distance
+    const z = shelter.z + dir.z * distance
+    return field.blocks(x, z, query.height(x, z), WALL_CLIMB)
+  }
+  // A pig's own radius is what it always keeps; what must not be there is
+  // another 96 on top of it.
+  expect(blocked(across, 320 + PIG_RADIUS - 8), 'up against the short face').toBe(true)
+  expect(blocked(across, 320 + PIG_RADIUS + 8), 'a stride off the short face').toBe(false)
+  expect(blocked(along, 416 + PIG_RADIUS - 8), 'up against the long face').toBe(true)
+  expect(blocked(along, 416 + PIG_RADIUS + 8), 'a stride off the long face').toBe(false)
 })
 
 test('the battle draws the map objects where the file puts them', async ({ app }) => {
