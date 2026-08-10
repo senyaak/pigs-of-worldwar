@@ -531,25 +531,24 @@ function ground(
     // step-up envelope refuse; a big enough drop turns the step into a
     // fall; a wall is entered as far as the envelope reaches and scraped
     // along past that, while the wedge counter runs toward the throw.
-    const move = step(query, state.x, state.z, state.heading, speed * delta * intent.walk)
-    // The look-ahead that turns a step into a FALL is the LANDSCAPE's, and a
-    // pig on a walkway is not on the landscape. It gets the drop wrong both
-    // ways round, and CAMP's first bridge shows both: crossing the ditch, the
-    // ground falls away under every step and the pig launched itself off a drop
-    // it was standing over; walking off the far END of the deck, the ground
-    // below reads level and the pig snapped 650 units down into the water
-    // without ever leaving its feet. So what is under the STEP decides.
+    // A walkway is what the landscape's own look-ahead cannot see, both ways
+    // round — `step`'s `supported` handles the drop that is not there, and the
+    // branch below the one that is.
+    const holds = (x: number, z: number): boolean =>
+      obstruction.standOn(x, z, footY, WALL_CLIMB) !== null
+    const move = step(query, state.x, state.z, state.heading, speed * delta * intent.walk, holds)
+    // …and walking OFF a walkway is a fall the landscape cannot see either:
+    // over the far end of CAMP's bridge the ground below reads level all the
+    // way, so the pig snapped 650 units down into the water without ever
+    // leaving its feet.
     let outcome = move.outcome
-    if (onWalkway) {
-      const ahead = obstruction.standOn(move.x, move.z, footY, WALL_CLIMB)
-      if (outcome === 'falling' && ahead !== null) outcome = 'moved'
-      else if (
-        outcome === 'moved' &&
-        ahead === null &&
-        restingY(query, move.x, move.z) - footY > STEP_DOWN
-      ) {
-        outcome = 'falling'
-      }
+    if (
+      onWalkway &&
+      outcome === 'moved' &&
+      !holds(move.x, move.z) &&
+      restingY(query, move.x, move.z) - footY > STEP_DOWN
+    ) {
+      outcome = 'falling'
     }
     if (outcome === 'falling') {
       state.x = move.x

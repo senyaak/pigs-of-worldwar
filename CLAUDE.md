@@ -1627,10 +1627,21 @@ half of it, and the only reading under which this file's own sentence about the 
     all. With one, a pig's cylinder still overlaps a deck 160 units past the
     edge and it walked half its own width out over the gap before falling.
   - **the FALL look-ahead is the landscape's**, and it is wrong both ways over a
-    bridge: crossing the ditch the ground falls away under every step and the
-    pig launched itself off a drop it was standing over, while walking off the
-    far end the ground below reads level and it snapped 650 units down into the
-    water without leaving its feet. What is under the STEP decides.
+    bridge, so `step` takes a `supported` predicate now (`lib/game/movement.ts`)
+    and the walk-off case is `locomotion`'s. Crossing the ditch the ground falls
+    away under every step, and the pig launched itself off a drop it was
+    standing over; walking off the far end the ground below reads level, and it
+    snapped 650 units down into the water without ever leaving its feet.
+
+    **The launch off the LIP is the one that survived a first pass**, and it is
+    worth knowing why: CAMP's abutment tops out at 1724 against a bank crest of
+    1722, so a pig stepping off the lip left the ground TWO units under the deck
+    — and a body in flight only lands on what is below it, so it sailed over the
+    abutment and into the ditch. It also only happens at the ENGINE's step: at
+    1/60 a stride is 13 units and at the 1/15 the other locomotion specs drive
+    with it is 52, which steps clean over the two-unit window. Every walk in
+    `e2e/002/ramp.spec.ts` therefore runs at `STEP_SECONDS`, and the bridge one
+    fails without the fix.
 - **The three ARCH bridges are still fallen through** — `STR06PPP` on MASHED,
   `W1R06PPP` on BAY, `SNR05PPP` on DEMO2 and ICEFLOW. Their collider is 198.5
   above the deck they draw, so walking them on the box would hold a pig in the

@@ -113,7 +113,18 @@ export function step(
   x: number,
   z: number,
   heading: number,
-  distance: number
+  distance: number,
+  /**
+   * Whether something OTHER than the landscape holds a pig up at (x, z) — a
+   * bridge deck or a ramp (lib/game/obstacles.ts). The look-ahead below is the
+   * landscape's, and a walkway is not on it: over a ditch the ground falls away
+   * ahead of every step, and a pig walking a bridge would launch itself off a
+   * drop it is standing over. Worse at the near END of one — CAMP's first
+   * bridge sits two units above the bank it starts from, so a pig stepping off
+   * the lip left the ground two units UNDER the deck, and a body in flight only
+   * lands on what is BELOW it: it sailed over the abutment and into the ditch.
+   */
+  supported: (x: number, z: number) => boolean = () => false
 ): MoveResult {
   const wantX = x + Math.sin(heading) * distance
   const wantZ = z + Math.cos(heading) * distance
@@ -133,7 +144,11 @@ export function step(
   const aheadZ = z + Math.cos(heading) * Math.sign(distance) * reach
   // Game-space heights grow DOWNWARD, so a bigger height is lower ground.
   const here = query.height(x, z)
-  if (query.height(aheadX, aheadZ) - here > STEP_DOWN && !query.isWater(toX, toZ)) {
+  if (
+    query.height(aheadX, aheadZ) - here > STEP_DOWN &&
+    !query.isWater(toX, toZ) &&
+    !supported(aheadX, aheadZ)
+  ) {
     return { outcome: 'falling', x: toX, z: toZ }
   }
   const drop = query.height(toX, toZ) - here

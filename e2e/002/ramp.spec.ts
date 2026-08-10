@@ -23,7 +23,7 @@ import type { MapObject } from '../../src/lib/formats/pog'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseModel } from '../../src/lib/formats/model'
 import { parsePmg } from '../../src/lib/formats/pmg'
-import { FRAME_SECONDS } from '../../src/lib/game/ballistics'
+import { STEP_SECONDS } from '../../src/lib/game/engine'
 import { createLocomotion, updateLocomotion } from '../../src/lib/game/locomotion'
 import { ObstacleField } from '../../src/lib/game/obstacles'
 import { RAMP_TILT, isRamp } from '../../src/lib/game/ramps'
@@ -87,6 +87,14 @@ const span = (values: number[]): { lo: number; hi: number } => ({
  */
 const ART = 4
 const PLACED = 16
+
+/**
+ * Every walk here is driven at `STEP_SECONDS`, the rate the engine actually
+ * runs at, and not at the `FRAME_SECONDS` the other locomotion specs use.
+ * It matters: at 1/15 a step is 52 units and at 1/60 it is 13, and the bug
+ * play found on this bridge only happens at the small step — the pig leaves the
+ * bank's lip two units under the deck, which a 52-unit step jumps straight over.
+ */
 const near = (a: number, b: number, slack: number): boolean => Math.abs(a - b) <= slack
 
 test("the record's own collision box says which art is drawn lying down", () => {
@@ -210,10 +218,10 @@ test('a pig walks up the ramp and onto the deck', () => {
   expect(near(-state.y, -query.height(foot.x, foot.z), ART), 'starts on the ground').toBe(true)
 
   // Long enough to cover the two ramps' 1024 and step onto the deck.
-  const frames = Math.round(2 / FRAME_SECONDS)
+  const frames = Math.round(2 / STEP_SECONDS)
   let highest = state.y
   for (let i = 0; i < frames; i++) {
-    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS, field)
+    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS, field)
     highest = Math.min(highest, state.y)
   }
   // It got up, it got ALL the way up, and it is standing on the deck rather
@@ -227,7 +235,7 @@ test('a pig walks up the ramp and onto the deck', () => {
   // stops at the foot of a 1024-unit face.
   const bare = createLocomotion(query, foot.x, foot.z, -Math.PI / 2)
   for (let i = 0; i < frames; i++) {
-    updateLocomotion(bare, query, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
+    updateLocomotion(bare, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS)
   }
   expect(-bare.y, 'the bare terrain is 1024 lower').toBeLessThan(deckTop - 512)
 })
@@ -252,8 +260,8 @@ test("CAMP's first bridge is walked over, and the gap in it is not", () => {
   const deck = 1728
   let onDeck = 0
   let fell = false
-  for (let i = 0; i < Math.round(2.5 / FRAME_SECONDS); i++) {
-    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS, field)
+  for (let i = 0; i < Math.round(2.5 / STEP_SECONDS); i++) {
+    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS, field)
     // Over the ditch, at deck height, on its feet: that is being ON the bridge.
     if (near(-query.height(state.x, state.z), 1216, ART) && near(-state.y, deck, 8)) onDeck++
     if (state.airborne !== null) fell = true
@@ -277,9 +285,9 @@ test('a pig on a bridge is not in the water it crosses', () => {
   // Ramp #6 at (6912, −6400) climbs +z, and the shore at its foot is exactly
   // its own low end — so this is a walk from the beach onto the bridge.
   const state = createLocomotion(query, 6912, -6900, 0)
-  const frames = Math.round(1.8 / FRAME_SECONDS)
+  const frames = Math.round(1.8 / STEP_SECONDS)
   for (let i = 0; i < frames; i++) {
-    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS, field)
+    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS, field)
   }
   expect(query.isWater(state.x, state.z), 'over water').toBe(true)
   expect(near(-state.y, 640, ART), `on the deck at ${-state.y}`).toBe(true)
