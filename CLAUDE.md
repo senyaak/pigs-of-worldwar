@@ -1540,18 +1540,35 @@ half of it, and the only reading under which this file's own sentence about the 
   a bar, clicking chooses it. The original is keyboard and pad only (it even
   ships `nomouse.com`); this is the remake's convenience, and so is F1 for
   the asset browsers, which are not a screen the original has.
-- **A pig cannot get ONTO a bridge, and the ramp is PARKED.** The deck
-  sections are boxes and the shape-kind-1 pieces are bodiless, so a pig
-  walks clean through the one it should be climbing. Play says plainly that
-  it IS a ramp you walk up — and that it only appears partway through the
-  tutorial, which is the same script the tagged records belong to. So the
-  two questions are one question, and it is deliberately left until the
-  tutorial's intro reaches that ramp: whatever raises it is what will say
-  how it is walked. Do not "fix" the collision for it before then.
-- **A bridge the script has placed still cannot be WALKED on.** Its pieces are
-  shape kind 1 and so bodiless, which is the same parked question the first
-  bridge has. The script now raises it at the right moment; climbing it is
-  still its own job.
+- **A RAMP is drawn TILTED 45°, and no record says so.** Its art is authored
+  lying down: `BRID2_S` is a triangular prism with a flat face, a 45° face
+  and a third side carrying no geometry at all. Turned −45° about its own z
+  the flat face becomes the SLOPE, the 45° face the wall at the top end, and
+  the unfaced side the bottom — which is why it was never modelled. Nothing
+  in the exe applies this and the search is written up in
+  `lib/game/ramps.ts`: `Map::Load` reads field 5 and no other angle (ten
+  sites read `[record+0x2A]`, none `+0x28`/`+0x2C`), and the ramps and the
+  abutments that must NOT tilt share one constructor arm. So the rule is
+  MEASURED, four ways, and `e2e/002/ramp.spec.ts` pins all four: the family
+  is exactly the seven models whose art sits off its own origin (against
+  6322 records saying the stored y IS the model's centre); only −45° centres
+  the three that are not symmetric; CAMP's second bridge then runs
+  2240 → 1728 → 1216 onto its own ground with its four `M1S_SU03` legs
+  filling 1216..1728 under exactly the first piece; and ISLAND's six ramps
+  each top out at their deck's own walking surface with the yaw picking which
+  way they climb. Untilted the pieces are 725 across a 512 spacing, overlap
+  each other, and sit 256 BELOW the deck.
+- **A pig still cannot get ONTO a bridge or up a ramp.** The deck sections are
+  boxes and the shape-kind-1 pieces are bodiless — a 94-record set that is
+  every bridge and step piece, so they are not in the original's collision
+  world either — and a pig walks clean through the one it should be climbing.
+  The exe's own answer is not found: the only thing seen so far that lets an
+  object touch the ground a pig walks on is a 3×3 block of TILE values an
+  object saves at `[obj+0x182]` and stamps back through `Map::SetTile`
+  (0x4767a0 saves, 0x4768c0 and 0x476ba5 stamp, gated on `[obj+0x19C]` being
+  4, 5..7 or 0x0E) — which is a tile TYPE and carries no height, so it is not
+  what lifts a pig onto a deck. Own job, and the geometry it needs is now
+  right.
 - **Two sides, though a map offers up to six.** The spawn markers name six
   (FINAL uses all of them, the arenas four); the battle fields the first two
   it finds, because there is no AI for the rest. There is no filling in
@@ -1755,7 +1772,11 @@ in the same session on play's instruction ("ПРИЧЁМ ТУТ ВСПЛЕСК? 
 grenade fix. The flip is one line in `advanceEffect`; the lift should ride
 `MODEL_SCALE` the way the ring's radius does at the same time.
 
-**7. The RAMP is wrong**, and has been parked since the grenade started.
+**7. The RAMP is wrong**, and half of it is now done: play said "она появляется
+криво… модельки отрисованы криво, −45 градусов от нужного" and −45° is exactly
+what it was, to the unit — see the ramp entry among the divergences above. What
+is left of the item is the other half play named in the same breath: it must
+let you WALK up it, and a shape-kind-1 piece is bodiless.
 
 ### What is still not read
 

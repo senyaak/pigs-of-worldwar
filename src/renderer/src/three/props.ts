@@ -12,8 +12,13 @@ import * as THREE from 'three'
 import type { MapObject, MapProp, Texture } from '../api'
 import { buildModelGeometry, buildTextureMaterials, disposeMesh } from './modelMesh'
 import { modelRotationY } from '../../../lib/formats/pog'
+import { RAMP_TILT, isRamp } from '../../../lib/game/ramps'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { HEIGHT_SCALE } from '../../../lib/game/terrain'
+
+/** The vertical the yaw turns about, and the ramp's own tilt — built once. */
+const UP = new THREE.Vector3(0, 1, 0)
+const TILT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), RAMP_TILT)
 
 export interface MapProps {
   /** Add to the battle's game-space root; not converted on its own. */
@@ -70,7 +75,11 @@ export function buildMapProps(
     // the negation.
     mesh.position.set(object.x, -object.y * HEIGHT_SCALE, object.z)
     restingY.set(object.id, mesh.position.y)
-    mesh.rotation.y = modelRotationY(object.yaw)
+    // The yaw is about the vertical and outside everything else; a RAMP is
+    // then tilted about its OWN z, which is what stands its flat face up as
+    // the slope (lib/game/ramps.ts).
+    mesh.quaternion.setFromAxisAngle(UP, modelRotationY(object.yaw))
+    if (isRamp(object.name)) mesh.quaternion.multiply(TILT)
     // A VTX unit is half a world unit (lib/game/scale.ts). The record's
     // position is already the world's, so the scale goes on the mesh alone
     // and a prop shrinks about its own origin — which the POG puts at the
