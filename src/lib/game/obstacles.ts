@@ -211,13 +211,24 @@ export interface Obstruction {
    * shot really is stopped by the world; this is the object half of that.
    */
   solid(x: number, y: number, z: number): boolean
+  /**
+   * …and WHICH record stopped it, or null for nothing in the way.
+   *
+   * A bullet needs the id, not the yes/no: half the boxes on a map belong to
+   * something BREAKABLE, and a shot that is swallowed by a dummy's collider
+   * without hurting the dummy is a shot that hit and did nothing. Play found
+   * exactly that — "пуля врезается в манекен и ничего не происходит"
+   * (lib/game/bullets.ts).
+   */
+  stopper(x: number, y: number, z: number): number | null
 }
 
 /** Nothing in the way — the default when a map's objects failed to load. */
 export const NO_OBSTACLES: Obstruction = {
   standOn: () => null,
   blocks: () => false,
-  solid: () => false
+  solid: () => false,
+  stopper: () => null
 }
 
 /** The obstacle a POG record makes, or null when it is not solid. */
@@ -454,13 +465,17 @@ export class ObstacleField implements Obstruction {
    */
 
   solid(x: number, y: number, z: number): boolean {
+    return this.stopper(x, y, z) !== null
+  }
+
+  stopper(x: number, y: number, z: number): number | null {
     for (const obstacle of this.near(x, z)) {
       // Y counts DOWN, so inside is between the top and the bottom that way
       // round. A point has no radius of its own.
       if (y < topAt(obstacle, x, z) || y > obstacle.bottom) continue
-      if (penetrates(obstacle, x, z, 0)) return true
+      if (penetrates(obstacle, x, z, 0)) return obstacle.id
     }
-    return false
+    return null
   }
 }
 
@@ -502,6 +517,9 @@ export function withPigs(field: Obstruction, pigs: PigBody[]): Obstruction {
     },
     // The pigs are not part of this one: a bullet resolves a body itself, so
     // that it can hurt it (three/shots.ts).
-    solid: (x, y, z) => field.solid(x, y, z)
+    solid: (x, y, z) => field.solid(x, y, z),
+    // A PIG is not a record and has no id, so it can never be the stopper: a
+    // bullet is resolved against bodies by its own test (lib/game/bullets.ts).
+    stopper: (x, y, z) => field.stopper(x, y, z)
   }
 }

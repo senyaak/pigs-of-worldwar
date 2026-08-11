@@ -7,6 +7,7 @@ export const ACTIONS = [
   'turnLeft',
   'turnRight',
   'jump',
+  'enter',
   'fire',
   'aimUp',
   'aimDown',
@@ -88,7 +89,17 @@ export const DEFAULT_BINDINGS: Record<string, Action> = {
   // The aim view. The original holds it on a pad bit (0x100 or 0x1000) and
   // steers with the ordinary controls underneath; G is the remake's key for
   // it, and while it is down W and S drive the ANGLE instead of walking.
-  KeyG: 'aimMode'
+  KeyG: 'aimMode',
+  // **Getting into a building has a key of its own, and SPACE is not it.**
+  // Play: "я не говорил по пробелу — там просто анимация входа, запрыгивание;
+  // сделай отдельную кнопку, пробел уже прыжок." Right — a door on the jump key
+  // is one thing wearing two meanings, and the pig would stop being able to hop
+  // anywhere near a shelter. C is beside the walking hand and unbound.
+  //
+  // The ORIGINAL puts it in the menu instead — skill 61 BUILDING INOUT — which is
+  // still where it belongs the day the other five buildings are worth entering
+  // (lib/game/buildings.ts). A key is the remake's, and this is where it says so.
+  KeyC: 'enter'
   // …and there is no key for ENDING a turn. That is a SKILL — 65, SKIP TURN,
   // always in the menu whatever the pig carries — taken in hand from the menu
   // like a weapon and applied with FIRE (lib/game/controls.ts). Enter used to be

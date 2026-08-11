@@ -17,6 +17,17 @@ import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { pickupsOf } from '../../src/lib/game/pickups'
 import { createScript } from '../../src/lib/game/script'
+import { ObstacleField, PIG_RADIUS, boxOf, isSolid } from '../../src/lib/game/obstacles'
+import { createBullets } from '../../src/lib/game/bullets'
+import { createBus } from '../../src/lib/game/events'
+import type { BattleEvent } from '../../src/lib/game/events'
+import { parsePmg } from '../../src/lib/formats/pmg'
+import { TerrainQuery } from '../../src/lib/game/terrain'
+import { Game } from '../../src/lib/game/game'
+import { NO_BODY } from '../../src/lib/game/body'
+
+const campQuery = (): TerrainQuery =>
+  new TerrainQuery(parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG'))))
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 /** 3 BAYONET is the first crate; breaking the first dummy drops the RIFLE. */
@@ -91,6 +102,69 @@ const release = (page: Page, action: string): Promise<void> =>
       window as unknown as { pow: { controller: { release(x: string): void } } }
     ).pow.controller.release(a)
   }, action)
+
+test("a bullet that a TARGET's own box stops knocks that target down", () => {
+  // **The bug play found, pinned.** "Пуля врезается в манекен и ничего не
+  // происходит — там что-то с регистрацией попаданий." Right, and the cause was a
+  // coupling with no business existing: a bullet was spent by `obstacles.solid()`
+  // and the dummy was then looked for by a POINT test whose window was
+  // `HIT_RADIUS`, which was `PIG_RADIUS`.
+  //
+  // A DUMMY is BOTH — a 128 × 512 × 256 collision box AND a target — so which
+  // test fired first was pure geometry. At the old `PIG_RADIUS` of 170 the point
+  // window was wider than the box's 128 of half-depth and the target loop caught
+  // the bullet a step before the collider did. Halving the pig to 85 for an
+  // unrelated reason — how near it may stand to a wall — pulled that window inside
+  // the box, and every shot was swallowed by the collider one step early.
+  //
+  // The fix asks the box WHICH record it is, so the coincidence cannot come back.
+  const dummy = CAMP.find((one) => one.name.toUpperCase() === 'DUMMY')!
+  expect(isSolid(dummy), 'a dummy really is in the collision world').toBe(true)
+  const box = boxOf(dummy)
+  // …and the box is DEEPER than the pig's radius, which is the whole geometry of
+  // the bug: the collider is reached first.
+  expect(box.halfZ).toBeGreaterThan(PIG_RADIUS)
+
+  const field = new ObstacleField([dummy])
+  const middle = { x: dummy.x, y: (box.top + box.bottom) / 2, z: dummy.z }
+  expect(field.solid(middle.x, middle.y, middle.z)).toBe(true)
+  expect(field.stopper(middle.x, middle.y, middle.z), 'and it says which one').toBe(dummy.id)
+
+  // Now fly a bullet into it and watch it take the damage.
+  const targets = targetsOf([dummy])
+  expect(targets).toHaveLength(1)
+  const heard: BattleEvent[] = []
+  const bus = createBus()
+  bus.on((event) => heard.push(event))
+  // A pig standing a tile short of it, holding a rifle, whose hand is exactly
+  // where the muzzle should be — the pose port is what a bullet is fired FROM
+  // (lib/game/pose.ts), and a spec may answer it however it likes.
+  const from = { x: dummy.x, y: middle.y, z: dummy.z - 512 }
+  const game = new Game({
+    players: [{ name: 'Tommy', pigNames: ['Nobby'] }],
+    spawns: [{ x: from.x, z: from.z, y: from.y, body: NO_BODY }]
+  })
+  const pig = game.currentPig
+  pig.holding = RIFLE
+  pig.heading = 0
+  const bullets = createBullets(
+    {
+      pigs: () => [],
+      targets,
+      present: () => true,
+      training: false,
+      query: campQuery(),
+      obstacles: field,
+      pose: { boneToWorld: () => from }
+    },
+    bus.emit
+  )
+  expect(bullets.fire(pig, 0), 'the rifle went off').toBe(true)
+  for (let step = 0; step < 120 && bullets.live().length > 0; step++) bullets.update(1 / 60)
+
+  expect(heard.some((one) => one.kind === 'damaged'), 'the bullet did nothing at all').toBe(true)
+  expect(heard.some((one) => one.kind === 'broke'), 'the dummy is still standing').toBe(true)
+})
 
 test('a rifle shot knocks a dummy down from across the yard', async ({ app }) => {
   const { page } = app

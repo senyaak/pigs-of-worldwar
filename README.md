@@ -41,7 +41,12 @@ Controls in the battle (tank-style, as in the original):
 | `R` | open the skill menu (the original's own key is Return) |
 | `Q` / `E` | aim up / down (the original's are Page Up and Page Down) |
 | `F` | use what is in hand (the original fires with the select button) |
+| `C` | get into the building you are standing at, or come back out |
 | `Enter` | end turn |
+
+A pig standing against a BOMB SHELTER can get in with `C`. Inside it is out of
+sight and cannot be driven, and the only thing its menu offers is SKIP TURN;
+`C` again puts it back on the spot it came from. Three fit in a shelter.
 
 Walk into a crate to collect it: what is inside goes into the pig's
 inventory — fifteen slots, as in the original, and everything is unlimited on

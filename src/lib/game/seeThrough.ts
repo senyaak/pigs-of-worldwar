@@ -17,6 +17,7 @@
 
 import { boxOf, isSolid } from './obstacles'
 import type { Obstacle } from './obstacles'
+import { buildingKind } from './buildings'
 import type { MapObject } from '../formats/pog'
 
 export interface Spot {
@@ -25,10 +26,19 @@ export interface Spot {
   z: number
 }
 
-/** The boxes worth asking about: everything solid enough to hide something,
- * which is the same test the collision world makes. Built once. */
+/**
+ * The boxes worth asking about: everything solid enough to hide something, which
+ * is the same test the collision world makes, **less the BUILDINGS**. Built once.
+ *
+ * Play: "просвечивать должны стены, которые мы взрываем — не бомбоубежище." And a
+ * building is the one case where fading is not merely unwanted but pointless: a
+ * pig inside one is not DRAWN at all (`indoors.ts`, and it is the exe's own rule —
+ * `[pig+0x30] = 0` is the draw loop's gate), so there is nothing behind the wall
+ * for the wall to be in front of. The eighteen pieces of the house are ordinary
+ * breakable scenery and go on fading, which is the half play asked to keep.
+ */
 export const sightBlockers = (objects: MapObject[]): Obstacle[] =>
-  objects.filter(isSolid).map(boxOf)
+  objects.filter((one) => isSolid(one) && buildingKind(one.name) === null).map(boxOf)
 
 /** Which of them the segment `from`→`to` passes through, by record id. */
 export function crossedBy(boxes: readonly Obstacle[], from: Spot, to: Spot): number[] {

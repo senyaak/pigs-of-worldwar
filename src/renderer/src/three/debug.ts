@@ -104,6 +104,15 @@ export interface DebugParts {
    * displacement it produced, this turns a step into a rate.
    */
   frame: () => number
+  /**
+   * The SHELTER the acting pig is in, the one it could jump into, and whether its
+   * model is on the scene at all (lib/game/indoors.ts).
+   *
+   * Being inside is invisible by design — the pig is not drawn — so nothing a
+   * spec can look at says whether it worked. `drawn` is the mesh's own answer,
+   * which is the half a screenshot could not be held to either.
+   */
+  shelter: () => { inside: number | null; doorway: number | null; drawn: boolean }
   /** Whether the beat after a blow is still running. */
   aftermath: () => boolean
   /** The beat at the END of a turn, and how many pigs are still in the water
@@ -217,6 +226,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       barks: () => parts.barks(),
       /** True while the turn is held on what the blow left behind — the clock
        * is stopped and the camera is off the pig (lib/game/aftermath.ts). */
+      shelter: () => parts.shelter(),
       frame: () => parts.frame(),
       aftermath: () => parts.aftermath(),
       /** True while the turn is ENDING: the exe's mode 13, WALK AWAY. Nobody

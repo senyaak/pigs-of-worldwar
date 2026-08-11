@@ -6,6 +6,11 @@
 import { test, expect } from '@playwright/test'
 
 import { modeOf, readControls, verbOf, wakes } from '../../src/lib/game/controls'
+import {
+  DEFAULT_BINDINGS,
+  DRIVING_ACTIONS,
+  HELD_ACTIONS
+} from '../../src/renderer/src/input/actions'
 import type { Held, Situation } from '../../src/lib/game/controls'
 
 const still: Held = { walk: 0, turn: 0, aim: 0, sighting: false, firing: false, fired: false }
@@ -135,6 +140,27 @@ test('SPACE is a different verb in every mode', () => {
   expect(verbOf('inventory', 'jump')).toBe('choose')
   // …and the one exception in the whole lock: it cuts the canopy.
   expect(verbOf('locked', 'jump')).toBe('cutChute')
+})
+
+test('the DOOR of a building is its own key, and SPACE is not it', () => {
+  // Play: "я не говорил по пробелу — там просто анимация входа, запрыгивание;
+  // сделай отдельную кнопку, пробел уже прыжок." So `enter` is a verb of its own
+  // and the jump key means the same thing standing at a shelter as anywhere else.
+  expect(verbOf('battle', 'enter')).toBe('enterBuilding')
+  expect(verbOf('battle', 'jump')).toBe('jump')
+  // Down the sights it goes with everything else that moves the pig.
+  expect(verbOf('sights', 'enter')).toBeNull()
+  // …and it is not reachable from a menu, a lock or the gauge either.
+  for (const mode of ['inventory', 'locked', 'charging', 'armed'] as const) {
+    expect(verbOf(mode, 'enter')).toBeNull()
+  }
+  // It has a KEY, and it is not one anything else uses.
+  expect(DEFAULT_BINDINGS.KeyC).toBe('enter')
+  expect(DEFAULT_BINDINGS.Space).toBe('jump')
+  expect(Object.values(DEFAULT_BINDINGS).filter((one) => one === 'enter')).toHaveLength(1)
+  // …and it is a one-shot: nothing about a door is held.
+  expect(HELD_ACTIONS).not.toContain('enter')
+  expect(DRIVING_ACTIONS).not.toContain('enter')
 })
 
 test('a locked or charging pig cannot open its inventory or end its turn', () => {

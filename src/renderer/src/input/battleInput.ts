@@ -30,6 +30,7 @@ import { controller } from './controller'
 import { modeOf, readControls, verbOf, wakes } from '../../../lib/game/controls'
 import type { ControlMode, Held } from '../../../lib/game/controls'
 import { SKILL } from '../../../lib/game/skills'
+import { choosableIn } from '../../../lib/game/indoors'
 import type { Battle } from '../../../lib/game/battle'
 import type { Emit } from '../../../lib/game/events'
 import type { Game } from '../../../lib/game/game'
@@ -171,6 +172,22 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
     return mode
   }
 
+  /**
+   * **What the menu OFFERS — and inside a building it is not what the pig
+   * carries.**
+   *
+   * Play: "в инвентаре скилы только постройки, и у бомбоубежища это только
+   * пропустить ход." A shelter's own list is empty (lib/game/buildings.ts), so
+   * the menu comes up with the one entry it always adds and that entry is SKIP
+   * TURN — which is exactly what a pig sitting one turn out in a bomb shelter
+   * should be able to reach and nothing else.
+   */
+  const choosable = (): { skill: number; amount: number }[] => {
+    const game = host.game()
+    if (!game) return []
+    return choosableIn(game.currentPig.carrying, host.battle()?.view().inside ?? null)
+  }
+
   /** What a one-shot key DOES, which is the mode's to say: SPACE is a jump in
    * the battle, SELECT in the inventory, the canopy's knife while a crate is
    * coming down, and nothing at all down the sights. */
@@ -180,13 +197,18 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
       case 'openInventory':
         // R opens what the pig is carrying — plus what it can always do. It
         // drives in from the right, with a noise.
-        if (game && host.skills.toggle(game.currentPig.carrying)) {
+        if (game && host.skills.toggle(choosable())) {
           host.emit({ kind: 'menuOpened' })
         }
         return
+      case 'enterBuilding':
+        // Its OWN key, and never the jump's: play asked for that in as many words
+        // (input/actions.ts). The engine answers it inside the step.
+        host.battle()?.enterBuilding()
+        return
       case 'closeInventory':
         if (game) {
-          host.skills.toggle(game.currentPig.carrying)
+          host.skills.toggle(choosable())
           // R is CANCEL, and cancelling puts the weapon away — play asked for it
           // twice, the second time in capitals. SPACE is the only thing that
           // leaves a skill in the pig's hands.

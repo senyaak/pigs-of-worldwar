@@ -14,6 +14,9 @@ export type Action =
   | 'turnLeft'
   | 'turnRight'
   | 'jump'
+  // The DOOR of a building, on its own key — never the jump's
+  // (input/actions.ts).
+  | 'enter'
   | 'fire'
   | 'aimMode'
   | 'aimUp'

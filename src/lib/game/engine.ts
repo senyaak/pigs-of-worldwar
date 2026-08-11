@@ -43,6 +43,7 @@ import type { EffectField } from './effectField'
 import { createDamageNumbers } from './damage'
 import { createDrowning } from './drowning'
 import type { DamageNumbers } from './damage'
+import { createIndoors } from './indoors'
 import { createBattle } from './battle'
 import type { Battle } from './battle'
 import { DEFAULT_SEED, seeded } from './random'
@@ -360,10 +361,15 @@ export function createEngine(parts: EngineParts): Engine {
    * whole pig list, every frame, in every mode. */
   const drowning = createDrowning({ pigs, query, training }, bus.emit)
 
+  /** The BUILDINGS on the map and who is standing in one — a shelter a pig can
+   * jump into (lib/game/indoors.ts). */
+  const indoors = createIndoors(world.objects, bus.emit)
+
   const battle = createBattle({
     game,
     query,
     scenery,
+    indoors,
     anim,
     clips: world.clips,
     shots,
@@ -442,6 +448,7 @@ export function createEngine(parts: EngineParts): Engine {
       overlay: over.index,
       overlayPhase: over.phase,
       underCanopy: dropIn.underCanopy(pig),
+      sheltered: indoors.inside(pig) !== null,
       arriving: dropIn.live().some((one) => one.pig === pig)
     }
   }

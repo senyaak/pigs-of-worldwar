@@ -77,7 +77,14 @@ export interface Weapon {
 }
 
 // model, aimClip, readyClip, attackClip, aims, power — exe 0x4d7300.
-const TABLE: [number, number, number, number, number, number][] = [
+/**
+ * The 80-byte skill records at 0x4d7300, transcribed: model, aimClip, readyClip,
+ * attackClip, aims, power.
+ *
+ * Exported so a spec can hold a reading to it — the IN/OUT clip was found here
+ * after being declared absent somewhere else (lib/game/buildings.ts).
+ */
+export const WEAPON_TABLE: [number, number, number, number, number, number][] = [
   [0, 0, 0, -1, 0, 0], // 0 NONE
   [0, 0, 17, 21, 0, 0], // 1 TROTTER
   [1, 0, 18, 21, 0, 0], // 2 KNIFE
@@ -158,7 +165,7 @@ const NOTHING: Weapon = {
 
 /** What a skill is, as a weapon. An id off the end reads as empty hands. */
 export function weaponOf(skill: number | null): Weapon {
-  const row = skill === null ? undefined : TABLE[skill]
+  const row = skill === null ? undefined : WEAPON_TABLE[skill]
   if (!row) return NOTHING
   return {
     model: row[0],

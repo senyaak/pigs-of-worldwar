@@ -294,6 +294,7 @@ export type Verb =
   | 'closeInventory'
   | 'beginTurn'
   | 'holdSkipTurn'
+  | 'enterBuilding'
 
 export function verbOf(mode: ControlMode, action: string): Verb | null {
   // The beat at the top of a turn: ANY key starts it, whatever the key is. The
@@ -316,6 +317,10 @@ export function verbOf(mode: ControlMode, action: string): Verb | null {
   // The aim view takes the jump away and nothing else: the exe reaches no jump
   // from its own input branch while the bit is down (0x4928dc).
   if (action === 'jump') return mode === 'sights' ? null : 'jump'
+  // …and the DOOR of a building is its own key, which is the point of it having
+  // one: SPACE stays a jump wherever the pig is standing (lib/game/indoors.ts).
+  // Down the sights it is refused along with everything else that moves the pig.
+  if (action === 'enter') return mode === 'sights' ? null : 'enterBuilding'
   // The inventory cannot be opened from the aim view — play: "инвентарь работает
   // во время прицеливания", and it should not.
   if (action === 'skills') return mode === 'sights' ? null : 'openInventory'

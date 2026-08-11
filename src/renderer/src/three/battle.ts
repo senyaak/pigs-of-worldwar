@@ -354,6 +354,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // while the scope is up — every other pig stays, because those are what
     // is being aimed at.
     soldier.node.visible = view !== 'scope'
+    // …**and a pig inside a SHELTER is not drawn at all**, which is the engine's
+    // own word rather than a flourish: the exe clears `[pig+0x30]`, the byte its
+    // draw loop gates every object on (lib/game/indoors.ts). The camera stays
+    // where it is — pointed at the building he is in.
+    if (pigShot(soldier.pig.id)?.sheltered) soldier.node.visible = false
   }
 
   /** Take the battle to a pig, and the camera and marker with it. */
@@ -504,6 +509,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         weapons.show(soldier.mesh, reaching ? null : weaponModelName(held))
       }
     }
+    // …and every pig in a building is gone from the picture, acting or not.
+    for (const soldier of squad.members) {
+      if (pigShot(soldier.pig.id)?.sheltered) soldier.node.visible = false
+    }
     // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts a
     // field of view is the library's and the library is not in the install, so
     // SCOPE_MAGNIFY is the remake's pick and three/chase.ts says so.
@@ -606,6 +615,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     charging: () => battle.charging(),
     firing: () => battle.view().firing?.phase ?? null,
 
+    shelter: () => {
+      const view = battle.view()
+      const drawn = squad.of(game.currentPig.id)?.node.visible === true
+      return { inside: view.inside?.id ?? null, doorway: view.doorway?.id ?? null, drawn }
+    },
     frame: () => lastFrame,
     aftermath: () => battle.view().aftermath !== null,
     /**

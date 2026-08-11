@@ -51,6 +51,15 @@ export interface PigShot {
   underCanopy: boolean
   /** On the opening drop at all — cut canopy or not, it is still falling. */
   arriving: boolean
+  /**
+   * Standing INSIDE a building, and so **not drawn at all**.
+   *
+   * The exe's own rule rather than a choice: both of its doors clear
+   * `[pig+0x30]`, which is the byte the draw loop gates every object on
+   * (lib/game/indoors.ts). It travels on the snapshot because hiding a mesh is
+   * the renderer's job and being in a shelter is the engine's.
+   */
+  sheltered: boolean
 }
 
 /** One thing in the air. Bullets and grenades share a shape because what is

@@ -45,10 +45,15 @@ const MUZZLE: Record<number, Point> = {
   18: { x: 44, y: 36, z: 350 }
 }
 
-/** How near a bullet has to pass. A pig is 320 tall and 320 across, and the
- * exe gives every gun's projectile a collision box of ZERO in its table — so
- * this is the BODY's size, not the bullet's, and it is the remake's reading of
- * a hit rather than a decoded one. */
+/**
+ * How near a bullet has to pass A PIG. The exe gives every gun's projectile a
+ * collision box of ZERO in its table, so this is the BODY's size rather than the
+ * bullet's, and it is the remake's reading of a hit rather than a decoded one.
+ *
+ * It is the pig's own collision radius because a pig is what it is asking about.
+ * **It used to be the test for a DUMMY as well, and that is the bug play found**
+ * — see `land` below.
+ */
 const HIT_RADIUS = PIG_RADIUS
 const HIT_RISE = 320
 
@@ -96,6 +101,20 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
   let named = 0
   const standing = world.targets
 
+  /** Take a shot's damage off the target at `at`, and knock it down if that
+   * finished it. One place, because two callers reach it now: the box that
+   * stopped the bullet, and the point test for a target that has no box. */
+  const breakInto = (at: number, skill: number): void => {
+    const dummy = standing[at]
+    const amount = damageOf(skill)
+    hurt(dummy, amount, false)
+    emit({ kind: 'damaged', at: dummy, amount })
+    if (isDead(dummy)) {
+      standing.splice(at, 1)
+      emit({ kind: 'broke', target: dummy.id, at: { x: dummy.x, y: dummy.y, z: dummy.z } })
+    }
+  }
+
   /** Whether this bullet is inside that body. */
   const inside = (shot: Shot, body: Point): boolean =>
     Math.abs(shot.x - body.x) < HIT_RADIUS &&
@@ -109,7 +128,36 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
     // the walk uses — so a shot is stopped by the ground, and the map's own
     // boxes stop it the same way (lib/game/obstacles.ts).
     if (shot.y >= world.query.height(shot.x, shot.z)) return true
-    if (world.obstacles.solid(shot.x, shot.y, shot.z)) return true
+    /**
+     * **…and whatever BOX stopped it takes the hit, if that box is something
+     * that breaks.**
+     *
+     * Play: "пуля врезается в манекен и ничего не происходит — там что-то с
+     * регистрацией попаданий." Exactly right, and the cause is a coupling that
+     * had no business existing: this used to be a flat `solid()` that spent the
+     * bullet, and the dummy was then looked for by the POINT test below — whose
+     * window was `HIT_RADIUS`, which is `PIG_RADIUS`.
+     *
+     * A DUMMY is BOTH a collision box (128 × 512 × 256) and a target. So which of
+     * the two tests fires first is pure geometry: at the old `PIG_RADIUS` of 170
+     * the point window was wider than the box's own 128 of half-depth, so a bullet
+     * flying at a dummy entered the window a step BEFORE the box and the target
+     * loop caught it. Halving the pig to 85 — for a completely different reason,
+     * how near a pig may stand to a wall — pulled the window inside the box, and
+     * from then on every shot was swallowed by the collider one step before it
+     * could ever reach the target. The dummy is hit and nothing happens.
+     *
+     * Asking the box WHICH record it was removes the coincidence: a bullet is
+     * stopped by geometry, and the geometry's owner takes the damage. A record's
+     * own box is a better hit shape than a radius borrowed from a pig, and the two
+     * numbers can now move without silently disarming each other.
+     */
+    const stopper = world.obstacles.stopper(shot.x, shot.y, shot.z)
+    if (stopper !== null) {
+      const at = standing.findIndex((one) => one.id === stopper)
+      if (at >= 0 && world.present(stopper)) breakInto(at, shot.skill)
+      return true
+    }
     for (const pig of world.pigs()) {
       if (isDead(pig)) continue
       const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
@@ -120,17 +168,14 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id })
       return true
     }
+    // …and a target with NO collider at all — a bush, a low prop, anything the
+    // solidity rule leaves out — is still shot by the point test. That is what
+    // this loop was always for; it simply is not what a dummy needs.
     for (let i = standing.length - 1; i >= 0; i--) {
       const dummy = standing[i]
       if (!world.present(dummy.id)) continue
       if (!inside(shot, dummy)) continue
-      const amount = damageOf(shot.skill)
-      hurt(dummy, amount, false)
-      emit({ kind: 'damaged', at: dummy, amount })
-      if (isDead(dummy)) {
-        standing.splice(i, 1)
-        emit({ kind: 'broke', target: dummy.id, at: { x: dummy.x, y: dummy.y, z: dummy.z } })
-      }
+      breakInto(i, shot.skill)
       return true
     }
     return false

@@ -35,6 +35,8 @@ import type { Game, Pig } from './game'
 import type { TerrainQuery } from './terrain'
 import type { Anim } from './anim'
 import type { Scenery } from './scenery'
+import type { Building, Indoors } from './indoors'
+import { INOUT_CLIP } from './buildings'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
 import type { Mines } from './mines'
@@ -57,6 +59,8 @@ export interface BattleParts {
   game: Game
   query: TerrainQuery
   scenery: Scenery
+  /** The BUILDINGS on the map and who is standing in one (lib/game/indoors.ts). */
+  indoors: Indoors
   anim: Anim
   clips: ClipTiming[]
   shots: Bullets
@@ -112,6 +116,12 @@ export interface BattleView {
    * see out of the water (lib/game/walkAway.ts). Null when a turn is being
    * played. */
   walkAway: { swimming: number } | null
+  /** The building the acting pig is standing in, or null. A pig inside one is
+   * NOT DRAWN — the exe's own rule (lib/game/indoors.ts). */
+  inside: Building | null
+  /** …and the one it could jump into from where it stands, which is what a
+   * prompt would be drawn off. Null while it is already in one. */
+  doorway: Building | null
 }
 
 export interface Battle {
@@ -123,6 +133,10 @@ export interface Battle {
   /** Tank controls: walk -1|0|1 (back/stop/forward), turn -1|0|1. */
   setIntent(walk: number, turn: number): void
   jump(): void
+  /** Go INTO the building in reach, or come back out of the one the pig is in
+   * (lib/game/indoors.ts). Its own key, not the jump's — play asked for that in
+   * as many words. Does nothing when there is nothing to go into. */
+  enterBuilding(): void
   /**
    * Whether the fire button is DOWN, and whether it went down THIS frame.
    *
@@ -184,7 +198,7 @@ export interface Battle {
 }
 
 export function createBattle(parts: BattleParts): Battle {
-  const { game, query, scenery, anim, shots, grenades, mines, swings, effects, numbers } = parts
+  const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, effects, numbers } = parts
   const { tumbles, airDrops, dropIn, drowning, onChanged } = parts
   const emit = parts.bus.emit
 
@@ -193,6 +207,13 @@ export function createBattle(parts: BattleParts): Battle {
 
   const intent = { walk: 0, turn: 0 }
   let jumpRequested = false
+  /** The DOOR key, latched the same way the jump is: it is answered inside the
+   * step rather than wherever the input happened to be read (lib/game/indoors.ts). */
+  let doorRequested = false
+  /** The pig part-way through the getting-IN clip, or null. It is not inside yet
+   * — the clip has to run first (`INOUT_CLIP`, lib/game/buildings.ts) — and until
+   * it has, nothing drives it and the turn cannot end. */
+  let climbing: Pig | null = null
   /** What the acting pig had chosen last frame — a change is what brings a
    * weapon out. */
   let holding: number | null = null
@@ -289,6 +310,10 @@ export function createBattle(parts: BattleParts): Battle {
     // wait for the flight hands the turn on before the pig has moved a unit.
     tumbles.live() > 0 ||
     loco.airborne !== null ||
+    // …and a pig part-way through climbing INTO a building: the clip runs 17
+    // frames and the turn must not be handed over on top of it
+    // (lib/game/buildings.ts, `INOUT_CLIP`).
+    climbing !== null ||
     numbers.live() > 0 ||
     airDrops.falling() > 0
 
@@ -384,15 +409,29 @@ export function createBattle(parts: BattleParts): Battle {
     })
   )
 
-  const focus = (pig: Pig): void => {
-    // WHERE THE PIG ALREADY IS, and not just where the ground under it is: a
-    // turn that starts on a bridge starts on the DECK. The pig's own y plus the
-    // objects is what settles that (lib/game/locomotion.ts `Footing`) — the
-    // squad is not in it, because a pig is never something to stand on.
-    loco = createLocomotion(query, pig.position.x, pig.position.z, pig.heading, {
+  /**
+   * A fresh locomotion state for wherever this pig ACTUALLY is.
+   *
+   * WHERE THE PIG ALREADY IS, and not just where the ground under it is: a turn
+   * that starts on a bridge starts on the DECK. The pig's own y plus the objects
+   * is what settles that (lib/game/locomotion.ts `Footing`) — the squad is not in
+   * it, because a pig is never something to stand on.
+   *
+   * Two things need it now: a turn beginning, and a pig stepping back out of a
+   * shelter onto the spot it jumped from.
+   */
+  const footingAt = (pig: Pig): LocomotionState =>
+    createLocomotion(query, pig.position.x, pig.position.z, pig.heading, {
       y: pig.position.y,
       obstruction: scenery.obstacles
     })
+
+  const focus = (pig: Pig): void => {
+    loco = footingAt(pig)
+    // A climb belongs to the pig that started it, and `settling` waits on this —
+    // so a turn handed over on top of one (a pig killed mid-clip) must not leave
+    // it set, or nothing ever ends again.
+    climbing = null
     holding = pig.holding
     sights.rearm(pig.holding)
     readying = 0
@@ -611,6 +650,50 @@ export function createBattle(parts: BattleParts): Battle {
       return
     }
 
+    // **THE DOOR OF A BUILDING, on its own key.**
+    //
+    // Play: "бомбоубежище не работает — нельзя залезть внутрь", then "свин должен
+    // запрыгивать внутрь", and then the correction that matters here — "я не
+    // говорил по пробелу; сделай отдельную кнопку, пробел уже прыжок." So the
+    // door is `enterBuilding` and the jump key is untouched by any of it: a pig
+    // standing against a shelter can still hop.
+    //
+    // It is answered before the walk, because a pig INSIDE is not driven at all —
+    // it is not drawn, its whole turn is standing there, and the two things it
+    // can do are skip the turn and come back out.
+    if (doorRequested) {
+      doorRequested = false
+      if (indoors.inside(acting)) {
+        // OUT first and the climb after it: he cannot be seen playing a clip from
+        // inside, because inside he is not drawn at all.
+        indoors.leave(acting)
+        // His footing is rebuilt from where he came out, exactly the way a turn
+        // beginning on a bridge rebuilds one: `loco` has been standing at the
+        // building's own middle and knows nothing about the doorstep.
+        loco = footingAt(acting)
+        anim.playOnce(acting, INOUT_CLIP)
+        onChanged()
+        return
+      }
+      // …and IN the other way round: the climb first, and he goes in when it has
+      // run. `climbing` is what holds him to it — the same rule a lay clip has
+      // (`attack.busy()`), and the same reason: an animation nobody may walk out
+      // of.
+      if (indoors.reachable(acting)) {
+        climbing = acting
+        anim.playOnce(acting, INOUT_CLIP)
+        onChanged()
+        return
+      }
+    }
+    // …and the climb finishing is what puts him inside. Asked before anything is
+    // driven, so the frame he lands in is the frame he is gone.
+    if (climbing === acting && !anim.animating(acting)) {
+      climbing = null
+      indoors.enter(acting)
+      onChanged()
+      return
+    }
     // ONE BLOW A TURN: a pig that has already used a weapon answers the fire key
     // with nothing at all. Everything that ENDS the turn takes care of itself —
     // the beat is running by then and swallows the press anyway — so this is here
@@ -659,8 +742,14 @@ export function createBattle(parts: BattleParts): Battle {
       jumpRequested = false
       sights.push(0)
     }
-    const walking = committed() ? 0 : intent.walk
-    const turning = committed() ? 0 : intent.turn
+    // …and a pig INSIDE a building is not driven at all: not the walk, not the
+    // turn, and the jump above has already been spent on the door. The exe
+    // switches its body off outright (`[body+0x44] |= 1`). The FIRE key still
+    // reaches it, because SKIP TURN is the whole of what a shelter offers and it
+    // is used like any other skill.
+    const sheltered = indoors.inside(acting) !== null || climbing === acting
+    const walking = committed() || sheltered ? 0 : intent.walk
+    const turning = committed() || sheltered ? 0 : intent.turn
     // The SIGHTS are a different control set, not a locked one. The one thing
     // the aim view does take away is the JUMP: the exe routes input through its
     // own branch while the aim bit is down (0x4928dc).
@@ -685,7 +774,7 @@ export function createBattle(parts: BattleParts): Battle {
     updateLocomotion(
       loco,
       query,
-      { walk: walking, turn: scoping ? 0 : turning, jump: jumpRequested },
+      { walk: walking, turn: scoping ? 0 : turning, jump: sheltered ? false : jumpRequested },
       delta,
       // The squad is in the way too: every pig but the acting one, as the body
       // its own spawn marker measured (lib/game/obstacles).
@@ -715,9 +804,10 @@ export function createBattle(parts: BattleParts): Battle {
     // taking one away mid-swim would leave the turn unendable.
     const armed = ['melee', 'gun', 'lob', 'charge'].includes(weaponLayer(acting.holding))
     if (loco.swimming && armed && !committed()) acting.holding = null
-    game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
-    // Walking INTO a crate is how one is collected; there is no button.
-    scenery.collect(acting)
+    if (!sheltered) game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
+    // Walking INTO a crate is how one is collected; there is no button — and a
+    // pig standing in a shelter is not walking into anything.
+    if (!sheltered) scenery.collect(acting)
 
     // …and walking onto a MINE is how one is found. Every pig, not just the one
     // being driven — the exe asks it in the per-pig ground update — and only with
@@ -728,6 +818,9 @@ export function createBattle(parts: BattleParts): Battle {
     for (const pig of everyone()) {
       if (isDead(pig)) continue
       if (pig === acting && loco.airborne !== null) continue
+      // …nor does one standing INSIDE a building, which is where the exe's own
+      // `[pig+0x382]` (feet down) would say the same thing.
+      if (indoors.inside(pig)) continue
       // …nor does a pig a blast has THROWN find one in mid-air: the tile under a
       // flying pig is not the tile it is standing on (lib/game/tumble.ts).
       if (tumbles.has(pig)) continue
@@ -838,7 +931,9 @@ export function createBattle(parts: BattleParts): Battle {
       driving: intent.walk !== 0 || intent.turn !== 0,
       firing: attack.firing(),
       aftermath,
-      walkAway: walkAway === null ? null : { swimming: walkAway.swimming() }
+      walkAway: walkAway === null ? null : { swimming: walkAway.swimming() },
+      inside: indoors.inside(game.currentPig),
+      doorway: indoors.reachable(game.currentPig)
     }),
     setIntent(walk, turn) {
       intent.walk = walk
@@ -846,6 +941,9 @@ export function createBattle(parts: BattleParts): Battle {
     },
     jump() {
       jumpRequested = true
+    },
+    enterBuilding() {
+      doorRequested = true
     },
     setFiring(held, pressed) {
       // The PRESS is what a gun and a blade answer to; the gauge wants the

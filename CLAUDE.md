@@ -2438,12 +2438,12 @@ SHELTER in the game, at all four yaws, carries 832×640 for art that measures
 on the other two, which is exactly the pair play could walk into.
 `TRANSPOSED_BOX` in `lib/game/obstacles.ts` is that one name, and it says why.
 
-**Getting INSIDE is a missing FEATURE, not a bug.** The SHELTER is a closed
-twelve-triangle box — there is no interior to walk into, in the remake or in the
-original. What the original has is the IN/OUT family: skills **61 IN-OUT, 62 PBOX,
-64 GET OUT**, and the taxonomy's own GUN_BARRELS group (BIGBAR, BUNKGUN, PILLBAR,
-AMPHGUN, B_GUN, TANBAR) beside the BUILDINGS a pig climbs into to fire them
-(45 `pillbhmg`, 46 `pillbfla` are the pillbox's weapons). None of that is built.
+**Getting INSIDE is a missing FEATURE, not a bug — and it is BUILT now**, further
+down under "THE SHELTER". The model is a closed twelve-triangle box with no
+interior to walk into, in the remake and in the original alike; what happens is
+that the pig stops being drawn. The skill numbers this paragraph used to carry were
+wrong and are corrected there: 60 VEHICLE INOUT, **61 BUILDING INOUT**, 62 EJECT
+PIG, and 64 is BINOCULARS.
 
 **And the props are UNLIT at last.** `three/modelMesh.ts` has said since it was
 written that a map's props must not be lit — a third of their NO2 entries are
@@ -2672,6 +2672,136 @@ components truncate to zero and goes straight up — about one in sixteen out of
 cone. The claim belongs to the population: 80% of them spread, and the ones that do
 not have nothing sideways to move along.
 
+### THE SHELTER: a pig JUMPS IN, and is gone from the picture
+
+Play: "давай бомбоубежище доделаем — свин должен запрыгивать внутрь. И видит
+бомбоубежище — в инвентаре скилы только постройки, и у бомбоубежища это только
+пропустить ход. И просвечивать должны стены, которые мы взрываем — не
+бомбоубежище." Three sentences, and the third turned out to be a consequence of
+the first.
+
+**Being inside means NOT BEING DRAWN, and that is the exe's own rule.** Both of
+its doors — 0x469f60 in, 0x469b60 out — and the loader's own boarding do the same
+two things to the pig: `[body+0x44] |= 1` and **`[pig+0x30] = 0`**. That second
+byte is the gate the draw loop tests every object on (0x44e43e) and the base
+constructor clears it (0x4a7e1b). So a pig in a shelter is off the screen, and
+`lib/game/indoors.ts` does the same through the snapshot's own `sheltered` flag.
+
+Which settles the fade: **a BUILDING is out of `sightBlockers` altogether**. Play
+asked for it and the reason is stronger than the request — there is nothing behind
+the wall to see. The eighteen pieces of CAMP's house are ordinary breakable scenery
+and go on fading, which is the half play asked to keep.
+
+**A building's own row is read**, out of 0x4c2e08 the constructor indexes by
+`kind − 1` (`lib/game/buildings.ts`), and it carries two numbers:
+
+| kind | | health | room |
+| - | - | - | - |
+| 1 | BIG_GUN | 200 | 1 |
+| 2 | M_TENT1 | 30 | 2 |
+| 3 | M_TENT2 | 40 | 4 |
+| 4 | PILLBOX | 100 | 2 |
+| 5 | **SHELTER** | **100** | **3** |
+| 6 | TENT_S | 25 | 1 |
+
+The second column is a CAPACITY and it is read rather than guessed: 0x46ca50 takes
+`[+0xd8] − [+0xe4]` through `neg`/`sbb`/`inc` — the compiler's `== 0` — and turns
+the pig away when they are equal, `[+0xe4]` being the occupant count kept beside
+the list `Building::AddOccupant` (0x43f7f0) hangs off `[+0x80]`. So three pigs fit
+in a shelter and the fourth is refused. The HEALTH is read and deliberately NOT
+applied — a building is still not breakable here — and `002/shelter.spec.ts` pins
+it so the reading cannot rot.
+
+**The door has a KEY OF ITS OWN — `C` — and that was a correction.** It went in on
+the jump key first, off "свин должен запрыгивать внутрь", and play sent it straight
+back: "я не говорил по пробелу — там просто анимация входа, запрыгивание; сделай
+отдельную кнопку, пробел уже прыжок." Right on both counts. The **запрыгивание** is
+the animation the original plays, not the key, and a door sharing the jump means a
+pig standing against a shelter cannot hop — one key wearing two meanings, which is
+the kind of thing that reads as a hack because it is one. So `enter` is an action
+of its own (`input/actions.ts`), `enterBuilding` a verb of its own
+(`lib/game/controls.ts`), and `002/controls.spec.ts` pins that SPACE still means
+jump in the battle and that nothing else is bound to `C`.
+
+The exe's own door is the SKILL, 61 BUILDING INOUT out of the menu, and that is
+still where it belongs the day the other five buildings are worth entering; the key
+is the remake's and says so where it is bound. The verb is answered before the
+walk, because a pig inside is not driven at all — no walk, no turn, no jump, no
+crate collected, no mine trodden on. The FIRE key still reaches it, because SKIP
+TURN has to.
+
+**The entry ANIMATION is not built and nothing was found to build it from.** The
+exe's enter arm (0x469f21..0x469fb4) calls `0x4a9800`, `0x4734b0`, `0x4a9ee0` and
+`0x4a9e50` and **no `Pig::SetAnim` at all** — it clears the draw byte and the pig
+is gone. So whatever play remembers hopping in is either one of those four or a
+clip the picker asks for elsewhere, and inventing one here would be a stand-in.
+
+**The menu indoors is the BUILDING's list, not the pig's** (`choosableIn`), and a
+shelter's is empty — so the menu comes up with the one entry it always adds and
+that entry is SKIP TURN, which is exactly what play described. The PILLBOX's own
+45 HEAVY M-GUN and 46 FLAME THROWER are read and left out on purpose: neither is
+built, and a menu entry that does nothing is the one thing a menu must not have.
+
+Two numbers are the remake's and say so at the field: the reach — the exe's 0x100
+applied to the building's own FOOTPRINT, because the pair its own test differences
+comes out of an untranscribed call — and where a pig comes back OUT, which is the
+doorstep it jumped from rather than anything the exe was seen to compute.
+`pow.debug.shelter()` gives the building he is in, the one he could enter, and
+whether his model is on the scene at all, because none of it is visible by design.
+
+### A BULLET IS REGISTERED BY THE BOX THAT STOPPED IT
+
+Play: "пуля врезается в манекен и ничего не происходит — там что-то с регистрацией
+попаданий", and before that the guess that turned out to be right — "я подозреваю,
+твоя обрезка свиней как-то повлияла на манекены?"
+
+It did, through a place that has nothing to do with dummies. A bullet was resolved
+world-first: `obstacles.solid()` spent it, and the targets were then looked for by a
+POINT test whose window was `HIT_RADIUS` — which was **`PIG_RADIUS`**.
+
+A DUMMY is BOTH things at once: a 128 × 512 × 256 collision box and a target. So
+which of the two tests fired first was pure geometry.
+
+| | window on the target | the box's own half-depth | which fires first |
+| - | - | - | - |
+| `PIG_RADIUS` **170** | 170 | 128 | the TARGET — the hit lands |
+| `PIG_RADIUS` **85** | 85 | 128 | the BOX — the bullet is eaten a step early |
+
+Halving the pig was right and stays right: it answers "how near a wall may it
+stand", which is what play felt as "цепляет всё невидимыми боками". What it also
+did, silently, was pull a bullet's hit window inside the collider of every dummy in
+the game.
+
+**The fix is not a number.** `ObstacleField.stopper(x, y, z)` returns WHICH record
+stopped the point, and `lib/game/bullets.ts` gives that record the damage if it is
+something that breaks. A bullet is stopped by geometry and the geometry's owner
+takes the hit — a record's own box is a better hit shape than a radius borrowed from
+a pig, and the two numbers can no longer disarm each other. The point test survives
+for targets with NO collider, which is what it was always for.
+
+**Why the suite was green through all of it, which is the part worth keeping.**
+`002/shoot.spec.ts` shoots the first target the map SCRIPT places — and that one has
+no collider, so the point test caught it and the spec passed while the game did not.
+The new pin shoots a **DUMMY** and asserts `box.halfZ > PIG_RADIUS` first, so it is
+standing on the very geometry the bug lives in. It was checked by reverting the fix:
+it fails with "the bullet did nothing at all", which is play's sentence.
+
+Two general lessons, and the second is the one that cost the time:
+
+- **A constant borrowed across concerns is a trap with no compiler behind it.**
+  `HIT_RADIUS = PIG_RADIUS` read as tidy and coupled "how near a wall a pig may
+  stand" to "whether a bullet hit a dummy".
+- **"The suite is green" is not "it works".** Two hundred and fifty tests passed
+  over a game where no gun could hit a dummy. What the suite covered was the case
+  with no collider; what a player does was uncovered. When play reports something
+  the suite says is fine, the suite is what is wrong.
+
+And **I said the wrong thing twice on the way here** — that the entry animation did
+not exist (it is clip 7, above), and that the pig-shrink was not the cause. The first
+came from reading one arm and stopping; the second from three measurements that all
+happened to test melee, which really was fine, while the report was about a bullet.
+Neither was a guess presented as a guess, which is the fault.
+
 ### PLAY'S OPEN LIST — what is still open (2026-08-11)
 
 Everything play has named over four passes is written up above as its own section:
@@ -2700,21 +2830,35 @@ here rather than in a chat that scrolls away.
    on the minimap. What is built instead: the `WE_MINE` model for the engineer family
    (5, 6, 7) inside 1024 on the ground. Play, twice: "но ладно это потом" and
    "индикатор мин пока рано — у нас нет инженеров щас". So it waits on the classes.
-3. **Getting INSIDE a building** — skill **61 BUILDING INOUT**, with **60 VEHICLE
-   INOUT** and **62 EJECT PIG** beside it. (An earlier note here said "61, 62, 64";
-   64 is BINOCULARS.) Not built, but the state is read, and it is three fields:
-   `[pig+0x310]` is what he could get into, `[pig+0x170]` what he IS in, `[pig+0x2ec]`
-   is 3 for a vehicle and 4 for a building. Both doors do the same two things to the
-   pig — `[body+0x44] |= 1` and **`[pig+0x30] = 0`**, and that second one is the draw
-   loop's own gate (0x44e43e), so a pig inside a building is simply NOT DRAWN. Which
-   is the reason the see-through hook exists: the wall fades and there is nothing
-   inside to see except through it. **And some pigs start inside** — `0x47d4e0` runs
-   once from the map loader, walks the object list for every pig whose `[+0x3c0]` is
-   1, and boards the nearest thing within **4096** units. Still unread: the
-   GUN_BARRELS group and the pillbox's own weapons, 45 HEAVY M-GUN and 46 FLAME
-   THROWER; and which marker bit fills `[pig+0x3c0]`. When it lands, the fade should
-   follow the exe's rule for a BUILDING (`[pig+0x170] == this`) instead of the
-   remake's general one. `objects/notes.md` has the read.
+3. **Walking into a dummy shoulders the pig PAST it.** Measured while hunting the
+   bullet: hold W at a dummy and the pig is stopped 149 out, then the wedge counter
+   sidesteps it — x moves and z holds for four ticks — and it squeezes round the
+   corner and ends up **687 units beyond** the target. Release the key at the moment
+   it stops and the swing lands, so this is not the strike; it is that you cannot
+   stand still in front of a small box by walking at it. The wedge exists to get a
+   pig off a wall, and a dummy is not a wall.
+4. **`002/camera-smooth.spec.ts`'s opening drop scores worse near 60 fps.** 0.157 at
+   144 fps and 0.355 at 62, which is a hair over the engine's own 60 Hz step — so its
+   bar is 0.5 where the other two are 0.35, and the score now reports the frame rate
+   it was measured at. The measure itself is sound (it is a rate, not a step). What
+   is not answered is why the DESCENT is the one that shows it: the pig is drawn
+   between steps like everything else, so the suspect is `dropInArt.riseOver`, handed
+   to the chase separately and tweened by nothing.
+5. **The rest of getting INSIDE.** The SHELTER is done (above); what is left round
+   it is the other five buildings' reasons to be entered. The **PILLBOX** wants its
+   own two weapons, **45 HEAVY M-GUN** and **46 FLAME THROWER**, and the taxonomy's
+   GUN_BARRELS group beside them (BIGBAR, BUNKGUN, PILLBAR, AMPHGUN, B_GUN, TANBAR);
+   `buildingSkills` is the table they go in and it is empty on purpose until they
+   exist. **A VEHICLE is the other half** — skill 60 VEHICLE INOUT, `[pig+0x2ec] = 3`,
+   body type 0x1358, through `0x49a320` instead of the building's `0x43f7f0` — and
+   none of it is built. **And some pigs START inside**: `0x47d4e0` runs once from the
+   map loader, walks the object list for every pig whose `[+0x3c0]` is 1, and boards
+   the nearest thing within **4096** units; which marker bit fills `[+0x3c0]` is not
+   decoded (the loader takes it from a stack table at `[esp + (flags & 0x40) + 0xc8]`,
+   0x4a6768). Two more that will matter the day a pillbox is worth entering: the exe
+   refuses a building the OTHER SIDE is holding (`0x43f910` against `[+0x194]`), and
+   its own reach test differences a pair of words out of `0x44e850` that have not
+   been transcribed. `objects/notes.md` has the read.
 
 ### What is still not read
 

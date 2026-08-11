@@ -40,6 +40,11 @@ export type BattleEvent =
   /** Something went off here, and WHICH effect id it spawns: a grenade and a
    * mine do not look alike (lib/game/blast.ts, `Charge.effect`). */
   | { kind: 'blasted'; at: Point; effect: number }
+  /** This pig has JUMPED INTO a building, and stops being drawn from here
+   * (lib/game/indoors.ts). */
+  | { kind: 'wentIn'; pig: PigId; building: number }
+  /** …and back out onto the spot it jumped from. */
+  | { kind: 'cameOut'; pig: PigId; building: number }
   /** A pig has just found a MINE with its foot. The CLICK, not the bang — the
    * blast is four tenths of a second behind it and arrives as `blasted` like any
    * other (lib/game/mines.ts). */
