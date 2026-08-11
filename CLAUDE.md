@@ -2903,7 +2903,10 @@ done yet.
    corner and ends up **687 units beyond** the target. Release the key at the moment
    it stops and the swing lands, so this is not the strike; it is that you cannot
    stand still in front of a small box by walking at it. The wedge exists to get a
-   pig off a wall, and a dummy is not a wall.
+   pig off a wall, and a dummy is not a wall. **Play confirmed the reading**
+   (2026-08-11): "это потому что постепенно сдвиг в бок идёт и обход цели — не
+   проход насквозь." So nothing walks THROUGH the dummy and no spec claims one
+   does; the collision holds and it is the sidestep that has to stop firing here.
 4. **`002/camera-smooth.spec.ts`'s opening drop scores worse near 60 fps.** 0.157 at
    144 fps and 0.355 at 62, which is a hair over the engine's own 60 Hz step — so its
    bar is 0.5 where the other two are 0.35, and the score now reports the frame rate
