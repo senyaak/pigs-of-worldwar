@@ -200,13 +200,18 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
   const runVerb = (mode: ControlMode, action: Action): void => {
     const game = host.game()
     switch (verbOf(mode, action)) {
-      case 'openInventory':
+      case 'openInventory': {
         // R opens what the pig is carrying — plus what it can always do. It
         // drives in from the right, with a noise.
-        if (game && host.skills.toggle(choosable())) {
-          host.emit({ kind: 'menuOpened' })
+        const offered = choosable()
+        if (game && host.skills.toggle(offered)) {
+          // What is in the FIRST cell goes with it: the training ground's script
+          // reads the menu's own first entry and nothing else
+          // (lib/game/tutorial.ts, `clipForMenu`).
+          host.emit({ kind: 'menuOpened', first: offered[0]?.skill ?? null })
         }
         return
+      }
       case 'enterBuilding':
         // Its OWN key, and never the jump's: play asked for that in as many words
         // (input/actions.ts). The engine answers it inside the step.

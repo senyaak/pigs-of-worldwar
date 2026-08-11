@@ -29,7 +29,7 @@ import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { pickupsOf } from '../../src/lib/game/pickups'
-import { clipForPlacement } from '../../src/lib/game/tutorial'
+import { clipForMenu, clipForPlacement } from '../../src/lib/game/tutorial'
 import { createScript } from '../../src/lib/game/script'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
@@ -105,7 +105,15 @@ test('the training script moves: collected, chosen, and then PLACED', async ({ a
   // Step two: take it in hand through the real menu. The prompt is the script's
   // own counter — zeroed by the crate line just heard, armed when the menu
   // opens, and spent by the choice, which is count two.
+  //
+  // …and OPENING it is a step of its own, which is clip 4 — the line that had
+  // nothing to fire it until the field it hangs on was identified as the menu's
+  // own first cell (lib/game/tutorial.ts, `clipForMenu`).
+  expect(clipForMenu(BAYONET, 0), 'the bayonet is what clip 4 answers to').toBe(4)
   expect(await chooseSkill(page, BAYONET)).toBe(true)
+  await expect
+    .poll(async () => spoken(page), { timeout: 10_000 })
+    .toContain(4) // PRESS SPACE TO SELECT YOUR WEAPON.
   await expect
     .poll(async () => spoken(page), { timeout: 10_000 })
     .toContain(5) // PRESS SPACE TO ATTACK THE DUMMY.
@@ -132,7 +140,8 @@ test('the training script moves: collected, chosen, and then PLACED', async ({ a
   // …and in that order. A script that says step three before step one is not a
   // script at all.
   const heard = await spoken(page)
-  expect(at(heard, 3), `out of order: ${heard.join(',')}`).toBeLessThan(at(heard, 5))
+  expect(at(heard, 3), `out of order: ${heard.join(',')}`).toBeLessThan(at(heard, 4))
+  expect(at(heard, 4), `out of order: ${heard.join(',')}`).toBeLessThan(at(heard, 5))
   expect(at(heard, 5), `out of order: ${heard.join(',')}`).toBeLessThan(at(heard, line))
 })
 

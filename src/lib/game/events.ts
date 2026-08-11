@@ -107,8 +107,15 @@ export type BattleEvent =
   | { kind: 'missionOver'; won: boolean; turns: number }
   /** …and the beat that showed it has run out: put the battle away. */
   | { kind: 'missionEnded' }
-  /** The pig's inventory came open — R, and it drives in from the right. */
-  | { kind: 'menuOpened' }
+  /**
+   * The pig's inventory came open — R, and it drives in from the right.
+   *
+   * `first` is what sits in the menu's FIRST CELL, or null for an empty one:
+   * the training ground's script reads exactly that (lib/game/tutorial.ts), and
+   * so does the exe, off the very same place — the cells ARE the game object's
+   * first 0x300 bytes.
+   */
+  | { kind: 'menuOpened'; first: number | null }
   /** …and something came OUT of it, into the pig's hands. The training
    * ground's script counts these (lib/game/tutorial.ts). */
   | { kind: 'chose'; skill: number }

@@ -200,6 +200,31 @@ const GRENADE_NAG_CLIP = 14
 export const MENU_ARMED = 1
 
 /**
+ * **Clip 4, and the field it hangs on is the MENU ITSELF.**
+ *
+ * "PRESS SPACE TO SELECT YOUR WEAPON" was the one line of the script nothing
+ * could fire, because its gate is `[gameMode+0] == 3` (0x492af5) and the field
+ * was unidentified. It is not a vtable slot and it is not a mode: **the game
+ * object's first 0x300 bytes ARE the skill menu**, sixty-four cells of twelve —
+ * skill, amount, and a 1-or-2 flag. `0x492FD0` zeroes the block in one 4×16 loop
+ * and `0x468BD0` fills it from the pig's own list and returns how many, which is
+ * why the same `mov eax,[esi]` two instructions earlier decides whether the
+ * cursor gets put back: an empty first cell is an empty menu.
+ *
+ * So the line is: the menu has just been opened, on the training ground, with
+ * the counter still at nought — a crate line has spoken and this is the first
+ * menu since — and the first thing in the menu is the **BAYONET**. Which is the
+ * step exactly: clip 3 has just said to press RETURN, and this says what to do
+ * now that you have.
+ */
+export function clipForMenu(first: number | null, count: number): number {
+  return count === 0 && first === SKILL_BAYONET ? 4 : 0
+}
+
+/** The training ground's first weapon, and the only skill clip 4 answers to. */
+const SKILL_BAYONET = 3
+
+/**
  * The clip taking `skill` in hand speaks, with the counter at `count` — 0 for
  * a choice the script has nothing to say about, which is most of them.
  *

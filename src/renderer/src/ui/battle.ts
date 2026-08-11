@@ -26,6 +26,7 @@ import {
   MENU_ARMED,
   clipForChosen,
   clipForClosing,
+  clipForMenu,
   clipForPickup,
   clipForPlacement,
   isTrainingGround,
@@ -416,7 +417,12 @@ export function initBattle(onLeave: () => void): BattleView {
           step = 0
           sergeant(clipForPlacement(skill, amount))
         },
-        menuOpened: () => {
+        menuOpened: ({ first }) => {
+          // The one line of the script that had nothing to fire it, and its gate
+          // turned out to be the MENU: the exe reads the first cell, which is
+          // the game object's own first dword (lib/game/tutorial.ts). Spoken
+          // BEFORE the counter is armed, as the exe speaks it before writing 1.
+          sergeant(clipForMenu(first, step))
           step = MENU_ARMED
         },
         chose: ({ skill }) => {

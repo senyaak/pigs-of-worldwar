@@ -3016,15 +3016,29 @@ lives. That line was the one the notes called untraceable. Clip 9 is the rifle's
 same beat; clip 14 is the grenade's NAG, which asks for a count divisible by five
 and for the sergeant to be quiet, so it comes back round rather than firing first.
 
-Clip 4 is the same block's other half and is NOT built: it hangs on
-`[gameMode+0]` being 3 (0x492af5) and that field is not identified.
+**Clip 4 is the same block's other half, and the field it hangs on is the MENU
+ITSELF** — identified 2026-08-11, which is the last line of the script to land.
+`[gameMode+0]` is not a vtable slot and not a mode: **the game object's first
+0x300 bytes ARE the skill menu**, sixty-four cells of twelve bytes — skill,
+amount, and a 1-or-2 flag. `0x492FD0` clears the block in one 4×16 loop and
+`0x468BD0` fills it from the pig's own `[+0x84]`/`[+0x88]` arrays and returns how
+many, which is exactly why the same `mov eax,[esi]` two instructions earlier
+decides whether the cursor is put back: an empty first cell is an empty menu.
+
+So `cmp eax,3` is **the BAYONET sitting in the first cell**, and clip 4 is: the
+menu has just been opened, on the training ground, with the counter still at
+nought — a crate line has spoken and this is the first menu since — and the
+bayonet is the first thing in it. Clip 3 has just said to press RETURN; this says
+what to do now that you have. `clipForMenu` in `lib/game/tutorial.ts`, and the
+`menuOpened` event carries the first cell because that is the only thing the rule
+reads.
 
 `lib/game/tutorial.ts` is the tables, `events.ts` carries `placed` and `chose`,
 `ui/battle.ts` holds the counter and is the one listener that speaks, and
 `pow.spoken()` is how any of it can be watched — the script runs on SPEECH, and
 the briefing bar only ever carries the key press. `e2e/002/tutorial.spec.ts`
-drives the first three steps on the real map and reads the clips back in order:
-3 collected, 5 chosen, 6 placed.
+drives the first steps on the real map and reads the clips back in order:
+3 collected, **4 the menu opened**, 5 chosen, 6 placed.
 
 ### …AND THE LAST DUMMY ENDS IT — the exe's mode 2, 2026-08-11
 

@@ -56,17 +56,30 @@ put away — on a CAMP built with its DUMMY records left off, because reaching t
 condition legitimately is the entire tutorial. `e2e/002/endOfGame.spec.ts` pins
 the data around it.
 
-### A2. Clip 4 — the one line of the script that is not built
+### A2. Clip 4 — the last line of the script — DONE 2026-08-11
 
-`0x492B32` speaks clip 4 ("PRESS SPACE TO SELECT YOUR WEAPON") only when
-`[gameMode+0]` is 3 (0x492af5). That field is not identified — it is read two
-instructions earlier to decide whether the menu cursor gets initialised, so it is
-not a vtable slot being misread. Find its writer and the line falls out.
+"PRESS SPACE TO SELECT YOUR WEAPON", and the field it hung on was the MENU: the
+game object's first 0x300 bytes ARE the skill menu, sixty-four cells of twelve
+(skill, amount, a 1-or-2 flag). `0x492FD0` clears the block in one 4×16 loop and
+`0x468BD0` fills it from the pig's own list — which is why the same
+`mov eax,[esi]` two instructions earlier decides whether the cursor is put back:
+an empty first cell is an empty menu. So `[gameMode+0] == 3` is **the bayonet
+sitting in the first cell**, and the line is "the menu has just been opened, the
+counter is still at nought, and the first thing in it is the bayonet".
 
-### A3. The camera looks the pig in the FACE under the canopy
+`clipForMenu` in `lib/game/tutorial.ts`, the `menuOpened` event carries the first
+cell, and `e2e/002/tutorial.spec.ts` now hears 3 → 4 → 5 → 6 in order on the real
+map. All 28 clips of the script now have something that fires them except the two
+that were never closers — clip 21, the first mine, and clip 26, a turn spent
+doing nothing (both read, neither built).
 
-Play remembers it and it is not traced. The remake's chase camera watches from
-behind for the whole opening drop.
+### A3. The camera looks the pig in the FACE under the canopy — ALREADY BUILT
+
+The entry was stale. `three/chase.ts` has the view (`FACE_LIFT`, and `watch`
+picks `'face'` while `underCanopy` is up) — the chase rig turned around, level
+with the pig rather than over its shoulder. What is true is the disasm note's own
+sentence: **nothing in the exe has been traced for it**, so the framing is the
+remake's own and play is what corrects it.
 
 ---
 
