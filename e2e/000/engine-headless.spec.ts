@@ -48,7 +48,9 @@ interface Built {
   heard: BattleEvent[]
 }
 
-async function buildHeadless(seed?: number): Promise<Built> {
+/** Records to leave OFF the map, by model name — how a mission is put into a
+ * state the training ground would take the whole tutorial to reach. */
+async function buildHeadless(seed?: number, without: string[] = []): Promise<Built> {
   const maps = path.join(GAME_DIR, 'Maps')
   const chars = path.join(GAME_DIR, 'Chars')
   const terrain = await loadTerrain(path.join(maps, `${MAP}.PMG`))
@@ -57,7 +59,9 @@ async function buildHeadless(seed?: number): Promise<Built> {
   const teams = nations(await loadGameText(GAME_DIR, 'fetext'))
   const art = await loadModel(path.join(chars, 'british.mad'), GRUNT)
 
-  const objects = fielded(loaded.objects)
+  const objects = fielded(loaded.objects).filter(
+    (one) => !without.includes(one.name.toUpperCase())
+  )
   const query = buildQuery(terrain.blocks, terrain.textures)
   const squads = mapSquads(objects, teams)
   expect(squads.length, `${MAP} carries spawn markers`).toBeGreaterThan(0)
@@ -220,6 +224,72 @@ test('a gun finds its own barrel — the engine poses the skeleton itself', asyn
   // depends on what the arm is doing.
   const reach = Math.hypot(up!.x - pig.position.x, up!.z - pig.position.z)
   expect(reach, 'it left from the barrel, not from the hip').toBeGreaterThan(20)
+})
+
+/**
+ * **THE MISSION ENDS WHEN THERE IS NOTHING LEFT TO KNOCK DOWN.**
+ *
+ * Play: "убить последний манекен — не заканчивает миссию… очевидно что
+ * заканчивает миссию." It is asked at the HANDOVER and nowhere else, which is
+ * where the exe asks it (0x48F490 → 0x4966A0, lib/game/endOfGame.ts) — so this
+ * runs the clock out, ends the turn, and watches what the handover decides.
+ *
+ * The training ground's own condition would take the whole tutorial to reach
+ * honestly — eleven dummies, each waiting on the crate before it — so the map is
+ * built here with its DUMMY records left off. Everything else about it stands,
+ * the 85 firs and the eighteen house pieces included: those are breakable and
+ * they are not what a mission is measured by.
+ */
+test('the last dummy ENDS the training mission, and three seconds later it lets go', async () => {
+  if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
+    test.skip(true, `no game install at ${GAME_DIR}`)
+  }
+  const played = await buildHeadless(7)
+  const cleared = await buildHeadless(7, ['DUMMY'])
+
+  expect(played.engine.targetsLeft(), 'CAMP carries its eleven dummies').toBe(11)
+  expect(cleared.engine.targetsLeft(), 'and none with them taken off').toBe(0)
+
+  /** Run the clock out and take the handover — the only place a mission ends. */
+  const handOver = async ({ engine, game }: Built): Promise<void> => {
+    while (engine.dropIn.running()) engine.update(FRAME)
+    game.beginTurn()
+    game.hurryTurn(0.1)
+    for (let frame = 0; frame < 10; frame++) engine.update(FRAME)
+    // The beat at the END of the turn is not what this is about (walkAway.ts).
+    engine.battle.cutTurnBeat()
+    engine.update(FRAME)
+  }
+
+  await handOver(played)
+  expect(played.engine.battle.view().ending, 'a mission with dummies left carries on').toBeNull()
+
+  await handOver(cleared)
+  const ending = cleared.engine.battle.view().ending
+  expect(ending, 'nothing left to break: the mission is over').not.toBeNull()
+  expect(ending!.won).toBe(true)
+  expect(ending!.watching, 'the camera is on a pig that is still standing').toBe(
+    cleared.game.currentPig.id
+  )
+  expect(
+    cleared.heard.some((event) => event.kind === 'missionOver'),
+    'and it announced itself, which is what the sergeant speaks off'
+  ).toBe(true)
+
+  // **A key is worth nothing for the first three seconds** (`cmp eax,12Ch`,
+  // 0x490FB4) — the finger that broke the last dummy must not skip the ending it
+  // earned.
+  cleared.engine.battle.leaveMission()
+  cleared.engine.update(FRAME)
+  expect(cleared.heard.some((event) => event.kind === 'missionEnded')).toBe(false)
+
+  for (let frame = 0; frame < 15 * 3; frame++) cleared.engine.update(FRAME)
+  cleared.engine.battle.leaveMission()
+  cleared.engine.update(FRAME)
+  expect(
+    cleared.heard.some((event) => event.kind === 'missionEnded'),
+    'past three seconds, any key puts the battle away'
+  ).toBe(true)
 })
 
 test('it steps: the drop lands, the clock runs, and the pig walks where it is told', async () => {

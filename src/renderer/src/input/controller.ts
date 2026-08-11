@@ -198,6 +198,13 @@ export interface DebugHooks {
    * many pigs it is still waiting to see out of the water. Null while a turn is
    * being played (lib/game/walkAway.ts). */
   walkAway(): { swimming: number } | null
+  /** The MISSION being over — the exe's mode 2, END OF GAME: whether it was won,
+   * which pig the camera's tour is on and how long the beat has run. Null while
+   * there is a game to play (lib/game/endOfGame.ts). */
+  ending(): { won: boolean; watching: number; elapsed: number } | null
+  /** How many of the map's mission targets are still standing: every dummy the
+   * map carries, whether its script has placed it yet or not. */
+  targetsLeft(): number
   /** The acting pig's pose from both ends of the chain — the engine's sampler
    * and the bone the mesh wears — for telling a frozen clip from a renderer that
    * is not applying one (three/battle.ts). */

@@ -3026,6 +3026,59 @@ the briefing bar only ever carries the key press. `e2e/002/tutorial.spec.ts`
 drives the first three steps on the real map and reads the clips back in order:
 3 collected, 5 chosen, 6 placed.
 
+### …AND THE LAST DUMMY ENDS IT — the exe's mode 2, 2026-08-11
+
+Play: "убить последний манекен — не заканчивает миссию… очевидно что заканчивает
+миссию." Nothing here ended a level at all: `game.over` is "nobody is left" over
+the SQUADS, and the training ground fields one pig and no enemy.
+
+**Nothing watches for a win frame by frame.** `Game::NextTurn` (0x48F490) asks
+ONE function — 0x4966A0 — before it advances anybody, so a mission ends at the
+HANDOVER and never before. That timing is kept and it is worth keeping: the dummy
+comes apart, its crate lands, the beat at the end of the turn runs, and only then
+does anyone notice there is nothing left to break. `handOver` in
+`lib/game/battle.ts` is the one place, and `cutTurnBeat` goes through it too so a
+spec cannot skip an ending along with a beat.
+
+**What the training branch counts is the DUMMIES**, and the field it counts them
+by is not the one it looks like: it walks the object list for a breakable (body
+type 0x135A) whose `[obj+0x84]` is `0x43..0x47` or `0x4B`, and that field is the
+object name table's index **minus 0x1C** (`lea eax,[edi-1Ch]`, written at
+0x48D076). So the six kinds are TARGET, TARGET2..5 and DUMMY — and NOT
+`T_SUP`/`T_SUP2`/`T_SUP3` at 0x48..0x4A, the stands they are mounted on, though
+all nine share the one-point health row. CAMP carries eleven DUMMY records and
+none of the TARGET family. The test never looks at `[obj+0x30]`, so the eight
+records the script holds back count as standing from load — which is the only
+reason a mission cannot end on its first frame. **A training level cannot be
+LOST**: that branch has no losing answer in it, which agrees with the training
+ground flooring a pig at one point. Everything else goes by SIDES.
+
+**The ending is a mode of its own, 2 END OF GAME** (`lib/game/endOfGame.ts`,
+`turns/notes.md`): the clock stops, nothing is driven — it is a control set above
+every other (`ending` in `lib/game/controls.ts`) — the camera walks the survivors
+**one every two seconds**, and past **three seconds** any key, or twenty on its
+own, puts the battle away. The exe goes to mode 18 QUIT; here the engine emits
+`missionEnded` and `ui/battle.ts` does exactly what its LEAVE button does — on a
+microtask, because the event arrives from inside `engine.update` and the rest of
+that frame still draws the scene it would dispose.
+
+The sergeant signs off with clip **27** if it took more than twelve turns and
+**28** otherwise (`[gameMode+0x40C]`, the handover count, against `cmp eax,0Ch`).
+Which of the two is the congratulation is LOCATED and not heard — both lines are
+blank, voice only.
+
+**Two of the four "closers" are nothing of the kind**, and this file had them
+filed wrong: clip **21** is the first MINE going off on the training ground —
+its call site is the PROJECTILE constructor, gated on ammo rows 0x28/0x29, the
+two `WE_APMIN` — and clip **26** is a turn whose clock ran out with **no weapon
+used**, `[gameMode+0x334]` being incremented by the fire dispatcher and zeroed at
+the top of each turn. Neither is built and both are one line each now.
+
+`e2e/000/engine-headless.spec.ts` drives the whole seam in plain Node on a CAMP
+built with its DUMMY records left off — reaching the condition honestly is the
+entire tutorial — and `e2e/002/endOfGame.spec.ts` pins the data: which records
+the mission is measured by, and which line signs off.
+
 ### THE DOOR, THE STEP AND THE SLOT — play's three, 2026-08-11
 
 **The clip CARRIES the pig.** Read in full in `objects/notes.md`, summarised at
@@ -3197,10 +3250,11 @@ animation steps' repeat count and signed playback rate (`weapons/fire.md`).
    it reaches stages D and E of `0x48c410`, which this repo has never decoded and
    which "What is still not read" below already names. `Charge` would have to
    carry the id the way the mine's already does.
-8. **Killing the last dummy does not end the mission.** Nothing in the remake ends
-   a training level at all — `game.over` is "nobody is left" over the SQUADS, and
-   CAMP fields one pig and no enemy. What the original does with a training ground
-   that has run out of things to break is not read.
+8. ~~**Killing the last dummy does not end the mission.**~~ **Done, and read
+   rather than invented** — see "…AND THE LAST DUMMY ENDS IT" above. It is asked
+   at the HANDOVER, the count is the DUMMY records alone (their stands do not
+   count), and the ending is the exe's own mode 2 with its tour, its three-second
+   hold and its twenty-second bail.
 
 ### What is still not read
 

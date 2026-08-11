@@ -25,6 +25,7 @@ import {
   CLIP_FOR,
   MENU_ARMED,
   clipForChosen,
+  clipForClosing,
   clipForPickup,
   clipForPlacement,
   isTrainingGround,
@@ -297,7 +298,8 @@ export function initBattle(onLeave: () => void): BattleView {
   })
   controller.bindKeyboard(isBattleUp)
 
-  byId<HTMLButtonElement>('battle-leave').addEventListener('click', () => {
+  /** Put the battle away: the LEAVE button, and the end of a mission. */
+  const leave = (): void => {
     controller.releaseAll()
     scene?.dispose()
     scene = null
@@ -308,7 +310,9 @@ export function initBattle(onLeave: () => void): BattleView {
     speech.stop()
     hud.clear()
     onLeave()
-  })
+  }
+
+  byId<HTMLButtonElement>('battle-leave').addEventListener('click', leave)
 
   /** (Re)start the battle on `name` — fresh spawns, fresh turn order. A load
    * failure leaves whatever battle was running untouched. */
@@ -421,7 +425,22 @@ export function initBattle(onLeave: () => void): BattleView {
           if (step < MENU_ARMED) return
           step += 1
           sergeant(clipForChosen(skill, step, speech.saying() === 0))
-        }
+        },
+        // **THE LAST DUMMY IS DOWN.** The sergeant signs off — one of two lines,
+        // by how many turns it took (lib/game/tutorial.ts) — over the beat the
+        // engine holds the battle in.
+        missionOver: ({ won, turns }) => {
+          if (won) sergeant(clipForClosing(turns))
+        },
+        // …and that beat has run out: the battle goes away, exactly as the LEAVE
+        // button puts it away (lib/game/endOfGame.ts).
+        //
+        // NOT on the spot, though. This arrives from inside `engine.update`,
+        // which is called from the middle of the scene's own frame — and the
+        // rest of that frame still draws the thing `leave` would have disposed.
+        // A microtask runs as soon as the frame's stack is empty and before the
+        // next one, which is exactly late enough.
+        missionEnded: () => queueMicrotask(leave)
       })
     )
     scene = buildBattle({

@@ -20,6 +20,7 @@ import type { TerrainArt } from './watermask'
 import { isTrainingGround } from './tutorial'
 import { targetsOf } from './targets'
 import type { Target } from './targets'
+import { missionTargetIds } from './endOfGame'
 import { createScenery } from './scenery'
 import type { Scenery } from './scenery'
 import { createAirDrops } from './airDrop'
@@ -198,6 +199,10 @@ export interface Engine {
    * is drawing (lib/game/bonePose.ts). */
   readonly pose: BonePose
   readonly targets: Target[]
+  /** How many of the map's MISSION targets are still standing — the dummies and
+   * the shooting targets alone, and every one the map carries whether the script
+   * has placed it or not (lib/game/endOfGame.ts). */
+  targetsLeft(): number
   readonly shots: Bullets
   readonly grenades: Lobs
   /** The minefields, and what has been trodden on (lib/game/mines.ts). */
@@ -315,6 +320,19 @@ export function createEngine(parts: EngineParts): Engine {
    * its script step run twice.
    */
   const targets = targetsOf(objects)
+  /**
+   * …and which of them the MISSION is measured by — the dummies and the
+   * shooting targets, not the trees and not the house (lib/game/endOfGame.ts).
+   *
+   * Taken off the map ONCE, every record it carries, including the ones its
+   * script is still holding back: the exe's own test never looks at the placed
+   * flag, which is the only reason a mission cannot end on its first frame.
+   * What is left is whichever of them are still in the shared target list, which
+   * the blade and the barrel splice as they go.
+   */
+  const missionIds = missionTargetIds(objects)
+  const targetsLeft = (): number =>
+    targets.reduce((left, one) => left + (missionIds.has(one.id) ? 1 : 0), 0)
   /** A dummy the script has not placed yet is not a target: the exe's own
    * strike tests `[obj+0x30]`, the placed flag, before it will hit one
    * (0x476319). */
@@ -382,6 +400,9 @@ export function createEngine(parts: EngineParts): Engine {
     airDrops,
     dropIn,
     drowning,
+    training,
+    /** What ENDS the mission (lib/game/endOfGame.ts). */
+    targetsLeft,
     onChanged,
     bus,
     random
@@ -489,6 +510,9 @@ export function createEngine(parts: EngineParts): Engine {
         driving: view.driving,
         firing: view.firing,
         aftermath: view.aftermath,
+        // A copy, like everything else here: the ending is a live object in the
+        // battle and a snapshot is data (lib/game/endOfGame.ts).
+        ending: view.ending === null ? null : { ...view.ending },
         swinging: swings.running(),
         dropping: dropIn.running(),
         bullets: shots.live().map(flightOf),
@@ -505,6 +529,7 @@ export function createEngine(parts: EngineParts): Engine {
     anim,
     pose: bones,
     targets,
+    targetsLeft,
     shots,
     grenades,
     mines,

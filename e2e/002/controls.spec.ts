@@ -17,6 +17,7 @@ const still: Held = { walk: 0, turn: 0, aim: 0, sighting: false, firing: false, 
 const driving = (over: Partial<Held> = {}): Held => ({ ...still, walk: 1, turn: 1, ...over })
 
 const at = (over: Partial<Situation> = {}): Situation => ({
+  ending: false,
   starting: false,
   inventory: false,
   locked: false,
@@ -41,6 +42,23 @@ test('the modes fall in priority order', () => {
   expect(modeOf(at({ inventory: true, locked: true, charging: true }))).toBe('inventory')
   // …and the beat at the top of a turn beats the lot.
   expect(modeOf(at({ starting: true, inventory: true, locked: true }))).toBe('starting')
+  // …except the MISSION being over, which outlives everything: whatever the pig
+  // was in the middle of, it is not doing it any more (lib/game/endOfGame.ts).
+  expect(modeOf(at({ ending: true }))).toBe('ending')
+  expect(modeOf(at({ ending: true, starting: true, inventory: true }))).toBe('ending')
+})
+
+test('the ENDING drives nothing, and any key puts the battle away', () => {
+  expect(readControls('ending', driving({ aim: 1, firing: true }))).toMatchObject({
+    walk: 0,
+    turn: 0,
+    aim: 0,
+    firing: false
+  })
+  // Any key at all, which is what the exe's own way out of mode 2 is — and the
+  // engine is what refuses one that comes too early (`HOLD_SECONDS`).
+  for (const action of HELD_ACTIONS) expect(verbOf('ending', action)).toBe('leaveMission')
+  expect(verbOf('ending', 'jump')).toBe('leaveMission')
 })
 
 test('in the BATTLE all three axes drive', () => {

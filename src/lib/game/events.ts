@@ -99,6 +99,14 @@ export type BattleEvent =
   | { kind: 'cameraReset' }
   /** SKIP TURN was used. */
   | { kind: 'skillUsed' }
+  /**
+   * THE MISSION IS OVER — asked at the handover and nowhere else, which is where
+   * the exe asks it (lib/game/endOfGame.ts). `turns` is how many were played, and
+   * the training ground's sergeant picks his closing line by it.
+   */
+  | { kind: 'missionOver'; won: boolean; turns: number }
+  /** …and the beat that showed it has run out: put the battle away. */
+  | { kind: 'missionEnded' }
   /** The pig's inventory came open — R, and it drives in from the right. */
   | { kind: 'menuOpened' }
   /** …and something came OUT of it, into the pig's hands. The training

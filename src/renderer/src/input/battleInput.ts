@@ -90,6 +90,7 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
   let wasMode: ControlMode | null = null
 
   const blank = {
+    ending: false,
     starting: false,
     locked: false,
     charging: false,
@@ -147,6 +148,11 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
       host.battle()?.beginTurn()
       mode = ask()
     }
+    // The ending takes any key too — and unlike the beat above it does NOT
+    // re-ask: there is no set behind it to read the press in, and the engine is
+    // the one that decides whether it was early enough to ignore
+    // (lib/game/endOfGame.ts).
+    if (mode === 'ending' && woke) host.battle()?.leaveMission()
     if (mode !== wasMode) {
       // Two changes CARRY the keys instead of dropping them, and each cost a
       // failing spec on the way in:
@@ -235,6 +241,10 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
         // The scene owns the drop and reads the same jump request — passing it
         // on is all this has to do.
         host.battle()?.jump()
+        return
+      case 'leaveMission':
+        // Same shape as `beginTurn` below: `liveMode` has already offered the
+        // press, because a queued verb is exactly what `wakes` counts.
         return
       case 'beginTurn':
         // Unreachable: `liveMode` has already resolved the beat away, because a

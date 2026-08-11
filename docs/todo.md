@@ -12,25 +12,49 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 ## A. THE TUTORIAL — finish the training ground
 
 The script MOVES now: a crate collected speaks, a crate PLACED speaks, and the
-menu counts (CLAUDE.md, "THE TRAINING SCRIPT MOVES"). What is left is the end of
-it and one line.
+menu counts (CLAUDE.md, "THE TRAINING SCRIPT MOVES"). The END of it is built too
+(A1, done). What is left is one line and the camera.
 
-### A1. Killing the last dummy must END the mission
+### A1. Killing the last dummy must END the mission — DONE 2026-08-11
 
 Play: "убить последний манекен — не заканчивает миссию… очевидно что заканчивает
-миссию." Nothing in the remake ends a training level at all: `game.over` is
-"nobody is left" over the SQUADS, and CAMP fields one pig and no enemy.
+миссию." Read end to end and built; `lib/game/endOfGame.ts` is the rule and
+`tutorial/notes.md` + `turns/notes.md` the derivation.
 
-**What is known.** The tutorial's last four clips are the closers and their call
-sites are already located (`tutorial/notes.md`): `0x48FAC7` clip **28** and
-`0x48FAF4` clip **27**, both inside `0x48F490`; `0x4900F4` clip **26** in
-`0x48FCA0`; `0x497F72` clip **21** in `0x497F20`. Clips 26, 27 and 28 are all
-blank lines — voice only — which is what an ending sounds like.
+**Nothing watches for a win frame by frame.** `Game::NextTurn` (0x48F490) asks
+0x4966A0 for the state of the game before it advances anybody, so a mission ends
+at the HANDOVER and never before — the dummy comes apart, its crate lands, the
+beat at the end of the turn runs, and only then does anyone notice there is
+nothing left to break. That timing is kept.
 
-**Next move.** Read `0x48F490` and `0x48FCA0` and find what state they are
-testing; those two functions also carry the `[gameMode+0x329]` training flag and
-`[+0x32C]`, so they are the right neighbourhood. Then wire an ending: what it
-shows, what it does to the turn, and how the player leaves.
+**What the training branch counts**: the object list, for a breakable (body type
+0x135A) whose `[obj+0x84]` is `0x43..0x47` or `0x4B`. That field is the name
+table's index **minus 0x1C** (written at 0x48D076), so the six kinds are TARGET,
+TARGET2..5 and **DUMMY** — and pointedly not `T_SUP`/`T_SUP2`/`T_SUP3`, the
+stands they are mounted on, though all nine share the one-point health row. CAMP
+carries eleven DUMMY records and none of the TARGET family. The test never looks
+at the placed flag, so the eight the script holds back count as standing from
+load. A training level cannot be LOST, either — the branch has no such answer.
+
+**The ending itself is mode 2, END OF GAME**: the clock stops, nothing is driven,
+the camera walks the survivors one every two seconds (`0x490EFF` stamps `+0x4BC`
+forward by exactly 0xC8), and past **three seconds** any key — or **twenty** on
+its own — puts the battle away (mode 18, QUIT). The sergeant signs off with clip
+**27** if it took more than twelve turns and **28** otherwise (`[+0x40C]`, the
+handover count).
+
+**Two of the four "closers" turned out to be nothing of the kind**, and the
+todo's own premise was wrong about them: clip **21** is the first MINE going off
+on the training ground (the projectile constructor, ammo rows 0x28/0x29), and
+clip **26** is a turn whose clock ran out with **no weapon used** — `[+0x334]` is
+incremented by the fire dispatcher and zeroed at the top of each turn. Neither is
+built; both are one line each now that they are read.
+
+**What is NOT pinned**: the honest eleven-dummy path. `e2e/000/engine-headless.spec.ts`
+drives the whole seam — handover, ending, the three-second hold, the battle being
+put away — on a CAMP built with its DUMMY records left off, because reaching the
+condition legitimately is the entire tutorial. `e2e/002/endOfGame.spec.ts` pins
+the data around it.
 
 ### A2. Clip 4 — the one line of the script that is not built
 

@@ -24,6 +24,7 @@
 
 import type { Firing } from './shot'
 import type { Aftermath } from './aftermath'
+import type { EndOfGame } from './endOfGame'
 import type { LocomotionState } from './locomotion'
 import type { Effect } from './effects'
 import type { FloatingDamage } from './damage'
@@ -107,6 +108,9 @@ export interface BattleSnapshot {
   driving: boolean
   firing: Firing | null
   aftermath: Aftermath | null
+  /** The mission being OVER, and which pig its camera is on — the exe's mode 2
+   * (lib/game/endOfGame.ts). Null while there is a game to play. */
+  ending: EndOfGame | null
   /** Whether a hand-to-hand swing is running — the camera goes side-on for it. */
   swinging: boolean
   /** Whether the level's opening drop is still going: nothing else runs while

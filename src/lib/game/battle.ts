@@ -26,6 +26,8 @@ import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
 import { beginWalkAway } from './walkAway'
 import type { WalkAway } from './walkAway'
+import { advanceEndOfGame, beginEndOfGame, outcomeOf } from './endOfGame'
+import type { EndOfGame } from './endOfGame'
 import { endsTurn, hurryFor } from './spend'
 import { createSights } from './sights'
 import { createAttack } from './attack'
@@ -81,6 +83,12 @@ export interface BattleParts {
   /** What being in the water costs, for every pig on the map
    * (lib/game/drowning.ts). */
   drowning: Drowning
+  /** Whether this is the TRAINING ground, whose mission ends on its own
+   * condition rather than on the squads (lib/game/endOfGame.ts). */
+  training: boolean
+  /** …and that condition: how many of the map's mission targets are still
+   * standing. Every dummy the map carries, placed or not. */
+  targetsLeft: () => number
   /** Called whenever the state changed this frame (a HUD refresh). */
   onChanged: () => void
   /** The stream everything the battle does is announced on, and the one it
@@ -118,6 +126,9 @@ export interface BattleView {
    * see out of the water (lib/game/walkAway.ts). Null when a turn is being
    * played. */
   walkAway: { swimming: number } | null
+  /** The MISSION being over, and which pig the tour is on — the exe's mode 2
+   * (lib/game/endOfGame.ts). Null for as long as there is a game to play. */
+  ending: EndOfGame | null
   /** The building the acting pig is standing in, or null. A pig inside one is
    * NOT DRAWN — the exe's own rule (lib/game/indoors.ts). */
   inside: Building | null
@@ -161,6 +172,7 @@ export interface Battle {
   /** The three states the CONTROL SET turns on that only the battle knows
    * (lib/game/controls.ts). */
   situation(): {
+    ending: boolean
     starting: boolean
     locked: boolean
     charging: boolean
@@ -178,6 +190,14 @@ export interface Battle {
    * (lib/game/walkAway.ts). Nothing when no beat is running.
    */
   cutTurnBeat(): void
+  /**
+   * Any key, once the mission is over: put the battle away.
+   *
+   * The engine decides whether it counts — nothing does for the first three
+   * seconds of the ending (lib/game/endOfGame.ts) — so this only ever OFFERS the
+   * press, exactly as `beginTurn` offers one to the beat at the top of a turn.
+   */
+  leaveMission(): void
   /**
    * Say something on the battle's own bus.
    *
@@ -238,6 +258,15 @@ export function createBattle(parts: BattleParts): Battle {
   /** …and the beat at the END of a turn: the exe's mode 13, WALK AWAY. Nobody
    * is driving and anyone in the water is swimming out (lib/game/walkAway.ts). */
   let walkAway: WalkAway | null = null
+  /** …and the one past that: the MISSION being over, the exe's mode 2
+   * (lib/game/endOfGame.ts). Once this is set nothing ever clears it — a battle
+   * that has ended has ended, and what happens next is whoever is presenting it
+   * putting it away. */
+  let ending: EndOfGame | null = null
+  /** Whether the ending has already asked to be put away, so it asks once. */
+  let ended = false
+  /** A key pressed during the ending, latched for the step the way the jump is. */
+  let leaveRequested = false
   /** A script step owed to something that has broken, and not run until it has
    * finished breaking. One animation at a time. */
   let pending: { id: number; y: number } | null = null
@@ -409,6 +438,46 @@ export function createBattle(parts: BattleParts): Battle {
     attack.swallow()
   }
 
+  /**
+   * Who the ending's camera may look at: alive, and not shut inside a building —
+   * the exe skips exactly those two (`[pig+0x2EC]` of 1 or 8, 0x490F46), and a
+   * pig in a shelter is not drawn at all (lib/game/indoors.ts).
+   */
+  const watchable = (): number[] =>
+    everyone()
+      .filter((pig) => !isDead(pig) && !indoors.inside(pig))
+      .map((pig) => pig.id)
+
+  /**
+   * **THE HANDOVER, and the one place a mission can END.**
+   *
+   * `Game::NextTurn` (0x48F490) asks 0x4966A0 for the state of the game before it
+   * advances anybody, and on anything but "carry on" it goes to mode 2 instead of
+   * to the next pig (lib/game/endOfGame.ts). Play: "убить последний манекен — не
+   * заканчивает миссию… очевидно что заканчивает миссию."
+   *
+   * Asking it HERE rather than the moment the last dummy falls is the original's
+   * own timing and it is what gives the blow room: the dummy comes apart, its
+   * crate lands, the beat at the end of the turn runs, and only then does anyone
+   * notice there is nothing left to knock down.
+   */
+  const handOver = (): void => {
+    const standing = game.players.filter((player) =>
+      player.pigs.some((pig) => !isDead(pig))
+    ).length
+    const outcome = outcomeOf(parts.training, standing, parts.targetsLeft())
+    if (outcome !== 'playing') {
+      // The turn that has just been played is the count the closer is picked by —
+      // the exe's `[gameMode+0x40C]`, which its own `NextPlayer` has just
+      // incremented (lib/game/tutorial.ts).
+      ending = beginEndOfGame(outcome === 'won', watchable())
+      emit({ kind: 'missionOver', won: outcome === 'won', turns: game.turn })
+      return
+    }
+    game.endTurn()
+    focus(game.currentPig)
+  }
+
   // The battle LISTENS to its own weapons for the two things that stop a turn.
   // A blow does not decide that a turn ends; the OBJECT breaking does, which is
   // where the exe hangs it too (0x48d750), and every weapon simply announces.
@@ -493,8 +562,30 @@ export function createBattle(parts: BattleParts): Battle {
       return
     }
 
+    // **THE MISSION IS OVER**, and this beat is the last thing the battle does:
+    // the exe's mode 2, END OF GAME (lib/game/endOfGame.ts). The clock does not
+    // run, nothing is driven, and the camera walks the survivors one every two
+    // seconds until a key — or twenty — puts the battle away.
+    if (ending) {
+      jumpRequested = false
+      doorRequested = false
+      attack.swallow()
+      const leave = leaveRequested
+      leaveRequested = false
+      // Everything still running runs on: the engine steps it after this call,
+      // which is what lets the last crate finish coming down behind the tour.
+      if (advanceEndOfGame(ending, delta, watchable(), leave) && !ended) {
+        ended = true
+        emit({ kind: 'missionEnded' })
+      }
+      onChanged()
+      return
+    }
+
     // Nobody left standing: the battle stops where it is rather than handing
-    // a turn to a squad that cannot take one (lib/game/game.ts).
+    // a turn to a squad that cannot take one (lib/game/game.ts). The ending
+    // above is what a battle normally reaches instead; this is what is left if
+    // a squad is emptied some way that never hands a turn over.
     if (game.over) {
       onChanged()
       return
@@ -556,8 +647,7 @@ export function createBattle(parts: BattleParts): Battle {
       loco.swimming = inWater(query, loco.x, loco.z, loco.y)
       if (done) {
         walkAway = null
-        game.endTurn()
-        focus(game.currentPig)
+        handOver()
       }
       onChanged()
       return
@@ -1039,6 +1129,7 @@ export function createBattle(parts: BattleParts): Battle {
       firing: attack.firing(),
       aftermath,
       walkAway: walkAway === null ? null : { swimming: walkAway.swimming() },
+      ending,
       inside: indoors.inside(game.currentPig),
       doorway: indoors.reachable(game.currentPig)
     }),
@@ -1074,6 +1165,8 @@ export function createBattle(parts: BattleParts): Battle {
     charging: () => attack.gauge(game.currentPig.holding),
     aim: () => (weaponOf(holding).aims ? sights.angle() : null),
     situation: () => ({
+      // Over everything: a mission that has ended has ended.
+      ending: ending !== null,
       starting: game.starting,
       // A gauge filling is its OWN control set rather than a hole in the lock,
       // which is what it was for a commit and what play corrected.
@@ -1092,8 +1185,12 @@ export function createBattle(parts: BattleParts): Battle {
     cutTurnBeat() {
       if (walkAway === null) return
       walkAway = null
-      game.endTurn()
-      focus(game.currentPig)
+      // The same handover the beat's own end runs, mission check and all: a spec
+      // that skips the beat must not skip the ending with it.
+      handOver()
+    },
+    leaveMission() {
+      leaveRequested = true
     },
     announce: emit,
     fling(pig, speed, bearing) {

@@ -26,6 +26,7 @@ import { isGun } from './projectile'
  * actions, so it never reaches this file.
  */
 export type ControlMode =
+  | 'ending'
   | 'starting'
   | 'battle'
   | 'sights'
@@ -82,6 +83,13 @@ export interface Intent {
 
 /** What the game is doing, in the only terms this decision needs. */
 export interface Situation {
+  /**
+   * The mission is OVER and the beat that shows it is running — the exe's mode
+   * 2, END OF GAME (lib/game/endOfGame.ts). Its rule is the same shape as the
+   * beat at the top of a turn: nothing drives anything, and any key at all ends
+   * it — except that the key does nothing for the first three seconds.
+   */
+  ending: boolean
   /** The beat at the top of a turn — "START OF TURN, press any key". */
   starting: boolean
   /** The skill menu is up. */
@@ -172,6 +180,9 @@ export function weaponLayer(skill: number | null): WeaponLayer {
  * With both named, `locked` becomes what its name says: nothing gets through.
  */
 export function modeOf(situation: Situation): ControlMode {
+  // Above everything, because it outlives everything: a mission that is over is
+  // over whatever the pig was in the middle of when the turn ended.
+  if (situation.ending) return 'ending'
   if (situation.starting) return 'starting'
   if (situation.inventory) return 'inventory'
   if (situation.charging) return 'charging'
@@ -256,7 +267,9 @@ export function readControls(mode: ControlMode, held: Held): Intent {
   if (mode === 'charging' || mode === 'armed') {
     return { ...STILL, firing: held.firing, fired: held.fired }
   }
-  if (mode === 'locked' || mode === 'starting') return { ...STILL }
+  // …and `ending` beside them for the same reason `starting` is there: any input
+  // resolves the beat and the axes are never asked for in it.
+  if (mode === 'locked' || mode === 'starting' || mode === 'ending') return { ...STILL }
   if (mode === 'sights') {
     return {
       walk: 0,
@@ -287,6 +300,7 @@ export function readControls(mode: ControlMode, held: Held): Intent {
  * the turn key, a locked pig cannot open its inventory.
  */
 export type Verb =
+  | 'leaveMission'
   | 'jump'
   | 'choose'
   | 'cutChute'
@@ -297,6 +311,10 @@ export type Verb =
   | 'enterBuilding'
 
 export function verbOf(mode: ControlMode, action: string): Verb | null {
+  // The mission is over: ANY key puts the battle away, and there is nothing else
+  // left to do. The engine still decides whether it is early enough to ignore
+  // (lib/game/endOfGame.ts, `HOLD_SECONDS`).
+  if (mode === 'ending') return 'leaveMission'
   // The beat at the top of a turn: ANY key starts it, whatever the key is. The
   // caller then re-reads the same input in the set that follows, so nothing a
   // player does is swallowed.

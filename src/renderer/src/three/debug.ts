@@ -118,6 +118,14 @@ export interface DebugParts {
   /** The beat at the END of a turn, and how many pigs are still in the water
    * (lib/game/walkAway.ts). Null while a turn is being played. */
   walkAway: () => { swimming: number } | null
+  /** The MISSION being over: whether it was won, which pig the tour is on and
+   * how long it has been running (lib/game/endOfGame.ts). Null while there is a
+   * game to play — and the only thing on this surface that says the training
+   * ground ever finishes, since the ending is a camera and a voice. */
+  ending: () => { won: boolean; watching: number; elapsed: number } | null
+  /** How many of the map's mission targets are still standing — every dummy it
+   * carries, placed or not. What the ending is measured by. */
+  targetsLeft: () => number
   /** The acting pig's pose from both ends: the engine's sampler and the bone the
    * mesh is wearing (three/battle.ts). */
   pose: () => {
@@ -233,6 +241,10 @@ export function exposeBattleDebug(parts: DebugParts): void {
        * can drive, the clock is stopped and `swimming` is how many pigs are
        * still making for the shore (lib/game/walkAway.ts). */
       walkAway: () => parts.walkAway(),
+      /** The mission being over — the exe's mode 2, END OF GAME. Nothing else a
+       * spec can look at says the training ground finished (lib/game/endOfGame.ts). */
+      ending: () => parts.ending(),
+      targetsLeft: () => parts.targetsLeft(),
       /** Whether the pig's own body is MOVING, and which half of the chain is
        * responsible when it is not: `foot` is the ankle relative to the hip out
        * of the engine's sampler, `drawn` the quaternion that bone wears on the

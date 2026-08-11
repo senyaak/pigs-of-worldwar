@@ -53,6 +53,26 @@ export function lineFor(strings: string[], clip: number): string {
   return strings[LINE_BASE + clip] ?? ''
 }
 
+// ——— the END of it, which is two clips and a count ———
+//
+// `Game::NextTurn` speaks one of them on the winning answer (0x48FA81, and the
+// whole read is in `tutorial/notes.md`): the training flag is up, so the sergeant
+// signs off rather than the ordinary victory line playing. Which of the two is
+// `[gameMode+0x40C]`, the running count of handovers that `Game::NextPlayer`
+// (0x4965D0) increments — more than TWELVE takes clip 27, twelve or fewer clip 28.
+//
+// Both lines are blank, like every other closer: voice only, and the bar has
+// nothing to open for. Which of the two is the congratulation has been LOCATED
+// and not heard — correct it against play rather than against this comment.
+
+/** Turns at or under which the mission counts as briskly done (`cmp eax,0Ch`). */
+export const BRISK_TURNS = 12
+
+/** What the sergeant says when the last dummy is down — the mission's own end. */
+export function clipForClosing(turns: number): number {
+  return turns > BRISK_TURNS ? 27 : 28
+}
+
 /** The moments the remake can currently tell the script about. */
 export type Cue = 'drop' | 'round'
 

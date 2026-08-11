@@ -521,7 +521,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       host.camera.fov = magnified
       host.camera.updateProjectionMatrix()
     }
-    watch(active, delta)
+    // **THE MISSION IS OVER**, and the camera is no longer the acting pig's: the
+    // exe's END OF GAME walks the survivors, one every two seconds, and hands
+    // each to the camera as its subject (lib/game/endOfGame.ts). Which pig is the
+    // engine's to say; all this does is point the ordinary chase at it.
+    watch((now.ending ? squad.of(now.ending.watching) : null) ?? active, delta)
   }
 
 
@@ -672,6 +676,13 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       }
     },
     walkAway: () => battle.view().walkAway,
+    ending: () => {
+      const ending = battle.view().ending
+      return ending === null
+        ? null
+        : { won: ending.won, watching: ending.watching, elapsed: ending.elapsed }
+    },
+    targetsLeft: () => engine.targetsLeft(),
     cutTurnBeat: () => battle.cutTurnBeat(),
     warp: (x, z, heading) => {
       battle.warp(x, z, heading)
