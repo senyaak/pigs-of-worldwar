@@ -183,12 +183,13 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       // in-plane speed (0x4A9260 at an angle of 0x400 — a quarter turn, straight
       // up), which is a stone off a pond, and the fifth is paid for out of the
       // travel so the hops run down (lib/game/grenade.ts).
-      // A ROCKET never skims. The exe would let it: the douse arm wants an
-      // arrival under 150 or one of the bullet kinds (0x0C..0x17), and kind 10 is
-      // neither — so a fast one would take 0x437e5d, be kicked up, and carry on.
-      // Play's word is flat against that — "важно в воде не взрывается, а тонет"
-      // — and play's word is what stands where the two disagree.
-      if (!row.contact && skipsOnWater(shot)) {
+      // **A ROCKET SKIPS LIKE ANYTHING ELSE.** A first pass read play's "важно в
+      // воде не взрывается, а тонет" as "a rocket never skims" and made it a
+      // divergence; play corrected it on sight — "ракеты скачат! как и гранаты! я
+      // про потонуть когда нельзя скакать!" The rule was the exe's all along and
+      // there is no special case: fast along the surface it skips, and when it
+      // cannot skip it goes DOWN without going off.
+      if (skipsOnWater(shot)) {
         bounceLob(
           shot,
           level,

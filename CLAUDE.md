@@ -3091,13 +3091,28 @@ the split a fired rocket flew as a second launcher. `lib/game/ammo.ts` is the
 table, and `three/grenades.ts` falls back to the map's archive for any name
 `Chars/WEAPONS.MAD` has never heard of.
 
+**Two corrections play made on sight, and both are worth keeping.**
+
+*The rocket SKIPS.* A first pass read "важно в воде не взрывается, а тонет" as a
+divergence — a rocket never skims — and play was flat: "ракеты скачат! как и
+гранаты! я про потонуть когда нельзя скакать!" There is no special case. The
+exe's own rule was right: fast along the surface it skips, and what cannot skip
+goes down without going off.
+
+*The red indicator is not the power gauge.* It is the **LENS in the weapon
+port** — `pcpie4`, the only pie in the whole install, one 32×32 red disc
+(palette index 2, rgb 205,0,0) in a brass ring. Play sent a picture of the
+original's and the words for it: an ordinary weapon shows a HALF-filled circle,
+and the bazooka's is "полностью закрашен — как оружие которое детонирует при
+контакте". So how full it is is the weapon's CLASS, not its charge, and
+`ui/battle.ts` drives it off `Lob.contact`. One image means the fraction cannot
+be frames, so it is clipped; the direction, the half, and where it sits are all
+eyework and all live in `LAYOUT.dial.slot.lens` for the console. **Nothing in
+the exe has been traced to `pcpie4` at all** — the sprite is entry 25 of
+`dashtims.mad` and its drawer has not been found.
+
 Left open: the record's `+0x28`/`+0x2C`, which are 1 on the grenade and TNT and 0
-on the rifle and the bazooka, readers unchased. And play's "индикатор красный на
-панели силы полностью закрашен" — the trough's red is painted into `newpow3..7`
-themselves (palette index 4, rgb 205,0,0) and the remake draws all five tiles
-whole, so the red bar is already fully there; nothing in the exe has been found
-that fills or clears it per weapon, and screenshots went back to play rather than
-a guess at pixels.
+on the rifle and the bazooka, readers unchased.
 
 ### What is still not read
 

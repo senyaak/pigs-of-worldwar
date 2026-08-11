@@ -165,7 +165,35 @@ test('it goes off the moment it touches the ground — no bounce, no wait', () =
   expect(heard.filter((one) => one.kind === 'fired')).toHaveLength(1)
 })
 
-test('…but WATER takes it whole: it sinks, and nothing goes off', () => {
+test('…and a rocket SKIPS off water exactly as a grenade does', () => {
+  // Play, correcting a divergence this file used to carry: "ракеты скачат! как и
+  // гранаты! я про потонуть когда нельзя скакать!" There is no special case for
+  // a contact weapon on water — the same in-plane speed that skips a grenade
+  // skips a rocket, and only what cannot skip goes down.
+  const query = campQuery()
+  let wet: { x: number; z: number } | null = null
+  for (let x = -12000; x < 12000 && !wet; x += 256) {
+    for (let z = -12000; z < 12000 && !wet; z += 256) {
+      if (query.isWater(x, z)) wet = { x, z }
+    }
+  }
+  expect(wet, 'CAMP has water on it').not.toBeNull()
+  // Flat and fast, a hair over the surface: a stone off a pond.
+  const { heard, lobs } = fireAt(
+    { x: wet!.x, y: query.surface(wet!.x, wet!.z) - 40, z: wet!.z },
+    0,
+    4095
+  )
+  for (let step = 0; step < 120; step++) lobs.update(1 / 60)
+  const skimmed = heard.findIndex((one) => one.kind === 'skimmed')
+  expect(skimmed, 'it went straight in instead of skipping').toBeGreaterThanOrEqual(0)
+  // …and the skip itself did not set it off. What it does afterwards is ordinary
+  // — a rocket that comes down on LAND goes off there, contact being contact.
+  const burst = heard.findIndex((one) => one.kind === 'blasted')
+  expect(burst === -1 || burst > skimmed, 'the water set it off').toBe(true)
+})
+
+test('…but WATER takes what cannot skip: it sinks, and nothing goes off', () => {
   const query = campQuery()
   // CAMP's own ditch. The rule is the engine's twice over — the water test comes
   // first in the handler (0x437c74) and the douse sets the quiet flag the
@@ -189,10 +217,6 @@ test('…but WATER takes it whole: it sinks, and nothing goes off', () => {
 
   expect(heard.some((one) => one.kind === 'doused'), 'it did not go in').toBe(true)
   expect(heard.filter((one) => one.kind === 'blasted'), 'it went off in the water').toHaveLength(0)
-  // …and it does not SKIM either, however fast it arrives: a rocket is not a
-  // stone. That one is play's word over the exe's own speed test, and lobs.ts
-  // says so at the line.
-  expect(heard.some((one) => one.kind === 'skimmed'), 'the rocket skipped').toBe(false)
   expect(lobs.live(), 'a sinking rocket is not live').toBe(0)
 })
 

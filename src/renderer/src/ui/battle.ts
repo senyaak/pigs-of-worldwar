@@ -32,6 +32,7 @@ import {
 } from '../../../lib/game/tutorial'
 import type { Cue } from '../../../lib/game/tutorial'
 import { SKILL, skillName } from '../../../lib/game/skills'
+import { lobOf } from '../../../lib/game/grenade'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../../../lib/game/scenery'
 import { give } from '../../../lib/game/inventory'
@@ -80,6 +81,22 @@ const FOUND_PROVISIONS = 172
  * same centred card the mission title uses.
  */
 const GET_READY = 168
+
+/**
+ * How full the weapon port's red lens is — null for an empty port.
+ *
+ * Play, of the bazooka's: "индикатор красный на панели силы полностью закрашен —
+ * как оружие которое детонирует при контакте", and of the ordinary one "на
+ * половину залитого круга". So it is the CLASS: whole for anything that goes off
+ * on touch (`Lob.contact`, read off the projectile's state machine in
+ * lib/game/grenade.ts) and half for everything else.
+ *
+ * The half is play's word rather than a reading, like the position it is drawn
+ * at — nothing in the exe has been traced to `pcpie4` at all.
+ */
+const LENS_ORDINARY = 0.5
+const lensFor = (holding: number | null): number | null =>
+  holding === null ? null : lobOf(holding)?.contact ? 1 : LENS_ORDINARY
 
 /** ">S MISSES A TURN!" — `gtext 167`, what SKIP TURN says. Also the game's own,
  * and also a line an invented one stood in for. */
@@ -229,6 +246,9 @@ export function initBattle(onLeave: () => void): BattleView {
       // acts on, and the remake's door is a key of its own (play asked for that),
       // so putting 61 in the pig's hands would arm a weapon nobody chose.
       holding: scene.battle.view().inside ? SKILL.BUILDING_INOUT : game.currentPig.holding,
+      // …and how full the port's red lens is, which says what the thing in hand
+      // DOES rather than how charged it is (ui/hud.ts, `DIAL.slot.lens`).
+      lens: lensFor(game.currentPig.holding),
       scope: scene.scoped(),
       // The card carries the mission's name for as long as anyone is still in the
       // air, and then "GET READY >S..." for the beat at the top of every turn.

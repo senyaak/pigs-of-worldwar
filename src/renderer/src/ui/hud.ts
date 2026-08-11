@@ -88,7 +88,25 @@ export const LAYOUT = {
        * The icon is centred in it, and one of the menu's own 56×34 ones —
        * with the box pulled 7 left of the arithmetic, which is where it sits
        * against the art in play. */
-      icon: { x: 57, y: 22, width: 88, height: 78 }
+      icon: { x: 57, y: 22, width: 88, height: 78 },
+      /**
+       * **The LENS in the port — `pcpie4`, and how full it is says what the
+       * weapon does.**
+       *
+       * Play, with a picture of the original's: "есть текстура которая ложится
+       * поверх на половину залитого круга", and of the bazooka's "индикатор
+       * красный … полностью закрашен — как оружие которое детонирует при
+       * контакте." So the port carries a red disc filled to a fraction, an
+       * ordinary weapon shows HALF of it and a contact one shows the lot.
+       *
+       * `pcpie4` is the only pie in the whole install — one 32×32 image, a red
+       * disc (palette index 2, rgb 205,0,0) in a brass ring with a dark rim and
+       * a highlight — so the fraction cannot be frames. It is CLIPPED, from the
+       * bottom, which is the reading a level fill gives; nothing in the exe has
+       * been traced to it, so the direction and this position are both eyework
+       * and both live here for the console to correct (`pow.hud.layout`).
+       */
+      lens: { x: 89, y: 45, width: 32, height: 32 }
     },
     green: [104, 168, 72] as [number, number, number],
     /** How much of the battle shows through that green. */
@@ -242,6 +260,14 @@ export interface HudState {
   /** The skill the acting pig has in hand, whose icon fills the slot beside
    * the dial. Null leaves the slot empty. */
   holding: number | null
+  /**
+   * How full the port's red LENS is, 0..1 — or null for an empty port.
+   *
+   * Not the charge: it is what the weapon DOES. Half for an ordinary one and
+   * whole for one that goes off on contact, which is what play describes of the
+   * bazooka's (`DIAL.slot.lens`, and lib/game/grenade.ts for the class).
+   */
+  lens: number | null
   /** How full the power gauge is, 0..1, or null when nothing is charging —
    * which is when the gauge is not drawn at all (lib/game/gauge.ts). */
   charge: number | null
@@ -525,6 +551,28 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       blit(art.get('ang2'), dialX + DIAL.slot.x, dialY + DIAL.slot.top)
       blit(art.get('ang4'), dialX + DIAL.slot.x, dialY + DIAL.slot.bottom)
       blit(art.get('ang5'), dialX + DIAL.slot.cap.x, dialY + DIAL.slot.cap.y)
+
+      // …and the LENS inside that port, under whatever is in hand. How full it
+      // is is the weapon's CLASS and not its charge (`DIAL.slot.lens`).
+      if (state.lens !== null) {
+        const lens = art.get('pcpie4')
+        const box = DIAL.slot.lens
+        const shows = Math.min(1, Math.max(0, state.lens))
+        const rows = Math.max(0, Math.round(lens.height * shows))
+        if (rows > 0) {
+          context.drawImage(
+            lens.image,
+            0,
+            lens.height - rows,
+            lens.width,
+            rows,
+            Math.round((dialX + box.x) * scale),
+            Math.round((dialY + box.y + box.height - rows) * scale),
+            Math.round(box.width * scale),
+            Math.round((rows * box.height) / lens.height * scale)
+          )
+        }
+      }
 
       // What is in hand, in the ring beside the needle — the same icon the
       // skill menu shows, out of the same archive (ui/skillMenu.ts).
