@@ -174,7 +174,7 @@ export const LAYOUT = {
      * been traced to the sprite at all, so the direction, the half and this
      * position are eyework and live here for the console.
      */
-    lens: { x: 66, y: 4, width: 32, height: 32 },
+    lens: { x: 50, y: 4, width: 32, height: 32 },
     /** The pair above the left end, `newpow1` then `newpow2`. */
     cap: { x: 0, y: -18 }
   },

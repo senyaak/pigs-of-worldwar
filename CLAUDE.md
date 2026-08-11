@@ -7,6 +7,9 @@ game folder, so `..` is the installation.
 
 Start with [README.md](README.md) (how to play and run), then
 [docs/testing.md](docs/testing.md) and [docs/formats.md](docs/formats.md).
+**[docs/todo.md](docs/todo.md) is the WORK LIST** — everything open, in the order
+it is worth doing, each item carrying what is already measured and what the next
+move is. This file is the reference; that one is what to pick up next.
 Reverse-engineering findings live in the **disasm repo** — notes plus the
 scripts that prove them. Every bare path below of the form `anim/notes.md`,
 `movement/notes.md`, `effects/notes.md` and so on is a file inside it, never
