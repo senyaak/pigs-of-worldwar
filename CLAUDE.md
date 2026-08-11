@@ -2871,46 +2871,42 @@ done yet.
    query.downhill(...) ?? state.heading + π`), which a pig landing wedged runs
    every 25 frames — a half turn each time would read as spinning. That is a pig on
    the GROUND, though, not one in the air, so it may not be what play saw.
-6. **Going in puts the pig at the building's MIDDLE, and that is not where he
-   should be.** "В убежище прыгает в центр строения — не на месте." One of the two
-   suspects is now ruled out by reading: **the transposition does not move the
-   centre.** `TRANSPOSED_BOX` swaps `halfX` and `halfZ` and touches nothing else, so
-   `building.box.x/z` is the record's own x/z — which IS the transform 0x469fde
-   copies. `indoors.enter` is doing exactly what the exe does.
+6. ~~**Going in puts the pig at the building's MIDDLE, and that is not where he
+   should be.**~~ **Done, and the middle was right — it was the JUMP CUT that was
+   wrong.** Play settled it: "свин прыгает на месте — должен прыгать в центр
+   строения и выпрыгивать из центра строения наверх." The door arm writes three
+   signed words at `[pig+0x210..0x214]` and the pig's own update ADDS them to the
+   body's position every frame the clip runs (0x46e1a1), each being
+   `(target − here) / n`. Going IN, all three axes step to the building's own
+   transform and the pig stays DRAWN for the whole of it. Coming OUT, **x and z
+   are written as zero** (0x46a150, 0x46a15e) and only the vertical is stepped —
+   so a pig leaves through the TOP and nowhere else. That also re-reads the old
+   "из убежища выпрыгивает на крышу": the destination was never the bug.
+   `lib/game/doorway.ts` is the glide, `battle.ts`'s door block drives it, and
+   how FAR up is the one number not recovered — `[+0x212]`'s difference runs
+   through 0x479690 and two pushes that move the frame under the reads, so the
+   remake takes the building's own box top and says so.
 
-   Two things are left, and the second is the likelier one. The remake copies x and
-   z and NOT y, where the exe copies the whole transform — so the pig sits at the
-   building's plan position but at the doorstep's height. And the pig is not DRAWN
-   in there, so the only thing the move can show a player is where the CAMERA goes:
-   it flies to the middle of the shelter, which is what "прыгает в центр строения"
-   would look like from outside. Nothing is changed on a guess; this wants play to
-   say whether what moves is the pig or the view.
-7. **Coming OUT lands him on the ROOF, and the cause was NOT what this said.** "Из
-   убежища выпрыгивает на крышу." The reading here was that `loco = footingAt(acting)`
-   re-derives a footing that `standOn` snaps to the shelter's box top. **Measured, and
-   it does not**: CAMP's SHELTER box runs y −1568 (top) to −1184, the ground at its
-   wall is −1216, so the top is **352** above the doorstep — past `WALL_CLIMB` 128 and
-   past `PIG_HOLD` 196 alike. A footing rebuilt at the doorstep gives −1216, one
-   rebuilt at the shelter's own centre gives −1216, and a pig left standing at that
-   centre for three seconds neither rises nor wedges. The door now hands back the
-   footing it took anyway (`indoors.enter(pig, footing)` / `leave(pig)` return it),
-   because deriving one where a kept one exists is guessing — from the box top the
-   rebuild does stick to the box top, so it is only the ground that made it safe —
-   but that is tidiness, not the fix.
+   *(What this entry used to say, kept because it is still true and still worth
+   not re-deriving: the transposition does NOT move the centre — `TRANSPOSED_BOX`
+   swaps `halfX`/`halfZ` and nothing else, so `box.x/z` is the record's own
+   position, which IS the transform 0x469fde copies.)*
 
-   **What is left, and it is the only candidate that survives measurement:** the way
-   out plays clip 7 FORWARDS, the same way in does. That clip is a climb — its root
-   track runs −115 at frame 0, **−564 at its peak** and −115 again at frame 53 — and
-   `wear.ts` puts `rootAt` on the body, so leaving springs the drawn pig ~449 model
-   units up the outside of the shelter and back down. The box is 384 tall. That is
-   what "выпрыгивает на крышу" would look like, and it explains why nothing in the
-   pig's POSITION shows it: the rise is in the pose, not in `loco`. Ruled out on the
-   way: a clamped last frame (the track returns to where it started, so it holds
-   nothing), and the exe's own per-slot reverse flag (`cmp [4D7324h],1`, which negates
-   `[pig+0x370]`) — it is 0 for skill 61 slot 0, so the binary does not say to reverse
-   it. Confirming this wants play's eye on whether the pig springs UP the wall on the
-   way out; reversing the clip is a flag through `anim` → snapshot → `wear` and is not
-   built.
+7. ~~**Coming OUT lands him on the ROOF.**~~ **Answered by the same read as 6: out
+   through the top IS the original.** Two measured negatives survive from the pass
+   that chased it as a bug, and both are worth keeping. *(a)* `footingAt` does not
+   snap to the box: CAMP's SHELTER box runs y −1568 (top) to −1184, the ground at
+   its wall is −1216, so the top is **352** above the doorstep — past `WALL_CLIMB`
+   128 and past `PIG_HOLD` 196 alike; a footing rebuilt at the doorstep gives
+   −1216, one rebuilt at the shelter's own centre gives −1216, and a pig left
+   standing at that centre for three seconds neither rises nor wedges. *(b)* Clip
+   7 does not clamp him up there either: its root track runs −115 at frame 0,
+   −564 at its peak and **−115 again at frame 53**, so a held last frame holds
+   nothing. What play was complaining about was the jump cut, and the glide is
+   what fixes it. The door still hands back the footing it took
+   (`indoors.enter(pig, footing)` / `leave`), because deriving one where a kept
+   one exists is guessing — from the box top the rebuild does stick to the box
+   top.
 8. ~~**Finishing the shelter does not move the TUTORIAL on.**~~ **Done** — and the
    shelter had nothing to do with it. See "THE TRAINING SCRIPT MOVES" below.
 
@@ -3017,6 +3013,40 @@ Clip 4 is the same block's other half and is NOT built: it hangs on
 the briefing bar only ever carries the key press. `e2e/002/tutorial.spec.ts`
 drives the first three steps on the real map and reads the clips back in order:
 3 collected, 5 chosen, 6 placed.
+
+### THE DOOR, THE STEP AND THE SLOT — play's three, 2026-08-11
+
+**The clip CARRIES the pig.** Read in full in `objects/notes.md`, summarised at
+item 6 of the list above. `lib/game/doorway.ts` is the pure half — `carryIn`,
+`carryOut`, `advanceCarry` — and `battle.ts`'s door block starts it, ticks it
+after `updateLocomotion` (the exe's own add comes after the movement update too,
+and overrules the ground pin), and ends it when the once-clip does. Two things
+had to move with it: a pig going THROUGH a door is not driven but IS moving, so
+`game.moveCurrentPig` is now gated on being actually inside rather than on
+`sheltered`; and `focus` drops a half-open door the way it drops a half-finished
+climb.
+
+**A SCRIPT STEP IS OWED BY THE BATTLE, not by the beat that is running** — and
+this is what had the tutorial stuck. Play: "когда взрываю дверь — должна базука
+падать - щас нет." CAMP's door is record #46, `STW04_D2`, the one object on the
+map carrying the guarded opcode 22: it waits on label 89, which nothing else
+waits on, and signals **7** — which the bazooka crate (#19), the health×25 crate
+(#56) and two more dummies all wait for. So everything after the TNT step hangs
+off that single break. But TNT's fuse outlasts the four seconds planting hands
+back, so the door breaks inside the beat at the END of the turn — and that beat
+returns three branches above the block that paid the step, with `focus` clearing
+the debt on the handover. `payScriptStep()` is now called before the branches and
+the walk-away beat holds while anything is owed. The exe owes no wait at all
+(`Object::RunScript` is the last thing the break handler does, 0x48d972); the
+wait is the remake's own pacing, and what it must not do is depend on the mode.
+
+**A pig INSIDE holds the door.** Play: "когда прыгаю в здание — в оружии должна
+быть иконка запрыгивания во что-то (есть в игре)." Skill **61 BUILDING INOUT**
+has an icon like every other (`SKILL_ICON`, and 60 is the VEHICLE's own), so the
+slot beside the dial carries it for as long as the pig is in there. A DRAWING
+decision and not a rule — `ui/battle.ts` substitutes it into `hud.draw`'s
+`holding` and `pig.holding` is untouched, because the fire key acts on that and
+the remake's door is a key of its own.
 
 ### What is still not read
 

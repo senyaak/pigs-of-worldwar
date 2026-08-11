@@ -31,7 +31,7 @@ import {
   lineFor
 } from '../../../lib/game/tutorial'
 import type { Cue } from '../../../lib/game/tutorial'
-import { skillName } from '../../../lib/game/skills'
+import { SKILL, skillName } from '../../../lib/game/skills'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../../../lib/game/scenery'
 import { give } from '../../../lib/game/inventory'
@@ -218,7 +218,17 @@ export function initBattle(onLeave: () => void): BattleView {
       strings: battleText,
       aim: scene.aim(),
       charge: scene.charging(),
-      holding: game.currentPig.holding,
+      // **A PIG INSIDE HOLDS THE DOOR.** Play: "когда прыгаю в здание — в оружии
+      // должна быть иконка запрыгивания во что-то (есть в игре)." Skill 61 is
+      // BUILDING INOUT and it has an icon of its own like every other
+      // (lib/game/skills.ts), so the slot beside the dial carries it for as long
+      // as the pig is in there — which is also the only thing it can do from in
+      // there besides skipping the turn.
+      //
+      // A DRAWING decision and not a rule: `pig.holding` is what the fire key
+      // acts on, and the remake's door is a key of its own (play asked for that),
+      // so putting 61 in the pig's hands would arm a weapon nobody chose.
+      holding: scene.battle.view().inside ? SKILL.BUILDING_INOUT : game.currentPig.holding,
       scope: scene.scoped(),
       // The card carries the mission's name for as long as anyone is still in the
       // air, and then "GET READY >S..." for the beat at the top of every turn.

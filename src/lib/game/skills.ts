@@ -64,6 +64,10 @@ export const SKILL = {
   GRENADE: 19,
   BAZOOKA: 29,
   TNT: 37,
+  /** The door of a BUILDING — what a pig uses to get in and out of one, and
+   * what the slot beside the dial carries while it is in there
+   * (lib/game/buildings.ts; 60 is the VEHICLE's own). */
+  BUILDING_INOUT: 61,
   /** Always in the menu, whatever the pig is carrying. */
   SKIP_TURN: 65,
   SURRENDER: 66

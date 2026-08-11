@@ -318,6 +318,21 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
     .toBe(INOUT_CLIP)
   expect((await shelter(page)).inside, 'he was inside before the clip ran').toBeNull()
   expect((await shelter(page)).drawn, 'and he is on screen for it').toBe(true)
+  // **AND THE CLIP CARRIES HIM INTO THE MIDDLE.** Play: "свин прыгает на месте —
+  // должен прыгать в центр строения." The arm sets a per-frame step at
+  // `[pig+0x210..0x214]` from where he stands to the building's own transform and
+  // the pig's update adds it every frame (lib/game/doorway.ts), so he is nearer
+  // the middle a moment into the clip than he was at the door.
+  const reach = Math.hypot(doorstep.x - box.x, doorstep.z - box.z)
+  await expect
+    .poll(
+      async () => {
+        const now = await debugState(page)
+        return Math.hypot(now.x - box.x, now.z - box.z)
+      },
+      { timeout: 3000, message: 'the climb left him standing at the door' }
+    )
+    .toBeLessThan(reach - 32)
   // …and the clip finishing is what takes him in.
   await expect.poll(async () => (await shelter(page)).inside, { timeout: 4000 }).not.toBeNull()
   // **AND IT IS NOT DRAWN.** The exe clears `[pig+0x30]`, which is the byte its
@@ -350,18 +365,23 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
   )
   await cutTurnBeat(page)
 
-  // …and the same key again puts it back on the doorstep it came from — out
-  // FIRST, because a clip cannot be watched from inside, and the climb after it.
+  // **AND OUT OF THE MIDDLE, STRAIGHT UP.** Play: "должен … выпрыгивать из центра
+  // строения наверх", and the exe says the same thing in one line: the leave arm
+  // WRITES the x and z steps as zero (0x46a150, 0x46a15e) and gives only the
+  // vertical a value. So he reappears at the building's own middle and rises,
+  // and nothing moves him sideways while he does.
   await tap(page, 'enter')
   await expect.poll(async () => (await shelter(page)).inside, { timeout: 4000 }).toBeNull()
   await expect.poll(async () => (await shelter(page)).drawn, { timeout: 4000 }).toBe(true)
   const out = await debugState(page)
-  expect(Math.hypot(out.x - at.x, out.z - at.z), 'it came out somewhere else').toBeLessThan(64)
-  // …and at the height it went in at. The door hands back the footing it took
-  // rather than deriving one from the doorstep (lib/game/indoors.ts). This does
-  // NOT reproduce play's "из убежища выпрыгивает на крышу" — nothing here does
-  // yet, and CLAUDE.md carries what has been ruled out.
-  expect(out.nodeY, 'it came out at a different height').toBeCloseTo(doorstep.nodeY, 0)
+  expect(Math.hypot(out.x - box.x, out.z - box.z), 'he did not come out of the middle')
+    .toBeLessThan(32)
+  // …rising. Game space is Y-DOWN, so going up is the number going DOWN.
+  await page.waitForTimeout(300)
+  const risen = await debugState(page)
+  expect(risen.nodeY, 'he came out and did not rise').toBeLessThan(out.nodeY - 8)
+  expect(Math.hypot(risen.x - out.x, risen.z - out.z), 'the rise drifted sideways')
+    .toBeLessThan(1)
   // …and it survived the handover in there: CAMP fields ONE pig, so the turn that
   // came back is the same pig's, still standing in the shelter it skipped from.
 })

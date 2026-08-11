@@ -13,7 +13,9 @@
 //
 // Game space (Y-down) throughout.
 
-import { ANIM, createLocomotion, inWater, updateLocomotion } from './locomotion'
+import { ANIM, copyLocomotion, createLocomotion, inWater, updateLocomotion } from './locomotion'
+import { advanceCarry, carryIn, carryOut, doorwayStart } from './doorway'
+import type { Carry } from './doorway'
 import type { LocomotionState } from './locomotion'
 import { withPigs } from './obstacles'
 import { isDead } from './health'
@@ -239,6 +241,14 @@ export function createBattle(parts: BattleParts): Battle {
   /** A script step owed to something that has broken, and not run until it has
    * finished breaking. One animation at a time. */
   let pending: { id: number; y: number } | null = null
+  /** The pig on its way back OUT of a building, playing the same clip going in
+   * uses — it rises out of the middle while it runs (lib/game/doorway.ts). */
+  let leaving: Pig | null = null
+  /** …and what the door is adding to its position this frame, either way. */
+  let carry: Carry | null = null
+  /** The footing a pig going IN is leaving behind, kept whole for the door to
+   * hand back — the glide's own end is the middle of a box and is not it. */
+  let doorstep: LocomotionState | null = null
 
   /**
    * Pay it, once everything the break set going has stopped.
@@ -448,6 +458,11 @@ export function createBattle(parts: BattleParts): Battle {
     // so a turn handed over on top of one (a pig killed mid-clip) must not leave
     // it set, or nothing ever ends again.
     climbing = null
+    // …and so does a door half-opened: the glide belongs to the pig that started
+    // it (lib/game/doorway.ts).
+    leaving = null
+    carry = null
+    doorstep = null
     holding = pig.holding
     sights.rearm(pig.holding)
     readying = 0
@@ -689,17 +704,27 @@ export function createBattle(parts: BattleParts): Battle {
     // It is answered before the walk, because a pig INSIDE is not driven at all —
     // it is not drawn, its whole turn is standing there, and the two things it
     // can do are skip the turn and come back out.
+    // **AND THE CLIP CARRIES HIM.** Play: "свин прыгает на месте — должен прыгать
+    // в центр строения и выпрыгивать из центра строения наверх." Read, and it is
+    // one mechanism in two directions (`lib/game/doorway.ts`): the arm sets a
+    // fixed per-frame step at `[pig+0x210..0x214]` and the pig's own update adds
+    // it to the body's position every frame (0x46e1a1). Going IN, all three axes
+    // step from where he stands to the building's own transform (0x46a032,
+    // 0x46a08c, 0x46a0e4). Coming OUT, **x and z are written as zero**
+    // (0x46a150, 0x46a15e) and only the vertical is stepped — so he leaves
+    // through the top and nowhere else.
     if (doorRequested) {
       doorRequested = false
-      if (indoors.inside(acting)) {
-        // OUT first and the climb after it: he cannot be seen playing a clip from
-        // inside, because inside he is not drawn at all.
-        //
-        // The footing comes back WITH him: the door kept the one he walked in on
-        // rather than deriving a new one from the doorstep, which is a different
-        // question with a different answer for anyone who came off raised ground
-        // (lib/game/indoors.ts).
-        loco = indoors.leave(acting) ?? footingAt(acting)
+      const within = indoors.inside(acting)
+      if (within) {
+        // OUT: he is put back on the picture at the building's own middle and
+        // rises out of it while the clip runs. `leave` hands back the footing he
+        // walked in on, which is not where he is going — but it is what the
+        // battle rebuilds from if the glide is cut short.
+        indoors.leave(acting)
+        loco = doorwayStart(within, footingAt(acting))
+        carry = carryOut(within, loco, clipSeconds(parts.clips[INOUT_CLIP]))
+        leaving = acting
         anim.playOnce(acting, INOUT_CLIP)
         onChanged()
         return
@@ -707,9 +732,13 @@ export function createBattle(parts: BattleParts): Battle {
       // …and IN the other way round: the climb first, and he goes in when it has
       // run. `climbing` is what holds him to it — the same rule a lay clip has
       // (`attack.busy()`), and the same reason: an animation nobody may walk out
-      // of.
-      if (indoors.reachable(acting)) {
+      // of. The footing he LEFT is kept whole, because that is what the door has
+      // to hand back (lib/game/indoors.ts).
+      const doorway = indoors.reachable(acting)
+      if (doorway) {
         climbing = acting
+        doorstep = copyLocomotion(loco)
+        carry = carryIn(doorway, loco, clipSeconds(parts.clips[INOUT_CLIP]))
         anim.playOnce(acting, INOUT_CLIP)
         onChanged()
         return
@@ -719,9 +748,20 @@ export function createBattle(parts: BattleParts): Battle {
     // driven, so the frame he lands in is the frame he is gone.
     if (climbing === acting && !anim.animating(acting)) {
       climbing = null
-      // …and the footing he climbed from goes in with him, to be handed back at
-      // the door.
-      indoors.enter(acting, loco)
+      carry = null
+      // …and the footing he climbed FROM goes in with him, to be handed back at
+      // the door — not the one the glide ended on, which is the middle of a box.
+      indoors.enter(acting, doorstep ?? loco)
+      doorstep = null
+      onChanged()
+      return
+    }
+    // …and the leap OUT finishing hands him back to the world, wherever the rise
+    // left him: the exe simply stops stepping him and the physics has him.
+    if (leaving === acting && !anim.animating(acting)) {
+      leaving = null
+      carry = null
+      loco = footingAt(acting)
       onChanged()
       return
     }
@@ -778,7 +818,9 @@ export function createBattle(parts: BattleParts): Battle {
     // switches its body off outright (`[body+0x44] |= 1`). The FIRE key still
     // reaches it, because SKIP TURN is the whole of what a shelter offers and it
     // is used like any other skill.
-    const sheltered = indoors.inside(acting) !== null || climbing === acting
+    // Nobody DRIVES through a door: in, out, or already inside.
+    const sheltered =
+      indoors.inside(acting) !== null || climbing === acting || leaving === acting
     const walking = committed() || sheltered ? 0 : intent.walk
     const turning = committed() || sheltered ? 0 : intent.turn
     // The SIGHTS are a different control set, not a locked one. The one thing
@@ -817,6 +859,11 @@ export function createBattle(parts: BattleParts): Battle {
       )
     )
     jumpRequested = false
+    // …and the DOOR overrules all of it. The exe adds its own step to the body's
+    // position every frame the clip runs (0x46e1a1), after the movement update
+    // and regardless of what the ground said, which is what carries the pig into
+    // the middle and back up out of it (lib/game/doorway.ts).
+    if (carry && !advanceCarry(carry, loco, delta)) carry = null
     // **IN THE WATER THE WEAPON GOES AWAY.** Play: "в воде оружие убирается пока
     // не вылезешь — у нас нет." Play's rule and NOT a reading: the holster proper
     // is `Pig::HoldWeapon(0)` (0x469090, whose refusal prints "Forced holstering
@@ -835,7 +882,12 @@ export function createBattle(parts: BattleParts): Battle {
     // taking one away mid-swim would leave the turn unendable.
     const armed = ['melee', 'gun', 'lob', 'charge'].includes(weaponLayer(acting.holding))
     if (loco.swimming && armed && !committed()) acting.holding = null
-    if (!sheltered) game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
+    // A pig going THROUGH a door is not being driven and is still MOVING: the
+    // clip carries it, so its position follows `loco` for the whole of the glide.
+    // Only one that is actually inside stops — it is not on the map at all then.
+    if (indoors.inside(acting) === null) {
+      game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
+    }
     // Walking INTO a crate is how one is collected; there is no button — and a
     // pig standing in a shelter is not walking into anything.
     if (!sheltered) scenery.collect(acting)
