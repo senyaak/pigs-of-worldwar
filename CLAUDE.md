@@ -2818,11 +2818,14 @@ before anything is touched, with what is already known about each — none of it
 done yet.
 
 1. **A wall should go SEE-THROUGH, not vanish.** "Стены должны не пропадать, а
-   становиться полупрозрачными." `SEE_THROUGH = 0.25` in `three/props.ts` with
-   `depthWrite: false` — a quarter opacity over the terrain reads as gone. The
-   opacity is the remake's own pick and wants raising; the `depthWrite` is there so
-   a faded wall does not hide the pig, and whether it can come back is part of the
-   same question.
+   становиться полупрозрачными." `SEE_THROUGH` in `three/props.ts` is **0.5** now,
+   up from 0.25 — half, the one value that cannot be argued in either direction:
+   the wall is exactly as present as what is behind it. It is the remake's own
+   number and there is nothing in the binary to check it against, so the next move
+   on it is play's. The `depthWrite: false` STAYS and is not part of the same
+   question: it is there so a faded wall does not go on occluding the pig, which is
+   the whole point of fading it, and turning it back on would undo the feature at
+   any opacity.
 2. ~~**The dynamite's flame is not the game's.**~~ **Done, and it was exactly where
    the guess said to look.** Kind 53's constructor arm (`0x432414`, shared with kind
    52) hangs a PARENTED effect on the projectile the same way the grenade's arm

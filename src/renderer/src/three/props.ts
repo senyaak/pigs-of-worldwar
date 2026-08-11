@@ -21,8 +21,14 @@ import { HEIGHT_SCALE } from '../../../lib/game/terrain'
  *
  * The remake's own number, like the camera swing next door (lib/game/sightline.ts):
  * enough of the wall left to read as a wall, little enough to see a pig through it.
+ *
+ * It was 0.25 and play said that is not a fade: "стены должны не пропадать, а
+ * становиться полупрозрачными" — a quarter of a wall standing over the ground it
+ * matches in colour reads as no wall at all. **HALF**, which is the one value
+ * that cannot be argued about in either direction: the wall is exactly as present
+ * as what is behind it. Move it in play, not by reasoning.
  */
-const SEE_THROUGH = 0.25
+const SEE_THROUGH = 0.5
 
 /** The vertical the yaw turns about, and the ramp's own tilt — built once. */
 const UP = new THREE.Vector3(0, 1, 0)
