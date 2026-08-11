@@ -242,8 +242,10 @@ export function createBattle(parts: BattleParts): Battle {
    * finished breaking. One animation at a time. */
   let pending: { id: number; y: number } | null = null
   /** The pig on its way back OUT of a building, playing the same clip going in
-   * uses — it rises out of the middle while it runs (lib/game/doorway.ts). */
-  let leaving: Pig | null = null
+   * uses — it rises out of the middle while it runs (lib/game/doorway.ts) — and
+   * the ROOF it is rising to, which is what it has to be given as a footing when
+   * the door lets go. */
+  let leaving: { pig: Pig; roof: number } | null = null
   /** …and what the door is adding to its position this frame, either way. */
   let carry: Carry | null = null
   /** The footing a pig going IN is leaving behind, kept whole for the door to
@@ -724,7 +726,7 @@ export function createBattle(parts: BattleParts): Battle {
         indoors.leave(acting)
         loco = doorwayStart(within, footingAt(acting))
         carry = carryOut(within, loco, clipSeconds(parts.clips[INOUT_CLIP]))
-        leaving = acting
+        leaving = { pig: acting, roof: within.box.top }
         anim.playOnce(acting, INOUT_CLIP)
         onChanged()
         return
@@ -756,12 +758,34 @@ export function createBattle(parts: BattleParts): Battle {
       onChanged()
       return
     }
-    // …and the leap OUT finishing hands him back to the world, wherever the rise
-    // left him: the exe simply stops stepping him and the physics has him.
-    if (leaving === acting && !anim.animating(acting)) {
+    // …and the leap OUT finishing hands him back to the world FALLING, which is
+    // what the exe leaves behind: it stops stepping the position and the physics
+    // has him.
+    //
+    // Not `footingAt`. That asks where he RESTS, and a pig hanging over a roof
+    // rests nowhere — `standOn` finds nothing within reach above the box and the
+    // fallback is the ground, so the door ended by teleporting him down through
+    // the shelter. Play: "выпрыгивание не работает — проваливаюсь обратно сквозь
+    // крышу." The footing is built at the ROOF, so the step-up envelope is
+    // measured from the thing he is about to land on rather than from the ground
+    // 352 below it, and then a still velocity lets the ordinary landing put him
+    // on it.
+    if (leaving?.pig === acting && !anim.animating(acting)) {
+      const { roof } = leaving
       leaving = null
       carry = null
-      loco = footingAt(acting)
+      loco = createLocomotion(query, loco.x, loco.z, loco.heading, {
+        y: roof,
+        obstruction: scenery.obstacles
+      })
+      // ON the roof plane, not wherever the glide's last frame left him. The two
+      // clocks end a frame apart — the door block asks `anim` before the carry is
+      // advanced — and a few units SHORT is the whole difference between standing
+      // on the box and being inside it: `standOn` counts nothing above the feet,
+      // so six units under the top is no support at all and he fell straight
+      // through. Measured: the rise ended at −1562 against a top of −1568.
+      loco.y = roof
+      loco.airborne = { vx: 0, vy: 0, vz: 0, bouncing: false, pushIn: null }
       onChanged()
       return
     }
@@ -820,7 +844,7 @@ export function createBattle(parts: BattleParts): Battle {
     // is used like any other skill.
     // Nobody DRIVES through a door: in, out, or already inside.
     const sheltered =
-      indoors.inside(acting) !== null || climbing === acting || leaving === acting
+      indoors.inside(acting) !== null || climbing === acting || leaving?.pig === acting
     const walking = committed() || sheltered ? 0 : intent.walk
     const turning = committed() || sheltered ? 0 : intent.turn
     // The SIGHTS are a different control set, not a locked one. The one thing

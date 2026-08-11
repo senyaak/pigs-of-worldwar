@@ -22,6 +22,7 @@ import {
   chooseSkill,
   cutTurnBeat,
   debugState,
+  hold,
   holding,
   hud,
   landed,
@@ -373,15 +374,61 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
   await tap(page, 'enter')
   await expect.poll(async () => (await shelter(page)).inside, { timeout: 4000 }).toBeNull()
   await expect.poll(async () => (await shelter(page)).drawn, { timeout: 4000 }).toBe(true)
-  const out = await debugState(page)
-  expect(Math.hypot(out.x - box.x, out.z - box.z), 'he did not come out of the middle')
+  // He reappears at the building's own middle. Polled rather than read once:
+  // `leave` puts the pig back on its doorstep and the door moves it to the
+  // middle on the frame after, so a single read can catch the doorstep.
+  await expect
+    .poll(
+      async () => {
+        const now = await debugState(page)
+        return Math.hypot(now.x - box.x, now.z - box.z)
+      },
+      { timeout: 3000, message: 'he did not come out of the middle' }
+    )
     .toBeLessThan(32)
+  const out = await debugState(page)
   // …rising. Game space is Y-DOWN, so going up is the number going DOWN.
   await page.waitForTimeout(300)
   const risen = await debugState(page)
   expect(risen.nodeY, 'he came out and did not rise').toBeLessThan(out.nodeY - 8)
   expect(Math.hypot(risen.x - out.x, risen.z - out.z), 'the rise drifted sideways')
     .toBeLessThan(1)
+
+  // **AND HE STAYS UP.** Play: "выпрыгивание не работает — проваливаюсь обратно
+  // сквозь крышу." The leap used to end wherever its last frame left him — a few
+  // units UNDER the box's top, because the clip and the glide finish a frame
+  // apart — and `standOn` counts nothing above the feet, so there was no support
+  // and he fell the whole 352 back to the ground inside the shelter. The door
+  // ends it ON the roof plane now and hands him to gravity from there
+  // (lib/game/battle.ts).
+  // The rise takes the clip's own length, so wait it out and THEN watch: the
+  // question is where he is left, not where he passes through.
+  await expect
+    .poll(
+      async () => {
+        const a = (await debugState(page)).nodeY
+        await page.waitForTimeout(300)
+        return Math.abs((await debugState(page)).nodeY - a) < 0.5
+      },
+      { timeout: 8000, message: 'he never stopped moving' }
+    )
+    .toBe(true)
+  const settled = await debugState(page)
+  // …and he is UP: a whole shelter above the doorstep, not back on the ground
+  // inside it. Y-DOWN, so up is the smaller number.
+  expect(settled.nodeY, 'he sank back through the roof').toBeLessThan(doorstep.nodeY - 300)
+  const still = settled
+
+  // …**AND THE CONTROLS COME BACK.** The same bug held them: a pig standing at
+  // the shelter's own centre is inside a solid box and cannot take a step, so the
+  // door read as never letting go. Play: "применение — отключает управление пока
+  // не завершится действие."
+  await hold(page, 'walkForward', 600)
+  const walked = await debugState(page)
+  expect(
+    Math.hypot(walked.x - still.x, walked.z - still.z),
+    'it could not be driven after the door'
+  ).toBeGreaterThan(50)
   // …and it survived the handover in there: CAMP fields ONE pig, so the turn that
   // came back is the same pig's, still standing in the shelter it skipped from.
 })

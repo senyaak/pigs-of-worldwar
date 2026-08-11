@@ -3026,6 +3026,22 @@ had to move with it: a pig going THROUGH a door is not driven but IS moving, so
 `sheltered`; and `focus` drops a half-open door the way it drops a half-finished
 climb.
 
+**Where the leap OUT ends is the whole of it.** Play, on the first pass:
+"выпрыгивание не работает — проваливаюсь обратно сквозь крышу", and with it
+"применение — отключает управление пока не завершится действие." Both were one
+bug and it is measured. The glide targets the box's TOP, but the clip and the
+carry finish a frame apart — the door block asks `anim` before `advanceCarry`
+runs — so the rise stopped a few units SHORT: −1562 against a top of −1568. And
+`standOn` counts nothing above the feet, so six units under the roof is no
+support at all: the pig fell the whole 352 back to the ground **inside** the
+shelter, where a solid box holds it still and the controls read as dead. The door
+now ends the leap ON the roof plane, builds the footing FROM the roof (so the
+step-up envelope is measured off the thing being landed on rather than the ground
+below it) and hands the pig to gravity with a still velocity — the ordinary
+landing does the rest. `e2e/002/shelter.spec.ts` waits for the rise to stop and
+then asserts both halves: he is a shelter's height above the doorstep, and he
+walks.
+
 **A SCRIPT STEP IS OWED BY THE BATTLE, not by the beat that is running** — and
 this is what had the tutorial stuck. Play: "когда взрываю дверь — должна базука
 падать - щас нет." CAMP's door is record #46, `STW04_D2`, the one object on the
