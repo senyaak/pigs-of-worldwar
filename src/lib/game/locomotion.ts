@@ -407,6 +407,27 @@ export function createLocomotion(
 }
 
 /**
+ * A state that can be put back later, with nothing shared with the original.
+ *
+ * There is one thing in the game that has to remember a footing rather than
+ * work one out again — a pig going into a building (lib/game/indoors.ts).
+ * Rebuilding one is not the same answer as keeping one: `createLocomotion`
+ * runs `standOn` from the y it is handed, and a pig that walked in from
+ * anything RAISED gets whatever that spot resolves to now. Measured on CAMP's
+ * shelter: from the ground the rebuild gives the ground back, but from the
+ * box's own top it gives the box top back — so the answer depends on a number
+ * the door has, and it should use the one it has.
+ *
+ * The two nested pieces are copied too, or the stored footing would follow
+ * whatever the live one did next.
+ */
+export const copyLocomotion = (state: LocomotionState): LocomotionState => ({
+  ...state,
+  airborne: state.airborne ? { ...state.airborne } : null,
+  bounciness: { ...state.bounciness }
+})
+
+/**
  * One frame. Mutates `state`; `delta` is the frame's seconds.
  *
  * `obstruction` is everything that is not the landscape — the map's objects

@@ -34,7 +34,8 @@ import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseMcapClip } from '../../src/lib/formats/mcap'
-import { ANIM } from '../../src/lib/game/locomotion'
+import { ANIM, createLocomotion } from '../../src/lib/game/locomotion'
+import type { LocomotionState } from '../../src/lib/game/locomotion'
 import { WEAPON_TABLE } from '../../src/lib/game/weapons'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
@@ -49,7 +50,7 @@ import {
 } from '../../src/lib/game/buildings'
 import { choosableIn, createIndoors } from '../../src/lib/game/indoors'
 import { sightBlockers } from '../../src/lib/game/seeThrough'
-import { boxOf, isSolid } from '../../src/lib/game/obstacles'
+import { ObstacleField, boxOf, isSolid } from '../../src/lib/game/obstacles'
 import { SKILL } from '../../src/lib/game/skills'
 import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
 import { Game } from '../../src/lib/game/game'
@@ -175,8 +176,16 @@ test('…and going in takes the pig off the map, while coming out puts it back',
   const indoors = createIndoors(CAMP, bus.emit)
   const [one, two, three, four] = game.players[0].pigs
   const doorstep = { ...one.position }
+  // The FOOTING goes in with the pig, and comes back out with it — that is what
+  // stops the door standing him on the shelter's own roof (lib/game/indoors.ts).
+  const footingOf = (pig: (typeof game.players)[0]['pigs'][0]): LocomotionState =>
+    createLocomotion(query, pig.position.x, pig.position.z, pig.heading, {
+      y: pig.position.y,
+      obstruction: new ObstacleField(CAMP)
+    })
+  const walkedIn = footingOf(one)
 
-  expect(indoors.enter(one)).toBe(true)
+  expect(indoors.enter(one, walkedIn)).toBe(true)
   expect(indoors.inside(one)?.id).toBe(SHELTER.id)
   expect(heard.filter((e) => e.kind === 'wentIn')).toHaveLength(1)
   // It stands at the building's own middle, which is where the exe puts it —
@@ -185,18 +194,24 @@ test('…and going in takes the pig off the map, while coming out puts it back',
   expect(one.position.z).toBe(box.z)
 
   // THREE fit, and the fourth is turned away — `[+0xd8] == [+0xe4]` at 0x46ca50.
-  expect(indoors.enter(two)).toBe(true)
-  expect(indoors.enter(three)).toBe(true)
+  expect(indoors.enter(two, footingOf(two))).toBe(true)
+  expect(indoors.enter(three, footingOf(three))).toBe(true)
   expect(indoors.occupants(SHELTER.id)).toBe(3)
   expect(indoors.reachable(four), 'a full shelter takes nobody else').toBeNull()
-  expect(indoors.enter(four)).toBe(false)
+  expect(indoors.enter(four, footingOf(four))).toBe(false)
 
-  // …and coming out is the doorstep, exactly.
-  expect(indoors.leave(one)).toBe(true)
+  // …and coming out is the doorstep, exactly — the position AND the footing it
+  // was standing on, which is the whole point of keeping the second one.
+  const cameOut = indoors.leave(one)
+  expect(cameOut, 'it came back out').not.toBeNull()
   expect(indoors.inside(one)).toBeNull()
   expect(one.position).toMatchObject(doorstep)
+  expect(cameOut!.y, 'it came out onto the footing it walked in on').toBe(walkedIn.y)
+  expect(cameOut!.freeY).toBe(walkedIn.freeY)
+  // …and it is a COPY: the live state moving on must not drag the stored one.
+  expect(cameOut).not.toBe(walkedIn)
   expect(indoors.occupants(SHELTER.id)).toBe(2)
-  expect(indoors.leave(one), 'twice').toBe(false)
+  expect(indoors.leave(one), 'twice').toBeNull()
 })
 
 test('the menu INSIDE is the building\'s, and a shelter offers only SKIP TURN', () => {
@@ -287,6 +302,10 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
   expect((await shelter(page)).inside, 'the jump key put it inside').toBeNull()
   await landed(page)
 
+  // Where he is standing when he goes in — the doorstep, which is what he has
+  // to be given back when he comes out again.
+  const doorstep = await debugState(page)
+
   // The DOOR key — its own, and not the jump's. Play: "я не говорил по пробелу…
   // сделай отдельную кнопку, пробел уже прыжок" (input/actions.ts).
   await tap(page, 'enter')
@@ -338,6 +357,11 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
   await expect.poll(async () => (await shelter(page)).drawn, { timeout: 4000 }).toBe(true)
   const out = await debugState(page)
   expect(Math.hypot(out.x - at.x, out.z - at.z), 'it came out somewhere else').toBeLessThan(64)
+  // …and at the height it went in at. The door hands back the footing it took
+  // rather than deriving one from the doorstep (lib/game/indoors.ts). This does
+  // NOT reproduce play's "из убежища выпрыгивает на крышу" — nothing here does
+  // yet, and CLAUDE.md carries what has been ruled out.
+  expect(out.nodeY, 'it came out at a different height').toBeCloseTo(doorstep.nodeY, 0)
   // …and it survived the handover in there: CAMP fields ONE pig, so the turn that
   // came back is the same pig's, still standing in the shelter it skipped from.
 })

@@ -22,6 +22,8 @@
 // Pure, and game space (Y-down) like the rest of lib/game.
 
 import { ENTER_REACH, buildingKind, buildingRoom, buildingSkills } from './buildings'
+import { copyLocomotion } from './locomotion'
+import type { LocomotionState } from './locomotion'
 import { boxOf } from './obstacles'
 import type { Obstacle } from './obstacles'
 import type { MapObject } from '../formats/pog'
@@ -38,13 +40,23 @@ export interface Building {
   box: Obstacle
 }
 
-/** Where a pig stood before it went in, so leaving puts it back. */
+/**
+ * Where a pig stood before it went in, so leaving puts it back.
+ *
+ * The whole FOOTING and not just the spot — position, heading, and what it was
+ * standing on. Coming out used to restore the three coordinates and let the
+ * battle build a fresh locomotion state from them, which is a DERIVED answer
+ * where a kept one was available: the rebuild runs `standOn` again and gives
+ * back whatever that spot resolves to, which for a pig that walked in off
+ * anything raised is not where it came from (lib/game/locomotion.ts,
+ * `copyLocomotion`).
+ *
+ * NOT the cause of play's "из убежища выпрыгивает на крышу" — that was the
+ * guess and it is measured wrong; see CLAUDE.md.
+ */
 interface Doorstep {
   building: number
-  x: number
-  y: number
-  z: number
-  heading: number
+  footing: LocomotionState
 }
 
 export interface Indoors {
@@ -60,10 +72,14 @@ export interface Indoors {
    * Put the pig in, if it can go: something in reach with room in it. True when
    * it went. The pig is moved to the building's own middle, which is what the
    * exe does (0x469fde copies the building's transform onto the pig).
+   *
+   * `footing` is what it was standing on at the door, kept whole so that
+   * leaving can put it back rather than derive a new one.
    */
-  enter(pig: Pig): boolean
-  /** …and back out, onto the spot it came from. True when it left. */
-  leave(pig: Pig): boolean
+  enter(pig: Pig, footing: LocomotionState): boolean
+  /** …and back out, onto the footing it came from — which is handed back, so
+   * the battle can stand on it again. Null when the pig was not inside. */
+  leave(pig: Pig): LocomotionState | null
   /** Whatever the pig is standing in, gone — a pig that just died, or a battle
    * being torn down. */
   clear(pig?: Pig): void
@@ -127,16 +143,10 @@ export function createIndoors(objects: readonly MapObject[], emit: Emit): Indoor
       }
       return best
     },
-    enter(pig) {
+    enter(pig, footing) {
       const building = this.reachable(pig)
       if (!building) return false
-      held.set(pig.id, {
-        building: building.id,
-        x: pig.position.x,
-        y: pig.position.y,
-        z: pig.position.z,
-        heading: pig.heading
-      })
+      held.set(pig.id, { building: building.id, footing: copyLocomotion(footing) })
       // Into the middle of it, the way the exe puts him on the building's own
       // transform. He is not drawn from here, so where exactly hardly shows —
       // but the CAMERA still watches this point, and the middle is what reads as
@@ -148,14 +158,14 @@ export function createIndoors(objects: readonly MapObject[], emit: Emit): Indoor
     },
     leave(pig) {
       const step = held.get(pig.id)
-      if (!step) return false
+      if (!step) return null
       held.delete(pig.id)
-      pig.position.x = step.x
-      pig.position.y = step.y
-      pig.position.z = step.z
-      pig.heading = step.heading
+      pig.position.x = step.footing.x
+      pig.position.y = step.footing.y
+      pig.position.z = step.footing.z
+      pig.heading = step.footing.heading
       emit({ kind: 'cameOut', pig: pig.id, building: step.building })
-      return true
+      return step.footing
     },
     clear(pig) {
       if (pig) held.delete(pig.id)

@@ -2851,12 +2851,32 @@ done yet.
    building's own transform) — but the SHELTER's record extents are transposed
    (`TRANSPOSED_BOX`), so its "middle" may not be the middle of the art, and the
    exe's transform is not the box centre either.
-7. **Coming OUT lands him on the ROOF, and the cause is known.** "Из убежища
-   выпрыгивает на крышу." `leave()` restores the doorstep's x/y/z exactly, and then
-   `loco = footingAt(acting)` re-derives the footing from that position through
-   `standOn` — which, standing against the shelter with `PIG_HOLD` of 196, finds the
-   shelter's own box top and stands him on it. The footing has to be the one he had,
-   not one worked out again.
+7. **Coming OUT lands him on the ROOF, and the cause was NOT what this said.** "Из
+   убежища выпрыгивает на крышу." The reading here was that `loco = footingAt(acting)`
+   re-derives a footing that `standOn` snaps to the shelter's box top. **Measured, and
+   it does not**: CAMP's SHELTER box runs y −1568 (top) to −1184, the ground at its
+   wall is −1216, so the top is **352** above the doorstep — past `WALL_CLIMB` 128 and
+   past `PIG_HOLD` 196 alike. A footing rebuilt at the doorstep gives −1216, one
+   rebuilt at the shelter's own centre gives −1216, and a pig left standing at that
+   centre for three seconds neither rises nor wedges. The door now hands back the
+   footing it took anyway (`indoors.enter(pig, footing)` / `leave(pig)` return it),
+   because deriving one where a kept one exists is guessing — from the box top the
+   rebuild does stick to the box top, so it is only the ground that made it safe —
+   but that is tidiness, not the fix.
+
+   **What is left, and it is the only candidate that survives measurement:** the way
+   out plays clip 7 FORWARDS, the same way in does. That clip is a climb — its root
+   track runs −115 at frame 0, **−564 at its peak** and −115 again at frame 53 — and
+   `wear.ts` puts `rootAt` on the body, so leaving springs the drawn pig ~449 model
+   units up the outside of the shelter and back down. The box is 384 tall. That is
+   what "выпрыгивает на крышу" would look like, and it explains why nothing in the
+   pig's POSITION shows it: the rise is in the pose, not in `loco`. Ruled out on the
+   way: a clamped last frame (the track returns to where it started, so it holds
+   nothing), and the exe's own per-slot reverse flag (`cmp [4D7324h],1`, which negates
+   `[pig+0x370]`) — it is 0 for skill 61 slot 0, so the binary does not say to reverse
+   it. Confirming this wants play's eye on whether the pig springs UP the wall on the
+   way out; reversing the clip is a flag through `anim` → snapshot → `wear` and is not
+   built.
 8. ~~**Finishing the shelter does not move the TUTORIAL on.**~~ **Done** — and the
    shelter had nothing to do with it. See "THE TRAINING SCRIPT MOVES" below.
 

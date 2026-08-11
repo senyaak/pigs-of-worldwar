@@ -666,11 +666,12 @@ export function createBattle(parts: BattleParts): Battle {
       if (indoors.inside(acting)) {
         // OUT first and the climb after it: he cannot be seen playing a clip from
         // inside, because inside he is not drawn at all.
-        indoors.leave(acting)
-        // His footing is rebuilt from where he came out, exactly the way a turn
-        // beginning on a bridge rebuilds one: `loco` has been standing at the
-        // building's own middle and knows nothing about the doorstep.
-        loco = footingAt(acting)
+        //
+        // The footing comes back WITH him: the door kept the one he walked in on
+        // rather than deriving a new one from the doorstep, which is a different
+        // question with a different answer for anyone who came off raised ground
+        // (lib/game/indoors.ts).
+        loco = indoors.leave(acting) ?? footingAt(acting)
         anim.playOnce(acting, INOUT_CLIP)
         onChanged()
         return
@@ -690,7 +691,9 @@ export function createBattle(parts: BattleParts): Battle {
     // driven, so the frame he lands in is the frame he is gone.
     if (climbing === acting && !anim.animating(acting)) {
       climbing = null
-      indoors.enter(acting)
+      // …and the footing he climbed from goes in with him, to be handed back at
+      // the door.
+      indoors.enter(acting, loco)
       onChanged()
       return
     }
