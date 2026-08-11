@@ -30,11 +30,17 @@ import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { pickupsOf } from '../../src/lib/game/pickups'
 import { clipForPlacement } from '../../src/lib/game/tutorial'
+import { createScript } from '../../src/lib/game/script'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
-/** 3 BAYONET, 7 RIFLE — the training ground's first two weapons. */
+/** 3 BAYONET, 7 RIFLE, 29 BAZOOKA, 37 TNT — the weapons the script hands out. */
 const BAYONET = 3
 const RIFLE = 7
+const BAZOOKA = 29
+const TNT = 37
+/** CAMP's own door, `STW04_D2`, and the crate its label brings down. */
+const DOOR = 46
+const BAZOOKA_CRATE = 19
 
 type Page = import('@playwright/test').Page
 
@@ -54,6 +60,25 @@ const dummies = (page: Page): Promise<number> =>
           pow: { debug: { props(): { at: { name: string }[] } } }
         }
       ).pow.debug.props().at.filter((each) => each.name === 'DUMMY').length
+  )
+
+/** What the map script is still holding back (three/debug.ts). */
+const script = (page: Page): Promise<{ absent: number[]; falling: number }> =>
+  page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          pow: { debug: { script(): { absent: number[]; falling: number } } }
+        }
+      ).pow.debug.script()
+  )
+
+/** Put a skill straight in the acting pig's hands — the console's own, since no
+ * crate on the way to the door carries TNT (ui/battle.ts). */
+const give = (page: Page, skill: number): Promise<boolean> =>
+  page.evaluate(
+    (s) => (window as unknown as { pow: { give(x: number): boolean } }).pow.give(s),
+    skill
   )
 
 /** Where `clip` first appears, or −1 — the order is the whole assertion. */
@@ -109,4 +134,43 @@ test('the training script moves: collected, chosen, and then PLACED', async ({ a
   const heard = await spoken(page)
   expect(at(heard, 3), `out of order: ${heard.join(',')}`).toBeLessThan(at(heard, 5))
   expect(at(heard, 5), `out of order: ${heard.join(',')}`).toBeLessThan(at(heard, line))
+})
+
+test('BLOWING THE DOOR drops the bazooka, and the sergeant says so', async ({ app }) => {
+  const { page } = app
+  await startGame(page)
+
+  // CAMP's door is record #46, `STW04_D2`, and it is the one object on the map
+  // whose command is the guarded opcode 22: it waits on label 89, which nothing
+  // else waits on, and signals **7** — which the BAZOOKA crate (#19), the
+  // health×25 crate (#56) and two more dummies all wait for. So the whole rest of
+  // the tutorial hangs off this one break.
+  const door = createScript(CAMP).finish(DOOR).map((one) => one.id)
+  expect(door, 'the door places the bazooka crate').toContain(BAZOOKA_CRATE)
+
+  const before = await script(page)
+  expect(before.absent, 'the bazooka is held back at load').toContain(BAZOOKA_CRATE)
+
+  // Blow it up. TNT one-shots it — 6400 in 128ths against fifty points.
+  const record = CAMP.find((one) => one.id === DOOR)!
+  await warp(page, record.x, record.z - 300, 0)
+  await beginTurn(page)
+  await give(page, TNT)
+  await page.waitForTimeout(900) // the getting-it-out clip
+  await press(page, 'fire')
+
+  // **THE STEP IS OWED BY THE BATTLE, not by the beat that is running.** TNT's
+  // fuse outlasts the four seconds planting hands back, so the door breaks inside
+  // the beat at the END of the turn — and that beat used to return before the
+  // script step was ever paid, with `focus` clearing the debt on the handover.
+  // Play: "когда взрываю дверь — должна базука падать - щас нет."
+  await expect
+    .poll(async () => (await script(page)).absent, { timeout: 20_000 })
+    .not.toContain(BAZOOKA_CRATE)
+
+  // …and the crate coming down is what SPEAKS: clip 22, the placement line for
+  // skill 29 (lib/game/tutorial.ts).
+  const line = clipForPlacement(BAZOOKA, 0)
+  expect(line, 'the placement table has forgotten the bazooka').toBe(22)
+  await expect.poll(async () => spoken(page), { timeout: 10_000 }).toContain(line)
 })

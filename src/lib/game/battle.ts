@@ -239,6 +239,22 @@ export function createBattle(parts: BattleParts): Battle {
   /** A script step owed to something that has broken, and not run until it has
    * finished breaking. One animation at a time. */
   let pending: { id: number; y: number } | null = null
+
+  /**
+   * Pay it, once everything the break set going has stopped.
+   *
+   * ONE THING AT A TIME. The script's next step waits for the thing that
+   * triggered it to finish — play's rule for the whole game, "ждёшь конца одной
+   * анимации и включаешь другую". `effects.busy()`, not `smoke() === 0`: the
+   * break effect's burst does not fire until its third frame, so counting puffs
+   * said "finished" on the very frame the dummy broke.
+   */
+  const payScriptStep = (): void => {
+    if (!pending) return
+    if (swings.running() || anim.animating(game.currentPig) || effects.busy()) return
+    scenery.advance(pending.id, pending.y)
+    pending = null
+  }
   /** Whether the weapon in hand has been USED, and so the turn is over as soon
    * as the world it disturbed goes quiet (lib/game/spend.ts). */
   let spent = false
@@ -479,6 +495,20 @@ export function createBattle(parts: BattleParts): Battle {
       aloft: loco.airborne !== null
     })
 
+    // **THE SCRIPT STEP IS OWED BY THE BATTLE, not by the beat that happened to
+    // be running.** It used to be paid inside the `aftermath` branch alone, and
+    // that is where the training ground stopped dead: TNT's fuse outlasts the
+    // four seconds planting hands back, so the DOOR breaks inside the beat at the
+    // END of the turn — which returns three branches above this one and never
+    // reaches it — and then `focus` cleared the debt on the handover. Play:
+    // "когда взрываю дверь — должна базука падать - щас нет." The crate the whole
+    // rest of the tutorial waits on was being dropped on the floor.
+    //
+    // The exe owes no wait at all — `Object::RunScript` is the last thing the
+    // break handler does (0x48d972). The wait is the remake's own pacing, so it
+    // stays; what it must not do is depend on which mode the game is in.
+    payScriptStep()
+
     // The beat at the END of a turn: mode 13, WALK AWAY. Nobody is driving, the
     // clock does not run, and everyone still in the water makes for the nearest
     // shore (lib/game/walkAway.ts). It holds until they are all out and the
@@ -488,7 +518,10 @@ export function createBattle(parts: BattleParts): Battle {
       attack.swallow()
       // Everything that runs on its own runs on: the engine's step advances all
       // of it after this call (lib/game/engine.ts). All this beat does is watch.
-      const done = walkAway.update(delta, settling())
+      // …and it holds for an unpaid script step too, so the turn cannot be handed
+      // over on top of one. `focus` clears the debt, which is right for a warp and
+      // fatal here.
+      const done = walkAway.update(delta, settling() || pending !== null)
       // A pig thrown by the charge it planted is still in the air, and the beat is
       // waiting for it (`settling`). Its flight owns its position for as long as it
       // lasts; the walk home is what the beat does with pigs on the ground.
@@ -599,15 +632,10 @@ export function createBattle(parts: BattleParts): Battle {
       flyOn(delta)
       // The shot that caused all this ends here rather than a frame late.
       attack.settled()
-      // ONE THING AT A TIME. The script's next step waits for the thing that
-      // triggered it to finish — play's rule for the whole game, "ждёшь конца
-      // одной анимации и включаешь другую". `busy()`, not `smoke() === 0`: the
-      // break effect's burst does not fire until its third frame, so counting
-      // puffs said "finished" on the very frame the dummy broke.
-      if (pending && !swings.running() && !anim.animating(acting) && !effects.busy()) {
-        scenery.advance(pending.id, pending.y)
-        pending = null
-      }
+      // …and the step it owes, now that everything it was waiting on has had
+      // this frame (`payScriptStep` is also called before the branches, for the
+      // beats that never get here).
+      payScriptStep()
       // The world, plus the three things only this wait knows about: the script
       // step it owes, the blow's own animation, and the pig playing it out. A pig
       // swimming for the shore is on the exe's list too and is not modelled —
