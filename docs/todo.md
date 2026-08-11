@@ -331,10 +331,24 @@ library that cannot be read" any more.
   since: **the field IS the skill in hand** (its eight writers hand the same
   number to the pig, including the literals 60 VEHICLE INOUT and 61 BUILDING
   INOUT), and **the ART is a full disc** — measured, 335 flat-red pixels in
-  a brass ring with a specular highlight, nothing half-filled. Play's
-  reading that the lens means "a second fire press does something" does not
-  survive it: the grenade family is exactly what CAN be hand-detonated, and
-  it is exactly what the lens is hidden for. Same pass: the gauge
+  a brass ring with a specular highlight.
+
+  **AND WHAT IT MEANS IS SETTLED — play's reading, which I first wrote down
+  as refuted and which is in fact exactly right.** Play: "лампа гаснет
+  именно там, где второе нажатие работает — ЭТО И ЕСТЬ ПОЛУЗАЛИВКА." The
+  exe's two states are play's two states: the **full disc** is shown for
+  everything that goes off by itself, and it is **absent** for skills 19..26
+  — the grenade family, precisely the set where a second FIRE press
+  hand-detonates. So the lens tells the player whether they still have a say.
+  The half-filled circle is the weapon port showing through, i.e. the remake's
+  own `LENS_ORDINARY = 0.5` in `ui/battle.ts` — and our existing rule
+  (`lobOf(holding)?.contact ? 1 : 0.5`) already sorts the weapons the way the
+  exe does. Nothing here needs changing; only the empty state is painted
+  differently (the exe draws no disc at all rather than half of one).
+
+  The mistake worth not repeating: I stated the correlation — "the family the
+  lens is hidden for is exactly the family with hand-detonation" — and then
+  concluded it disproved the meaning instead of being it. Same pass: the gauge
   slides in over 20 frames through an authored ease table (0x4D1958), the
   slider's x is `[game+0x4E4]` times two constants, the clock's digits are
   `dashtims[13 + digit]`, and — the big one — **the dashboard's LAYOUT is
