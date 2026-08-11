@@ -2857,11 +2857,8 @@ done yet.
    `standOn` — which, standing against the shelter with `PIG_HOLD` of 196, finds the
    shelter's own box top and stands him on it. The footing has to be the one he had,
    not one worked out again.
-8. **Finishing the shelter does not move the TUTORIAL on.** "Выполнение задания по
-   убежищу не двигает туториал." `lib/game/tutorial.ts` speaks off the SKILL just
-   collected, because the exe's dispatcher switches on that — so nothing in it can
-   answer for getting into a building. Which step the original attaches to the
-   shelter is not read.
+8. ~~**Finishing the shelter does not move the TUTORIAL on.**~~ **Done** — and the
+   shelter had nothing to do with it. See "THE TRAINING SCRIPT MOVES" below.
 
 1. **A trodden mine wants an EXCLAMATION MARK over it.** "когда наступил — мина
    появляется с восклицательным знаком над ней." The mine itself appears now, in the
@@ -2909,6 +2906,60 @@ done yet.
    refuses a building the OTHER SIDE is holding (`0x43f910` against `[+0x194]`), and
    its own reach test differences a pair of words out of `0x44e850` that have not
    been transcribed. `objects/notes.md` has the read.
+
+### THE TRAINING SCRIPT MOVES — and no step is hung on a building
+
+Play: "выполнение задания по убежищу не двигает туториал." The guess in the list
+above was that the shelter wanted a trigger of its own. It does not. **Nothing in
+the original's training script fires on entering a building**, and the two lines
+that mention one are an ordinary pair of crates: "USE BACKSPACE BUTTON TO ENTER
+AND EXIT BUILDINGS OR VEHICLES" is the health×25 crate being COLLECTED, and
+"ENTER THE BUILDING AND COLLECT THE CRATE" is the bazooka crate being PLACED —
+inside it. Walking in is never a step; collecting what is in there is the next
+one.
+
+What was actually missing is the whole other HALF of the script. Everything the
+remake could say hung on a crate being collected, and **a collected crate signals
+nothing**: field 15's high byte is its contents, so `Command.signals` is always 0
+(`lib/game/script.ts`). The chain runs on DUMMIES breaking, and what speaks then
+is the second dispatcher, `0x465AB0`, called from the placement arm at
+`0x4AA6B7` — guarded by the training flag and by the crate not being a health one
+(`cmp [esi+80h],1`). Those are the six "FOLLOW THE … PATH" lines, and without
+them the sergeant explains each weapon and never once says where to go.
+
+Its table is read off the jump table rather than off its prose: `[skill - 7]`
+into the byte map at `0x465C88`, six targets at `0x465C70`, and each arm pushes a
+`gtext` and then its clip 209 apart, as everywhere else in the script.
+
+| placed | clip | line |
+| ------ | ---- | ---- |
+| 7 RIFLE | 6 | FOLLOW THE YELLOW PATH AND COLLECT THE CRATE. |
+| 11 SNIPER RIFLE | 10 | COLLECT THE CRATE. |
+| 19 GRENADE ×5 | 12 | FOLLOW THE RED PATH… |
+| 19 GRENADE ×10 | 15 | FOLLOW THE BLUE PATH… |
+| 29 BAZOOKA | 22 | ENTER THE BUILDING AND COLLECT THE CRATE. |
+| 37 TNT | 17 | FOLLOW THE PURPLE PATH AND CLIMB OVER THE GATE. |
+
+**And the third mechanism is a COUNTER, not a dispatcher.** `[gameMode+0x32C]`
+— on the object at `[0x537F24]`, whose `+0x329` is the level's copy of the
+training flag — is moved by exactly three sites: every crate line ZEROES it in
+its shared tail (0x465bb5, 0x465c4a), opening the skill menu sets it to **1**
+(0x492b37), and taking something OUT of that menu increments it, but only from 1
+upwards (0x4933c5). So the ordinary course is crate → menu → choice, and the
+choice is count TWO — which is where clip 5, "PRESS SPACE TO ATTACK THE DUMMY",
+lives. That line was the one the notes called untraceable. Clip 9 is the rifle's
+same beat; clip 14 is the grenade's NAG, which asks for a count divisible by five
+and for the sergeant to be quiet, so it comes back round rather than firing first.
+
+Clip 4 is the same block's other half and is NOT built: it hangs on
+`[gameMode+0]` being 3 (0x492af5) and that field is not identified.
+
+`lib/game/tutorial.ts` is the tables, `events.ts` carries `placed` and `chose`,
+`ui/battle.ts` holds the counter and is the one listener that speaks, and
+`pow.spoken()` is how any of it can be watched — the script runs on SPEECH, and
+the briefing bar only ever carries the key press. `e2e/002/tutorial.spec.ts`
+drives the first three steps on the real map and reads the clips back in order:
+3 collected, 5 chosen, 6 placed.
 
 ### What is still not read
 

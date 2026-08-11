@@ -62,6 +62,11 @@ export type BattleEvent =
   | { kind: 'shown'; id: number; visible: boolean }
   /** …and this one is gone for good: collected. */
   | { kind: 'taken'; id: number }
+  /** The script has just PUT a crate on the map — what it holds, before it has
+   * come down. The training ground's own script speaks off this and nothing
+   * else (lib/game/tutorial.ts); `shown`/`crateSent` say the same moment for
+   * the art. */
+  | { kind: 'placed'; id: number; skill: number | null; amount: number }
   /** A crate the pig walked into — `given` is what it actually got. */
   | { kind: 'collected'; skill: number | null; amount: number; given: number; pig: PigId }
   /** …and points went BACK in: the number floats off the pig and it sighs.
@@ -96,6 +101,9 @@ export type BattleEvent =
   | { kind: 'skillUsed' }
   /** The pig's inventory came open — R, and it drives in from the right. */
   | { kind: 'menuOpened' }
+  /** …and something came OUT of it, into the pig's hands. The training
+   * ground's script counts these (lib/game/tutorial.ts). */
+  | { kind: 'chose'; skill: number }
   /** The acting pig says a firing line, per squad. */
   | { kind: 'bark'; player: number }
 

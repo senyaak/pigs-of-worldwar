@@ -320,9 +320,12 @@ declare global {
       swapMap?(name?: string): Promise<boolean>
       /** Console command: put a line through the briefing bar —
        * `pow.say('USE SHIFT BUTTON TO JUMP THE GAP.')`. With no argument it
-       * sends the tutorial's own line 227. The tutorial script will drive
-       * the same bar when it lands. */
+       * sends the tutorial's own line 227. The tutorial script drives the
+       * same bar. */
       say?(text?: string): void
+      /** Every training clip spoken this battle, in order — the tutorial
+       * script runs on speech, so this is how it is watched (ui/battle.ts). */
+      spoken?(): number[]
       /** Console command: put a skill in the acting pig's hands —
        * `pow.give(19)` for a grenade. The remake's own: no crate on the
        * training ground carries one, so nothing else can reach it. */

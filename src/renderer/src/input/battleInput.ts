@@ -220,8 +220,12 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
           // Everything the pig reaches for and HOLDS (three/battle.ts) — SKIP
           // TURN included, which is the correction play asked for: "пропуск хода
           // должен применяться на стрелять, а не на выборе". Nothing fires here.
-          game.currentPig.holding = host.skills.chosen()
+          const skill = host.skills.chosen()
+          game.currentPig.holding = skill
           host.skills.close()
+          // The training ground counts this: a weapon coming out of the menu is
+          // the beat the sergeant says what to do with it (lib/game/tutorial.ts).
+          if (skill !== null) host.emit({ kind: 'chose', skill })
         }
         return
       case 'jump':

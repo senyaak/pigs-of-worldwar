@@ -20,8 +20,16 @@ import { missionTitle } from './titleCard'
 import { createSpeech } from '../audio/speech'
 import { createBattleSound } from '../audio/battleSound'
 import type { BattleSound } from '../audio/battleSound'
-import { createBus } from '../../../lib/game/events'
-import { CLIP_FOR, clipForPickup, isTrainingGround, lineFor } from '../../../lib/game/tutorial'
+import { createBus, handling } from '../../../lib/game/events'
+import {
+  CLIP_FOR,
+  MENU_ARMED,
+  clipForChosen,
+  clipForPickup,
+  clipForPlacement,
+  isTrainingGround,
+  lineFor
+} from '../../../lib/game/tutorial'
 import type { Cue } from '../../../lib/game/tutorial'
 import { skillName } from '../../../lib/game/skills'
 import { UNLIMITED } from '../../../lib/game/inventory'
@@ -110,20 +118,33 @@ export function initBattle(onLeave: () => void): BattleView {
   const speech = createSpeech()
   /** Which cues have already been spoken this battle — each fires once. */
   let cued = new Set<Cue>()
+  /**
+   * The script's own counter, `[gameMode+0x32C]` — zeroed by every crate line,
+   * armed when the skill menu opens, spent by what comes out of it
+   * (lib/game/tutorial.ts).
+   */
+  let step = 0
 
   /**
    * The tutorial speaking: the clip out of `Speech/Sku1/Train1`, and its line
-   * through the briefing bar. Only on the training ground, and only the once
-   * per battle (lib/game/tutorial.ts).
+   * through the briefing bar. Only on the training ground, and clip 0 is the
+   * script's own "say nothing" (lib/game/tutorial.ts). Every step in the
+   * script arrives here — the opening beats, a crate collected, a crate
+   * placed.
    */
-  const cue = (kind: Cue): void => {
-    if (!isTrainingGround(map) || cued.has(kind)) return
-    cued.add(kind)
-    const clip = CLIP_FOR[kind]
+  const sergeant = (clip: number): void => {
+    if (!isTrainingGround(map) || clip === 0) return
     speech.play(clip)
     // Several of the lines are a single space — those steps are voice alone,
     // and the bar has nothing to open for.
     hud.say(lineFor(battleText, clip).trim())
+  }
+
+  /** The two beats that are not an object's doing: each fires once a battle. */
+  const cue = (kind: Cue): void => {
+    if (cued.has(kind)) return
+    cued.add(kind)
+    sergeant(CLIP_FOR[kind])
   }
 
   /**
@@ -146,14 +167,10 @@ export function initBattle(onLeave: () => void): BattleView {
     }
     // On the training ground the crate IS the script, and the exe says its
     // line FIRST: the tutorial is called at the top of `GiveSkill`, before
-    // the pickup's own message is queued (lib/game/tutorial.ts).
-    if (isTrainingGround(map)) {
-      const clip = clipForPickup(skill, amount)
-      if (clip !== 0) {
-        speech.play(clip)
-        hud.say(lineFor(battleText, clip).trim())
-      }
-    }
+    // the pickup's own message is queued (lib/game/tutorial.ts). A crate line
+    // starts the prompt counter over, whichever dispatcher spoke it.
+    step = 0
+    sergeant(clipForPickup(skill, amount))
     if (skill === null) {
       hud.say((battleText[FOUND_PROVISIONS] ?? '').replace('>S', nameOf(pig)))
       return
@@ -293,6 +310,7 @@ export function initBattle(onLeave: () => void): BattleView {
     // opening again.
     speech.stop()
     cued = new Set()
+    step = 0
     const teams = nations(textResult.strings)
     if (teams.length === 0) return refuse('the install names no teams')
 
@@ -353,6 +371,29 @@ export function initBattle(onLeave: () => void): BattleView {
     sound?.dispose()
     const bus = createBus()
     sound = createBattleSound(bus)
+    // The instructor is a listener like any other. A crate the SCRIPT has just
+    // put on the map is the half of the tutorial that says where to go next,
+    // and it comes straight off the bus rather than through the scene — the
+    // collected line goes the long way round only because it shares the
+    // briefing bar's wording with the pickup message.
+    bus.on(
+      handling({
+        placed: ({ skill, amount }) => {
+          step = 0
+          sergeant(clipForPlacement(skill, amount))
+        },
+        menuOpened: () => {
+          step = MENU_ARMED
+        },
+        chose: ({ skill }) => {
+          // Never from a standing start: a menu that was not opened since the
+          // last crate line counts nothing (`cmp eax,1 ; jl`, 0x4933c5).
+          if (step < MENU_ARMED) return
+          step += 1
+          sergeant(clipForChosen(skill, step, speech.saying() === 0))
+        }
+      })
+    )
     scene = buildBattle({
       host,
       query,
@@ -408,6 +449,10 @@ export function initBattle(onLeave: () => void): BattleView {
     // The bar has no script driving it yet, so this is how it is watched:
     // any line, or the tutorial's own long one by default.
     say: (text?: string) => hud.say(text ?? battleText[SAMPLE_LINE] ?? ''),
+    // Every clip the sergeant has spoken this battle, in order — the script
+    // runs on speech, so this is the only way to watch it work. Read-only, and
+    // the same list `Speech.spoken()` keeps (audio/speech.ts).
+    spoken: () => speech.spoken(),
     // …and the console is how a weapon nobody's crate carries gets tried.
     // The training ground hands out a bayonet and then a rifle and that is
     // the whole of it, so a GRENADE cannot be reached by playing at all —

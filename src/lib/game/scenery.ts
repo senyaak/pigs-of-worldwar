@@ -139,6 +139,15 @@ export function createScenery(
         // The collision world waits for the landing; a crate still in the air
         // is not standing anywhere.
         drop(one.id, fromY)
+        // …and this is the moment the training ground's script talks at. The
+        // exe announces it from the same arm, between setting the crate's own
+        // "just placed" byte and clearing the pig (0x4aa69c..0x4aa6b7), and
+        // what it says is about the crate's CONTENTS — so the event carries
+        // them (lib/game/tutorial.ts).
+        const crate = pickups.find((each) => each.id === one.id)
+        if (crate) {
+          emit({ kind: 'placed', id: one.id, skill: crate.skill, amount: crate.amount })
+        }
         continue
       }
       emit({ kind: 'shown', id: one.id, visible: true })
