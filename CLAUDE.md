@@ -3048,6 +3048,57 @@ decision and not a rule — `ui/battle.ts` substitutes it into `hud.draw`'s
 `holding` and `pig.holding` is untouched, because the fire key acts on that and
 the remake's door is a key of its own.
 
+### THE BAZOOKA — a rocket with no fuse, 2026-08-11
+
+Play: "продектайл со своей анимацией итд + звук выстрела + урон при касании —
+важно в воде не взрывается, а тонет." Skill 29 was in neither table — not a gun
+(it charges) and not among the lob rows — so it could be taken in hand and did
+nothing at all. The whole of it is read; `weapons/fire.md` has the derivation.
+
+**Row +0x14 nil is the CONTACT class, and that is the finding.** The projectile
+constructor branches on it (0x43200c): non-zero starts the thing in state 0, the
+arming count every grenade takes; nil takes `[proj+0xA2]` — row +0x1C's low byte
+— through the table at 0x432590, and the bazooka's 0 lands on **state 2**, one of
+the two update arms that do nothing at all. It has no fuse and nothing counts it
+down. What ends it is the landscape handler turning state 2 into state 6 the
+moment it touches anything (0x437f2c), and state 6 is `[proj+0x31] = 1`, which is
+the destructor, which is where the blast is.
+
+Its row against the plain grenade's: speed **500** a frame at full charge against
+300, damage **5120** — forty points, so a grunt survives on ten — over a blast
+field of 2048, TNT's reach rather than a grenade's. `Lob.contact` in
+`lib/game/grenade.ts` is that read, `fuseSeconds` returns Infinity for it, and
+`lobs.ts` bursts on the first ground or box contact instead of bouncing.
+
+**Water still takes it**, and not as a special case: the water test is FIRST in
+the same handler and the douse sets the quiet flag the destructor reads before
+anything else. One divergence is flagged at the line — the douse arm wants an
+arrival under 150 or one of the bullet kinds, and kind 10 is neither, so the exe
+would let a fast rocket SKIP. Play's word is flat against that and the remake
+follows play: a rocket never skims.
+
+**The report is decoded, not picked.** Every weapon's fire arm hangs off one jump
+table (0x47cf8c, indexed by `skill − 6`) and each plays its own sound: skill 29's
+is `Sound::Play(0x24, 100, 100)` and index 36 of `Audio/sfxday.srl` is
+**`L_BAZOO`**. The rest of that column is written down in the notes and in
+`audio/battle.ts` and is one line each when wanted. `fired` is emitted by
+`lobs.throwOne` now as well as by the bullets, and a lob with no cue makes no
+report — a grenade leaving the hand is not a gunshot.
+
+**And the ROCKET is not the launcher.** Name-table row 398 is `WE_BAZZ`, out of
+the MAP's own archive like `WE_APMIN`; what is in the hand is `bazookr`. Without
+the split a fired rocket flew as a second launcher. `lib/game/ammo.ts` is the
+table, and `three/grenades.ts` falls back to the map's archive for any name
+`Chars/WEAPONS.MAD` has never heard of.
+
+Left open: the record's `+0x28`/`+0x2C`, which are 1 on the grenade and TNT and 0
+on the rifle and the bazooka, readers unchased. And play's "индикатор красный на
+панели силы полностью закрашен" — the trough's red is painted into `newpow3..7`
+themselves (palette index 4, rgb 205,0,0) and the remake draws all five tiles
+whole, so the red bar is already fully there; nothing in the exe has been found
+that fills or clears it per weapon, and screenshots went back to play rather than
+a guess at pixels.
+
 ### What is still not read
 
 - **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's
