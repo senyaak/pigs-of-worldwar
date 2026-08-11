@@ -2546,11 +2546,41 @@ frame, so an oriented box needs no special case) and `three/props.ts` swaps thos
 meshes onto a cloned see-through material set. Every record of a model shares one
 material array, which is why it clones rather than turning the shared one down.
 
+### THE FUSE BURNS, and the throw is six times the damage
+
+The last two off play's list, both of them numbers or art the exe does not give.
+
+**"Динамит не горит."** It does now: a spark on the end the black stub is on, which
+is the end that stands up. `three/fuse.ts` — an additive sprite that flickers on the
+battle's own clock, so two machines stepping the same battle draw the same flame,
+sized off the bundle and placed at model x −148 (the far end of the stub, measured
+when the charge was stood up in the first place). **Nothing about it is a reading**
+and the file says so at the top: the two mine rows differ only in their effect ids,
+0x4c against 0x55, and neither effect has been opened. `window.pow.debug.burning()`
+counts them, because a sprite on a transparent quad is not something a screenshot
+can be held to.
+
+**And the throw went from four times the damage to SIX.** Play: "отбрасывание миной
+всё ещё кажется слабым (может я не прав)." Not wrong — at four a mine's twenty
+points came to 80 a frame, between a bayonet and a trotter. At six the three blasts
+in the game land like this, all of it under the cattle prod's 200 which is the
+hardest knock the exe hands out:
+
+| blast | points at the core | speed |
+| ----- | ------------------ | ----- |
+| a MINE | 20 | **120 = 0x78**, the engine's own other decoded knock |
+| a GRENADE | 30 | 180 |
+| TNT | 50 | 300, held at the 200 cap |
+
 ### PLAY'S OPEN LIST — what is still open (2026-08-10)
 
-Four of the seven are fixed and are written up above: the charge that stands
-fuse-up, the blast that throws, the house that takes damage, the textures that
-flickered. Written down here rather than in a chat that scrolls away.
+Everything play has named over three passes is written up above as its own section:
+the charge that stands fuse-up and burns, the blast that throws and how hard, the
+house that takes damage and stops flickering and stops being walk-through, the
+shelter's collider, the door's own health, the pig that is no longer twice its own
+width, the wall that fades when he is behind it, the crate that empties the hands, a
+steep throw that goes in the water, black smoke, a bullet's trail. What is left is
+here rather than in a chat that scrolls away.
 
 1. **A trodden mine wants an EXCLAMATION MARK over it.** "когда наступил — мина
    появляется с восклицательным знаком над ней." The mine's own model appears now
@@ -2572,31 +2602,24 @@ flickered. Written down here rather than in a chat that scrolls away.
 3. **`002/effects.spec.ts:161` is flaky** — one fireball sprite's outward bearing can
    roll near-vertical and the assertion is on blob 0 alone. Seed the roll or assert
    over all of them; it failed once in a full run and passes alone.
-4. **A BURNING FUSE.** "Динамит не горит." A planted charge lays the grenade's own
-   smoke trail where it stands (the constructor's parented effect, lib/game/trail.ts),
-   and that is all it does. What the original shows at the fuse is not decoded — the
-   two mine rows differ only in their effect ids, 0x4c and 0x55, and neither is
-   built — so anything more would be invented art. Say the word and it gets some.
-5. **Is the throw still light?** "Отбрасывание миной всё ещё кажется слабым (может
-   я не прав)." A mine's twenty points now throw at 80 a frame — above a bayonet's
-   75, below a trotter's 100 — while TNT's fifty hit the cattle prod's 200 cap. If a
-   mine should fling harder than a punch, the coefficient is the one number to move
-   (`FLING_PER_POINT`, lib/game/blast.ts).
-6. **`002/camera-smooth.spec.ts:92` is load-sensitive**, not broken by anything in
+4. **`002/camera-smooth.spec.ts:92` is load-sensitive**, not broken by anything in
    this pass: measured at 0.390 against a 0.35 threshold at HEAD with every change
    of this round stashed away, and it passed three full runs earlier in the same
    session. It is a jerk-over-step ratio sampled from real frames, so a machine
    busy building and running suites fails it. Either the threshold is wrong or the
    measure needs the engine's own step rather than the monitor's.
-7. **`PIG_RADIUS` still bears watching, from the other end.** The radius itself is
-   read now, but the pig's ctor passes `0x1000` for its three scales where a prop
-   gets `0x800` (0x466986 against 0x4a592f) — so the original may draw a pig at FULL
-   model scale, twice what this remake does. That decides whether a 170 sphere is
-   right beside a 325-tall pig or beside a 651-tall one, and it moves every reach in
-   the game, so it wants its own measured pass. Play: "также про свина с сильно
-   большой моделькой."
-8. **Getting INSIDE a building** is the IN/OUT family (skills 61, 62, 64) with the
-   taxonomy's GUN_BARRELS beside it, and none of it is built.
+5. **The pig's DRAW SCALE, from the other end.** Its body is settled — 170 halved,
+   and the drawn shoulders agree — but the ctor still passes `0x1000` for the three
+   scales where a prop gets `0x800` (0x466986 against 0x4a592f). If that means the
+   original draws a pig at full model scale it moves every reach in the game, so it
+   wants its own measured pass; the two agreeing measurements are why it is no
+   longer urgent.
+6. **Getting INSIDE a building** is the IN/OUT family (skills 61, 62, 64) with the
+   taxonomy's GUN_BARRELS group beside it (BIGBAR, BUNKGUN, PILLBAR, AMPHGUN,
+   B_GUN, TANBAR) and the pillbox's own weapons at 45 and 46. None of it is built —
+   and the exe's see-through hook is for exactly that state (`[pig+0x170]`), so the
+   day it lands, the fade above should follow the exe's rule for a BUILDING rather
+   than the remake's general one.
 
 ### What is still not read
 
