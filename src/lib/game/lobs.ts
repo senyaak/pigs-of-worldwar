@@ -150,12 +150,21 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
     )
   }
 
-  /** Put it back on whatever it went into. False when it met nothing. */
-  const settle = (shot: Lobbed, wasY: number): boolean => {
+  /**
+   * What a contact did to the thing that made it.
+   *
+   * `'burst'` is the rocket's: state 2 goes straight to state 6 on a landscape
+   * contact and the destructor is where the blast is (lib/game/grenade.ts,
+   * `Lob.contact`). Everything else either bounced, skipped or sank, and the
+   * caller has nothing more to do about it.
+   */
+  type Landing = 'none' | 'settled' | 'burst'
+
+  const settle = (shot: Lobbed, wasY: number): Landing => {
     const ground = world.query.height(shot.x, shot.z)
     // Its own row's physics material — the surface multiplies its half in.
     const row = lobOf(shot.skill)
-    if (!row) return false
+    if (!row) return 'none'
     // WATER FIRST, and it is ONE contact — the surface and the bed are the same
     // plane. `Projectile::OnHitLandscape` (0x4377d0) splits on the contact scalar:
     // under 150 it douses (0x437bfb, gated on the water test `0x4A6FA0`), over it
@@ -174,7 +183,12 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       // in-plane speed (0x4A9260 at an angle of 0x400 — a quarter turn, straight
       // up), which is a stone off a pond, and the fifth is paid for out of the
       // travel so the hops run down (lib/game/grenade.ts).
-      if (skipsOnWater(shot)) {
+      // A ROCKET never skims. The exe would let it: the douse arm wants an
+      // arrival under 150 or one of the bullet kinds (0x0C..0x17), and kind 10 is
+      // neither — so a fast one would take 0x437e5d, be kicked up, and carry on.
+      // Play's word is flat against that — "важно в воде не взрывается, а тонет"
+      // — and play's word is what stands where the two disagree.
+      if (!row.contact && skipsOnWater(shot)) {
         bounceLob(
           shot,
           level,
@@ -185,15 +199,19 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
         )
         skipOffWater(shot)
         emit({ kind: 'skimmed', at: on })
-        return true
+        return 'settled'
       }
       // …or it goes in and DOWN, and it does not go off. The quiet flag is the
       // engine's (0x437d34) — play remembered it before the binary said so,
       // "по-моему даже не взрываться" — and the couple of seconds of sinking are
       // the remake's, because there is nothing on these maps to sink through.
+      // …and a ROCKET goes the same way. Play, and the exe: the water test comes
+      // FIRST in the handler (0x437c74) and the douse sets the quiet flag the
+      // destructor reads before anything else (0x4328c9), so nothing that goes
+      // in the water goes off — contact weapon or not.
       douseInWater(shot)
       emit({ kind: 'doused', at: on })
-      return true
+      return 'settled'
     }
     if (shot.y >= ground) {
       // A MINEFIELD is set off by anything that touches it, not only by a foot:
@@ -204,6 +222,13 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       if (world.mines.tread(shot.x, shot.z)) {
         emit({ kind: 'mineTripped', at: { x: shot.x, y: ground, z: shot.z } })
       }
+      // A ROCKET does not bounce: it is stopped where it touched, and the caller
+      // sets it off there. Checked BEFORE the bounce, or the blast would land at
+      // the reflected point rather than at the impact.
+      if (row.contact) {
+        shot.y = ground
+        return 'burst'
+      }
       bounceLob(
         shot,
         ground,
@@ -212,17 +237,21 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
         !world.query.walkable(shot.x, shot.z),
         lobBounce(row)
       )
-      return true
+      return 'settled'
     }
     // A box is a flat stop rather than a surface: the map's obstacles carry no
     // normal, so a grenade that goes into one is put back where it came from
     // and bounced off the vertical. Crude, and the same crudeness a bullet's
     // `solid` test has.
     if (world.obstacles.solid(shot.x, shot.y, shot.z)) {
+      if (row.contact) {
+        shot.y = wasY
+        return 'burst'
+      }
       bounceLob(shot, wasY, { x: 0, y: -1, z: 0 }, 0, true, lobBounce(row))
-      return true
+      return 'settled'
     }
-    return false
+    return 'none'
   }
 
   return {
@@ -235,6 +264,10 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       if (!shot) return false
       shot.id = named++
       flying.push(shot)
+      // …and the barrel is heard. Every weapon's fire arm plays a sound of its
+      // own — the bazooka's is decoded (audio/battle.ts) — and a lob whose sound
+      // nobody has read simply makes none.
+      emit({ kind: 'fired', skill })
       return true
     },
     plant(pig) {
@@ -304,7 +337,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
         for (let step = 0; step < steps && !spent && !shot.doused; step++) {
           const wasY = shot.y
           spent = advanceLob(shot, delta / steps)
-          settle(shot, wasY)
+          if (settle(shot, wasY) === 'burst') spent = true
           // Whatever happened, it does not END below the ground. A bounce off
           // a slope reflects into the hill as often as out of it, and one
           // sub-step of that is enough to lose the thing.

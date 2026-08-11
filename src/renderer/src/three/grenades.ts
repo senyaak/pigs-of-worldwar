@@ -14,6 +14,7 @@ import { LOB_STEP } from '../../../lib/game/lobs'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import type { Point } from '../../../lib/game/pose'
 import { weaponModelName } from '../../../lib/game/weapons'
+import { projectileModel } from '../../../lib/game/ammo'
 import { isPlanted } from '../../../lib/game/grenade'
 import { createLobArt } from './lobArt'
 import { createLobTrails } from './lobTrail'
@@ -104,7 +105,14 @@ const liftOf = (mesh: THREE.Mesh, skill: number): number => {
   return posed.copy(box).applyMatrix4(pose.makeRotationFromEuler(mesh.rotation)).max.y
 }
 
-export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
+export function createGrenadeArt(
+  root: THREE.Object3D,
+  /** A fresh mesh of one of the MAP's models by name — where the engine's own
+   * spawned art lives (lib/game/ammo.ts). The bazooka's rocket is `WE_BAZZ` and
+   * it is not in `Chars/WEAPONS.MAD` at all, so without this a fired rocket had
+   * nothing to be drawn as. */
+  spawn?: (name: string) => THREE.Mesh | null
+): GrenadeArt {
   /** The mesh drawn for each live grenade, by its index — null while the model
    * is still loading, which is the one state that draws nothing at all. */
   const meshes: (THREE.Mesh | null)[] = []
@@ -126,7 +134,9 @@ export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
     while (meshes.length <= i) meshes.push(null)
     if (meshes[i]) return meshes[i]
     if (!name) return null
-    const mesh = art.take(name)
+    // The weapon archive first, and the MAP's if it has never heard of the name:
+    // `take` caches its miss, so this asks WEAPONS.MAD once and the map after.
+    const mesh = art.take(name) ?? spawn?.(name) ?? null
     if (!mesh) return null
     mesh.scale.setScalar(MODEL_SCALE)
     root.add(mesh)
@@ -151,7 +161,9 @@ export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
       alight.clear()
       for (let i = 0; i < live.length; i++) {
         const shot = live[i]
-        const mesh = meshAt(i, weaponModelName(shot.skill))
+        // What FLIES is not always what was in the hand — a bazooka's rocket is
+        // `WE_BAZZ` and the launcher stays with the pig (lib/game/ammo.ts).
+        const mesh = meshAt(i, projectileModel(shot.skill) ?? weaponModelName(shot.skill))
         if (!mesh) continue
         const at = where(shot)
         // It POINTS along its flight, nose down as it falls. Nothing has been

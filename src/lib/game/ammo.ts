@@ -35,7 +35,27 @@
  * here — a list of everything in the AMMO run would load 55 models for the two
  * that are used.
  */
-export const SPAWNED_MODELS = ['WE_APMIN']
+export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ']
+
+/**
+ * The model a SKILL's projectile wears, by the same table — or null when the
+ * remake has nothing better than the thing that was in the hand.
+ *
+ * Only the ones that are both read AND loaded go in here. The BAZOOKA's rocket
+ * is row **398, `WE_BAZZ`**, and it matters twice over: what is in the hand for
+ * skill 29 is `bazookr`, the LAUNCHER, so without this a fired rocket flew as a
+ * second launcher.
+ *
+ * The grenade family's own is row 412, **`WE_GRE2`**, and it is deliberately NOT
+ * here: it would change how every grenade in the game looks, nothing has asked
+ * for it, and it is one line the day something does.
+ */
+export const PROJECTILE_MODEL: Record<number, string> = { 29: 'WE_BAZZ' }
+
+/** What flies when this skill is fired, or null to fall back to the held model
+ * (lib/game/weapons.ts). */
+export const projectileModel = (skill: number | null): string | null =>
+  skill === null ? null : (PROJECTILE_MODEL[skill] ?? null)
 
 /** The model a mine on the ground wears: rows 428 and 429 of the name table,
  * both `WE_APMIN`, out of the MAP's archive. */

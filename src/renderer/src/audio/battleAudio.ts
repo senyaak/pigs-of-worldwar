@@ -13,6 +13,7 @@
 import { handling } from '../../../lib/game/events'
 import type { Emit } from '../../../lib/game/events'
 import { meleeOf } from '../../../lib/game/melee'
+import { isGun } from '../../../lib/game/projectile'
 import { BARREL_SOUND, BATTLE_SOUNDS, playCue } from './battle'
 import type { Bank } from './bank'
 
@@ -40,7 +41,14 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
   return {
     listen: handling({
       // ——— weapons ———
-      fired: ({ skill }) => playCue(bank(), BATTLE_SOUNDS[BARREL_SOUND[skill] ?? 'rifle']),
+      // A barrel this table names, or the rifle's report for any GUN it does not
+      // — the thirteen guns all sound alike enough for one stand-in and say so
+      // (audio/battle.ts). A LOB with no entry makes no report at all: a grenade
+      // leaving the hand is not a gunshot.
+      fired: ({ skill }) => {
+        const barrel = BARREL_SOUND[skill] ?? (isGun(skill) ? 'rifle' : null)
+        if (barrel) playCue(bank(), BATTLE_SOUNDS[barrel])
+      },
       whoosh: () => playCue(bank(), BATTLE_SOUNDS.whoosh),
       struck: ({ skill }) => {
         const weapon = meleeOf(skill)

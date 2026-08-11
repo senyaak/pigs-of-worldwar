@@ -255,7 +255,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   /** The spheres that show the bullets (three/shots.ts). */
   const bulletArt = createBulletArt(root)
   /** The grenade models and the smoke behind them (three/grenades.ts). */
-  const grenadeArt = createGrenadeArt(root)
+  const grenadeArt = createGrenadeArt(root, (name) => props.spawn(name))
   /** …and the mines a pig who KNOWS about them can see, plus the trodden ones,
    * which wear the MAP's own `WE_APMIN` (three/mineArt.ts). */
   const mineArt = createMineArt(root, (name) => props.spawn(name))

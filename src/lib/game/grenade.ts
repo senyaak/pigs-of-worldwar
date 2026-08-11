@@ -100,6 +100,32 @@ export interface Lob {
    * a pig's is. See `lobBounce`. */
   friction: number
   restitution: number
+  /**
+   * **Whether it goes off the moment it TOUCHES something**, rather than on a
+   * fuse — and it is read off the state machine rather than declared.
+   *
+   * The constructor picks the initial state from row +0x14 (0x43200c): non-zero
+   * starts it in state 0, the arming count, which every grenade takes. **Nil
+   * takes the other branch** — `ecx = [proj+0xA2]`, row +0x1C's low byte,
+   * through the jump table at 0x432590 into states 2, 3, 1, 4, 5. The bazooka's
+   * +0x1C is 0, so it starts in **state 2**, and states 2 and 3 are the two arms
+   * of the update that do nothing at all (0x436150). It has no fuse to run.
+   *
+   * What ends it is the landscape handler, three instructions into its
+   * not-water branch:
+   *
+   * ```
+   * 437f1d  eax = [proj+0xB4]          ; the state
+   * 437f2c  cmp eax,2
+   * 437f2f  jne short 00437F37h
+   * 437f31  mov [esi+0B4h],ecx         ; ...ecx is 6 -> [proj+0x31] = 1, finished
+   * ```
+   *
+   * — and the destructor is where the blast is. So state 2 IS the
+   * contact-detonating class. (`[+0xA2]` of 3 or 4 is destroyed on contact by
+   * the same block, two instructions further on; those are other rows.)
+   */
+  contact: boolean
 }
 
 /**
@@ -110,17 +136,17 @@ export interface Lob {
 const LOBS: Record<number, Lob> = {
   /** 19 GRENADE — the plain one. Friction 0.30, restitution 0.80, so 0.12 and
    * 0.32 against grass: a few hops and then a long roll. */
-  19: { id: 412, kind: 24, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
-  20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
-  21: { id: 414, kind: 26, speed: 300, fuse: 150, arming: 3, damage: 2560, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
-  22: { id: 415, kind: 27, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
-  23: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED },
-  24: { id: 417, kind: 29, speed: 300, fuse: 150, arming: 3, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED },
-  25: { id: 418, kind: 30, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 2048 / FIXED, restitution: 3276 / FIXED },
+  19: { id: 412, kind: 24, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
+  20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
+  21: { id: 414, kind: 26, speed: 300, fuse: 150, arming: 3, damage: 2560, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  22: { id: 415, kind: 27, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  23: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  24: { id: 417, kind: 29, speed: 300, fuse: 150, arming: 3, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  25: { id: 418, kind: 30, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
   /** 26 is the odd one twice over: half the row's +0x04 and no +0x08, and a
    * material of 0.001 on both — it STICKS where it lands. */
-  26: { id: 419, kind: 31, speed: 300, fuse: 150, arming: 3, damage: 5120, blast: 1024, friction: 4 / FIXED, restitution: 4 / FIXED },
-  27: { id: 420, kind: 32, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED },
+  26: { id: 419, kind: 31, speed: 300, fuse: 150, arming: 3, damage: 5120, blast: 1024, friction: 4 / FIXED, restitution: 4 / FIXED, contact: false },
+  27: { id: 420, kind: 32, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
   /**
    * **37 TNT — PLANTED, not thrown**, and its row says so in three places: a
    * speed of 50 where a grenade has 300 and no power gauge to multiply it by, so
@@ -133,7 +159,26 @@ const LOBS: Record<number, Lob> = {
    * Fifty points at the core over 2048 of blast — twice a grenade's reach, and
    * enough to kill a grunt outright where a grenade takes thirty off it.
    */
-  37: { id: 441, kind: 53, speed: 50, fuse: 125, arming: 50, damage: 6400, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED }
+  37: { id: 441, kind: 53, speed: 50, fuse: 125, arming: 50, damage: 6400, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED, contact: false },
+  /**
+   * **29 BAZOOKA — the one thing here that goes off on TOUCH.** Play asked for
+   * it whole: "продектайл со своей анимацией, звук выстрела, урон при касании —
+   * важно в воде не взрывается, а тонет."
+   *
+   * Its row is kind **10**, and every field of it separates the rocket from the
+   * grenades above. Speed **500** a frame at full charge where a grenade has
+   * 300. Damage **5120** — forty points, enough to leave a grunt with ten — over
+   * a blast field of 2048, twice a grenade's, so the same reach as TNT. Friction
+   * and restitution 0.0999 apiece, which never matters: it does not live long
+   * enough to bounce. And **arming 0 with a fuse of 0**, which is not "a fuse of
+   * nothing" but the switch into `contact` above.
+   *
+   * The rocket wears **`WE_BAZZ`** — name-table row 398, out of the MAP's own
+   * archive like every other spawned model (lib/game/ammo.ts) — and the report
+   * is index **0x24 `L_BAZOO`** at 100/100, straight off the fire arm
+   * (0x47ae9d..0x47aea3).
+   */
+  29: { id: 398, kind: 10, speed: 500, fuse: 0, arming: 0, damage: 5120, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true }
 }
 
 /**
@@ -196,7 +241,10 @@ export const FUSE_JITTER = 7
  * `random` is injectable so a spec can pin the jitter.
  */
 export const fuseSeconds = (row: Lob, random: () => number = Math.random): number =>
-  fromExeFrames(row.arming + row.fuse + Math.floor(random() * (FUSE_JITTER + 1)))
+  row.contact
+    ? // Nothing counts one down: it sits in state 2 until something stops it.
+      Number.POSITIVE_INFINITY
+    : fromExeFrames(row.arming + row.fuse + Math.floor(random() * (FUSE_JITTER + 1)))
 
 /**
  * The blast, DECODED end to end — `0x48CBA0`, which `Pig::OnHit`'s

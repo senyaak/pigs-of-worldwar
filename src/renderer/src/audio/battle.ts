@@ -203,11 +203,34 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * What goes off afterwards is `blast` above — the mine's own destructor arm
    * funnels into the very same `E_1` a grenade plays (0x433d1a → 0x435375).
    */
-  mine: { sound: 'L_MINETR', volume: 100, pitch: 100 }
+  mine: { sound: 'L_MINETR', volume: 100, pitch: 100 },
+  /**
+   * The BAZOOKA going off. Decoded, mix and all: its fire arm plays index
+   * **0x24 at 100/100** (0x47ae9d), and index 36 of `Audio/sfxday.srl` is
+   * `L_BAZOO`. Nothing here is a name pick.
+   */
+  bazooka: { sound: 'L_BAZOO', volume: 100, pitch: 100 }
 }
 
-/** Which barrel makes which noise, by skill — see `pistol`/`rifle` above. */
-export const BARREL_SOUND: Record<number, 'pistol' | 'rifle'> = { 6: 'pistol' }
+/**
+ * Which barrel makes which noise, by skill.
+ *
+ * The BAZOOKA's is DECODED rather than picked: the per-weapon fire arms hang off
+ * one jump table (`0x47cf8c`, indexed by `skill - 6`) and every arm plays a sound
+ * the same way, so the whole column can be read off. Skill 29's is
+ * `Sound::Play(0x24, 100, 100)` at 0x47ae9d, and index 36 of `Audio/sfxday.srl`
+ * is **L_BAZOO**.
+ *
+ * The rest of the column, read at the same time and NOT wired, because each one
+ * would change a noise nobody has asked about: 6 PISTOL 42 `L_PISTOL`, 7 RIFLE
+ * 43 `L_RIFLE`, 11 SNIPER 43 at pitch **90**, 19/20 GRENADE 40 `L_MINETR` (the
+ * pin, not a blast), 30 GRENADE LAUNCHER 36 like the bazooka, 37 TNT 35
+ * `L_ARTIL`. They are one line each the day they are wanted.
+ */
+export const BARREL_SOUND: Record<number, 'pistol' | 'rifle' | 'bazooka'> = {
+  6: 'pistol',
+  29: 'bazooka'
+}
 
 /**
  * Play a cue the way the exe would: both scales are percentages of nominal,
