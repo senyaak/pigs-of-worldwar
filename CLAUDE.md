@@ -2813,6 +2813,56 @@ steep throw that goes in the water, black smoke, a bullet's trail, and now the m
 that explodes with its own picture and wears the engine's own model. What is left is
 here rather than in a chat that scrolls away.
 
+**PLAY'S NEWEST LIST, straight off testing the shelter (2026-08-11).** Written down
+before anything is touched, with what is already known about each — none of it is
+done yet.
+
+1. **A wall should go SEE-THROUGH, not vanish.** "Стены должны не пропадать, а
+   становиться полупрозрачными." `SEE_THROUGH = 0.25` in `three/props.ts` with
+   `depthWrite: false` — a quarter opacity over the terrain reads as gone. The
+   opacity is the remake's own pick and wants raising; the `depthWrite` is there so
+   a faded wall does not hide the pig, and whether it can come back is part of the
+   same question.
+2. **The dynamite's flame is not the game's.** "Горение динамита не из игры." True
+   and `three/fuse.ts` says so at the top: nothing about that spark is a reading.
+   Where to look next is NOT the mine rows — those turned out to be the BLAST (row
+   14) — but the projectile's own effect fields: a grenade's constructor hangs a
+   PARENTED trail on itself (id 0x15, `lib/game/trail.ts`), so TNT's row 53 is where
+   a fuse effect of its own would be named.
+3. **A charge is planted AT the pig, and should be IN FRONT.** "Динамит ставится на
+   месте свина, а не перед ним." `Lobs.plant` puts it at `pig.position` — the soles
+   — on the reading that clip 77's event fires with the pig bent over its own
+   trotters. Play's word goes in front of that; the offset wants the pig's heading
+   and a distance.
+4. **The house's SEAMS still misbehave.** "Всё ещё текстуры странно себя ведут на
+   стыках дома." The per-record `renderOrder` fixed the z-fight between the twelve
+   COPLANAR pairs; something else is left. Two candidates, neither measured: the
+   64-unit overlap itself (the faces are inside each other, not merely touching),
+   and texture bleed at the UV edges — the atlas has no padding and the models' UVs
+   are in pixels.
+5. **A pig thrown by a blast SPINS about its own axis.** "Летящая свинья вроде ещё
+   крутится вокруг своей оси." Nothing in `lib/game/tumble.ts` turns a pig — it sets
+   a velocity and lets `updateLocomotion` fly it — so the spin is either the bounce
+   clip's own root rotation being applied, or `heading` being written from the
+   velocity each frame somewhere on the draw path.
+6. **Going in puts the pig at the building's MIDDLE, and that is not where he
+   should be.** "В убежище прыгает в центр строения — не на месте." `indoors.enter`
+   copies `building.box.x/z`, which is what the exe does (0x469fde copies the
+   building's own transform) — but the SHELTER's record extents are transposed
+   (`TRANSPOSED_BOX`), so its "middle" may not be the middle of the art, and the
+   exe's transform is not the box centre either.
+7. **Coming OUT lands him on the ROOF, and the cause is known.** "Из убежища
+   выпрыгивает на крышу." `leave()` restores the doorstep's x/y/z exactly, and then
+   `loco = footingAt(acting)` re-derives the footing from that position through
+   `standOn` — which, standing against the shelter with `PIG_HOLD` of 196, finds the
+   shelter's own box top and stands him on it. The footing has to be the one he had,
+   not one worked out again.
+8. **Finishing the shelter does not move the TUTORIAL on.** "Выполнение задания по
+   убежищу не двигает туториал." `lib/game/tutorial.ts` speaks off the SKILL just
+   collected, because the exe's dispatcher switches on that — so nothing in it can
+   answer for getting into a building. Which step the original attaches to the
+   shelter is not read.
+
 1. **A trodden mine wants an EXCLAMATION MARK over it.** "когда наступил — мина
    появляется с восклицательным знаком над ней." The mine itself appears now, in the
    engine's own `WE_APMIN`; the mark is still not found, and this pass ruled out six
