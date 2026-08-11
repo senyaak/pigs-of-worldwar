@@ -266,20 +266,28 @@ library that cannot be read" any more.
   `+0x28` is the attack clip's repeat count (4 on skills 58/59, else 1) and
   `+0x2C` a signed playback-rate multiplier (negative = backward; every
   shipped value is 1). Non-zero exactly where an attack clip exists.
-- **`pcpie4`** — STILL OPEN, and the search space is now SMALL
-  (`library/notes.md`): the 2D-poly path is ruled out structurally (the
-  dashtims base index is read by nothing but the loader and the animal/ammo
-  sprite builder), and `afCreateObj2` is read with ALL its call sites
-  identified — weapons/faces/hats, two sky-scaled backdrops, the DEBRIEF
-  screen (`dbpill.mtd`, and `afDrawObj`'s single caller belongs to it too)
-  — none of them the dashboard. What is left is the in-frame HUD widget
-  cluster, skimmed but not walked: **0x45A8E0, 0x45A9B0, 0x45B580, 0x45B8B0,
-  0x45BFA0, 0x45C2E0, 0x45D6D0, 0x45FF30, 0x4607A0** — no trig in any of
-  them, so the pie would be a CLIPPED quad, which is also how the remake
-  guessed it. Bounded, one session. **B9's lead firmed up on the way:
-  0x44EBA0 is the battle's only fonttims consumer** (world-space text, fed
-  by particle type 0x23 via 0x44F950), and 0x447DC0/0x447FD0 are twin
-  glyph-layout routines over a metrics table at 0x51EC70.
+- ~~**`pcpie4`**~~ — FOUND, and the whole DASHBOARD with it
+  (`library/notes.md`, "THE DASHBOARD, end to end"). The earlier "structural
+  negative" was a one-slot mis-parse of the loader's handle table — dashtims
+  is `[0x520668+0x400]`, not +0x3E0 — and once corrected: init `0x454578`
+  resolves pcpie4 (entry 25) into a four-vertex pretransformed buffer at
+  `[0x51C640]`, and **`0x457FB0` draws it WHOLE every frame — there is NO
+  fill mechanic** — gated only on `[0x537F24]+0x458` (plausibly the skill
+  in hand) being outside 19..26, the grenade family. So the original's lens
+  never fills or empties on the PC: it is the full red disc, hidden for the
+  gauge weapons. The remake's class-driven clipping (`LAYOUT.gauge.lens`,
+  off `Lob.contact`) is its own invention over play's memory — **play
+  should see this reading before anything moves**. Same pass: the gauge
+  slides in over 20 frames through an authored ease table (0x4D1958), the
+  slider's x is `[game+0x4E4]` times two constants, the clock's digits are
+  `dashtims[13 + digit]`, and — the big one — **the dashboard's LAYOUT is
+  authored DATA at 0x4CF71C/0x4CF878/0x4CFA54, anchored to the screen dims**:
+  the remake's eyework `LAYOUT` in `ui/hud.ts` could be replaced by the
+  exe's own numbers, one mechanical transcription away. **B9's lead firmed
+  up on the way: 0x44EBA0 is the battle's only fonttims consumer**
+  (world-space text, fed by particle type 0x23 via 0x44F950), and
+  0x447DC0/0x447FD0 are twin glyph-layout routines over a metrics table at
+  0x51EC70.
 - **The remaining barrel sounds.** Read and written down, not wired: 6 PISTOL 42
   `L_PISTOL`, 7 RIFLE 43 `L_RIFLE`, 11 SNIPER 43 at pitch **90**, 19/20 GRENADE 40
   `L_MINETR`, 30 GRENADE LAUNCHER 36, 37 TNT 35 `L_ARTIL`. One line each in

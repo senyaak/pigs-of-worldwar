@@ -3135,12 +3135,16 @@ and the bazooka's is "полностью закрашен — как оружи�
 контакте". So how full it is is the weapon's CLASS, not its charge, and
 `ui/battle.ts` drives it off `Lob.contact`. One image means the fraction cannot
 be frames, so it is clipped; the direction, the half, and where it sits are all
-eyework and all live in `LAYOUT.dial.slot.lens` for the console. **Nothing in
-the exe has been traced to `pcpie4` at all** — the sprite is entry 25 of
-`dashtims.mad` and its drawer has not been found.
+eyework and all live in `LAYOUT.dial.slot.lens` for the console. **TRACED
+2026-08-11** (`library/notes.md`, "THE DASHBOARD"): the exe's drawer is
+`0x457FB0` and it draws the disc WHOLE, always — no fill mechanic exists —
+hidden only while `[0x537F24]+0x458` is 19..26 (the grenade family). So the
+half-filled look play remembers is not a fraction the PC exe computes, and the
+remake's class-driven clipping stays its own reading of play's screenshot
+until play weighs the new evidence.
 
-Left open: the record's `+0x28`/`+0x2C`, which are 1 on the grenade and TNT and 0
-on the rifle and the bazooka, readers unchased.
+~~Left open: the record's `+0x28`/`+0x2C`~~ — closed 2026-08-11: the attack
+animation steps' repeat count and signed playback rate (`weapons/fire.md`).
 
 ### PLAY'S LIST OF 2026-08-11 (the second one) — three done, four open
 
@@ -3220,10 +3224,15 @@ digits and the pig's shadow live there — and drawn ADDITIVE ONE:ONE, and
 smoke play keeps reporting MISSING: the remake's blob has the wrong art AND
 an invented draw law; the fix to try is the real puff textures with the
 exe's colours under both blend modes, shown to play ("additive cannot
-darken" was the remake's own argument, never play's). Still genuinely
-unread: `pcpie4`'s drawer — the 2D-poly path and every `afCreateObj2` site
-are ruled out; what is left is the in-frame HUD widget cluster
-0x45A8E0..0x4607A0, bounded and listed in todo D.
+darken" was the remake's own argument, never play's). The third pass found
+**the whole DASHBOARD** (`library/notes.md`): dashtims is `[0x520668+0x400]`
+(an earlier one-slot mis-parse hid it), init 0x454578 + frame 0x457840, and
+two findings that matter here — **`pcpie4` is drawn WHOLE, no fill mechanic,
+hidden for skills 19..26** (the remake's class-driven lens clipping is its
+own invention — show play before moving anything), and **the dashboard's
+layout is authored DATA in the exe** (0x4CF71C/0x4CF878/0x4CFA54, anchored
+to the screen dims), so `LAYOUT`'s eyework in `ui/hud.ts` could be replaced
+by the original's own numbers when asked.
 
 ### Worth not re-deriving
 
