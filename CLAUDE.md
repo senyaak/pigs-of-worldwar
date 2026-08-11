@@ -852,8 +852,10 @@ caller — for skill 11 and skill 64 only, the input handler creeps the zoom in
 by **0x20 a frame** toward **0x1000** (0x495e75). The same handler scales the
 aim step by `(0x1000 − zoom) >> 12`, floored, so the sights get finer the
 closer they look. `lib/game/zoom.ts` has all of it. What 0x1000 does to a
-field of view cannot be read — that library is not in the install — so
-`SCOPE_MAGNIFY = 4` in `three/chase.ts` is the remake's pick.
+field of view was "cannot be read" until 2026-08-11 — the library turned out
+to be `Data/_d3d.dll`, in the install all along (`library/notes.md` in the
+disasm repo; `afSetZoom` is at 0x1000FB60) — so `SCOPE_MAGNIFY = 4` in
+`three/chase.ts` is the remake's pick until someone reads it.
 
 **Bullets stop at the world.** `ObstacleField.solid(x, y, z)` is a new POINT
 test — `blocks` is shaped like a pig, with feet and a step-up reach, which a
@@ -1335,7 +1337,9 @@ long and a twenty-frame fireball took a second and a third to go off.
 got twice as fast with it, deliberately.
 
 Two scalars are the remake's own and say so at the field: `BLOB_UNIT`, because
-a sprite's size is handed to `wh32LIB.DLL` and the unit is the library's, and
+a sprite's size is handed to the library and the unit is the library's (the
+library is `_d3d.dll`'s `afAdd2dPolyToSortList`, readable since 2026-08-11 —
+`library/notes.md`; NOT wh32LIB.DLL, which is the LaserLok copy protection), and
 the split where a puff's DRIFT rides `MODEL_SCALE` while the point it started
 from does not — same argument as the ring's radius.
 
@@ -1375,8 +1379,9 @@ VISIBLE marker (eight pixels at cols 8..15 of a 24-wide box) rather than the box
 because centring the box put the marker four pixels past the trough. The clouds
 are NOT additive — additive light cannot darken, and row 0's second cloud is a
 near-black whose whole job is to be smoke ("чёрного дыма нет на взрыве"); the
-blend mode lives in `wh32LIB.DLL` and cannot be read, so this is the remake's
-pick. And a landing CRATE takes row 0's smoke without its fire (`DUST_EFFECT`) —
+blend mode lives in the library — `_d3d.dll`, readable since 2026-08-11
+(`library/notes.md`), not the wh32LIB this used to blame — so this is the
+remake's pick until someone reads it. And a landing CRATE takes row 0's smoke without its fire (`DUST_EFFECT`) —
 it was borrowing the whole row, so once the row grew a fireball a crate arriving
 set one off ("коробка когда падает — искрит").
 
@@ -3191,26 +3196,21 @@ on the rifle and the bazooka, readers unchased.
 
 ### What is still not read
 
-- **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's
-  upward kick by. Filled at contact construction (0x409ca0, 0x409af9) from the
-  creator's argument, sitting between the contact's two three-float vectors, and at
-  least one creation site passes zero. The remake takes it as the IN-PLANE speed
-  because that is the only reading that makes a vertical drop sink and a flat throw
-  skip, which is how play describes it — but the field's identity is not
-  transcribed. `weapons/fire.md`.
-- **effect 0x0D** — what a SKIP off water leaves. Not decoded past its jitter; the
-  splash (0x0E) stands in, which is why a skim and a sinking look alike.
-- **`0x48c410`**, stages D and E, which rows 1 and 16 reach and row 0 does not; and
-  **stage C**, the inline flash, which no decoded row turns on.
-- **a sprite's SIZE unit** belongs to `wh32LIB.DLL` and cannot come out of the exe.
-  `BLOB_UNIT`, `BLOB_ALPHA`, `PUFF_SIZE` and the trail's own pair are the remake's
-  and say so at the field.
-- **`ANIM.PARACHUTE = 82` against a table that names 59 clips.** The exe's clip
-  names run 0 "Run cycle (normal)" to 58 "Parachuting" — a table just before the
-  D3D wrapper's strings — and every other ANIM constant checks out against it. So
-  either MCAP holds more clips than the exe names, or 82 is wrong and the canopy
-  hangs on something else. The parachute works in play, so probably the first.
-  Noticed 2026-08-08 and not chased.
+**Swept 2026-08-11 — docs/todo.md section D is the live list now**, and most of
+what used to sit here is READ (the reads are in the disasm repo):
+`[contact+0x14]` is the contacting body's TOTAL speed with a flat-vs-plunge
+class byte beside it at `[contact+0x30]` (`weapons/fire.md`); effect 0x0D is a
+mud spray, decoded in full; `0x48c410`'s stages D/E are a fan of smoke jets and
+stages E and C are enabled in NO shipped row; the skill record's `+0x28`/`+0x2C`
+are the attack clip's repeats and its signed playback rate; and PARACHUTE=82
+was already settled in `parachute/notes.md` (MCAP ships 93 clips, the name
+array stops at 59). The big one: **the render library is `Data/_d3d.dll`, in
+the install, 94 named exports, and the exe's whole call-slot table is mapped**
+(`library/notes.md`) — `wh32LIB.DLL` is the LaserLok copy protection and every
+"lives in wh32LIB, cannot be read" verdict in this file is dead. Still genuinely
+unread: the sprite SIZE unit and blend mode (now one `_d3d.dll` read away, at
+`afAdd2dPolyToSortList` 0x10008FA0), `afSetZoom`'s meaning (0x1000FB60), and
+`pcpie4`'s drawer (behind the unwalked `Begin2D`/`afDrawText`/`End2D` path).
 
 ### Worth not re-deriving
 

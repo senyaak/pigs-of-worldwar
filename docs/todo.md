@@ -94,12 +94,13 @@ the grenade's arm pushes 0x54; both play sound 0x0C (`E_1`). The id → row map
 resolves 0x53 to **parameter ROW 1** (`byte [0x489680 + id − 1]` → slot 54 → arm
 `0x488faa` → `0x48ccc0(1)`), against the grenade's row 0.
 
-**Not read.** Row 1 itself. It reaches **stages D and E of `0x48c410`**, which
-this repo has never decoded — row 0 does not use them, which is why they were
-skipped. Transcribe row 1 out of the 143-byte-per-kind table at `0x4d61e8`
-(scaled per index by `0x4d6c88`), decode stages D and E, and add the row to
-`lib/game/effects.ts` beside `ROW_ZERO` and `MINE_EFFECT`. Then `Charge` has to
-carry the effect id the way the mine's already does.
+**Read now — 2026-08-11.** Row 1 is transcribed and stages D and E are decoded
+(`effects/notes.md`): a near-black 70-sprite cloud, a **five-way fan of grey
+smoke JETS** at 200 a frame (stage D — fifty frames a jet), and two bursts.
+Stage E turned out to be enabled in no row at all. What is left is only the
+build: add row 1 to `lib/game/effects.ts` beside `ROW_ZERO` and `MINE_EFFECT`
+(the jet fan needs its stage-D shape drawn), and `Charge` has to carry the
+effect id the way the mine's already does.
 
 ### B4. The rocket is drawn crooked, and it wants its own trail
 
@@ -204,30 +205,58 @@ The SHELTER is done end to end. What is left round it:
 
 ## D. WHAT IS STILL NOT READ (disassembly gaps)
 
-- **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's
-  upward kick by. Filled at contact construction (0x409ca0, 0x409af9) from the
-  creator's argument, sitting between the contact's two three-float vectors, and
-  at least one creation site passes zero. The remake takes it as the IN-PLANE
-  speed because that is the only reading that makes a vertical drop sink and a
-  flat throw skip, but the field's identity is not transcribed.
-- **effect 0x0D** — what a SKIP off water leaves. Not decoded past its jitter; the
-  splash (0x0E) stands in, which is why a skim and a sinking look alike.
-- **`0x48c410`, stages D and E**, which rows 1 and 16 reach and row 0 does not;
-  and **stage C**, the inline flash, which no decoded row turns on. (Row 1 is
-  B3 above.)
-- **a sprite's SIZE unit** belongs to `wh32LIB.DLL` and cannot come out of the
-  exe. `BLOB_UNIT`, `BLOB_ALPHA`, `PUFF_SIZE` and the trail's own pair are the
-  remake's and say so at the field.
-- **`ANIM.PARACHUTE = 82` against a table that names 59 clips.** The parachute
-  works in play, so either MCAP holds more clips than the exe names or 82 is
-  wrong and the canopy hangs on something else.
-- **The weapon record's `+0x28`/`+0x2C`** — 1 on the grenade and TNT, 0 on the
-  rifle, the bazooka and the grenade launcher. That splits "things with a fuse you
-  might set off by hand" from "things that go off by themselves", which is
-  suspiciously close to B1; readers unchased.
-- **`pcpie4`** — the lens at the gauge's left end. The sprite is entry 25 of
-  `dashtims.mad` and its drawer has never been found, so how full it is, which way
-  it fills and where it sits are all play's word rather than a reading.
+**A sweep on 2026-08-11 closed most of this list** — the reads are in the
+disasm repo; what survives of each item is the WIRING, which waits for play to
+ask. And one discovery reshapes the leftovers: **`wh32LIB.DLL` is the LaserLok
+copy protection, not the renderer** — every library call the exe makes goes to
+`Data/_d3d.dll`, which ships in the install with 94 named exports, and the
+exe's whole slot table is now mapped (`library/notes.md`). Nothing is "in a
+library that cannot be read" any more.
+
+- ~~**`[contact+0x14]`**~~ — READ (`weapons/fire.md`): it is the |v| of the
+  contacting body's velocity — the TOTAL speed, not in-plane — and the
+  flat-vs-plunge verdict is a CLASS BYTE beside it, `[contact+0x30]` (2 rising,
+  1 grazing, 0 plunging; getter 0x409C10). The water arm gates on BOTH, with a
+  douse gate nobody had seen: a fast plunge (class 0) douses however hard it
+  arrives. The remake's in-plane reading got the behaviour right and the
+  mechanism wrong; `lib/game/grenade.ts` could carry the exe's own two-part
+  test now (total speed against 150, and drop-dominates refuses the skip).
+- ~~**effect 0x0D**~~ — READ (`effects/notes.md`): twenty grey five-frame
+  droplets thrown up 20..50 under gravity, plus six frames of mud-red (25,0,5)
+  streak particles along the travel — a modest MUD spray, no rings, beside the
+  full splash's rings-and-cloud. Wiring it where the skip borrows 0x0E is
+  remake work.
+- ~~**`0x48c410`, stages D and E**~~ — READ (`effects/notes.md`): a circular
+  FAN of smoke-jet child effects, fifty frames a jet. Stage D is enabled in
+  exactly rows 1 and 16; **stages E and C are enabled in NO row of the
+  nineteen** (row 16 carries both authored and switched off), so neither ever
+  runs in the shipped game. Row 1 and row 16 are transcribed, and the id → row
+  map plus a per-row stage-enable table are in the notes. B3's remaining half
+  is purely `lib/game/effects.ts` work.
+- **a sprite's SIZE unit** — REFRAMED, still unread: "belongs to wh32LIB.DLL
+  and cannot come out of the exe" was wrong twice. The particle draw
+  (0x489FA0) hands `(200 − age) * [effect+0x7E] * 12.5` to
+  **`afAdd2dPolyToSortList`**, readable at `_d3d.dll` 0x10008FA0 — the unit,
+  `BLOB_ALPHA` and the blend mode are one DLL read away. The same door opens
+  on **`afSetZoom`** (0x1000FB60), the sniper's `SCOPE_MAGNIFY = 4`.
+- ~~**`ANIM.PARACHUTE = 82`**~~ — was already answered in
+  `parachute/notes.md`: MCAP ships 93 clips, the exe's 59-name array is not
+  the index order at the tail, and `Pig::SetAnim`'s only clamp is
+  `id >= 0x53 → 0`, so 82 is the last reachable clip and its pose ranks 2nd
+  of 93 for the hands-above-the-shoulders hang. Nothing left to chase.
+- ~~**The weapon record's `+0x28`/`+0x2C`**~~ — READ (`weapons/fire.md`,
+  `weapons/notes.md`), and the hand-fuse theory was wrong: the record's tail
+  is three 16-byte ANIMATION steps `(clip, direction, repeats, rate)`.
+  `+0x28` is the attack clip's repeat count (4 on skills 58/59, else 1) and
+  `+0x2C` a signed playback-rate multiplier (negative = backward; every
+  shipped value is 1). Non-zero exactly where an attack clip exists.
+- **`pcpie4`** — STILL OPEN, with the search narrowed: the drawer is not in
+  the ammo-sprite path (the only non-loader reader of the dashtims handle,
+  0x45E3A0, builds AMMO models — `library/notes.md`), so it lives behind the
+  2D pipeline — `Begin2D` / `afDrawText` / `afAdd2dPolyToSortList` / `End2D`
+  — which nothing has walked yet. The same walk would find the battle FONT
+  (B9's exclamation mark), and the fonttims handle sits beside dashtims at
+  `[0x520668+0x3F8]`.
 - **The remaining barrel sounds.** Read and written down, not wired: 6 PISTOL 42
   `L_PISTOL`, 7 RIFLE 43 `L_RIFLE`, 11 SNIPER 43 at pitch **90**, 19/20 GRENADE 40
   `L_MINETR`, 30 GRENADE LAUNCHER 36, 37 TNT 35 `L_ARTIL`. One line each in
