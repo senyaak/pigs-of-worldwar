@@ -2872,11 +2872,19 @@ done yet.
    every 25 frames — a half turn each time would read as spinning. That is a pig on
    the GROUND, though, not one in the air, so it may not be what play saw.
 6. **Going in puts the pig at the building's MIDDLE, and that is not where he
-   should be.** "В убежище прыгает в центр строения — не на месте." `indoors.enter`
-   copies `building.box.x/z`, which is what the exe does (0x469fde copies the
-   building's own transform) — but the SHELTER's record extents are transposed
-   (`TRANSPOSED_BOX`), so its "middle" may not be the middle of the art, and the
-   exe's transform is not the box centre either.
+   should be.** "В убежище прыгает в центр строения — не на месте." One of the two
+   suspects is now ruled out by reading: **the transposition does not move the
+   centre.** `TRANSPOSED_BOX` swaps `halfX` and `halfZ` and touches nothing else, so
+   `building.box.x/z` is the record's own x/z — which IS the transform 0x469fde
+   copies. `indoors.enter` is doing exactly what the exe does.
+
+   Two things are left, and the second is the likelier one. The remake copies x and
+   z and NOT y, where the exe copies the whole transform — so the pig sits at the
+   building's plan position but at the doorstep's height. And the pig is not DRAWN
+   in there, so the only thing the move can show a player is where the CAMERA goes:
+   it flies to the middle of the shelter, which is what "прыгает в центр строения"
+   would look like from outside. Nothing is changed on a guess; this wants play to
+   say whether what moves is the pig or the view.
 7. **Coming OUT lands him on the ROOF, and the cause was NOT what this said.** "Из
    убежища выпрыгивает на крышу." The reading here was that `loco = footingAt(acting)`
    re-derives a footing that `standOn` snaps to the shelter's box top. **Measured, and
