@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs'
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
 import {
+  beginTurn,
   cutTurnBeat,
   debugState,
   hold,
@@ -490,3 +491,40 @@ test('a jump cannot be started from inside a wall, so it is no ladder', async ({
   expect(app.errors()).toEqual([])
 })
 
+
+test('NOTHING IS FIRED FROM THE AIR — a jump swallows the fire key', async ({ app }) => {
+  const { page } = app
+  await startGame(page)
+  await beginTurn(page)
+
+  // Something with a GAUGE in hand, so "did it start charging" is a number.
+  await page.evaluate(() => {
+    ;(window as unknown as { pow: { give(s: number, a?: number): boolean } }).pow.give(19, 5)
+  })
+  await page.waitForTimeout(900)
+  const charging = (): Promise<number | null> =>
+    page.evaluate(
+      () =>
+        (window as unknown as { pow: { debug: { charging(): number | null } } }).pow.debug.charging()
+    )
+
+  // On the ground the key FILLS it. The gauge is up for any weapon that has one,
+  // so what says "charging" is the number rising rather than the number existing.
+  await press(page, 'fire')
+  await expect.poll(charging, { timeout: 3000 }).toBeGreaterThan(0)
+  await release(page, 'fire')
+  await page.waitForTimeout(600)
+
+  // …and in the AIR it does nothing at all. Play: "можно во время прыжка начать
+  // заряжать оружие — баг." `Pig::MayAct` refuses outright while the pig's own
+  // mode is 5, which is being airborne (0x467a28, and 0x46b205 is the same value
+  // the movement update returns on).
+  await tap(page, 'jump')
+  await page.waitForTimeout(300)
+  await press(page, 'fire')
+  await page.waitForTimeout(300)
+  expect(await charging(), 'it started charging in mid-air').toBe(0)
+  await release(page, 'fire')
+
+  expect(app.errors()).toEqual([])
+})

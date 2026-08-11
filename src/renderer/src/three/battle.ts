@@ -40,7 +40,7 @@ import type { SceneSound } from '../contracts/sound'
 import type { Collected } from '../../../lib/game/scenery'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBulletArt } from './shots'
-import { crossedBy, sightBlockers } from '../../../lib/game/seeThrough'
+import { SIGHT_MARGIN, crossedBy, sightBlockers } from '../../../lib/game/seeThrough'
 import { createGrenadeArt } from './grenades'
 import { createMineArt } from './mineArt'
 import { PIG_HEIGHT } from '../../../lib/game/obstacles'
@@ -578,7 +578,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
           x: game.currentPig.position.x,
           y: game.currentPig.position.y - PIG_HEIGHT / 2,
           z: game.currentPig.position.z
-        })
+        }, SIGHT_MARGIN)
       )
     }
     effectArt.draw(now.effects)

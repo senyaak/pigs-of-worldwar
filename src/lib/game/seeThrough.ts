@@ -18,6 +18,7 @@
 import { boxOf, isSolid } from './obstacles'
 import type { Obstacle } from './obstacles'
 import { buildingKind } from './buildings'
+import { isRamp } from './ramps'
 import type { MapObject } from '../formats/pog'
 
 export interface Spot {
@@ -30,6 +31,13 @@ export interface Spot {
  * The boxes worth asking about: everything solid enough to hide something, which
  * is the same test the collision world makes, **less the BUILDINGS**. Built once.
  *
+ * **A RAMP is not in the way either.** Play: "просвечивание включается на рампе —
+ * не должно, ведь она за свином, не между ним и камерой." A ramp's box is the
+ * whole triangular prism (lib/game/ramps.ts) and a pig standing on its LOW end
+ * has its middle well below the box's top, so a camera behind and above looks
+ * down THROUGH the slab to reach it. It is a walkway, not a wall: you stand on
+ * it, and what you stand on is never between you and anything.
+ *
  * Play: "просвечивать должны стены, которые мы взрываем — не бомбоубежище." And a
  * building is the one case where fading is not merely unwanted but pointless: a
  * pig inside one is not DRAWN at all (`indoors.ts`, and it is the exe's own rule —
@@ -38,12 +46,35 @@ export interface Spot {
  * breakable scenery and go on fading, which is the half play asked to keep.
  */
 export const sightBlockers = (objects: MapObject[]): Obstacle[] =>
-  objects.filter((one) => isSolid(one) && buildingKind(one.name) === null).map(boxOf)
+  objects
+    .filter((one) => isSolid(one) && buildingKind(one.name) === null && !isRamp(one.name))
+    .map(boxOf)
 
-/** Which of them the segment `from`→`to` passes through, by record id. */
-export function crossedBy(boxes: readonly Obstacle[], from: Spot, to: Spot): number[] {
+/**
+ * How far OUTSIDE the sight line a box still counts as being in the way.
+ *
+ * Play: "просвечивается крыша и стены слишком мало — надо больше." One ray from
+ * the eye to a point inside the pig fades exactly the pieces it happens to
+ * skewer, and a house is eighteen of them — so the panel the pig is behind went
+ * see-through while its neighbours stayed solid and the pig was still hidden.
+ * Every box is grown by this before the segment is tested, which fades the piece
+ * beside the one in the way as well.
+ *
+ * The remake's own number, like the rest of this file: half a tile, which is
+ * about a pig and a half across.
+ */
+export const SIGHT_MARGIN = 256
+
+/** Which of them the segment `from`→`to` passes through, by record id — each box
+ * grown by `margin` first. */
+export function crossedBy(
+  boxes: readonly Obstacle[],
+  from: Spot,
+  to: Spot,
+  margin = 0
+): number[] {
   const out: number[] = []
-  for (const box of boxes) if (crosses(box, from, to)) out.push(box.id)
+  for (const box of boxes) if (crosses(box, from, to, margin)) out.push(box.id)
   return out
 }
 
@@ -54,15 +85,15 @@ export function crossedBy(boxes: readonly Obstacle[], from: Spot, to: Spot): num
  * `top`/`bottom` are already Y-DOWN (the top is the SMALLER y), which is why the
  * vertical slab reads back to front against the other two.
  */
-export function crosses(box: Obstacle, from: Spot, to: Spot): boolean {
+export function crosses(box: Obstacle, from: Spot, to: Spot, margin = 0): boolean {
   const a = local(box, from)
   const b = local(box, to)
   let near = 0
   let far = 1
   const slabs: readonly [number, number, number, number][] = [
-    [a.x, b.x, -box.halfX, box.halfX],
-    [a.y, b.y, box.top, box.bottom],
-    [a.z, b.z, -box.halfZ, box.halfZ]
+    [a.x, b.x, -box.halfX - margin, box.halfX + margin],
+    [a.y, b.y, box.top - margin, box.bottom + margin],
+    [a.z, b.z, -box.halfZ - margin, box.halfZ + margin]
   ]
   for (const [start, end, low, high] of slabs) {
     const step = end - start

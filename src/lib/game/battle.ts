@@ -1053,6 +1053,17 @@ export function createBattle(parts: BattleParts): Battle {
       doorRequested = true
     },
     setFiring(held, pressed) {
+      // **NOTHING IS FIRED FROM THE AIR.** Play: "можно во время прыжка начать
+      // заряжать оружие — баг." `Pig::MayAct` refuses it outright — `[pig+0x2EC]`
+      // is the pig's own mode and 5 is being airborne, the same value
+      // `UpdateMovement` returns on so that a flying pig is neither walked nor
+      // turned (0x467a28, 0x46b205). The whole press is dropped rather than the
+      // hold alone, or a gauge already filling would loose on the way up.
+      if (loco.airborne !== null) {
+        attack.swallow()
+        attack.hold(false)
+        return
+      }
       // The PRESS is what a gun and a blade answer to; the gauge wants the
       // whole hold, and the frame it ends.
       if (pressed) attack.press()

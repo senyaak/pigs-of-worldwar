@@ -40,8 +40,9 @@ import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
-import { boxOf } from '../../src/lib/game/obstacles'
-import { crossedBy, crosses, sightBlockers } from '../../src/lib/game/seeThrough'
+import { boxOf, isSolid } from '../../src/lib/game/obstacles'
+import { isRamp } from '../../src/lib/game/ramps'
+import { SIGHT_MARGIN, crossedBy, crosses, sightBlockers } from '../../src/lib/game/seeThrough'
 
 type Page = import('@playwright/test').Page
 
@@ -132,4 +133,37 @@ test('the app fades the house round a pig inside it, and nothing in the open', a
   await expect.poll(async () => fadedCount(page), { timeout: 4000 }).toBe(0)
 
   expect(app.errors()).toEqual([])
+})
+
+test('a RAMP is never in the way, and the fade has a MARGIN round the ray', () => {
+  // Play: "просвечивание включается на рампе — не должно, ведь она за свином, не
+  // между ним и камерой." A ramp's box is the whole triangular prism
+  // (lib/game/ramps.ts), so a pig on its LOW end has its middle well below the
+  // box's top and a camera behind and above looks down THROUGH the slab to reach
+  // it. What you stand on is never between you and anything.
+  const ramps = CAMP.filter((one) => isRamp(one.name) && isSolid(one))
+  expect(ramps.length, 'CAMP carries ramps').toBeGreaterThan(0)
+  const blockers = sightBlockers(CAMP)
+  for (const ramp of ramps) {
+    expect(blockers.some((box) => box.id === ramp.id), `${ramp.name} #${ramp.id} still fades`).toBe(
+      false
+    )
+  }
+
+  // …and the MARGIN. Play: "просвечивается крыша и стены слишком мало — надо
+  // больше." One ray fades exactly what it skewers, and a house is eighteen
+  // pieces, so the panel beside the one in the way stayed solid. Every box is
+  // grown by `SIGHT_MARGIN` before the test.
+  expect(SIGHT_MARGIN).toBeGreaterThan(0)
+  const wall = boxOf(CAMP.find((one) => one.name === 'STW04_D2')!)
+  // A ray that passes clear of the wall by less than the margin now counts.
+  const past = {
+    x: wall.x + wall.halfX + SIGHT_MARGIN / 2,
+    y: (wall.top + wall.bottom) / 2,
+    z: wall.z
+  }
+  const from = { x: past.x, y: past.y, z: wall.z - 4096 }
+  const to = { x: past.x, y: past.y, z: wall.z + 4096 }
+  expect(crosses(wall, from, to), 'it really is clear of the wall').toBe(false)
+  expect(crosses(wall, from, to, SIGHT_MARGIN), 'the margin did not widen it').toBe(true)
 })
