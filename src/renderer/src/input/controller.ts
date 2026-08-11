@@ -175,6 +175,8 @@ export interface DebugHooks {
   /** How each planted charge STANDS: its fuse's world direction — (0, −1, 0) is
    * straight up, game space being Y-down — and the y of its lowest corner. */
   charges(): { fuse: { x: number; y: number; z: number }; base: number }[]
+  /** How many planted charges have a spark alight on the fuse (three/fuse.ts). */
+  burning(): number
   /** Mines that have been trodden on and are counting down (lib/game/mines.ts). */
   mines(): { x: number; y: number; z: number; fuse: number }[]
   /** How many buried mines are being DRAWN for the side whose turn it is — a

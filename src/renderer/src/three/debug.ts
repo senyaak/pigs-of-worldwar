@@ -64,6 +64,9 @@ export interface DebugParts {
    * its lowest corner (three/grenades.ts). Standing on its end is a fact about
    * the mesh, so the engine's list cannot answer for it. */
   charges: () => { fuse: { x: number; y: number; z: number }; base: number }[]
+  /** How many planted charges have a FUSE alight (three/fuse.ts). A spark is a
+   * sprite on a transparent quad, so nothing else can see one. */
+  burning: () => number
   /** Mines that have been trodden on and are counting down. Nothing is DRAWN for
    * a buried one unless somebody can SEE it, so this is the only way a spec can
    * find one at all (lib/game/mines.ts). */
@@ -174,6 +177,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** How the planted charges STAND — the fuse's world direction and the
        * ground under each one (three/grenades.ts). */
       charges: () => parts.charges(),
+      /** …and how many of them are BURNING: play's "динамит не горит"
+       * (three/fuse.ts). */
+      burning: () => parts.burning(),
       /** Every mine counting down under somebody's feet (lib/game/mines.ts). */
       mines: () => parts.mines(),
       /** …and how many BURIED ones are being drawn for the side whose turn it is:

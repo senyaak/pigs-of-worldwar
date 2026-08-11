@@ -541,7 +541,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // …and what the engine says is in the air gets drawn where it now is. Once
     // a frame, after everything that could have moved or spent one.
     bulletArt.draw(now.bullets, delta, (shot) => drawnAt(`shot:${shot.id}`, shot))
-    grenadeArt.draw(now.lobs, delta, (lob) => drawnAt(`lob:${lob.id}`, lob))
+    grenadeArt.draw(now.lobs, delta, time, (lob) => drawnAt(`lob:${lob.id}`, lob))
     // The minefield, through the eyes of whoever's turn it is: a buried mine is
     // shown to the side that has somebody near it who can see one, and to nobody
     // else (lib/game/mines.ts).
@@ -591,6 +591,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     aim: () => battle.aim(),
     grenades: () => grenades.at(),
     charges: () => grenadeArt.charges(),
+    burning: () => grenadeArt.burning(),
     mines: () => mines.at().map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     mineMarkers: () => mineArt.shown(),
     charging: () => battle.charging(),

@@ -52,7 +52,7 @@ export interface BlastWorld {
 }
 
 /**
- * **What a blast THROWS with: four times the damage it did, in points.**
+ * **What a blast THROWS with: six times the damage it did, in points.**
  *
  * The exe's whole vocabulary for shoving a pig is one call,
  * `0x4a9100(speed, 0x200, bearing, 0)`, and the speeds at its six sites are the
@@ -65,15 +65,23 @@ export interface BlastWorld {
  * That last row is what the first attempt got wrong. It used 0x40 flat, which is
  * **less than a punch** for a charge going off under a pig's trotters, and play
  * said so at once: "толчёк очень мелкий." So the magnitude scales with the damage
- * instead, and the two ends of it land on the engine's own numbers: a grenade's
- * thirty points at the core come to **120 = 0x78**, and TNT's fifty to the cattle
- * prod's **200**, which is the hardest knock anything in the exe hands out — hence
- * the cap. A mine's twenty come to 80, above a bayonet and below a trotter.
+ * instead — and then once more, because four times it still left a mine feeling
+ * light ("отбрасывание миной всё ещё кажется слабым"). At **six** the three blasts
+ * in the game land like this:
+ *
+ * | blast | points at the core | speed |
+ * | ----- | ------------------ | ----- |
+ * | a MINE | 20 | **120 = 0x78**, the engine's other decoded knock |
+ * | a GRENADE | 30 | 180 |
+ * | TNT | 50 | 300, held at the **200** cap |
+ *
+ * — monotone, none of it past the hardest knock the exe hands out, and both ends on
+ * the engine's own numbers.
  *
  * The FALLOFF is free: the damage is already the share for the distance, so
  * standing back saves your footing along with your health.
  *
- * The four, and the cap, are the REMAKE's — play's word standing in for a read
+ * The six, and the cap, are the REMAKE's — play's word standing in for a read
  * that came up empty. `Pig::OnHit`'s own blast arm (0x477c22) carries no impulse at
  * all: it takes the falloff damage through `[vtbl+0x34]`, adds **twice it** to the
  * tally at `[pig+0x1b8]` — which is where the melee's knockback goes too, in
@@ -82,7 +90,7 @@ export interface BlastWorld {
  * physics: the blast effect has a BODY, a sphere of radius 35 (`weapons/fire.md`),
  * and that contact's impulse is not decoded.
  */
-export const FLING_PER_POINT = 4
+export const FLING_PER_POINT = 6
 /** …and no harder than the hardest knock in the engine: the cattle prod's. */
 export const FLING_CAP = fromExeSpeed(200)
 

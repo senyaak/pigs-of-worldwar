@@ -116,14 +116,21 @@ test('a fling is 45° UP along its bearing — the engine\'s own pitch', () => {
   expect(east.vx).toBeGreaterThan(0)
   expect(east.vz).toBeCloseTo(0, 6)
 
-  // …and how HARD: four times the damage in points, capped at the cattle prod's
-  // 200 a frame, which is the hardest knock anything in the exe hands out. Play:
-  // "толчёк очень мелкий" — the first attempt used a flat 0x40, which is less than
-  // a punch. The two ends land on the engine's own numbers.
-  expect(FLING_PER_POINT).toBe(4)
-  expect(flingSpeed(30), "a grenade's core is 0x78").toBeCloseTo(fromExeSpeed(0x78), 6)
-  expect(flingSpeed(50), "TNT's core is the prod's 200").toBeCloseTo(fromExeSpeed(200), 6)
-  expect(flingSpeed(20), "a mine's core is above a bayonet's 75").toBeGreaterThan(fromExeSpeed(75))
+  // …and how HARD: SIX times the damage in points, capped at the cattle prod's 200
+  // a frame, which is the hardest knock anything in the exe hands out. Play twice —
+  // "толчёк очень мелкий" against the flat 0x40 that was less than a punch, and then
+  // "отбрасывание миной всё ещё кажется слабым" against four times. At six a mine
+  // lands on the engine's other decoded knock.
+  expect(FLING_PER_POINT).toBe(6)
+  expect(flingSpeed(20), "a mine's core is 0x78").toBeCloseTo(fromExeSpeed(0x78), 6)
+  expect(flingSpeed(30), "a grenade's is 180").toBeCloseTo(fromExeSpeed(180), 6)
+  expect(flingSpeed(50), "TNT's fifty are held at the prod's 200").toBeCloseTo(
+    fromExeSpeed(200),
+    6
+  )
+  // Monotone up to the cap, and the cap is the hardest knock in the exe.
+  expect(flingSpeed(20)).toBeLessThan(flingSpeed(30))
+  expect(flingSpeed(30)).toBeLessThan(flingSpeed(50))
   expect(flingSpeed(500), 'nothing throws harder than the cap').toBe(FLING_CAP)
 })
 
@@ -143,7 +150,7 @@ test('a mine THROWS the pig that trod on it — off the ground and down again', 
   expect(tumbles.has(pig)).toBe(true)
   const launch = tumbles.at()[0]
   expect(launch.vy, 'it was not thrown upward').toBeLessThan(0)
-  // Twenty points at the core, so four times that a frame.
+  // Twenty points at the core, so six times that a frame — 0x78.
   expect(Math.hypot(launch.vx, launch.vy, launch.vz)).toBeCloseTo(flingSpeed(20), 4)
 
   // …and then it FLIES. Game space is Y-down, so off the ground is a smaller y.

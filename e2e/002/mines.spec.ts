@@ -300,6 +300,12 @@ const standing = (
     ).pow.debug.charges()
   )
 
+/** How many planted charges have a spark on the fuse (three/fuse.ts). */
+const burning = (page: Page): Promise<number> =>
+  page.evaluate(() =>
+    (window as unknown as { pow: { debug: { burning(): number } } }).pow.debug.burning()
+  )
+
 /** How many mine markers the scene is drawing for the side whose turn it is. */
 const markers = (page: Page): Promise<number> =>
   page.evaluate(() =>
@@ -461,6 +467,12 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
   await page.waitForTimeout(600)
   expect((await thrown(page)).length, 'a second charge went down').toBe(1)
 
+  // **AND IT BURNS.** Play: "динамит не горит." A spark sits on the end the black
+  // stub is on — which is the end that stands up (three/fuse.ts) — for as long as
+  // the fuse runs. What the original shows there is not decoded, and the file says
+  // so; where the fuse IS was measured off the model.
+  expect(await burning(page), 'the charge is not alight').toBe(1)
+
   // **AND IT STAYS WHERE IT WAS PUT.** Play: "динамит катится по склону." It did:
   // it was stepped like anything else in the air, so gravity pressed it into the
   // ground and the contact carried the whole slope-parallel part of the bounce on
@@ -480,6 +492,8 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
   const waiting = await debugState(page)
   await expect.poll(async () => (await thrown(page)).length, { timeout: 15000 }).toBe(0)
   expect((await sounds(page)).slice(quiet), 'it went off').toContain('E_1')
+  // …and the spark goes out with it.
+  expect(await burning(page), 'a fuse is still alight with nothing to burn').toBe(0)
 
   // …**AND IT THROWS THE PIG THAT PLANTED IT**, inside that beat. Play: "динамит
   // не толкает" — right, and the charge was never the problem: TNT's six-second
