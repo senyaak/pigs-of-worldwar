@@ -2450,6 +2450,102 @@ written that a map's props must not be lit — a third of their NO2 entries are
 garbage floats and the faces reference them — and no caller ever passed the flag.
 `three/props.ts` does now, which puts them on the same footing as the ground.
 
+### THE THIRD PASS: the door, the walls, the pig's own sphere, and the smoke
+
+Play's batch, in the order the answers came.
+
+**"В игре не может быть мусора" — and he was right to push.** The claim that a
+third of a prop's normals were garbage floats is corrected where it lived
+(`three/modelMesh.ts`): the bytes are **x86 instructions**. STW07PWW's NO2 holds 28
+entries, 7 unit-or-zero and 21 reading `5a 59 5b c3` (pop/pop/pop/ret),
+`53 51 52 56`, `b8 ff ff ff`, `e8 d4 1e 00` with every fourth dword zero — the
+archiver padded with whatever memory it had. The layout is not in doubt
+(`british.mad` is 97.5% unit through the same reader), and a quad's four normal
+indices ARE its four vertex indices, so the faces point into the code. Which
+settles unlit props from the other end: the original cannot be reading that.
+
+**A RECORD'S OWN HEALTH beats the table.** "У дома кажется сильно много хп — с
+1-го взрыва дверь ломается." The door says so itself: CAMP's record 46 is
+`STW04_D2` and its **field 12 is 50**, exactly TNT's fifty at the core, where every
+wall round it leaves the field at 255 and takes the table's sixty. The exe reads it
+at 0x4a6179 (`field12 << 7` into `[+0x4c]`, and `[+0xa8]` too for the breakable
+class); 5479 of 6322 shipped records say 255, and `lib/game/targets.ts` now honours
+the rest.
+
+**A WALL IS THIN, and that is what "дом бестелесен" was.** `MIN_SOLID` asked both
+horizontal extents to reach two box units, and every wall piece in the game is ONE
+unit thick (STW04PPP 64×512×512, STW07PWW 64×512×2048). The line is on the
+FOOTPRINT now — a box stops a pig unless it is a single unit square, which over the
+shipped data is exactly the tufts, the fish, a lamp post and a chimney pot.
+
+**The pig's body is READ at last: a sphere of radius 0xAA = 170.** The 160 was half
+a spawn marker's 5×5×5, and the loader jumps the box build outright for a pig
+(0x4a61ad) — so that marker is not a collider anywhere in the original. What a body
+is comes off the type-keyed table at 0x4a90cc: slot 0 is shape kind 2 with
+`esi = 0xAA`, and slot 7 gives the blast effect the 35 this engine already draws
+with. So the pig keeps a radius, and it is now the game's own number.
+
+**A crate takes what you were carrying.** Play, asked and answered: "тнт не
+забирается когда аптечку в доме подбираешь… должен." Measured first — the medkit IS
+collected (50→100 with `I_PICKUP` and `P_SIGH`) and the TNT survived it — so this is
+play's rule going in on top of the exe's, whose own `ClearInventory` (0x468f50) is
+called from the PLACEMENT arm alone. One weapon at a time, which is the tutorial's
+whole shape.
+
+**A steep throw goes IN.** "Если вертикальная скорость выше горизонтальной —
+прожектайл тонет." The skip already needed 150 along the surface; it now also needs
+to be going along faster than down, which is the same reading of `[contact+0x14]`
+the page already argues for, with the case play caught added to it.
+
+**Black smoke, and a bullet that smokes.** A puff was 55 units across in mid grey —
+a sixth of a pig, invisible beside a fireball. It takes the fireball's own colour
+law now (`cloudChannel(16)` = 100 of 255) at a size where fourteen of them read as
+a cloud. And a bullet lays the same trail a grenade does, from the same pool: the
+engine hangs that effect off a projectile in its constructor and does not care
+whether the thing was thrown or fired.
+
+**The flight ANIMATES.** "Отбрасывание не запускает анимацию полёта. падение не
+запускает анимацию подьёма после полёта." Both were one line: the frame dresses
+every non-acting pig in IDLE once a frame, which took the bounce clip straight back
+off — and the two beats did the same to the acting pig. All three now leave a pig
+in the air alone.
+
+### THE PIG IS TWO NUMBERS, and a wall it hides behind FADES
+
+**"Раздутая свинья."** Play: "очень сильно заметно что цепляет всё невидимыми
+боками." The 170 read out of the exe is right and the mistake was the units — it is
+a MODEL-space length, and every one of those halves in this remake (the bayonet's
+460 → 230, `lib/game/melee.ts`). Halved it is **85**, and the pig as DRAWN — bone
+offsets resolved, `MODEL_SCALE` applied — is **182 across the shoulders**. The exe's
+own body and the visible pig are the same size, which is the check that the halving
+is right.
+
+**But one cylinder cannot be a pig**, and the tutorial is what proves it. The drawn
+body is 393 nose to tail; the GAP in CAMP's first bridge is 512 and a running jump
+carries 303, so nothing narrower than 104 either side can cross it — and the
+tutorial's own words are JUMP THE GAP. So the two questions are two numbers:
+
+- **`PIG_RADIUS` = 85** — how near a wall it may stand. Its SIDES.
+- **`PIG_HOLD` = 196** — how far past an edge it is still held up. Its LENGTH,
+  because a body is supported while any part of it is over the edge.
+
+**A WALL THE PIG HIDES BEHIND FADES.** "Здание не просвечивает когда свинья
+внутри", and then "там полупрозрачность — в exe посмотри." Both true, and the exe's
+own hook is now written out in `../pigs-disasm/objects/notes.md`: the draw loop
+dispatches on body type through a twelve-entry table (0x44e5e8), and the **BUILDING**
+arm (0x1359, 0x44e486) calls `afForceTransparencyOff` when `[pig+0x170]` — what a
+pig has ENTERED — is the building being drawn. Two things it is not: the PC
+wrapper's hook is a stub (three instructions, stores its argument, nothing reads it
+back), and the semi-transparency is not in the art (the PSX palette bit is set in 6
+of CAMP's 191 textures, none of them the house's).
+
+CAMP's house is not a BUILDING either — it is eighteen scenery pieces — so the
+remake does the general version: `lib/game/seeThrough.ts` says which records the
+segment from the eye to the pig's middle crosses (a slab test in each box's own
+frame, so an oriented box needs no special case) and `three/props.ts` swaps those
+meshes onto a cloned see-through material set. Every record of a model shares one
+material array, which is why it clones rather than turning the shared one down.
+
 ### PLAY'S OPEN LIST — what is still open (2026-08-10)
 
 Four of the seven are fixed and are written up above: the charge that stands
@@ -2476,18 +2572,31 @@ flickered. Written down here rather than in a chat that scrolls away.
 3. **`002/effects.spec.ts:161` is flaky** — one fireball sprite's outward bearing can
    roll near-vertical and the assertion is on blob 0 alone. Seed the roll or assert
    over all of them; it failed once in a full run and passes alone.
-4. **`PIG_RADIUS` has no witness in the exe, and play can feel it.** It is 160 —
-   half the spawn marker's own 5×5×5 — and the loader **skips the collider entirely
-   for a pig**: `if ([obj+0x38] == 0x1357) goto` past the box build (0x4a61ad), so
-   that 5×5×5 is never a collider in the original at all. A pig therefore stops 160
-   units short of every wall in the remake on a number nothing supports, which is
-   the general half of "нельзя подойти вплотную". What the pig's own body IS comes
-   out of its class's constructor and has not been read. Worth a measured pass:
-   it moves every wall in the game, so it is not a number to guess twice.
-5. **A record can carry its OWN health in field 12** — `[esi+0x38] != 0xFF` writes
-   `field12 << 7` into both `[+0x4c]` and `[+0xa8]` (0x4a6179–0x4a61ad), overriding
-   the table `lib/game/breakable.ts` transcribes. Shipped records are 255 nearly
-   everywhere; the day one is not, this is where it belongs.
+4. **A BURNING FUSE.** "Динамит не горит." A planted charge lays the grenade's own
+   smoke trail where it stands (the constructor's parented effect, lib/game/trail.ts),
+   and that is all it does. What the original shows at the fuse is not decoded — the
+   two mine rows differ only in their effect ids, 0x4c and 0x55, and neither is
+   built — so anything more would be invented art. Say the word and it gets some.
+5. **Is the throw still light?** "Отбрасывание миной всё ещё кажется слабым (может
+   я не прав)." A mine's twenty points now throw at 80 a frame — above a bayonet's
+   75, below a trotter's 100 — while TNT's fifty hit the cattle prod's 200 cap. If a
+   mine should fling harder than a punch, the coefficient is the one number to move
+   (`FLING_PER_POINT`, lib/game/blast.ts).
+6. **`002/camera-smooth.spec.ts:92` is load-sensitive**, not broken by anything in
+   this pass: measured at 0.390 against a 0.35 threshold at HEAD with every change
+   of this round stashed away, and it passed three full runs earlier in the same
+   session. It is a jerk-over-step ratio sampled from real frames, so a machine
+   busy building and running suites fails it. Either the threshold is wrong or the
+   measure needs the engine's own step rather than the monitor's.
+7. **`PIG_RADIUS` still bears watching, from the other end.** The radius itself is
+   read now, but the pig's ctor passes `0x1000` for its three scales where a prop
+   gets `0x800` (0x466986 against 0x4a592f) — so the original may draw a pig at FULL
+   model scale, twice what this remake does. That decides whether a 170 sphere is
+   right beside a 325-tall pig or beside a 651-tall one, and it moves every reach in
+   the game, so it wants its own measured pass. Play: "также про свина с сильно
+   большой моделькой."
+8. **Getting INSIDE a building** is the IN/OUT family (skills 61, 62, 64) with the
+   taxonomy's GUN_BARRELS beside it, and none of it is built.
 
 ### What is still not read
 
