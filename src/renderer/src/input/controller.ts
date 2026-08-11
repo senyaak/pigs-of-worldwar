@@ -221,6 +221,13 @@ export interface DebugHooks {
   /** Where it is LOOKING, as a unit vector — the rig eases its position and
    * not its aim, so a shake in the view lives here (three/debug.ts). */
   facing(): { x: number; y: number; z: number }
+  /** How many mines are drawn, and how many of those are TRODDEN ones wearing
+   * the engine's own `WE_APMIN` out of the map's archive (three/mineArt.ts). */
+  minesTripped(): number
+  /** How long the last drawn frame took, seconds. Pairs with `facing()` to turn
+   * a step into a RATE, which is the only way to measure judder on a machine
+   * whose frame interval is itself uneven (three/debug.ts). */
+  frame(): number
   /** Every sound the battle has played, in order. */
   sounds(): string[]
   /** The squads as fielded: where each pig started, the class the map gave

@@ -157,8 +157,23 @@ test('the fireball goes UP, and gravity brings it back', () => {
   frames(effect, 1)
   // Gravity is 20 a frame and it takes the climb off, so dy moves toward zero.
   expect(cloud.blobs[0].dy).toBe(before + 20)
-  // …and out along its own bearing at the same time.
-  expect(Math.hypot(cloud.blobs[0].x, cloud.blobs[0].z)).toBeGreaterThan(0)
+  // …and out along its own bearing at the same time — but NOT every one of them,
+  // and that is the engine's own arithmetic rather than a flake. The in-plane
+  // speed is `((trig * sinPitch) >> 11) * out * spread >> 7` with `trig` at most
+  // 256 and `sinPitch` at most 178, so a sprite whose pitch rolls under about
+  // 2.5° has BOTH its horizontal components truncate to exactly zero and goes
+  // straight up. The cone is 44° wide out of a `rand() % 0xc9`, which puts that
+  // at roughly one sprite in sixteen — so asserting it on blob 0 alone failed
+  // about that often, and the claim belongs to the population.
+  const moved = cloud.blobs.filter((blob) => Math.hypot(blob.x, blob.z) > 0)
+  expect(moved.length / cloud.blobs.length, 'the fireball did not spread').toBeGreaterThan(0.8)
+  // …and the ones that did not are exactly the ones with nothing sideways to
+  // move along: nothing else can hold a sprite still.
+  for (const blob of cloud.blobs) {
+    if (Math.hypot(blob.x, blob.z) > 0) continue
+    expect(blob.dx, 'a sprite stood still with a sideways speed').toBe(0)
+    expect(blob.dz, 'a sprite stood still with a sideways speed').toBe(0)
+  }
 })
 
 test('a fireball SHRINKS over twenty frames and then is gone', () => {

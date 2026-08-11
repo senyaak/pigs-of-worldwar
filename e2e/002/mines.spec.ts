@@ -27,10 +27,17 @@ import {
   detectsMines
 } from '../../src/lib/game/mines'
 import { FUSE_JITTER, fuseSeconds, isPlanted, lobOf } from '../../src/lib/game/grenade'
-import { fromExeFrames } from '../../src/lib/game/ballistics'
+import { EXE_FRAME_SECONDS, fromExeFrames } from '../../src/lib/game/ballistics'
 import { layerFires, layerSights, weaponLayer } from '../../src/lib/game/controls'
 import { PLANTED_SECONDS, endsTurn, hurryFor } from '../../src/lib/game/spend'
 import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
+import { LOB_EFFECT_ID, MINE_EFFECT_ID } from '../../src/lib/game/blast'
+import { BLAST_EFFECT, MINE_EFFECT } from '../../src/lib/game/effects'
+import { createEffectField } from '../../src/lib/game/effectField'
+import { SPAWNED_MODELS, TRIPPED_MINE_MODEL } from '../../src/lib/game/ammo'
+import { WEAPON_MODEL } from '../../src/lib/game/weapons'
+import { parseArchive } from '../../src/lib/formats/mad'
+import { parseModel } from '../../src/lib/formats/model'
 import { Game } from '../../src/lib/game/game'
 import { NO_BODY } from '../../src/lib/game/body'
 import { createBus } from '../../src/lib/game/events'
@@ -153,6 +160,95 @@ test('…and then it goes off where the TILE is, and takes twenty off a grunt', 
   // …and the blast reaches a tile and a half: 1024 less the 512 the falloff is
   // biased by, which is a quarter of the damage still landing at the rim.
   expect(MINE_BLAST).toBe(1024)
+  // …and it does NOT look like a grenade. The mine's destructor names effect
+  // 0x4c, and the announcement carries it so the picture can be its own.
+  expect(blast[0]).toMatchObject({ effect: MINE_EFFECT_ID })
+  expect(MINE_EFFECT_ID).not.toBe(LOB_EFFECT_ID)
+})
+
+test('a MINE goes off on parameter row 14, and a grenade on row 0', () => {
+  // The two mine flavours differ in one field, their effect id — 0x4c against
+  // 0x55 — and both ids reach the same arm (`byte [0x489680 + id − 1]` gives
+  // slot 51 and slot 56, and both slots hold 0x488fb8, which is
+  // `push 0xE; call 0x48ccc0`). So a mine is ROW 14 and never row 0.
+  expect(MINE_EFFECT.kind).toBe(14)
+  expect(BLAST_EFFECT.kind).toBe(0)
+  expect(MINE_EFFECT.id).toBe(0x4c)
+
+  // Row 14 is a different picture in every part of it, and all of it on frame 1
+  // where a grenade's is staged over three.
+  expect(MINE_EFFECT.clouds, 'one fireball, not two').toHaveLength(1)
+  expect(BLAST_EFFECT.clouds).toHaveLength(2)
+  expect(MINE_EFFECT.clouds![0]).toMatchObject({
+    at: 1,
+    count: 70,
+    colour: [5, 2, 0],
+    up: 3,
+    out: 2,
+    gravity: 30
+  })
+  // A grenade throws no ring at all; a mine throws one, and it SLOWS — the only
+  // other row in the game with a negative drift is the sword's.
+  expect(BLAST_EFFECT.rings).toHaveLength(0)
+  expect(MINE_EFFECT.rings).toHaveLength(1)
+  expect(MINE_EFFECT.rings[0]).toMatchObject({ at: 1, growth: 95, drift: -2, step: 8 })
+  expect(MINE_EFFECT.rings[0].colour).toEqual([13, 10, 4])
+  // …and its smoke goes STRAIGHT UP, which is what a buried charge does: out 0
+  // against a grenade's 10, and eighteen puffs on frame 1 rather than fourteen
+  // over frames 2 and 3.
+  const puffs = MINE_EFFECT.bursts!
+  expect(puffs).toHaveLength(2)
+  expect(puffs.every((one) => one.at === 1)).toBe(true)
+  expect(puffs.every((one) => one.out === 0 && one.up === 60)).toBe(true)
+  expect(puffs.reduce((n, one) => n + one.count, 0)).toBe(18)
+  expect(BLAST_EFFECT.bursts!.every((one) => one.out === 10)).toBe(true)
+
+  // …and the field hands out the right one for each id.
+  const field = createEffectField(() => 0)
+  field.blast({ x: 0, y: 0, z: 0 }, MINE_EFFECT_ID)
+  field.update(EXE_FRAME_SECONDS)
+  expect(field.rings(), 'the mine threw no ring').toBe(1)
+  field.clear()
+  field.blast({ x: 0, y: 0, z: 0 }, LOB_EFFECT_ID)
+  field.update(EXE_FRAME_SECONDS)
+  expect(field.rings(), 'a grenade threw a ring').toBe(0)
+})
+
+test("a TRODDEN mine wears the ENGINE's own model, out of the MAP's archive", () => {
+  // Name table 0x4d9680, `START_OF_AMMO` at 387, so a projectile row's id indexes
+  // it: 428 and 429 — the two mines a foot sets off — are both `WE_APMIN`. Which
+  // is NOT the `WE_MINE` a pig carries, and is not in `Chars/WEAPONS.MAD` at all.
+  expect(TRIPPED_MINE_MODEL).toBe('WE_APMIN')
+  expect(WEAPON_MODEL[20]).toBe('WE_MINE')
+  expect(SPAWNED_MODELS, 'the map loader has to be told').toContain(TRIPPED_MINE_MODEL)
+
+  const weapons = readFileSync(path.join(GAME_DIR, 'Chars', 'WEAPONS.MAD'))
+  const inHand = parseArchive(weapons).entries.map((one) => one.name.toUpperCase())
+  expect(inHand, 'the carried mine is in the weapon archive').toContain('WE_MINE.VTX')
+  expect(inHand, "…and the ground one is not — that is the whole catch").not.toContain(
+    'WE_APMIN.VTX'
+  )
+
+  // It IS in every map's own archive, beside the trees.
+  const camp = readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.MAD'))
+  const { entries } = parseArchive(camp)
+  const part = (ext: string): Uint8Array => {
+    const one = entries.find((e) => e.name.toUpperCase() === `WE_APMIN.${ext}`)!
+    expect(one, `CAMP.MAD has WE_APMIN.${ext}`).toBeTruthy()
+    return camp.subarray(one.offset, one.offset + one.size)
+  }
+  const model = parseModel(part('VTX'), part('NO2'), part('FAC'))
+  expect(model.sourceQuads).toBe(22)
+  // …and it is a BIGGER object than the carried one, which is why it gets a lift
+  // of its own: y −46..44 about its origin.
+  let low = -1e9
+  let high = 1e9
+  for (let i = 1; i < model.positions.length; i += 3) {
+    low = Math.max(low, model.positions[i])
+    high = Math.min(high, model.positions[i])
+  }
+  expect(low).toBe(44)
+  expect(high).toBe(-46)
 })
 
 test('TNT is PLANTED: no gauge, no aim view, and a fuse longer than the run', () => {
@@ -331,6 +427,14 @@ function walkableMine(): { x: number; z: number } {
   return at
 }
 
+/** How many TRODDEN mines the scene is drawing, wearing `WE_APMIN`
+ * (three/mineArt.ts). */
+const trippedShown = (page: Page): Promise<number> =>
+  page.evaluate(
+    () =>
+      (window as unknown as { pow: { debug: { minesTripped(): number } } }).pow.debug.minesTripped()
+  )
+
 test('a pig that walks onto a MINE hears it and then loses twenty points', async ({ app }) => {
   const { page } = app
   await startGame(page)
@@ -344,10 +448,15 @@ test('a pig that walks onto a MINE hears it and then loses twenty points', async
   const quiet = (await sounds(page)).length
   await warp(page, at.x, at.z, 0)
 
-  // The CLICK first, and a mine counting down — nothing is drawn for either, so
-  // this is the whole of what a player gets before the bang.
+  // The CLICK first, and a mine counting down.
   await expect.poll(async () => (await counting(page)).length, { timeout: 4000 }).toBe(1)
   expect((await sounds(page)).slice(quiet), 'the trigger was heard').toContain('L_MINETR')
+  // …and the mine SHOWS ITSELF, in the engine's own `WE_APMIN` — which comes out
+  // of the MAP's archive and not the weapon one, so a loader that failed to pick
+  // it up would draw nothing at all and say nothing about it (lib/game/ammo.ts).
+  // CAMP's own field has nobody near it who can see a buried mine, so this count
+  // is the trodden one and only it.
+  expect(await trippedShown(page), 'the trodden mine was not drawn').toBe(1)
 
   // …and then it goes off: the same E_1 a grenade plays, and twenty points off a
   // grunt standing on the thing.

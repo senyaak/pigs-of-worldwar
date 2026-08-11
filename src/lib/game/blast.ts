@@ -28,7 +28,23 @@ export interface Charge {
   /** How far the falloff runs: `blastRange(row)` for a lob, and the same
    * arithmetic off its own row for anything else. */
   reach: number
+  /**
+   * The EFFECT id its destructor spawns — what the bang looks like.
+   *
+   * It belongs to the charge because that is where the exe keeps it: a projectile
+   * row's destructor arm names one id, and the two mine rows differ in nothing
+   * ELSE (0x433cd0 and 0x433d1f against a lob's 0x432e75). Two ids here, and they
+   * read two different parameter rows: **0x54 → row 0** for a grenade, **0x4c →
+   * row 14** for a mine (lib/game/effects.ts). Anything without one still hurts
+   * and simply looks like a grenade.
+   */
+  effect?: number
 }
+
+/** What a GRENADE's destructor spawns (0x432e75) — parameter row 0. */
+export const LOB_EFFECT_ID = 0x54
+/** …and what a MINE's does (0x433cd0/0x433d1f) — parameter row 14. */
+export const MINE_EFFECT_ID = 0x4c
 
 /** Everything a blast can catch. The same four fields the bullets and the blade
  * take, and the SAME dummy array — a list of its own means a dummy dies twice
@@ -106,7 +122,11 @@ export const flingSpeed = (points: number): number =>
  * has to be seen (lib/game/battle.ts).
  */
 export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit): void {
-  emit({ kind: 'blasted', at: { x: at.x, y: at.y, z: at.z } })
+  emit({
+    kind: 'blasted',
+    at: { x: at.x, y: at.y, z: at.z },
+    effect: charge.effect ?? LOB_EFFECT_ID
+  })
   const took = (dx: number, dy: number, dz: number): number =>
     Math.round((charge.damage * blastShare(Math.hypot(dx, dy, dz), charge.reach)) / DAMAGE_UNIT)
   for (const pig of world.pigs()) {

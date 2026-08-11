@@ -2556,7 +2556,8 @@ battle's own clock, so two machines stepping the same battle draw the same flame
 sized off the bundle and placed at model x −148 (the far end of the stub, measured
 when the charge was stood up in the first place). **Nothing about it is a reading**
 and the file says so at the top: the two mine rows differ only in their effect ids,
-0x4c against 0x55, and neither effect has been opened. `window.pow.debug.burning()`
+0x4c against 0x55, and those two turned out to be the mine's BLAST and not its fuse
+(see below), so there is still nothing read behind the spark. `window.pow.debug.burning()`
 counts them, because a sprite on a transparent quad is not something a screenshot
 can be held to.
 
@@ -2572,54 +2573,148 @@ hardest knock the exe hands out:
 | a GRENADE | 30 | 180 |
 | TNT | 50 | 300, held at the 200 cap |
 
-### PLAY'S OPEN LIST — what is still open (2026-08-10)
+### A MINE does not go off like a GRENADE — it is parameter row 14
 
-Everything play has named over three passes is written up above as its own section:
+The open list said the two mine rows' effect ids, 0x4c and 0x55, were "the likeliest
+place the original's mark lives" and that their two-level dispatch had not been
+untangled. It is untangled now, and it says something else.
+
+Both ids reach the SAME arm — `byte [0x489680 + id − 1]` gives slot 51 and slot 56,
+and the jump table at 0x489574 holds `0x488fb8` for both, which is three
+instructions: `push 0xE; call 0x48ccc0`. So the two flavours are identical and both
+read **parameter row 14**. The remake had been blowing every charge up with row 0,
+which is the grenade's, and that was never read for the mine — only assumed.
+
+**The twelve stages are pinned end to end now**, which is what made row 14 readable
+at all. Every one of them is `flag = param(f) == 1`, `when = param(f+1)`,
+`base = param(f+2)`, straight off the update loop at 0x48bcaa..0x48bf1b — clouds at
+flags 0x00/0x0a, rings at 0x14/0x21/0x2e, bursts at 0x5b/0x66/0x71/0x80, and three
+more (0x53 inline, 0x3b and 0x47 through an undecoded spawner). The check that says
+the map is right rather than plausible: **run row 0 through it and `ROW_ZERO` comes
+back out to the number**, frames and all.
+
+| | a GRENADE (row 0) | a MINE (row 14) |
+| - | - | - |
+| fireball | TWO clouds, dark red then near-black | **one**, dim (5,2,0), rising less and falling harder |
+| ring | none at all | **one**, and it SLOWS — drift −2, warm (13,10,4) |
+| smoke | 14 puffs thrown OUTWARD over frames 2 and 3 | **18 thrown straight UP**, `out` 0, all on frame 1 |
+
+A buried charge throws its smoke up and a thrown one throws it out, which is the
+whole difference in one line. `MINE_EFFECT` in `lib/game/effects.ts`, and the seam
+that carries it is the exe's own shape: a `Charge` names the effect id its
+destructor spawns (`LOB_EFFECT_ID` 0x54, `MINE_EFFECT_ID` 0x4c), the `blasted` event
+carries it, and `effectField.blast(at, effect)` picks the row. The SOUND is shared —
+`0x48ccc0` plays 0x1a whatever the id — which is what the older note's "both funnel
+into the same `E_1`" was seeing.
+
+### A trodden mine wears `WE_APMIN`, and it comes off the MAP
+
+The object name table is 466 POINTERS at 0x4d9680 with `START_OF_AMMO` at 387, so a
+projectile row's id indexes it — and **rows 428 and 429, the two mines a foot sets
+off, are both `WE_APMIN`**. Not the `WE_MINE` a pig carries, which is entry 20 of
+`Chars/WEAPONS.MAD`; `WE_APMIN` is not in that archive at all. It is in **every
+map's own .MAD**, all 61, beside the trees — along with `WE_GRE2`, `BULL1`,
+`WE_BOMB` and the rest of the AMMO run. So a projectile's art loads the way a tree's
+does.
+
+Two things had to move for it. `main/assets.ts` walked the .POG for "one model per
+placed record" and nothing places `WE_APMIN`, so `lib/game/ammo.ts` names the models
+the ENGINE spawns and the loader takes those too; and `three/props.ts` grew
+`spawn(name)`, a fresh mesh off the map's own shared geometry. `three/mineArt.ts`
+now draws two lists from two models, and the split is the honest one: **the trodden
+ones are the engine's art** (`WE_APMIN`, lift 44 — the model runs y −46..44 and
+Y-DOWN makes the greatest y its underside, which the art agrees with: the flat plane
+at 44 carries `APMIN002` and the red plunger at −46 sits on top), and **the revealed ones are the
+remake's own**, still `WE_MINE` standing in until the yellow-and-black ground
+texture lands.
+
+`pow.debug.minesTripped()` counts the first kind on its own, and it earns its keep
+here rather than being a nicety: if the loader ever stops picking `WE_APMIN` up, the
+mine draws NOTHING and nothing else in the suite would notice.
+
+### The pig's DRAW SCALE: the question dissolves
+
+Open item 5 is closed and nothing had to change. The pig's constructor pushes
+`0x1000` three times where the loader's building arm pushes `0x800`, and the worry
+was that the original draws a pig at full model scale. It does not read either
+number: both paths funnel into one base constructor, **`0x4a7db0`**, which is thirty
+instructions and ends `ret 0x2c` — eleven dword arguments — and it reads exactly
+**two** of them, arguments 1 and 3, into `word [this+0x2c]` and `[this+0x2e]`.
+Everything else it writes is a zero or a constant. The scale triple is arguments 7,
+8 and 9, and on the pig's path they are dropped twice over: its intermediate
+`0x4407e0` ignores the three it was handed and pushes three fresh `0x1000`s, which
+`0x4a7db0` then also drops. A dead argument in the engine's object constructor. The
+body stands on the two measurements that agree — the shape table's 0xAA halved, and
+the drawn shoulders.
+
+### The judder measure is a RATE now, and both bars are back at 0.35
+
+`002/camera-smooth.spec.ts` was scoring the second difference of the view direction
+PER FRAME, which asks a frame that took 33 ms to have moved the camera as far as one
+that took 16 and calls the difference judder. On a machine running other suites the
+frame interval swings by that much, so the number wandered — 0.15 quiet against 0.39
+busy, on a bar of 0.35 — and one of the three bars had already been let out to 0.6
+to live with it.
+
+Dividing each step by the time it was given fixes it at the root, and the time is the
+app's own: `pow.debug.frame()` hands out the very delta `three/battle.ts`'s `onFrame`
+was called with. The sampler's own gaps could not do it — its callback runs after the
+battle's in the same frame, so those gaps carry the app's work as noise. A view moving
+at a steady rate now scores zero however uneven the frames are, and the case the spec
+exists for still scores about 1. Measured: 0.162 / 0.039 / 0.131 alone, and
+0.156 / 0.039 / 0.077 inside a full run. All three bars are 0.35.
+
+`002/effects.spec.ts:161` was the other one, and it was not flaky either — it was
+asserting on blob 0 alone something that is true of most of a cloud and not all of
+it. A sprite's in-plane speed is `((trig * sinPitch) >> 11) * out * spread >> 7` with
+`trig` at most 256, so a sprite whose pitch rolls under about 2.5° has BOTH
+components truncate to zero and goes straight up — about one in sixteen out of a 44°
+cone. The claim belongs to the population: 80% of them spread, and the ones that do
+not have nothing sideways to move along.
+
+### PLAY'S OPEN LIST — what is still open (2026-08-11)
+
+Everything play has named over four passes is written up above as its own section:
 the charge that stands fuse-up and burns, the blast that throws and how hard, the
 house that takes damage and stops flickering and stops being walk-through, the
 shelter's collider, the door's own health, the pig that is no longer twice its own
 width, the wall that fades when he is behind it, the crate that empties the hands, a
-steep throw that goes in the water, black smoke, a bullet's trail. What is left is
+steep throw that goes in the water, black smoke, a bullet's trail, and now the mine
+that explodes with its own picture and wears the engine's own model. What is left is
 here rather than in a chat that scrolls away.
 
 1. **A trodden mine wants an EXCLAMATION MARK over it.** "когда наступил — мина
-   появляется с восклицательным знаком над ней." The mine's own model appears now
-   (`three/mineArt.ts` draws `mines.at()` too); the glyph needs the battle font —
-   GameChars, which `002/hud.spec.ts` already proves has letters, and which nothing
-   in the renderer draws with yet — or the game's own art. **Where to look first:**
-   the two mine rows spawn projectiles 428/429, identical but for their EFFECT ids,
-   0x4c against 0x55, and the remake has neither. One of those two is the likeliest
-   place the original's mark lives. Their arms are a two-level dispatch (a byte at
-   `0x489680 + id - 1` gives the slot, 51 and 56, and the slot indexes a jump table
-   that was not untangled this pass).
+   появляется с восклицательным знаком над ней." The mine itself appears now, in the
+   engine's own `WE_APMIN`; the mark is still not found, and this pass ruled out six
+   places by measurement rather than by looking: the mine's effect (0x4c/0x55 are the
+   BLAST — row 14), the whole tread path (0x46bfd9..0x46c169), the projectile's model,
+   `WE_BANG` (a wire and a box — it is skill 40's MINE SHELL), `MAPICONS.MTD`, all 743
+   texture names in the install, and every one of `gtext`'s 272 strings. **Where to
+   look next:** the battle FONT drawn in world space the way a damage number is —
+   effect 0x35 through 0x487b90, and a sibling call passing a character rather than a
+   value would be it — and `Language/Tims/fonttims.mad`, which nothing in the exe has
+   been traced to. `weapons/mines.md` has the negative results so they are not redone.
 2. **The reveal is a TEXTURE SWAP, and for three classes.** "инженеры и командос с
    героем видят жёлто-чёрные текстуры там где есть мины", the range applies to the
    ground AND the map view ("к земле тоже"), and the enemy simply is not shown them
    on the minimap. What is built instead: the `WE_MINE` model for the engineer family
-   (5, 6, 7) inside 1024 on the ground. Play said "но ладно это потом" — so the swap,
-   the third class and the minimap are all still open, and the hazard stripes are
-   almost certainly CAMP's four mine-only textures.
-3. **`002/effects.spec.ts:161` is flaky** — one fireball sprite's outward bearing can
-   roll near-vertical and the assertion is on blob 0 alone. Seed the roll or assert
-   over all of them; it failed once in a full run and passes alone.
-4. **`002/camera-smooth.spec.ts:92` is load-sensitive**, not broken by anything in
-   this pass: measured at 0.390 against a 0.35 threshold at HEAD with every change
-   of this round stashed away, and it passed three full runs earlier in the same
-   session. It is a jerk-over-step ratio sampled from real frames, so a machine
-   busy building and running suites fails it. Either the threshold is wrong or the
-   measure needs the engine's own step rather than the monitor's.
-5. **The pig's DRAW SCALE, from the other end.** Its body is settled — 170 halved,
-   and the drawn shoulders agree — but the ctor still passes `0x1000` for the three
-   scales where a prop gets `0x800` (0x466986 against 0x4a592f). If that means the
-   original draws a pig at full model scale it moves every reach in the game, so it
-   wants its own measured pass; the two agreeing measurements are why it is no
-   longer urgent.
-6. **Getting INSIDE a building** is the IN/OUT family (skills 61, 62, 64) with the
-   taxonomy's GUN_BARRELS group beside it (BIGBAR, BUNKGUN, PILLBAR, AMPHGUN,
-   B_GUN, TANBAR) and the pillbox's own weapons at 45 and 46. None of it is built —
-   and the exe's see-through hook is for exactly that state (`[pig+0x170]`), so the
-   day it lands, the fade above should follow the exe's rule for a BUILDING rather
-   than the remake's general one.
+   (5, 6, 7) inside 1024 on the ground. Play, twice: "но ладно это потом" and
+   "индикатор мин пока рано — у нас нет инженеров щас". So it waits on the classes.
+3. **Getting INSIDE a building** — skill **61 BUILDING INOUT**, with **60 VEHICLE
+   INOUT** and **62 EJECT PIG** beside it. (An earlier note here said "61, 62, 64";
+   64 is BINOCULARS.) Not built, but the state is read, and it is three fields:
+   `[pig+0x310]` is what he could get into, `[pig+0x170]` what he IS in, `[pig+0x2ec]`
+   is 3 for a vehicle and 4 for a building. Both doors do the same two things to the
+   pig — `[body+0x44] |= 1` and **`[pig+0x30] = 0`**, and that second one is the draw
+   loop's own gate (0x44e43e), so a pig inside a building is simply NOT DRAWN. Which
+   is the reason the see-through hook exists: the wall fades and there is nothing
+   inside to see except through it. **And some pigs start inside** — `0x47d4e0` runs
+   once from the map loader, walks the object list for every pig whose `[+0x3c0]` is
+   1, and boards the nearest thing within **4096** units. Still unread: the
+   GUN_BARRELS group and the pillbox's own weapons, 45 HEAVY M-GUN and 46 FLAME
+   THROWER; and which marker bit fills `[pig+0x3c0]`. When it lands, the fade should
+   follow the exe's rule for a BUILDING (`[pig+0x170] == this`) instead of the
+   remake's general one. `objects/notes.md` has the read.
 
 ### What is still not read
 

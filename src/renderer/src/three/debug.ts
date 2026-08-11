@@ -74,6 +74,15 @@ export interface DebugParts {
   /** How many mine MARKERS are on the scene — what the side whose turn it is can
    * see of the field (three/mineArt.ts). */
   mineMarkers: () => number
+  /**
+   * …and how many of those are TRODDEN ones, which wear a different model.
+   *
+   * The only way to tell that the engine's own `WE_APMIN` actually arrived: it
+   * comes out of the MAP's archive rather than the weapon one, and a map loader
+   * that failed to pick it up would draw NOTHING and say nothing about it
+   * (lib/game/ammo.ts).
+   */
+  minesTripped: () => number
   /** How full the power gauge is, 0..1, or null when nothing charges. */
   charging: () => number | null
   /** Where the shot SEQUENCE has got to: the fuse, the flight, or nothing at
@@ -82,6 +91,19 @@ export interface DebugParts {
   /** Every voice line the pigs have said, in order — the only way a spec can
    * hear one (audio/pigVoice.ts). */
   barks: () => string[]
+  /**
+   * How long the LAST drawn frame took, seconds — the very delta the battle's
+   * own `onFrame` was handed (three/battle.ts).
+   *
+   * A spec watching the view cannot time its own samples: it reads in a
+   * `requestAnimationFrame` callback of its own, which runs AFTER the battle's,
+   * so the gap between two of its readings is the frame interval plus however
+   * much the app's work varied. That difference is what made
+   * `002/camera-smooth.spec.ts` fail on a busy machine and pass on a quiet one —
+   * the camera was smooth in TIME and the ruler was not. Paired with the
+   * displacement it produced, this turns a step into a rate.
+   */
+  frame: () => number
   /** Whether the beat after a blow is still running. */
   aftermath: () => boolean
   /** The beat at the END of a turn, and how many pigs are still in the water
@@ -185,6 +207,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** …and how many BURIED ones are being drawn for the side whose turn it is:
        * a mine is hidden unless a pig near it has the class to see one. */
       mineMarkers: () => parts.mineMarkers(),
+      minesTripped: () => parts.minesTripped(),
       charging: () => parts.charging(),
       /** Where the shot sequence is: 'fuse' while the ten frames run down,
        * 'flight' while the camera rides the bullet, null when the pig is its
@@ -194,6 +217,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       barks: () => parts.barks(),
       /** True while the turn is held on what the blow left behind — the clock
        * is stopped and the camera is off the pig (lib/game/aftermath.ts). */
+      frame: () => parts.frame(),
       aftermath: () => parts.aftermath(),
       /** True while the turn is ENDING: the exe's mode 13, WALK AWAY. Nobody
        * can drive, the clock is stopped and `swimming` is how many pigs are

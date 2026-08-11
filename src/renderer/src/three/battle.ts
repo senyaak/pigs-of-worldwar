@@ -256,8 +256,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const bulletArt = createBulletArt(root)
   /** The grenade models and the smoke behind them (three/grenades.ts). */
   const grenadeArt = createGrenadeArt(root)
-  /** …and the mines a pig who KNOWS about them can see (three/mineArt.ts). */
-  const mineArt = createMineArt(root)
+  /** …and the mines a pig who KNOWS about them can see, plus the trodden ones,
+   * which wear the MAP's own `WE_APMIN` (three/mineArt.ts). */
+  const mineArt = createMineArt(root, (name) => props.spawn(name))
   /**
    * Camera and marker onto a pig, wherever it happens to be standing — or
    * hanging: a pig still on its canopy is watched from the front, face on,
@@ -515,8 +516,13 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   }
 
 
+  /** The last frame's own length, seconds — kept only so a spec can pair a
+   * displacement with the time that produced it (three/debug.ts, `frame`). */
+  let lastFrame = 0
+
   const onFrame = (delta: number): void => {
     time += delta
+    lastFrame = delta
     // The GAME, in whole steps — the order of events and everything running
     // with it, the engine's own business from end to end. A step that is about
     // to run leaves behind where the pig stood, which is what the picture is
@@ -546,8 +552,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // shown to the side that has somebody near it who can see one, and to nobody
     // else (lib/game/mines.ts).
     // …plus every one that has been TRODDEN ON: play asked for the mine to show
-    // itself the moment a foot finds it, and by then it is nobody's secret.
-    mineArt.draw([...mines.revealed(game.currentPlayer.pigs), ...mines.at()])
+    // itself the moment a foot finds it, and by then it is nobody's secret. Those
+    // are the ENGINE's own art and get its model (`WE_APMIN`), which is why the
+    // two lists go in separately.
+    mineArt.draw(mines.revealed(game.currentPlayer.pigs), mines.at())
     // **AND WHATEVER STANDS BETWEEN THE CAMERA AND THE PIG GOES SEE-THROUGH.**
     // Play: "здание не просвечивает когда свинья внутри." Indoors the camera has
     // nowhere to swing to — every heading is a wall (lib/game/sightline.ts) — so
@@ -594,9 +602,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     burning: () => grenadeArt.burning(),
     mines: () => mines.at().map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     mineMarkers: () => mineArt.shown(),
+    minesTripped: () => mineArt.tripped(),
     charging: () => battle.charging(),
     firing: () => battle.view().firing?.phase ?? null,
 
+    frame: () => lastFrame,
     aftermath: () => battle.view().aftermath !== null,
     /**
      * The acting pig's POSE, from BOTH ends of the chain.

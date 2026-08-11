@@ -50,6 +50,16 @@ export interface MapProps {
    * its way down, and nothing else so far. */
   meshOf(id: number): THREE.Object3D | null
   /**
+   * A FRESH mesh of one of the map's models by name, for something the engine
+   * spawns rather than something a record places — a mine on the ground is
+   * `WE_APMIN` out of this same archive (lib/game/ammo.ts).
+   *
+   * The geometry and the materials are the shared ones, so this costs a mesh.
+   * It is NOT added to the group: the caller owns where it goes and when it goes
+   * away. Null when the map's archive has no such model.
+   */
+  spawn(name: string): THREE.Mesh | null
+  /**
    * **Fade exactly these records, and put every other one back solid.**
    *
    * Play: "здание не просвечивает когда свинья внутри." WHICH records are in the
@@ -184,6 +194,13 @@ export function buildMapProps(
     },
     restingY: (id) => restingY.get(id) ?? null,
     meshOf: (id) => byId.get(id) ?? null,
+    spawn(name) {
+      const model = built.get(name)
+      if (!model) return null
+      const mesh = new THREE.Mesh(model.geometry, model.materials)
+      mesh.name = name
+      return mesh
+    },
     fade(ids) {
       const want = new Set(ids)
       for (const id of dim) {

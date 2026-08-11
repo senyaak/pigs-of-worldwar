@@ -274,7 +274,7 @@ export function createEngine(parts: EngineParts): Engine {
       // argument apart (lib/game/scenery.ts).
       healed: ({ at, amount }) => numbers.show(at, amount, 'heal'),
       struck: ({ skill, at }) => effects.hit(skill, at),
-      blasted: ({ at }) => effects.blast(at),
+      blasted: ({ at, effect }) => effects.blast(at, effect),
       // The splash is drawn on the WATER LINE however deep it gets, because
       // effect 0x0E snaps its own y there (0x488c19).
       skimmed: ({ at }) => effects.splash(at),

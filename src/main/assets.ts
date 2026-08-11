@@ -23,6 +23,7 @@ import type { GlyphTable } from '../lib/formats/tab'
 import { parseText } from '../lib/formats/text'
 import { parsePmg } from '../lib/formats/pmg'
 import type { TerrainBlock } from '../lib/formats/pmg'
+import { SPAWNED_MODELS } from '../lib/game/ammo'
 import { parsePog } from '../lib/formats/pog'
 import type { MapObject } from '../lib/formats/pog'
 import { parsePtg } from '../lib/formats/ptg'
@@ -320,7 +321,10 @@ export async function loadMapObjects(full: string): Promise<LoadedMapObjects> {
   }
 
   const props: LoadedProp[] = []
-  for (const name of new Set(objects.map((object) => object.name))) {
+  // Every model a RECORD names, plus the handful the ENGINE spawns and no record
+  // places — a mine on the ground is `WE_APMIN` out of this same archive and
+  // nothing in the .POG mentions it (lib/game/ammo.ts).
+  for (const name of new Set([...objects.map((object) => object.name), ...SPAWNED_MODELS])) {
     const vtx = bytes(`${name}.VTX`)
     const no2 = bytes(`${name}.NO2`)
     const fac = bytes(`${name}.FAC`)

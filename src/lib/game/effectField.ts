@@ -13,6 +13,7 @@ import {
   BLAST_EFFECT,
   BREAK_EFFECT,
   DUST_EFFECT,
+  MINE_EFFECT,
   SPLASH_EFFECT,
   advanceEffect,
   beginEffect,
@@ -30,9 +31,16 @@ export interface EffectField {
    * of the exe's handler anything else that breaks. A different effect
    * entirely from a hit: smoke, and not a ring in it. */
   broke(at: Point): void
-  /** …and something EXPLODED here. The same parameter row as a breaking, and
-   * that is the exe's own doing: both ids land on the same init arm. */
-  blast(at: Point): void
+  /**
+   * …and something EXPLODED here, under the effect id its own row names.
+   *
+   * A GRENADE's 0x54 shares row 0 with a breaking crate, and that is the exe's
+   * own doing: both ids land on the same init arm. A MINE's 0x4c does not — it
+   * reads row 14, which is one dim fireball, a slowing ring and eighteen puffs
+   * thrown straight up (lib/game/effects.ts). Anything else falls back to the
+   * grenade's.
+   */
+  blast(at: Point, effect: number): void
   /** …and something heavy LANDED here. Row 0's smoke without its fire, so a
    * crate arriving raises dust rather than going off (lib/game/effects.ts). */
   dust(at: Point): void
@@ -74,7 +82,8 @@ export function createEffectField(random: Random = Math.random): EffectField {
       live.push(beginEffect(effect, at))
     },
     broke: (at) => void live.push(beginEffect(BREAK_EFFECT, at)),
-    blast: (at) => void live.push(beginEffect(BLAST_EFFECT, at)),
+    blast: (at, effect) =>
+      void live.push(beginEffect(effect === MINE_EFFECT.id ? MINE_EFFECT : BLAST_EFFECT, at)),
     dust: (at) => void live.push(beginEffect(DUST_EFFECT, at)),
     splash: (at) => void live.push(beginEffect(SPLASH_EFFECT, at)),
     update(delta) {

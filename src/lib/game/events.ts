@@ -37,8 +37,9 @@ export type BattleEvent =
   | { kind: 'damaged'; at: Point; amount: number }
   /** This pig has just gone down. */
   | { kind: 'killed'; pig: PigId }
-  /** A grenade went off here. */
-  | { kind: 'blasted'; at: Point }
+  /** Something went off here, and WHICH effect id it spawns: a grenade and a
+   * mine do not look alike (lib/game/blast.ts, `Charge.effect`). */
+  | { kind: 'blasted'; at: Point; effect: number }
   /** A pig has just found a MINE with its foot. The CLICK, not the bang — the
    * blast is four tenths of a second behind it and arrives as `blasted` like any
    * other (lib/game/mines.ts). */

@@ -232,6 +232,76 @@ export const BREAK_EFFECT: HitEffect = { ...ROW_ZERO, id: 0x3e }
 export const BLAST_EFFECT: HitEffect = { ...ROW_ZERO, id: 0x54 }
 
 /**
+ * **A MINE does NOT go off like a grenade. It is parameter row 14.**
+ *
+ * The remake blew every charge up with row 0, which is what a grenade and a
+ * breaking crate share — and that was never read for the mine, only assumed.
+ * The two mine rows' effect ids **0x4c and 0x55** (`weapons/mines.md`: the only
+ * field the two flavours differ in) go through the same two-level dispatch every
+ * other id does — `byte [0x489680 + id − 1]` gives the slot, 51 and 56, both
+ * slots hold `0x488fb8`, and that arm is `push 0xE; call 0x48ccc0`. So both
+ * flavours read **row 14**, identically, and neither reads row 0.
+ *
+ * The stage map is now pinned end to end rather than stage by stage. Every one of
+ * the twelve is `flag = param(f) == 1`, `when = param(f+1)`, `base = param(f+2)`,
+ * and the twelve spawners are read straight off the update (0x48bcaa..0x48bf1b):
+ *
+ * | stage | flag | spawner | | stage | flag | spawner |
+ * | - | - | - | - | - | - | - |
+ * | A | 0x00 | cloud 0x48bff0 | | G | 0x21 | ring 0x48c6d0 |
+ * | B | 0x0a | cloud 0x48bff0 | | H | 0x2e | ring 0x48c6d0 |
+ * | C | 0x53 | inline | | I | 0x5b | burst 0x48c160 |
+ * | D | 0x3b | 0x48c410 | | J | 0x66 | burst 0x48c160 |
+ * | E | 0x47 | 0x48c410 | | K | 0x71 | burst 0x48c860 |
+ * | F | 0x14 | ring 0x48c6d0 | | L | 0x80 | burst 0x48c860 |
+ *
+ * Run row 0 through it and out comes `ROW_ZERO` above to the number, frames and
+ * all — which is the check that says the map is right and not a story.
+ *
+ * Row 14 is a different picture in every part of it, and **all of it lands on
+ * frame 1** where a grenade's is staged over three:
+ *
+ * | | a GRENADE (row 0) | a MINE (row 14) |
+ * | - | - | - |
+ * | fireball | TWO clouds, dark red then near-black | **one**, dim (5,2,0), rising less and falling harder |
+ * | ring | none | **one**, and it SLOWS — drift −2, in a warm (13,10,4) |
+ * | smoke | 14 puffs thrown outward over frames 2 and 3 | **18 thrown straight up**, out 0 |
+ *
+ * A mine is buried, so its blast goes UP and not out, and it throws a brown
+ * shockwave a grenade has none of. Nothing here is invented: `beginEffect` reads
+ * these fields the same way it reads row 0's.
+ *
+ * The RING's `lift` is the one number that needed a decision. The row says
+ * **+100** and +y is up in the engine (`cloud.ts` settles that from four
+ * directions), so it sits 100 ABOVE the blast — which in this Y-down space is
+ * −100. The splash's own lift is knowingly left with the other sign because that
+ * is a parked thread (`RingStage.lift`); this one is flipped on the way in, the
+ * way `cloud.ts` flips, and says so here.
+ */
+export const MINE_EFFECT: HitEffect = {
+  id: 0x4c,
+  kind: 14,
+  rings: [
+    {
+      at: 1,
+      radius: 0,
+      growth: 95,
+      drift: -2,
+      width: 0,
+      spread: 41,
+      step: 8,
+      colour: [13, 10, 4],
+      lift: -100
+    }
+  ],
+  clouds: [{ at: 1, count: 70, colour: [5, 2, 0], up: 3, out: 2, gravity: 30, size: 4 }],
+  bursts: [
+    { at: 1, count: 10, colour: [16, 16, 16], out: 0, up: 60, jitter: 30, gravity: 18, step: 6 },
+    { at: 1, count: 8, colour: [16, 16, 16], out: 0, up: 60, jitter: 30, gravity: 18, step: 6 }
+  ]
+}
+
+/**
  * What a CRATE arriving under its canopy kicks up: row 0's smoke, and none of
  * its fire.
  *

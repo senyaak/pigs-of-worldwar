@@ -35,7 +35,7 @@
 // Pure, seconds and game space (Y-DOWN), like the rest of lib/game.
 
 import { FUSE_JITTER, blastReach } from './grenade'
-import { burst } from './blast'
+import { MINE_EFFECT_ID, burst } from './blast'
 import type { BlastWorld } from './blast'
 import { fromExeFrames } from './ballistics'
 import { isDead } from './health'
@@ -192,7 +192,14 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
         mine.fuse -= delta
         if (mine.fuse > 0) continue
         counting.splice(i, 1)
-        burst(mine, { damage: MINE_DAMAGE, reach: blastReach(MINE_BLAST) }, world, emit)
+        // …and it does not look like a grenade. The mine's own destructor names
+        // effect 0x4c, which reads parameter row 14 (lib/game/effects.ts).
+        burst(
+          mine,
+          { damage: MINE_DAMAGE, reach: blastReach(MINE_BLAST), effect: MINE_EFFECT_ID },
+          world,
+          emit
+        )
       }
     },
     revealed(watchers) {

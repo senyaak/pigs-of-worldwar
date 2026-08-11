@@ -47,21 +47,46 @@ const grenadesUp = (page: Page): Promise<number> =>
 
 /**
  * Watch the view for `ms`, one reading a rendered frame, and score its
- * roughness: mean |second difference| over mean |first difference|.
+ * roughness: mean |change in turn RATE| over mean |turn rate|.
  *
- * Frames where the view does not move at all are dropped — a camera holding
- * still is not judder, and including them would flatter the number.
+ * **The rate, not the step, and that is the whole of what this measure got
+ * wrong.** The first version scored the second difference of the facing itself,
+ * per frame — which asks a frame that took 33 ms to have moved the view as far
+ * as one that took 16, and calls the difference judder. On a machine building and
+ * running other suites at the same time the frame interval swings by that much
+ * and more, so the number wandered: the opening drop measured 0.15 on a quiet run
+ * and 0.39 on a busy one, against a bar of 0.35, and nothing about the camera had
+ * changed between them.
+ *
+ * Dividing each step by the time it was given fixes it at the root. A view moving
+ * at a steady rate scores zero however uneven the frames are, and the case this
+ * spec exists for still scores about 1: a target drawn straight off the engine's
+ * quanta stands still on the frames that buy no step and jumps two on the ones
+ * that buy two, which is a change in RATE and survives the division.
+ *
+ * The time each step was given is the app's own (`pow.debug.frame()`), not the
+ * gap between two of these readings. This callback runs after the battle's in the
+ * same frame, so its own gaps carry the app's work as noise — measuring with them
+ * would put back a good part of what the division just took out.
+ *
+ * Frames where the view does not move at all are dropped from the denominator — a
+ * camera holding still is not judder, and including them would flatter the number.
  */
 const roughness = (page: Page, ms: number): Promise<{ score: number; frames: number }> =>
   page.evaluate((limit) => {
     const pow = (
-      window as unknown as { pow: { debug: { facing(): { x: number; y: number; z: number } } } }
+      window as unknown as {
+        pow: { debug: { facing(): { x: number; y: number; z: number }; frame(): number } }
+      }
     ).pow
     return new Promise<{ score: number; frames: number }>((resolve) => {
       const seen: { x: number; y: number; z: number }[] = []
+      /** How long the frame that produced each reading took, seconds. */
+      const took: number[] = []
       const start = performance.now()
       const sample = (): void => {
         seen.push(pow.debug.facing())
+        took.push(pow.debug.frame())
         if (performance.now() - start < limit) {
           requestAnimationFrame(sample)
           return
@@ -72,13 +97,22 @@ const roughness = (page: Page, ms: number): Promise<{ score: number; frames: num
           a: { x: number; y: number; z: number },
           b: { x: number; y: number; z: number }
         ): { x: number; y: number; z: number } => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z })
-        const steps = seen.slice(1).map((one, i) => minus(one, seen[i]))
-        const moving = steps.filter((one) => size(one) > 1e-6)
+        // Reading i came out of a frame that lasted `took[i]`, so that is the time
+        // the step into it was given. A frame with no length to it — the very
+        // first, before the battle has been handed one — cannot be a rate.
+        const rates: { x: number; y: number; z: number }[] = []
+        for (let i = 1; i < seen.length; i++) {
+          const span = took[i]
+          if (!(span > 0)) continue
+          const step = minus(seen[i], seen[i - 1])
+          rates.push({ x: step.x / span, y: step.y / span, z: step.z / span })
+        }
+        const moving = rates.filter((one) => size(one) > 1e-6)
         if (moving.length < 3) {
           resolve({ score: 0, frames: seen.length })
           return
         }
-        const jerks = steps.slice(1).map((one, i) => size(minus(one, steps[i])))
+        const jerks = rates.slice(1).map((one, i) => size(minus(one, rates[i])))
         const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length
         resolve({
           score: mean(jerks) / mean(moving.map(size)),
@@ -143,10 +177,10 @@ test('the view rides a grenade smoothly — no step in what it is pointed at', a
   // buy a step and not at all on the ones that do not. Anything well under that
   // is the easing doing its job on a target that moves every frame.
   //
-  // The bar was 0.35 and it is 0.6, because 0.35 was inside this measurement's
-  // own SPREAD: the same ride scores 0.17 on a quiet run and 0.41 behind a
-  // couple of other app specs, so the tight bar was a flake waiting to happen
-  // and it went off the first time `FRAME_SECONDS` moved. What the test is
-  // about is the distance to the stepping case, and 0.6 keeps most of it.
-  expect(score, `view roughness ${score.toFixed(3)}`).toBeLessThan(0.6)
+  // This bar was let out to 0.6 once, because the measure it was reading swung
+  // with the machine's load — the same ride scored 0.17 alone and 0.41 behind
+  // other app specs. It is back at 0.35 with the rest of them now that the score
+  // is a RATE (`roughness` above): measured 0.131 on its own and 0.077 inside a
+  // full 241-test run, which is the spread the old bar was inside.
+  expect(score, `view roughness ${score.toFixed(3)}`).toBeLessThan(0.35)
 })
