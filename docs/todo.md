@@ -296,6 +296,30 @@ library that cannot be read" any more.
   archive — read, deliberately not wired, because it changes how every grenade in
   the game looks and nothing has asked.
 
+### The loose ends this sweep left, in plain words
+
+None of these blocks anything; they are the threads that were *touched* and
+not pulled, written here so nobody has to remember an address.
+
+1. **What decides that a body reports its speed to a contact at all.** Two
+   places build a contact and both first test one bit on the body; which
+   bodies carry that bit is unread. Matters only if a collision ever behaves
+   differently for one kind of thing than another. (`weapons/fire.md`.)
+2. **A second number on the contact record**, sitting beside the speed and
+   filled from the same call, which nothing in the water path reads. Probably
+   a penetration depth. (`weapons/fire.md`.)
+3. **What exactly the dashboard checks to hide the round lens.** It is a field
+   on the game object holding a number in the 19..26 range for the grenade
+   family — almost certainly "the skill in hand", but the field's writer was
+   not chased, so the remake should not hang a rule on it yet.
+   (`library/notes.md`.)
+4. **One HUD widget function was not walked** — the small one beside the gauge
+   and the dial. Everything around it is decoded, so it is a half-hour if a
+   piece of brass ever turns out to be missing. (`library/notes.md`.)
+5. **The dashboard's LAYOUT tables are located but not transcribed.** The
+   positions live as authored records in the exe; turning them into numbers is
+   mechanical and waits for a reason (see below — the next UI is the reason).
+
 ---
 
 ## E. BIGGER THINGS NOT BUILT
@@ -304,6 +328,19 @@ library that cannot be read" any more.
 - **The rest of the battle screen** in the order play asks for it.
 - **The two unbuilt menu screens** — MULTI-PLAYER leads somewhere, OPTIONS does
   not.
+- **There is no ESCAPE MENU**, and play named it (2026-08-11). The original has
+  one and its ART SHIPS: `dashtims.mad` entries 26..35 are `score1`, `score2`
+  and `pause1..pause8`, and the battle's dashboard init LOADS ALL TEN at
+  startup — five two-frame widgets, built the same way as the dial and the
+  gauge (the loop at 0x45709D..0x45734F, two pages an iteration; see "THE
+  DASHBOARD" in `library/notes.md`). The exe's own pause is a MODE: the beat
+  at the top of a turn lists the pause button as one of its three ways out
+  (0x4d8a2c, `turns/notes.md`). So an escape menu has a decoded skeleton to
+  sit on — the widget machinery, the art, and a mode to enter — and this is
+  the job that would justify transcribing the layout tables (D's loose end 5),
+  because a new UI wants the original's coordinates rather than fresh eyework.
+  Note the remake's own constraint from play: a real pause is single-player
+  only, and multiplayer must never stop (CLAUDE.md, "Threads left mid-pull").
 - **There is no SKY.** The battle renders against a flat clear colour.
 - **Fall damage** (`P_LAND1` is the impact that hurts, and nothing plays it).
 - **The melee's own battle cry** — the same `0x43af70` call, not yet wired to a
