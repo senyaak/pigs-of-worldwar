@@ -158,11 +158,13 @@ wedge exists to get a pig off a WALL.
 Six places ruled out by measurement rather than by looking: the mine's effect
 (0x4c/0x55 are the BLAST, row 14), the whole tread path (0x46bfd9..0x46c169), the
 projectile's model, `WE_BANG`, `MAPICONS.MTD`, all 743 texture names in the
-install, and every one of `gtext`'s 272 strings. **Where to look next:** the
-battle FONT drawn in world space the way a damage number is — effect 0x35 through
-`0x487b90`, and a sibling call passing a character rather than a value would be it
-— and `Language/Tims/fonttims.mad`, which nothing in the exe has been traced to.
-`weapons/mines.md` has the negative results.
+install, and every one of `gtext`'s 272 strings. **Where to look next — and
+fonttims IS traced now** (2026-08-11, `library/notes.md`): **0x44EBA0** is the
+battle's only consumer of `fonttims.mad` (`[0x520668+0x3F8]`), it draws in
+world space, and the damage numbers flow through it (particle type 0x23 →
+0x44F950). An exclamation mark over a mine would be drawn there; read its
+callers (0x440A20, 0x45E110) for a site passing a character rather than a
+value. `weapons/mines.md` has the negative results.
 
 ### B10. The mine REVEAL is a texture swap, for three classes
 
@@ -233,12 +235,22 @@ library that cannot be read" any more.
   runs in the shipped game. Row 1 and row 16 are transcribed, and the id → row
   map plus a per-row stage-enable table are in the notes. B3's remaining half
   is purely `lib/game/effects.ts` work.
-- **a sprite's SIZE unit** — REFRAMED, still unread: "belongs to wh32LIB.DLL
-  and cannot come out of the exe" was wrong twice. The particle draw
-  (0x489FA0) hands `(200 − age) * [effect+0x7E] * 12.5` to
-  **`afAdd2dPolyToSortList`**, readable at `_d3d.dll` 0x10008FA0 — the unit,
-  `BLOB_ALPHA` and the blend mode are one DLL read away. The same door opens
-  on **`afSetZoom`** (0x1000FB60), the sniper's `SCOPE_MAGNIFY = 4`.
+- ~~**a sprite's SIZE unit**~~ — READ (`library/notes.md`, 2026-08-11 second
+  pass): the 2D-poly record's half-extents go through the SAME perspective
+  factor as its position, so they are WORLD UNITS at the sprite's own depth —
+  `BLOB_UNIT` can die in favour of the exe's own formulas (cloud sprites
+  `(200−age)·[+0x7E]·12.5`; particles `(a1·10 + a2·age/10)`-shaped, with a10
+  a linear brightness fade). Two surprises came with it: **effect particles
+  are TEXTURED, from `expltims.mad`** (setter a0 is the entry), and **the
+  blend is ADDITIVE ONE:ONE** (flags 0x5A) for sprites, particles and clouds
+  alike — which contradicts the remake's play-driven non-additive smoke;
+  both looks want showing to play before anything is flipped.
+- ~~**`afSetZoom`**~~ — READ: the target is `15 + 45·z/4096` fifteenths of
+  the base focal length, so full zoom 0x1000 is **exactly ×4** —
+  `SCOPE_MAGNIFY = 4` was the original's own number all along — and the
+  library GLIDES the live zoom a third of the gap per frame (Begin2D's
+  tail), on top of the exe's 0x20-a-frame creep. `lib/game/zoom.ts` could
+  carry the glide.
 - ~~**`ANIM.PARACHUTE = 82`**~~ — was already answered in
   `parachute/notes.md`: MCAP ships 93 clips, the exe's 59-name array is not
   the index order at the tail, and `Pig::SetAnim`'s only clamp is
@@ -250,13 +262,20 @@ library that cannot be read" any more.
   `+0x28` is the attack clip's repeat count (4 on skills 58/59, else 1) and
   `+0x2C` a signed playback-rate multiplier (negative = backward; every
   shipped value is 1). Non-zero exactly where an attack clip exists.
-- **`pcpie4`** — STILL OPEN, with the search narrowed: the drawer is not in
-  the ammo-sprite path (the only non-loader reader of the dashtims handle,
-  0x45E3A0, builds AMMO models — `library/notes.md`), so it lives behind the
-  2D pipeline — `Begin2D` / `afDrawText` / `afAdd2dPolyToSortList` / `End2D`
-  — which nothing has walked yet. The same walk would find the battle FONT
-  (B9's exclamation mark), and the fonttims handle sits beside dashtims at
-  `[0x520668+0x3F8]`.
+- **`pcpie4`** — STILL OPEN, and the negative is now STRUCTURAL
+  (`library/notes.md`): a TIM is drawn as `base + entry` where the bases are
+  load-order indices kept only at `[0x520668+0x3E0..0x41C]`, and the
+  dashtims base is read by NOTHING but the loader and the sprite-object
+  builder 0x45E3A0 — so no exe code blits any dashtims entry through the
+  2D-poly path at all. The battle's 2D frame is mapped meanwhile (weather,
+  facetims weapon icons at 0x457840, the map piece, a trig-free 2D cluster
+  0x45A8E0..0x45C2E0). Next move: read `afCreateObj2` (0x1000D190) and
+  re-read 0x45E3A0 without its "ammo" label — the dashboard's art has
+  nowhere else left to flow through. **B9's own lead firmed up on the way:
+  0x44EBA0 is the battle's only fonttims consumer** (called from 0x440A20
+  and 0x45E110, world-space text; the damage numbers' particle type 0x23
+  feeds it via 0x44F950) — that is where an exclamation mark over a mine
+  would be drawn.
 - **The remaining barrel sounds.** Read and written down, not wired: 6 PISTOL 42
   `L_PISTOL`, 7 RIFLE 43 `L_RIFLE`, 11 SNIPER 43 at pitch **90**, 19/20 GRENADE 40
   `L_MINETR`, 30 GRENADE LAUNCHER 36, 37 TNT 35 `L_ARTIL`. One line each in

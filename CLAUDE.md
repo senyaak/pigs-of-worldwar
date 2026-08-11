@@ -852,10 +852,12 @@ caller — for skill 11 and skill 64 only, the input handler creeps the zoom in
 by **0x20 a frame** toward **0x1000** (0x495e75). The same handler scales the
 aim step by `(0x1000 − zoom) >> 12`, floored, so the sights get finer the
 closer they look. `lib/game/zoom.ts` has all of it. What 0x1000 does to a
-field of view was "cannot be read" until 2026-08-11 — the library turned out
-to be `Data/_d3d.dll`, in the install all along (`library/notes.md` in the
-disasm repo; `afSetZoom` is at 0x1000FB60) — so `SCOPE_MAGNIFY = 4` in
-`three/chase.ts` is the remake's pick until someone reads it.
+field of view IS read now (2026-08-11, `library/notes.md` in the disasm repo —
+the library turned out to be `Data/_d3d.dll`, in the install all along):
+`afSetZoom` sets a target of `15 + 45·z/4096` fifteenths of the base focal
+length, so full zoom is **exactly ×4** — `SCOPE_MAGNIFY = 4` in
+`three/chase.ts` was the original's own number — and the library glides the
+live zoom a third of the gap per frame, which the remake does not yet.
 
 **Bullets stop at the world.** `ObstacleField.solid(x, y, z)` is a new POINT
 test — `blocks` is shaped like a pig, with feet and a step-up reach, which a
@@ -872,10 +874,12 @@ Only the aim view is changed; a pig turning on its feet turns as it always
 did.
 
 Left open on this whole thread, and all of it flagged where it lives: a gun's
-DAMAGE (`SHOT_DAMAGE = 20` is invented), the sniper's magnification, where a
-no-gauge weapon's charge becomes 0xFFF, what bit 0 of a body's `+0x44` means
-at 0x47a24b, the melee's own battle cry — the same `0x43af70` call, not yet
-wired to a swing — and which mode number the wait above actually is.
+DAMAGE (`SHOT_DAMAGE = 20` is invented), where a no-gauge weapon's charge
+becomes 0xFFF, what bit 0 of a body's `+0x44` means at 0x47a24b, the melee's
+own battle cry — the same `0x43af70` call, not yet wired to a swing — and
+which mode number the wait above actually is. (The sniper's magnification
+used to be on this list; it is read now — exactly ×4, see the zoom paragraph
+above.)
 
 ### One thing at a time, and the sights hold still
 
@@ -3207,10 +3211,16 @@ was already settled in `parachute/notes.md` (MCAP ships 93 clips, the name
 array stops at 59). The big one: **the render library is `Data/_d3d.dll`, in
 the install, 94 named exports, and the exe's whole call-slot table is mapped**
 (`library/notes.md`) — `wh32LIB.DLL` is the LaserLok copy protection and every
-"lives in wh32LIB, cannot be read" verdict in this file is dead. Still genuinely
-unread: the sprite SIZE unit and blend mode (now one `_d3d.dll` read away, at
-`afAdd2dPolyToSortList` 0x10008FA0), `afSetZoom`'s meaning (0x1000FB60), and
-`pcpie4`'s drawer (behind the unwalked `Begin2D`/`afDrawText`/`End2D` path).
+"lives in wh32LIB, cannot be read" verdict in this file is dead. The second
+pass the same day read the DLL side too: a 2D sprite's size is WORLD UNITS at
+its own depth (so `BLOB_UNIT` can die for the exe's own formulas), effect
+particles are TEXTURED from `expltims.mad` and drawn ADDITIVE ONE:ONE (which
+contradicts the remake's play-driven non-additive smoke — show play both
+before flipping), and `afSetZoom`'s full zoom is exactly ×4 with a
+thirds-of-the-gap glide. Still genuinely unread: `pcpie4`'s drawer — the
+dashtims base index is consumed ONLY by the sprite-object builder 0x45E3A0,
+so the dashboard's art flows through `afCreateObj2` (0x1000D190) or nowhere;
+that read is the next move (todo D).
 
 ### Worth not re-deriving
 
