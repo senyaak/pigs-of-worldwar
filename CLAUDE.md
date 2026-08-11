@@ -3130,6 +3130,62 @@ the exe has been traced to `pcpie4` at all** — the sprite is entry 25 of
 Left open: the record's `+0x28`/`+0x2C`, which are 1 on the grenade and TNT and 0
 on the rifle and the bazooka, readers unchased.
 
+### PLAY'S LIST OF 2026-08-11 (the second one) — three done, four open
+
+**Done.**
+
+1. *A RAMP fades and should not.* "Просвечивание включается на рампе — не должно,
+   ведь она за свином, не между ним и камерой." A ramp's box is the whole
+   triangular prism, so a pig on its LOW end has its middle well below the box's
+   top and a camera behind and above looks down THROUGH the slab to reach it.
+   `sightBlockers` drops ramps the way it already drops buildings: what you stand
+   on is never between you and anything.
+2. *Too little of the roof and the walls fades.* One ray fades exactly the pieces
+   it skewers and a house is eighteen of them, so the panel in the way went
+   see-through while its neighbours stayed solid. Every box is grown by
+   `SIGHT_MARGIN` (256, half a tile) before the segment is tested.
+3. *Charging in mid-air.* "Можно во время прыжка начать заряжать оружие — баг."
+   `Pig::MayAct` refuses outright while the pig's mode is 5, which is being
+   airborne — the same value `UpdateMovement` returns on (0x467a28, 0x46b205).
+   `setFiring` drops the whole press rather than the hold alone, or a gauge
+   already filling would loose on the way up.
+4. *The lens is in the wrong widget.* It belongs at the gauge's left end, before
+   the scale's zero — "надо в низу левее нуля шкалы, там есть полузалитый круг" —
+   not behind the weapon slot. Moved to `LAYOUT.gauge.lens`.
+
+**Open, with what is measured.**
+
+5. **TNT's blast is too big to get clear of.** "Я отхожу задом все 4 секунды — а
+   меня всё равно задевает." The arithmetic: the row is 50 points over a blast
+   field of 2048, `blastReach` makes that 1536, and the falloff — the exe's own
+   `0x48CBA0` — reaches **zero only at 2560** (512 of core plus 4/3 of the reach).
+   The fuse is 5.83 s and planting hands back **4**, of which the laying clip eats
+   the first stretch; backing away is HALF speed, 520 a second, so about 2000
+   units. 2000 against 2560 is exactly play's complaint.
+   **Where to look:** the falloff is not what decides WHO is caught. In the exe
+   the blast hurts what the EFFECT's own body touches — `Pig::OnHit` off the
+   physics contact — and `0x48CBA0` only says how much. The effect body's size has
+   not been read, and the remake uses the falloff's extent as the reach instead.
+   That is the number to find; nothing here should be tuned by hand first.
+6. **The rocket is drawn crooked.** "Прожектайл кривой при выстреле базуки."
+   `three/grenades.ts` points a flying lob along its velocity with a yaw and a
+   pitch, which assumes the model's nose is +Z. `WE_TNT`'s own long axis turned
+   out to be −X (that is what `STAND` is for), so `WE_BAZZ`'s wants measuring the
+   same way — off the model's vertices and its textures — rather than guessing.
+7. **The blast's picture is the wrong one — and this half IS read.** The
+   destructor's per-kind table (0x435A6C) sends kind 10 to `0x433220`, which joins
+   the tail at `0x43533E` and pushes effect **0x53**, where the grenade's arm
+   pushes 0x54. Both play sound 0x0C (`E_1`). And the id → row map resolves
+   0x53 to **parameter ROW 1** against the grenade's row 0 (`byte [0x489680+id-1]`
+   → slot 54 → arm 0x488faa → `0x48ccc0(1)`). What is NOT built is row 1 itself:
+   it reaches stages D and E of `0x48c410`, which this repo has never decoded and
+   which "What is still not read" below already names. `Charge` would have to
+   carry the id the way the mine's already does.
+8. **Killing the last dummy does not end the mission.** Nothing in the remake ends
+   a training level at all — `game.over` is "nobody is left" over the SQUADS, and
+   CAMP fields one pig and no enemy. What the original does with a training ground
+   that has run out of things to break is not read.
+
 ### What is still not read
 
 - **`[contact+0x14]`** — the scalar the water arm gates on and scales the skip's
