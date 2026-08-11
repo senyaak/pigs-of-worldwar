@@ -241,10 +241,14 @@ library that cannot be read" any more.
   `BLOB_UNIT` can die in favour of the exe's own formulas (cloud sprites
   `(200−age)·[+0x7E]·12.5`; particles `(a1·10 + a2·age/10)`-shaped, with a10
   a linear brightness fade). Two surprises came with it: **effect particles
-  are TEXTURED, from `expltims.mad`** (setter a0 is the entry), and **the
-  blend is ADDITIVE ONE:ONE** (flags 0x5A) for sprites, particles and clouds
-  alike — which contradicts the remake's play-driven non-additive smoke;
-  both looks want showing to play before anything is flipped.
+  are TEXTURED, from `expltims.mad`** — the `ptp*` puff art, the `num0..9`
+  digit art and the pig's `Shad_org` shadow all live there — and **the blend
+  is ADDITIVE ONE:ONE** (flags 0x5A) for sprites, particles and clouds
+  alike. Play's standing complaint is that the black smoke NEVER APPEARS
+  (the "additive cannot darken" line was the remake's own reasoning, never
+  play's), and the read says the remake's smoke is missing the ART as much
+  as the law — the fix to try is the real `ptp` textures with the exe's
+  colours, under both blend modes, shown to play.
 - ~~**`afSetZoom`**~~ — READ: the target is `15 + 45·z/4096` fifteenths of
   the base focal length, so full zoom 0x1000 is **exactly ×4** —
   `SCOPE_MAGNIFY = 4` was the original's own number all along — and the
@@ -262,20 +266,20 @@ library that cannot be read" any more.
   `+0x28` is the attack clip's repeat count (4 on skills 58/59, else 1) and
   `+0x2C` a signed playback-rate multiplier (negative = backward; every
   shipped value is 1). Non-zero exactly where an attack clip exists.
-- **`pcpie4`** — STILL OPEN, and the negative is now STRUCTURAL
-  (`library/notes.md`): a TIM is drawn as `base + entry` where the bases are
-  load-order indices kept only at `[0x520668+0x3E0..0x41C]`, and the
-  dashtims base is read by NOTHING but the loader and the sprite-object
-  builder 0x45E3A0 — so no exe code blits any dashtims entry through the
-  2D-poly path at all. The battle's 2D frame is mapped meanwhile (weather,
-  facetims weapon icons at 0x457840, the map piece, a trig-free 2D cluster
-  0x45A8E0..0x45C2E0). Next move: read `afCreateObj2` (0x1000D190) and
-  re-read 0x45E3A0 without its "ammo" label — the dashboard's art has
-  nowhere else left to flow through. **B9's own lead firmed up on the way:
-  0x44EBA0 is the battle's only fonttims consumer** (called from 0x440A20
-  and 0x45E110, world-space text; the damage numbers' particle type 0x23
-  feeds it via 0x44F950) — that is where an exclamation mark over a mine
-  would be drawn.
+- **`pcpie4`** — STILL OPEN, and the search space is now SMALL
+  (`library/notes.md`): the 2D-poly path is ruled out structurally (the
+  dashtims base index is read by nothing but the loader and the animal/ammo
+  sprite builder), and `afCreateObj2` is read with ALL its call sites
+  identified — weapons/faces/hats, two sky-scaled backdrops, the DEBRIEF
+  screen (`dbpill.mtd`, and `afDrawObj`'s single caller belongs to it too)
+  — none of them the dashboard. What is left is the in-frame HUD widget
+  cluster, skimmed but not walked: **0x45A8E0, 0x45A9B0, 0x45B580, 0x45B8B0,
+  0x45BFA0, 0x45C2E0, 0x45D6D0, 0x45FF30, 0x4607A0** — no trig in any of
+  them, so the pie would be a CLIPPED quad, which is also how the remake
+  guessed it. Bounded, one session. **B9's lead firmed up on the way:
+  0x44EBA0 is the battle's only fonttims consumer** (world-space text, fed
+  by particle type 0x23 via 0x44F950), and 0x447DC0/0x447FD0 are twin
+  glyph-layout routines over a metrics table at 0x51EC70.
 - **The remaining barrel sounds.** Read and written down, not wired: 6 PISTOL 42
   `L_PISTOL`, 7 RIFLE 43 `L_RIFLE`, 11 SNIPER 43 at pitch **90**, 19/20 GRENADE 40
   `L_MINETR`, 30 GRENADE LAUNCHER 36, 37 TNT 35 `L_ARTIL`. One line each in

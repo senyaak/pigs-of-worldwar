@@ -3214,13 +3214,16 @@ the install, 94 named exports, and the exe's whole call-slot table is mapped**
 "lives in wh32LIB, cannot be read" verdict in this file is dead. The second
 pass the same day read the DLL side too: a 2D sprite's size is WORLD UNITS at
 its own depth (so `BLOB_UNIT` can die for the exe's own formulas), effect
-particles are TEXTURED from `expltims.mad` and drawn ADDITIVE ONE:ONE (which
-contradicts the remake's play-driven non-additive smoke — show play both
-before flipping), and `afSetZoom`'s full zoom is exactly ×4 with a
-thirds-of-the-gap glide. Still genuinely unread: `pcpie4`'s drawer — the
-dashtims base index is consumed ONLY by the sprite-object builder 0x45E3A0,
-so the dashboard's art flows through `afCreateObj2` (0x1000D190) or nowhere;
-that read is the next move (todo D).
+particles are TEXTURED from `expltims.mad` — the `ptp*` puffs, the damage
+digits and the pig's shadow live there — and drawn ADDITIVE ONE:ONE, and
+`afSetZoom`'s full zoom is exactly ×4 with a thirds-of-the-gap glide. On the
+smoke play keeps reporting MISSING: the remake's blob has the wrong art AND
+an invented draw law; the fix to try is the real puff textures with the
+exe's colours under both blend modes, shown to play ("additive cannot
+darken" was the remake's own argument, never play's). Still genuinely
+unread: `pcpie4`'s drawer — the 2D-poly path and every `afCreateObj2` site
+are ruled out; what is left is the in-frame HUD widget cluster
+0x45A8E0..0x4607A0, bounded and listed in todo D.
 
 ### Worth not re-deriving
 
