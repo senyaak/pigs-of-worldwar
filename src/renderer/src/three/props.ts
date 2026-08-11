@@ -16,6 +16,14 @@ import { RAMP_TILT, isRamp } from '../../../lib/game/ramps'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { HEIGHT_SCALE } from '../../../lib/game/terrain'
 
+/**
+ * How solid a wall the view has to see through stays.
+ *
+ * The remake's own number, like the camera swing next door (lib/game/sightline.ts):
+ * enough of the wall left to read as a wall, little enough to see a pig through it.
+ */
+const SEE_THROUGH = 0.25
+
 /** The vertical the yaw turns about, and the ramp's own tilt — built once. */
 const UP = new THREE.Vector3(0, 1, 0)
 const TILT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), RAMP_TILT)
@@ -41,6 +49,17 @@ export interface MapProps {
   /** One record's mesh, for hanging something on — a canopy over a crate on
    * its way down, and nothing else so far. */
   meshOf(id: number): THREE.Object3D | null
+  /**
+   * **Fade exactly these records, and put every other one back solid.**
+   *
+   * Play: "здание не просвечивает когда свинья внутри." WHICH records are in the
+   * way is the engine's answer (lib/game/seeThrough.ts); this is the art half.
+   * Once a frame.
+   */
+  fade(ids: readonly number[]): void
+  /** How many are faded right now — what a spec can ask, since transparency is
+   * not something markup can see. */
+  faded(): number
   dispose(): void
 }
 
@@ -54,17 +73,46 @@ export function buildMapProps(
   for (const prop of props) {
     built.set(prop.name, {
       geometry: buildModelGeometry(prop.model, textures),
-      // **UNLIT, and that was written down long before it was done.**
-      // `modelMesh.ts` says why in full: a THIRD of the props' NO2 entries are
-      // not unit vectors at all but garbage floats (TREEP 12 of 37, IRONGATE 5
-      // of 12, DUMMY 20 of 66), and the faces reference them, so lighting them
-      // can only speckle — a fir shredded into grey shards. The option was added
-      // with that finding and never passed; this is the call site catching up,
-      // and it puts the props on the same footing as the ground, which has
-      // always been unlit because the art carries its own light.
+      // **UNLIT, and `modelMesh.ts` says why in full**: half of what a prop's
+      // NO2 holds is not normals but fragments of the game's own machine code,
+      // and a quad's normal indices are its vertex indices, so the faces point
+      // straight into it. The original cannot be lighting props off that. This
+      // puts them on the same footing as the ground, which has always been unlit
+      // because the art carries its own light.
       materials: buildTextureMaterials(prop.model, textures, { lit: false })
     })
   }
+
+  /**
+   * A see-through copy of each model's materials, made on demand.
+   *
+   * Cloning rather than turning the shared originals transparent: every record of
+   * a model shares one material array, so the house's near wall and its far wall
+   * are the same object and fading one would fade the lot. A clone shares its
+   * TEXTURE (three copies the map by reference), so this costs a material and not
+   * an upload.
+   *
+   * `depthWrite` off, or a faded wall would still hide the pig behind it — the
+   * whole point of the fade — and the pig is drawn in its own pass anyway.
+   */
+  const ghosts = new Map<string, THREE.Material[]>()
+  const ghostOf = (name: string): THREE.Material[] | null => {
+    const solid = built.get(name)
+    if (!solid) return null
+    const had = ghosts.get(name)
+    if (had) return had
+    const made = solid.materials.map((one) => {
+      const copy = one.clone()
+      copy.transparent = true
+      copy.opacity = SEE_THROUGH
+      copy.depthWrite = false
+      return copy
+    })
+    ghosts.set(name, made)
+    return made
+  }
+  /** Which records are faded as of the last `fade` call. */
+  const dim = new Set<number>()
 
   let placed = 0
   /** Every placed mesh by its record's id, so one can be taken away again. */
@@ -136,11 +184,34 @@ export function buildMapProps(
     },
     restingY: (id) => restingY.get(id) ?? null,
     meshOf: (id) => byId.get(id) ?? null,
+    fade(ids) {
+      const want = new Set(ids)
+      for (const id of dim) {
+        if (want.has(id)) continue
+        const mesh = byId.get(id)
+        const solid = mesh && built.get(mesh.name)
+        if (mesh && solid) mesh.material = solid.materials
+      }
+      for (const id of want) {
+        if (dim.has(id)) continue
+        const mesh = byId.get(id)
+        const ghost = mesh && ghostOf(mesh.name)
+        if (mesh && ghost) mesh.material = ghost
+      }
+      dim.clear()
+      for (const id of want) dim.add(id)
+    },
+    faded: () => dim.size,
     dispose() {
       group.clear()
       byId.clear()
       restingY.clear()
       for (const { geometry, materials } of built.values()) disposeMesh(geometry, materials)
+      // The ghosts share their maps with the originals, which have just been
+      // disposed of, so only the material goes.
+      for (const materials of ghosts.values()) for (const one of materials) one.dispose()
+      ghosts.clear()
+      dim.clear()
     }
   }
 }

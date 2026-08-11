@@ -50,7 +50,7 @@ const VERTS = (RING_SEGMENTS + 1) * 2
  * about its size or its art. A pig is 320 tall; this starts at about a third
  * of one and doubles.
  */
-const PUFF_SIZE = 110 * MODEL_SCALE
+const PUFF_SIZE = 640 * MODEL_SCALE
 const PUFF_GROWTH = 1
 
 /**
@@ -259,7 +259,16 @@ export function createEffectArt(root: THREE.Object3D): EffectArt {
     )
     const size = PUFF_SIZE * (1 + PUFF_GROWTH * age)
     sprite.scale.set(size, size, size)
-    const grey = 16 / 31
+    // **BLACK, and the fireball's own colour law says how black.** Play, twice:
+    // "чёрного дыма нет на взрыве", and then "всё ещё нет чёрного дыма от
+    // взрывов" — because a puff was 55 units across (a sixth of a pig) in mid
+    // grey, which next to a fireball is nothing at all. The colour now goes
+    // through `cloudChannel`, the engine's own flat law (`c * 400 >> 6`), which
+    // takes row 0's sixteen to 100 of 255 rather than 132 — and the SIZE is the
+    // remake's, like every particle size here (`docs`: the half of the engine that
+    // draws a particle is not read), set where fourteen puffs read as a rolling
+    // cloud instead of a handful of beads.
+    const grey = cloudChannel(16) / 255
     sprite.material.color.setRGB(grey, grey, grey)
     sprite.material.opacity = 1 - age
   }

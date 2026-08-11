@@ -12,16 +12,26 @@ import type { Model, Texture } from '../api'
  * One material per model group, in group order — which is also the order
  * the geometry's draw groups are added in.
  *
- * `lit` is off for the map's props, and that is a finding rather than a
- * taste: a THIRD of their NO2 entries are not unit vectors at all but
- * garbage floats (TREEP 12 of 37, IRONGATE 5 of 12, DUMMY 20 of 66), and
- * the faces reference them — the best any index offset can do is 67% of
- * quad corners landing on a real normal, and the plateau across +8..+16
- * says the vertex and normal index arrays are the same numbers anyway. The
- * original cannot be lighting geometry off that; it would get exactly the
- * speckle we got, a fir shredded into grey shards with its trunk eaten.
- * The characters are the other way round — `pcgru_hi` has 645 of 653 unit
- * length — so the pig keeps its light.
+ * `lit` is off for the map's props, and the reason is now READ rather than
+ * inferred. Play would not have "garbage in the data" as an answer — "в игре
+ * не может быть мусора" — and he was right to push: the bytes are not
+ * meaningless, they are **x86 machine code**. STW07PWW's NO2 holds 28 entries
+ * of which 7 are unit vectors or exact zeros and the other 21 read
+ * `5a 59 5b c3` (pop edx, pop ecx, pop ebx, ret), `53 51 52 56`,
+ * `b8 ff ff ff`, `e8 d4 1e 00` — fragments of the game's own code, with every
+ * fourth dword left zero. The tool that wrote these archives padded them with
+ * whatever memory it had.
+ *
+ * A quad's normal indices are its VERTEX indices, one for one (dumped: quad 0
+ * of STW07PWW carries 18,19,16,17 in both fields), so the faces do point
+ * straight into that. Which settles it from the other end: the original cannot
+ * be lighting a prop off its NO2, because half of what it would read is
+ * instruction bytes. The characters are the other way round — 97.5% of every
+ * corner `british.mad` hands over is unit length — so the pig keeps its light.
+ *
+ * A prop's own NO2 does carry real normals where the model was authored with
+ * them, and exact ZEROS elsewhere (STW04PPP: eight unit, eight zero), and a
+ * zero normal is its own instruction: nothing to light this face by.
  *
  * This is the same rule the ground already follows: the art carries its own
  * light and the engine must not add one.

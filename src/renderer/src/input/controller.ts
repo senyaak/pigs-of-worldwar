@@ -232,6 +232,9 @@ export interface DebugHooks {
   props(): {
     placed: number
     objects: number
+    /** How many props are faded because they stand between the camera and the
+     * pig (three/props.ts). */
+    faded: number
     at: { name: string; x: number; y: number; z: number; order: number }[]
   }
   /** The level's opening drop: who is still coming down under a canopy, and

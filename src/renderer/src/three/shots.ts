@@ -17,6 +17,7 @@ import { bulletSize, projectileOf } from '../../../lib/game/projectile'
 import type { FlightShot } from '../../../lib/game/snapshot'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import type { Point } from '../../../lib/game/pose'
+import { createLobTrails } from './lobTrail'
 
 export interface BulletArt {
   /**
@@ -26,7 +27,10 @@ export interface BulletArt {
    * does not, so what is drawn is the point between the last two steps
    * (three/tween.ts). The shot's own x/y/z is where the RULES have it.
    */
-  draw(live: readonly FlightShot[], where: (shot: FlightShot) => Point): void
+  draw(live: readonly FlightShot[], delta: number, where: (shot: FlightShot) => Point): void
+  /** How many puffs its trails have up (lib/game/trail.ts) — a spec cannot see a
+   * transparent quad. */
+  trail(): number
   dispose(): void
 }
 
@@ -35,6 +39,14 @@ const BULLET_GEOMETRY = new THREE.SphereGeometry(1, 8, 6)
 export function createBulletArt(root: THREE.Object3D): BulletArt {
   const meshes: THREE.Mesh[] = []
   const material = new THREE.MeshBasicMaterial({ color: 0xfff0b0, fog: false })
+  /**
+   * **A BULLET SMOKES TOO.** Play: "у пули тоже нет шлейфа — как было с гранатой
+   * давно." The same pool the grenade's trail uses (three/lobTrail.ts), because it
+   * is the same thing: the engine hangs a parented effect off a projectile in its
+   * CONSTRUCTOR (lib/game/trail.ts), and nothing in that constructor cares whether
+   * the projectile is thrown or fired.
+   */
+  const trails = createLobTrails(root)
 
   const meshAt = (i: number): THREE.Mesh => {
     while (meshes.length <= i) {
@@ -47,7 +59,11 @@ export function createBulletArt(root: THREE.Object3D): BulletArt {
   }
 
   return {
-    draw(live, where) {
+    draw(live, delta, where) {
+      // The trail follows what is still flying, at the point being DRAWN rather
+      // than the stepping one; anything gone fades on its own.
+      for (const shot of live) trails.follow(shot.id, where(shot))
+      trails.update(delta)
       let i = 0
       for (const shot of live) {
         const mesh = meshAt(i++)
@@ -59,7 +75,9 @@ export function createBulletArt(root: THREE.Object3D): BulletArt {
       }
       for (let rest = i; rest < meshes.length; rest++) meshes[rest].visible = false
     },
+    trail: () => trails.live(),
     dispose() {
+      trails.dispose()
       for (const mesh of meshes) root.remove(mesh)
       meshes.length = 0
       material.dispose()

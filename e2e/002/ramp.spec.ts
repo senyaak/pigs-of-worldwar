@@ -29,7 +29,7 @@ import { parseModel } from '../../src/lib/formats/model'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { STEP_SECONDS } from '../../src/lib/game/engine'
 import { createLocomotion, inWater, updateLocomotion } from '../../src/lib/game/locomotion'
-import { ObstacleField, PIG_RADIUS } from '../../src/lib/game/obstacles'
+import { ObstacleField, PIG_HOLD } from '../../src/lib/game/obstacles'
 import { RAMP_TILT, isRamp } from '../../src/lib/game/ramps'
 import { MODEL_SCALE } from '../../src/lib/game/scale'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
@@ -283,10 +283,12 @@ test("CAMP's first bridge is walked over, and the gap in it is not", () => {
 
 test("…and the gap IS jumpable, which is what settles how a pig is held up", () => {
   // The tutorial says JUMP THE GAP, so the step has to be possible — and that
-  // is the whole argument for holding a pig up by its own BOX rather than by
-  // its feet (lib/game/obstacles.ts). The gap is 512 and a running jump
-  // carries 303: by the feet it cannot be done at any launch the exe gives,
-  // and by the box it is 512 less 160 either side, which the jump clears.
+  // is the whole argument for holding a pig up by its own BODY rather than by
+  // its feet (lib/game/obstacles.ts `PIG_HOLD`). The gap is 512 and a running
+  // jump carries 303: by the feet it cannot be done at any launch the exe gives,
+  // and by the pig's own LENGTH it is 512 less 196 either side, which the jump
+  // clears. Its WIDTH cannot do it — 91 either side leaves 330 — which is the
+  // measurement that split the two reaches apart.
   const CAMP = parsePog(mapFile('CAMP.POG'))
   const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
   const field = new ObstacleField(CAMP)
@@ -308,7 +310,7 @@ test("…and the gap IS jumpable, which is what settles how a pig is held up", (
   expect(near(-state.y, 1728, 8), `landed at ${-state.y}`).toBe(true)
   // Standing ON it means its own box is over it, which is the rule under test:
   // the deck's near edge plus a pig's half-width.
-  expect(state.x, `landed at x ${state.x}`).toBeLessThan(far.x + far.box.x / 2 + PIG_RADIUS)
+  expect(state.x, `landed at x ${state.x}`).toBeLessThan(far.x + far.box.x / 2 + PIG_HOLD)
   expect(state.swimming, 'it did not go in the ditch').toBe(false)
 })
 

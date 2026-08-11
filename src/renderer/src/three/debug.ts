@@ -228,6 +228,10 @@ export function exposeBattleDebug(parts: DebugParts): void {
       props: () => ({
         placed: props.placed,
         objects: parts.objectCount,
+        /** How many records are SEE-THROUGH this frame, because they stand between
+         * the camera and the pig (lib/game/seeThrough.ts). Transparency is not
+         * something a screenshot can be asserted on. */
+        faded: props.faded(),
         at: props.group.children.map((mesh) => ({
           name: mesh.name,
           x: mesh.position.x,

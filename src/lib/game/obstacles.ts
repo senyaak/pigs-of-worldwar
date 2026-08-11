@@ -6,9 +6,9 @@
 //
 // The shapes come out of the .POG, which stores a collision box on every
 // record — counts of BOX_UNIT in the order (z, y, x), a COLLIDER rather than the
-// art, since a tree's is its trunk (docs/formats.md). The pig's own box is
-// in there too: every one of the 772 spawn markers carries 5×5×5, so a pig
-// is 320 units on a side and this file needs no guess for it.
+// art, since a tree's is its trunk (docs/formats.md). The PIG's is not in there:
+// the loader jumps the box build for a pig outright (0x4a61ad), and its body
+// comes off the engine's own shape table instead (`PIG_RADIUS`).
 //
 // The BEHAVIOUR is the one the disassembly already gave up. `TryMove`'s
 // dispatch (0x478e78) reads "hitting only the landscape is the successful
@@ -21,6 +21,7 @@
 import { BOX_UNIT, SHAPE_BOX, modelRotationY } from '../formats/pog'
 import type { MapObject } from '../formats/pog'
 import { isRamp, isWalkway } from './ramps'
+import { MODEL_SCALE } from './scale'
 import { isSpawnMarker } from './spawns'
 import { HEIGHT_SCALE } from './terrain'
 
@@ -44,11 +45,47 @@ import { HEIGHT_SCALE } from './terrain'
  * already uses (`weapons/fire.md`), which is the check that the units are the
  * world's.
  *
+ * **And it is a MODEL-space length, so it halves** — the same conversion the
+ * bayonet's 460 takes to 230 (`lib/game/melee.ts`), and two measurements agree on
+ * it. The pig as DRAWN, bone offsets resolved and `MODEL_SCALE` applied, is
+ * **182 across the shoulders** (`pcgru_hi`; 185 for `gr_hi`, 195 for the heavy) by
+ * 326 tall and 393 nose to tail. Half its width is 91, and 170 × ½ is 85: the
+ * exe's own sphere and the visible pig come out the same size.
+ *
+ * Which is what play was feeling with the raw 170: "надо что-то делать с раздутой
+ * свиньёй — очень сильно заметно что цепляет всё невидимыми боками." A radius of
+ * 170 round a body 182 wide is a cylinder twice the pig, and every wall in the
+ * game stood that far off it.
+ *
+ * The WIDTH and not the length: a cylinder cannot fit both, and 393 of snout and
+ * tail poking a few units into a wall is nothing beside being held 170 away from
+ * it.
+ *
  * Used as a CYLINDER of that radius rather than a sphere: the vertical is the
  * step-up's business, and a walking body's contact is rounded off in the
  * original's solver anyway.
  */
-export const PIG_RADIUS = 0xaa
+export const PIG_RADIUS = 0xaa * MODEL_SCALE
+
+/**
+ * **…and how far past an EDGE it is still held up: half its own LENGTH, 196.**
+ *
+ * One cylinder cannot be a pig. The drawn body is 182 across and **393 nose to
+ * tail** (`pcgru_hi`, bone offsets resolved and halved), and the two numbers answer
+ * two different questions:
+ *
+ * - **How near a wall may it stand?** Its SIDES — `PIG_RADIUS`, and taking the
+ *   length here is what play felt: "цепляет всё невидимыми боками."
+ * - **How far over a drop is it still standing?** Its LENGTH along the ground,
+ *   because a body is held while any part of it is over the edge.
+ *
+ * The tutorial is what forces the second one, and it is the same argument this
+ * class was built on: the GAP in CAMP's first bridge is 512 and a running jump
+ * carries 303, so nothing narrower than 104 either side can cross it — and the
+ * tutorial's own words are JUMP THE GAP. Half the pig's length is 196, which
+ * clears it; half its width is 91, which cannot.
+ */
+export const PIG_HOLD = 393 / 2
 export const PIG_HEIGHT = 5 * BOX_UNIT
 
 /**
@@ -273,6 +310,10 @@ export function topAt(obstacle: Obstacle, x: number, z: number): number {
  */
 const wallReachOf = (obstacle: Obstacle): number => (obstacle.sloped ? 0 : PIG_RADIUS)
 
+/** …and how far out it is HELD UP by one: its own length rather than its width
+ * (`PIG_HOLD`). A slope still holds a pig by the feet alone. */
+const holdReachOf = (obstacle: Obstacle): number => (obstacle.sloped ? 0 : PIG_HOLD)
+
 /** The point of this box nearest (x, z) — in the world, not its own frame. */
 function nearestOn(obstacle: Obstacle, x: number, z: number): { x: number; z: number } {
   const point = local(obstacle, x, z)
@@ -354,17 +395,17 @@ export class ObstacleField implements Obstruction {
   }
 
   /**
-   * What holds the pig up is its OWN BOX resting on something, which is the
-   * 320 the spawn markers give it — so a pig is held while any part of it is
-   * over the edge, the way a box on a ledge is.
+   * What holds the pig up is its OWN BODY resting on something — `PIG_HOLD`, half
+   * the length of the drawn pig — so it is held while any part of it is over the
+   * edge, the way a box on a ledge is.
    *
    * That was tried the other way, by the feet alone, and the tutorial says no:
-   * the GAP in CAMP's first bridge is 512 and a running jump carries 303, so
-   * the only way over it is to walk out to the edge of one's own width and
-   * catch the far side by it — 512 less the 160 either side is 192, which a
-   * jump clears easily. Held by the feet, the step is impossible. The cost is
-   * that a pig stands up to 160 units out over a drop before it falls, and
-   * that is what a box on a ledge does in a solver that cannot tip it.
+   * the GAP in CAMP's first bridge is 512 and a running jump carries 303, so the
+   * only way over it is to reach the far side with one's own body — 512 less the
+   * 196 either side is 120, which a jump clears easily. Held by the feet, the step
+   * is impossible. The cost is that a pig stands up to 196 units out over a drop
+   * before it falls, and that is what a box on a ledge does in a solver that cannot
+   * tip it.
    *
    * A RAMP still gets none of it — see `wallReachOf` for why a slope has to
    * hold a pig by its feet.
@@ -374,7 +415,7 @@ export class ObstacleField implements Obstruction {
     for (const obstacle of this.near(x, z)) {
       const top = topAt(obstacle, x, z)
       if (top < footY - reach) continue // too tall to step onto
-      if (!penetrates(obstacle, x, z, wallReachOf(obstacle))) continue
+      if (!penetrates(obstacle, x, z, holdReachOf(obstacle))) continue
       if (best === null || top < best) best = top
     }
     return best

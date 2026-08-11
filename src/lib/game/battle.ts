@@ -338,7 +338,13 @@ export function createBattle(parts: BattleParts): Battle {
     // cycle the pig was wearing when the clock ran out played on through the whole
     // beat, because the beat only ever dressed the SWIMMERS. Before
     // `beginWalkAway`, which puts those back into their own clip on top of this.
-    for (const pig of everyone()) if (!isDead(pig)) anim.setClip(pig, ANIM.IDLE)
+    for (const pig of everyone()) {
+      // A pig a blast threw is not standing about: its flight is still running and
+      // the beat waits for it (`settling`).
+      if (isDead(pig) || tumbles.has(pig)) continue
+      if (pig === game.currentPig && loco.airborne !== null) continue
+      anim.setClip(pig, ANIM.IDLE)
+    }
     walkAway = beginWalkAway({
       pigs: everyone,
       query,
@@ -513,6 +519,12 @@ export function createBattle(parts: BattleParts): Battle {
       // and clamped, and standing it back up is exactly what this loop would
       // otherwise do every frame.
       if (isDead(pig)) continue
+      // …and neither does a pig IN THE AIR stand. Play: "отбрасывание не
+      // запускает анимацию полёта. падение не запускает анимацию подьёма после
+      // полёта" — both were this line: `tumble` puts the bounce clip on and then
+      // this loop took it straight back off, once a frame, for the whole flight
+      // and through the get-up as well (lib/game/tumble.ts).
+      if (tumbles.has(pig)) continue
       anim.setClip(pig, ANIM.IDLE)
       // Only the pig being driven holds its weapon up; the rest stand.
       anim.overlay(pig, -1, 0)
@@ -572,7 +584,10 @@ export function createBattle(parts: BattleParts): Battle {
         // Standing about is only what a pig does once it has finished. Asking
         // for a clip is what CANCELS a committed one, so this line
         // unconditionally was the interruption.
-        if (!swings.swinging() && !anim.animating(acting)) anim.setClip(acting, ANIM.IDLE)
+        // …unless it is in the AIR, where the flight owns what it wears.
+        if (!swings.swinging() && !anim.animating(acting) && loco.airborne === null) {
+          anim.setClip(acting, ANIM.IDLE)
+        }
         onChanged()
         return
       }

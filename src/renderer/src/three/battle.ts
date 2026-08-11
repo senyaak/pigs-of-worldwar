@@ -40,8 +40,10 @@ import type { SceneSound } from '../contracts/sound'
 import type { Collected } from '../../../lib/game/scenery'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBulletArt } from './shots'
+import { crossedBy, sightBlockers } from '../../../lib/game/seeThrough'
 import { createGrenadeArt } from './grenades'
 import { createMineArt } from './mineArt'
+import { PIG_HEIGHT } from '../../../lib/game/obstacles'
 import { exposeBattleDebug } from './debug'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SceneHost } from './scene'
@@ -147,6 +149,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   // the training map the dummies and the gate.
   const props = buildMapProps(assets.objects, assets.props, assets.propTextures)
   root.add(props.group)
+  /** Every box that could hide the pig from the camera (lib/game/seeThrough.ts),
+   * built once — the records do not move. */
+  const blockers = sightBlockers(assets.objects)
+  /** Scratch for the camera's position in GAME space: the root is turned half a
+   * turn about x, so the world's y and z are the game's negated. */
+  const eyeInGame = new THREE.Vector3()
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
@@ -532,7 +540,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     marker.bob(time)
     // …and what the engine says is in the air gets drawn where it now is. Once
     // a frame, after everything that could have moved or spent one.
-    bulletArt.draw(now.bullets, (shot) => drawnAt(`shot:${shot.id}`, shot))
+    bulletArt.draw(now.bullets, delta, (shot) => drawnAt(`shot:${shot.id}`, shot))
     grenadeArt.draw(now.lobs, delta, (lob) => drawnAt(`lob:${lob.id}`, lob))
     // The minefield, through the eyes of whoever's turn it is: a buried mine is
     // shown to the side that has somebody near it who can see one, and to nobody
@@ -540,6 +548,22 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // …plus every one that has been TRODDEN ON: play asked for the mine to show
     // itself the moment a foot finds it, and by then it is nobody's secret.
     mineArt.draw([...mines.revealed(game.currentPlayer.pigs), ...mines.at()])
+    // **AND WHATEVER STANDS BETWEEN THE CAMERA AND THE PIG GOES SEE-THROUGH.**
+    // Play: "здание не просвечивает когда свинья внутри." Indoors the camera has
+    // nowhere to swing to — every heading is a wall (lib/game/sightline.ts) — so
+    // the wall fades instead. From the eye to the pig's own middle rather than its
+    // feet, or the floor it stands on counts as being in the way.
+    const watched = squad.of(game.currentPig.id)
+    if (watched) {
+      root.worldToLocal(eyeInGame.copy(host.camera.position))
+      props.fade(
+        crossedBy(blockers, eyeInGame, {
+          x: game.currentPig.position.x,
+          y: game.currentPig.position.y - PIG_HEIGHT / 2,
+          z: game.currentPig.position.z
+        })
+      )
+    }
     effectArt.draw(now.effects)
     airDropArt.draw(now.crates, (one) => drawnAt(`crate:${one.id}`, { x: 0, y: one.y, z: 0 }).y)
   }
