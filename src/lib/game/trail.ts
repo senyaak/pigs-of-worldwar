@@ -1,4 +1,6 @@
-// The smoke a grenade leaves behind it.
+// The smoke a thrown thing leaves behind it — a grenade's trail, and a planted
+// charge's burning fuse, which turn out to be the same machinery with different
+// numbers (`LOB_TRAIL` and `FUSE_TRAIL` below).
 //
 // Play: "там нет шлейфа от гранаты." There is one, and it took looking in the
 // right place to find: it is not in the projectile's UPDATE, where two separate
@@ -46,20 +48,84 @@
 //
 // Pure, game space, exe units.
 
-/** How many go down per frame, spread along the step (0x48b038). */
-export const TRAIL_STEPS = 6
-
-/** What one's age advances a frame — so five frames of life (0x486f9b). */
-export const TRAIL_AGE_STEP = 0x14
-
 /** The age they all die at, as everywhere else in the effect system. */
 export const TRAIL_DEAD = 100
 
-/** 0x4210: sixteen of thirty-one on every channel (0x486f8f). */
-export const TRAIL_COLOUR: [number, number, number] = [16, 16, 16]
+/** One trail's numbers: how many go down a frame, how fast they age, and what
+ * one looks like. Two projectiles in the game carry one and they are not the
+ * same trail. */
+export interface TrailKind {
+  /** The effect id, so the row it came from is on the record. */
+  id: number
+  /** How many go down per frame, spread along the step. */
+  steps: number
+  /** What one's age advances a frame — 100 is dead, so 0x14 is five frames. */
+  ageStep: number
+  /** The particle type its update arm spawns. */
+  particle: number
+  /** Five bits a channel, as everywhere in the effect system. */
+  colour: [number, number, number]
+  /** The particle setter's own size argument. */
+  size: number
+}
 
-/** …so this many can be alive at once, which is the capacity id 0x15 gets. */
-export const TRAIL_ROOM = TRAIL_STEPS * (TRAIL_DEAD / TRAIL_AGE_STEP)
+/**
+ * **A GRENADE's trail** — effect 0x15, six a frame of particle type 0x16, mid
+ * grey, size 8 (0x48b038, 0x486f8d).
+ */
+export const LOB_TRAIL: TrailKind = {
+  id: 0x15,
+  steps: 6,
+  ageStep: 0x14,
+  particle: 0x16,
+  colour: [16, 16, 16],
+  size: 8
+}
+
+/**
+ * **A CHARGE's own burning fuse** — and it is a trail like the grenade's, not a
+ * flame. Play: "горение динамита не из игры", and it was not: the spark was
+ * invented. The projectile constructor's arm for kind 53 (TNT and the mine
+ * shell, `0x432414`) does exactly what the grenade's arm does one branch
+ * along — it hangs a PARENTED effect on the projectile:
+ *
+ * ```
+ * 432414  new(0xE4)
+ * 432442  push 1Dh ; push esi        ; id 0x1D, parent = the projectile
+ * 432447  0x487620(parent, 0x1D, 0, 0x3C, 0,0,0,0, 1, 0x3E8, 0x19, 1, 2)
+ * 43246b  push 8 ; 0x43A9D0          ; ...and sound 8, at 100/100
+ * ```
+ *
+ * The 0x3C is the offset the grenade's arm passes as zero — the effect rides
+ * ABOVE the bundle, where the fuse is. Effect 0x1D's update arm (0x48ad9d) is
+ * the same shape as the grenade's, with its own numbers: **four** a frame
+ * rather than six (`sar 2`), laid evenly along the segment travelled, of
+ * particle type **0x18** — whose setter (0x486f16) gives colour **0x14A5** and
+ * size **0x10**, against the grenade's 0x4210 and 8.
+ *
+ * So the fuse is DARK smoke, five of thirty-one on every channel, in puffs
+ * twice the size of a grenade's, four a frame. A planted charge does not move,
+ * so all four land on the same spot: a column of smoke standing off the fuse,
+ * which is what a burning one looks like. There is no fire in it — the same
+ * answer the grenade's trail gave.
+ */
+export const FUSE_TRAIL: TrailKind = {
+  id: 0x1d,
+  steps: 4,
+  ageStep: 0x14,
+  particle: 0x18,
+  colour: [5, 5, 5],
+  size: 0x10
+}
+
+/** How far above the charge the effect is hung — `0x3C`, exe units, the one
+ * argument that is not zero (0x43243f). */
+export const FUSE_LIFT = 0x3c
+
+/** How many of a kind can be alive at once, which is the capacity its id gets
+ * from the count table. */
+export const trailRoom = (kind: TrailKind): number =>
+  kind.steps * (TRAIL_DEAD / kind.ageStep)
 
 /** One puff. It does not move — type 0x16 carries no velocity. */
 export interface Puff {
@@ -70,18 +136,24 @@ export interface Puff {
 }
 
 export interface Trail {
+  /** Which of the two this is — the numbers travel with it. */
+  kind: TrailKind
   puffs: Puff[]
-  /** Where the grenade was when the trail was last laid, or null on the frame
-   * it was thrown — the engine's `[+0xB0..0xB4]`, and with nothing there yet
-   * there is no segment to lay along. */
+  /** Where the projectile was when the trail was last laid, or null on the
+   * frame it was thrown — the engine's `[+0xB0..0xB4]`, and with nothing there
+   * yet there is no segment to lay along. */
   last: { x: number; y: number; z: number } | null
 }
 
-export const beginTrail = (): Trail => ({ puffs: [], last: null })
+export const beginTrail = (kind: TrailKind = LOB_TRAIL): Trail => ({
+  kind,
+  puffs: [],
+  last: null
+})
 
 /**
- * Lay this frame's six along the segment from where it was to where it is, and
- * age everything already down.
+ * Lay this frame's along the segment from where it was to where it is, and age
+ * everything already down.
  *
  * The engine's order: it interpolates and seeds first, then the common tail ages
  * the particles. A puff put down this frame is therefore already one step old by
@@ -89,14 +161,15 @@ export const beginTrail = (): Trail => ({ puffs: [], last: null })
  */
 export function advanceTrail(
   trail: Trail,
-  /** Where the grenade is, or null once it is gone — the last six still have to
-   * fade out, and nothing more goes down. */
+  /** Where the projectile is, or null once it is gone — the last few still have
+   * to fade out, and nothing more goes down. */
   at: { x: number; y: number; z: number } | null
 ): void {
+  const { steps, ageStep } = trail.kind
   const from = at ? trail.last : null
   if (at && from) {
-    for (let n = 1; n <= TRAIL_STEPS; n++) {
-      const t = n / TRAIL_STEPS
+    for (let n = 1; n <= steps; n++) {
+      const t = n / steps
       trail.puffs.push({
         x: from.x + (at.x - from.x) * t,
         y: from.y + (at.y - from.y) * t,
@@ -106,7 +179,7 @@ export function advanceTrail(
     }
   }
   if (at) trail.last = { x: at.x, y: at.y, z: at.z }
-  for (const puff of trail.puffs) puff.age += TRAIL_AGE_STEP
+  for (const puff of trail.puffs) puff.age += ageStep
   trail.puffs = trail.puffs.filter((puff) => puff.age < TRAIL_DEAD)
 }
 

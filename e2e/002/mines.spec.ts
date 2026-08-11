@@ -31,6 +31,7 @@ import { EXE_FRAME_SECONDS, fromExeFrames } from '../../src/lib/game/ballistics'
 import { layerFires, layerSights, weaponLayer } from '../../src/lib/game/controls'
 import { PLANTED_SECONDS, endsTurn, hurryFor } from '../../src/lib/game/spend'
 import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
+import { PIG_RADIUS } from '../../src/lib/game/obstacles'
 import { LOB_EFFECT_ID, MINE_EFFECT_ID } from '../../src/lib/game/blast'
 import { BLAST_EFFECT, MINE_EFFECT } from '../../src/lib/game/effects'
 import { createEffectField } from '../../src/lib/game/effectField'
@@ -490,7 +491,7 @@ test('a pig that walks onto a MINE hears it and then loses twenty points', async
   expect(app.errors()).toEqual([])
 })
 
-test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async ({ app }) => {
+test('TNT goes down IN FRONT of the pig, keeps the turn, and leaves four seconds', async ({ app }) => {
   const { page } = app
   await startGame(page)
   const before = await hud(page)
@@ -521,11 +522,28 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
   // It is on the ground, and the pig still has the controls: the turn was NOT
   // spent, it was HURRIED (lib/game/spend.ts).
   await expect.poll(async () => (await thrown(page)).length, { timeout: 4000 }).toBe(1)
-  // AT ITS FEET, not dropped from the hand: the pig's own position, to the unit
-  // in the plane and within a body's height of the soles.
+  // **IN FRONT OF IT, and by the HAND.** Play: "динамит ставится на месте свина,
+  // а не перед ним." It used to go at `pig.position`, the soles. It goes where
+  // the laying clip's own hand is now — the same bone the throw leaves from —
+  // so the distance is the arm's reach and not a number anybody picked
+  // (lib/game/lobs.ts).
   const where = await debugState(page)
   const charge = (await thrown(page))[0]
-  expect(Math.hypot(charge.x - where.x, charge.z - where.z), 'under the pig').toBeLessThan(32)
+  const ahead =
+    (charge.x - where.x) * Math.sin(where.heading) + (charge.z - where.z) * Math.cos(where.heading)
+  const aside =
+    (charge.x - where.x) * Math.cos(where.heading) - (charge.z - where.z) * Math.sin(where.heading)
+  // Measured: 131 ahead and 16 aside, against a pig 85 in radius — clear of the
+  // soles and still within arm's length. The floor is the pig's own radius, so
+  // the assertion says "in front of it" rather than pinning a number the pose
+  // owns.
+  expect(ahead, `the charge went down ${ahead.toFixed(0)} ahead, ${aside.toFixed(0)} aside`)
+    .toBeGreaterThan(PIG_RADIUS)
+  // …and still the pig's own patch of ground rather than thrown clear: within a
+  // body's width of where it stands.
+  expect(Math.hypot(charge.x - where.x, charge.z - where.z), 'it was thrown, not laid').toBeLessThan(
+    PIG_RADIUS * 2
+  )
 
   // **AND IT STANDS, FUSE UP.** Play: "тнт лежит боком на земле — должна стоять
   // фитилём вверх." The fuse is the model's own −X (the black stub out of the
@@ -576,10 +594,13 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
   await page.waitForTimeout(600)
   expect((await thrown(page)).length, 'a second charge went down').toBe(1)
 
-  // **AND IT BURNS.** Play: "динамит не горит." A spark sits on the end the black
-  // stub is on — which is the end that stands up (three/fuse.ts) — for as long as
-  // the fuse runs. What the original shows there is not decoded, and the file says
-  // so; where the fuse IS was measured off the model.
+  // **AND IT BURNS — the ENGINE's own way.** Play: "динамит не горит", and then
+  // "горение динамита не из игры", which was fair: the first answer was an
+  // invented orange spark. It is decoded now. Kind 53's constructor hangs a
+  // PARENTED effect 0x1D on the projectile the same way the grenade's arm hangs
+  // 0x15, offset 0x3C up the fuse, and that effect lays four dark puffs a frame
+  // (lib/game/trail.ts, `FUSE_TRAIL`). So "alight" is a charge laying its own
+  // trail, and there is no flame in it at all.
   expect(await burning(page), 'the charge is not alight').toBe(1)
 
   // **AND IT STAYS WHERE IT WAS PUT.** Play: "динамит катится по склону." It did:
@@ -601,7 +622,7 @@ test('TNT goes down at the feet, keeps the turn, and leaves four seconds', async
   const waiting = await debugState(page)
   await expect.poll(async () => (await thrown(page)).length, { timeout: 15000 }).toBe(0)
   expect((await sounds(page)).slice(quiet), 'it went off').toContain('E_1')
-  // …and the spark goes out with it.
+  // …and the smoke stops with it.
   expect(await burning(page), 'a fuse is still alight with nothing to burn').toBe(0)
 
   // …**AND IT THROWS THE PIG THAT PLANTED IT**, inside that beat. Play: "динамит

@@ -2823,28 +2823,51 @@ done yet.
    opacity is the remake's own pick and wants raising; the `depthWrite` is there so
    a faded wall does not hide the pig, and whether it can come back is part of the
    same question.
-2. **The dynamite's flame is not the game's.** "Горение динамита не из игры." True
-   and `three/fuse.ts` says so at the top: nothing about that spark is a reading.
-   Where to look next is NOT the mine rows — those turned out to be the BLAST (row
-   14) — but the projectile's own effect fields: a grenade's constructor hangs a
-   PARENTED trail on itself (id 0x15, `lib/game/trail.ts`), so TNT's row 53 is where
-   a fuse effect of its own would be named.
-3. **A charge is planted AT the pig, and should be IN FRONT.** "Динамит ставится на
-   месте свина, а не перед ним." `Lobs.plant` puts it at `pig.position` — the soles
-   — on the reading that clip 77's event fires with the pig bent over its own
-   trotters. Play's word goes in front of that; the offset wants the pig's heading
-   and a distance.
+2. ~~**The dynamite's flame is not the game's.**~~ **Done, and it was exactly where
+   the guess said to look.** Kind 53's constructor arm (`0x432414`, shared with kind
+   52) hangs a PARENTED effect on the projectile the same way the grenade's arm
+   (`0x43247b`) hangs id 0x15 — same call, same tail arguments — with id **0x1D**
+   and one changed argument: **0x3C** where the grenade passes zero, so the effect
+   rides up the FUSE. Its update arm (0x48ad9d) is the trail's shape with its own
+   numbers: **four** a frame rather than six, of particle type **0x18**, whose
+   setter (0x486f16) gives colour **0x14A5** — five of thirty-one on every channel,
+   dark smoke — in puffs of **0x10**, twice a grenade's 8. A planted charge does not
+   move, so all four land on the same spot: a column of smoke off the fuse. **There
+   is no fire in it.** `lib/game/trail.ts` now carries both rows (`LOB_TRAIL`,
+   `FUSE_TRAIL`), `three/lobTrail.ts` draws either, and the invented
+   `three/fuse.ts` is deleted. Not carried over: the arm also plays **sound 8** at
+   100/100 as the charge goes down (0x43246b), and the particle spawner's own fields
+   past what the row quotes.
+3. ~~**A charge is planted AT the pig, and should be IN FRONT.**~~ **Done, and by the
+   HAND rather than by a number.** `Lobs.plant` now puts it where `HAND_BONE` is —
+   the same bone the throw leaves from — with the pig's own feet for the height, so
+   a pig on a bridge does not lay one in the ditch, and a battle nobody is drawing
+   (`NO_POSE`) falls back to the soles. Measured in play's own path: **131 ahead and
+   16 aside**, against a pig 85 in radius. The spec's floor is `PIG_RADIUS`, so it
+   asserts "in front of it" without pinning a number the pose owns.
 4. **The house's SEAMS still misbehave.** "Всё ещё текстуры странно себя ведут на
    стыках дома." The per-record `renderOrder` fixed the z-fight between the twelve
    COPLANAR pairs; something else is left. Two candidates, neither measured: the
    64-unit overlap itself (the faces are inside each other, not merely touching),
    and texture bleed at the UV edges — the atlas has no padding and the models' UVs
    are in pixels.
-5. **A pig thrown by a blast SPINS about its own axis.** "Летящая свинья вроде ещё
-   крутится вокруг своей оси." Nothing in `lib/game/tumble.ts` turns a pig — it sets
-   a velocity and lets `updateLocomotion` fly it — so the spin is either the bounce
-   clip's own root rotation being applied, or `heading` being written from the
-   velocity each frame somewhere on the draw path.
+5. **A pig thrown by a blast SPINS about its own axis** — and BOTH guesses are now
+   measured out. "Летящая свинья вроде ещё крутится вокруг своей оси."
+   - *Not the draw path.* `heading` reaches the picture from one place —
+     `pigShotOf` copies `pig.heading` (engine.ts), `squad.place` turns the node by
+     it — and nothing writes it from a velocity. `tumble.update` writes
+     `pig.position` and never `pig.heading`; `updateLocomotion` touches heading in
+     exactly two places, the turn key (guarded on `airborne === null`) and the
+     wall EJECT.
+   - *Not the clip.* BOUNCE is clip 39, twenty frames, and bone 0 does not move at
+     all in it — x/y/z spans of 0°, a constant z of 43°. Its root track has a y
+     span of **zero**. The biggest thing in it is 44° on bone 10. It is a flail,
+     not a somersault.
+
+   What is left unexamined: the wall EJECT (`locomotion.ts`, `state.heading =
+   query.downhill(...) ?? state.heading + π`), which a pig landing wedged runs
+   every 25 frames — a half turn each time would read as spinning. That is a pig on
+   the GROUND, though, not one in the air, so it may not be what play saw.
 6. **Going in puts the pig at the building's MIDDLE, and that is not where he
    should be.** "В убежище прыгает в центр строения — не на месте." `indoors.enter`
    copies `building.box.x/z`, which is what the exe does (0x469fde copies the

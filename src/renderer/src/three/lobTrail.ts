@@ -10,35 +10,35 @@
 
 import * as THREE from 'three'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
-import {
-  TRAIL_COLOUR,
-  TRAIL_DEAD,
-  advanceTrail,
-  beginTrail,
-  trailSpent
-} from '../../../lib/game/trail'
-import type { Trail } from '../../../lib/game/trail'
+import { LOB_TRAIL, TRAIL_DEAD, advanceTrail, beginTrail, trailSpent } from '../../../lib/game/trail'
+import type { Trail, TrailKind } from '../../../lib/game/trail'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 
 /**
- * How big one puff is drawn. The remake's own, like every other particle size
- * here: the half of the engine that draws a particle (0x48a570) is not read, so
- * nothing is known about the art. A grenade is 35 across; this is a little wider
- * than the thing making it.
+ * How big one puff is drawn, per unit of the row's own size byte. The remake's
+ * own, like every other particle size here: the half of the engine that draws a
+ * particle (0x48a570) is not read, so nothing is known about the art. A grenade
+ * is 35 across, and its row's 8 through this puts its haze a little wider than
+ * the thing making it — so a charge's 0x10 comes out twice that, which is the
+ * ratio the rows carry.
  */
-const PUFF_SIZE = 90 * MODEL_SCALE
+const PUFF_UNIT = (90 / 8) * MODEL_SCALE
 
 /** How solid one is. The remake's — thin, because six a frame overlap heavily
  * and the trail should read as haze rather than as beads. */
 const PUFF_ALPHA = 0.45
 
 export interface LobTrails {
-  /** Follow one grenade. Keyed by its ID rather than by its place in the list,
-   * because the engine splices that list and an index does not survive it — and
-   * rather than by the object, because a snapshot is a fresh object every step
-   * (lib/game/snapshot.ts). Call once a frame per live grenade, with where it
-   * is now. */
-  follow(who: number, at: { x: number; y: number; z: number }): void
+  /** Follow one projectile. Keyed by its ID rather than by its place in the
+   * list, because the engine splices that list and an index does not survive it
+   * — and rather than by the object, because a snapshot is a fresh object every
+   * step (lib/game/snapshot.ts). Call once a frame per live one, with where it
+   * is now and which trail its own kind carries (lib/game/trail.ts). The kind is
+   * fixed the first time each is seen. */
+  follow(who: number, at: { x: number; y: number; z: number }, kind?: TrailKind): void
+  /** How many are laying a trail of this kind right now — what says a fuse is
+   * alight, since a puff is a colour on a transparent quad. */
+  laying(kind: TrailKind): number
   /** Anything not followed this frame keeps fading and then goes. Call after
    * every `follow` for the frame. */
   update(delta: number): void
@@ -103,22 +103,32 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
         const sprite = spriteAt(n++)
         sprite.visible = true
         sprite.position.set(puff.x, puff.y, puff.z)
-        sprite.scale.setScalar(PUFF_SIZE)
-        const grey = TRAIL_COLOUR[0] / 31
-        sprite.material.color.setRGB(grey, grey, grey)
+        sprite.scale.setScalar(PUFF_UNIT * trail.kind.size)
+        const [r, g, b] = trail.kind.colour
+        sprite.material.color.setRGB(r / 31, g / 31, b / 31)
         sprite.material.opacity = PUFF_ALPHA * (1 - puff.age / TRAIL_DEAD)
       }
     }
     for (let rest = n; rest < sprites.length; rest++) sprites[rest].visible = false
   }
 
-  /** Where each followed grenade is this frame, held until the frame ticks. */
+  /** Where each followed projectile is this frame, held until the frame ticks. */
   const where = new Map<number, { x: number; y: number; z: number }>()
+  /** …and who was still laying one on the last frame that ticked, which is what
+   * "is it alight" asks about — `where` is emptied every frame. */
+  const active = new Set<number>()
 
   return {
-    follow(who, at) {
+    follow(who, at, kind = LOB_TRAIL) {
       where.set(who, { ...at })
-      if (!trails.has(who)) trails.set(who, beginTrail())
+      if (!trails.has(who)) trails.set(who, beginTrail(kind))
+    },
+    laying(kind) {
+      let n = 0
+      for (const who of active) {
+        if (trails.get(who)?.kind.id === kind.id) n++
+      }
+      return n
     },
     update(delta) {
       carry += delta / EXE_FRAME_SECONDS
@@ -131,6 +141,8 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
           if (!at && trailSpent(trail)) trails.delete(who)
         }
       }
+      active.clear()
+      for (const who of where.keys()) active.add(who)
       where.clear()
       redraw()
     },
@@ -142,6 +154,7 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
     clear() {
       trails.clear()
       where.clear()
+      active.clear()
       redraw()
     },
     dispose() {

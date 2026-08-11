@@ -17,7 +17,8 @@ import { weaponModelName } from '../../../lib/game/weapons'
 import { isPlanted } from '../../../lib/game/grenade'
 import { createLobArt } from './lobArt'
 import { createLobTrails } from './lobTrail'
-import { FUSE_TIP, createFuseArt } from './fuse'
+import { FUSE_LIFT, FUSE_TRAIL, LOB_TRAIL } from '../../../lib/game/trail'
+import { fromExeY } from '../../../lib/game/terrain'
 
 /**
  * How far the MESH is lifted off the point that bounces.
@@ -44,18 +45,14 @@ export interface GrenadeArt {
   /** Show exactly these, and lay their smoke. Once a frame. */
   /** `where` is where to DRAW one — between the last two steps
    * (three/tween.ts); the lob's own x/y/z is where the rules have it. */
-  draw(
-    live: readonly FlightShot[],
-    delta: number,
-    seconds: number,
-    where: (shot: FlightShot) => Point
-  ): void
+  draw(live: readonly FlightShot[], delta: number, where: (shot: FlightShot) => Point): void
   /** How every planted charge is standing, as of the last frame — a spec cannot
    * look at it, and "standing" is not something the engine's list knows. */
   charges(): DrawnCharge[]
   /** How many puffs the trails have up (lib/game/trail.ts). */
   trail(): number
-  /** …and how many fuses are alight: one per planted charge (three/fuse.ts). */
+  /** …and how many fuses are alight: one per planted charge that is laying its
+   * own trail (lib/game/trail.ts, `FUSE_TRAIL`). */
   burning(): number
   clear(): void
   dispose(): void
@@ -119,14 +116,9 @@ export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
    * CONSTRUCTOR — a parented effect of id 0x15 — so it is born with the grenade
    * and dies a few frames after it (lib/game/trail.ts). */
   const trails = createLobTrails(root)
-  /**
-   * **The spark on a planted charge.** Play: "динамит не горит." It burns now — on
-   * the end the model's own black stub is, which is the end that stands up
-   * (three/fuse.ts, and `STAND` below for which end that is).
-   */
-  const fuses = createFuseArt(root)
-  /** Where each fuse tip came out this frame. */
-  const alight: { x: number; y: number; z: number }[] = []
+  /** Where each fuse tip came out this frame, so the trail is laid off the MESH's
+   * own origin rather than off the lob's ground point — the lift is counted once. */
+  const alight = new Map<number, { x: number; y: number; z: number }>()
 
   /** The mesh for the i-th live grenade, made on demand out of the weapon's
    * own model. Null until that model has arrived. */
@@ -150,18 +142,13 @@ export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
   }
 
   return {
-    draw(live, delta, seconds, where) {
-      // The trail follows what is still up; anything gone stops laying and its
-      // last six fade out on their own. Keyed by the lob itself and laid at the
-      // point being DRAWN, or the puffs would come off a stepping position.
-      for (const shot of live) trails.follow(shot.id, where(shot))
-      trails.update(delta)
+    draw(live, delta, where) {
       // Index-aligned with the engine's list, and a splice shifts everything
       // after it, so the simplest correct thing is to rebuild rather than track
       // identities: there is never more than a handful in the air.
       if (meshes.length > live.length) clearMeshes()
       standing.length = 0
-      alight.length = 0
+      alight.clear()
       for (let i = 0; i < live.length; i++) {
         const shot = live[i]
         const mesh = meshAt(i, weaponModelName(shot.skill))
@@ -188,31 +175,48 @@ export function createGrenadeArt(root: THREE.Object3D): GrenadeArt {
             fuse: { x: facing.x, y: facing.y, z: facing.z },
             base: mesh.position.y + lift
           })
-          // …and the spark sits at the tip of that stub. Off the MESH's own origin
-          // rather than off the lob's ground point, so the lift is counted once.
-          alight.push({
+          // …and its own trail comes off the fuse rather than off the bundle:
+          // the exe hangs effect 0x1D on the projectile with an offset of 0x3C
+          // where the grenade's arm passes zero (lib/game/trail.ts). Off the
+          // MESH's own origin, so the lift is counted once.
+          alight.set(shot.id, {
             x: mesh.position.x,
-            y: mesh.position.y - FUSE_TIP * MODEL_SCALE,
+            y: mesh.position.y - fromExeY(FUSE_LIFT),
             z: mesh.position.z
           })
         }
         // Nothing special for a SINKING one: the water sheet is see-through, so
         // it is simply visible under it (three/terrain.ts, `WATER_ALPHA`).
       }
-      // …and every planted charge burns while it counts down.
-      fuses.draw(alight, seconds)
+      // The trail follows what is still up; anything gone stops laying and its
+      // last few fade out on their own. Keyed by the lob itself, and laid at the
+      // point being DRAWN or the puffs would come off a stepping position. A
+      // planted charge lays its FUSE's trail instead, off the tip worked out
+      // above — which is why this is the end of the frame and not the top of it.
+      //
+      // WHICH trail it is comes off the SKILL and not off the tip: a charge is
+      // born on a frame whose model may still be loading, and the kind is fixed
+      // the first time a trail is seen — so reading it off `alight` latched
+      // every charge onto the grenade's row for the whole of its fuse.
+      for (const shot of live) {
+        const planted = isPlanted(shot.skill)
+        trails.follow(
+          shot.id,
+          (planted ? alight.get(shot.id) : null) ?? where(shot),
+          planted ? FUSE_TRAIL : LOB_TRAIL
+        )
+      }
+      trails.update(delta)
     },
     charges: () => standing,
     trail: () => trails.live(),
-    burning: () => fuses.lit(),
+    burning: () => trails.laying(FUSE_TRAIL),
     clear() {
       trails.clear()
-      fuses.clear()
       clearMeshes()
     },
     dispose() {
       trails.dispose()
-      fuses.dispose()
       clearMeshes()
       art.dispose()
     }

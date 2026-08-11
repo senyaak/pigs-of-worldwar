@@ -240,9 +240,24 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
     plant(pig) {
       const skill = pig.holding
       if (skill === null || !isPlanted(skill) || !lobOf(skill)) return false
-      // The FEET, which is `pig.position` — the soles, and so the ground it is
-      // standing on — with no charge behind it and nothing to aim.
-      const shot = lob(skill, pig.position, pig.heading, 0, 0, world.random)
+      // **IN FRONT, and by the HAND rather than by a number.** Play: "динамит
+      // ставится на месте свина, а не перед ним." It was at `pig.position` — the
+      // soles — on the reading that clip 77's own event fires with the pig bent
+      // over its trotters, and play's word goes in front of that reading.
+      //
+      // Where it goes instead is not an invented distance: it is the same hand
+      // the throw leaves from (`HAND_BONE`, lib/game/pose.ts), which at the
+      // laying clip's event is reaching out and down — so the charge is put
+      // where the pig actually puts it, and the arm's own reach is the offset.
+      //
+      // Only the PLAN comes from the hand. The height stays the pig's own feet,
+      // because a charge rests on what the pig is standing on and the hand is
+      // holding it above that — and a pig on a bridge must not lay one in the
+      // ditch. A battle nobody is drawing has no hand to ask (`NO_POSE`), and
+      // then it is the feet as before.
+      const hand = world.pose.boneToWorld(pig, HAND_BONE, THROW_FROM)
+      const at = hand ? { x: hand.x, y: pig.position.y, z: hand.z } : pig.position
+      const shot = lob(skill, at, pig.heading, 0, 0, world.random)
       if (!shot) return false
       shot.id = named++
       // It is DOWN, not landing: nothing has to fall for a charge to be placed,
