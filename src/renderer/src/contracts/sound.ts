@@ -34,4 +34,12 @@ export interface SceneSound {
    */
   played(): string[]
   spoken(): string[]
+  /**
+   * Whether the acting pig is still SAYING its firing line.
+   *
+   * The third poll, and the only one the RULES read: the shot waits for the
+   * line to finish (play's rule, `lib/game/shot.ts`). The scene hands it to the
+   * battle once a frame; nothing here knows what a battle is.
+   */
+  saying(): boolean
 }

@@ -40,10 +40,10 @@ import type { SceneSound } from '../contracts/sound'
 import type { Collected } from '../../../lib/game/scenery'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBulletArt } from './shots'
-import { SIGHT_MARGIN, crossedTowards, sightBlockers } from '../../../lib/game/seeThrough'
+import { SIGHT_MARGIN, crossedTowards, nearSideOf, sightBlockers } from '../../../lib/game/seeThrough'
 import { createGrenadeArt } from './grenades'
 import { createMineArt } from './mineArt'
-import { PIG_HEIGHT } from '../../../lib/game/obstacles'
+import { PIG_HEIGHT, PIG_HOLD } from '../../../lib/game/obstacles'
 import { exposeBattleDebug } from './debug'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SceneHost } from './scene'
@@ -509,6 +509,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         weapons.show(soldier.mesh, reaching ? null : weaponModelName(held))
       }
     }
+    // **THE MISSION IS OVER: EVERY PIG PUTS ITS WEAPON DOWN.** Play: "анимация
+    // победы играется в позе вытащенного оружия — все оружия надо убрать у всех
+    // свинов." The engine empties the hands (lib/game/battle.ts), but the block
+    // above that takes the model off the arm does not run once the battle is in
+    // its ending — so the mesh stayed where it was.
+    if (now.ending) {
+      for (const soldier of squad.members) weapons.show(soldier.mesh, null)
+    }
     // …and every pig in a building is gone from the picture, acting or not.
     for (const soldier of squad.members) {
       if (pigShot(soldier.pig.id)?.sheltered) soldier.node.visible = false
@@ -536,6 +544,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const onFrame = (delta: number): void => {
     time += delta
     lastFrame = delta
+    // **THE LINE COMES BEFORE THE SHOT**, so the rules are told whether the pig
+    // is still talking before they step (play's rule, lib/game/shot.ts). Ahead
+    // of `engine.update`, like every other input.
+    battle.setSpeaking(sounds.saying())
     // The GAME, in whole steps — the order of events and everything running
     // with it, the engine's own business from end to end. A step that is about
     // to run leaves behind where the pig stood, which is what the picture is
@@ -582,16 +594,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         crossedTowards(
           blockers,
           eyeInGame,
-          // THE WHOLE PIG, not a point in the middle of it. Play: "текстура
-          // наверху прозрачная, а внизу еле-еле" — one ray fades the piece it
-          // skewers, and a wall is pieces stacked up the wall, so the panel his
-          // head was behind faded and the one his feet were behind did not.
-          // Y-DOWN: the crown is the smaller number, the soles are `y` itself.
-          [
-            { x, y: y - PIG_HEIGHT, z },
-            { x, y: y - PIG_HEIGHT / 2, z },
-            { x, y, z }
-          ],
+          // THE BODY, and each ray stopped at his NEAR SIDE. Y-DOWN, so the
+          // crown is the smaller number — and the SOLES are deliberately not in
+          // here: a ray that ends at his feet ends inside whatever he is
+          // standing on, which is how the bridge under him went see-through
+          // ("мост пропадает когда встаю на него").
+          [PIG_HEIGHT, PIG_HEIGHT * 0.66, PIG_HEIGHT * 0.33].map((up) =>
+            nearSideOf(eyeInGame, { x, y: y - up, z }, PIG_HOLD / 2)
+          ),
           SIGHT_MARGIN
         )
       )

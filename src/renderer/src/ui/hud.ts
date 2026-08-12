@@ -169,12 +169,21 @@ export const LAYOUT = {
      * on the dial. Zero is `track.from`, so this sits in the ornament before it.
      *
      * `pcpie4` is the only pie in the whole install — one 32×32 image, a red
-     * disc (palette index 2, rgb 205,0,0) in a brass ring — so the fraction
-     * cannot be frames. It is CLIPPED, from the bottom. Nothing in the exe has
-     * been traced to the sprite at all, so the direction, the half and this
-     * position are eyework and live here for the console.
+     * disc in a brass ring — so the fraction cannot be frames. It is CLIPPED,
+     * from the bottom. Nothing in the exe has been traced to the sprite at all,
+     * so the direction, the amount and this position are eyework and live here
+     * for the console.
+     *
+     * `disc` is MEASURED off the art rather than assumed: red-dominant texels
+     * run from row **2 to row 29** of the 32, so a fill against the tile's own
+     * height would leave two dead rows top and bottom. The fraction is taken
+     * against the disc, which is what "half" is meant to be half of.
+     *
+     * Play: "красный индикатор гранаты заполнен на 3 четверти — должен быть на
+     * половину." `fill` is the number to move for that, live:
+     * `pow.hud.layout.gauge.lens.fill = 0.4`.
      */
-    lens: { x: 50, y: 4, width: 32, height: 32 },
+    lens: { x: 50, y: 4, width: 32, height: 32, disc: { top: 2, bottom: 29 }, fill: 1 },
     /** The pair above the left end, `newpow1` then `newpow2`. */
     cap: { x: 0, y: -18 }
   },
@@ -529,19 +538,25 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         if (state.lens !== null) {
           const lens = art.get('pcpie4')
           const box = GAUGE.lens
-          const shows = Math.min(1, Math.max(0, state.lens))
-          const rows = Math.max(0, Math.round(lens.height * shows))
+          const shows = Math.min(1, Math.max(0, state.lens * box.fill))
+          // Against the DISC's own rows, not the tile's: the red runs 2..29 of
+          // the 32 (measured off `pcpie4` itself), so a half taken over the tile
+          // is not a half of the thing anybody is looking at.
+          const disc = box.disc.bottom - box.disc.top + 1
+          const rows = Math.max(0, Math.round(disc * shows))
+          // …and the fill is measured up from the disc's own bottom edge.
+          const from = box.disc.bottom + 1 - rows
           if (rows > 0) {
             context.drawImage(
               lens.image,
               0,
-              lens.height - rows,
+              from,
               lens.width,
               rows,
               Math.round((gaugeX + box.x) * scale),
-              Math.round((gaugeY + box.y + box.height - rows) * scale),
+              Math.round((gaugeY + box.y + from) * scale),
               Math.round(box.width * scale),
-              Math.round(((rows * box.height) / lens.height) * scale)
+              Math.round(rows * scale)
             )
           }
         }

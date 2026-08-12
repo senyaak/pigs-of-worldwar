@@ -62,11 +62,27 @@ export const beginFiring = (): Firing => ({ phase: 'fuse', fuse: FIRE_FUSE })
  * The phase moves to `flight` either way: whether the shot actually leaves is
  * the scene's business, and a sequence that produced no bullet still has to
  * end rather than hang.
+ *
+ * **`speaking` holds it, and that half is play's rule rather than the exe's.**
+ * "Надо ждать пока свинья договорит фразу — только потом стрелять; надо чётко
+ * разделить: фраза перед выстрелом, и потом, когда закончилась, сам выстрел."
+ * The original does not: `Pig::Fire` plays the bark and stamps ten frames, so
+ * the shot goes off over the line. The ten frames still run first — the exe's
+ * own number, and it is what the attack clip is timed against — and then the
+ * fuse simply does not expire until the pig has stopped talking.
+ *
+ * It is the ONE reading this engine takes from the presentation layer, and it
+ * costs something worth writing down: a battle stepped with no sound at all
+ * (`speaking` always false) fires ten frames after the press, as the exe does,
+ * while a battle with a voice waits — so two machines in lockstep would have to
+ * agree on the line's LENGTH, not on the audio. When that day comes the fix is
+ * to make the duration data (the twelve lines are shipped files) rather than a
+ * poll.
  */
-export function advanceFiring(firing: Firing, delta: number): boolean {
+export function advanceFiring(firing: Firing, delta: number, speaking = false): boolean {
   if (firing.phase !== 'fuse') return false
   firing.fuse -= delta
-  if (firing.fuse > 0) return false
+  if (firing.fuse > 0 || speaking) return false
   firing.phase = 'flight'
   return true
 }

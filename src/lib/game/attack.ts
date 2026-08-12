@@ -95,6 +95,12 @@ export interface Attack {
   gauge(holding: number | null): number | null
   /** Whether the pig is committed on this state's account. */
   busy(): boolean
+  /**
+   * Whether the acting pig is still SAYING its firing line — the shot waits for
+   * it (play's rule, lib/game/shot.ts). Polled once a frame from wherever the
+   * voice actually is, which is the presentation layer.
+   */
+  setSpeaking(saying: boolean): void
   /** A new turn, or a warp: a charge belongs to the pig that started it. */
   reset(): void
 }
@@ -103,6 +109,8 @@ export function createAttack(parts: AttackParts): Attack {
   const { shots, grenades, swings, sights, anim } = parts
   /** Whether the fire key went down since the last frame. */
   let requested = false
+  /** Whether the pig is still saying its line, as of this frame. */
+  let speaking = false
   /** The fire button, last frame — both edges are wanted. */
   let held = false
   /** The power gauge, while one is filling (lib/game/gauge.ts). */
@@ -225,8 +233,10 @@ export function createAttack(parts: AttackParts): Attack {
         if (laying.untilDone <= 0) laying = null
       }
       // Ten frames between the press and the bullet, and the frame the fuse
-      // runs out is the frame it leaves.
-      if (firing && advanceFiring(firing, delta)) {
+      // runs out is the frame it leaves — unless the pig is still saying its
+      // line, which holds the trigger down until it has finished (play's rule,
+      // lib/game/shot.ts).
+      if (firing && advanceFiring(firing, delta, speaking)) {
         const firearm = weaponOf(holding)
         // A PLANTED charge is the one thing the fuse does not loose. `Pig::Attack`
         // starts the clip either way (0x46971a); what a gun does at that moment,
@@ -266,12 +276,16 @@ export function createAttack(parts: AttackParts): Attack {
     // …and a charge being laid holds the pig for the whole of its clip: the exe's
     // own `[pig+0x2FF]` is up from `Pig::Attack` until the animation is spent.
     busy: () => gauge !== null || firing !== null || laying !== null,
+    setSpeaking(saying) {
+      speaking = saying
+    },
     reset() {
       requested = false
       gauge = null
       thrownWith = 0
       firing = null
       laying = null
+      speaking = false
     }
   }
 }

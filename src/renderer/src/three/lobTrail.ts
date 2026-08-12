@@ -10,7 +10,7 @@
 
 import * as THREE from 'three'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
-import { LOB_TRAIL, TRAIL_DEAD, advanceTrail, beginTrail, trailSpent } from '../../../lib/game/trail'
+import { LOB_TRAIL, ROCKET_TRAIL, TRAIL_DEAD, advanceTrail, beginTrail, trailSpent } from '../../../lib/game/trail'
 import type { Trail, TrailKind } from '../../../lib/game/trail'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 
@@ -27,6 +27,23 @@ const PUFF_UNIT = (90 / 8) * MODEL_SCALE
 /** How solid one is. The remake's — thin, because six a frame overlap heavily
  * and the trail should read as haze rather than as beads. */
 const PUFF_ALPHA = 0.45
+
+/**
+ * **How much bigger and thicker a ROCKET's smoke is drawn — and this is the
+ * DRAWING's number, not the row's.**
+ *
+ * Play, twice: "дым от снаряда базуки слишком не тот — должен быть больше и
+ * гуще." The rows are the engine's and stay that way (`lib/game/trail.ts`): both
+ * trails carry the same grey at the same size 8, and the rocket's difference is
+ * that it lays six a frame against a grenade's three.
+ *
+ * What is NOT the engine's is the puff itself — the original draws a textured
+ * additive particle out of `expltims.mad` and this draws a soft blob on a canvas
+ * (`PUFF_UNIT` above says the same about size). So the correction belongs here,
+ * where the invention already lives, rather than in a row that is read.
+ */
+const ROCKET_SWELL = 2.2
+const ROCKET_ALPHA = 0.6
 
 export interface LobTrails {
   /** Follow one projectile. Keyed by its ID rather than by its place in the
@@ -101,12 +118,17 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
     for (const trail of trails.values()) {
       for (const puff of trail.puffs) {
         const sprite = spriteAt(n++)
+        // A rocket's is drawn bigger and thicker than its row asks — the row is
+        // the engine's, the PUFF is ours, and this is where that difference
+        // belongs (`ROCKET_SWELL`).
+        const rocket = trail.kind.id === ROCKET_TRAIL.id
         sprite.visible = true
         sprite.position.set(puff.x, puff.y, puff.z)
-        sprite.scale.setScalar(PUFF_UNIT * trail.kind.size)
+        sprite.scale.setScalar(PUFF_UNIT * trail.kind.size * (rocket ? ROCKET_SWELL : 1))
         const [r, g, b] = trail.kind.colour
         sprite.material.color.setRGB(r / 31, g / 31, b / 31)
-        sprite.material.opacity = PUFF_ALPHA * (1 - puff.age / TRAIL_DEAD)
+        sprite.material.opacity =
+          (rocket ? ROCKET_ALPHA : PUFF_ALPHA) * (1 - puff.age / TRAIL_DEAD)
       }
     }
     for (let rest = n; rest < sprites.length; rest++) sprites[rest].visible = false

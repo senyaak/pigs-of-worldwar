@@ -56,6 +56,7 @@ export function createBattleSound(bus: BattleBus): BattleSound {
     chuteOverhead: audio.chuteOverhead,
     played: () => bank.played(),
     spoken: () => voice.spoken(),
+    saying: () => voice.saying(),
     dispose() {
       voice.dispose()
       bank.dispose()

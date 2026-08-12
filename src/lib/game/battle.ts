@@ -164,6 +164,15 @@ export interface Battle {
   setAim(direction: number): void
   /** Whether the aim view is HELD. */
   setSighting(held: boolean): void
+  /**
+   * Whether the acting pig is still saying its firing LINE.
+   *
+   * Play: "надо ждать пока свинья договорит фразу — только потом стрелять."
+   * Polled once a frame from where the voice lives, because the engine has no
+   * sound — and it is the only reading the rules take from the presentation
+   * layer at all. What that costs is written up in `lib/game/shot.ts`.
+   */
+  setSpeaking(saying: boolean): void
   /** How full the power gauge is, 0..1 — or null when nothing in hand charges,
    * which is what the dashboard hides it on. */
   charging(): number | null
@@ -600,8 +609,13 @@ export function createBattle(parts: BattleParts): Battle {
       for (const pig of everyone()) {
         if (isDead(pig) || indoors.inside(pig)) continue
         pig.holding = null
-        if (ending.won) anim.setClip(pig, ANIM.VICTORY)
-        else anim.setClip(pig, ANIM.IDLE)
+        // …and the AIMING POSE goes with the weapon. Play: "анимация победы
+        // играется в позе вытащенного оружия — все оружия надо убрать у всех
+        // свинов." The pose is the second animation channel (lib/game/anim.ts),
+        // so putting the dance on the first one leaves the arms where the rifle
+        // was until this clears it.
+        anim.overlay(pig, -1, 0)
+        anim.setClip(pig, ending.won ? ANIM.VICTORY : ANIM.IDLE)
       }
       holding = null
       const leave = leaveRequested
@@ -848,6 +862,12 @@ export function createBattle(parts: BattleParts): Battle {
     // 0x46a08c, 0x46a0e4). Coming OUT, **x and z are written as zero**
     // (0x46a150, 0x46a15e) and only the vertical is stepped — so he leaves
     // through the top and nowhere else.
+    // **ONE DOOR AT A TIME.** Play: "запрыгивание и выпрыгивание из бункера не
+    // блокирует ввод — можно спамить." A clip that carries the pig is an
+    // animation nobody may walk out of, the same rule the lay clip has
+    // (`attack.busy()`): while a climb or a leap is running, the key does
+    // nothing at all.
+    if (climbing !== null || leaving !== null || carry !== null) doorRequested = false
     if (doorRequested) {
       doorRequested = false
       const within = indoors.inside(acting)
@@ -1208,6 +1228,7 @@ export function createBattle(parts: BattleParts): Battle {
     },
     setAim: sights.push,
     setSighting: sights.setHeld,
+    setSpeaking: attack.setSpeaking,
     charging: () => attack.gauge(game.currentPig.holding),
     aim: () => (weaponOf(holding).aims ? sights.angle() : null),
     situation: () => ({
@@ -1224,7 +1245,17 @@ export function createBattle(parts: BattleParts): Battle {
       // not a mode anybody drives in (lib/game/walkAway.ts). So does a turn a
       // weapon has SPENT: the blow is over, the handover has not happened yet,
       // and those few frames are not a last chance to walk (lib/game/spend.ts).
-      locked: committed() || spent || aftermath !== null || walkAway !== null,
+      // …and so does a DOOR: the clip carries the pig through it and nothing may
+      // be driven, chosen or fired while it runs. Play found the hole by spamming
+      // the key — "запрыгивание и выпрыгивание не блокирует ввод".
+      locked:
+        committed() ||
+        spent ||
+        aftermath !== null ||
+        walkAway !== null ||
+        climbing !== null ||
+        leaving !== null ||
+        carry !== null,
       sights: layerSights(weaponLayer(game.currentPig.holding)) && !dropIn.running()
     }),
     beginTurn: () => game.beginTurn(),

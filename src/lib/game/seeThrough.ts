@@ -79,15 +79,21 @@ export function crossedBy(
 }
 
 /**
- * The same, over SEVERAL points on the thing being looked at — the union of what
- * each of them is behind.
+ * The same, over SEVERAL points on the thing being looked at — and it takes a
+ * MAJORITY of them, not any one.
  *
- * Play: "текстура наверху прозрачная, а внизу еле-еле." One ray to the pig's
- * middle fades the piece that middle is behind and nothing else, and a wall is
- * built of pieces stacked up the wall — so the panel his HEAD was behind went
- * see-through while the one his feet were behind stayed solid, which is exactly
- * "transparent at the top and hardly at the bottom". A pig is a body, not a
- * point: everything in front of any part of him gets out of the way.
+ * Two reports, and they pull in opposite directions. First: "текстура наверху
+ * прозрачная, а внизу еле-еле" — one ray to the pig's middle fades the piece
+ * that middle is behind and nothing else, and a wall is built of pieces stacked
+ * up the wall. Then, with three rays and ANY of them counting: "манекен
+ * пропадает когда я подхожу вплотную… колючая проволока пропадает когда стоит за
+ * мной — но ни кусочек свина не загорожен, камера его полностью видит."
+ *
+ * Both are the same question asked properly: **does this box hide the pig, or
+ * does it clip a corner of him?** A wall panel between the camera and the pig
+ * covers every ray; a dummy at his shoulder, a coil of wire at his heel or a
+ * tree beside him covers one. So: half the points or more, and one is not
+ * enough.
  */
 export function crossedTowards(
   boxes: readonly Obstacle[],
@@ -96,10 +102,38 @@ export function crossedTowards(
   margin = 0
 ): number[] {
   const out: number[] = []
+  const enough = Math.max(1, Math.ceil(targets.length / 2))
   for (const box of boxes) {
-    if (targets.some((to) => crosses(box, from, to, margin))) out.push(box.id)
+    let hit = 0
+    for (const to of targets) {
+      if (crosses(box, from, to, margin)) hit++
+      if (hit >= enough) break
+    }
+    if (hit >= enough) out.push(box.id)
   }
   return out
+}
+
+/**
+ * Where the sight line STOPS: the pig's own near side rather than his middle.
+ *
+ * Play: "думаю надо сделать проверку от задней части свина." Right — a segment
+ * that runs to the middle of him goes on THROUGH his front half, so anything
+ * standing at his chest is "in the way" although the camera can see all of him
+ * over it. Ending the line where his body starts is the difference between
+ * "between the camera and the pig" and "near the pig".
+ *
+ * `back` is how much of him to leave out: half his own length
+ * (lib/game/obstacles.ts, `PIG_HOLD`).
+ */
+export function nearSideOf(from: Spot, at: Spot, back: number): Spot {
+  const dx = from.x - at.x
+  const dy = from.y - at.y
+  const dz = from.z - at.z
+  const span = Math.hypot(dx, dy, dz)
+  if (span <= back || span === 0) return { x: at.x, y: at.y, z: at.z }
+  const t = back / span
+  return { x: at.x + dx * t, y: at.y + dy * t, z: at.z + dz * t }
 }
 
 /**

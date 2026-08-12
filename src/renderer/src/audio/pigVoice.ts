@@ -63,6 +63,8 @@ export interface PigVoice {
   fire(squad: number): void
   /** Every file played, in order: the only way a spec can hear this. */
   spoken(): string[]
+  /** Whether a line is still going. The SHOT waits for it (lib/game/shot.ts). */
+  saying(): boolean
   dispose(): void
 }
 
@@ -91,14 +93,32 @@ export function createPigVoice(): PigVoice {
   const counters = new Map<number, number>()
   let disposed = false
 
+  /**
+   * How many lines are in the air — what the SHOT waits for. Play: "надо ждать
+   * пока свинья договорит фразу, только потом стрелять." Counted rather than
+   * timed, because the file's own length is the answer and it is different for
+   * every line (0.2 s to 5.7 s over the shipped set).
+   *
+   * It is raised the moment the line is ASKED for, not when the buffer is
+   * ready: a file still loading is a pig about to speak, and letting the shot
+   * through in that window is the very race this closes.
+   */
+  let saying = 0
+
   const start = (path: string): void => {
     const ctx = context()
     const buffer = buffers.get(path)
-    if (!ctx || !buffer || disposed) return
+    if (!ctx || !buffer || disposed) {
+      saying = Math.max(0, saying - 1)
+      return
+    }
     if (ctx.state === 'suspended') void ctx.resume()
     const playing = ctx.createBufferSource()
     playing.buffer = buffer
     playing.connect(ctx.destination)
+    playing.onended = (): void => {
+      saying = Math.max(0, saying - 1)
+    }
     playing.start()
   }
 
@@ -129,12 +149,15 @@ export function createPigVoice(): PigVoice {
       counters.set(squad, at + 1 > FIRE_LINES - 1 ? 0 : at + 1)
       const path = voiceFile(voiceFor(squad), at + 1)
       heard.push(path)
+      saying++
       if (buffers.has(path)) start(path)
       else void load(path).then(() => start(path))
     },
     spoken: () => [...heard],
+    saying: () => saying > 0,
     dispose() {
       disposed = true
+      saying = 0
       buffers.clear()
     }
   }

@@ -129,6 +129,18 @@ export function buildMapProps(
       copy.transparent = true
       copy.opacity = SEE_THROUGH
       copy.depthWrite = false
+      // **AND THE ALPHA TEST HAS TO COME DOWN WITH IT**, or the fade is not a
+      // fade at all — it is the thing vanishing. Play: "снова пропадает вместо
+      // полупрозрачности", of a dummy, a tree, a bridge and a coil of wire, all
+      // at once. Props are built with `alphaTest: 0.5` (three/modelMesh.ts) to
+      // punch the keyed texels out, and the shader discards a fragment whose
+      // FINAL alpha is under it — texel alpha times this opacity. At 0.5 that
+      // was exactly on the line and squeaked through; the moment the fade went
+      // to 0.4 every fragment of every faded prop was discarded.
+      //
+      // Half the fade: a keyed texel is alpha 0 and still cut, and the solid
+      // body of the model survives at whatever opacity is asked for.
+      if ('alphaTest' in copy) copy.alphaTest = SEE_THROUGH / 2
       return copy
     })
     ghosts.set(name, made)
