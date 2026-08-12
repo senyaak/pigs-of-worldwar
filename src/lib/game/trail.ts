@@ -47,6 +47,14 @@
 //  2. What uses 0x14 is the ROCKET, and it comes from a third dispatch nobody
 //     had read — see `ROCKET_TRAIL`.
 //
+// That dispatch (0x436766, the map at 0x436D68 indexed by the KIND straight)
+// hands a parented effect to nearly every projectile in the game, and it settles
+// the BULLET too: kinds **12..17**, the guns, take slot 3 → `push 15h` — the
+// grenade's own id. So a bullet really does lay a grenade's trail, which this
+// engine had right by accident and for the wrong reason. The rest of the map, for
+// whoever needs it next: 5..10 → 0x14, 11 → 0x17, 18..19 → 0x16, 34/35/46 → 0x14
+// hung 0xC8 above, and everything unlisted → nothing.
+//
 // Both particle types resolve to the SAME setter (0x486F8D, the table at
 // 0x4871D0): colour **0x4210**, the mid grey that is the setter's own default;
 // age step **0x14**, so one lives `100/20 =` **five frames**; size 8; and no
@@ -159,20 +167,29 @@ export const FUSE_LIFT = 0x3c
  * of particle type 0x16, against a grenade's three. Twice the smoke, off the
  * engine's own table, which is what "густой" is.
  *
- * The COLOUR and the SIZE are the two numbers here that are not the engine's,
- * and they say so: the setter gives both trails 0x4210 and 8 — mid grey — and
- * play asked for WHITE. Our puff is a soft canvas blob rather than the
- * original's textured additive particle (`three/lobTrail.ts`), so grey-on-grey
- * reads as nothing at all; 31/31/31 at twice the size is that difference made
- * up. Move them in play.
+ * **Every number here is the engine's**, colour and size included — play asked
+ * for that in as many words ("давай делаем как в движке, в этом же и суть")
+ * after a first pass shipped a white, double-size row on the strength of
+ * "белый густой дым". The setter gives this trail the same 0x4210 and the same
+ * 8 a grenade's gets: what differs is the COUNT, and six against three is the
+ * whole of what "густой" turns out to be.
+ *
+ * If it still reads as nothing in play, the thing that is wrong is the PUFF —
+ * our soft canvas blob against the original's textured additive particle
+ * (`three/lobTrail.ts`, `expltims.mad`'s `ptp*` art) — and that is where the
+ * change belongs, not in this row.
+ *
+ * One thing read and NOT built: effect 0x14's own Init arm (0x488CCC) lays a
+ * single particle of type **0x14** at the spawn point — same grey, size 0x10,
+ * so one bigger puff where the rocket left the barrel.
  */
 export const ROCKET_TRAIL: TrailKind = {
   id: 0x14,
   steps: 6,
   ageStep: 0x14,
   particle: 0x16,
-  colour: [31, 31, 31],
-  size: 0x10
+  colour: [16, 16, 16],
+  size: 8
 }
 
 /** How many of a kind can be alive at once, which is the capacity its id gets

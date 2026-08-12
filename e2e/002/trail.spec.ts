@@ -55,12 +55,13 @@ test('A ROCKET carries one too, and it is the ENGINE that lays it', () => {
   expect(ROCKET_TRAIL.steps).toBe(LOB_TRAIL.steps * 2)
   expect(ROCKET_TRAIL.particle).toBe(0x16)
   expect(ROCKET_TRAIL.ageStep).toBe(LOB_TRAIL.ageStep)
-  // The colour and the size are the two that are NOT the engine's — it gives
-  // both trails grey 0x4210 at size 8 — and they say so where they live: our
-  // puff is a canvas blob, not the original's textured additive particle, so
-  // grey-on-grey reads as nothing (lib/game/trail.ts).
-  expect(ROCKET_TRAIL.colour).toEqual([31, 31, 31])
-  expect(ROCKET_TRAIL.size).toBe(0x10)
+  // …and NOTHING here is picked. Both particle types share one setter, so the
+  // rocket's puff is the same grey at the same size as a grenade's and the COUNT
+  // is the only difference between the two rows. A first pass shipped a white,
+  // double-size row off play's "белый густой дым"; play's answer was "давай
+  // делаем как в движке — в этом же и суть".
+  expect(ROCKET_TRAIL.colour).toEqual(LOB_TRAIL.colour)
+  expect(ROCKET_TRAIL.size).toBe(LOB_TRAIL.size)
 })
 
 test('A CHARGE CARRIES ONE TOO, and its fuse is where it hangs', () => {

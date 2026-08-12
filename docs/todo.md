@@ -239,10 +239,21 @@ slot*4]` puts id 0x14 on 0x48B024 (÷6, particle 0x16) and id 0x15 on 0x48B0F5
 (÷3, particle 0x19) — so the "six a frame" every note called the grenade's is the
 ROCKET's, and a grenade lays three. `LOB_TRAIL` is fixed to match.
 
-Two numbers in `ROCKET_TRAIL` are still not the engine's and say so: the setter
-gives both trails grey 0x4210 at size 8, and play asked for WHITE. Our puff is a
-canvas blob rather than the original's textured additive particle, so grey-on-grey
-reads as nothing at all.
+**And it is the engine's end to end** — a first pass shipped a white, double-size
+row off play's "белый густой дым" and play sent it back: "давай делаем как в
+движке — в этом же и суть." Both trails share one particle setter, so the row is
+grey 0x4210 at size 8 like a grenade's and the COUNT is the only difference; six
+against three is the whole of "густой". If it still reads as nothing in play, what
+is wrong is the PUFF — our canvas blob against the original's textured additive
+particle — and that is the thing to change, not the row.
+
+The same dispatch settles the BULLET: kinds 12..17, the guns, take `push 15h` —
+the grenade's own id — so a bullet really does lay a grenade's trail, which this
+engine had right by accident and for the wrong reason.
+
+Read and not built: effect 0x14's Init lays one particle of type 0x14 at the
+spawn point, same grey at size 0x10 — a bigger puff where the rocket leaves the
+barrel.
 
 **The lesson, and it is the one already written down**: "I could not find it" is
 never "it is not there". Two dispatches read is not the same as the site read.

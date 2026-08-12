@@ -2515,22 +2515,27 @@ the page already argues for, with the case play caught added to it.
 **Black smoke, and a bullet that smokes.** A puff was 55 units across in mid grey —
 a sixth of a pig, invisible beside a fireball. It takes the fireball's own colour
 law now (`cloudChannel(16)` = 100 of 255) at a size where fourteen of them read as
-a cloud. And a bullet lays the same trail a grenade does, from the same pool —
-though **the reason given here was wrong** and is corrected 2026-08-11: the
-CONSTRUCTOR's trail dispatch is `kind − 0x15` over 0x21 entries, so it answers
-kinds 21..53 and a BULLET (4..20) is outside it. A bullet's trail is the
-remake's.
+a cloud. And a bullet lays the same trail a grenade does — **which was right by
+accident**: the CONSTRUCTOR's dispatch answers kinds 21..53 only, so a bullet is
+outside it, and what actually hands one over is the projectile UPDATE's second
+per-kind dispatch, where kinds 12..17 push the grenade's own id 0x15.
 
-**The ROCKET's is not**, and getting that wrong is the pass worth remembering.
-The same reading was offered as "the exe hangs nothing on a bazooka either" and
-play refused it in one word — "ВРЁШЬ!!!" — and was right: the projectile's UPDATE
-has TWO per-kind dispatches, and the one that was not read (0x436596 → 0x436727,
-the map at 0x436D68 indexed by the kind STRAIGHT) hangs effect **0x14** on kind 10
-on its second frame. Reading it also corrected the grenade: the id → update map
-(`[0x48BF90 + id − 1]`) puts 0x14 on the ÷6 arm and 0x15 on the ÷3 one, so the
-"six a frame of type 0x16" this repo called a grenade's trail is the rocket's, and
-a grenade lays **three** of type 0x19. `lib/game/trail.ts` carries both, with the
-white and the size flagged as the two numbers that are ours.
+**Finding that dispatch is the pass worth remembering.** The same reading had been
+offered as "the exe hangs nothing on a bazooka either" and play refused it in one
+word — "ВРЁШЬ!!!" — and was right. The update has TWO per-kind dispatches; the one
+that had never been read (0x436596 → 0x436727, the map at 0x436D68 indexed by the
+kind STRAIGHT) hangs effect **0x14** on kind 10 on its second frame. Reading it
+also corrected the grenade: the id → update map (`[0x48BF90 + id − 1]`) puts 0x14
+on the ÷6 arm and 0x15 on the ÷3 one, so the "six a frame of type 0x16" this repo
+called a grenade's trail is the ROCKET's, and a grenade lays **three** of type
+0x19.
+
+`lib/game/trail.ts` carries all three rows and **every number in them is the
+engine's**. A pass that gave the rocket a white, double-size row off play's
+"белый густой дым" was sent back — "давай делаем как в движке, в этом же и суть"
+— and the count is where the difference really lives. If a trail reads as nothing
+on screen, the thing to fix is the PUFF (our canvas blob against the original's
+textured additive particle), not the row.
 
 **The flight ANIMATES.** "Отбрасывание не запускает анимацию полёта. падение не
 запускает анимацию подьёма после полёта." Both were one line: the frame dresses
