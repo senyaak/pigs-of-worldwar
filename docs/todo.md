@@ -132,26 +132,50 @@ by play. In the order they turn up:
    grenade's) drawn bigger and thicker than the row asks. Fire does not set it
    off in the air any more.
 8. **THE THROWN WEAPON'S TWO CAMERAS (2026-08-12) — both read off the exe.**
-   Take a grenade or the bazooka in hand and the camera changes on the spot:
+   Take a grenade or the bazooka IN HAND and the camera changes on the spot:
    `0x493BB0` dispatches on the skill and asks for **mode 4**, whose row
-   `0x49F6F0` stamps to **3500** for anything thrown (1500 for a blade, nothing
-   at all for a gun). Hold **G** and it comes in to the **TR cam, mode 0x12** —
-   200 out, 400 up, nominal 1700 — close over his back. **The fire button does
-   not touch the camera**; it did for one commit and that was the bug. The knobs
-   are `LOB_CLOSE`/`LOB_RISE` and `THROW_CLOSE`/`THROW_RISE` in three/chase.ts,
-   and `pow.debug.view()` says which is live. **Mode 4 has no lift of its own** —
-   its arm sets a target and three springs glide onto it, and what holds the
-   camera up is the tail's floor of **ground + 768** (0x4a0c12), from which the
-   TR cam alone is exempt (0x4a0bd4). So `CLEARANCE` is the exe's 768 now and
-   the HEIGHT is read too: **column 1 of the mode table is the camera's
-   elevation ceiling** (`0x4A0900`, 0x400 = level, smaller = higher), and
-   `0x49F6F0` stamps it beside the distance — **692 = 29.2°** for anything
-   thrown against the chase's 768 = 22.5°, and 800 = 19.7° for a blade. So the
-   lob view is placed by that ANGLE and has no lift of its own; `LOB_CEILING` is
-   the number if it ever wants moving. **The charge no longer cancels the view** — the `charging` control
-   set carries the sight key through, which is what the exe does. Still not
-   modelled: the exe lets the player PITCH the TR cam (±700 of 4096,
-   `[cam+0x76]`) and nothing here is bound to a camera pitch.
+   `0x49F6F0` stamps — **3500 out at up to 29.2° above level** for anything
+   thrown, 1500 at 19.7° for a blade, and **nothing at all for a gun**. Hold
+   **G** and it comes in to the **TR cam, mode 0x12**: 200 out, 400 up, nominal
+   1700, close over his back, and the one view the exe lets under the ground
+   floor. **The fire button touches neither** — it did for one commit and that
+   was the bug — and **the charge no longer cancels the view**, because the
+   `charging` control set carries the sight key through the way the exe's aim
+   branch does.
+
+   Two numbers that were invented and are not any more: `CLEARANCE` is the exe's
+   **ground + 768** (0x4a0c12, the tail every mode ends with), and **column 1 of
+   the mode table is the elevation CEILING** (`0x4A0900`, 0x400 = level, smaller
+   = higher) rather than the zoom it had been written down as. The lob view is
+   placed by that ANGLE and by 3500 taken as a LENGTH through `MODEL_SCALE` —
+   play looked at the ratio-against-`BACK` version and said the original pulled
+   further back. The knobs, if it still wants moving: `LOB_CLOSE`/`LOB_CEILING`
+   and `THROW_CLOSE`/`THROW_RISE` in three/chase.ts, and `pow.debug.view()` says
+   which view is live. Not modelled: the exe lets the player PITCH the TR cam
+   (±700 of 4096, `[cam+0x76]`) and nothing here is bound to a camera pitch.
+
+9. **THE EJECT (2026-08-12), and it wants standing on.** Play stood on CAMP
+   **18,12** — a flat wall tile 128 BELOW the ground beside it — and got
+   "прыгает по полу будто соскальзывает, но на месте". Two bugs in
+   `EjectFromWall`, both the remake's reading: the gradient's atan2 is the
+   bearing of an IMPULSE and not a new facing (turning the pig walked him back
+   into the wall while W was held), and the arm has **two** impulses — 32 level
+   downhill, 32 at 83.5° — where this had one 0x20 pitched at 83.5, which keeps
+   the lift and throws the push away. Both fixed; `002/wedge.spec.ts` stands a
+   pig on that very tile. **What to watch:** he should be pushed clear once and
+   walk on, not hop. And the same half-turn was the last suspect for "летящая
+   свинья крутится вокруг своей оси" — see whether that is gone too.
+
+10. **G WITH A BAYONET OR EMPTY HANDS — play says it moved the camera, the code
+    says it cannot.** `sighting` is "held AND the weapon's layer has an aim
+    view", and only `gun` and `lob` do; the camera picks its two lob views off
+    the layer as well, so a blade can reach neither. That is the exe's own shape
+    too — its aim branch gives a blade no camera, and `0x493BB0` moves the view
+    for a blade only when it is TAKEN IN HAND (mode 4 at 1500/19.7°, closer and
+    lower than the chase, which is a real change and may be what was seen).
+    `002/sights.spec.ts` pins the rule. If it still moves on this build, the next
+    step is measuring `pow.debug.view()` and `pow.debug.camera()` with a bayonet
+    out rather than reasoning about it again.
 
 ## B. PLAY'S REPORTS, still open
 
