@@ -203,20 +203,28 @@ by play. In the order they turn up:
    mode 2; and **7 RIFLE, 8, 9, 10, 14, 16 and the planted charges ask for
    nothing at all**. `TRACKS_ITS_SHOT` in three/chase.ts is that table.
 
-   **Mode 0x0B's handler is MISSING from this build, which is not the same as
-   doing nothing.** `[0x4D95A0 + 0x0B*4]` is 0x4199C0 — one `ret` — and modes
-   5, 8 and 0x0C hold the same address: four empty functions folded onto one,
-   in a region nowhere near the camera code. A `ret` reached by every thrown
-   weapon in the game is a removed handler. What survives says the shape: the
-   **row is real** (3000 out, column 1 = 1024 dead level, column 2 = 0 no
-   swing), the **setup arm remembers what a follow needs** — the camera's own
-   position and, at `[cam+0x7A]`, its distance to the subject, whose only
-   reader in the image is mode 0x0A's distance spring — and the fire arm hands
-   it the projectile as its subject. Play settles the rest: "камера следует за
-   ней… замораживается на то чтобы сказать фразу, а потом бросок и идёт
-   правильная камера." The freeze is the beat BEFORE the throw (the battle cry
-   over a still mode 4); the flight is followed from straight behind at its own
-   height. `chase.pursue`.
+   **NOBODY IS EVER IN MODE 0x0B — `0x49F740` rewrites it to 0x0D on entry**
+   (`cmp ebp,0Bh` … `mov ebp,0Dh`, 0x49f774..0x49f7a5), which is why 0x0B's own
+   handler is a `ret` shared with modes 5, 8 and 0x0C: unreachable, not a
+   behaviour. It also closes three loose ends at once — 0x0B/0x0C/0x0D share
+   the setup arm 0x49f912, that arm is the only writer of `[cam+0x7A]` and
+   0x0D's handler its only reader, and the setter zeroes `[cam+0x78]` for every
+   mode BUT 0x0D.
+
+   **Mode 0x0D (0x4a3a20) swings in behind the thing and then RIDES ROUND it**
+   — play named the shape before it was read ("камера там ещё будто едет по
+   кругу вокруг"). Phase one springs the camera's yaw toward the subject's own
+   facing and turns it about the subject until the step is under 1.4°, then
+   stamps the separation into `[cam+0x7A]`. Phase two, once a frame: radius =
+   clamp(⅔ × separation, stamp, 10000), `[cam+0x78] -= 10` of 4096 — **0.879° a
+   frame, one way, held within 67.5°** of the bearing it locked at — and the
+   camera is placed at that bearing and radius. The height is the row's own
+   ceiling, **column 1 = 824 → 17.6° above level**, plus the tail's 768 floor;
+   the row's 3000 is not read at all. `chase.pursue` is that, state and all.
+
+   The freeze play describes is the beat BEFORE the throw — `Pig::Fire`'s
+   battle cry with the camera still in mode 4 — which is also why mode 4 aims
+   1536 down-range.
 
    **A RIFLE tracks like a sniper**, also play's. The exe's own split (the
    pistol and the sniper reach the shared tail at 0x47ad71, 7 RIFLE's arm jumps

@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import type { Pig } from '../../../lib/game/game'
 import { SWIM_SINK } from '../../../lib/game/locomotion'
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { clearHeading } from '../../../lib/game/sightline'
 import type { Blocked } from '../../../lib/game/sightline'
@@ -390,37 +391,29 @@ export const SCOPE_BONE = 5
  * | 51 SUICIDE | mode 2 | 7500, level — not built |
  * | **7 RIFLE**, 8, 9 MACHINE GUN, 10 HEAVY M-GUN, 14, 16, 35..38, 45, 46, 52..55, 60, 61 | nothing | — |
  *
- * **MODE 0x0B'S HANDLER IS MISSING FROM THIS BUILD, and that is not the same
- * as doing nothing.** `[0x4D95A0 + 0x0B*4]` is `0x4199C0`, which is one
- * instruction — `ret` — and modes **5, 8 and 0x0C point at the very same
- * address**. Four empty functions folded onto one by the linker, in a region
- * (0x419xxx) nowhere near the camera code every real handler lives in
- * (0x4a0xxx..0x4a4xxx). That is what a REMOVED handler looks like, and mode
- * 0x0B is asked for by every thrown weapon in the game — the one thing a stub
- * cannot be.
+ * **NOBODY IS EVER IN MODE 0x0B — `0x49F740` REWRITES IT TO 0x0D ON ENTRY.**
+ * Four instructions at the top of the setter, before anything else happens:
  *
- * The rest of the mode is all there, which is how the shape is recovered:
+ * ```
+ * 49f774  cmp ebp,0Bh
+ * 49f79b  jne short 0049F7A9h        ; anything else: carry on
+ * 49f79d  mov dword ptr [esp+34h],0Dh
+ * 49f7a5  mov ebp,[esp+34h]          ; ...ask for 0x0B, GET 0x0D
+ * ```
  *
- * - **its ROW is real** — 3000 out, column 1 = 1024 (dead LEVEL, `elevationOf`)
- *   and column 2 = 0 (no swing, so straight behind), where a stubbed mode would
- *   have no reason to carry one;
- * - **its setup arm remembers what a follow needs**: 0x49f912 stores the
- *   camera's own position into `[cam+0xA8]`/`[cam+0x6E]` and **the distance
- *   from the camera to the subject into `[cam+0x7A]`** — and the ONLY reader of
- *   `[cam+0x7A]` in the image is mode **0x0A**'s distance spring (0x4a4547),
- *   the surviving handler of the same family;
- * - and the fire arm hands it the PROJECTILE as its subject (0x47b273), which
- *   a camera that never looks at anything would not need.
+ * Which is why 0x0B's own handler is `0x4199C0` — one `ret`, shared with modes
+ * 5, 8 and 0x0C, four empty functions folded onto one address in a region
+ * (0x419xxx) nowhere near the camera code (0x4a0xxx..0x4a4xxx). It is
+ * unreachable, not a behaviour. (This file called it "the camera freezes" for
+ * one commit. Play: "граната — бред! камера следует за ней!" — and they were
+ * right twice, because the second report named the shape as well: "камера там
+ * ещё будто едет по кругу вокруг".)
  *
- * So play's word settles what the stub cannot: "граната — бред! камера следует
- * за ней… замораживается на то чтобы сказать фразу, а потом бросок и идёт
- * правильная камера." The freeze play describes is the beat BEFORE the throw —
- * the pig's line over a still lob view — and once the grenade is in the air the
- * camera goes behind it. `pursue` is that, built on 0x0B's own row.
- *
- * (This page said "a thrown weapon freezes the picture" for one commit. A
- * `ret` is not a behaviour: it is a missing function, the same shape as mode
- * 4's dead 1536. Both are the PC port dropping what the PSX build had.)
+ * Three things line up behind the rewrite and each was a loose end before it:
+ * modes 0x0B, 0x0C and 0x0D share the setup arm at 0x49f912; that arm is the
+ * only writer of `[cam+0x7A]`, which **0x0D's handler alone reads**; and the
+ * setter's tail zeroes `[cam+0x78]` for every mode **except 0x0D** (0x49fda0)
+ * — the one field that same arm computes.
  *
  * **And a RIFLE tracks like a sniper**, which is play's too. The exe's own
  * split — the pistol and the sniper reaching the shared tail at 0x47ad71 while
@@ -428,13 +421,59 @@ export const SCOPE_BONE = 5
  * anything else in the shot path honours, and it is not what the game does. So
  * the caller asks the weapon's LAYER and not its number (three/battle.ts):
  * every `gun` gets `watch` and every `lob` gets `pursue`.
- *
- * Mode 0x0B's own row, and the whole of what `pursue` is built from: 3000 out,
- * column 1 dead level, column 2 no swing — straight behind the thing, at its
- * own height.
  */
-const FLIGHT_BACK = 3000
-const FLIGHT_CEILING = 1024
+
+/**
+ * **MODE 0x0D, 0x4a3a20: get behind the thing, then RIDE ROUND IT.** Play named
+ * it before it was read — "камера там ещё будто едет по кругу вокруг" — and the
+ * handler is exactly two phases, told apart by `[cam+0x5C]`.
+ *
+ * **While `[cam+0x5C]` is 0 — SWING BEHIND.** It asks the subject for its own
+ * facing (`[vtable+0x44]`), springs the camera's yaw toward it (`0x4A0870` at
+ * 0x4a3d0d) and turns the camera about the subject by the step (`0x44E660`).
+ * Once that step falls under **0x10 of 4096 — 1.4°** — it is lined up: it
+ * stamps the separation into `[cam+0x7A]` (`0x44E850`, 0x4a3d53), sets
+ * `[cam+0x5C]` and the second phase begins. Until then the orbit is skipped
+ * entirely, so the camera swings round to behind the flight first.
+ *
+ * **After that — ORBIT.** Once a frame, and this is the whole of it:
+ *
+ * ```
+ * 4a3d65  radius = clamp(2/3 * separation, [cam+0x7A], 0x2710 = 10000)
+ * 4a3d88  [cam+0x78] -= 0x0A                  ; TEN of 4096, every frame
+ * 4a3d92  ...held within 0x300 of [cam+0xB6]  ; 67.5° either side of where it began
+ * 4a3e04  0x44E620(radius, [cam+0x78], &dx, &dz)
+ * 4a3e09  camera.x = subject.x + dx ; camera.z = subject.z + dz
+ * ```
+ *
+ * So: **0.879° of a turn per frame**, one way, up to 67.5° from the bearing it
+ * locked at — a slow ride round the grenade, which is what play was describing.
+ * The radius closes to two thirds of the separation each frame and cannot go
+ * under what it was at the lock, so it settles at that distance within a few
+ * frames and holds it. Height is not in the orbit block at all: the elevation
+ * spring after it (0x4A0030 → `0x4A0900`) holds the camera at the row's own
+ * ceiling, **column 1 = 824, which is 17.6° above level**, and the common tail
+ * keeps it 768 off the ground like everything but the TR cam.
+ *
+ * The row's distance, 3000, is not read by this handler — the radius comes off
+ * the separation and the stamp instead. One thing NOT modelled: the y is also
+ * clamped to `[cam+0x80]`/`[cam+0x82]`, the ±12288 the setter stamps, which is
+ * the map's own vertical bounds rather than anything about a grenade.
+ */
+const FLIGHT_CEILING = 824
+/** `sub cx,0Ah` at 0x4a3d88 — of 4096, per exe frame. */
+const FLIGHT_ORBIT = ((10 / 4096) * 2 * Math.PI) / EXE_FRAME_SECONDS
+/** 0x300 of 4096 either side of the bearing it locked at (0x4a3db2). */
+const FLIGHT_SWING = (0x300 / 4096) * 2 * Math.PI
+/** `cmp eax,10h` at 0x4a3d3a: the swing-behind is done under 1.4°. */
+const FLIGHT_LOCKED = (0x10 / 4096) * 2 * Math.PI
+/** `fadd st,st` then `fmul [0x4BD6D0]` — two thirds of the separation. */
+const FLIGHT_CLOSE = 2 / 3
+/** `cmp eax,2710h` at 0x4a3d71. */
+const FLIGHT_FAR = 10000
+/** What the yaw spring gets through in a frame. The family's own third
+ * (0x4BD6C8, 0x4BD6D0); `0x4A0870`'s own arithmetic is not transcribed. */
+const FLIGHT_TURN = 1 / 3
 
 /** Where a pig is being drawn, and which way it faces. Not the pig itself: the
  * rig frames what is on SCREEN (three/tween.ts). */
@@ -584,18 +623,14 @@ export interface Chase {
    */
   watch(at: { x: number; y: number; z: number }): void
   /**
-   * **PURSUE a thrown thing — the exe's mode 0x0B, rebuilt from its row.**
+   * **PURSUE a thrown thing: swing in behind it, then ride round it.** The
+   * exe's mode 0x0D, which is what asking for 0x0B gets you — the constants
+   * above have the read.
    *
-   * Every thrown weapon asks for it and its handler is missing from this build
-   * (`TRACKS_ITS_SHOT` above has the whole argument). What survives is the row
-   * — **3000 out, dead level, no swing** — so the camera sits straight behind
-   * the grenade at its own height and travels with it. `heading` is where the
-   * thing is going, which is what "straight behind" means for a subject with a
-   * velocity and no yaw of its own.
-   *
-   * No line-of-sight swing here, unlike `ride`: play's report that started this
-   * whole thread was the camera drifting sideways, and half of that was the
-   * dodge.
+   * `heading` is where the thing is going: the exe asks the SUBJECT for its own
+   * facing, and a projectile's is its flight. No line-of-sight swing here,
+   * unlike `ride` — the sideways drift play reported was half the dodge and
+   * half a rig that had no orbit in it.
    */
   pursue(at: { x: number; y: number; z: number }, heading: number, delta: number | null): void
   /**
@@ -635,6 +670,21 @@ export function createChase(
   const at = new THREE.Vector3()
   let snapped = false
   let wait = 0
+  /**
+   * The orbit's own four fields, and they are mode 0x0D's: whether the camera
+   * has swung in behind the flight yet (`[cam+0x5C]`), the bearing it stands at
+   * (`[cam+0x78]`), the one it locked at (`[cam+0xB6]`) and how far out
+   * (`[cam+0x7A]`). `chasing` is the remake's own — the exe enters the mode
+   * once and knows it, where this rig is asked frame by frame.
+   */
+  let chasing = false
+  let orbiting = false
+  let bearing = 0
+  let origin = 0
+  let radius = 0
+  /** To ±π, which is the exe's `& 0xFFF` read as a signed turn. */
+  const wrapAngle = (a: number): number =>
+    a - Math.PI * 2 * Math.round(a / (Math.PI * 2))
 
   /**
    * The height the camera frames a pig at: its node, less the sink when it
@@ -751,6 +801,7 @@ export function createChase(
 
   return {
     follow(stance, nodeY, rise, delta, view, aim = 0, yaw = 0, eye = null) {
+      chasing = false
       const { position, target } = want(stance, nodeY, rise, view, aim, yaw, eye)
       // The scope SNAPS. Easing a first-person view is motion sickness: the
       // whole point of it is that the barrel and the frame are the same thing.
@@ -764,33 +815,60 @@ export function createChase(
       camera.lookAt(target)
     },
     watch(point) {
+      chasing = false
       // Mode 1 in full: the position is left alone — `at` is not touched, so
       // whatever view the throw was made from is still standing there and the
       // next `follow` carries on from it — and only the aim moves.
       camera.lookAt(new THREE.Vector3(point.x, -point.y, -point.z))
     },
     pursue(point, heading, delta) {
-      // Mode 0x0B's row and nothing else: straight behind along the flight, at
-      // the flight's own height (column 1 is level, so the lift is zero).
-      const lift = FLIGHT_BACK * Math.tan(elevationOf(FLIGHT_CEILING))
+      // Where the camera stands round the thing, and how far. `bearing` runs
+      // from the SUBJECT out to the camera, which is the sense `0x44E620` is
+      // called in (0x4a3e04); the flight's own heading is where the camera
+      // wants to be BEHIND, hence the half turn.
+      const away = Math.atan2(at.x - point.x, -at.z - point.z)
+      const separation = Math.hypot(at.x - point.x, -at.z - point.z)
+      // The mode is ENTERED where the camera already stands — the setup arm
+      // stamps its position and its distance and moves nothing (0x49f912).
+      if (!chasing) {
+        chasing = true
+        orbiting = false
+        bearing = away
+        radius = separation
+      }
+      if (!orbiting) {
+        // Phase one: swing round to behind the flight, a third of what is left
+        // each frame, and stop being told what to do the moment it is there.
+        const gap = wrapAngle(heading + Math.PI - bearing)
+        bearing = wrapAngle(bearing + gap * FLIGHT_TURN)
+        if (Math.abs(gap) <= FLIGHT_LOCKED) {
+          orbiting = true
+          origin = bearing
+          radius = separation
+        }
+      } else {
+        // …and phase two rides round, one way, held inside its window.
+        bearing = wrapAngle(bearing - FLIGHT_ORBIT * (delta ?? 0))
+        const swung = wrapAngle(bearing - origin)
+        if (Math.abs(swung) > FLIGHT_SWING) bearing = origin + Math.sign(swung) * FLIGHT_SWING
+        radius = Math.min(FLIGHT_FAR, Math.max(radius, separation * FLIGHT_CLOSE))
+      }
+      const reach = orbiting ? radius : separation
       const position = new THREE.Vector3(
-        point.x - Math.sin(heading) * FLIGHT_BACK,
-        -point.y + lift,
-        -(point.z - Math.cos(heading) * FLIGHT_BACK)
+        point.x + Math.sin(bearing) * reach,
+        -point.y + reach * Math.tan(elevationOf(FLIGHT_CEILING)),
+        -(point.z + Math.cos(bearing) * reach)
       )
       // The common tail still holds it off the ground — mode 0x12 is the one
       // view exempt from that and this is not it.
       position.y = Math.max(position.y, -query.surface(position.x, -position.z) + CLEARANCE)
-      if (delta === null || !snapped) {
-        at.copy(position)
-        snapped = true
-      } else {
-        at.lerp(position, 1 - Math.exp(-6 * delta))
-      }
+      at.copy(position)
+      snapped = true
       camera.position.copy(at)
       camera.lookAt(new THREE.Vector3(point.x, -point.y, -point.z))
     },
     ride(point, heading, delta) {
+      chasing = false
       // Swing round whatever is in the way. THE REMAKE'S OWN — the original
       // has no line-of-sight test anywhere in its camera code, which was
       // checked (lib/game/sightline.ts says where) — and play asked for it
@@ -837,6 +915,7 @@ export function createChase(
     reset() {
       wait = 0
       snapped = false
+      chasing = false
     }
   }
 }
