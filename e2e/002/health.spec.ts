@@ -18,7 +18,7 @@ import {
 } from '../../src/lib/game/health'
 import { meleeOf } from '../../src/lib/game/melee'
 
-test('a grunt has fifty and a heavy far more — health is the CLASS s', () => {
+test('a grunt has fifty and a heavy far more — health is the CLASS s', { tag: '@nodata' }, () => {
   expect(maxHealthFor(0)).toBe(50)
   expect(maxHealthFor(4)).toBe(130)
   expect(CLASS_HEALTH).toHaveLength(12)
@@ -26,7 +26,7 @@ test('a grunt has fifty and a heavy far more — health is the CLASS s', () => {
   expect(maxHealthFor(99)).toBe(maxHealthFor(0))
 })
 
-test('five bayonet swings put a grunt down, and the fifth is the one', () => {
+test('five bayonet swings put a grunt down, and the fifth is the one', { tag: '@nodata' }, () => {
   const bayonet = meleeOf(3)!
   const pig = { health: maxHealthFor(0) }
   for (let swing = 1; swing <= 4; swing++) {
@@ -38,14 +38,14 @@ test('five bayonet swings put a grunt down, and the fifth is the one', () => {
   expect(pig.health).toBe(0)
 })
 
-test('the training ground will not let a pig fall', () => {
+test('the training ground will not let a pig fall', { tag: '@nodata' }, () => {
   const pig = { health: 10 }
   expect(hurt(pig, 50, true)).toBe('spared')
   expect(pig.health).toBe(TRAINING_FLOOR)
   expect(isDead(pig)).toBe(false)
 })
 
-test('sixty points past dead is a different death', () => {
+test('sixty points past dead is a different death', { tag: '@nodata' }, () => {
   // The exe's test is STRICTLY below −0x1e00 (0x467cb1 is a `jge` out), so
   // exactly sixty under is still the ordinary death.
   const edge = { health: 10 }
@@ -54,7 +54,7 @@ test('sixty points past dead is a different death', () => {
   expect(hurt(pig, 10 - GIB_BELOW + 1, false)).toBe('gibbed')
 })
 
-test('healing has no ceiling, because the exe has none', () => {
+test('healing has no ceiling, because the exe has none', { tag: '@nodata' }, () => {
   const pig = { health: 40 }
   heal(pig, 50)
   expect(pig.health).toBe(90)
@@ -64,7 +64,7 @@ test('healing has no ceiling, because the exe has none', () => {
   expect(pig.health).toBe(90)
 })
 
-test('the dead are stepped over, by pig and by side', () => {
+test('the dead are stepped over, by pig and by side', { tag: '@nodata' }, () => {
   const game = new Game({
     players: [
       { name: 'A', pigNames: ['a1', 'a2'] },

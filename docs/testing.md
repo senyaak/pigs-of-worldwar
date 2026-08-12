@@ -123,8 +123,38 @@ same commit as the dialog.
 - Fabricated game folders (for negative/CLI tests) and all other scratch state
   go under `_tmp/` or `os.tmpdir()`, and are wiped by the spec that made them.
 
+## Two halves: with the game's files, and without — `@nodata`
+
+**Most of this suite cannot run anywhere but here.** It drives the app against
+a real installation of the original, which is the whole point of it: the specs
+assert against the game's own maps, models and text rather than against
+fixtures somebody wrote to match the code.
+
+The other half never touches either. The engine is pure (`src/lib/game/`) —
+parsed data in, numbers out — so a spec can build a battle, step it and assert
+what happened with no window open and no game on disk. **Those tests carry the
+tag `@nodata`**, one per test, and that tag is what a build server runs:
+
+```ts
+test('a low object is a step onto, not a wall', { tag: '@nodata' }, () => {
+```
+
+```bash
+npm run test:nodata   # playwright test --grep @nodata
+npm run nodata        # …and whether that tag is still telling the truth
+```
+
+**The tag is a claim, and `npm run nodata` holds it to the file.** A spec that
+takes the `app` fixture or names `GAME_DIR` can reach the install; one that
+does neither cannot. So a tagged test in the first kind is an error — CI would
+fail on it for a confusing reason — and an untagged test in the second kind is
+an error too, because it is coverage a build server could have had and did not.
+Both are named by `scripts/nodata-check.mjs`, which is run in CI ahead of the
+tests themselves. Write a new engine spec and the check will ask for the tag.
+
 ## Running
 
 ```bash
-npm run test:e2e   # electron-vite build + playwright test
+npm run test:e2e     # electron-vite build + the WHOLE suite, needs the game
+npm run test:nodata  # only the half that needs nothing
 ```

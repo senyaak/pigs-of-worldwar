@@ -2,10 +2,10 @@
 #
 # Not the whole suite: e2e/ is written against a REAL installation of the
 # original game (docs/testing.md) — most of it launches the app and reads the
-# player's own Maps/, and a runner has neither. What it CAN run is the engine
-# half, which is a good third of the specs and all of the rules:
-# `scripts/pure-specs.mjs` works out which those are rather than keeping a list
-# that would drift.
+# player's own Maps/, and a runner has neither. What it CAN run is every test
+# tagged **@nodata**, which is the engine half — the rules, stepped directly,
+# with no window and no game files. The tag is written by hand, one per test,
+# and `npm run nodata` checks that every claim matches the file it is in.
 #
 # LINUX, though the app targets Windows, and the reason is the bill: this repo
 # is private, where a Windows runner costs double. Nothing these steps do is
@@ -49,6 +49,11 @@ jobs:
 
       - run: npm run build
 
+      # The split itself, before it is trusted: a test tagged @nodata that
+      # actually needs the install would fail here for a confusing reason, and
+      # an untagged pure test would silently not run at all.
+      - run: npm run nodata
+
       # No `playwright install` — these specs never open a browser. They step
       # the engine directly and assert numbers.
-      - run: npm run test:pure
+      - run: npm run test:nodata

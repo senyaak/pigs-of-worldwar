@@ -92,7 +92,7 @@ function run(
 /** Flat ground at elevation zero — game space Y-down, so y = 0 is the floor. */
 const flat = (): TerrainQuery => terrain(() => 0)
 
-test('what counts as solid at all', () => {
+test('what counts as solid at all', { tag: '@nodata' }, () => {
   // A structure does.
   expect(isSolid(record({ box: { x: 384, y: 1024, z: 384 } }))).toBe(true)
   // Grass, flowers and the swimming fish carry a box one unit SQUARE — that is
@@ -135,7 +135,7 @@ test('what counts as solid at all', () => {
   expect(isSolid(record({ ...bodiless, name: 'TREEP' })), 'not a walkway at all').toBe(false)
 })
 
-test('a tall object refuses the step, and the pig scrapes along it', () => {
+test('a tall object refuses the step, and the pig scrapes along it', { tag: '@nodata' }, () => {
   const query = flat()
   // A wall of a box across the pig's path, far taller than the envelope.
   const field = new ObstacleField([
@@ -151,7 +151,7 @@ test('a tall object refuses the step, and the pig scrapes along it', () => {
   expect(Math.abs(state.x)).toBeGreaterThan(0)
 })
 
-test('a low object is a step onto, not a wall', () => {
+test('a low object is a step onto, not a wall', { tag: '@nodata' }, () => {
   const query = flat()
   // A slab starting at z 1024, its top exactly at the step-up envelope.
   // The stored y is the box's CENTRE, so half the height sits under it.
@@ -175,7 +175,7 @@ test('a low object is a step onto, not a wall', () => {
   expect(state.y).toBeCloseTo(-WALL_CLIMB, 3)
 })
 
-test('a bridge deck is what a hoof lands on, and it is not the tile under it', () => {
+test('a bridge deck is what a hoof lands on, and it is not the tile under it', { tag: '@nodata' }, () => {
   // The FOOTSTEP's question (lib/game/underfoot.ts): the exe asks the tile and
   // nothing else, and no shipped map carries a wooden tile at all, so a bridge
   // sounding like a bridge is the remake's own line and this is where it is
@@ -211,7 +211,7 @@ test('a bridge deck is what a hoof lands on, and it is not the tile under it', (
   expect(crate.underfoot(state.x, state.z, state.y)).toBeNull()
 })
 
-test('an object over the pig’s head is walked under', () => {
+test('an object over the pig’s head is walked under', { tag: '@nodata' }, () => {
   const query = flat()
   // A deck whose underside clears a pig standing on the floor.
   const clearance = PIG_HEIGHT + 64
@@ -230,7 +230,7 @@ test('an object over the pig’s head is walked under', () => {
   expect(state.y).toBeCloseTo(0, 3)
 })
 
-test('a box is oriented, so its long side stops a pig its short side lets by', () => {
+test('a box is oriented, so its long side stops a pig its short side lets by', { tag: '@nodata' }, () => {
   // A hedge 2048 long and 256 thick, standing 2048 up the pig's path.
   const hedge = record({ name: 'BARBWIRE', x: 0, y: 1024, z: 2048, box: { x: 2048, y: 2048, z: 256 } })
   const walk = (yaw: number, seconds: number): LocomotionState => {
@@ -274,7 +274,7 @@ test('a box is oriented, so its long side stops a pig its short side lets by', (
   expect(walk(QUARTER, APPROACH * 2 + AROUND * 2).z).toBeGreaterThan(2048)
 })
 
-test('a pig is in the way of another pig', () => {
+test('a pig is in the way of another pig', { tag: '@nodata' }, () => {
   const query = flat()
   const standing = [{ x: 0, z: 1024, y: 0 }]
   const field = withPigs(new ObstacleField([]), standing)

@@ -81,7 +81,7 @@ const wallFace = (): TerrainQuery =>
  */
 const lipOf = (): number => 1024 - WALK_SPEED * FRAME_SECONDS + WALL_CLIMB / 4
 
-test('walking is kinematic: pinned to the ground, straight, at walking speed', () => {
+test('walking is kinematic: pinned to the ground, straight, at walking speed', { tag: '@nodata' }, () => {
   const hill = terrain((_x, z) => Math.max(0, z) * 0.5)
   const s = createLocomotion(hill, 0, -400, NORTH)
   run(s, hill, { walk: 1 }, 1)
@@ -96,7 +96,7 @@ test('walking is kinematic: pinned to the ground, straight, at walking speed', (
 // The exe's own numbers, spelled out rather than recomputed from the
 // constants they came from: 64 units a frame asked for, 13/16 of it granted
 // to a grunt, and the backward request clamped to -32 before that scale.
-test('the walking speeds are the exe’s: 52 units a frame, half that back', () => {
+test('the walking speeds are the exe’s: 52 units a frame, half that back', { tag: '@nodata' }, () => {
   const flat = terrain(() => 0)
   // The exe's own two numbers are still exactly there — under one declared
   // factor that is play's and says so (`WALK_SCALE` in game/movement.ts). Take
@@ -116,7 +116,7 @@ test('the walking speeds are the exe’s: 52 units a frame, half that back', () 
   expect(s.clip).toBe(ANIM.WALK_BACK)
 })
 
-test('scramble is the ground underfoot, in every band', () => {
+test('scramble is the ground underfoot, in every band', { tag: '@nodata' }, () => {
   const mud = terrain(() => 0, () => ({ type: 0x2b }))
   const s = createLocomotion(mud, 0, 0, NORTH)
   run(s, mud, {}, 0.2)
@@ -127,7 +127,7 @@ test('scramble is the ground underfoot, in every band', () => {
   expect(s.clip, 'turning on mud scrambles').toBe(ANIM.SCRAMBLE)
 })
 
-test('real water swims: capped at 16 a frame, sunk below the surface', () => {
+test('real water swims: capped at 16 a frame, sunk below the surface', { tag: '@nodata' }, () => {
   const sea = terrain(() => 0, () => ({ type: 0x24 }))
   const s = createLocomotion(sea, 0, 0, NORTH)
   run(s, sea, { walk: 1 }, 1)
@@ -137,7 +137,7 @@ test('real water swims: capped at 16 a frame, sunk below the surface', () => {
   expect(s.y).toBeCloseTo(sea.height(s.x, s.z) + SWIM_SINK)
 })
 
-test('a wall is not a ladder: the step-up envelope is all a pig ever gets', () => {
+test('a wall is not a ladder: the step-up envelope is all a pig ever gets', { tag: '@nodata' }, () => {
   const face = wallFace()
   const s = createLocomotion(face, 0, 1024 - 256, NORTH)
   // Walk in: the step is allowed INTO the face as far as the original's
@@ -172,7 +172,7 @@ test('a wall is not a ladder: the step-up envelope is all a pig ever gets', () =
   expect(Math.abs(s.heading - NORTH), 'the eject turned it').toBeLessThan(1e-6)
 })
 
-test('a wall is scraped along, not oscillated at: the sidestep remembers its side', () => {
+test('a wall is scraped along, not oscillated at: the sidestep remembers its side', { tag: '@nodata' }, () => {
   // The face again, but the pig walks at it OBLIQUELY: forward is refused,
   // and the original's answer (0x4790d9) is to probe both right angles and
   // scrape 8 units a frame along whichever is clear — remembering the side,
@@ -185,7 +185,7 @@ test('a wall is scraped along, not oscillated at: the sidestep remembers its sid
   expect(s.x, 'scraped along the wall to the east').toBeGreaterThan(40)
 })
 
-test('out of the wall, the counter forgets', () => {
+test('out of the wall, the counter forgets', { tag: '@nodata' }, () => {
   const face = wallFace()
   const s = createLocomotion(face, 0, lipOf(), NORTH)
   run(s, face, { walk: 1 }, 4 * FRAME_SECONDS)
@@ -195,7 +195,7 @@ test('out of the wall, the counter forgets', () => {
   expect(s.wedgedSeconds).toBe(0)
 })
 
-test('a landing inside a wall rests but never STANDS UP, and the counter throws it', () => {
+test('a landing inside a wall rests but never STANDS UP, and the counter throws it', { tag: '@nodata' }, () => {
   // A flat world that is ALL wall: nowhere to stand up. What `Map::IsBlocked`
   // gates is the getting-up — the impact handler's own test is the arrival speed
   // and nothing else (`cmp di,19h`, 0x4711d8, then `0x471350` zeroes the
@@ -225,14 +225,14 @@ test('a landing inside a wall rests but never STANDS UP, and the counter throws 
   expect(ejected, 'and the wedge counter threw it out').toBe(true)
 })
 
-test('wedged, the pig grows bouncier; free, it recovers only on landing', () => {
+test('wedged, the pig grows bouncier; free, it recovers only on landing', { tag: '@nodata' }, () => {
   const face = wallFace()
   const s = createLocomotion(face, 0, lipOf(), NORTH)
   run(s, face, { walk: 1 }, 6 * FRAME_SECONDS)
   expect(s.bounciness.restitution).toBeGreaterThan(RESTITUTION_FREE)
 })
 
-test('a jump crouches first, then leaves straight UP and pushes forward', () => {
+test('a jump crouches first, then leaves straight UP and pushes forward', { tag: '@nodata' }, () => {
   // The exe's launch (0x46c199) is pitch 0x400 — vertical, at |nDist|/2 +
   // 0x30 — and the forward half is a separate impulse the pig update adds on
   // the third frame of the fall (0x46e943). Standing still, that is 48 up
@@ -290,7 +290,7 @@ test('a jump crouches first, then leaves straight UP and pushes forward', () => 
   expect(s.airborne, 'and left the ground').not.toBeNull()
 })
 
-test('a RUN-UP does not crouch — it leaves on the frame it is asked', () => {
+test('a RUN-UP does not crouch — it leaves on the frame it is asked', { tag: '@nodata' }, () => {
   // The dispatcher branches on the step it was handed (0x46c220): forward
   // motion goes straight to StartFalling, everything else crouches. So the
   // crouch is the standing hop's, and a run-up has none.
@@ -308,7 +308,7 @@ test('a RUN-UP does not crouch — it leaves on the frame it is asked', () => {
   expect(back.windUp).toBeGreaterThan(0)
 })
 
-test('a running jump leaves faster, by half its walking step', () => {
+test('a running jump leaves faster, by half its walking step', { tag: '@nodata' }, () => {
   // The stride is taken when the key is pressed. It only MATTERS for the
   // crouching kinds, where by launch time the pig has been standing still
   // for the whole wind-up — a launch read off the speed at that moment would
@@ -327,7 +327,7 @@ test('a running jump leaves faster, by half its walking step', () => {
   expect(leap(0).airborne!.vy).toBeCloseTo(-JUMP_SPEED)
 })
 
-test('the get-up plays out when a pig is left alone, and not when it is driven', () => {
+test('the get-up plays out when a pig is left alone, and not when it is driven', { tag: '@nodata' }, () => {
   const flat = terrain(() => 0)
   const land = (): LocomotionState => {
     const s = createLocomotion(flat, 0, 0, NORTH)
@@ -358,7 +358,7 @@ test('the get-up plays out when a pig is left alone, and not when it is driven',
   expect(driven.commit).toBe(false)
 })
 
-test('falling pulls at GRAVITY from rest and stops accelerating at the cap', () => {
+test('falling pulls at GRAVITY from rest and stops accelerating at the cap', { tag: '@nodata' }, () => {
   // The pig's force generator is `(320 - v)/32` a frame, not a constant: at
   // rest that is exactly the flat gravity every other body gets, and far
   // enough down it is nothing at all.
@@ -380,7 +380,7 @@ test('falling pulls at GRAVITY from rest and stops accelerating at the cap', () 
   expect(s.airborne, 'still falling').not.toBeNull()
 })
 
-test('the horizontal bleeds while the fall does not', () => {
+test('the horizontal bleeds while the fall does not', { tag: '@nodata' }, () => {
   // The force's target has no sideways part, so the same 32 frames that cap
   // the fall drag the travel to nothing — a pig thrown off a cliff stops
   // going anywhere long before it lands.
@@ -395,7 +395,7 @@ test('the horizontal bleeds while the fall does not', () => {
   expect(s.airborne!.vz).toBeGreaterThan(0)
 })
 
-test('no jump out of a wall — the ladder is closed', () => {
+test('no jump out of a wall — the ladder is closed', { tag: '@nodata' }, () => {
   const face = wallFace()
   const s = createLocomotion(face, 0, 1024 + 100, NORTH)
   expect(face.walkable(s.x, s.z)).toBe(false)
@@ -405,7 +405,7 @@ test('no jump out of a wall — the ladder is closed', () => {
   expect(s.airborne).toBeNull()
 })
 
-test('walking off a drop keeps 1.5x the walking speed and hands over to ballistics', () => {
+test('walking off a drop keeps 1.5x the walking speed and hands over to ballistics', { tag: '@nodata' }, () => {
   const cliff = terrain((_x, z) => (z > 512 ? -4000 : 0))
   const s = createLocomotion(cliff, 0, 400, NORTH)
   run(s, cliff, { walk: 1 }, 2, (t) => t.airborne !== null)

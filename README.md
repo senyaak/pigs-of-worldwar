@@ -150,10 +150,10 @@ maps like ARTGUN and ICEFLOW.)
 ```bash
 npm install
 npm run dev        # start with HMR
-npm run typecheck  # TypeScript check
-npm run test:pure  # the specs that need no game installed
-npm run test:e2e   # build + the WHOLE suite, against your own installation
-npm run dist       # package a Windows installer and zip into dist/
+npm run typecheck    # TypeScript check
+npm run test:nodata  # the @nodata half — no game installation needed
+npm run test:e2e     # build + the WHOLE suite, against your own installation
+npm run dist         # package a Windows installer and zip into dist/
 ```
 
 The game launches borderless fullscreen. `--windowed` keeps a desktop
@@ -179,7 +179,7 @@ write into itself.
 Two workflows, both Windows, both in [.github/workflows](.github/workflows):
 
 - **CI** on every push and pull request — the domain boundaries, TypeScript,
-  the build, and `npm run test:pure`.
+  the build, and the `@nodata` tests.
 - **Release** on a `v*` tag — the same checks, then the installer and the zip,
   attached to a GitHub Release. The notes are lifted out of
   [CHANGELOG.md](CHANGELOG.md), which is where what-changed is written down;
@@ -194,10 +194,12 @@ git tag v0.1.0 && git push origin v0.1.0
 ```
 
 **The whole e2e suite cannot run on a build server** and is not asked to: it
-drives the real game's own files (docs/testing.md). What CI runs is the engine
-half — the specs that neither launch the app nor read `GAME_DIR`, worked out by
-[scripts/pure-specs.mjs](scripts/pure-specs.mjs) rather than kept in a list
-that would drift. The rest runs here, against a real installation.
+drives the real game's own files (docs/testing.md). The engine half needs
+neither the app nor those files, and **each of those tests says so with a
+`@nodata` tag** — 126 of them today. That tag is what CI runs, and
+[scripts/nodata-check.mjs](scripts/nodata-check.mjs) checks that every claim
+still matches the spec it is in, both ways round. The rest runs here, against
+a real installation.
 
 ## Status
 

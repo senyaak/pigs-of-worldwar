@@ -42,7 +42,8 @@ jobs:
       # one moment where shipping something broken costs somebody else's time.
       - run: npm run boundaries
       - run: npm run typecheck
-      - run: npm run test:pure
+      - run: npm run nodata
+      - run: npm run test:nodata
 
       # The tag IS the version, and the changelog IS the notes — so both have to
       # be there before a single minute is spent packaging.

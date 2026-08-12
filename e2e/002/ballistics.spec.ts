@@ -28,13 +28,13 @@ import {
   slopePull
 } from '../../src/lib/game/ballistics'
 
-test('the wedged pig is the slippery one, and the free pig the grippy one', () => {
+test('the wedged pig is the slippery one, and the free pig the grippy one', { tag: '@nodata' }, () => {
   expect(FRICTION_STUCK).toBeLessThan(FRICTION_FREE)
   expect(RESTITUTION_STUCK).toBeGreaterThan(RESTITUTION_FREE)
   expect(RESTITUTION_MIN).toBeLessThan(RESTITUTION_FREE)
 })
 
-test('pressed into a wall, a pig reaches full bounciness within a few frames', () => {
+test('pressed into a wall, a pig reaches full bounciness within a few frames', { tag: '@nodata' }, () => {
   let state = FREE
   for (let frame = 0; frame < 3; frame++) {
     state = easeBounciness(state, true, false, FRAME_SECONDS)
@@ -45,7 +45,7 @@ test('pressed into a wall, a pig reaches full bounciness within a few frames', (
   expect(easeBounciness(FREE, true, false, FRAME_SECONDS).restitution).toBeLessThan(RESTITUTION_STUCK)
 })
 
-test('the bounciness survives the flight and only resets on landing', () => {
+test('the bounciness survives the flight and only resets on landing', { tag: '@nodata' }, () => {
   const wedged = easeBounciness(easeBounciness(FREE, true, false, FRAME_SECONDS * 3), true, false, FRAME_SECONDS)
   // Thrown clear: in the air, nothing is reset.
   const flying = easeBounciness(wedged, false, false, FRAME_SECONDS)
@@ -54,13 +54,13 @@ test('the bounciness survives the flight and only resets on landing', () => {
   expect(easeBounciness(flying, false, true, FRAME_SECONDS)).toEqual(FREE)
 })
 
-test('a landing bounces in proportion to how bouncy the pig is, or not at all', () => {
+test('a landing bounces in proportion to how bouncy the pig is, or not at all', { tag: '@nodata' }, () => {
   expect(bounceSpeed(1000, RESTITUTION_STUCK)).toBeGreaterThan(bounceSpeed(1000, RESTITUTION_FREE))
   expect(bounceSpeed(1000, RESTITUTION_MIN)).toBe(0)
   expect(bounceSpeed(1000, 0)).toBe(0)
 })
 
-test('a bounce is a hop, not a relaunch: it never returns most of the impact', () => {
+test('a bounce is a hop, not a relaunch: it never returns most of the impact', { tag: '@nodata' }, () => {
   // The exe's `>> 3` is damping, not a unit conversion. Without it a pig
   // wedged at 0.85 keeps enough speed to sail off the map.
   expect(bounceSpeed(1000, RESTITUTION_STUCK)).toBeLessThan(1000 / 4)
@@ -70,21 +70,21 @@ test('a bounce is a hop, not a relaunch: it never returns most of the impact', (
   expect(speed).toBeLessThan(1)
 })
 
-test('the eject waits under a second — the original waits 25 frames', () => {
+test('the eject waits under a second — the original waits 25 frames', { tag: '@nodata' }, () => {
   expect(EJECT_SECONDS).toBeCloseTo(25 * FRAME_SECONDS)
   // A bound on the FRAME RATE, which is the remake's knob — the exe only
   // ever says 25 frames. Loose enough to say "a beat, not a stall".
   expect(EJECT_SECONDS).toBeLessThan(2)
 })
 
-test('a jump costs a cooldown, and it is shorter than being wedged', () => {
+test('a jump costs a cooldown, and it is shorter than being wedged', { tag: '@nodata' }, () => {
   // 15 frames of recharge against the 25 a wall takes to give up on you.
   expect(JUMP_COOLDOWN_SECONDS).toBeCloseTo(15 * FRAME_SECONDS)
   expect(JUMP_COOLDOWN_SECONDS).toBeLessThan(EJECT_SECONDS)
   expect(JUMP_COOLDOWN_SECONDS).toBeGreaterThan(0)
 })
 
-test('a hit reflects across the normal and keeps what runs along the surface', () => {
+test('a hit reflects across the normal and keeps what runs along the surface', { tag: '@nodata' }, () => {
   const FLAT = { x: 0, y: -1, z: 0 } // game space: up is -y
   const down = { x: 300, y: 900, z: 0 } // moving forward AND falling
 
@@ -107,7 +107,7 @@ test('a hit reflects across the normal and keeps what runs along the surface', (
   expect(bounceOff(up, { friction: 0.25, restitution: RESTITUTION_STUCK }, GROUND_DEFAULT, FLAT)).toEqual(up)
 })
 
-test('gravity along a slope is what keeps a landed pig moving', () => {
+test('gravity along a slope is what keeps a landed pig moving', { tag: '@nodata' }, () => {
   const FLAT = { x: 0, y: -1, z: 0 }
   // On the level there is nothing left over sideways: a pig stops.
   const level = slopePull(FLAT, 0, 5000, 0.1)
@@ -127,7 +127,7 @@ test('gravity along a slope is what keeps a landed pig moving', () => {
   expect(slopePull(steeper, 0, 5000, 0.1).x).toBeGreaterThan(pull.x)
 })
 
-test('friction holds a pig on gentle ground and lets go on steep', () => {
+test('friction holds a pig on gentle ground and lets go on steep', { tag: '@nodata' }, () => {
   const gentle = { x: 0.05 / Math.hypot(0.05, 1), y: -1 / Math.hypot(0.05, 1), z: 0 }
   // Shallower than the coefficient: nothing to slide down.
   expect(slopePull(gentle, FRICTION_FREE, 5000, 0.1)).toEqual({ x: 0, y: 0, z: 0 })
@@ -138,7 +138,7 @@ test('friction holds a pig on gentle ground and lets go on steep', () => {
   expect(slopePull(middling, FRICTION_STUCK, 5000, 0.1).x).toBeGreaterThan(0)
 })
 
-test('the landing threshold is the exe own 25 a frame, not a number we liked', () => {
+test('the landing threshold is the exe own 25 a frame, not a number we liked', { tag: '@nodata' }, () => {
   // 0x4711d8: under 25 the impact handler gets the pig up, at or over it the
   // bounce runs. The exe counts per logic frame; we count per second.
   expect(BOUNCE_CUTOFF).toBeCloseTo(0x19 / FRAME_SECONDS)
@@ -150,7 +150,7 @@ test('the landing threshold is the exe own 25 a frame, not a number we liked', (
   expect(bounceOff(hard, { friction: 0, restitution: RESTITUTION_STUCK }, GROUND_DEFAULT, FLAT).y, 'a hard one comes back up').toBeLessThan(0)
 })
 
-test('the ground brings its own material, and it depends on the terrain', () => {
+test('the ground brings its own material, and it depends on the terrain', { tag: '@nodata' }, () => {
   // Twelve real entries, all of them sane fractions; past 11 the bytes at
   // 0x4c0088 are something else and must not be read as a material.
   expect(TILE_MATERIALS).toHaveLength(12)

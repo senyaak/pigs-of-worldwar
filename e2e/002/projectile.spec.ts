@@ -17,7 +17,7 @@ import {
   spentShot
 } from '../../src/lib/game/projectile'
 
-test('a gun is a gun and a grenade is not', () => {
+test('a gun is a gun and a grenade is not', { tag: '@nodata' }, () => {
   expect(isGun(7)).toBe(true)
   expect(isGun(11)).toBe(true)
   // 3 BAYONET swings, 19 GRENADE has a power gauge — neither belongs here.
@@ -26,7 +26,7 @@ test('a gun is a gun and a grenade is not', () => {
   expect(isGun(null)).toBe(false)
 })
 
-test('the sniper rifle reaches three times as far, on the same speed', () => {
+test('the sniper rifle reaches three times as far, on the same speed', { tag: '@nodata' }, () => {
   const rifle = projectileOf(7)!
   const sniper = projectileOf(11)!
   expect(rifle.speed).toBe(sniper.speed)
@@ -36,7 +36,7 @@ test('the sniper rifle reaches three times as far, on the same speed', () => {
   expect(rangeOf(rifle)).toBeCloseTo(9000)
 })
 
-test('a level shot goes straight out along the pig facing', () => {
+test('a level shot goes straight out along the pig facing', { tag: '@nodata' }, () => {
   // Heading 0 is +z, the same forward every step a pig takes uses.
   const shot = fireShot(7, { x: 100, y: -50, z: 200 }, 0, 0)!
   expect(shot.vx).toBeCloseTo(0)
@@ -47,7 +47,7 @@ test('a level shot goes straight out along the pig facing', () => {
   expect(shot.y).toBeCloseTo(-50)
 })
 
-test('aiming UP sends it up — y counts DOWN in this space', () => {
+test('aiming UP sends it up — y counts DOWN in this space', { tag: '@nodata' }, () => {
   const up = fireShot(7, { x: 0, y: 0, z: 0 }, 0, AIM_UNITS / 8)! // 45 degrees
   expect(up.vy).toBeLessThan(0)
   expect(Math.abs(up.vy)).toBeCloseTo(up.vz)
@@ -55,7 +55,7 @@ test('aiming UP sends it up — y counts DOWN in this space', () => {
   expect(down.vy).toBeGreaterThan(0)
 })
 
-test('it expires by FRAMES, which is the only range there is', () => {
+test('it expires by FRAMES, which is the only range there is', { tag: '@nodata' }, () => {
   const shot = fireShot(7, { x: 0, y: 0, z: 0 }, 0, 0)!
   for (let frame = 0; frame < 29; frame++) advanceShot(shot, FRAME_SECONDS)
   expect(spentShot(shot)).toBe(false)
@@ -64,12 +64,12 @@ test('it expires by FRAMES, which is the only range there is', () => {
   expect(shot.z).toBeCloseTo(rangeOf(projectileOf(7)!))
 })
 
-test('a long frame does not let a bullet outlive its range', () => {
+test('a long frame does not let a bullet outlive its range', { tag: '@nodata' }, () => {
   const shot = fireShot(12, { x: 0, y: 0, z: 0 }, 0, 0)! // fifteen frames
   advanceShot(shot, FRAME_SECONDS * 20)
   expect(spentShot(shot)).toBe(true)
 })
 
-test('nothing that is not a gun fires', () => {
+test('nothing that is not a gun fires', { tag: '@nodata' }, () => {
   expect(fireShot(3, { x: 0, y: 0, z: 0 }, 0, 0)).toBeNull()
 })

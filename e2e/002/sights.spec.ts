@@ -49,7 +49,7 @@ const typically = (frames: number): number => {
   return sum / 20
 }
 
-test('only the two zooming skills zoom, and they creep to the cap', () => {
+test('only the two zooming skills zoom, and they creep to the cap', { tag: '@nodata' }, () => {
   expect(zoomsIn(11)).toBe(true)
   expect(zoomsIn(64)).toBe(true)
   expect(zoomsIn(19)).toBe(false)
@@ -67,7 +67,7 @@ test('only the two zooming skills zoom, and they creep to the cap', () => {
   expect(zoom.value).toBe(0)
 })
 
-test('a step lands once an ENGINE frame, and a fraction owes', () => {
+test('a step lands once an ENGINE frame, and a fraction owes', { tag: '@nodata' }, () => {
   const wobble = createWobble()
   const random = rolling()
   // Half a frame is nothing yet; the other half pays for it.
@@ -81,7 +81,7 @@ test('a step lands once an ENGINE frame, and a fraction owes', () => {
   expect(one).toBeGreaterThan(0)
 })
 
-test('it WANDERS, and nothing brings it back', () => {
+test('it WANDERS, and nothing brings it back', { tag: '@nodata' }, () => {
   // A walk of small steps: a rattle frame to frame, a drift over seconds, and no
   // centre anywhere in it. "ЦЕНТРА ВООБЩЕ НЕ ДОЛЖНО БЫТЬ."
   const wobble = createWobble()
@@ -102,7 +102,7 @@ test('it WANDERS, and nothing brings it back', () => {
   expect(both.pitch).not.toBeCloseTo(both.yaw, 6)
 })
 
-test('lowering the sights owes nothing - the aim keeps what the tremor put there', () => {
+test('lowering the sights owes nothing - the aim keeps what the tremor put there', { tag: '@nodata' }, () => {
   // There is nothing to put back: the tremor IS the aim now. Stopping the steps is
   // all that lowering the sights does, and the fuse holds the same way - `Pig::Aim`
   // is refused from the press to the attack.
@@ -112,7 +112,7 @@ test('lowering the sights owes nothing - the aim keeps what the tremor put there
   expect(wobble.owed).toBe(0)
 })
 
-test('a weapon brings its own LAYER, and only two of them have an aim view', () => {
+test('a weapon brings its own LAYER, and only two of them have an aim view', { tag: '@nodata' }, () => {
   // Play's model: "каждое оружие — свой контроллер; можно ведь комбинировать их,
   // movement + melee или movement + gun?" This is that table.
   expect(weaponLayer(3)).toBe('melee')
@@ -138,7 +138,7 @@ test('a weapon brings its own LAYER, and only two of them have an aim view', () 
   expect(layerSights('lob')).toBe(true)
 })
 
-test('the VIEW key is inert unless the weapon aims', () => {
+test('the VIEW key is inert unless the weapon aims', { tag: '@nodata' }, () => {
   // Play: "g, по-моему, для без оружия и для штыка например — вроде тоже двигало
   // камеру." It must not, and this is the rule that says so: `sighting` is what
   // the camera reads (three/battle.ts picks `lob`/`throw` off it and off the

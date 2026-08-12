@@ -278,11 +278,15 @@ as floors where savegame churn could move them and exactly where it cannot.
 npm run typecheck && npm run build && npx playwright test
 ```
 
-**A build server runs the half of that suite it can.** `npm run test:pure`
-runs every spec that neither takes the `app` fixture nor names `GAME_DIR` —
-worked out by `scripts/pure-specs.mjs`, never kept as a list — and that is
-what `.github/workflows/ci.yml` runs beside the boundaries, the typecheck and
-the build. The rest needs the installation and stays here. **A `v*` tag builds
+**A test says for itself whether it needs the game — `@nodata`.** The engine
+half is pure, so it runs with no window and no installation; those tests carry
+the tag and `npm run test:nodata` is what a build server runs
+(`.github/workflows/ci.yml`, beside the boundaries, the typecheck and the
+build). Everything else drives the real thing and stays here. **The tag is a
+CLAIM and `npm run nodata` checks it both ways**: tagged in a spec that takes
+the `app` fixture or names `GAME_DIR` is wrong, and untagged in a spec that
+does neither is coverage thrown away. Write an engine spec, tag it; the check
+asks otherwise (docs/testing.md). **A `v*` tag builds
 a release** (`.github/workflows/release.yml`, `electron-builder.yml`): a
 Windows installer and a zip, carrying no game data. The notes are the matching
 section of `CHANGELOG.md` — so a version is written up THERE before it is

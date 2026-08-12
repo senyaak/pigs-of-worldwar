@@ -23,14 +23,14 @@ const STRIDE = 200
 /** Ground that climbs `perStride` world units for every STRIDE walked north. */
 const slope = (perStride: number): TerrainQuery => terrain((_x, z) => (z * perStride) / STRIDE)
 
-test('flat ground: the step just happens, the whole way', () => {
+test('flat ground: the step just happens, the whole way', { tag: '@nodata' }, () => {
   const move = step(terrain(() => 0), 0, 0, NORTH, STRIDE)
   expect(move.outcome).toBe('moved')
   expect(move.z).toBeCloseTo(STRIDE)
   expect(move.x).toBeCloseTo(0)
 })
 
-test('a steep climb is still just a step — terrain height never refuses', () => {
+test('a steep climb is still just a step — terrain height never refuses', { tag: '@nodata' }, () => {
   // Four times the exe's object step-up allowance, and it walks straight up.
   const move = step(slope(512), 0, 0, NORTH, STRIDE)
   expect(move.outcome).toBe('moved')
@@ -38,19 +38,19 @@ test('a steep climb is still just a step — terrain height never refuses', () =
   expect(move.z).toBeCloseTo(STRIDE)
 })
 
-test('a drop deeper than the step-down is walked off, not stopped at', () => {
+test('a drop deeper than the step-down is walked off, not stopped at', { tag: '@nodata' }, () => {
   const move = step(slope(-(STEP_DOWN + 18)), 0, 0, NORTH, STRIDE)
   expect(move.outcome).toBe('falling')
   expect(move.z).toBeCloseTo(STRIDE)
 })
 
-test('a drop within the step-down is just a step down', () => {
+test('a drop within the step-down is just a step down', { tag: '@nodata' }, () => {
   const move = step(slope(-(STEP_DOWN - 7)), 0, 0, NORTH, STRIDE)
   expect(move.outcome).toBe('moved')
   expect(move.z).toBeCloseTo(STRIDE)
 })
 
-test('a wall does not refuse the step — nothing about the ground does', () => {
+test('a wall does not refuse the step — nothing about the ground does', { tag: '@nodata' }, () => {
   // Shape 0: every tile north of z = 512 is solid all through. The step goes
   // in anyway. `0x415590` makes that ground friction 0.01 and restitution
   // 0.99 instead of stopping anyone, and the scene throws the pig back out.
@@ -73,7 +73,7 @@ test('a wall does not refuse the step — nothing about the ground does', () => 
   expect(step(ledge, 0, 400, NORTH, STRIDE).outcome).toBe('falling')
 })
 
-test('a shaped wall is that surface over only its own half of the tile', () => {
+test('a shaped wall is that surface over only its own half of the tile', { tag: '@nodata' }, () => {
   // Shape 3 is solid where tz > 0.5, and tz runs +z: the half of the tile
   // furthest along +z. That tile spans z = 512..1024.
   const shaped = terrain(
@@ -88,14 +88,14 @@ test('a shaped wall is that surface over only its own half of the tile', () => {
   expect(step(shaped, 0, 400, NORTH, 500).outcome).toBe('moved')
 })
 
-test('the world limit refuses the step rather than sliding along it', () => {
+test('the world limit refuses the step rather than sliding along it', { tag: '@nodata' }, () => {
   const east = Math.PI / 2
   const move = step(terrain(() => 0), WORLD_LIMIT, 0, east, STRIDE)
   expect(move.outcome).toBe('limit')
   expect(move.x).toBe(WORLD_LIMIT)
 })
 
-test('an edge is seen a walking step ahead, not a frame ahead', () => {
+test('an edge is seen a walking step ahead, not a frame ahead', { tag: '@nodata' }, () => {
   // The drop starts one LOOK_AHEAD north of the pig, and is deep enough to
   // clear STEP_DOWN over that distance but not over a tenth of it.
   const cliff = terrain((_x, z) => (z > LOOK_AHEAD ? 0 : -20 * STEP_DOWN))

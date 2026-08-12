@@ -28,7 +28,7 @@ const frames = (effect: ReturnType<typeof beginEffect>, n: number): void => {
   for (let i = 0; i < n; i++) advanceEffect(effect, EXE_FRAME_SECONDS)
 }
 
-test('each melee weapon throws its own id and its own row', () => {
+test('each melee weapon throws its own id and its own row', { tag: '@nodata' }, () => {
   // Not the grouping the impact SOUNDS use — the bayonet shares I_STAB with
   // the knife and the prod, and shares its ring with neither.
   expect(hitEffectOf(1)).toMatchObject({ id: 0x37, kind: 0x0b })
@@ -41,13 +41,13 @@ test('each melee weapon throws its own id and its own row', () => {
   expect(hitEffectOf(null)).toBeNull()
 })
 
-test('the bayonet throws two rings and the sword three', () => {
+test('the bayonet throws two rings and the sword three', { tag: '@nodata' }, () => {
   expect(hitEffectOf(3)!.rings).toHaveLength(2)
   expect(hitEffectOf(4)!.rings).toHaveLength(3)
   expect(hitEffectOf(5)!.rings).toHaveLength(3)
 })
 
-test('the second ring is born three frames after the first', () => {
+test('the second ring is born three frames after the first', { tag: '@nodata' }, () => {
   const effect = beginEffect(hitEffectOf(3)!, { x: 0, y: 0, z: 0 })
   expect(effect.rings).toHaveLength(0)
   frames(effect, 1)
@@ -58,7 +58,7 @@ test('the second ring is born three frames after the first', () => {
   expect(effect.rings).toHaveLength(2)
 })
 
-test('a bayonet ring grows 25 a frame and lives seven of them', () => {
+test('a bayonet ring grows 25 a frame and lives seven of them', { tag: '@nodata' }, () => {
   const effect = beginEffect(hitEffectOf(3)!, { x: 100, y: -50, z: 200 })
   frames(effect, 1)
   const [first] = effect.rings
@@ -74,7 +74,7 @@ test('a bayonet ring grows 25 a frame and lives seven of them', () => {
   expect(effect.rings.map((one) => one.age)).not.toContain(112)
 })
 
-test("the sword's big rings SLOW as they go out — the only negative drift", () => {
+test("the sword's big rings SLOW as they go out — the only negative drift", { tag: '@nodata' }, () => {
   const effect = beginEffect(hitEffectOf(4)!, { x: 0, y: 0, z: 0 })
   frames(effect, 1)
   const one = effect.rings[0]
@@ -85,7 +85,7 @@ test("the sword's big rings SLOW as they go out — the only negative drift", ()
   expect(one.age).toBeLessThan(RING_DEAD)
 })
 
-test('a hit is a white flash that collapses into the row own colour', () => {
+test('a hit is a white flash that collapses into the row own colour', { tag: '@nodata' }, () => {
   const effect = beginEffect(hitEffectOf(3)!, { x: 0, y: 0, z: 0 })
   frames(effect, 1)
   const one = effect.rings[0]
@@ -106,7 +106,7 @@ test('a hit is a white flash that collapses into the row own colour', () => {
   expect(b).toBeLessThan(0.3)
 })
 
-test('an effect is spent once its last ring has gone', () => {
+test('an effect is spent once its last ring has gone', { tag: '@nodata' }, () => {
   const effect = beginEffect(hitEffectOf(3)!, { x: 0, y: 0, z: 0 })
   expect(spent(effect)).toBe(false)
   frames(effect, 30)
@@ -114,7 +114,7 @@ test('an effect is spent once its last ring has gone', () => {
   expect(spent(effect)).toBe(true)
 })
 
-test('a BLAST and a BREAKING are the same parameter row', () => {
+test('a BLAST and a BREAKING are the same parameter row', { tag: '@nodata' }, () => {
   // Both ids land on the same init arm — 0x488f80, `push 0; call 0x48ccc0` —
   // so what separates them is the id and nothing about the look.
   expect(BREAK_EFFECT.id).toBe(0x3e)
@@ -125,14 +125,14 @@ test('a BLAST and a BREAKING are the same parameter row', () => {
   expect(BLAST_EFFECT.bursts).toEqual(BREAK_EFFECT.bursts)
 })
 
-test('row 0 has no ring in it, and five stages that are not rings', () => {
+test('row 0 has no ring in it, and five stages that are not rings', { tag: '@nodata' }, () => {
   // F, G and H are off, which is why a hit and a blast look nothing alike.
   expect(BREAK_EFFECT.rings).toHaveLength(0)
   expect(BREAK_EFFECT.clouds).toHaveLength(2)
   expect(BREAK_EFFECT.bursts).toHaveLength(3)
 })
 
-test('the fireball is a hundred and forty sprites, and it comes first', () => {
+test('the fireball is a hundred and forty sprites, and it comes first', { tag: '@nodata' }, () => {
   const effect = beginEffect(BLAST_EFFECT, { x: 0, y: -100, z: 0 })
   frames(effect, 1)
   // Stage B on frame 1: seventy sprites, dark red.
@@ -145,7 +145,7 @@ test('the fireball is a hundred and forty sprites, and it comes first', () => {
   expect(effect.clouds[0].blobs.length + effect.clouds[1].blobs.length).toBe(140)
 })
 
-test('the fireball goes UP, and gravity brings it back', () => {
+test('the fireball goes UP, and gravity brings it back', { tag: '@nodata' }, () => {
   // The engine's world has +y up — all three of its force generators point
   // (0,-1,0) — so the byte it subtracts from the vertical is gravity. Game
   // space is Y-down, so a rising sprite has a NEGATIVE y velocity here.
@@ -176,7 +176,7 @@ test('the fireball goes UP, and gravity brings it back', () => {
   }
 })
 
-test('a fireball SHRINKS over twenty frames and then is gone', () => {
+test('a fireball SHRINKS over twenty frames and then is gone', { tag: '@nodata' }, () => {
   const effect = beginEffect(BLAST_EFFECT, { x: 0, y: 0, z: 0 })
   frames(effect, 1)
   const cloud = effect.clouds[0]
@@ -194,7 +194,7 @@ test('a fireball SHRINKS over twenty frames and then is gone', () => {
   expect(effect.clouds).toHaveLength(0)
 })
 
-test('a cloud does not flash the way a ring does', () => {
+test('a cloud does not flash the way a ring does', { tag: '@nodata' }, () => {
   // A ring divides its colour by its age and so is blinding on frame one; a
   // cloud's law is flat, `c * 400 >> 6`, so the brightest anything gets is 193
   // rather than 255.
@@ -203,7 +203,7 @@ test('a cloud does not flash the way a ring does', () => {
   expect(cloudChannel(31)).toBe(193)
 })
 
-test('the smoke bursts come after the fireball, and none of them falls', () => {
+test('the smoke bursts come after the fireball, and none of them falls', { tag: '@nodata' }, () => {
   const effect = beginEffect(BREAK_EFFECT, { x: 0, y: 0, z: 0 })
   frames(effect, 1)
   expect(effect.smoke).toHaveLength(0)
@@ -215,7 +215,7 @@ test('the smoke bursts come after the fireball, and none of them falls', () => {
   expect(effect.smoke.every((one) => one.gravity === 0)).toBe(true)
 })
 
-test('the smoke goes out, and the effect with it', () => {
+test('the smoke goes out, and the effect with it', { tag: '@nodata' }, () => {
   const effect = beginEffect(BREAK_EFFECT, { x: 0, y: 0, z: 0 })
   frames(effect, 3)
   expect(spent(effect)).toBe(false)
@@ -226,7 +226,7 @@ test('the smoke goes out, and the effect with it', () => {
   expect(spent(effect)).toBe(true)
 })
 
-test('a long frame does not let a stage go by unfired', () => {
+test('a long frame does not let a stage go by unfired', { tag: '@nodata' }, () => {
   // The engine counts FRAMES; a renderer that stalls hands back a delta worth
   // several, and both rings must still be born.
   const effect = beginEffect(hitEffectOf(4)!, { x: 0, y: 0, z: 0 })

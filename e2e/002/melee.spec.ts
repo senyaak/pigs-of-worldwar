@@ -27,14 +27,14 @@ const BAYONET = 3
 /** Clip 22 is 36 frames; at the flat 25 the renderer plays everything at. */
 const SWING_SECONDS = 36 / 25
 
-test('only the five hand-to-hand skills swing', () => {
+test('only the five hand-to-hand skills swing', { tag: '@nodata' }, () => {
   for (const skill of [1, 2, 3, 4, 5]) expect(meleeOf(skill)).not.toBeNull()
   // A rifle, a grenade, empty hands: nothing to swing.
   for (const skill of [0, 6, 7, 19, 29, 65]) expect(meleeOf(skill)).toBeNull()
   expect(meleeOf(null)).toBeNull()
 })
 
-test('the bayonet reaches furthest and hits softest', () => {
+test('the bayonet reaches furthest and hits softest', { tag: '@nodata' }, () => {
   const bayonet = meleeOf(BAYONET)!
   const sword = meleeOf(4)!
   expect(bayonet.clip).toBe(22)
@@ -43,7 +43,7 @@ test('the bayonet reaches furthest and hits softest', () => {
   expect(bayonet.damage).toBeLessThan(sword.damage)
 })
 
-test('the blade is sampled along its length, halved toward zero', () => {
+test('the blade is sampled along its length, halved toward zero', { tag: '@nodata' }, () => {
   const points = strikeOffsets(meleeOf(BAYONET)!)
   expect(points).toEqual([
     { x: 32, y: 40, z: 460 },
@@ -52,7 +52,7 @@ test('the blade is sampled along its length, halved toward zero', () => {
   ])
 })
 
-test('nothing happens for ten frames, and then the clip goes on', () => {
+test('nothing happens for ten frames, and then the clip goes on', { tag: '@nodata' }, () => {
   const swing = beginSwing(BAYONET, SWING_SECONDS)!
   expect(SWING_DELAY).toBeCloseTo(SWING_DELAY_FRAMES * FRAME_SECONDS)
   let frames = 0
@@ -66,7 +66,7 @@ test('nothing happens for ten frames, and then the clip goes on', () => {
   expect(frames + 1).toBe(SWING_DELAY_FRAMES)
 })
 
-test('four strikes, the first with a whoosh and the last a release', () => {
+test('four strikes, the first with a whoosh and the last a release', { tag: '@nodata' }, () => {
   const swing = beginSwing(BAYONET, SWING_SECONDS)!
   const seen: string[] = []
   // Two seconds is well past the wind-up plus the clip.
@@ -80,13 +80,13 @@ test('four strikes, the first with a whoosh and the last a release', () => {
   expect(seen.filter((e) => e === 'done')).toHaveLength(1)
 })
 
-test('the strikes fall in the first half of the clip, four frames apart', () => {
+test('the strikes fall in the first half of the clip, four frames apart', { tag: '@nodata' }, () => {
   const phases = STRIKE_PHASES[22]
   const frames = phases.map((phase) => Math.round((phase / PHASE_UNITS) * 36))
   expect(frames).toEqual([11, 12, 13, 14])
 })
 
-test('a body in front, within the box, is struck', () => {
+test('a body in front, within the box, is struck', { tag: '@nodata' }, () => {
   const points = [{ x: 0, y: 0, z: 400 }]
   const attacker = { x: 0, z: 0, heading: 0 }
   expect(struck(points, attacker, { x: 0, y: 0, z: 400 })).toBe(true)
@@ -97,7 +97,7 @@ test('a body in front, within the box, is struck', () => {
   expect(struck(points, attacker, { x: 0, y: STRIKE_RISE, z: 400 })).toBe(false)
 })
 
-test('the vertical hardly refuses at all, and that is the exe', () => {
+test('the vertical hardly refuses at all, and that is the exe', { tag: '@nodata' }, () => {
   // 360 against a pig 320 tall: anything within a body height of the blade is
   // caught. It is why the aim angle would decide almost nothing even if the
   // strike read it — and it does not read it (lib/game/melee.ts).
@@ -108,7 +108,7 @@ test('the vertical hardly refuses at all, and that is the exe', () => {
   expect(struck(blade, attacker, { x: 0, y: -500, z: 460 })).toBe(false)
 })
 
-test('and a body behind the pig is not, however close the blade', () => {
+test('and a body behind the pig is not, however close the blade', { tag: '@nodata' }, () => {
   // Same point, but the attacker is looking the other way: the bearing test
   // is what refuses it (0x475ff9).
   const points = [{ x: 0, y: 0, z: 400 }]

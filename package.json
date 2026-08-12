@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "boundaries": "node scripts/boundaries.mjs",
     "test:e2e": "npm run boundaries && electron-vite build && playwright test",
-    "test:pure": "node scripts/pure-specs.mjs",
+    "nodata": "node scripts/nodata-check.mjs",
+    "test:nodata": "playwright test --grep @nodata",
     "dist": "electron-vite build && electron-builder --win --publish never"
   },
   "license": "MIT",

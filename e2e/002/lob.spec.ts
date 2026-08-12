@@ -50,7 +50,7 @@ const dropped = (vy: number, vx = 0): Lobbed => ({
   sinking: 0
 })
 
-test('a grenade brings its own material, and it is not near-elastic', () => {
+test('a grenade brings its own material, and it is not near-elastic', { tag: '@nodata' }, () => {
   // Row +0x20 and +0x22 of the projectile table: 0.30 and 0.80.
   expect(ROW.friction).toBeCloseTo(0.3, 3)
   expect(ROW.restitution).toBeCloseTo(0.8, 3)
@@ -58,7 +58,7 @@ test('a grenade brings its own material, and it is not near-elastic', () => {
   expect(lobOf(26)!.restitution).toBeCloseTo(0.001, 3)
 })
 
-test('the surface multiplies its half in, so grass is not stone', () => {
+test('the surface multiplies its half in, so grass is not stone', { tag: '@nodata' }, () => {
   // The solver's combine is a plain product of the two bodies' pairs
   // (0x40f690), which is why the tile matters at all.
   const grass = lobSurface(0)
@@ -71,7 +71,7 @@ test('the surface multiplies its half in, so grass is not stone', () => {
   expect(-shot.vy / 1000).toBeCloseTo(0.32, 2)
 })
 
-test('the same throw on a different tile bounces differently', () => {
+test('the same throw on a different tile bounces differently', { tag: '@nodata' }, () => {
   // Tile 4 is the dead one: restitution 0.10 against grass's 0.40.
   const soft = dropped(1000)
   bounceLob(soft, 0, UP, 4, false, lobBounce(ROW))
@@ -80,7 +80,7 @@ test('the same throw on a different tile bounces differently', () => {
   expect(-soft.vy).toBeLessThan(-grass.vy / 3)
 })
 
-test('friction is a Coulomb IMPULSE, capped by the normal one', () => {
+test('friction is a Coulomb IMPULSE, capped by the normal one', { tag: '@nodata' }, () => {
   // The solver normalises the tangential and takes the friction product in as a
   // scalar (0x4110c1, 0x40f980), with restitution entering as (1 + e). So what
   // comes off the slide is mu * (1 + e) * |vn| — bounded by the contact, not a
@@ -93,7 +93,7 @@ test('friction is a Coulomb IMPULSE, capped by the normal one', () => {
   expect(shot.vx).toBeCloseTo(4000 - mu * (1 + e) * 1000, 3)
 })
 
-test('...which is why it ROLLS — play: "гранаты не катаются совсем"', () => {
+test('...which is why it ROLLS — play: "гранаты не катаются совсем"', { tag: '@nodata' }, () => {
   // At rest on flat ground the contact carries only gravity's own increment, so
   // the friction impulse available each frame is tiny. A flat fraction of the
   // slide took an eighth off every frame regardless and stopped it dead.
@@ -108,7 +108,7 @@ test('...which is why it ROLLS — play: "гранаты не катаются �
   expect(4000 * Math.pow(1 - 0.12, 30)) .toBeLessThan(4000 * 0.05)
 })
 
-test('a contact already leaving is not resolved twice', () => {
+test('a contact already leaving is not resolved twice', { tag: '@nodata' }, () => {
   // The scene sub-steps by the grenade's own size, so the same contact comes
   // back several frames running; taking friction off each time is what used to
   // eat the roll.
@@ -118,7 +118,7 @@ test('a contact already leaving is not resolved twice', () => {
   expect(shot.vy).toBe(-500)
 })
 
-test('thrown FLAT it skips off water — the frog, and it is the engine own', () => {
+test('thrown FLAT it skips off water — the frog, and it is the engine own', { tag: '@nodata' }, () => {
   // 0x437e5d's last act is 0x4A9260(scalar/5, 0x400, 0, 0), and 0x400 of 4096 is
   // a quarter turn: a kick straight UP of a fifth of the speed along the surface.
   // Play insisted this existed and was right; the arm had been skimmed.
@@ -135,7 +135,7 @@ test('thrown FLAT it skips off water — the frog, and it is the engine own', ()
   expect(shot.vx).toBeCloseTo(4000 * 0.8, 3)
 })
 
-test('and dropped straight DOWN it does not — nothing is in the plane', () => {
+test('and dropped straight DOWN it does not — nothing is in the plane', { tag: '@nodata' }, () => {
   // The gate is the speed ALONG the water, not the total. That is what makes a
   // thing falling out of the sky go in while a thing thrown flat skips, which is
   // how play described it and the only reading that produces both.
@@ -147,7 +147,7 @@ test('and dropped straight DOWN it does not — nothing is in the plane', () => 
   expect(skipsOnWater(dribbling)).toBe(false)
 })
 
-test('the hops RUN DOWN, and a spent grenade cannot cross a pond', () => {
+test('the hops RUN DOWN, and a spent grenade cannot cross a pond', { tag: '@nodata' }, () => {
   // The whole of play's complaint in one measurement. Water is type 4 (0.90
   // friction, 0.10 restitution — measured over CAMP, BAY and ARCHI, every wet
   // sample), a grenade brings 0.30/0.80, and each hop pays a fifth of its travel
@@ -185,14 +185,14 @@ test('the hops RUN DOWN, and a spent grenade cannot cross a pond', () => {
   expect(shot.doused).toBe(true)
 })
 
-test('once it is in and slow, water DOUSES it — no blast', () => {
+test('once it is in and slow, water DOUSES it — no blast', { tag: '@nodata' }, () => {
   // The arm at 0x437bfb sets the projectile's quiet flag, and the destructor's
   // first test then spawns nothing and plays nothing (0x4328c9).
   const sinking = dropped(0, 0)
   expect(dousedByWater(sinking)).toBe(true)
 })
 
-test('a doused grenade SINKS for a couple of seconds, then is simply gone', () => {
+test('a doused grenade SINKS for a couple of seconds, then is simply gone', { tag: '@nodata' }, () => {
   // Play: "граната должна реально пару секунд тонуть, как и все прожектайлы." It
   // cannot come from the map — the shipped water is 0 to 48 units deep, the bed
   // and the surface being the same plane — so the descent is the remake's and it

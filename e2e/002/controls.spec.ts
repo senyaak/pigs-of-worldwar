@@ -27,7 +27,7 @@ const at = (over: Partial<Situation> = {}): Situation => ({
   ...over
 })
 
-test('the modes fall in priority order', () => {
+test('the modes fall in priority order', { tag: '@nodata' }, () => {
   expect(modeOf(at())).toBe('battle')
   expect(modeOf(at({ sighting: true }))).toBe('sights')
   expect(modeOf(at({ locked: true }))).toBe('locked')
@@ -48,7 +48,7 @@ test('the modes fall in priority order', () => {
   expect(modeOf(at({ ending: true, starting: true, inventory: true }))).toBe('ending')
 })
 
-test('the ENDING drives nothing, and any key puts the battle away', () => {
+test('the ENDING drives nothing, and any key puts the battle away', { tag: '@nodata' }, () => {
   expect(readControls('ending', driving({ aim: 1, firing: true }))).toMatchObject({
     walk: 0,
     turn: 0,
@@ -61,12 +61,12 @@ test('the ENDING drives nothing, and any key puts the battle away', () => {
   expect(verbOf('ending', 'jump')).toBe('leaveMission')
 })
 
-test('in the BATTLE all three axes drive', () => {
+test('in the BATTLE all three axes drive', { tag: '@nodata' }, () => {
   const intent = readControls('battle', driving({ aim: 1 }))
   expect(intent).toMatchObject({ walk: 1, turn: 1, aim: 1, sighting: false })
 })
 
-test('down the SIGHTS the walk POINTS instead, and the turn still turns', () => {
+test('down the SIGHTS the walk POINTS instead, and the turn still turns', { tag: '@nodata' }, () => {
   // The exe leaves A and D turning the pig and puts the elevation on the pad's
   // vertical, which is what W and S are here.
   const intent = readControls('sights', driving())
@@ -78,7 +78,7 @@ test('down the SIGHTS the walk POINTS instead, and the turn still turns', () => 
   expect(readControls('sights', driving({ walk: 1, aim: -1 })).aim).toBe(-1)
 })
 
-test('in the INVENTORY nothing drives, and the axes step the CURSOR', () => {
+test('in the INVENTORY nothing drives, and the axes step the CURSOR', { tag: '@nodata' }, () => {
   const intent = readControls('inventory', driving())
   expect(intent).toMatchObject({ walk: 0, turn: 0, aim: 0, sighting: false })
   // Forward is UP the list, so the vertical is inverted.
@@ -86,12 +86,12 @@ test('in the INVENTORY nothing drives, and the axes step the CURSOR', () => {
   expect(readControls('inventory', driving({ walk: -1, turn: 0 })).cursor).toEqual({ x: 0, y: 1 })
 })
 
-test('LOCKED stops everything, fire included — it is not a lock with a hole', () => {
+test('LOCKED stops everything, fire included — it is not a lock with a hole', { tag: '@nodata' }, () => {
   const intent = readControls('locked', driving({ aim: 1, firing: true }))
   expect(intent).toMatchObject({ walk: 0, turn: 0, aim: 0, firing: false })
 })
 
-test('CHARGING is the fire key and nothing else — play: "там просто другой контроллер"', () => {
+test('CHARGING is the fire key and nothing else — play: "там просто другой контроллер"', { tag: '@nodata' }, () => {
   // The gauge's own set. Its whole job is to see the button come UP, which is what
   // the exe's split needs (0x493796: the press charges, the release throws), and
   // it steers with nothing.
@@ -100,7 +100,7 @@ test('CHARGING is the fire key and nothing else — play: "там просто �
   expect(intent.firing).toBe(true)
 })
 
-test('the fire key is held where a mode has one, and dropped where it does not', () => {
+test('the fire key is held where a mode has one, and dropped where it does not', { tag: '@nodata' }, () => {
   for (const mode of ['battle', 'sights', 'charging'] as const) {
     expect(readControls(mode, { ...still, firing: true }).firing).toBe(true)
   }
@@ -109,7 +109,7 @@ test('the fire key is held where a mode has one, and dropped where it does not',
   }
 })
 
-test('the PRESS travels beside the hold, and never comes out of it', () => {
+test('the PRESS travels beside the hold, and never comes out of it', { tag: '@nodata' }, () => {
   // A mode that reads the fire key gets both; one that does not gets neither.
   for (const mode of ['battle', 'sights', 'charging', 'armed'] as const) {
     expect(readControls(mode, { ...still, firing: true, fired: true }).fired).toBe(true)
@@ -124,7 +124,7 @@ test('the PRESS travels beside the hold, and never comes out of it', () => {
   expect(readControls('armed', { ...still, firing: true }).fired).toBe(false)
 })
 
-test('STARTING has one rule: any key starts the turn, whatever the key is', () => {
+test('STARTING has one rule: any key starts the turn, whatever the key is', { tag: '@nodata' }, () => {
   // And it cannot simply CONSUME the key, which is the trap: a held key never
   // produces a one-shot verb, so a set that swallowed the axes could not be ended
   // by them. The caller starts the turn and then re-reads the same input in the
@@ -134,7 +134,7 @@ test('STARTING has one rule: any key starts the turn, whatever the key is', () =
   }
 })
 
-test('…and the beat needs INPUT to end it, which is what a poll cannot assume', () => {
+test('…and the beat needs INPUT to end it, which is what a poll cannot assume', { tag: '@nodata' }, () => {
   // The gate the per-frame poll needs. A poll runs whether the player touched
   // anything or not, so without this `starting` resolves on the first frame of
   // every turn and the beat is never seen — one of the three things the first
@@ -150,7 +150,7 @@ test('…and the beat needs INPUT to end it, which is what a poll cannot assume'
   }
 })
 
-test('SPACE is a different verb in every mode', () => {
+test('SPACE is a different verb in every mode', { tag: '@nodata' }, () => {
   expect(verbOf('battle', 'jump')).toBe('jump')
   // The aim view reaches no jump from its own input branch (0x4928dc).
   expect(verbOf('sights', 'jump')).toBeNull()
@@ -160,7 +160,7 @@ test('SPACE is a different verb in every mode', () => {
   expect(verbOf('locked', 'jump')).toBe('cutChute')
 })
 
-test('the DOOR of a building is its own key, and SPACE is not it', () => {
+test('the DOOR of a building is its own key, and SPACE is not it', { tag: '@nodata' }, () => {
   // Play: "я не говорил по пробелу — там просто анимация входа, запрыгивание;
   // сделай отдельную кнопку, пробел уже прыжок." So `enter` is a verb of its own
   // and the jump key means the same thing standing at a shelter as anywhere else.
@@ -181,7 +181,7 @@ test('the DOOR of a building is its own key, and SPACE is not it', () => {
   expect(DRIVING_ACTIONS).not.toContain('enter')
 })
 
-test('a locked or charging pig cannot open its inventory or end its turn', () => {
+test('a locked or charging pig cannot open its inventory or end its turn', { tag: '@nodata' }, () => {
   for (const mode of ['locked', 'charging'] as const) {
     expect(verbOf(mode, 'skills')).toBeNull()
     expect(verbOf(mode, 'endTurn')).toBeNull()
@@ -193,7 +193,7 @@ test('a locked or charging pig cannot open its inventory or end its turn', () =>
   expect(verbOf('inventory', 'skills')).toBe('closeInventory')
 })
 
-test('ending a turn goes through the SKILL, and only on FIRE', () => {
+test('ending a turn goes through the SKILL, and only on FIRE', { tag: '@nodata' }, () => {
   // Play, twice: "закончить ход вообще можно только через умение", then "пропуск
   // хода должен применяться на стрелять — а не на выборе". So the verb only takes
   // skill 65 IN HAND; the scene's fire handler is what applies it. There is no key
@@ -201,12 +201,12 @@ test('ending a turn goes through the SKILL, and only on FIRE', () => {
   expect(verbOf('battle', 'endTurn')).toBe('holdSkipTurn')
 })
 
-test('the aim view cannot open the inventory', () => {
+test('the aim view cannot open the inventory', { tag: '@nodata' }, () => {
   // Play: "инвентарь работает во время прицеливания" — it should not.
   expect(verbOf('sights', 'skills')).toBeNull()
 })
 
-test('a live grenade gets its OWN set, or it could never be set off', () => {
+test('a live grenade gets its OWN set, or it could never be set off', { tag: '@nodata' }, () => {
   // Play found this the moment `locked` stopped letting fire through: "пока
   // граната летит — не могу взорвать её". `armed` beats the lock and passes the
   // one key that matters.
@@ -219,7 +219,7 @@ test('a live grenade gets its OWN set, or it could never be set off', () => {
   })
 })
 
-test('the sights are NOT a lock — play caught that one', () => {
+test('the sights are NOT a lock — play caught that one', { tag: '@nodata' }, () => {
   // "там должен включаться другой контрол сет — выключаться должно когда выстрел
   // нажал, не прицел."
   const sighted = readControls('sights', driving({ aim: 1 }))

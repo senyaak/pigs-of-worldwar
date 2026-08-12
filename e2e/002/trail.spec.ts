@@ -23,7 +23,7 @@ const TRAIL_AGE_STEP = LOB_TRAIL.ageStep
 const TRAIL_STEPS = LOB_TRAIL.steps
 const TRAIL_ROOM = trailRoom(LOB_TRAIL)
 
-test('the numbers are the engine own', () => {
+test('the numbers are the engine own', { tag: '@nodata' }, () => {
   // THREE a frame, and that is a correction: `0x48B024`, the ÷6 arm this repo
   // used to quote, belongs to effect id **0x14** — the map is
   // `[0x48BF90 + id − 1]` into `[0x48BF24 + slot*4]`, and 0x15 lands on 0x48B0F5
@@ -40,7 +40,7 @@ test('the numbers are the engine own', () => {
   expect(TRAIL_ROOM).toBe(15)
 })
 
-test('A ROCKET carries one too, and it is the ENGINE that lays it', () => {
+test('A ROCKET carries one too, and it is the ENGINE that lays it', { tag: '@nodata' }, () => {
   // Play: "нет белого густого дыма за снарядом базуки", and then "ВРЁШЬ" at a
   // first pass that said the exe hangs nothing on a bazooka. It does — from the
   // projectile update's SECOND per-kind dispatch, which that pass never read:
@@ -64,7 +64,7 @@ test('A ROCKET carries one too, and it is the ENGINE that lays it', () => {
   expect(ROCKET_TRAIL.size).toBe(LOB_TRAIL.size)
 })
 
-test('A CHARGE CARRIES ONE TOO, and its fuse is where it hangs', () => {
+test('A CHARGE CARRIES ONE TOO, and its fuse is where it hangs', { tag: '@nodata' }, () => {
   // Play: "горение динамита не из игры." It is now. Kind 53's constructor arm
   // (0x432414) hangs effect 0x1D on the projectile exactly the way the grenade's
   // arm hangs 0x15 — same call, same tail arguments — with two differences that
@@ -85,7 +85,7 @@ test('A CHARGE CARRIES ONE TOO, and its fuse is where it hangs', () => {
   expect(FUSE_TRAIL.size).toBe(LOB_TRAIL.size * 2)
 })
 
-test('a charge does not move, so its four pile up where the fuse is', () => {
+test('a charge does not move, so its four pile up where the fuse is', { tag: '@nodata' }, () => {
   // Which is what a burning one looks like: the trail is laid along the segment
   // travelled and a planted charge travels nothing.
   const trail = beginTrail(FUSE_TRAIL)
@@ -98,13 +98,13 @@ test('a charge does not move, so its four pile up where the fuse is', () => {
   expect(trailRoom(FUSE_TRAIL)).toBe(20)
 })
 
-test('the first frame lays nothing — there is no segment yet', () => {
+test('the first frame lays nothing — there is no segment yet', { tag: '@nodata' }, () => {
   const trail = beginTrail()
   advanceTrail(trail, { x: 0, y: 0, z: 0 })
   expect(trail.puffs).toHaveLength(0)
 })
 
-test('then a frame’s worth, spread ALONG the step and not heaped at the end', () => {
+test('then a frame’s worth, spread ALONG the step and not heaped at the end', { tag: '@nodata' }, () => {
   const trail = beginTrail()
   advanceTrail(trail, { x: 0, y: 0, z: 0 })
   advanceTrail(trail, { x: 600, y: 0, z: 0 })
@@ -120,7 +120,7 @@ test('then a frame’s worth, spread ALONG the step and not heaped at the end', 
   expect(rocket.puffs.map((p) => p.x)).toEqual([100, 200, 300, 400, 500, 600])
 })
 
-test('a puff is STILL — type 0x16 carries no velocity and no gravity', () => {
+test('a puff is STILL — type 0x16 carries no velocity and no gravity', { tag: '@nodata' }, () => {
   const trail = beginTrail()
   advanceTrail(trail, { x: 0, y: 0, z: 0 })
   advanceTrail(trail, { x: 600, y: -300, z: 0 })
@@ -131,14 +131,14 @@ test('a puff is STILL — type 0x16 carries no velocity and no gravity', () => {
   expect(same!.age).toBe(TRAIL_AGE_STEP * 2)
 })
 
-test('it holds thirty at a time and no more', () => {
+test('it holds thirty at a time and no more', { tag: '@nodata' }, () => {
   const trail = beginTrail()
   for (let frame = 0; frame <= 20; frame++) advanceTrail(trail, { x: frame * 600, y: 0, z: 0 })
   expect(trail.puffs).toHaveLength(TRAIL_ROOM - TRAIL_STEPS)
   expect(trail.puffs.every((p) => p.age < TRAIL_DEAD)).toBe(true)
 })
 
-test('once the grenade is gone the last of it fades and then it is done', () => {
+test('once the grenade is gone the last of it fades and then it is done', { tag: '@nodata' }, () => {
   const trail = beginTrail()
   for (let frame = 0; frame <= 10; frame++) advanceTrail(trail, { x: frame * 600, y: 0, z: 0 })
   expect(trailSpent(trail)).toBe(false)
