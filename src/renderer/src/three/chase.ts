@@ -121,27 +121,36 @@ const RIFLE_CLOSE = 2048 / 3072
  */
 
 /**
- * **How much further out the lob rig stands than the exe's halved lengths, and
- * it is the one EYEWORK number in this view.** Play, with the aim point in:
- * "уже лучше — но камера вроде как дальше должна быть, а вот угол вроде
- * верный."
+ * **A CAMERA LENGTH DOES NOT RIDE `MODEL_SCALE`, AND NOTHING HERE IS EYEWORK.**
+ * Play, on a fudge factor being offered for the distance: "точно нет? как
+ * движок тогда это делает?" — and there was nothing to invent. The halving was
+ * the mistake.
  *
- * It multiplies BOTH lengths, which is why it cannot touch the angle: the
- * elevation is `atan(lift / reach)` and the drop of the pig under the axis is
- * `atan(lift / (reach − ahead))`, and scaling reach and ahead together leaves
- * both exactly where they were. Only the SIZE of the pig in the frame changes.
+ * `MODEL_SCALE` is what a MODEL is drawn at (`afScaleObj`, 0x800 of 0x1000, and
+ * `lib/game/scale.ts`), and the exe applies it too. It is not a change of
+ * units: the map is authored in units where a tile is 512 and this remake
+ * renders those untouched, so **the exe's world and this one are the same
+ * world** — its pig is drawn 325 units tall and so is ours. A distance BETWEEN
+ * two points of that world is therefore the exe's own number outright, exactly
+ * as `WALL_CLIMB`'s 128 and `Pig::Walk`'s 52 a frame are.
  *
- * Why a factor rather than a number: `MODEL_SCALE` on a camera distance is the
- * remake's own judgement and always has been (see `LOB_CLOSE` below) — a rig
- * around a BODY halves with the body, but a thrown weapon is aimed at the
- * GROUND and the map is not halved, so this view is the one that sits between
- * the two. Dropping the halving outright is the other end of that argument and
- * it is too far: the pig would be 5542 from the lens where the ordinary chase
- * has him at 2285, and 4009 has already been heard as "очень далеко". At 1.25
- * he is 3464 out. **Correct this against play, not against the exe** — there is
- * nothing in the binary that can settle it.
+ * What halves is a length taken off a MODEL — the bayonet's 460, the body's
+ * 0xAA — because those are model-space and the model is drawn at half. The
+ * camera is not on the model.
+ *
+ * So `LOB_CLOSE`'s "3500 through `MODEL_SCALE`" was a world length halved, and
+ * the fudge factor invented to argue with it is deleted. The exe's own reading
+ * lands where play was pointing on its own.
+ *
+ * The same halving is still on `BACK`/`LIFT` and on the TR cam's 400, and there
+ * it is NOT a decoded number being halved — `BACK` is the remake's own eyework,
+ * tuned when the models were full size and halved with them so the framing
+ * would not move. Worth knowing what that costs, since it is the same question
+ * one step along: the exe's ordinary chase is its row's **3072 at 22.5°**,
+ * where `BACK`/`LIFT` put the lens 1142 from the pig — **2.7× closer than the
+ * original's**. Not touched here; it is not what was asked and it is play's
+ * call, the whole feel of the game hanging off it.
  */
-const LOB_OUT = 1.25
 
 /**
  * **THE LOB VIEW LOOKS PAST THE PIG, AND THAT IS WHY HE SITS AT THE BOTTOM OF
@@ -170,30 +179,14 @@ const LOB_OUT = 1.25
  * branch with a reason to make it, in the build whose PSX sibling is what play
  * is describing. So it is applied here.
  *
- * What it does to the picture is the check, and it is worked in model units off
- * this rig's own convention (`reach` is the HORIZONTAL run and `lift` is
- * `reach·tan 29.2°` on top of it). Holding its distance to the LOOK POINT, the
- * camera stands `3500 − 1536` behind the pig and `3500·tan 29.2°` over him,
- * which puts him **15.7° under the view axis** — and the frame is 45° tall, so
- * he sits seven tenths of the way from the middle to the bottom edge. Those are
- * ANGLES: they are what `LOB_OUT` cannot move, and they are the half play
- * confirmed ("а вот угол вроде верный").
+ * What it does to the picture is the check. The camera holds `LOB_RANGE` to the
+ * LOOK POINT, so it stands 1520 behind the pig and 1706 over him: he falls
+ * **19.1° under the view axis**, and the frame is 45° tall, so he sits within a
+ * sixth of the bottom edge — "свин у нижней границы экрана", which is what play
+ * asked for in those words. He is 2285 from the lens; aimed AT him the same rig
+ * had him dead centre at 3500.
  */
-const LOB_AHEAD = 1536 * MODEL_SCALE * LOB_OUT
-
-/**
- * …and it is the exe's 3500 OUTRIGHT rather than a ratio against the chase.
- *
- * Play looked at the ratio and said the original pulled back further — "она в
- * игре дальше отдалялась" — and they are right that a ratio is the weaker
- * reading: it is measured against `BACK`, which is the remake's own eyework, so
- * a proportion inherits that invention. Every other decoded LENGTH in this
- * remake lands through `MODEL_SCALE` (the bayonet's 460, the pig's 170, the
- * jump's 0x30), and this one does now too — with `LOB_OUT` over the top of it,
- * which is where the halving is argued with rather than in here. It comes out
- * two thirds further back than the chase, which is what play was describing.
- */
-const LOB_CLOSE = (3500 * MODEL_SCALE * LOB_OUT) / BACK
+const LOB_AHEAD = 1536
 
 /**
  * **COLUMN 1 OF THE MODE TABLE IS HOW HIGH THE CAMERA MAY STAND**, and that is
@@ -232,6 +225,29 @@ const elevationOf = (ceiling: number): number => ((0x400 - ceiling) / 4096) * 2 
 
 /** …and the ceiling `0x49F6F0` stamps for anything THROWN. */
 const LOB_CEILING = 692
+
+/**
+ * …and it is the exe's 3500 OUTRIGHT rather than a ratio against the chase.
+ *
+ * Play looked at the ratio and said the original pulled back further — "она в
+ * игре дальше отдалялась" — and they are right that a ratio is the weaker
+ * reading: it is measured against `BACK`, which is the remake's own eyework, so
+ * a proportion inherits that invention. Nor does it halve: a camera length is
+ * of the WORLD, not of a model (`LOB_AHEAD`'s note above).
+ *
+ * **And it is the SEPARATION rather than the horizontal run**, which is the
+ * other half of what play's "камера должна быть дальше" was catching. The
+ * distance spring (`0x4A0960`) differences `0x44E850` — the length of camera
+ * minus target — against the row and steps what is left along the bearing, so
+ * 3500 is the whole hypotenuse and the elevation splits it: `3500·cos 29.2°`
+ * along the ground and `3500·sin 29.2°` up. This rig places by the horizontal
+ * run and hangs `lift` off it (`want`), so the conversion belongs here rather
+ * than there — and `LOB_PITCH` is shared with `RIG` so the two cannot come to
+ * disagree about which angle they split it by.
+ */
+const LOB_RANGE = 3500
+const LOB_PITCH = elevationOf(LOB_CEILING)
+const LOB_CLOSE = (LOB_RANGE * Math.cos(LOB_PITCH)) / BACK
 /**
  * **Its arm carries no height, and it does not need one** — the ROW does.
  *
@@ -276,8 +292,38 @@ const LOB_CEILING = 692
  * to ±700 of 4096 rather than the usual window (0x49f606) — there is no key
  * bound to a camera pitch here.
  */
-const THROW_CLOSE = 1700 / 3072
-const THROW_RISE = 400 * MODEL_SCALE
+/**
+ * …and what its 200 and its 400 are is the LOOK POINT, not the camera. Read to
+ * the last instruction the same day the lob view was, because play asked for
+ * this one in the same breath ("и вид из-за спины тоже сразу посмотри").
+ *
+ * The handler ends `0x4A0B50(cam, &[esp+40h], &[esp+34h])` — the tail's second
+ * argument is the camera and its third is the target, exactly as mode 4's arm
+ * calls it — and the vector it has been building at `[esp+34h]` is the THIRD.
+ * So `subject + 200 along the bearing, +400 up` is where the rig LOOKS, and the
+ * camera is then put at the row's **1700** from it by the same distance spring
+ * (`0x4A0960`, 0x4a484d).
+ *
+ * **Its own column 1 is 1024, which is dead LEVEL** (`elevationOf`), and the
+ * elevation step at 0x4a48c4 confirms it reads that column and nothing else
+ * bar the player's own pitch: `[cam+0x88] + 0x400 − column1 − [cam+0x76]`. So
+ * the camera stands at the LOOK POINT's height — 400 over the pig — and 1700
+ * behind him, which is what "close in over his back" comes to in numbers.
+ *
+ * That leaves the pig 1500 ahead of the lens and 400 below it, **14.9° under a
+ * level axis** — two thirds of the way to the bottom edge of a 45° frame, the
+ * same corner of the picture the lob view puts him in. The two views agree
+ * without either being tuned, which is the check on both.
+ *
+ * Neither number halves — a camera length is of the world (`LOB_AHEAD`) — and
+ * the 400 that used to ride `MODEL_SCALE` here was the same mistake `LOB_CLOSE`
+ * carried.
+ */
+const THROW_CLOSE = 1700 / BACK
+const THROW_RISE = 400
+const THROW_AHEAD = 200
+/** 1024, and `elevationOf` makes that 0.0°: level with what it looks at. */
+const THROW_CEILING = 1024
 
 /**
  * The SCOPE: the view down the weapon, and it is BOLTED TO THE HAND.
@@ -357,16 +403,27 @@ export type View =
 
 /**
  * Where each view stands on the one rig: how much of the chase's distance it
- * keeps, how high it sits over the point it is looking at, and how far PAST the
- * pig that point is. A negative distance is IN FRONT — that is the whole of
- * what makes the drop-in a face.
+ * keeps, how high it sits over the point it is looking at, and where that point
+ * is — `ahead` PAST the pig and `raise` ABOVE him. A negative distance is IN
+ * FRONT, which is the whole of what makes the drop-in a face.
+ *
+ * The two exe views built from a decoded ROW carry a `pitch` instead of a
+ * `lift`, because that is what their own tables carry: the height then follows
+ * the distance rather than being a second number that can drift from it.
  *
  * `scope` is in here for completeness and is never read: that view is first
  * person and leaves `want` before any of this (it is bolted to the hand).
  */
 const RIG: Record<
   View,
-  { close: number; lift: number | null; pitch?: number; ahead?: number; floor: boolean }
+  {
+    close: number
+    lift: number | null
+    pitch?: number
+    ahead?: number
+    raise?: number
+    floor: boolean
+  }
 > = {
   chase: { close: 1, lift: LIFT, floor: true },
   face: { close: -1, lift: FACE_LIFT, floor: true },
@@ -378,13 +435,21 @@ const RIG: Record<
   lob: {
     close: LOB_CLOSE,
     lift: null,
-    pitch: elevationOf(LOB_CEILING),
+    pitch: LOB_PITCH,
     ahead: LOB_AHEAD,
     floor: true
   },
-  // …and the TR cam is the one view the exe lets under the ground floor,
-  // which is what makes its 400 over the pig mean 400 over the pig.
-  throw: { close: THROW_CLOSE, lift: THROW_RISE, floor: false },
+  // …and the TR cam looks 200 past the pig and 400 OVER him from dead level,
+  // 1700 back. It is also the one view the exe lets under the ground floor,
+  // which is what makes that 400 over the pig mean 400 over the pig.
+  throw: {
+    close: THROW_CLOSE,
+    lift: null,
+    pitch: elevationOf(THROW_CEILING),
+    ahead: THROW_AHEAD,
+    raise: THROW_RISE,
+    floor: false
+  },
   scope: { close: 0, lift: 0, floor: true }
 }
 
@@ -531,17 +596,20 @@ export function createChase(
     // to one side and close in for a swing; over him and past him for a lob.
     const stand = RIG[view]
     const from = view === 'melee' ? at.heading + MELEE_TURN : at.heading
-    // WHERE THE RIG POINTS, in game space. Every view but the lob's points at
-    // the pig; the lob's points `ahead` PAST him along the same yaw and at his
-    // own height — the exe offsets x and z and nothing else — which is what
-    // drops him to the bottom of the frame.
+    // WHERE THE RIG POINTS, in game space. The chase points at the pig; the two
+    // views the exe builds from a row point PAST him along the same yaw and, for
+    // the TR cam, OVER him as well. That offset is what drops him to the bottom
+    // of the frame in both.
     const aimX = at.x + Math.sin(from) * (stand.ahead ?? 0)
     const aimZ = at.z + Math.cos(from) * (stand.ahead ?? 0)
     // Looking a pig in the face means looking at the PIG: the canopy over it
     // is out of frame on purpose, so `rise` is ignored on this side.
     const target = new THREE.Vector3(
       aimX,
-      Math.max(-framedY(at, nodeY), waterline) + GAZE + (face ? 0 : rise / 2),
+      Math.max(-framedY(at, nodeY), waterline) +
+        GAZE +
+        (stand.raise ?? 0) +
+        (face ? 0 : rise / 2),
       -aimZ
     )
     // The pull-back that fits `rise` more height at this vertical field of

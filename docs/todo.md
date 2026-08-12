@@ -155,15 +155,39 @@ by play. In the order they turn up:
    edge of a 45° frame — and play confirmed that half ("а вот угол вроде
    верный"). `weapons/fire.md`.
 
-   **`LOB_OUT` is how far out it all stands, and it is the one eyework number
-   in this view.** Play wanted the camera further back with the angle left
-   alone, so the factor multiplies BOTH lengths — the elevation and the drop
-   are `atan(lift/reach)` and `atan(lift/(reach − ahead))`, so scaling them
-   together cannot move either. At 1.25 the camera is 2455 behind the pig and
-   2443 over him, 3463 from the lens against the ordinary chase's 2285.
-   Dropping `MODEL_SCALE` from these two lengths instead — the other end of the
-   same argument — puts him 5542 out, past the 4009 already heard as "очень
-   далеко". Nothing in the binary can settle it; correct it against play.
+   **A CAMERA LENGTH DOES NOT RIDE `MODEL_SCALE`, and there is no eyework in
+   either view.** Play asked the right question of a fudge factor offered for
+   the distance — "точно нет? как движок тогда это делает?" — and the answer is
+   that the halving was the bug. `MODEL_SCALE` is what a MODEL is drawn at and
+   the exe applies it too; the map is a tile of 512 either way, so the exe's
+   world IS this one and a distance between two of its points is the exe's
+   number outright. What halves is a length taken off a model (the bayonet's
+   460, the body's 0xAA). The factor is deleted.
+
+   Two more corrections came with it. **3500 is the SEPARATION, not the
+   horizontal run** — the distance spring differences `0x44E850`, the length of
+   camera minus target — so the elevation splits it, `3500·cos 29.2°` along the
+   ground and `3500·sin 29.2°` up. And **the TR cam's 200 and 400 are its LOOK
+   POINT**, not its camera: `0x4A0B50(cam, &camera, &target)` takes the vector
+   its handler builds as the THIRD argument, and the camera is put at the row's
+   1700 from it (0x4a484d) at that mode's own column 1 of 1024 — dead level.
+
+   Where the two views land, in world units, with nothing tuned:
+
+   | | behind the pig | over him | from the lens | he sits |
+   | - | - | - | - | - |
+   | lob (in hand) | 1520 | 1706 | 2285 | 19.1° under a 29.2° axis, 0.85 of the half-frame |
+   | TR (G held) | 1500 | 400 | 1552 | 14.9° under a level axis, 0.66 of it |
+
+   The two agree on which corner of the picture the pig sits in without either
+   being tuned to the other, which is the check on both.
+
+   **What this leaves standing: the ordinary chase is 2.7× closer than the
+   exe's.** `BACK`/`LIFT` put the lens 1142 from the pig where mode 0's row is
+   3072 at 22.5°. Those two are the remake's own eyework, tuned when models were
+   full size and halved with them so the framing would not move — not a decoded
+   number being mis-scaled. Not touched: the whole feel of the game hangs off
+   it and it is play's call.
 
    Two numbers that were invented and are not any more: `CLEARANCE` is the exe's
    **ground + 768** (0x4a0c12, the tail every mode ends with), and **column 1 of
