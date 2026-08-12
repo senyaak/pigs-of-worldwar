@@ -203,11 +203,26 @@ by play. In the order they turn up:
    mode 2; and **7 RIFLE, 8, 9, 10, 14, 16 and the planted charges ask for
    nothing at all**. `TRACKS_ITS_SHOT` in three/chase.ts is that table.
 
-   **Mode 0x0B's handler is `0x4199C0` — one instruction, `ret`.** Its setup
-   arm only remembers numbers. So a thrown weapon FREEZES the picture where the
-   throw left it: no follow, not even a turn. Which is the other half of why
-   mode 4 aims 1536 past the pig — the view is already looking down-range, so
-   a frozen frame still has the landing in it.
+   **Mode 0x0B's handler is MISSING from this build, which is not the same as
+   doing nothing.** `[0x4D95A0 + 0x0B*4]` is 0x4199C0 — one `ret` — and modes
+   5, 8 and 0x0C hold the same address: four empty functions folded onto one,
+   in a region nowhere near the camera code. A `ret` reached by every thrown
+   weapon in the game is a removed handler. What survives says the shape: the
+   **row is real** (3000 out, column 1 = 1024 dead level, column 2 = 0 no
+   swing), the **setup arm remembers what a follow needs** — the camera's own
+   position and, at `[cam+0x7A]`, its distance to the subject, whose only
+   reader in the image is mode 0x0A's distance spring — and the fire arm hands
+   it the projectile as its subject. Play settles the rest: "камера следует за
+   ней… замораживается на то чтобы сказать фразу, а потом бросок и идёт
+   правильная камера." The freeze is the beat BEFORE the throw (the battle cry
+   over a still mode 4); the flight is followed from straight behind at its own
+   height. `chase.pursue`.
+
+   **A RIFLE tracks like a sniper**, also play's. The exe's own split (the
+   pistol and the sniper reach the shared tail at 0x47ad71, 7 RIFLE's arm jumps
+   to the common exit) is not honoured anywhere else in the shot path, so the
+   caller asks the weapon's LAYER: every `gun` gets `watch`, every `lob` gets
+   `pursue`.
 
    **Mode 0x0A is read and NOT built** (0x4a43c0): the look point 1024 ahead of
    the subject's own heading, then the three springs and the tail — mode 4's

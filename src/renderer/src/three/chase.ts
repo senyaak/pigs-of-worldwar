@@ -382,32 +382,59 @@ export const SCOPE_BONE = 5
  * branches and shared tails (the guns' is 0x47ad71, the thrown family's
  * 0x47b853), there are four answers and no more:
  *
- * | | asks for | what that mode does |
+ * | | asks for | row (dist, col 1, col 2) |
  * | - | - | - |
- * | **6 PISTOL, 11 SNIPER RIFLE, 12, 13, 15, 17, 18** | **mode 1** | stands still and TURNS (`watch`) |
- * | **19..27 GRENADES, 28 MORTAR, 29 BAZOOKA, 30..33, 39..44, 47..49** | **mode 0x0B** | nothing at all — see below |
- * | 34, 50 JETPACK | mode 0x0A | its own rig, 1024 ahead of the subject — not built |
- * | 51 SUICIDE | mode 2 | not built |
- * | **7 RIFLE, 8, 9 MACHINE GUN, 10 HEAVY M-GUN, 14, 16**, 35..38, 45, 46, 52..55, 60, 61 | nothing | the camera is not told, so it holds whatever view it was in |
+ * | **6 PISTOL, 11 SNIPER RIFLE, 12, 13, 15, 17, 18** | **mode 1** | 3072, level, no swing — and its handler only AIMS (`watch`) |
+ * | **19..27 GRENADES, 28 MORTAR, 29 BAZOOKA, 30..33, 39..44, 47..49** | **mode 0x0B** | **3000, level, no swing** (`pursue`) |
+ * | 34, 50 JETPACK | mode 0x0A | 5000 at 45° above and 45° round — not built |
+ * | 51 SUICIDE | mode 2 | 7500, level — not built |
+ * | **7 RIFLE**, 8, 9 MACHINE GUN, 10 HEAVY M-GUN, 14, 16, 35..38, 45, 46, 52..55, 60, 61 | nothing | — |
  *
- * **Mode 0x0B's handler is `0x4199C0`, which is one instruction: `ret`.** Its
- * setup arm (0x49f912, the slot the byte map at 0x49FE84 gives modes 0x0B,
- * 0x0C and 0x0D) only REMEMBERS things — the camera's own position into
- * `[cam+0xA8]` and `[cam+0x6E]`, its distance to the subject into `[cam+0x7A]`
- * — and moves nothing. So a thrown weapon FREEZES the picture where it stood
- * at the throw: it does not follow the grenade and does not even turn after
- * it.
+ * **MODE 0x0B'S HANDLER IS MISSING FROM THIS BUILD, and that is not the same
+ * as doing nothing.** `[0x4D95A0 + 0x0B*4]` is `0x4199C0`, which is one
+ * instruction — `ret` — and modes **5, 8 and 0x0C point at the very same
+ * address**. Four empty functions folded onto one by the linker, in a region
+ * (0x419xxx) nowhere near the camera code every real handler lives in
+ * (0x4a0xxx..0x4a4xxx). That is what a REMOVED handler looks like, and mode
+ * 0x0B is asked for by every thrown weapon in the game — the one thing a stub
+ * cannot be.
  *
- * Which is the other half of why mode 4 aims 1536 PAST the pig (`LOB_AHEAD`).
- * The view a throw is made from is already looking down-range, so a frozen
- * frame still has the landing in it. The two readings were made a day apart
- * and each explains the other.
+ * The rest of the mode is all there, which is how the shape is recovered:
  *
- * (One transient is not modelled: entering 0x0B sets `[cam+0x7C]` to 0x46, and
- * leaving any mode copies that into `[cam+0x6C]`, the tail's own pitch offset
- * — so the NEXT view starts 6.2° off and springs back over a few frames.)
+ * - **its ROW is real** — 3000 out, column 1 = 1024 (dead LEVEL, `elevationOf`)
+ *   and column 2 = 0 (no swing, so straight behind), where a stubbed mode would
+ *   have no reason to carry one;
+ * - **its setup arm remembers what a follow needs**: 0x49f912 stores the
+ *   camera's own position into `[cam+0xA8]`/`[cam+0x6E]` and **the distance
+ *   from the camera to the subject into `[cam+0x7A]`** — and the ONLY reader of
+ *   `[cam+0x7A]` in the image is mode **0x0A**'s distance spring (0x4a4547),
+ *   the surviving handler of the same family;
+ * - and the fire arm hands it the PROJECTILE as its subject (0x47b273), which
+ *   a camera that never looks at anything would not need.
+ *
+ * So play's word settles what the stub cannot: "граната — бред! камера следует
+ * за ней… замораживается на то чтобы сказать фразу, а потом бросок и идёт
+ * правильная камера." The freeze play describes is the beat BEFORE the throw —
+ * the pig's line over a still lob view — and once the grenade is in the air the
+ * camera goes behind it. `pursue` is that, built on 0x0B's own row.
+ *
+ * (This page said "a thrown weapon freezes the picture" for one commit. A
+ * `ret` is not a behaviour: it is a missing function, the same shape as mode
+ * 4's dead 1536. Both are the PC port dropping what the PSX build had.)
+ *
+ * **And a RIFLE tracks like a sniper**, which is play's too. The exe's own
+ * split — the pistol and the sniper reaching the shared tail at 0x47ad71 while
+ * 7 RIFLE's arm jumps straight to the common exit — is not a difference
+ * anything else in the shot path honours, and it is not what the game does. So
+ * the caller asks the weapon's LAYER and not its number (three/battle.ts):
+ * every `gun` gets `watch` and every `lob` gets `pursue`.
+ *
+ * Mode 0x0B's own row, and the whole of what `pursue` is built from: 3000 out,
+ * column 1 dead level, column 2 no swing — straight behind the thing, at its
+ * own height.
  */
-export const TRACKS_ITS_SHOT = [6, 11, 12, 13, 15, 17, 18]
+const FLIGHT_BACK = 3000
+const FLIGHT_CEILING = 1024
 
 /** Where a pig is being drawn, and which way it faces. Not the pig itself: the
  * rig frames what is on SCREEN (three/tween.ts). */
@@ -556,6 +583,21 @@ export interface Chase {
    * with the camera standing still there is no ride to dodge with.
    */
   watch(at: { x: number; y: number; z: number }): void
+  /**
+   * **PURSUE a thrown thing — the exe's mode 0x0B, rebuilt from its row.**
+   *
+   * Every thrown weapon asks for it and its handler is missing from this build
+   * (`TRACKS_ITS_SHOT` above has the whole argument). What survives is the row
+   * — **3000 out, dead level, no swing** — so the camera sits straight behind
+   * the grenade at its own height and travels with it. `heading` is where the
+   * thing is going, which is what "straight behind" means for a subject with a
+   * velocity and no yaw of its own.
+   *
+   * No line-of-sight swing here, unlike `ride`: play's report that started this
+   * whole thread was the camera drifting sideways, and half of that was the
+   * dodge.
+   */
+  pursue(at: { x: number; y: number; z: number }, heading: number, delta: number | null): void
   /**
    * Ride a CRATE down — the exe's mode 0, which is the ordinary chase rig with
    * something other than a pig in the middle of it (0x4661c2).
@@ -725,6 +767,27 @@ export function createChase(
       // Mode 1 in full: the position is left alone — `at` is not touched, so
       // whatever view the throw was made from is still standing there and the
       // next `follow` carries on from it — and only the aim moves.
+      camera.lookAt(new THREE.Vector3(point.x, -point.y, -point.z))
+    },
+    pursue(point, heading, delta) {
+      // Mode 0x0B's row and nothing else: straight behind along the flight, at
+      // the flight's own height (column 1 is level, so the lift is zero).
+      const lift = FLIGHT_BACK * Math.tan(elevationOf(FLIGHT_CEILING))
+      const position = new THREE.Vector3(
+        point.x - Math.sin(heading) * FLIGHT_BACK,
+        -point.y + lift,
+        -(point.z - Math.cos(heading) * FLIGHT_BACK)
+      )
+      // The common tail still holds it off the ground — mode 0x12 is the one
+      // view exempt from that and this is not it.
+      position.y = Math.max(position.y, -query.surface(position.x, -position.z) + CLEARANCE)
+      if (delta === null || !snapped) {
+        at.copy(position)
+        snapped = true
+      } else {
+        at.lerp(position, 1 - Math.exp(-6 * delta))
+      }
+      camera.position.copy(at)
       camera.lookAt(new THREE.Vector3(point.x, -point.y, -point.z))
     },
     ride(point, heading, delta) {
