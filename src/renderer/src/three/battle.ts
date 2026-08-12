@@ -9,7 +9,7 @@
 // `lib/game`; this scene feeds them intents and draws what they say.
 
 import * as THREE from 'three'
-import type { Bone, Clip, MapObject, MapProp, Model, TerrainBlock, TerrainTexture, Texture } from '../api'
+import type { Bone, Clip, MapObject, MapProp, Model, Sky, TerrainBlock, TerrainTexture, Texture } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
 import { createEngine } from '../../../lib/game/engine'
 import type { TerrainQuery } from '../../../lib/game/terrain'
@@ -19,6 +19,7 @@ import { meleeOf } from '../../../lib/game/melee'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
+import { buildSky } from './sky'
 import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
 import { SCOPE_BONE, SCOPE_MAGNIFY, SCOPE_MOUNT, createChase } from './chase'
@@ -72,6 +73,10 @@ export interface BattleAssets {
    * under. Null is fine: a map whose squad parachutes simply stands instead
    * of dropping under nothing (three/dropIn.ts). */
   canopy: { model: Model; textures: Texture[] } | null
+  /** The dome the map stands under, already skinned with its own mood
+   * (lib/game/sky.ts). Null is fine: the battle falls back on the flat clear
+   * colour it had before there was a sky at all. */
+  sky: Sky | null
 }
 
 export interface BattleScene {
@@ -150,6 +155,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const { host, assets, query, game, onGameChanged, map, onCollected, bus, sound: sounds } = parts
   const root = new THREE.Group()
   root.rotation.x = Math.PI
+
+  // The sky goes in FIRST so it is the scene's first child, though what
+  // actually keeps it behind everything is its own render order (three/sky.ts).
+  const sky = assets.sky ? buildSky(root, assets.sky) : null
 
   const terrain: Terrain = buildTerrain(assets.blocks, assets.terrainTextures)
   // buildTerrain wraps in its own converted group; unwrap into ours. Its
@@ -660,9 +669,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // nowhere to swing to — every heading is a wall (lib/game/sightline.ts) — so
     // the wall fades instead. From the eye to the pig's own middle rather than its
     // feet, or the floor it stands on counts as being in the way.
+    // The eye in GAME space, wanted twice below: the sky is centred on it —
+    // an infinite dome drawn at a size a depth buffer can hold (three/sky.ts) —
+    // and the see-through test measures from it. AFTER `show`, which is what
+    // moved the camera this frame.
+    root.worldToLocal(eyeInGame.copy(host.camera.position))
+    sky?.follow(eyeInGame)
     const watched = squad.of(game.currentPig.id)
     if (watched) {
-      root.worldToLocal(eyeInGame.copy(host.camera.position))
       const { x, y, z } = game.currentPig.position
       props.fade(
         crossedTowards(
@@ -689,6 +703,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     props,
     objectCount: assets.objects.length,
     camera: host.camera,
+    // Measured against the eye as it stood at the end of the last frame,
+    // which is what `follow` was given.
+    sky: () => sky?.state(eyeInGame) ?? null,
     sounds: () => sounds.played(),
     barks: () => sounds.spoken(),
     still: () => battle.view().still,
@@ -793,6 +810,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     dispose() {
       host.onFrame.delete(onFrame)
       host.scene.remove(root)
+      sky?.dispose()
       terrain.dispose()
       props.dispose()
       dropInArt.dispose()

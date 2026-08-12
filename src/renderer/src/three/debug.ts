@@ -113,6 +113,16 @@ export interface DebugParts {
    * which is the half a screenshot could not be held to either.
    */
   shelter: () => { inside: number | null; doorway: number | null; drawn: boolean }
+  /**
+   * The SKY, and null on a map whose dome would not load (three/sky.ts).
+   *
+   * The dome is drawn behind everything and centred on the eye, so how much of
+   * it a screenshot catches is whatever the terrain does not cover — a band
+   * over one map and nothing at all over another. What a spec can hold it to
+   * is this: which mood loaded, that it is the whole dome, and that its centre
+   * has not drifted off the camera.
+   */
+  sky: () => { mood: string; triangles: number; skins: number; offEye: number; radius: number } | null
   /** Whether the beat after a blow is still running. */
   aftermath: () => boolean
   /**
@@ -245,6 +255,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** True while the turn is held on what the blow left behind — the clock
        * is stopped and the camera is off the pig (lib/game/aftermath.ts). */
       shelter: () => parts.shelter(),
+      sky: () => parts.sky(),
       frame: () => parts.frame(),
       aftermath: () => parts.aftermath(),
       /** True while the turn is ENDING: the exe's mode 13, WALK AWAY. Nobody

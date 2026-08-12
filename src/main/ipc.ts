@@ -16,6 +16,7 @@ import {
   loadGameText,
   loadMapObjects,
   loadModel,
+  loadSky,
   loadSound,
   loadSoundBank,
   loadTerrain,
@@ -69,6 +70,18 @@ export function registerIpc(): void {
       return { ok: true, ...(await loadModel(insideGameDir(relPath), base)) }
     } catch (error) {
       return fail(relPath, error)
+    }
+  })
+
+  // By MOOD, not by path: the archive name is checked against the exe's own
+  // list in assets.ts, and the dome itself is always the same file.
+  ipcMain.handle('sky:load', async (_event, archive: string) => {
+    const gameDir = getGameDir()
+    if (!gameDir) return { ok: false, error: 'Game folder is not set' }
+    try {
+      return { ok: true, sky: await loadSky(gameDir, archive) }
+    } catch (error) {
+      return fail(archive, error)
     }
   })
 

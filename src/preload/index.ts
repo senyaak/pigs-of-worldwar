@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('archive:list', relPath),
   loadModel: (relPath: string, base: string): Promise<unknown> =>
     ipcRenderer.invoke('model:load', relPath, base),
+  loadSky: (archive: string): Promise<unknown> => ipcRenderer.invoke('sky:load', archive),
   loadClips: (relPath: string): Promise<unknown> =>
     ipcRenderer.invoke('clips:load', relPath),
   loadTerrain: (relPath: string): Promise<unknown> =>

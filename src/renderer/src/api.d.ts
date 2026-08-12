@@ -54,6 +54,18 @@ export type LoadModelResult =
   | { ok: true; model: Model; textures: Texture[]; skeleton: Bone[] }
   | { ok: false; error: string }
 
+export interface Sky {
+  /** The mood's archive name: `sunny`, `coldsky`, … (lib/game/sky.ts). */
+  name: string
+  /** The hemisphere over the horizon, and its mirror below it. */
+  above: Model
+  below: Model
+  /** The four quadrant skins, in the order a face's texture index counts. */
+  textures: Texture[]
+}
+
+export type LoadSkyResult = { ok: true; sky: Sky } | { ok: false; error: string }
+
 export interface Clip {
   name: string
   frameCount: number
@@ -149,6 +161,8 @@ export interface Api {
   listFiles(): Promise<FileEntry[]>
   listArchive(relPath: string): Promise<ListArchiveResult>
   loadModel(relPath: string, base: string): Promise<LoadModelResult>
+  /** The sky dome and one mood's skins — by mood, not by path. */
+  loadSky(archive: string): Promise<LoadSkyResult>
   loadClips(relPath: string): Promise<LoadClipsResult>
   loadTerrain(relPath: string): Promise<LoadTerrainResult>
   loadMapObjects(relPath: string): Promise<LoadMapObjectsResult>

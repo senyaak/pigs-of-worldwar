@@ -119,6 +119,16 @@ reasoning, the false starts and the sessions behind them are in
 - **A map does not place the same things in every game.** The low byte of a
   record's flags is which player count it exists in, and the loader drops it
   otherwise (0x4a58cb). `[exe]`
+- **The SKY is a MODEL, and the `Skys/` folder is not it.** `Chars/SKYDOME.MAD`
+  carries two hemispheres — `skydome` over the horizon, `skydomeu` under it,
+  544 triangles each in four quadrants — and one of eleven `Chars/<mood>.MAD`
+  archives skins them with four 250×250 TIMs. The loader is 0x4866B0; it puts
+  both at the origin and scales them 256× across and 128× up, so a dome
+  authored round is drawn SQUASHED to half height. Which mood a map wears is
+  the first dword of its 60-byte record in the mission table at 0x4D5210,
+  paired to the map names at 0x4D1990 — `lib/game/sky.ts` carries the whole
+  table, `three/sky.ts` draws it. The exe's `afSetSky` and `afAddSkyToSortList`
+  are resolved and never called. `sky/notes.md`. `[exe]`
 - **The POG stores true world coordinates**, paired to geometry in the map's own
   `.MAD` by NAME, with y an ELEVATION of the model's CENTRE — so props hover
   their own half-height by design. The turn is `phi = yaw − π/2`, pinned to the
@@ -537,6 +547,20 @@ and the weakest of them were invented here:
   two it finds, because there is no AI for the rest. There is no filling in
   either way: CAMP fields ONE side of ONE pig, because that is what the
   training ground carries, and a map with no markers refuses to open.
+- `[CHECK — remake]` **The sky dome is SMALL and rides the eye.** The original
+  scales it to about four million units across and leaves it at the origin,
+  which no depth buffer can draw — the battle's far plane is 100 000 and
+  anything past it is clipped. `three/sky.ts` draws the same dome at a radius
+  of 40 000, centred on the camera every frame, with depth testing off and the
+  first place in the draw order. That is the same picture in the limit and the
+  ordinary skybox trick, but the radius is the remake's own number.
+- `[gap]` **The mood's FOG, snow and rain are decoded and not built.** The same
+  record that picks the dome gives a fog colour and a near/far per mood (238 to
+  about 4048 units, which is eight tiles), and turns snow on for the ten cold
+  maps and rain for the five ominous ones. `sky/notes.md` has every number. The
+  distance matters for more than weather: the original hides its far ground,
+  which is why its screenshots show far more sky than ours does over the same
+  map.
 - `[CHECK — remake]` **The wall envelope is an inference.** Whether wall
   geometry sits in the exe's collision world is still open (0x406bb0
   undecoded); the remake builds the play-observed behaviour from the decoded

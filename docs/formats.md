@@ -87,6 +87,22 @@ points into the paired `.mtd` archive (same base name as the `.mad`), in entry
 order — verified visually: pcace_hi + british.mtd produces the correctly
 dressed British ace.
 
+### The SKY's two archives
+
+`Chars/SKYDOME.MAD` is an ordinary named archive of six entries — two models,
+`skydome` (the half over the horizon, y −15779..0) and `skydomeu` (its mirror
+below) — 257 vertices and 544 triangles each, in four texture groups of 136,
+one per quadrant of the dome.
+
+The mood archives beside it are the exception the extension does not admit:
+`COLDSKY.MAD`, `DESERT.MAD`, `NIGHT1.MAD`, `OMINOUS.MAD`, `SUNNY.MAD`,
+`SUNRISE.MAD`, `SUNSET.MAD`, `TOY.MAD` and `SPACE.MAD` are all 252272 bytes and
+hold **TIMs, not models** — four 250×250 8-bit CLUT images each, which is the
+only place in the install a `.mad` is an MTD. Which one a map picks is a table
+in the exe (`lib/game/sky.ts`, `sky/notes.md`). `WHITE.MAD` next to them has
+the same shape — four entries all named `white.tim` — and the exe's table
+never names it.
+
 ## Textures — TIM (inside \*.mtd)
 
 Every MTD entry is a standard PSX TIM image. All 120 entries of british.mtd

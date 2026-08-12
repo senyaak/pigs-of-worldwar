@@ -42,6 +42,7 @@ import { lobOf } from '../../../lib/game/grenade'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../../../lib/game/scenery'
 import { give } from '../../../lib/game/inventory'
+import { skyArchiveFor } from '../../../lib/game/sky'
 import { byId } from './dom'
 
 // The training ground — the first map the original ever shows a player, and
@@ -521,6 +522,12 @@ export function initBattle(onLeave: () => void): BattleView {
       ? { model: canopyResult.model, textures: canopyResult.textures }
       : null
 
+    // …and the sky the map stands under, which the exe picks by MAP out of its
+    // mission records (lib/game/sky.ts). Failing it costs the dome and nothing
+    // else, so it is reported and stepped over like the props.
+    const skyResult = await window.api.loadSky(skyArchiveFor(name))
+    if (!skyResult.ok) console.log(`${name} without a sky: ${skyResult.error}`)
+
     // The squads, standing (lib/game/muster.ts). All the renderer supplies is
     // the MEASUREMENT — how big a pig of this class is, off its own art
     // (lib/game/body.ts), which used to be the mesh's alone and is what made
@@ -621,7 +628,8 @@ export function initBattle(onLeave: () => void): BattleView {
         props: objectsResult.ok ? objectsResult.props : [],
         propTextures: objectsResult.ok ? objectsResult.textures : [],
         strings: battleText,
-        canopy
+        canopy,
+        sky: skyResult.ok ? skyResult.sky : null
       },
       game,
       onGameChanged: updateTileText,

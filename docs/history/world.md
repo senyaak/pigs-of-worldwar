@@ -402,3 +402,77 @@ slot beside the dial carries it for as long as the pig is in there. A DRAWING
 decision and not a rule — `ui/battle.ts` substitutes it into `hud.draw`'s
 `holding` and `pig.holding` is untouched, because the fire key acts on that and
 the remake's door is a key of its own.
+
+## THE SKY, 2026-08-12 — and the folder named after it is not it
+
+The battle had drawn against a flat clear colour since there was a battle, with
+`Skys/` sitting in the install as the obvious place to start: paired `.PMG` and
+`.PTG` per mood, `COLD` and `DESERT` and `NIGHT` subfolders, and the `.PMG`s all
+23552 bytes — 64 blocks of the terrain format's own 368, an 8×8 grid where a map
+is 16×16. It reads like a sky made of ground.
+
+**It is dead data on the PC.** The exe holds exactly three strings with "sky" in
+them and not one of them is a path into that folder, and the two library exports
+that would have consumed it — `afSetSky` and `afAddSkyToSortList` — are resolved
+by name at 0x4AC430 and then never called: a scan of the whole `.text` for
+`ff 15 <slot>` finds zero sites for either. Which is the second time this repo
+has been saved by reading a search out to the end rather than stopping at the
+first plausible file.
+
+What the PC draws is at **0x4866B0**, and `library/notes.md` had already walked
+past it — "two objects at `[[0x537FA0]+4]`/`[+8]`, scaled ×0x100000 —
+sky/backdrop-sized". It is `Chars/SKYDOME.MAD`: `skydome`, a 32-segment
+hemisphere of radius 15778 in eight rings, and `skydomeu`, its mirror below the
+horizon, 544 triangles each in four quadrants. Four 250×250 TIMs skin them, out
+of one of eleven `Chars/<mood>.mad` archives — which are TIM archives wearing a
+model archive's extension, the only ones in the install that do. Both objects go
+at the origin and are scaled `(0x100000, 0x80000, 0x100000)` against
+`afScaleObj`'s unity of 4096: 256× across and 128× up, so a dome authored round
+is drawn squashed to half height.
+
+**Which mood is the MAP's, and the pairing is two tables.** `[0x520708]` turned
+out to be the first dword of a 60-byte mission record copied there whole — 53 of
+them at 0x4D5210, against 59 map names at 0x4D1990, and the campaign path
+indexes the one by the other. It looked wrong at first because the name table's
+base is easy to take four entries early; what settles it is `[0x4D17F0]`, the
+campaign order, whose first mission is id 10 — `CAMP`, the training ground. The
+data agrees the whole way down: ICE, ICEFLOW and FJORDS cold, DESVAL desert,
+LUNAR1 space, PLAY1 and PLAY2 toy. The skirmish path searches the same records
+for one whose field 0 is the mood the player picked, which is why that field is
+a key as well as a value. `lib/game/sky.ts` carries the table.
+
+Three things about the drawing are the remake's own, and `three/sky.ts` says so
+at each:
+
+- **The dome is small and rides the eye.** Four million units across cannot go
+  through a depth buffer — the battle's far plane is 100 000 — so it is drawn at
+  a radius of 40 000 centred on the camera every frame, which is the same
+  picture in the limit. Behind everything by RENDER ORDER and `depthTest: false`
+  rather than by distance.
+- **Its skins are forced opaque.** A TIM's colour 0 is transparent and the
+  ordinary model material discards it, which is right for a fir on a billboard
+  and wrong twice here: black is what a night sky is mostly made of, and there
+  is nothing behind the sky for a hole to show.
+- **`pig.HIR` must not touch it.** `loadModel` pairs textures by the archive's
+  own name and applies the skeleton sitting next to it in `Chars/`; the dome's
+  vertices are absolute and all carry bone 0, so that would have moved the whole
+  sky by the pig's root. `loadSky` is its own path for both reasons.
+
+**And the reason so little of it shows is the FOG, which is not built.** The
+same record gives a fog colour and a near/far per mood — 238 out to about 4048
+units, which is eight tiles against a 16384-unit map — so the original hides its
+distance and the terrain's silhouette sits low. The remake draws the whole plate
+to a 100 000 far plane, and the sky comes out as a band at the top of CAMP and
+nothing at all over ARTGUN. Every number is in `sky/notes.md`; so are the snow
+and rain, which are the same field's (cold snows, ominous rains, nothing else
+does).
+
+**Two things the verification cost, worth not paying twice.** `#battle-canvas`
+holds `<canvas id="battle-hud">` FIRST and the scene's canvas after it, so
+`querySelector('canvas')` reads the dashboard overlay back and reports a black
+screen — `canvas:not(#battle-hud)` is the one with the battle on it. And a
+pixel comparison ACROSS two launches proves nothing: the chase camera settles
+differently enough that every sample moves. What the spec holds the dome to
+instead is `pow.debug.sky()` — the mood, 544 triangles, four skins, and the
+distance from its centre to the eye, which is the one number a screenshot could
+never have shown.

@@ -239,6 +239,10 @@ export interface DebugHooks {
   /** Which building the acting pig is in and which it could jump into, by record
    * id, plus whether its model is drawn (three/battle.ts). */
   shelter(): { inside: number | null; doorway: number | null; drawn: boolean }
+  /** The sky dome: which mood loaded, how big it is, and how far its centre
+   * has drifted off the camera — which is meant to be nothing (three/sky.ts).
+   * Null on a map whose dome would not load. */
+  sky(): { mood: string; triangles: number; skins: number; offEye: number; radius: number } | null
   /** How many mines are drawn, and how many of those are TRODDEN ones wearing
    * the engine's own `WE_APMIN` out of the map's archive (three/mineArt.ts). */
   minesTripped(): number

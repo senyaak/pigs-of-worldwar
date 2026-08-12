@@ -29,6 +29,7 @@ import type { MapObject } from '../lib/formats/pog'
 import { parsePtg } from '../lib/formats/ptg'
 import { parseSrl } from '../lib/formats/srl'
 import type { SoundBank } from '../lib/formats/srl'
+import { SKY_ARCHIVES } from '../lib/game/sky'
 
 export interface LoadedModel {
   model: Model
@@ -96,6 +97,76 @@ export async function loadModel(full: string, base: string): Promise<LoadedModel
     textures: await pairedTextures(full),
     skeleton
   }
+}
+
+export interface LoadedSky {
+  /** The archive the map's mood picked: `sunny`, `coldsky`, `night1`, … */
+  name: string
+  /** The hemisphere OVER the horizon (`skydome`) and its mirror below it
+   * (`skydomeu`). The original builds an object from each and draws both. */
+  above: Model
+  below: Model
+  /** The four 250×250 quadrant skins in archive order, which is the order a
+   * face's texture index counts in. */
+  textures: TimImage[]
+}
+
+/** The dome's geometry — one archive for every mood, which only skins it. */
+const SKY_DOME = 'Chars/SKYDOME.MAD'
+
+/** A file in `dir` matched without regard to case: the install spells its
+ * archives `british.mad` and `SKYDOME.MAD` alike. */
+async function siblingNamed(dir: string, file: string): Promise<string> {
+  const siblings = await fs.readdir(dir)
+  const found = siblings.find((name) => name.toLowerCase() === file.toLowerCase())
+  if (!found) throw new Error(`no ${file} in ${path.basename(dir)}`)
+  return path.join(dir, found)
+}
+
+/**
+ * The sky: `Chars/SKYDOME.MAD`'s two hemispheres and the four TIMs of
+ * `Chars/<mood>.MAD` that skin them (lib/game/sky.ts).
+ *
+ * `loadModel` will not do for this. It pairs textures by the archive's OWN
+ * name — which would be `SKYDOME.MTD`, the `range1..4` mountains rather than
+ * the mood's sky — and it applies `pig.HIR`'s bone offsets, because the
+ * skeleton sits next to it in `Chars/`. The dome's vertices are absolute and
+ * every one of them carries bone 0, so those offsets would shift the whole
+ * sky by the pig's root.
+ *
+ * `archive` is checked against the exe's own list rather than trusted: it
+ * ends up in a path.
+ */
+export async function loadSky(gameDir: string, archive: string): Promise<LoadedSky> {
+  if (!(SKY_ARCHIVES as readonly string[]).includes(archive)) {
+    throw new Error(`no such sky: ${archive}`)
+  }
+  const domeData = await fs.readFile(path.join(gameDir, ...SKY_DOME.split('/')))
+  const { entries } = parseArchive(domeData)
+  const model = (base: string): Model => {
+    const slice = (ext: string): Uint8Array => {
+      const wanted = `${base}.${ext}`.toLowerCase()
+      const entry = entries.find((one) => one.name.toLowerCase() === wanted)
+      if (!entry) throw new Error(`no ${wanted} in ${SKY_DOME}`)
+      return domeData.subarray(entry.offset, entry.offset + entry.size)
+    }
+    // No bone offsets, on purpose — see above.
+    return parseModel(slice('vtx'), slice('no2'), slice('fac'))
+  }
+
+  const skinPath = await siblingNamed(path.join(gameDir, 'Chars'), `${archive}.mad`)
+  const skinData = await fs.readFile(skinPath)
+  const textures = parseArchive(skinData).entries.map((entry) => {
+    const tim = parseTim(skinData.subarray(entry.offset, entry.offset + entry.size))
+    return {
+      name: entry.name.replace(/\.tim$/i, '').toLowerCase(),
+      width: tim.width,
+      height: tim.height,
+      rgba: tim.rgba
+    }
+  })
+
+  return { name: archive, above: model('skydome'), below: model('skydomeu'), textures }
 }
 
 export interface FrontendImage {

@@ -866,11 +866,27 @@ control sets, polled once a frame" in [turns.md](turns.md).
   MENU claims a start — the table has one for every screen, but which id is
   which is only pinned for that one. What is still eyework is the MACHINE
   behind the column; see the layout entry below.
-- **There is no SKY.** The battle renders against a flat clear colour, while
-  the original ships `Skys/` — paired `.PTG`/`.PMG` files per mood
-  (`CLOUDY1`, `DAWN1`, `CLIMB`, plus `COLD` and `DESERT` folders). Neither
-  the format nor which map picks which sky is decoded. Own thread, after the
-  tutorial.
+- **The SKY is in, and the `Skys/` folder had nothing to do with it**
+  (2026-08-12). That folder — paired `.PTG`/`.PMG` per mood, `CLOUDY1`,
+  `DAWN1`, `CLIMB`, plus `COLD` and `DESERT` subfolders — is named NOWHERE in
+  the exe; the whole image holds three strings with "sky" in them and none is
+  a path into it. The PC draws a MODEL: `Chars/SKYDOME.MAD`'s two hemispheres,
+  skinned by four 250×250 TIMs out of one of eleven `Chars/<mood>.MAD`
+  archives, at 256× across and 128× up. Which mood is the first dword of the
+  map's own 60-byte mission record (0x4D5210, paired to the names at
+  0x4D1990), so CAMP is cold, DESVAL desert and LUNAR1 space — and it is the
+  same field that decides the fog, the weather values and whether it snows or
+  rains, none of which is built (`docs/todo.md`, `sky/notes.md`).
+
+  Two things the work turned up that were not the sky. The dome is drawn
+  behind everything by render order rather than by distance, because the
+  original's four-million-unit radius cannot go through a depth buffer; and
+  the reason so little of it shows is the missing fog — the exe hides the
+  ground past about 4048 units, which is eight tiles, while the remake draws
+  the whole 16384-unit plate and the terrain's own silhouette eats the sky.
+  A pixel readback of the battle is also worth knowing about: `#battle-canvas`
+  holds the HUD canvas FIRST, so `querySelector('canvas')` reads the dashboard
+  overlay and reports a black screen. `canvas:not(#battle-hud)` is the scene.
 - **The drop-in's card and camera are in, and both want a look.** The card
   is the exe's (`gtext 159` + the mission name, centred, y = 160 —
   `ui/titleCard.ts`), but only CAMP is answered: which display name goes
