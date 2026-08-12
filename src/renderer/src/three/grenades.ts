@@ -15,10 +15,10 @@ import { MODEL_SCALE } from '../../../lib/game/scale'
 import type { Point } from '../../../lib/game/pose'
 import { weaponModelName } from '../../../lib/game/weapons'
 import { projectileModel } from '../../../lib/game/ammo'
-import { isPlanted } from '../../../lib/game/grenade'
+import { isPlanted, lobOf } from '../../../lib/game/grenade'
 import { createLobArt } from './lobArt'
 import { createLobTrails } from './lobTrail'
-import { FUSE_LIFT, FUSE_TRAIL, LOB_TRAIL } from '../../../lib/game/trail'
+import { FUSE_LIFT, FUSE_TRAIL, LOB_TRAIL, ROCKET_TRAIL } from '../../../lib/game/trail'
 import { fromExeY } from '../../../lib/game/terrain'
 
 /**
@@ -84,6 +84,25 @@ const pose = new THREE.Matrix4()
 /** The model's fuse axis, before the pose turns it into a world direction. */
 const FUSE_AXIS = new THREE.Vector3(-1, 0, 0)
 const facing = new THREE.Vector3()
+
+/**
+ * **WHICH WAY A ROCKET POINTS, measured off its own model.** Play: "прожектайл
+ * кривой при выстреле базуки", twice.
+ *
+ * The old pose was a yaw and a pitch that assumed the nose ran along +Z, which
+ * was a guess and a wrong one — `WE_TNT`'s long axis turned out to be −X and
+ * `WE_BAZZ`'s is neither. Measured out of the MAP's own archive, which is where
+ * a fired rocket's art comes from (lib/game/ammo.ts): thirteen vertices, long
+ * axis **Y** (−196..191), with **one** vertex at the −196 end against **six** at
+ * +191 — an apex over a hexagonal body. A single vertex at one end of a rocket
+ * is the nose, so the nose is model **−Y**.
+ *
+ * Turning that onto the velocity is the whole pose, and it is right for a ball
+ * as well: `WE_GRE2` is symmetric about every axis, so spinning it costs
+ * nothing.
+ */
+const NOSE_AXIS = new THREE.Vector3(0, -1, 0)
+const heading = new THREE.Vector3()
 
 /**
  * How far to lift THIS mesh so it sits ON the ground rather than half in it — a
@@ -174,8 +193,12 @@ export function createGrenadeArt(
         // stands on its end instead (`STAND`).
         if (isPlanted(shot.skill)) mesh.rotation.z = STAND
         else {
-          mesh.rotation.y = Math.atan2(shot.vx, shot.vz) + Math.PI
-          mesh.rotation.x = Math.atan2(shot.vy, Math.hypot(shot.vx, shot.vz))
+          // Its NOSE along its flight — the model's own axis (`NOSE_AXIS`), not
+          // a yaw and a pitch that assumed one.
+          heading.set(shot.vx, shot.vy, shot.vz)
+          if (heading.lengthSq() > 1e-6) {
+            mesh.quaternion.setFromUnitVectors(NOSE_AXIS, heading.normalize())
+          }
         }
         // …and the lift comes after the pose, because it is measured FROM it.
         // Y-DOWN, so lifting is subtracting.
@@ -212,11 +235,12 @@ export function createGrenadeArt(
       // every charge onto the grenade's row for the whole of its fuse.
       for (const shot of live) {
         const planted = isPlanted(shot.skill)
-        trails.follow(
-          shot.id,
-          (planted ? alight.get(shot.id) : null) ?? where(shot),
-          planted ? FUSE_TRAIL : LOB_TRAIL
-        )
+        // …and a ROCKET lays its own, which is thicker and white. The exe hangs
+        // no trail on it at all — both of its sites were read and kind 10 is
+        // outside both — so this row is the remake's, on play's word
+        // (lib/game/trail.ts, `ROCKET_TRAIL`).
+        const row = planted ? FUSE_TRAIL : lobOf(shot.skill)?.contact ? ROCKET_TRAIL : LOB_TRAIL
+        trails.follow(shot.id, (planted ? alight.get(shot.id) : null) ?? where(shot), row)
       }
       trails.update(delta)
     },

@@ -35,6 +35,7 @@ import {
 import type { Bounciness, Velocity } from './ballistics'
 import { GAUGE_FULL } from './gauge'
 import { AIM_UNITS } from './aim'
+import { PIG_RADIUS } from './obstacles'
 
 /** One lobbed weapon's row, read out of 0x4c2030 the same way a gun's is. */
 export interface Lob {
@@ -280,16 +281,23 @@ export const BLAST_CORE = 512
  * …and the same 512 comes off the RANGE.
  *
  * `[0x4BD3FC]` reads 512.0 and 0x48cc49 subtracts it, so the exe's divisor is
- * `[effect+0x60] + [body+0x4C]+0x0C - 512`. For a grenade that is
- * `1024 + something - 512`. The body's own term is a float nobody has read; it
- * is left out and named here rather than guessed at.
+ * `[effect+0x60] + [[body+0x18]+0x4C]+0x0C − 512`.
+ *
+ * **And that middle term is read now** (2026-08-11): `[body+0x18]` is the
+ * struck body's own record and `+0x4C` its COLLIDER, whose `+0x0C` is the
+ * radius the shape table wrote there (0x4A90A0). So it is "how big the thing
+ * being hit is" — 0xAA for a pig, straight out of the same table its body comes
+ * from — which is why it rides `MODEL_SCALE` here like every other body length
+ * (`PIG_RADIUS`, lib/game/obstacles.ts).
  */
 export const BLAST_BIAS = 512
 
-/** How far the falloff runs for a blast of this size — the exe's divisor
- * without the struck body's own unread term. A MINE has a blast and no row
- * (lib/game/mines.ts), which is why the number comes in on its own. */
-export const blastReach = (blast: number): number => Math.max(0, blast - BLAST_BIAS)
+/** How far the falloff runs for a blast of this size — the exe's own divisor,
+ * measured against a PIG, which is what every blast in this engine is measured
+ * against. A MINE has a blast and no row (lib/game/mines.ts), which is why the
+ * number comes in on its own. */
+export const blastReach = (blast: number): number =>
+  Math.max(0, blast + PIG_RADIUS - BLAST_BIAS)
 
 /** …and the same, for a row that carries one. */
 export const blastRange = (row: Lob): number => blastReach(row.blast)
@@ -298,11 +306,26 @@ export const blastRange = (row: Lob): number => blastReach(row.blast)
  * never falls below a quarter inside the range. */
 export function blastShare(distance: number, range: number): number {
   if (range <= 0) return 1
-  // No cap and none needed: with the right range the formula bottoms out on
-  // its own at `512 + 4*range/3`, which for a grenade is about 1200 units —
-  // full damage inside one tile, nothing past two and a bit. The 3979 that had
-  // to be capped came from reading the range off the wrong argument.
   const past = Math.max(0, distance - BLAST_CORE)
+  // **THE RIM IS THE RANGE, and past it there is nothing.** Play: "у динамита
+  // радиус слишком большой — я отхожу задом все 4 секунды, а меня всё равно
+  // задевает." Measured: they were about 2400 units out and took 4 points.
+  //
+  // The formula is a ramp from the core to a QUARTER at exactly `past = range`,
+  // which is the rim the exe designs — "never to nothing, which is why standing
+  // back helps and hiding does not". This engine went on evaluating it past its
+  // own divisor to where the line crosses zero, `512 + 4·range/3`, and used THAT
+  // as the reach. The gap between the two is the RANGE's own size, which is why
+  // only TNT was ever complained about: a grenade loses under a hundred units by
+  // this and TNT loses four hundred.
+  //
+  // The exe's own WHO is still not found and this is not it: `Pig::OnHit`'s
+  // blast arm is reached from a physics CONTACT with the effect's own body,
+  // which the shape table gives a sphere of 35 (0x4A8F42) — 205 units of reach
+  // against a pig, at which the falloff could never be anything but full. So
+  // something grows that contact and it has not been read; until it has, the
+  // rim the formula itself draws is the honest reach.
+  if (past > range) return 0
   return Math.max(0, 1 - (3 * past) / (4 * range))
 }
 

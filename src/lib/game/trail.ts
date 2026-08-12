@@ -122,6 +122,41 @@ export const FUSE_TRAIL: TrailKind = {
  * argument that is not zero (0x43243f). */
 export const FUSE_LIFT = 0x3c
 
+/**
+ * **A ROCKET's smoke — and this one is the REMAKE's, against a clean negative.**
+ *
+ * Play: "нет белого густого дыма за снарядом базуки." The exe hangs nothing on
+ * it, and both of its trail sites were read to be sure:
+ *
+ * - the CONSTRUCTOR's trail dispatch is `kind − 0x15` against a 0x21-entry byte
+ *   map (0x4323F3), so it answers **kinds 21..53 only** — the grenade family to
+ *   0x43247B (id 0x15) and the charges to 0x432414 (id 0x1D). The bazooka is
+ *   kind **10** and falls out of range before the map is even read;
+ * - the UPDATE's every-fifth-frame trail is `kind − 4` against its own map
+ *   (0x436607), and kind 10's slot is 4 — the exit. Only kinds 26 and 27, the
+ *   guided family, lay one there.
+ *
+ * So the original's rocket leaves nothing behind it, and this row exists because
+ * play asked for one. It is the grenade's shape with the two things play named:
+ * WHITE (thirty-one of thirty-one, where the engine's own default grey is
+ * sixteen) and THICK — twice the puffs a grenade lays, at twice the size and
+ * living twice as long, since a rocket outruns anything a grenade's six-a-frame
+ * would leave.
+ *
+ * (The same reading corrects this file's old claim that a BULLET takes the
+ * grenade's trail "from the same pool, because the engine hangs that effect off
+ * a projectile in its constructor": kinds 4..20 are outside that dispatch too.
+ * A bullet's trail is the remake's as well.)
+ */
+export const ROCKET_TRAIL: TrailKind = {
+  id: 0x15,
+  steps: 12,
+  ageStep: 0x0a,
+  particle: 0x16,
+  colour: [31, 31, 31],
+  size: 0x10
+}
+
 /** How many of a kind can be alive at once, which is the capacity its id gets
  * from the count table. */
 export const trailRoom = (kind: TrailKind): number =>

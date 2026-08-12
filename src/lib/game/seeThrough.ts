@@ -79,6 +79,30 @@ export function crossedBy(
 }
 
 /**
+ * The same, over SEVERAL points on the thing being looked at — the union of what
+ * each of them is behind.
+ *
+ * Play: "текстура наверху прозрачная, а внизу еле-еле." One ray to the pig's
+ * middle fades the piece that middle is behind and nothing else, and a wall is
+ * built of pieces stacked up the wall — so the panel his HEAD was behind went
+ * see-through while the one his feet were behind stayed solid, which is exactly
+ * "transparent at the top and hardly at the bottom". A pig is a body, not a
+ * point: everything in front of any part of him gets out of the way.
+ */
+export function crossedTowards(
+  boxes: readonly Obstacle[],
+  from: Spot,
+  targets: readonly Spot[],
+  margin = 0
+): number[] {
+  const out: number[] = []
+  for (const box of boxes) {
+    if (targets.some((to) => crosses(box, from, to, margin))) out.push(box.id)
+  }
+  return out
+}
+
+/**
  * One box against one segment — the ordinary slab test, done in the box's OWN
  * frame so an oriented box needs no special case.
  *

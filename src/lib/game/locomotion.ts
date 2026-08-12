@@ -211,6 +211,19 @@ export const ANIM = {
    * have been instead — the menu's ICON is called `sleep`, which is where the
    * memory of one came from. */
   THINKING: 46,
+  /**
+   * **The victory dance.** Play: "при выигрыше… он не танцует победный танец" —
+   * and the clip they mean is the one already in this table, from the other end:
+   * "анимация пропуска хода кривая, и она на победу" (CLAUDE.md's open list).
+   * So 46 is a celebration that SKIP TURN borrowed, not a doze — the name table
+   * calls it "Thinking" and the name table has been wrong before (`PARACHUTE`).
+   *
+   * Named twice on purpose: the two moments are different, and whichever of them
+   * turns out to want its own clip can take one without moving the other. What
+   * SKIP TURN should wear instead is still open — skills 63/65/66 are out of
+   * range of `Pig::Fire`'s dispatch, so there is no call site to read it off.
+   */
+  VICTORY: 46,
   /** Thrown out of a wall — what `0x470c70` plays, and the only thing that
    * does. Ordinary falling is JUMP_MIDDLE; the impact handler plays BOUNCE. */
   EJECTED: 38,

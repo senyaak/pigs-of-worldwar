@@ -21,7 +21,7 @@ import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
 import { FLING_CAP, FLING_PER_POINT, burst, flingSpeed } from '../../src/lib/game/blast'
 import { PITCH, createTumbles, flingVelocity } from '../../src/lib/game/tumble'
 import { NO_OBSTACLES } from '../../src/lib/game/obstacles'
-import { blastReach, blastShare } from '../../src/lib/game/grenade'
+import { BLAST_CORE, blastReach, blastShare } from '../../src/lib/game/grenade'
 import { fromExeSpeed } from '../../src/lib/game/ballistics'
 import { Game } from '../../src/lib/game/game'
 import type { Pig } from '../../src/lib/game/game'
@@ -210,6 +210,36 @@ test('…and the pig NEXT to it is thrown too, away from the blast and less hard
 
   for (let i = 0; i < 600 && tumbles.live() > 0; i++) tumbles.update(STEP)
   expect(Math.hypot(far.position.x - from.x, far.position.z - from.z)).toBeGreaterThan(20)
+})
+
+test('THE RIM IS THE RANGE: past it a blast does nothing at all', () => {
+  // Play, of TNT: "радиус слишком большой — я отхожу задом все 4 секунды, а меня
+  // всё равно задевает на 4 урона." Measured, they were about 2400 units out.
+  //
+  // `0x48CBA0` is a ramp from the core to a QUARTER at exactly `past = range`,
+  // and this engine went on evaluating it past its own divisor to where the line
+  // crosses zero — `512 + 4·range/3`. For a GRENADE the two land on the same
+  // number and nothing ever looked wrong; for TNT, at twice the range, they are
+  // hundreds of units apart, and those hundreds are what play walked through.
+  const tnt = blastReach(2048)
+  const grenade = blastReach(1024)
+  // At the core, everything. At the rim, the exe's quarter and not nothing.
+  expect(blastShare(0, tnt)).toBe(1)
+  expect(blastShare(BLAST_CORE, tnt)).toBe(1)
+  expect(blastShare(BLAST_CORE + tnt, tnt)).toBeCloseTo(0.25, 6)
+  // …and one unit past it, nothing.
+  expect(blastShare(BLAST_CORE + tnt + 1, tnt)).toBe(0)
+  expect(blastShare(2400, tnt), 'four seconds of backing away is out of it').toBe(0)
+
+  // And the change is SIZED by the range, which is why only TNT was ever
+  // complained about: measured against what this engine used to reach — the
+  // line's zero crossing, `512 + 4·range/3`, off the old range with no striker
+  // term in it — a grenade loses under a hundred units and TNT loses four
+  // hundred.
+  const wasReaching = (blast: number): number => BLAST_CORE + (4 * (blast - BLAST_CORE)) / 3
+  expect(wasReaching(1024) - (BLAST_CORE + grenade)).toBeLessThan(100)
+  expect(wasReaching(2048) - (BLAST_CORE + tnt)).toBeGreaterThan(400)
+  expect(blastShare(1500, grenade), 'and a grenade past its own rim is nothing').toBe(0)
 })
 
 test('a blast with nobody to throw it to still hurts — the fling is optional', () => {

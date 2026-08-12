@@ -50,6 +50,8 @@ import {
   buildingSkills
 } from '../../src/lib/game/buildings'
 import { choosableIn, createIndoors } from '../../src/lib/game/indoors'
+import { DOOR_FROM, DOOR_TO, advanceCarry, carryIn } from '../../src/lib/game/doorway'
+import { PHASE_UNITS } from '../../src/lib/game/melee'
 import { sightBlockers } from '../../src/lib/game/seeThrough'
 import { ObstacleField, boxOf, isSolid } from '../../src/lib/game/obstacles'
 import { SKILL } from '../../src/lib/game/skills'
@@ -264,6 +266,38 @@ test('the way IN is CLIP 7, and the archive says it is a climb', () => {
   expect(lift(ANIM.IDLE), 'and the idle barely moves').toBeLessThan(4)
 })
 
+test('the CLIP says when he leaves the ground: nothing moves for the first half', () => {
+  // Play: "прыжок в и из бункера — свина надо двигать после начала прыжка, не во
+  // время подготовки." The clip carries the window and the exe reads it out:
+  // `0x4734B0` walks clip 7's own key-frame list and copies the phase of the row
+  // carrying event **68** into `[pig+0x218]` and event **69** into `[+0x21A]`,
+  // and the per-frame step is the difference over the frames between them. Both
+  // events have an empty arm in the dispatcher — they are markers.
+  expect(DOOR_FROM).toBe(1950)
+  expect(DOOR_TO).toBe(3300)
+  expect(DOOR_FROM / PHASE_UNITS).toBeGreaterThan(0.45)
+
+  const query = campQuery()
+  const building = createIndoors(CAMP, () => {}).all()[0]
+  const from = { x: SHELTER.x + 900, y: query.height(SHELTER.x + 900, SHELTER.z), z: SHELTER.z }
+  const whole = 2 // seconds of clip, round for the arithmetic
+  const one = carryIn(building, from, whole)
+  const footing = createLocomotion(query, from.x, from.z, 0, {
+    y: from.y,
+    obstruction: new ObstacleField(CAMP)
+  })
+
+  // The wind-up: not a unit of it moves.
+  advanceCarry(one, footing, (whole * DOOR_FROM) / PHASE_UNITS - 0.01)
+  expect(Math.hypot(footing.x - from.x, footing.z - from.z), 'still on the step').toBeLessThan(1)
+
+  // …then it travels, and it is DONE before the clip is — the last fifth is his
+  // own again.
+  advanceCarry(one, footing, (whole * (DOOR_TO - DOOR_FROM)) / PHASE_UNITS + 0.02)
+  expect(Math.abs(footing.x - building.box.x), 'arrived at the middle').toBeLessThan(1)
+  expect(one.left, 'and the carry is spent with clip left to run').toBe(0)
+})
+
 test('a BUILDING is never faded — the wall we blow up is', () => {
   // Play: "просвечивать должны стены, которые мы взрываем — не бомбоубежище."
   const blockers = sightBlockers(CAMP)
@@ -388,9 +422,19 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
     .toBeLessThan(32)
   const out = await debugState(page)
   // …rising. Game space is Y-DOWN, so going up is the number going DOWN.
-  await page.waitForTimeout(300)
+  //
+  // POLLED, and that is the clip's own doing: nothing moves for the first half of
+  // it. The glide runs between clip 7's events 68 and 69 — phases 1950 and 3300
+  // of 4096 — so he stands in the doorway for a second before he leaves the
+  // ground (lib/game/doorway.ts, and play asked for exactly that: "свина надо
+  // двигать после начала прыжка, не во время подготовки").
+  await expect
+    .poll(async () => (await debugState(page)).nodeY, {
+      timeout: 4000,
+      message: 'he came out and did not rise'
+    })
+    .toBeLessThan(out.nodeY - 8)
   const risen = await debugState(page)
-  expect(risen.nodeY, 'he came out and did not rise').toBeLessThan(out.nodeY - 8)
   expect(Math.hypot(risen.x - out.x, risen.z - out.z), 'the rise drifted sideways')
     .toBeLessThan(1)
 

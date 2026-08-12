@@ -107,6 +107,21 @@ const lensFor = (holding: number | null): number | null =>
  * and also a line an invented one stood in for. */
 const MISSES_TURN = 167
 
+/**
+ * **What a finished mission says, and it is the game's own card.** Play: "при
+ * выигрыше не написано победа."
+ *
+ * The exe draws its centred cards out of ONE function switching on the game's
+ * mode (0x45B94B → the table at 0x45BF78): mode 1 START OF GAME is the mission
+ * title this file already draws, mode 4 START OF TURN is "GET READY >S...", and
+ * **mode 2, END OF GAME, is this pair** (0x45BC66). One player takes `gtext` 163
+ * when its side is still standing and 164 when it is not; a multiplayer game
+ * takes 165, "VICTORY TO >S!!", with the winning team's name — which this does
+ * not draw, because nothing here fields two human sides.
+ */
+const MISSION_ACCOMPLISHED = 163
+const MISSION_FAILED = 164
+
 export interface BattleView {
   /** Open a battle. With no name it reopens whatever map the view is on,
    * which is the training ground until something asks for another — the
@@ -242,6 +257,8 @@ export function initBattle(onLeave: () => void): BattleView {
     // The script's first two beats: the sergeant starts talking over the
     // drop, and picks up again the moment the round is under way.
     cue(scene.dropping() ? 'drop' : 'round')
+    /** The mission being over, which is a card of its own (lib/game/endOfGame.ts). */
+    const ended = scene.battle.view().ending
     hud.draw({
       delta,
       seconds: game.timeLeft,
@@ -267,12 +284,16 @@ export function initBattle(onLeave: () => void): BattleView {
       lens: lensFor(game.currentPig.holding),
       scope: scene.scoped(),
       // The card carries the mission's name for as long as anyone is still in the
-      // air, and then "GET READY >S..." for the beat at the top of every turn.
+      // air, "MISSION ACCOMPLISHED!" once it is over, and "GET READY >S..." for
+      // the beat at the top of every turn — all three the same centred card the
+      // exe draws off its own mode (0x45B94B).
       title: scene.dropping()
         ? title
-        : game.starting
-          ? (battleText[GET_READY] ?? '').replace('>S', game.currentPlayer.name)
-          : null
+        : ended
+          ? (battleText[ended.won ? MISSION_ACCOMPLISHED : MISSION_FAILED] ?? '')
+          : game.starting
+            ? (battleText[GET_READY] ?? '').replace('>S', game.currentPlayer.name)
+            : null
     })
   }
 

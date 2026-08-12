@@ -29,7 +29,7 @@ import { PROJECTILE_MODEL, SPAWNED_MODELS, projectileModel } from '../../src/lib
 import { BARREL_SOUND, BATTLE_SOUNDS } from '../../src/renderer/src/audio/battle'
 import { WEAPON_MODEL, weaponModelName } from '../../src/lib/game/weapons'
 import { createLobs } from '../../src/lib/game/lobs'
-import { NO_OBSTACLES } from '../../src/lib/game/obstacles'
+import { NO_OBSTACLES, PIG_RADIUS } from '../../src/lib/game/obstacles'
 import { createBus } from '../../src/lib/game/events'
 import type { BattleEvent } from '../../src/lib/game/events'
 import { parsePog } from '../../src/lib/formats/pog'
@@ -84,9 +84,12 @@ test('the row is the exe’s, and it is nothing like a grenade’s', () => {
   expect(row!.speed).toBeGreaterThan(lobOf(GRENADE)!.speed)
   // Forty points at the core — enough to leave a fifty-point grunt with ten.
   expect(row!.damage / DAMAGE_UNIT).toBe(40)
-  // …over TNT's reach rather than a grenade's.
+  // …over TNT's reach rather than a grenade's. The RANGE is the row less the
+  // exe's own 512 and plus the struck body's radius — `[[body+0x18]+0x4C]+0x0C`
+  // at 0x48CC46, which is the pig's collider out of the same shape table its
+  // body comes from (lib/game/grenade.ts, `blastReach`).
   expect(row!.blast).toBe(2048)
-  expect(blastRange(row!)).toBe(1536)
+  expect(blastRange(row!)).toBe(2048 + PIG_RADIUS - 512)
   // And NO FUSE: arming nil is the switch into state 2.
   expect(row!.arming).toBe(0)
   expect(row!.fuse).toBe(0)

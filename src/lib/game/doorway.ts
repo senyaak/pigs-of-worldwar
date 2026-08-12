@@ -27,12 +27,40 @@
 // describes — because it is the model's own number rather than a pick, and
 // because "out through the top" is the only thing a zeroed x and z can mean.
 //
+// **AND IT DOES NOT MOVE FOR THE WHOLE CLIP** — play: "свина надо двигать после
+// начала прыжка, не во время подготовки." Right, and the clip says exactly when.
+// `n` above is `((s16)[+0x21A] − (s16)[+0x218]) / [+0x84]`, and those two words
+// are filled by `0x4734B0`, which walks the clip's own key-frame list and copies
+// the PHASE of the row carrying event **68** into `[+0x218]` and the one carrying
+// **69** into `[+0x21A]`. Both of those events have an EMPTY arm in the event
+// dispatcher (0x474ECB, the epilogue) — they are markers and nothing else.
+//
+// Clip 7's list, out of `afGetKeyFrameList` (`_d3d.dll` 0x1002C778 + clip*88, six
+// (phase, id, id) rows of twelve bytes):
+//
+// | phase | id | |
+// | ----- | -- | - |
+// | 300 | 16 | bone 5 |
+// | 975 | 22 | bone 5 |
+// | 1800 | 43 | bone 6, on a coin flip |
+// | **1950** | **68** | the glide STARTS |
+// | 3300 | 3, **69** | a footstep (sound 0x2D) — and the glide ENDS |
+//
+// So the pig crouches for the first 48% of the clip, travels over the next 33%,
+// and lands still for the last 19%.
+//
 // Pure, game space (Y-DOWN) like the rest of lib/game: up is −y, so the roof is
 // the SMALLER number.
 
 import type { Building } from './indoors'
 import type { LocomotionState } from './locomotion'
 import type { Point } from './pose'
+import { PHASE_UNITS } from './melee'
+
+/** Where clip 7's own event 68 sits — the frame the pig leaves the ground. */
+export const DOOR_FROM = 1950
+/** …and event 69, where it arrives. */
+export const DOOR_TO = 3300
 
 /** The step the door is adding this frame, and how much of the clip is left. */
 export interface Carry {
@@ -43,7 +71,10 @@ export interface Carry {
   vx: number
   vy: number
   vz: number
-  /** Seconds of the clip still to run. */
+  /** Seconds of the WIND-UP still to burn before anything moves — clip 7's own
+   * event 68 (`DOOR_FROM`). */
+  hold: number
+  /** Seconds of travel still to run. */
   left: number
 }
 
@@ -54,13 +85,24 @@ export const middleOf = (building: Building): Point => ({
   z: building.box.z
 })
 
-const carry = (from: Point, to: Point, seconds: number): Carry => ({
-  at: { x: from.x, y: from.y, z: from.z },
-  vx: seconds > 0 ? (to.x - from.x) / seconds : 0,
-  vy: seconds > 0 ? (to.y - from.y) / seconds : 0,
-  vz: seconds > 0 ? (to.z - from.z) / seconds : 0,
-  left: seconds
+/** The clip's own window, in seconds of it: what to wait out, and what to
+ * travel over. */
+const windowOf = (whole: number): { hold: number; span: number } => ({
+  hold: (whole * DOOR_FROM) / PHASE_UNITS,
+  span: (whole * (DOOR_TO - DOOR_FROM)) / PHASE_UNITS
 })
+
+const carry = (from: Point, to: Point, seconds: number): Carry => {
+  const { hold, span } = windowOf(seconds)
+  return {
+    at: { x: from.x, y: from.y, z: from.z },
+    vx: span > 0 ? (to.x - from.x) / span : 0,
+    vy: span > 0 ? (to.y - from.y) / span : 0,
+    vz: span > 0 ? (to.z - from.z) / span : 0,
+    hold,
+    left: span
+  }
+}
 
 /** IN: from where he stands to the building's own middle, all three axes. */
 export const carryIn = (building: Building, from: Point, seconds: number): Carry =>
@@ -97,7 +139,15 @@ export function doorwayStart(building: Building, footing: LocomotionState): Loco
  * Returns false once the clip's worth of it has run.
  */
 export function advanceCarry(one: Carry, footing: LocomotionState, delta: number): boolean {
-  const step = Math.min(delta, one.left)
+  // The wind-up first: nothing moves until the clip's own event 68 comes round,
+  // which is what stops the pig sliding through his own crouch.
+  let rest = delta
+  if (one.hold > 0) {
+    const held = Math.min(rest, one.hold)
+    one.hold -= held
+    rest -= held
+  }
+  const step = Math.min(rest, one.left)
   one.at.x += one.vx * step
   one.at.y += one.vy * step
   one.at.z += one.vz * step

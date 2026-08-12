@@ -1072,12 +1072,15 @@ damage "on its distribution" (zero for guns, a ladder for explosives) when
 `fire.md` had already recorded, correctly, that it is compared against a
 counter. **A distribution is a hint; an instruction is the answer.**
 
-**The blast's REACH is decoded too** — `BLAST_REACH = 0x400`, a half-extent per
-axis, from the last thing a projectile's update does: walk the pig list at
-`[0x51EE18]` and set `[pig+0x180]` on everything inside ±0x400 on all three
-(0x437775). What that flag MEANS is not followed and `grenade.ts` says so.
-What is left invented is `BLAST_DAMAGE` — the same gap `SHOT_DAMAGE` has — and
-the falloff across the box.
+**`BLAST_REACH = 0x400` is NOT the blast's reach** — that reading is dead, and
+what the flag means is read now (2026-08-11). The last thing a projectile's
+update does is walk the pig list at `[0x51EE18]` and set `[pig+0x180]` on
+everything inside ±0x400 on all three axes (0x437775); that byte has exactly two
+readers and both are in the ANIMATION picker (0x46F457, 0x4721B7), where it puts
+clip 0x21 on. **A pig with a live projectile within a tile of it COWERS.** It has
+nothing to do with damage, and the note that offered it as a candidate for "who
+is caught by a blast" was wrong. What decides that is still open — see the blast
+paragraph further down and `weapons/fire.md`.
 
 **The gauge shows whenever a weapon that HAS one is in hand**, not only while
 it fills — which is what the original does with it. `charging()` returns 0
@@ -2512,9 +2515,13 @@ the page already argues for, with the case play caught added to it.
 **Black smoke, and a bullet that smokes.** A puff was 55 units across in mid grey —
 a sixth of a pig, invisible beside a fireball. It takes the fireball's own colour
 law now (`cloudChannel(16)` = 100 of 255) at a size where fourteen of them read as
-a cloud. And a bullet lays the same trail a grenade does, from the same pool: the
-engine hangs that effect off a projectile in its constructor and does not care
-whether the thing was thrown or fired.
+a cloud. And a bullet lays the same trail a grenade does, from the same pool —
+though **the reason given here was wrong** and is corrected 2026-08-11: the
+constructor's trail dispatch is `kind − 0x15` over 0x21 entries, so it answers
+kinds 21..53 and a BULLET (4..20) is outside it, as is the bazooka's rocket (10).
+The engine hangs a trail on the grenade family and the charges and on nothing
+else; a bullet's is the remake's, like the rocket's own white one
+(`ROCKET_TRAIL`, lib/game/trail.ts).
 
 **The flight ANIMATES.** "Отбрасывание не запускает анимацию полёта. падение не
 запускает анимацию подьёма после полёта." Both were one line: the frame dresses
@@ -3080,6 +3087,17 @@ The sergeant signs off with clip **27** if it took more than twelve turns and
 **28** otherwise (`[gameMode+0x40C]`, the handover count, against `cmp eax,0Ch`).
 Which of the two is the congratulation is LOCATED and not heard — both lines are
 blank, voice only.
+
+**And it SHOWS something**, which play asked for — "при выигрыше не написано
+победа, остаётся оружие в руках, он не танцует победный танец". The card is the
+game's own and comes out of the same drawer every other card does: `0x45B8B0`
+switches on `Game::Mode()` (the table at 0x45BF78), and mode 2's arm is
+`gtext` **163 "MISSION ACCOMPLISHED!"** for a one-player side still standing,
+**164 "MISSION FAILED!"** when it is not, and 165 "VICTORY TO >S!!" with the
+team's name in multiplayer. The empty hands and the DANCE are the remake's — the
+exe's mode-2 arm plays no clip and touches no weapon — and the clip is play's own
+identification from the other end: 46, which they named as a celebration when
+SKIP TURN borrowed it (`ANIM.VICTORY` beside `ANIM.THINKING`).
 
 **Two of the four "closers" are nothing of the kind**, and this file had them
 filed wrong. Both are built now, and each turned out to have a rule worth

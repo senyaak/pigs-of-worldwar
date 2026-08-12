@@ -24,11 +24,18 @@ import { HEIGHT_SCALE } from '../../../lib/game/terrain'
  *
  * It was 0.25 and play said that is not a fade: "стены должны не пропадать, а
  * становиться полупрозрачными" — a quarter of a wall standing over the ground it
- * matches in colour reads as no wall at all. **HALF**, which is the one value
- * that cannot be argued about in either direction: the wall is exactly as present
- * as what is behind it. Move it in play, not by reasoning.
+ * matches in colour reads as no wall at all. Half was the answer to that, and
+ * play has now asked for a step the other way — "прозрачность ещё как-то мало,
+ * надо побольше" — so **0.4**, one step and not a jump back to the value that
+ * was already refused.
+ *
+ * Most of what play was seeing was NOT this number, though: only the piece one
+ * ray happened to skewer faded at all, so the wall went see-through level with
+ * the pig's head and stayed solid level with his feet
+ * (`crossedTowards`, lib/game/seeThrough.ts). Move this in play, not by
+ * reasoning.
  */
-const SEE_THROUGH = 0.5
+const SEE_THROUGH = 0.4
 
 /** The vertical the yaw turns about, and the ramp's own tilt — built once. */
 const UP = new THREE.Vector3(0, 1, 0)

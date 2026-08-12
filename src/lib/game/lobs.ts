@@ -357,6 +357,14 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       // руками когда граната тонет ещё можно" — and it goes on sinking instead.
       for (let i = flying.length - 1; i >= 0; i--) {
         if (flying[i].doused) continue
+        // **A CONTACT ROCKET HAS NO FUSE TO CUT SHORT.** Play, twice: "всё ещё
+        // при нажатии огонь снаряд базуки взрывается до касания с чем-то." Right,
+        // and it is the exe's own shape rather than a rule of ours: row +0x14
+        // nil is the contact class, and such a projectile starts in state 2 —
+        // one of the two update arms that do nothing at all — with nothing
+        // counting it down. What ends it is touching something (0x437F2C). A
+        // hand-detonator is the FUSE being cut, and this one has none.
+        if (lobOf(flying[i].skill)?.contact) continue
         detonate(flying[i])
         flying.splice(i, 1)
       }

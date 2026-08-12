@@ -590,6 +590,20 @@ export function createBattle(parts: BattleParts): Battle {
       jumpRequested = false
       doorRequested = false
       attack.swallow()
+      // **THE HANDS ARE EMPTY AND THE PIG DANCES.** Play: "при выигрыше остаётся
+      // оружие в руках свина, он не танцует победный танец." Both are the
+      // remake's own — the exe's mode 2 arm plays no clip and touches no weapon
+      // (0x490E7E is a camera, a countdown and the way out) — but a pig standing
+      // to attention with a bazooka is not what winning looks like. The clip is
+      // play's own identification: 46, which they named as a celebration when
+      // SKIP TURN borrowed it (lib/game/locomotion.ts, `ANIM.VICTORY`).
+      for (const pig of everyone()) {
+        if (isDead(pig) || indoors.inside(pig)) continue
+        pig.holding = null
+        if (ending.won) anim.setClip(pig, ANIM.VICTORY)
+        else anim.setClip(pig, ANIM.IDLE)
+      }
+      holding = null
       const leave = leaveRequested
       leaveRequested = false
       // Everything still running runs on: the engine steps it after this call,

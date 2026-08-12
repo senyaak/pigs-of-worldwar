@@ -99,6 +99,13 @@ remake's own and play is what corrects it.
 
 ## B. PLAY'S REPORTS, still open
 
+**The 2026-08-11 batch is done and its entries are marked below**: TNT's radius
+(B2), the wall's transparency (B5), the door's glide starting after the wind-up
+(A1 → `objects/notes.md`, and `lib/game/doorway.ts`), the rocket's pose and its
+trail (B4), the rocket that went off on the fire key (B1), and the victory — the
+card, the empty hands and the dance (A1's ending). What is left in this section
+is everything NOT in that batch.
+
 ### B0. THE BLACK SMOKE IS DROWNED, NOT MISSING — diagnosed 2026-08-11
 
 First in this section because play has raised it more times than anything
@@ -149,41 +156,46 @@ the original (the draw writes texture −1), so the canvas blob is right in
 kind for them. It is the fourteen BURST puffs that are textured, from
 `expltims.mad`'s `ptp*` art.
 
-### B1. A bazooka can be hand-detonated like a grenade
+### B1. A bazooka can be hand-detonated like a grenade — DONE 2026-08-11
 
-Play: "базуку можно взорвать как гранату — баг." `Lobs.detonateNow` sets off
-everything that is live, and the second fire press reaches it through the same
-control layer a grenade uses. A CONTACT rocket has no fuse to cut short: it goes
-off when it touches something and at no other time.
+`Lobs.detonateNow` skips a row with `contact` set: a rocket has no fuse to cut
+short (row +0x14 nil starts it in state 2, which nothing counts down — what ends
+it is touching something, 0x437F2C). The press is still swallowed, so F during a
+rocket's flight does nothing at all, which is the same "one blow a turn" rule
+everything else follows.
 
-**Next move.** Refuse `detonateNow` for a row with `contact` set, and check the
-control set at the same time — `weaponLayer(29)` is `'lob'`, so the second press
-is being offered at all. The exe's own trigger for hand-detonation has never been
-found (`lobs.ts` says so at the method), so this is the remake's rule either way.
+*(What this entry used to say, kept for the control-set half, which is unchanged:
+`weaponLayer(29)` is `'lob'`, so the second press is offered — and it is now
+offered to something that refuses it.)*
 
-### B2. TNT's blast is too big to get clear of
+### B2. TNT's blast is too big to get clear of — DONE 2026-08-11, and nothing was tuned
 
 Play: "у динамита радиус слишком большой — я отхожу задом все 4 секунды, а меня
-всё равно задевает на 4 урона."
+всё равно задевает на 4 урона." Measured off the old numbers, they were about
+**2400** units out when they took those four points.
 
-**Measured.** The row is 50 points over a blast field of 2048; `blastReach` makes
-that 1536; the exe's falloff (`0x48CBA0`) reaches **zero only at 2560** — 512 of
-core plus 4/3 of the reach. The fuse is 5.83 s, planting hands back **4**, the
-laying clip eats the start of it, and backing away is HALF speed (520 a second),
-so about 2000 units. 2000 against 2560 is the complaint exactly.
+**The rim is the RANGE.** `0x48CBA0` is a ramp from a 512-unit core to a QUARTER
+at exactly `past = range` — "never to nothing", which is the rim the exe draws.
+This engine went on evaluating that line past its own divisor to where it crosses
+zero, `512 + 4·range/3`, and used THAT as the reach. The gap is the range's own
+size, which is why only TNT was ever complained about: a grenade loses under a
+hundred units by the correction and TNT loses four hundred, so at 2400 there is
+now nothing at all.
 
-**Next move — and the trap.** The falloff says how MUCH, not WHO. Two candidates
-for who, and CLAUDE.md warns the range has been misread once already:
+**And the falloff's third term is read** — the one CLAUDE.md called "a float
+nobody has read". `[[body+0x18]+0x4C]+0x0C` (0x48CC46) is the STRUCK BODY's own
+collider radius, out of the shape table its body comes from: 0xAA for a pig,
+riding `MODEL_SCALE` here like every other body length.
 
-- the **±0x400 box** the projectile's update walks the pig list with (0x437775),
-  which sets `[pig+0x180]` — 1024 on each axis, and what that byte means was
-  never followed;
-- the EFFECT's own body, which is a **sphere of radius 35** (0x4a8f42) — far too
-  small to be the reach on its own, so if that is the contact then something else
-  grows it.
-
-Read `Pig::OnHit`'s effect arm (0x4778ae) to its last instruction and find what
-gates it before `0x48CBA0` is called. Do not tune a constant first.
+**What is still NOT found is WHO** — and one candidate is now ruled out by
+measurement. `Pig::OnHit`'s blast arm is reached from a physics CONTACT with the
+effect's own body, and the shape table (0x4A90CC, eleven entries) gives an effect
+a sphere of **35**: 205 units against a pig, inside the falloff's own core, where
+it could never be anything but full damage. So something grows that contact and
+it has not been read. The other candidate is DEAD: `[pig+0x180]`, which the
+projectile's ±0x400 sweep sets, has exactly two readers and both are in the
+ANIMATION picker (0x46F457, 0x4721B7) — they put clip 0x21 on, so a pig with a
+live projectile within a tile of it **cowers**. Nothing about damage.
 
 ### B3. Read ALL of the blast's picture, not half
 
@@ -203,29 +215,41 @@ build: add row 1 to `lib/game/effects.ts` beside `ROW_ZERO` and `MINE_EFFECT`
 (the jet fan needs its stage-D shape drawn), and `Charge` has to carry the
 effect id the way the mine's already does.
 
-### B4. The rocket is drawn crooked, and it wants its own trail
+### B4. The rocket is drawn crooked, and it wants its own trail — DONE 2026-08-11
 
-Play: "прожектайл кривой при выстреле базуки… также шлейф — своего рода дым такой
-белый."
+Play, twice: "прожектайл кривой при выстреле базуки… также шлейф — своего рода дым
+такой белый."
 
-`three/grenades.ts` points a flying lob along its velocity with a yaw and a pitch,
-which assumes the model's nose is +Z. `WE_TNT`'s long axis turned out to be **−X**
-(that is what `STAND` is for), so `WE_BAZZ`'s wants measuring the same way — off
-the model's own vertices and the textures on them — rather than guessed.
+**The nose is MEASURED.** `WE_BAZZ` out of the map's own archive (which is where a
+fired rocket's art comes from) is thirteen vertices with its long axis on **Y**,
+−196..191, and **one** vertex at the −196 end against six at +191 — an apex over a
+hexagonal body. So the nose is model **−Y**, and the pose is that axis turned onto
+the velocity rather than the yaw-and-pitch pair that assumed +Z.
 
-The TRAIL is a separate half and the machinery is already there: `lib/game/trail.ts`
-carries `LOB_TRAIL` and `FUSE_TRAIL` and `three/lobTrail.ts` draws either. Read
-kind 10's constructor arm for a parented effect the way the grenade's (0x15) and
-the charge's (0x1D) were read — the arm is `0x432414`, shared with kind 52, and it
-already hangs 0x1D. Play says WHITE smoke, so the particle type's colour is the
-thing to check.
+**And the trail is the REMAKE's, against a clean negative.** Both of the exe's
+trail sites were read and neither answers a bazooka: the constructor's dispatch is
+`kind − 0x15` over 0x21 entries, so kinds **21..53 only** (and the map at 0x4326E8
+sends the grenade family to id 0x15 and the charges to 0x1D), while the update's
+every-fifth-frame one is `kind − 4` and sends kind 10 to the exit. The bazooka is
+kind 10. The same read corrects an old claim in CLAUDE.md: a BULLET's trail is not
+the engine's either — kinds 4..20 are outside that dispatch too.
 
-### B5. The wall and the ceiling want to be a little more see-through
+So `ROCKET_TRAIL` is a row of its own, on play's word: white where the engine's
+grey is sixteen of thirty-one, twice the puffs at twice the size, living twice as
+long, because a rocket outruns anything a grenade's six-a-frame leaves.
 
-Play: "ещё чуть-чуть сильнее надо чтобы просвечивало — именно прозрачность стен и
-потолка." `SEE_THROUGH` in `three/props.ts` is 0.5 (it was 0.25, and play asked
-for more solid, then for a little less). This is eyework: move it a step and shoot
-a screenshot.
+### B5. The wall and the ceiling want to be a little more see-through — 2026-08-11
+
+Play, again: "прозрачность ещё как-то мало — надо побольше; вообще будто не
+менялась с прошлого раза — текстура наверху прозрачная, а внизу еле-еле."
+
+**Most of that was not the number.** One ray, from the eye to the pig's MIDDLE,
+faded exactly the piece it skewered — and a wall is pieces stacked up the wall, so
+it went see-through level with his head and stayed solid level with his feet,
+which is "transparent at the top and hardly at the bottom" to the word.
+`crossedTowards` takes three points down the body now (crown, middle, soles) and
+fades the union. `SEE_THROUGH` went 0.5 → **0.4**, one step and not a jump back to
+the 0.25 that was already refused. Still eyework.
 
 ### B6. The house's SEAMS still misbehave
 

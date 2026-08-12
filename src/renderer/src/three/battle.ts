@@ -40,7 +40,7 @@ import type { SceneSound } from '../contracts/sound'
 import type { Collected } from '../../../lib/game/scenery'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBulletArt } from './shots'
-import { SIGHT_MARGIN, crossedBy, sightBlockers } from '../../../lib/game/seeThrough'
+import { SIGHT_MARGIN, crossedTowards, sightBlockers } from '../../../lib/game/seeThrough'
 import { createGrenadeArt } from './grenades'
 import { createMineArt } from './mineArt'
 import { PIG_HEIGHT } from '../../../lib/game/obstacles'
@@ -577,12 +577,23 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     const watched = squad.of(game.currentPig.id)
     if (watched) {
       root.worldToLocal(eyeInGame.copy(host.camera.position))
+      const { x, y, z } = game.currentPig.position
       props.fade(
-        crossedBy(blockers, eyeInGame, {
-          x: game.currentPig.position.x,
-          y: game.currentPig.position.y - PIG_HEIGHT / 2,
-          z: game.currentPig.position.z
-        }, SIGHT_MARGIN)
+        crossedTowards(
+          blockers,
+          eyeInGame,
+          // THE WHOLE PIG, not a point in the middle of it. Play: "текстура
+          // наверху прозрачная, а внизу еле-еле" — one ray fades the piece it
+          // skewers, and a wall is pieces stacked up the wall, so the panel his
+          // head was behind faded and the one his feet were behind did not.
+          // Y-DOWN: the crown is the smaller number, the soles are `y` itself.
+          [
+            { x, y: y - PIG_HEIGHT, z },
+            { x, y: y - PIG_HEIGHT / 2, z },
+            { x, y, z }
+          ],
+          SIGHT_MARGIN
+        )
       )
     }
     effectArt.draw(now.effects)
