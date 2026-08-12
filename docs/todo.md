@@ -97,6 +97,35 @@ remake's own and play is what corrects it.
 
 ---
 
+## A0. WHAT ONLY PLAY CAN ANSWER NOW (2026-08-11, after the batch)
+
+Nothing here is a job; it is the list to walk through on the next run, because
+each one is either eyework or a rule that came from play and can only be judged
+by play. In the order they turn up:
+
+1. **The ENDING.** The last dummy stops the turn going round; the camera tours
+   the survivors, two seconds a pig; "MISSION ACCOMPLISHED!" on the card; the
+   pigs are empty-handed and dance clip 46; three seconds before a key does
+   anything, twenty before it leaves by itself. Which of clips 27/28 is the
+   congratulation is LOCATED and not heard — under twelve turns you should get
+   28.
+2. **The FADE.** Nothing should vanish any more (that was `alphaTest`, not the
+   opacity). A wall between the camera and the pig fades; a dummy, a tree, a coil
+   of wire or the bridge he is standing on should not. `SEE_THROUGH` is 0.4 —
+   `pow.hud` has no knob for it, so say the word and it moves.
+3. **The LENS**: `pow.hud.layout.gauge.lens.fill` — it is 1 against a disc that is
+   measured (rows 2..29 of `pcpie4`), so a grenade shows half of the red. If it
+   still reads as three quarters, that field is the one to type at.
+4. **The SHOT waits for the line.** Fire, the pig speaks, and only then does the
+   bullet leave.
+5. **The DOOR** takes no input while its clip runs, and the pig stands still for
+   the first half of it before the leap carries him.
+6. **TNT** should be escapable now: the rim is the range, so past about 2100
+   units nothing at all.
+7. **The ROCKET**: nose along its flight, and its smoke six a frame (twice a
+   grenade's) drawn bigger and thicker than the row asks. Fire does not set it
+   off in the air any more.
+
 ## B. PLAY'S REPORTS, still open
 
 **The 2026-08-11 batch is done and its entries are marked below**: TNT's radius
