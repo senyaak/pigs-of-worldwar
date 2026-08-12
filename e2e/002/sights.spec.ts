@@ -20,6 +20,7 @@ import { ZOOM_CAP, ZOOM_STEP, createZoom, updateZoom, zoomFraction, zoomsIn } fr
 import { createWobble, resetWobble, wobbleStep } from '../../src/lib/game/wobble'
 import { layerFires, layerSights, weaponLayer } from '../../src/lib/game/controls'
 import { SKILL } from '../../src/lib/game/skills'
+import { createSights } from '../../src/lib/game/sights'
 
 /** A deterministic stand-in for `Math.random` - varied, so a walk is a walk, and
  * repeatable, so the numbers below mean something. */
@@ -135,4 +136,26 @@ test('a weapon brings its own LAYER, and only two of them have an aim view', () 
   expect(layerSights('none')).toBe(false)
   expect(layerSights('gun')).toBe(true)
   expect(layerSights('lob')).toBe(true)
+})
+
+test('the VIEW key is inert unless the weapon aims', () => {
+  // Play: "g, по-моему, для без оружия и для штыка например — вроде тоже двигало
+  // камеру." It must not, and this is the rule that says so: `sighting` is what
+  // the camera reads (three/battle.ts picks `lob`/`throw` off it and off the
+  // weapon's own layer), and it answers for the two layers that HAVE an aim view
+  // and no others — which is the exe's own dispatch, where a blade is not among
+  // the weapons the aim-bit branch gives a camera to.
+  const sights = createSights(() => 0.5)
+  sights.setHeld(true)
+  for (const [skill, what] of [
+    [null, 'empty hands'],
+    [SKILL.BAYONET, 'a bayonet'],
+    [SKILL.SKIP_TURN, 'SKIP TURN'],
+    [SKILL.TNT, 'a planted charge']
+  ] as const) {
+    expect(sights.sighting(skill), `${what} answered the view key`).toBe(false)
+    expect(sights.scoped(skill), `${what} went first person`).toBe(false)
+  }
+  expect(sights.sighting(SKILL.RIFLE), 'a rifle').toBe(true)
+  expect(sights.sighting(SKILL.GRENADE), 'a grenade').toBe(true)
 })

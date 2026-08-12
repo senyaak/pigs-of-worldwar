@@ -160,12 +160,16 @@ test('a wall is not a ladder: the step-up envelope is all a pig ever gets', () =
   run(s, face, { walk: 1 }, 2, (t) => t.airborne !== null)
   expect(s.airborne?.ejected, 'thrown out, not just falling').toBe(true)
   expect(s.clip).toBe(ANIM.EJECTED)
-  // Downhill is south here, and the launch is the exe's: mostly up, a push
-  // of EJECT_SPEED out along the slope's descent.
+  // Downhill is south here, and the launch is the exe's TWO impulses: 0x20
+  // level along the gradient and 0x20 at 83.5°, so it is pushed out about as
+  // hard as it is thrown up.
   expect(s.airborne!.vy, 'launched upward').toBeLessThan(-EJECT_SPEED * 0.9)
-  expect(s.airborne!.vz, 'pushed downhill (south)').toBeLessThan(0)
-  // And the pig now FACES downhill — EjectFromWall turns it.
-  expect(Math.cos(s.heading)).toBeLessThan(0)
+  expect(s.airborne!.vz, 'pushed downhill (south)').toBeLessThan(-EJECT_SPEED * 0.9)
+  // **And it is NOT turned.** This spec used to assert the opposite off a
+  // reading that was the remake's own; `EjectFromWall` (0x46fbd0) spends the
+  // bearing on an impulse and writes no heading, and turning the pig is what
+  // walked it back into the wall for another 25 frames (`002/wedge.spec.ts`).
+  expect(Math.abs(s.heading - NORTH), 'the eject turned it').toBeLessThan(1e-6)
 })
 
 test('a wall is scraped along, not oscillated at: the sidestep remembers its side', () => {

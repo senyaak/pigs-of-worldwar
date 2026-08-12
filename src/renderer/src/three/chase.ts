@@ -117,13 +117,22 @@ const RIFLE_CLOSE = 2048 / 3072
  * file's 1500/2000 is whatever the last run left there, exactly as the TR cam's
  * row is.
  *
- * 3500 against the chase's 3072 is the ratio here. The LIFT is the one part
- * that is not read: this branch takes the subject's y as it stands and the
- * common tail (0x4A0B50) only clamps it 768 above the ground. Mode 4's OTHER
- * branch — the one a smoothed camera takes, 0x4a2246 — adds **300**, and that
- * is what the remake borrows for play's "выше, чтобы удобно целиться".
+ * Both words of that row are used below — the 3500 as a length and the 692 as an
+ * elevation ceiling (`elevationOf`).
  */
-const LOB_CLOSE = 3500 / 3072
+
+/**
+ * …and it is the exe's 3500 OUTRIGHT rather than a ratio against the chase.
+ *
+ * Play looked at the ratio and said the original pulled back further — "она в
+ * игре дальше отдалялась" — and they are right that a ratio is the weaker
+ * reading: it is measured against `BACK`, which is the remake's own eyework, so
+ * a proportion inherits that invention. Every other decoded LENGTH in this
+ * remake lands through `MODEL_SCALE` (the bayonet's 460, the pig's 170, the
+ * jump's 0x30), and this one does now too. It comes out two thirds further back
+ * than the chase, which is what play was describing.
+ */
+const LOB_CLOSE = (3500 * MODEL_SCALE) / BACK
 
 /**
  * **COLUMN 1 OF THE MODE TABLE IS HOW HIGH THE CAMERA MAY STAND**, and that is

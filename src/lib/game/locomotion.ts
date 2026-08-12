@@ -10,7 +10,7 @@
 //   drop hands over to the physics. A pig pressed into a wall KEEPS WALKING
 //   (and climbs the face) while `UpdateGroundState` (0x46fd50) counts the
 //   frames; past 25 the pig update calls `EjectFromWall` (0x46fbd0), which
-//   turns the pig DOWNHILL and launches it. The elastic wall material only
+//   pushes the pig DOWNHILL and up — and does NOT turn it (see `eject`). The elastic wall material only
 //   ever acts on a FALLING pig — a landing where `Map::IsBlocked` says yes
 //   is refused, so a body in a wall bounces until it is out or ejected.
 //
@@ -849,16 +849,41 @@ function sidestep(
   }
 }
 
-/** `EjectFromWall`: face downhill, launch mostly upward, count from one. */
+/**
+ * `EjectFromWall` (0x46fbd0): pushed OUT and UP, and **the pig is not turned**.
+ *
+ * Read to its last instruction after play stood on CAMP 18,12 — a wall tile
+ * whose floor is 128 BELOW the open ground beside it — and reported "прыгает по
+ * полу будто соскальзывает, но на месте". Both halves of that were this
+ * function's, and both were the remake's own invention:
+ *
+ * - **it wrote the HEADING.** The exe takes the same gradient bearing
+ *   (`0x40c090` off the pig's own x/z, then an inline `fpatan`) and spends it on
+ *   an IMPULSE — `0x4A9100(0x20, 0, bearing, 0)` — and never touches the pig's
+ *   facing anywhere in the arm or in `0x470c70` beyond it. Turning him round
+ *   meant that with W held he walked straight back into the wall, was thrown
+ *   again 25 frames later, and ping-ponged. (This is also the last unexamined
+ *   suspect for "летящая свинья крутится вокруг своей оси", which is why the
+ *   half-turn was written down as a candidate.)
+ * - **there are TWO impulses, not one pitched one.** The level push above, then
+ *   `0x4A9260(0x20, 0x3B6, 0, 0)`, which is 0x3B6 = **83.5°**, all but straight
+ *   up. Collapsing them into a single 0x20 at 83.5° kept the vertical (31.8) and
+ *   threw the horizontal away (3.6) — so the pig went UP and came down where it
+ *   started, which is the hop play was looking at.
+ *
+ * The second call's own horizontal is along bearing ZERO rather than the
+ * gradient; three and a half units at a fixed world angle is noise, so it is
+ * folded into `out` here. And where the exe's gradient is a flat zero its
+ * `fpatan` gives bearing 0; the remake has no vector at all there
+ * (`downhill` → null) and backwards is the least wrong thing left — it is only
+ * a velocity now, so nothing spins.
+ */
 function eject(state: LocomotionState, query: TerrainQuery): void {
-  // The exe's heading is the atan2 of the ground gradient (0x40c090 reads
-  // the four corner heights): out means DOWN the face. Dead-flat wall tops
-  // have no downhill; backwards is the least wrong direction left.
-  state.heading = query.downhill(state.x, state.z) ?? state.heading + Math.PI
-  const out = Math.cos(EJECT_PITCH) * EJECT_SPEED
+  const bearing = query.downhill(state.x, state.z) ?? state.heading + Math.PI
+  const out = EJECT_SPEED + Math.cos(EJECT_PITCH) * EJECT_SPEED
   state.airborne = {
-    vx: Math.sin(state.heading) * out,
-    vz: Math.cos(state.heading) * out,
+    vx: Math.sin(bearing) * out,
+    vz: Math.cos(bearing) * out,
     vy: -Math.sin(EJECT_PITCH) * EJECT_SPEED,
     bouncing: true,
     pushIn: null,

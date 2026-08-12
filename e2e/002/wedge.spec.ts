@@ -72,3 +72,37 @@ test('coming down on a wall tile it SETTLES, and is then thrown out', () => {
   // eight seconds is four of its 25-frame throws.
   expect(query.walkable(state.x, state.z), 'and it is out of the wall').toBe(true)
 })
+
+test('the tile play stood ON: pushed clear, not hopped in place', () => {
+  // Play, with the address again: "tile 18,12 tex 158 byte 0 type 0x85 — тут
+  // прыгает по полу будто соскальзывает, но на месте, если встать туда." Another
+  // wall over terrain type 5, and this one is 128 units BELOW the open ground
+  // beside it, so a pig walking in drops into it rather than climbing.
+  const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
+  const field = new ObstacleField(parsePog(mapFile('CAMP.POG')))
+  const at = tileAt(query, 18, 12)
+  expect(query.tileAddress(at.x, at.z)?.type).toBe(0x85)
+  // …and it is FLAT, which is what makes it the case that broke: the remake's
+  // eject asked for a downhill direction and there is none here.
+  expect(query.downhill(at.x, at.z), 'nothing to be thrown down').toBeNull()
+
+  const state = createLocomotion(query, at.x, at.z, 0)
+  const facing = state.heading
+  let ejections = 0
+  let wasAir = false
+  for (let i = 0; i < Math.round(6 / STEP_SECONDS); i++) {
+    updateLocomotion(state, query, { walk: 1, turn: 0, jump: false }, STEP_SECONDS, field)
+    const air = state.airborne !== null
+    if (air && !wasAir) ejections++
+    wasAir = air
+  }
+
+  // **The pig is never turned.** `EjectFromWall` spends its bearing on an
+  // impulse and writes no heading anywhere (0x46fbd0 → 0x470c70); turning him
+  // meant W walked him straight back in, to be thrown again 25 frames later.
+  expect(Math.abs(state.heading - facing), 'the eject turned him').toBeLessThan(1e-6)
+  // …and it has a HORIZONTAL: two impulses of 0x20, one level along the
+  // gradient and one at 83.5°, so he leaves the tile instead of hopping on it.
+  expect(Math.hypot(state.x - at.x, state.z - at.z), 'he went nowhere').toBeGreaterThan(512)
+  expect(ejections, `thrown ${ejections} times in six seconds`).toBeLessThan(4)
+})

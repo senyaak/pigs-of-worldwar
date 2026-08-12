@@ -3391,7 +3391,11 @@ So `0x49F6F0` was stamping the height all along, in the same nine instructions
 this file already quoted for the distance: a thrown weapon gets **3500 and 692**
 — 29.2° above level — and a blade **1500 and 800**, 19.7°. Further back AND
 higher for a grenade, closer and lower for a knife, against the chase's 3072 at
-22.5°. That is play's "выше, чтобы удобно целиться", read rather than chosen, and
+22.5°. **The 3500 is applied OUTRIGHT, through `MODEL_SCALE`, not as a ratio
+against the rig's own `BACK`** — play said the original pulled further back and
+they are right that a ratio is the weaker reading, since `BACK` is eyework and a
+proportion inherits the invention. Every other decoded length in this remake
+lands the same way. That is play's "выше, чтобы удобно целиться", read rather than chosen, and
 `three/chase.ts` places the lob view by that ANGLE instead of by a lift of its
 own. The remake's own rig turns out to be in the same world: `atan(LIFT / BACK)`
 is 23.2°, within a degree of the chase's own 22.5°, and those two numbers were
