@@ -57,7 +57,7 @@ Eight `Math.random()` calls today. They are not all the same kind:
   goes off) and `effects.ts` / `cloud.ts` (visual, but `effects.busy()` holds
   the beat after a blow, so it decides when the turn comes back);
 - **cosmetic** — `wobble.ts` (moves the eye, never the aim — settled, see
-  CLAUDE.md), `audio/battle.ts` (pitch jitter), `three/dropIn.ts`.
+  docs/history/weapons.md), `audio/battle.ts` (pitch jitter), `three/dropIn.ts`.
 
 The sim ones take a seeded generator that is part of the world state. The
 cosmetic ones take their own and are free to differ between peers.

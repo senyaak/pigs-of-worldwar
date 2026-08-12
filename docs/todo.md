@@ -12,11 +12,12 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 ## A. THE TUTORIAL — finish the training ground
 
 The script MOVES now: a crate collected speaks, a crate PLACED speaks, and the
-menu counts (CLAUDE.md, "THE TRAINING SCRIPT MOVES"). The END of it is built too
+menu counts (docs/history/training.md, "THE TRAINING SCRIPT MOVES"). The END
+of it is built too
 (A1, done). What is left is one line and the camera.
 
 **And it can be JUMPED to a step** — F12 on, F11 back, `pow.step(9)` for the
-bazooka (`lib/game/training.ts`, CLAUDE.md, README). Anything below that says
+bazooka (`lib/game/training.ts`, docs/history/training.md, README). Anything below that says
 "play the tutorial to the TNT" is a keypress now.
 
 ### A4. WHICH BUILDING clip 22 means — open, and the map disagrees with the guess
@@ -434,7 +435,7 @@ size, which is why only TNT was ever complained about: a grenade loses under a
 hundred units by the correction and TNT loses four hundred, so at 2400 there is
 now nothing at all.
 
-**And the falloff's third term is read** — the one CLAUDE.md called "a float
+**And the falloff's third term is read** — the one docs/history/weapons.md called "a float
 nobody has read". `[[body+0x18]+0x4C]+0x0C` (0x48CC46) is the STRUCK BODY's own
 collider radius, out of the shape table its body comes from: 0xAA for a pig,
 riding `MODEL_SCALE` here like every other body length.
@@ -798,7 +799,7 @@ not pulled, written here so nobody has to remember an address.
   the job that would justify transcribing the layout tables (D's loose end 5),
   because a new UI wants the original's coordinates rather than fresh eyework.
   Note the remake's own constraint from play: a real pause is single-player
-  only, and multiplayer must never stop (CLAUDE.md, "Threads left mid-pull").
+  only, and multiplayer must never stop (docs/history/status.md, "Threads left mid-pull").
 - **There is no SKY.** The battle renders against a flat clear colour.
 - **Fall damage** (`P_LAND1` is the impact that hurts, and nothing plays it).
 - **The melee's own battle cry** — the same `0x43af70` call, not yet wired to a

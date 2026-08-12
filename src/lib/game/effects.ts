@@ -44,7 +44,7 @@ export interface RingStage {
    * kind, and only the water splash uses it.
    *
    * **Its SIGN is wrong here and is deliberately left alone**: the splash is a
-   * thread of its own that play has parked (CLAUDE.md), and correcting the sign
+   * thread of its own that play has parked (docs/history/status.md), and correcting the sign
    * moves the splash. See that thread for the argument — in short, +y is up in the
    * engine, so −500 is BELOW the water and this draws it above.
    */

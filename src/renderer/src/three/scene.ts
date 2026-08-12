@@ -58,9 +58,9 @@ export function ensureScene(container: HTMLElement): SceneHost {
    * all resolved before anything was drawn.
    *
    * Clamping is not a PAUSE and does not pretend to be one — the world simply
-   * misses the time nobody was watching. A real pause is its own job (CLAUDE.md's
-   * thread list), and it has to be a pause in singleplayer and nothing at all in
-   * multiplayer, which is play's rule.
+   * misses the time nobody was watching. A real pause is its own job (the thread
+   * list in docs/history/status.md), and it has to be a pause in singleplayer
+   * and nothing at all in multiplayer, which is play's rule.
    */
   const LONGEST_FRAME = 0.1
   const animate = (): void => {

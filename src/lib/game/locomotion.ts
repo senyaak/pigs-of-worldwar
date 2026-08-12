@@ -214,7 +214,8 @@ export const ANIM = {
   /**
    * **The victory dance.** Play: "при выигрыше… он не танцует победный танец" —
    * and the clip they mean is the one already in this table, from the other end:
-   * "анимация пропуска хода кривая, и она на победу" (CLAUDE.md's open list).
+   * "анимация пропуска хода кривая, и она на победу" (docs/history/status.md,
+   * play's open list).
    * So 46 is a celebration that SKIP TURN borrowed, not a doze — the name table
    * calls it "Thinking" and the name table has been wrong before (`PARACHUTE`).
    *

@@ -52,7 +52,7 @@ export interface Building {
  * `copyLocomotion`).
  *
  * NOT the cause of play's "из убежища выпрыгивает на крышу" — that was the
- * guess and it is measured wrong; see CLAUDE.md.
+ * guess and it is measured wrong; see docs/history/world.md.
  */
 interface Doorstep {
   building: number
