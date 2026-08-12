@@ -175,18 +175,38 @@ export function createScenery(
         const worth = worthOf(pickup, training)
         let result: GiveResult = 'taken'
         let given = worth
-        // **A CRATE TAKES WHAT YOU WERE CARRYING.** Play, asked twice and
-        // answered plainly: "тнт не забирается когда аптечку в доме подбираешь…
-        // должен." So it is not only the parachute drop that empties a pig — every
-        // crate collected does, and what it hands over is all the pig then has.
+        // **A WEAPON CRATE TAKES WHAT YOU WERE CARRYING — A MEDKIT DOES NOT.**
         //
-        // The exe's own `Pig::ClearInventory` (0x468f50) is called from the
-        // PLACEMENT arm (0x4aa6cb, and the dummy branch jumps over it at
-        // 0x4aa659), which is the half `advance` below already does. That a
-        // COLLECTION does it too is play's word, and it is the tutorial's whole
-        // shape: one weapon at a time.
-        clearSlots(pig.carrying)
-        pig.holding = null
+        // Play asked for the first half plainly ("тнт не забирается когда аптечку
+        // в доме подбираешь… должен") and it is the tutorial's whole shape: one
+        // weapon at a time. Applied to a HEALTH crate as well, it dead-ends the
+        // training ground, which is what play then hit: "если сломать не дверь
+        // динамитом — туториал багуется — я сломал стену, взял аптечку, и там
+        // пропал динамит и не появилась базука."
+        //
+        // The arithmetic behind that, and it is all read: CAMP's own door
+        // (record 45, `STW04_D2`) is the ONE piece of the house with a health of
+        // its own — **50**, exactly TNT's damage at the core, where every wall
+        // beside it takes the table's 60 — and it is the only one carrying a
+        // command (opcode 22, waiting on label 89 and signalling 7). The bazooka
+        // (record 18) and the health crate inside the house (55) are what wait on
+        // that 7. Break a WALL instead and nothing is placed, which is correct;
+        // but on the training ground every skill is UNLIMITED (`worthOf`), so the
+        // player still has the TNT and can go and blow the door — unless a
+        // medkit has quietly emptied their pockets. There is no second TNT crate:
+        // record 52 is the only one, and it waits on label 6.
+        //
+        // The exe never clears on a collection at all — `Pig::ClearInventory`
+        // (0x468f50, and it is unconditional, no training-ground guard) is called
+        // from the PLACEMENT arm (0x4aa6cb; the dummy branch jumps over it at
+        // 0x4aa659), which is the half `advance` below does. So the clear is
+        // play's addition on top of the exe, and the narrowest cut that keeps it
+        // while unbreaking the level is this: a crate with a SKILL in it swaps
+        // your weapon, a crate with none is a heal and leaves you armed.
+        if (pickup.skill !== null) {
+          clearSlots(pig.carrying)
+          pig.holding = null
+        }
         if (pickup.skill === null) {
           // No ceiling: the original's heal adds and stops (lib/game/health.ts).
           heal(pig, worth)

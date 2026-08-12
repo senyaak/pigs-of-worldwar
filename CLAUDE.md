@@ -2500,12 +2500,27 @@ is comes off the type-keyed table at 0x4a90cc: slot 0 is shape kind 2 with
 `esi = 0xAA`, and slot 7 gives the blast effect the 35 this engine already draws
 with. So the pig keeps a radius, and it is now the game's own number.
 
-**A crate takes what you were carrying.** Play, asked and answered: "тнт не
-забирается когда аптечку в доме подбираешь… должен." Measured first — the medkit IS
-collected (50→100 with `I_PICKUP` and `P_SIGH`) and the TNT survived it — so this is
-play's rule going in on top of the exe's, whose own `ClearInventory` (0x468f50) is
-called from the PLACEMENT arm alone. One weapon at a time, which is the tutorial's
-whole shape.
+**A WEAPON crate takes what you were carrying — a MEDKIT does not.** Play, asked
+and answered: "тнт не забирается когда аптечку в доме подбираешь… должен."
+Measured first — the medkit IS collected (50→100 with `I_PICKUP` and `P_SIGH`)
+and the TNT survived it — so this is play's rule going in on top of the exe's,
+whose own `ClearInventory` (0x468f50) is called from the PLACEMENT arm alone.
+One weapon at a time, which is the tutorial's whole shape.
+
+**The health half of it was corrected 2026-08-12, because it DEAD-ENDED the
+training ground.** Play: "если сломать не дверь динамитом — туториал багуется —
+я сломал стену, взял аптечку, и там пропал динамит и не появилась базука." The
+arithmetic, all of it read off CAMP's own records: the DOOR (record 45,
+`STW04_D2`) is the one piece of the house with a health of its own — **50**,
+exactly TNT's damage at the core, where every wall beside it takes the table's
+60 — and the only one carrying a command (opcode 22, waiting on 89, signalling
+**7**), which is what the bazooka crate (18) and the health crate inside the
+house (55) wait on. Breaking a WALL therefore places nothing, correctly; and
+since every skill on the training ground is UNLIMITED the player still has the
+TNT and can go and blow the door — unless a medkit has emptied their pockets on
+the way. There is no second TNT crate: record 52 is the only one and it waits on
+label 6. So a crate with a SKILL in it swaps your weapon and a crate with none
+is a heal that leaves you armed. **Not pinned by a spec yet** — `docs/todo.md`.
 
 **A steep throw goes IN.** "Если вертикальная скорость выше горизонтальной —
 прожектайл тонет." The skip already needed 150 along the surface; it now also needs

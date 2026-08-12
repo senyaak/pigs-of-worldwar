@@ -294,6 +294,30 @@ trail (B4), the rocket that went off on the fire key (B1), and the victory — t
 card, the empty hands and the dance (A1's ending). What is left in this section
 is everything NOT in that batch.
 
+### B00. A MEDKIT NO LONGER DISARMS YOU — fixed 2026-08-12, NOT PINNED
+
+Play: "если сломать не дверь динамитом — туториал багуется — я сломал стену,
+взял аптечку, и там пропал динамит и не появилась базука."
+
+Read off CAMP's own records: the DOOR (45, `STW04_D2`) is the only piece of the
+house with a health of its own — **50, exactly TNT's core damage**, where the
+walls beside it take the table's 60 — and the only one carrying a command
+(opcode 22, waits on 89, signals **7**), which the bazooka crate (18) and the
+health crate inside the house (55) wait on. So breaking a wall places nothing,
+correctly. What dead-ended it was ours: every crate cleared the inventory on
+COLLECTION, which is play's own earlier rule on top of the exe (whose
+`ClearInventory` fires from the PLACEMENT arm alone, 0x4aa6cb, unconditional).
+Every skill on the training ground is UNLIMITED, so the TNT should have survived
+a wasted charge — and there is no second TNT crate, record 52 being the only one.
+Now only a crate with a SKILL in it clears; a medkit heals and leaves you armed.
+
+**What is missing is the pin.** Nothing in `e2e/` asserts on the inventory after
+a collection at all, which is why a rule that empties a pig could be added and
+nobody noticed it could empty him at the wrong moment. The spec wants the whole
+path — collect the TNT, plant one at a wall, collect a medkit, assert the TNT is
+still in `carrying` — and it belongs beside `002/strike.spec.ts`, which already
+drives the crate path end to end.
+
 ### B0. THE BLACK SMOKE IS DROWNED, NOT MISSING — diagnosed 2026-08-11
 
 First in this section because play has raised it more times than anything
