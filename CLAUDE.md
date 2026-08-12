@@ -3568,57 +3568,21 @@ nothing that reaches it (34, 50 JETPACK) exists here yet.
 
 ### A HOOF KNOWS WHAT IT IS STANDING ON — footsteps, 2026-08-12
 
-Play asked for them and asked the right question with it: "насколько помню
-зависит от того на какой поверхности они едут?" It does, and everything about
-it is authored rather than guessable. The note that stood here for a week — that
-footsteps want hoof-contact frames DERIVED from the skeleton — was aiming at the
-wrong thing twice over.
+Done, and decoded end to end rather than picked: **when** a hoof lands is a
+key-frame event on the clip (`lib/game/footsteps.ts` holds all 22 clips'
+rows), **what** it lands on is the tile's terrain type through the exe's own
+twelve-way switch (`SURFACE_SOUNDS`, `audio/battle.ts`), and the mix is the
+exe's. The read is `anim/audio-events.md`, with `anim/key-events.js` to dump
+any clip's events; nothing about it needs deriving from the skeleton, which is
+what the plan that stood here for a week was going to do.
 
-**WHEN a hoof lands is a key-frame event on the clip.** The same six-row
-`(phase, id, id)` channel the bayonet's strikes, the charge's placing and the
-doorway's glide come out of (`_d3d.dll`, `afGetKeyFrameList`, 0x1002c778 +
-clip*88). **Ids 1..6 — and 9/10, which are byte-for-byte aliases of 4/5 — all
-call one function**, 0x475010, and what the dispatcher's arm pushes is which
-hoof (1, 2, or 0 for a whole-body scuff) and how loud (45 for ids 1..3, 30 for
-the rest). So the run cycle steps twice a lap, the swim kicks four times
-quietly, and a pig laying a charge scuffs going down and coming up. Twenty-two
-clips carry them; `anim/key-events.js` dumps the table and
-`lib/game/footsteps.ts` holds it. **Scrambling is silent** — clip 11 has no
-footfall — and so is standing still, which is the original's own answer to the
-worry that a height-based detector would fire four times a swim stroke.
-
-**WHAT it lands on is the tile's terrain type**, masked to its low five bits the
-same way the scramble test and the material table take it, and switched
-twelve ways at 0x4754B8: grass for 0 and 1, metal 2, wood 3, water 4 and 10,
-sand 7, ice 8, snow 9, lava 11, and **stone for 5, 6 and anything else** — 6
-being the commonest tile in the game. The shipped maps agree type by type
-(MAZE and both training grounds are wall-to-wall grass, OASIS and ZULUS sand,
-ICE snow, ICEFLOW the only ice, ISLAND and LAKE water where the water is), which
-is a stronger check than any single arm. The odd row is 11: it is the CLIMBING
-tile and it plays LAVA.
-
-**The mix is the exe's, including two things nobody would have invented.** The
-volume is `45 − (rand() & 15)` — the jitter is on the VOLUME here, where the
-jump jitters its pitch, so `Cue.duck` joins `Cue.jitter` in `audio/battle.ts`.
-And the pitch says WHICH hoof: the handler writes 92, 108 or 100 into the slot
-it plays with (0x475275, 0x4752f6, 0x475374), so the two feet sit 8% either side
-of nominal. There is also a SECOND play every step — index 0x15 `FT_SAND` at the
-same volume and pitch (0x4753fd), unless the event's arm suppresses it, which no
-footstep id does. A step on stone is stone over sand. It reads as a scuff under
-the material; if play hears it as doubling, `STEP_UNDERLAY` is one line to drop.
-
-**One correction falls out of this.** `melee.md` and two code comments read the
-`0x2d` beside a footstep event as a sound index — index 45 is `L_SHOTG`, which
-should have been the tell. It is the VOLUME argument, and the sound comes from
-the ground.
-
-Wiring: the domain announces `stepped` on the bus (`lib/game/events.ts`) with
-the position, the surface, the hoof and how hard; `audio/battleAudio.ts` is the
-only thing that turns that into a file. The cursor lives in `footsteps.ts` and
-nowhere else — a footstep is not a rule, and nothing in the battle branches on
-it. Held by `e2e/002/audio.spec.ts`, which turns a pig on the spot (clip 4 steps
-twice a lap and a turning pig cannot walk onto a different material) and reads
-the material and the sand under it, in pairs, against the tile it is standing on.
+Four behaviours that will look like bugs and are not: **scrambling is silent**
+(clip 11 authors no footfall) and so is standing still; **swimming's four
+kicks a cycle are deliberately quiet**; the **climbing tile plays LAVA**, which
+is the switch's own odd row and audible on ICEFLOW; and **`FT_SAND` plays under
+every step**, at the same mix, because the handler plays it a second time. That
+last one is the only thing here play might overrule — `STEP_UNDERLAY` is one
+line to drop.
 
 ### What is still not read
 
