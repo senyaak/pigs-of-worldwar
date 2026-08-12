@@ -19,6 +19,10 @@ name: CI
 on:
   push:
     branches: [master, net]
+    # A doc-only commit has nothing here to break, and this repo writes a lot of
+    # prose. The rule is the same one the heroes editor's build.yml settled on
+    # for its own triggers: do not spend a run re-checking what was not touched.
+    paths-ignore: ['**.md', 'docs/**']
   pull_request:
   workflow_dispatch:
 
@@ -31,7 +35,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - run: npm ci

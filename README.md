@@ -181,11 +181,15 @@ Two workflows, both Windows, both in [.github/workflows](.github/workflows):
 - **CI** on every push and pull request — the domain boundaries, TypeScript,
   the build, and `npm run test:pure`.
 - **Release** on a `v*` tag — the same checks, then the installer and the zip,
-  attached to a GitHub Release. Run it by hand from the Actions tab and it
-  builds the artifacts without publishing anything.
+  attached to a GitHub Release. The notes are lifted out of
+  [CHANGELOG.md](CHANGELOG.md), which is where what-changed is written down;
+  the workflow refuses before packaging if the tag, `package.json` and the
+  changelog do not agree. Run it by hand from the Actions tab and it builds the
+  artifacts without publishing anything.
 
 ```bash
-npm version 0.1.0 --no-git-tag-version   # the tag and package.json must agree
+# rename the Unreleased heading in CHANGELOG.md to the version first
+npm version 0.1.0 --no-git-tag-version
 git tag v0.1.0 && git push origin v0.1.0
 ```
 

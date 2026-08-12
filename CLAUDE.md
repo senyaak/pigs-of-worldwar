@@ -284,8 +284,10 @@ worked out by `scripts/pure-specs.mjs`, never kept as a list — and that is
 what `.github/workflows/ci.yml` runs beside the boundaries, the typecheck and
 the build. The rest needs the installation and stays here. **A `v*` tag builds
 a release** (`.github/workflows/release.yml`, `electron-builder.yml`): a
-Windows installer and a zip, carrying no game data, with the tag checked
-against `package.json` before anything is published.
+Windows installer and a zip, carrying no game data. The notes are the matching
+section of `CHANGELOG.md` — so a version is written up THERE before it is
+tagged, and the workflow refuses if the tag, `package.json` and that file
+disagree.
 
 ## The history is in `docs/history/`, one file per subsystem
 

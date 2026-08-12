@@ -1,14 +1,17 @@
-# Cutting a release.
+# Tag a version, get a downloadable remake.
 #
 #   git tag v0.1.0 && git push origin v0.1.0
 #
 # builds the Windows installer and the portable zip (electron-builder.yml) and
-# publishes them on a GitHub Release. Run it by hand from the Actions tab
-# instead and it builds the same artifacts and attaches them to the run,
-# without publishing anything.
+# attaches them to a GitHub Release, with the notes lifted out of CHANGELOG.md.
+# Run it by hand from the Actions tab instead and it builds the same artifacts
+# and attaches them to the run, publishing nothing.
 #
 # The build carries NO game data — the app reads the player's own installation
 # at runtime — so there is nothing here that copies an asset out of the game.
+#
+# Everything runs on Windows, which is both what the exe is and the platform CI
+# does not check (ci.yml runs the same three checks on Linux, for the bill).
 
 name: Release
 
@@ -17,39 +20,50 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+permissions:
+  # For `gh release create`. Nothing else in this workflow writes.
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
-    permissions:
-      # For `gh release create`. Nothing else in this workflow writes.
-      contents: write
 
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - run: npm ci
 
-      # A release that fails the checks is not a release. Same three as CI,
-      # plus the engine specs.
+      # The same checks CI runs, before anything is packaged: a release is the
+      # one moment where shipping something broken costs somebody else's time.
       - run: npm run boundaries
       - run: npm run typecheck
       - run: npm run test:pure
 
-      # The tag IS the version: a mismatch means package.json was not bumped,
-      # and the artifacts would carry a name nobody asked for.
-      - name: The tag and package.json agree
+      # The tag IS the version, and the changelog IS the notes — so both have to
+      # be there before a single minute is spent packaging.
+      - name: The tag, package.json and CHANGELOG.md agree
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          tagged="${GITHUB_REF_NAME#v}"
+          version="${GITHUB_REF_NAME#v}"
           packaged=$(node -p "require('./package.json').version")
-          echo "tag $tagged, package.json $packaged"
-          test "$tagged" = "$packaged"
+          echo "tag $version, package.json $packaged"
+          test "$version" = "$packaged" || {
+            echo "::error::package.json says $packaged - bump it or fix the tag"
+            exit 1
+          }
+          # The carriage returns come off first: a Windows runner checks the
+          # repo out with CRLF, and a stray CR is the last character of every
+          # line a pattern would try to anchor. Same reason the notes step does.
+          tr -d '\r' < CHANGELOG.md | grep -q "^## $version" || {
+            echo "::error::CHANGELOG.md has no section for $version - write one before tagging"
+            exit 1
+          }
 
       - name: Build the installer and the zip
         run: npm run dist
@@ -62,27 +76,52 @@ jobs:
             dist/*.zip
           if-no-files-found: error
 
+      # bash rather than pwsh on purpose: the notes carry em dashes both from
+      # the changelog and from the standing part below, and PowerShell's file
+      # cmdlets guess a codepage and turn those into rubbish.
       - name: Publish the release
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # `--notes` is the flag that COMBINES with --generate-notes: gh
-          # prepends it to the generated changelog. `--notes-file` does not.
-          notes=$(cat <<'NOTES'
-          A remake ENGINE, not a game: it reads models, maps, textures and sounds
-          out of your own installation of Hogs of War (2000) and ships none of
-          them. Point it at a folder containing `warhogs_.exe` on first launch,
-          or pass `--game-dir=<path>`.
+          version="${GITHUB_REF_NAME#v}"
+          # What changed comes from CHANGELOG.md - one place to write it, and
+          # the file anyone reading the repo would look in anyway. This
+          # version's section, from its heading to the next one.
+          #
+          # No word-boundary escape in the pattern: in awk that is a BACKSPACE
+          # inside a dynamic regex rather than a boundary, and the section comes
+          # out empty. "($| )" is the same guard and portable - "## 0.1.0" and
+          # "## 0.1.0 - the bridge" match, "## 0.1.0-beta" does not.
+          tr -d '\r' < CHANGELOG.md | awk -v v="$version" '
+            $0 ~ ("^## " v "($| )") { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' > notes.md
+          test -s notes.md || { echo "::error::no notes for $version"; exit 1; }
+
+          # The standing part, true of every build.
+          cat >> notes.md <<'NOTES'
+
+          ---
+
+          **You need your own copy of the original.** The app reads models, maps,
+          textures and sounds out of an installation of *Hogs of War* (2000) and
+          distributes none of them. On first launch it asks for a folder holding
+          `warhogs_.exe`; `--game-dir=<path>` sets it without asking.
 
           Two downloads, same build: the `.exe` is a per-user installer, the
-          `.zip` is the same app unpacked. Neither is code-signed, so Windows
-          SmartScreen will want a "more info" click.
+          `.zip` is the same app unpacked - no installer, run
+          `Pigs of Worldwar.exe` out of the folder.
+
+          **The build is not code-signed.** Windows SmartScreen will warn about
+          an unknown publisher: More info -> Run anyway. A signature needs a
+          certificate from a certificate authority, which this project has not
+          got.
           NOTES
-          )
+
           gh release create "$GITHUB_REF_NAME" dist/*.exe dist/*.zip \
             --verify-tag \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            --notes "$notes"
+            --title "Pigs of Worldwar $GITHUB_REF_NAME" \
+            --notes-file notes.md
