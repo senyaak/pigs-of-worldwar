@@ -3391,15 +3391,41 @@ So `0x49F6F0` was stamping the height all along, in the same nine instructions
 this file already quoted for the distance: a thrown weapon gets **3500 and 692**
 — 29.2° above level — and a blade **1500 and 800**, 19.7°. Further back AND
 higher for a grenade, closer and lower for a knife, against the chase's 3072 at
-22.5°. **The 3500 is applied OUTRIGHT, through `MODEL_SCALE`, not as a ratio
-against the rig's own `BACK`** — play said the original pulled further back and
-they are right that a ratio is the weaker reading, since `BACK` is eyework and a
-proportion inherits the invention. Every other decoded length in this remake
-lands the same way. That is play's "выше, чтобы удобно целиться", read rather than chosen, and
+22.5°. That is play's "выше, чтобы удобно целиться", read rather than chosen, and
 `three/chase.ts` places the lob view by that ANGLE instead of by a lift of its
 own. The remake's own rig turns out to be in the same world: `atan(LIFT / BACK)`
 is 23.2°, within a degree of the chase's own 22.5°, and those two numbers were
 picked by eye years apart.
+
+**A CAMERA LENGTH IS OF THE WORLD AND DOES NOT RIDE `MODEL_SCALE`** — corrected
+the same day, after an eyework fudge factor was offered for the distance and
+play asked the right question of it: "точно нет? как движок тогда это делает?"
+`MODEL_SCALE` is what a MODEL is drawn at and the exe applies it too; the map is
+a tile of 512 either way, so **the exe's world and this one are the same world**
+and a distance between two of its points is the exe's number outright, exactly as
+`WALL_CLIMB`'s 128 is. What halves is a length taken off a MODEL — the bayonet's
+460, the body's 0xAA. Two more corrections rode with it: **3500 is the
+SEPARATION rather than the horizontal run** (the distance spring differences
+`0x44E850`, so the elevation splits it into `3500·cos 29.2°` along the ground
+and `3500·sin` up), and **the TR cam's 200 and 400 are its LOOK POINT, not its
+camera** — `0x4A0B50(cam, &camera, &target)` takes the vector that handler
+builds as its THIRD argument, and the camera is then put at the row's 1700 from
+it at that mode's own dead-level ceiling. What this leaves standing is written
+up in `docs/todo.md`: the ordinary chase is **2.7× closer than the exe's**
+3072 at 22.5°, because `BACK`/`LIFT` are the remake's own eyework and halved
+with the models rather than being a decoded number mis-scaled.
+
+**THE LOB VIEW LOOKS 1536 PAST THE PIG, which is why he sits at the bottom of
+the frame.** Play: "он поднимается выше и отдаляется — свин у нижней границы
+экрана", against a rig that had him dead centre. It is the one thing mode 4's
+thrown branch does that its blade branch does not — `0x44E620(0x600,
+[cam+0x8C], &dx, &dz)` at 0x4a22f6, 1536 along the camera's own FORWARD yaw
+(mode 0 springs that field toward `subjectYaw − column2`, and the chase's column
+2 is zero) — **and the PC build then never reads the result**: the target is
+stamped from the subject outright. A dead call on the one branch with a reason
+to make it, in the build whose PSX sibling play is describing. Applied, the pig
+lands 19.1° under a 29.2° axis — seven tenths of the way to the bottom edge of a
+45° frame, which is where the original's own screenshot has him.
 
 **And the CHARGE does not take the aim view away.** Play: "она отменяется когда
 нажимаешь f — и вот тут должна переживать пока зарядка идёт." A filling gauge is
@@ -3419,6 +3445,59 @@ One seam came with it: `Sights.sighting(holding)` is "the aim view is up at
 all", beside `scoped`, which is the first-person half and answers for guns
 alone. It is on the snapshot, because the camera is drawn from a snapshot and
 nothing else.
+
+### THE FLIGHT: what the camera does once the thing has LEFT (2026-08-12)
+
+Play, watching a throw: "камера не чисто за снарядом, а в бок будто
+перемещается", then "для гранат и базук она другая", then "камера следует за
+ней!", then "камера там ещё будто едет по кругу вокруг". Four reports, and every
+one of them was the binary being read to the wrong depth. `weapons/fire.md` has
+the whole chase; the shape:
+
+**Every weapon decides for itself.** They fire through one jump table — `eax =
+skill − 6`, `jmp [eax*4 + 0x47CF8C]` (0x47a233) — and each arm tells the camera
+its own thing, tails followed (the guns' is 0x47ad71, the thrown family's
+0x47b853). **6 PISTOL / 11 SNIPER / 12 / 13 / 15 / 17 / 18 → mode 1**;
+**19..27 GRENADES, 28 MORTAR, 29 BAZOOKA, 30..33, 39..44, 47..49 → mode 0x0B**;
+34 and 50 JETPACK → mode 0x0A; 51 SUICIDE → mode 2; **7 RIFLE, 8, 9, 10, 14, 16
+and the planted charges → nothing at all**. The remake asks the weapon's LAYER
+rather than its number, because play's word is that a rifle tracks like a
+sniper and the exe's own split is honoured nowhere else in the shot path.
+
+**MODE 1 DOES NOT MOVE THE CAMERA.** Its handler (0x4a11e0) is thirty
+instructions: decompose camera-to-subject, aim along it, return. No position, no
+spring, and `0x4A0B50` is never called, so its row and the ground floor are not
+read either. A gun's shot is watched from where the shot was taken, the camera
+only turning. Which also explains an old empty search — `lib/game/sightline.ts`
+dodges walls, the exe was found to have no line-of-sight test in its camera code
+at all, and a camera that does not move has no wall to dodge.
+
+**NOBODY IS EVER IN MODE 0x0B: `0x49F740` REWRITES IT TO 0x0D on entry**
+(`cmp ebp,0Bh` … `mov ebp,0Dh`, 0x49f774..0x49f7a5). That is why 0x0B's handler
+is a bare `ret` shared with modes 5, 8 and 0x0C — four empty functions folded
+onto one address, unreachable. **Reading behaviour off that stub was the
+mistake, twice over**: a `ret` is a missing function, exactly like mode 4's dead
+1536. The rewrite also closes three loose ends — 0x0B/0x0C/0x0D share the setup
+arm 0x49f912, that arm is the only writer of `[cam+0x7A]` and 0x0D's handler its
+only reader, and the setter zeroes `[cam+0x78]` for every mode BUT 0x0D.
+
+**Mode 0x0D (0x4a3a20) swings in behind the thing and then RIDES ROUND it**, in
+two phases told apart by `[cam+0x5C]`. First it springs the camera's yaw toward
+the subject's own facing and turns the camera ABOUT the subject until the step
+is under 1.4°, then stamps the separation into `[cam+0x7A]`. After that, once a
+frame: `radius = clamp(⅔ × separation, stamp, 10000)`, `[cam+0x78] -= 10` of
+4096 — **0.879° a frame, one way, held within 67.5°** of the bearing it locked
+at — and the camera is placed at that bearing and radius. Height is the row's
+own ceiling, **column 1 = 824 → 17.6° above level**, plus the tail's 768 floor;
+the row's 3000 is not read at all.
+
+So the beat play calls the freeze is the one BEFORE the throw — `Pig::Fire`
+plays the battle cry with the camera still in mode 4 — which is also why mode 4
+aims 1536 down-range: the view a throw is made from is already looking at where
+it will land. `chase.watch` is mode 1, `chase.pursue` is 0x0D, and `chase.ride`
+stays what it was for the CRATE (mode 0, 0x4661c2). Mode 0x0A is read and NOT
+built — 1024 ahead of the subject's heading, then the usual three springs — and
+nothing that reaches it (34, 50 JETPACK) exists here yet.
 
 ### What is still not read
 
