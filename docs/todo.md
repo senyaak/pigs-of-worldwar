@@ -151,9 +151,19 @@ by play. In the order they turn up:
    springs that field toward `subjectYaw − column2`, and the chase's column 2
    is zero) — and the PC build then never reads the result: the target is
    stamped from the subject outright. Applied here as `LOB_AHEAD`, it puts the
-   camera 1964 behind the pig and 1954 over him with the pig 15.7° under the
-   view axis, seven tenths of the way to the bottom edge of a 45° frame, at
-   2771 from the lens against the chase's 2285. `weapons/fire.md`.
+   pig **15.7° under the view axis** — seven tenths of the way to the bottom
+   edge of a 45° frame — and play confirmed that half ("а вот угол вроде
+   верный"). `weapons/fire.md`.
+
+   **`LOB_OUT` is how far out it all stands, and it is the one eyework number
+   in this view.** Play wanted the camera further back with the angle left
+   alone, so the factor multiplies BOTH lengths — the elevation and the drop
+   are `atan(lift/reach)` and `atan(lift/(reach − ahead))`, so scaling them
+   together cannot move either. At 1.25 the camera is 2455 behind the pig and
+   2443 over him, 3463 from the lens against the ordinary chase's 2285.
+   Dropping `MODEL_SCALE` from these two lengths instead — the other end of the
+   same argument — puts him 5542 out, past the 4009 already heard as "очень
+   далеко". Nothing in the binary can settle it; correct it against play.
 
    Two numbers that were invented and are not any more: `CLEARANCE` is the exe's
    **ground + 768** (0x4a0c12, the tail every mode ends with), and **column 1 of

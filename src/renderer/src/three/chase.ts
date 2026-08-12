@@ -121,6 +121,29 @@ const RIFLE_CLOSE = 2048 / 3072
  */
 
 /**
+ * **How much further out the lob rig stands than the exe's halved lengths, and
+ * it is the one EYEWORK number in this view.** Play, with the aim point in:
+ * "уже лучше — но камера вроде как дальше должна быть, а вот угол вроде
+ * верный."
+ *
+ * It multiplies BOTH lengths, which is why it cannot touch the angle: the
+ * elevation is `atan(lift / reach)` and the drop of the pig under the axis is
+ * `atan(lift / (reach − ahead))`, and scaling reach and ahead together leaves
+ * both exactly where they were. Only the SIZE of the pig in the frame changes.
+ *
+ * Why a factor rather than a number: `MODEL_SCALE` on a camera distance is the
+ * remake's own judgement and always has been (see `LOB_CLOSE` below) — a rig
+ * around a BODY halves with the body, but a thrown weapon is aimed at the
+ * GROUND and the map is not halved, so this view is the one that sits between
+ * the two. Dropping the halving outright is the other end of that argument and
+ * it is too far: the pig would be 5542 from the lens where the ordinary chase
+ * has him at 2285, and 4009 has already been heard as "очень далеко". At 1.25
+ * he is 3464 out. **Correct this against play, not against the exe** — there is
+ * nothing in the binary that can settle it.
+ */
+const LOB_OUT = 1.25
+
+/**
  * **THE LOB VIEW LOOKS PAST THE PIG, AND THAT IS WHY HE SITS AT THE BOTTOM OF
  * THE FRAME.** Play: "в оригинале он поднимается выше и отдаляется — свин у
  * нижней границы экрана", against a rig that had him dead centre.
@@ -149,16 +172,14 @@ const RIFLE_CLOSE = 2048 / 3072
  *
  * What it does to the picture is the check, and it is worked in model units off
  * this rig's own convention (`reach` is the HORIZONTAL run and `lift` is
- * `reach·tan 29.2°` on top of it). The camera keeps its 3500 to the LOOK POINT,
- * so it stands `3500 − 1536` = 1964 behind the pig and 1954 over him: the pig
- * falls **15.7° under the view axis**, and the frame is 45° tall, so he sits
- * seven tenths of the way from the middle to the bottom edge — about where the
- * original's own screenshot has him. He is 2771 from the lens where the
- * ordinary chase has him at 2285, so the view is genuinely further back as well
- * as higher, which is play's whole sentence. Aimed AT him the same rig had him
- * dead centre at 4009 out — the "очень далеко" being answered.
+ * `reach·tan 29.2°` on top of it). Holding its distance to the LOOK POINT, the
+ * camera stands `3500 − 1536` behind the pig and `3500·tan 29.2°` over him,
+ * which puts him **15.7° under the view axis** — and the frame is 45° tall, so
+ * he sits seven tenths of the way from the middle to the bottom edge. Those are
+ * ANGLES: they are what `LOB_OUT` cannot move, and they are the half play
+ * confirmed ("а вот угол вроде верный").
  */
-const LOB_AHEAD = 1536 * MODEL_SCALE
+const LOB_AHEAD = 1536 * MODEL_SCALE * LOB_OUT
 
 /**
  * …and it is the exe's 3500 OUTRIGHT rather than a ratio against the chase.
@@ -168,10 +189,11 @@ const LOB_AHEAD = 1536 * MODEL_SCALE
  * reading: it is measured against `BACK`, which is the remake's own eyework, so
  * a proportion inherits that invention. Every other decoded LENGTH in this
  * remake lands through `MODEL_SCALE` (the bayonet's 460, the pig's 170, the
- * jump's 0x30), and this one does now too. It comes out two thirds further back
- * than the chase, which is what play was describing.
+ * jump's 0x30), and this one does now too — with `LOB_OUT` over the top of it,
+ * which is where the halving is argued with rather than in here. It comes out
+ * two thirds further back than the chase, which is what play was describing.
  */
-const LOB_CLOSE = (3500 * MODEL_SCALE) / BACK
+const LOB_CLOSE = (3500 * MODEL_SCALE * LOB_OUT) / BACK
 
 /**
  * **COLUMN 1 OF THE MODE TABLE IS HOW HIGH THE CAMERA MAY STAND**, and that is
