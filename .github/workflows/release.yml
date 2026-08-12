@@ -68,7 +68,9 @@ jobs:
       - name: Build the installer and the zip
         run: npm run dist
 
-      - uses: actions/upload-artifact@v4
+      # v4 is the one action here still on the node20 runtime, which the
+      # runners now force onto 24 and warn about; v7 is built for it.
+      - uses: actions/upload-artifact@v7
         with:
           name: pigs-of-worldwar-windows
           path: |

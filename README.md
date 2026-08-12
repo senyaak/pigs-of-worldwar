@@ -147,6 +147,9 @@ maps like ARTGUN and ICEFLOW.)
 
 ## Development
 
+**Node 24 or newer** (`package.json` says so, and `.nvmrc` picks it up) — the
+same version CI and the release build run on.
+
 ```bash
 npm install
 npm run dev        # start with HMR

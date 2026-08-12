@@ -18,6 +18,9 @@
     "dist": "electron-vite build && electron-builder --win --publish never"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@types/three": "^0.185.3",

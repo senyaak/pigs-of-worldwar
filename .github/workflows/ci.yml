@@ -7,12 +7,12 @@
 # @nodata. `npm run boundaries` is what keeps that split from drifting, which
 # is why it runs first here.
 #
-# LINUX, though the app targets Windows, and the reason is the bill: this repo
-# is private, where a Windows runner costs double. Nothing these steps do is
+# LINUX, though the app targets Windows, and the reason is speed: half a minute
+# against a Windows runner's start-up alone. Nothing these steps do is
 # platform-specific — bundling, type checking and stepping the engine — and the
 # Windows path is walked on every release anyway, because release.yml runs the
-# same three checks on windows-latest before it packages. One word here moves
-# it back the day a path bug slips through.
+# same checks on windows-latest before it packages. One word here moves it back
+# the day a path bug slips through.
 
 name: CI
 
