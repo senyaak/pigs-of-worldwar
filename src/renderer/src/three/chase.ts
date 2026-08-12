@@ -483,17 +483,47 @@ export interface Chase {
     eye?: { x: number; y: number; z: number } | null
   ): void
   /**
-   * Ride a bullet.
+   * **WATCH a bullet — the camera does NOT go with it.**
    *
    * The moment a shot leaves, the exe hands the camera the PROJECTILE as its
    * subject (`0x49ec20`, from the shot's own tail at 0x47ad99) and puts it in
-   * **mode 1** (`0x49f740(1, 0)`). Mode 1's row of the table at 0x4d9528 is
-   * `3072, 1024` — the same distance as the ordinary chase, so this is the
-   * chase rig with a bullet in the middle of it instead of a pig, and it gets
-   * the same numbers here for the same reason.
+   * **mode 1** (`0x49f740(1, 0)`). Mode 1's handler is `0x4a11e0` and it is
+   * thirty instructions long — every one of them read:
    *
-   * `heading` is where the bullet is going, so the camera sits behind it and
-   * watches it fly away rather than side-on.
+   * ```
+   * 4a11e9  [cam+0x18]+4  -> the CAMERA's own position, as three shorts
+   * 4a1254  [cam+0x54]    -> the SUBJECT's, the same way
+   * 4a12f6  0x44E8E0(camera, subject, &yaw, &pitch)     ; decompose
+   * 4a1310  [cam vtable+0x48](pitch, yaw, [cam+0x90])   ; ...and aim
+   * ```
+   *
+   * **No position is written, no spring is stepped and the common tail
+   * (`0x4A0B50`) is never called** — so the row of the table this file used to
+   * quote for it, 3072/1024, is not read either, and neither is the ground
+   * floor. The camera stands exactly where the last mode left it and TURNS to
+   * keep the projectile in frame, like a man watching a ball. Entering the mode
+   * moves nothing either: mode 1 takes the default setup arm at `0x49fcfe`
+   * (byte map 0x49FE84, table 0x49FE58), which only copies the subject's
+   * position into the smoothing memory at `[cam+0x64]`.
+   *
+   * Play saw it as a drift: "камера не чисто за снарядом, а в бок будто
+   * перемещается". A camera flown along behind the flight has to swing round to
+   * stay behind a thing whose heading changes every bounce — this one has
+   * nothing to swing.
+   *
+   * It also settles an old loose end: `lib/game/sightline.ts` exists because
+   * watching a grenade through a wall is no use, and the exe was searched for
+   * something like it and found to have nothing. Of course it has nothing —
+   * with the camera standing still there is no ride to dodge with.
+   */
+  watch(at: { x: number; y: number; z: number }): void
+  /**
+   * Ride a CRATE down — the exe's mode 0, which is the ordinary chase rig with
+   * something other than a pig in the middle of it (0x4661c2).
+   *
+   * `heading` is where the subject is going, so the camera sits behind it and
+   * watches it fall away rather than side-on. Unlike `watch`, this one really
+   * does move: mode 0's arm is the full rig, springs and tail included.
    */
   ride(at: { x: number; y: number; z: number }, heading: number, delta: number | null): void
   /**
@@ -651,6 +681,12 @@ export function createChase(
       }
       camera.position.copy(at)
       camera.lookAt(target)
+    },
+    watch(point) {
+      // Mode 1 in full: the position is left alone — `at` is not touched, so
+      // whatever view the throw was made from is still standing there and the
+      // next `follow` carries on from it — and only the aim moves.
+      camera.lookAt(new THREE.Vector3(point.x, -point.y, -point.z))
     },
     ride(point, heading, delta) {
       // Swing round whatever is in the way. THE REMAKE'S OWN — the original

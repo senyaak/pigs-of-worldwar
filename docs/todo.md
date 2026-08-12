@@ -182,6 +182,25 @@ by play. In the order they turn up:
    The two agree on which corner of the picture the pig sits in without either
    being tuned to the other, which is the check on both.
 
+   **AND THE SHOT CAMERA DOES NOT FOLLOW THE SHOT (2026-08-12).** Play: "когда
+   кидаешь или стреляешь — камера не чисто за снарядом, а в бок будто
+   перемещается." Mode 1's handler is **0x4a11e0** — found through the pointer
+   table at 0x4D95A0 that `0x49F740` reads and `[cam+0xE0]` holds — and it is
+   thirty instructions that decompose camera-to-subject and aim along it. **No
+   position, no spring, and `0x4A0B50` never called**, so its row's 3072/1024
+   is not read and neither is the ground floor. The camera stands where the
+   throw left it and TURNS. A camera flown behind the flight has to swing round
+   every time the heading changes, which is the drift play saw; this one has
+   nothing to swing. `chase.watch` is that, and `chase.ride` stays for the
+   CRATE, which is mode 0 and really does move (0x4661c2).
+
+   It also explains an old empty search: `lib/game/sightline.ts` dodges walls
+   because watching a grenade through one is no use, and the exe was found to
+   have no line-of-sight test anywhere in its camera code. A camera that does
+   not move has no wall to dodge. The dodge now applies to the crate view
+   alone — if a wall hides a grenade in play, that is the thing to bring back,
+   as a swing of the STANDING camera.
+
    **What this leaves standing: the ordinary chase is 2.7× closer than the
    exe's.** `BACK`/`LIFT` put the lens 1142 from the pig where mode 0's row is
    3072 at 22.5°. Those two are the remake's own eyework, tuned when models were

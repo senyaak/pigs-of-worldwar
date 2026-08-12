@@ -313,15 +313,16 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // A bullet in the air takes the camera off the pig altogether: the shot's
     // own tail hands the camera the projectile and asks for mode 1
     // (0x47ad99). Only the acting pig's shot does this, and only while there
-    // is something left to watch. The NEWEST is the one it rides.
+    // is something left to watch. The NEWEST is the one it watches.
+    //
+    // **And mode 1 does not MOVE the camera** — it turns it and nothing else
+    // (three/chase.ts `watch`, read instruction by instruction). So the view
+    // the throw was made from stands still and follows the flight round, which
+    // is why nothing here has a heading to pass any more.
     const flying = now.bullets.length > 0 ? now.bullets : now.lobs
     const bullet = now.firing?.phase === 'flight' ? (flying[flying.length - 1] ?? null) : null
     if (bullet && acting) {
-      chase.ride(
-        drawnAt(`${now.bullets.length > 0 ? 'shot' : 'lob'}:${bullet.id}`, bullet),
-        Math.atan2(bullet.vx, bullet.vz),
-        delta
-      )
+      chase.watch(drawnAt(`${now.bullets.length > 0 ? 'shot' : 'lob'}:${bullet.id}`, bullet))
       soldier.node.visible = true
       lastView = 'ride'
       return
