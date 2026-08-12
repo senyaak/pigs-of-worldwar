@@ -14,15 +14,15 @@
 
 import { test, expect } from '@playwright/test'
 
-import { FRAME_SECONDS } from '../../src/lib/game/ballistics'
-import { WALK_SPEED } from '../../src/lib/game/movement'
+import { FRAME_SECONDS } from '../src/lib/game/ballistics'
+import { WALK_SPEED } from '../src/lib/game/movement'
 import {
   SIDESTEP_SPEED,
   WALL_CLIMB,
   createLocomotion,
   updateLocomotion
-} from '../../src/lib/game/locomotion'
-import type { Intent, LocomotionState } from '../../src/lib/game/locomotion'
+} from '../src/lib/game/locomotion'
+import type { Intent, LocomotionState } from '../src/lib/game/locomotion'
 import {
   MIN_SOLID,
   ObstacleField,
@@ -30,11 +30,11 @@ import {
   PIG_RADIUS,
   isSolid,
   withPigs
-} from '../../src/lib/game/obstacles'
-import type { MapObject } from '../../src/lib/formats/pog'
-import type { TerrainQuery } from '../../src/lib/game/terrain'
-import { WOOD } from '../../src/lib/game/underfoot'
-import type { Obstruction } from '../../src/lib/game/obstacles'
+} from '../src/lib/game/obstacles'
+import type { MapObject } from '../src/lib/formats/pog'
+import type { TerrainQuery } from '../src/lib/game/terrain'
+import { WOOD } from '../src/lib/game/underfoot'
+import type { Obstruction } from '../src/lib/game/obstacles'
 import { terrain } from './fixture'
 
 const NORTH = 0 // heading 0 is +z; forward is (sin h, cos h)

@@ -36,11 +36,11 @@ import {
   WALL_CLIMB,
   createLocomotion,
   updateLocomotion
-} from '../../src/lib/game/locomotion'
-import type { Intent, LocomotionState } from '../../src/lib/game/locomotion'
-import { WALK_BACK_SPEED, WALK_SCALE, WALK_SPEED } from '../../src/lib/game/movement'
-import { EJECT_SECONDS, FRAME_SECONDS, RESTITUTION_FREE } from '../../src/lib/game/ballistics'
-import type { TerrainQuery } from '../../src/lib/game/terrain'
+} from '../src/lib/game/locomotion'
+import type { Intent, LocomotionState } from '../src/lib/game/locomotion'
+import { WALK_BACK_SPEED, WALK_SCALE, WALK_SPEED } from '../src/lib/game/movement'
+import { EJECT_SECONDS, FRAME_SECONDS, RESTITUTION_FREE } from '../src/lib/game/ballistics'
+import type { TerrainQuery } from '../src/lib/game/terrain'
 import { terrain } from './fixture'
 
 const NORTH = 0 // heading 0 is +z; forward is (sin h, cos h)

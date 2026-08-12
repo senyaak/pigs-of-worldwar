@@ -6,8 +6,13 @@
 // layer was typed against the renderer, and the rules read the mesh to find out
 // how tall a pig was.
 //
-// Run: `npm run boundaries`. It exits non-zero on the first offence and names
-// the line, so the build fails rather than the split quietly rotting.
+// It answers a second question too, about the SUITE: does every test still live
+// where its kind belongs? `unit/` is the engine with no game and no window and
+// is what a build server runs; `e2e/` drives the real installation. Both halves
+// of that are below, under "THE TEST FOLDERS".
+//
+// Run: `npm run boundaries`. It names every offence and the line it is on, so
+// the build fails rather than a split quietly rotting.
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
@@ -62,7 +67,16 @@ function* files(dir) {
   }
 }
 
+/** Repo-relative and forward-slashed, so the message is clickable. */
+const pathOf = (file) => relative(process.cwd(), file).replace(/\\/g, '/')
+
 let broken = 0
+const fault = (where, what, why) => {
+  console.error(`${where}  ${what}`)
+  console.error(`  ${why}\n`)
+  broken++
+}
+
 for (const rule of RULES) {
   const root = join(SRC, rule.dir)
   for (const file of files(root)) {
@@ -72,16 +86,104 @@ for (const rule of RULES) {
       if (!banned) continue
       // Which LINE, so the message is somewhere to go rather than a scolding.
       const line = source.slice(0, source.indexOf(specifier)).split('\n').length
-      const where = relative(process.cwd(), file).replace(/\\/g, '/')
-      console.error(`${where}:${line}  imports '${specifier}'`)
-      console.error(`  src/${rule.dir} may not: ${rule.why}\n`)
-      broken++
+      fault(`${pathOf(file)}:${line}`, `imports '${specifier}'`, `src/${rule.dir} may not: ${rule.why}`)
     }
   }
 }
 
+// --------------------------------------------------------- THE TEST FOLDERS
+//
+// The suite is split in TWO ways on purpose, and the two have to agree:
+//
+//   - by FOLDER, which is what a run selects — `--project=unit` is the half a
+//     build server can run at all, having no game installed
+//     (playwright.config.ts);
+//   - by TAG, which is what each test claims about itself — `@nodata` shows up
+//     in the runner's own output and in `--grep`, so somebody reading one test
+//     can see it without knowing the folder convention.
+//
+// Two ways of saying one thing are worth having only while they cannot drift.
+// These four rules are what stops them.
+const UNIT = resolve(process.cwd(), 'unit')
+const E2E = resolve(process.cwd(), 'e2e')
+const TAG = '@nodata'
+
+/** Every `*.spec.ts` under a folder, at any depth. */
+function* specsIn(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) yield* specsIn(path)
+    else if (entry.name.endsWith('.spec.ts')) yield path
+  }
+}
+
+/**
+ * Can this spec reach the real thing? Two markers, and they are the only two
+ * doors: the `app` fixture IS the running application, and `GAME_DIR` (out of
+ * `e2e/launch.ts`) is the installation on disk. A spec that names neither
+ * cannot get at either, whatever folder it is sitting in.
+ */
+const needsTheInstall = (source) =>
+  /from '(\.\.\/)+app'/.test(source) || source.includes('GAME_DIR')
+
+/** A line that starts a test — `test(`, `test.skip(`, `test.describe(`. */
+const startsATest = (line) => /^test[.(]/.test(line)
+
+for (const file of specsIn(UNIT)) {
+  const source = readFileSync(file, 'utf8')
+
+  // 1. A unit spec may not reach into the e2e half — and that is not a matter
+  //    of taste. `app` and `GAME_DIR` both live over there, so this import is
+  //    the only door to the game, and keeping it shut is what makes "unit/
+  //    needs no installation" a fact rather than a hope.
+  for (const [, specifier] of source.matchAll(IMPORT)) {
+    if (!/(^|\/)e2e\//.test(specifier)) continue
+    const line = source.slice(0, source.indexOf(specifier)).split('\n').length
+    fault(
+      `${pathOf(file)}:${line}`,
+      `imports '${specifier}'`,
+      'unit/ runs with no game and no window; reaching into e2e/ is reaching for both.'
+    )
+  }
+
+  // 2. …and every test in it says so for itself.
+  source.split('\n').forEach((line, index) => {
+    if (!startsATest(line) || line.includes(TAG)) return
+    fault(
+      `${pathOf(file)}:${index + 1}`,
+      `is not tagged ${TAG}`,
+      `every test under unit/ carries it, so --grep ${TAG} and --project=unit stay the same set.`
+    )
+  })
+}
+
+for (const file of specsIn(E2E)) {
+  const source = readFileSync(file, 'utf8')
+
+  // 3. A spec down here that cannot reach the game is coverage a build server
+  //    could have had and silently does not. It belongs upstairs.
+  if (!needsTheInstall(source) && /^test[.(]/m.test(source)) {
+    fault(
+      `${pathOf(file)}:1`,
+      'needs neither the app nor the game files',
+      'move it to unit/, where CI will actually run it.'
+    )
+  }
+
+  // 4. …and nothing down here may claim otherwise: by rule 3 the file it sits
+  //    in reaches the install, so the tag would be a lie the runner believes.
+  source.split('\n').forEach((line, index) => {
+    if (!startsATest(line) || !line.includes(TAG)) return
+    fault(
+      `${pathOf(file)}:${index + 1}`,
+      `claims ${TAG} from inside e2e/`,
+      'this spec drives the real installation. If the test truly needs neither, move it to unit/.'
+    )
+  })
+}
+
 if (broken > 0) {
-  console.error(`${broken} boundary ${broken === 1 ? 'breach' : 'breaches'}.`)
+  console.error(`${broken} ${broken === 1 ? 'breach' : 'breaches'}.`)
   process.exit(1)
 }
-console.log(`boundaries clean — ${RULES.length} domains checked`)
+console.log(`boundaries clean — ${RULES.length} domains, and the unit/e2e split holds`)

@@ -151,8 +151,9 @@ maps like ARTGUN and ICEFLOW.)
 npm install
 npm run dev        # start with HMR
 npm run typecheck    # TypeScript check
-npm run test:nodata  # the @nodata half — no game installation needed
-npm run test:e2e     # build + the WHOLE suite, against your own installation
+npm run test:unit    # unit/ — the engine, no game installation needed
+npm run test:e2e     # build + e2e/, against your own installation
+npm run test:all     # both suites
 npm run dist         # package a Windows installer and zip into dist/
 ```
 
@@ -179,7 +180,7 @@ write into itself.
 Two workflows, both Windows, both in [.github/workflows](.github/workflows):
 
 - **CI** on every push and pull request — the domain boundaries, TypeScript,
-  the build, and the `@nodata` tests.
+  the build, and the `unit/` suite.
 - **Release** on a `v*` tag — the same checks, then the installer and the zip,
   attached to a GitHub Release. The notes are lifted out of
   [CHANGELOG.md](CHANGELOG.md), which is where what-changed is written down;
@@ -193,13 +194,13 @@ npm version 0.1.0 --no-git-tag-version
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-**The whole e2e suite cannot run on a build server** and is not asked to: it
-drives the real game's own files (docs/testing.md). The engine half needs
-neither the app nor those files, and **each of those tests says so with a
-`@nodata` tag** — 126 of them today. That tag is what CI runs, and
-[scripts/nodata-check.mjs](scripts/nodata-check.mjs) checks that every claim
-still matches the spec it is in, both ways round. The rest runs here, against
-a real installation.
+**`e2e/` cannot run on a build server** and is not asked to: it launches the
+app against the real game's own files (docs/testing.md). **`unit/` is the other
+suite** — the engine stepped directly, no window and no installation, 126 tests
+that also carry a `@nodata` tag apiece. That is what CI runs, and
+`npm run boundaries` checks the two cannot drift: a unit spec may not import
+out of `e2e/`, and a spec in `e2e/` that needs neither the app nor the game's
+files belongs upstairs where CI would actually run it.
 
 ## Status
 

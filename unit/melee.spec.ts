@@ -7,7 +7,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { FRAME_SECONDS } from '../../src/lib/game/ballistics'
+import { FRAME_SECONDS } from '../src/lib/game/ballistics'
 import {
   PHASE_UNITS,
   STRIKE_ARC,
@@ -21,7 +21,7 @@ import {
   meleeOf,
   strikeOffsets,
   struck
-} from '../../src/lib/game/melee'
+} from '../src/lib/game/melee'
 
 const BAYONET = 3
 /** Clip 22 is 36 frames; at the flat 25 the renderer plays everything at. */

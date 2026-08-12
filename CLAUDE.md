@@ -251,10 +251,12 @@ would still pass. Use `e2e/controller.ts`.
 
 ## Tests
 
-Phases are folders: `e2e/000/` foundation (formats, viewers), `e2e/001/` the
-menu, `e2e/002/` the battle. Serial, one worker; within a folder files run
-alphabetically, so the spec that creates the phase's state sorts first.
-Unnumbered specs at the root are standalone.
+Two suites — `unit/` flat and `e2e/` phased — and the split is spelled out at
+the end of this section. Inside `e2e/`, phases are folders: `e2e/000/`
+foundation (formats, viewers), `e2e/001/` the menu, `e2e/002/` the battle.
+Serial, one worker; within a folder files run alphabetically, so the spec that
+creates the phase's state sorts first. Unnumbered specs at the root are
+standalone.
 
 Fail fast: no sleeps, no raised timeouts. Every launch goes through
 `e2e/launch.ts`, which collects renderer errors, `console.error` and process
@@ -278,15 +280,19 @@ as floors where savegame churn could move them and exactly where it cannot.
 npm run typecheck && npm run build && npx playwright test
 ```
 
-**A test says for itself whether it needs the game — `@nodata`.** The engine
-half is pure, so it runs with no window and no installation; those tests carry
-the tag and `npm run test:nodata` is what a build server runs
-(`.github/workflows/ci.yml`, beside the boundaries, the typecheck and the
-build). Everything else drives the real thing and stays here. **The tag is a
-CLAIM and `npm run nodata` checks it both ways**: tagged in a spec that takes
-the `app` fixture or names `GAME_DIR` is wrong, and untagged in a spec that
-does neither is coverage thrown away. Write an engine spec, tag it; the check
-asks otherwise (docs/testing.md). **A `v*` tag builds
+**THE SUITE IS TWO, and the folder is the split.** `unit/` is the engine
+stepped directly — no window, no Electron, no installed game — and is what a
+build server runs (`npm run test:unit`, `.github/workflows/ci.yml`). `e2e/`
+launches the app against the real installation and can only run here. Every
+test in `unit/` also carries the tag `@nodata`, because the folder is what a
+RUN selects and the tag is what one test claims about itself. **`npm run
+boundaries` holds the two together** — a unit spec may not import out of
+`e2e/`, every unit test carries the tag, a spec in `e2e/` that needs neither
+the app nor `GAME_DIR` belongs in `unit/`, and nothing in `e2e/` may claim the
+tag. Write an engine spec in the wrong folder and it says so, with the line
+(docs/testing.md).
+
+**A `v*` tag builds
 a release** (`.github/workflows/release.yml`, `electron-builder.yml`): a
 Windows installer and a zip, carrying no game data. The notes are the matching
 section of `CHANGELOG.md` — so a version is written up THERE before it is

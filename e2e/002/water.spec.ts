@@ -32,7 +32,7 @@ import type { TerrainBlock } from '../../src/lib/formats/pmg'
 import { parsePtg } from '../../src/lib/formats/ptg'
 import { buildWaterMask, textureKind } from '../../src/lib/game/watermask'
 import type { TerrainArt } from '../../src/lib/game/watermask'
-import { terrain, terrainBlocks } from './fixture'
+import { terrain, terrainBlocks } from '../../unit/fixture'
 
 /** A lake at elevation 200 whose seabed dips to 40 in a hole around x≈0,
  * z≈2000 — the dip is water too, and must not show in the surface. */

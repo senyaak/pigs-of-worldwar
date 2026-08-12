@@ -23,7 +23,7 @@ import { test, expect } from '@playwright/test'
 import { GAME_DIR } from '../launch'
 import { CLIMBING_TILE, TerrainQuery } from '../../src/lib/game/terrain'
 import { parsePmg } from '../../src/lib/formats/pmg'
-import { terrain } from './fixture'
+import { terrain } from '../../unit/fixture'
 
 test('tileType is the low 5 bits; the raw byte stays readable for debugging', () => {
   const mud = terrain(() => 0, () => ({ type: 0x2b }))

@@ -12,9 +12,9 @@
 
 import { test, expect } from '@playwright/test'
 
-import { LOOK_AHEAD, STEP_DOWN, step } from '../../src/lib/game/movement'
-import { WORLD_LIMIT } from '../../src/lib/game/terrain'
-import type { TerrainQuery } from '../../src/lib/game/terrain'
+import { LOOK_AHEAD, STEP_DOWN, step } from '../src/lib/game/movement'
+import { WORLD_LIMIT } from '../src/lib/game/terrain'
+import type { TerrainQuery } from '../src/lib/game/terrain'
 import { terrain } from './fixture'
 
 const NORTH = 0 // heading 0 is +z; forward is (sin h, cos h)

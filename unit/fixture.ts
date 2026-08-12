@@ -3,9 +3,9 @@
 // movement, tile-query and locomotion specs — the fixture IS the contract
 // those specs talk to the engine through, so it lives once.
 
-import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP, VERTS_PER_SIDE } from '../../src/lib/formats/pmg'
-import type { TerrainBlock, TerrainTile } from '../../src/lib/formats/pmg'
-import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
+import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP, VERTS_PER_SIDE } from '../src/lib/formats/pmg'
+import type { TerrainBlock, TerrainTile } from '../src/lib/formats/pmg'
+import { HEIGHT_SCALE, TerrainQuery } from '../src/lib/game/terrain'
 
 export const BLOCK_SPAN = TILES_PER_SIDE * TILE_STEP
 export const MAP_ORIGIN = (BLOCKS_PER_SIDE * BLOCK_SPAN) / 2

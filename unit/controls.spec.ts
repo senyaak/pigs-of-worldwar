@@ -5,13 +5,13 @@
 
 import { test, expect } from '@playwright/test'
 
-import { modeOf, readControls, verbOf, wakes } from '../../src/lib/game/controls'
+import { modeOf, readControls, verbOf, wakes } from '../src/lib/game/controls'
 import {
   DEFAULT_BINDINGS,
   DRIVING_ACTIONS,
   HELD_ACTIONS
-} from '../../src/renderer/src/input/actions'
-import type { Held, Situation } from '../../src/lib/game/controls'
+} from '../src/renderer/src/input/actions'
+import type { Held, Situation } from '../src/lib/game/controls'
 
 const still: Held = { walk: 0, turn: 0, aim: 0, sighting: false, firing: false, fired: false }
 const driving = (over: Partial<Held> = {}): Held => ({ ...still, walk: 1, turn: 1, ...over })

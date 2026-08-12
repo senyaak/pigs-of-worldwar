@@ -26,7 +26,7 @@ import {
   bounceSpeed,
   easeBounciness,
   slopePull
-} from '../../src/lib/game/ballistics'
+} from '../src/lib/game/ballistics'
 
 test('the wedged pig is the slippery one, and the free pig the grippy one', { tag: '@nodata' }, () => {
   expect(FRICTION_STUCK).toBeLessThan(FRICTION_FREE)

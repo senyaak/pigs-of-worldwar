@@ -16,11 +16,11 @@
 
 import { test, expect } from '@playwright/test'
 
-import { ZOOM_CAP, ZOOM_STEP, createZoom, updateZoom, zoomFraction, zoomsIn } from '../../src/lib/game/zoom'
-import { createWobble, resetWobble, wobbleStep } from '../../src/lib/game/wobble'
-import { layerFires, layerSights, weaponLayer } from '../../src/lib/game/controls'
-import { SKILL } from '../../src/lib/game/skills'
-import { createSights } from '../../src/lib/game/sights'
+import { ZOOM_CAP, ZOOM_STEP, createZoom, updateZoom, zoomFraction, zoomsIn } from '../src/lib/game/zoom'
+import { createWobble, resetWobble, wobbleStep } from '../src/lib/game/wobble'
+import { layerFires, layerSights, weaponLayer } from '../src/lib/game/controls'
+import { SKILL } from '../src/lib/game/skills'
+import { createSights } from '../src/lib/game/sights'
 
 /** A deterministic stand-in for `Math.random` - varied, so a walk is a walk, and
  * repeatable, so the numbers below mean something. */

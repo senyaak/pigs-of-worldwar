@@ -6,8 +6,8 @@
 
 import { test, expect } from '@playwright/test'
 
-import { FRAME_SECONDS } from '../../src/lib/game/ballistics'
-import { AIM_UNITS } from '../../src/lib/game/aim'
+import { FRAME_SECONDS } from '../src/lib/game/ballistics'
+import { AIM_UNITS } from '../src/lib/game/aim'
 import {
   advanceShot,
   fireShot,
@@ -15,7 +15,7 @@ import {
   projectileOf,
   rangeOf,
   spentShot
-} from '../../src/lib/game/projectile'
+} from '../src/lib/game/projectile'
 
 test('a gun is a gun and a grenade is not', { tag: '@nodata' }, () => {
   expect(isGun(7)).toBe(true)

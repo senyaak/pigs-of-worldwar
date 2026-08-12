@@ -10,8 +10,8 @@
 
 import { test, expect } from '@playwright/test'
 
-import { BOUNCE_CUTOFF, TILE_MATERIALS } from '../../src/lib/game/ballistics'
-import { STEP_SECONDS } from '../../src/lib/game/engine'
+import { BOUNCE_CUTOFF, TILE_MATERIALS } from '../src/lib/game/ballistics'
+import { STEP_SECONDS } from '../src/lib/game/engine'
 import {
   WATER_DOUSE_SPEED,
   WATER_SINK_SECONDS,
@@ -27,8 +27,8 @@ import {
   lobSurface,
   sinkLob,
   sunkAway
-} from '../../src/lib/game/grenade'
-import type { Lobbed } from '../../src/lib/game/grenade'
+} from '../src/lib/game/grenade'
+import type { Lobbed } from '../src/lib/game/grenade'
 
 const GRENADE = 19
 const ROW = lobOf(GRENADE)!

@@ -1,9 +1,45 @@
-# E2E testing spec
+# Testing spec
 
-Conventions for the Playwright end-to-end suite, borrowed from the
-`homm5-editor` project. Read this before writing a spec.
+Conventions for the Playwright suite, borrowed from the `homm5-editor`
+project. Read this before writing a spec.
 
-## Phased specs
+## TWO SUITES, and the folder is the split
+
+**`unit/` needs nothing.** The engine is pure (`src/lib/game/`) — parsed data
+in, numbers out — so a spec can build a battle, step it and assert what
+happened with no window open and no game on disk. Flat folder, one file per
+subject, and **every test also carries the tag `@nodata`**:
+
+```ts
+test('a low object is a step onto, not a wall', { tag: '@nodata' }, () => {
+```
+
+**`e2e/` needs the real thing.** It launches the app and drives it against a
+real installation of the original, which is the whole point of it: the specs
+assert against the game's own maps, models and text rather than against
+fixtures somebody wrote to match the code. It cannot run anywhere else, and a
+build server is not asked to.
+
+Two ways of saying one thing — folder and tag — because they answer different
+questions. The folder is what a RUN selects (`--project=unit`, which is all CI
+can do); the tag is what one test claims about ITSELF, and it shows in the
+runner's output and in `--grep`, where a reader who has never heard of the
+convention will still see it.
+
+**`npm run boundaries` stops the two from drifting**, and it is run in CI ahead
+of the tests. Four rules: a `unit/` spec may not import out of `e2e/` (`app`
+and `GAME_DIR` both live there, so that import is the only door to the game);
+every test under `unit/` carries the tag; a spec in `e2e/` that names neither
+the app fixture nor `GAME_DIR` belongs in `unit/`, because as it stands it is
+coverage a build server could have had and silently does not; and nothing in
+`e2e/` may claim the tag. Write an engine spec in the wrong place and the check
+says so, with the line.
+
+The terrain fixture lives at `unit/fixture.ts` — it is pure, and the two e2e
+specs that build a map to order import it from there. That direction is the
+only one allowed: `e2e/` may use what `unit/` has, never the reverse.
+
+## Phased specs — inside `e2e/`
 
 Tests live in `e2e/` at the repo root. Each **phase is a folder** named by
 its number — `e2e/000/`, `e2e/001/`, … — holding every suite that belongs to
@@ -24,8 +60,8 @@ first (`000/foundation.spec.ts` before `000/model-viewer.spec.ts`).
   four labels (ONE PLAYER → the battle, QUIT APPLICATION → quits; the
   phase-000 browsers hang off the remake's own F1, since the original has no
   such screen). `002/` is the first
-  battle slice: the Game domain model (players, squads, turn rotation —
-  pinned by a pure-logic spec that runs with no Electron at all) and the
+  battle slice: the Game domain model (players, squads, turn rotation — the
+  half of it that needs a real map to read) and the
   battle scene ONE PLAYER opens: squads spawned on standable CAMP ground, the
   original's turn clock (auto end-of-turn on expiry), tank controls — W/S
   walk, A/D turn, Space jumps ballistically — swimming and slope-sliding per
@@ -123,38 +159,10 @@ same commit as the dialog.
 - Fabricated game folders (for negative/CLI tests) and all other scratch state
   go under `_tmp/` or `os.tmpdir()`, and are wiped by the spec that made them.
 
-## Two halves: with the game's files, and without — `@nodata`
-
-**Most of this suite cannot run anywhere but here.** It drives the app against
-a real installation of the original, which is the whole point of it: the specs
-assert against the game's own maps, models and text rather than against
-fixtures somebody wrote to match the code.
-
-The other half never touches either. The engine is pure (`src/lib/game/`) —
-parsed data in, numbers out — so a spec can build a battle, step it and assert
-what happened with no window open and no game on disk. **Those tests carry the
-tag `@nodata`**, one per test, and that tag is what a build server runs:
-
-```ts
-test('a low object is a step onto, not a wall', { tag: '@nodata' }, () => {
-```
-
-```bash
-npm run test:nodata   # playwright test --grep @nodata
-npm run nodata        # …and whether that tag is still telling the truth
-```
-
-**The tag is a claim, and `npm run nodata` holds it to the file.** A spec that
-takes the `app` fixture or names `GAME_DIR` can reach the install; one that
-does neither cannot. So a tagged test in the first kind is an error — CI would
-fail on it for a confusing reason — and an untagged test in the second kind is
-an error too, because it is coverage a build server could have had and did not.
-Both are named by `scripts/nodata-check.mjs`, which is run in CI ahead of the
-tests themselves. Write a new engine spec and the check will ask for the tag.
-
 ## Running
 
 ```bash
-npm run test:e2e     # electron-vite build + the WHOLE suite, needs the game
-npm run test:nodata  # only the half that needs nothing
+npm run test:unit  # unit/ only — no game, no window, a couple of seconds
+npm run test:e2e   # boundaries + build + e2e/, against your own installation
+npm run test:all   # both suites, unit first
 ```

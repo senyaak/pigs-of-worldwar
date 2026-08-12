@@ -6,8 +6,8 @@
 
 import { test, expect } from '@playwright/test'
 
-import { EXE_FRAME_SECONDS } from '../../src/lib/game/ballistics'
-import { CLOUD_DEAD, CLOUD_STEP, cloudChannel, cloudSize } from '../../src/lib/game/cloud'
+import { EXE_FRAME_SECONDS } from '../src/lib/game/ballistics'
+import { CLOUD_DEAD, CLOUD_STEP, cloudChannel, cloudSize } from '../src/lib/game/cloud'
 import {
   BLAST_EFFECT,
   BREAK_EFFECT,
@@ -17,7 +17,7 @@ import {
   hitEffectOf,
   ringColour,
   spent
-} from '../../src/lib/game/effects'
+} from '../src/lib/game/effects'
 
 /**
  * Step an effect by whole frames, the way the engine does — at the ENGINE's

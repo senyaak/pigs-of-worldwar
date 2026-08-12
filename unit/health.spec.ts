@@ -6,7 +6,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { Game } from '../../src/lib/game/game'
+import { Game } from '../src/lib/game/game'
 import {
   CLASS_HEALTH,
   GIB_BELOW,
@@ -15,8 +15,8 @@ import {
   hurt,
   isDead,
   maxHealthFor
-} from '../../src/lib/game/health'
-import { meleeOf } from '../../src/lib/game/melee'
+} from '../src/lib/game/health'
+import { meleeOf } from '../src/lib/game/melee'
 
 test('a grunt has fifty and a heavy far more — health is the CLASS s', { tag: '@nodata' }, () => {
   expect(maxHealthFor(0)).toBe(50)

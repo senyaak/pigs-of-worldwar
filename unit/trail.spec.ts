@@ -17,7 +17,7 @@ import {
   beginTrail,
   trailRoom,
   trailSpent
-} from '../../src/lib/game/trail'
+} from '../src/lib/game/trail'
 
 const TRAIL_AGE_STEP = LOB_TRAIL.ageStep
 const TRAIL_STEPS = LOB_TRAIL.steps
