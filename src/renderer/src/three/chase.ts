@@ -112,14 +112,53 @@ const RIFLE_CLOSE = 2048 / 3072
  * writes mode 4's own row — 0x4D9540 is `0x4d9528 + 4*6` — with **3500** for a
  * thrown weapon and **1500** for a blade (columns 1: 692 and 800), and sets
  * `[cam+0x94]`, which picks the branch mode 4's handler takes (0x4a2277): a
- * thrown weapon's non-zero puts the camera **1536 out from the subject**
- * (0x4a2307), a blade's zero puts it at the subject itself. So the shipped
- * file's 1500/2000 is whatever the last run left there, exactly as the TR cam's
- * row is.
+ * blade's zero aims the rig at the subject itself, a thrown weapon's non-zero
+ * aims it **1536 PAST him** (`LOB_AHEAD`). So the shipped file's 1500/2000 is
+ * whatever the last run left there, exactly as the TR cam's row is.
  *
  * Both words of that row are used below — the 3500 as a length and the 692 as an
  * elevation ceiling (`elevationOf`).
  */
+
+/**
+ * **THE LOB VIEW LOOKS PAST THE PIG, AND THAT IS WHY HE SITS AT THE BOTTOM OF
+ * THE FRAME.** Play: "в оригинале он поднимается выше и отдаляется — свин у
+ * нижней границы экрана", against a rig that had him dead centre.
+ *
+ * It is the one thing mode 4's thrown branch does that its blade branch does
+ * not, and the number is the exe's:
+ *
+ * ```
+ * 4a2277  if ([cam+0x94] == 0) goto 4a2281        ; a BLADE — target = subject
+ * 4a22f6  0x44E620(0x600, [cam+0x8C], &dx, &dz)   ; 1536 along the camera's YAW
+ * ```
+ *
+ * `[cam+0x8C]` is the camera's yaw and it points FORWARD, lens to subject: the
+ * chase springs it toward `[cam+0x78] − column2` (0x4a1036..0x4a104e), and
+ * column 2 is the yaw offset that swings the melee cam its own 612 round, so
+ * with the chase's zero there the look yaw IS the pig's heading. 1536 along it
+ * is 1536 beyond him at his own height — the call answers dx and dz and nothing
+ * else.
+ *
+ * **The PC build then drops it on the floor.** Nothing reads `[esp+18h]` or
+ * `[esp+1Ch]` again on that branch; the target is stamped from the subject's own
+ * x, y and z (0x4a2337, 0x4a2361, and the z through `0x4385C0`, which is the
+ * same ftol of `[body+0x18]+4` the other two inline). A dead call, on the one
+ * branch with a reason to make it, in the build whose PSX sibling is what play
+ * is describing. So it is applied here.
+ *
+ * What it does to the picture is the check, and it is worked in model units off
+ * this rig's own convention (`reach` is the HORIZONTAL run and `lift` is
+ * `reach·tan 29.2°` on top of it). The camera keeps its 3500 to the LOOK POINT,
+ * so it stands `3500 − 1536` = 1964 behind the pig and 1954 over him: the pig
+ * falls **15.7° under the view axis**, and the frame is 45° tall, so he sits
+ * seven tenths of the way from the middle to the bottom edge — about where the
+ * original's own screenshot has him. He is 2771 from the lens where the
+ * ordinary chase has him at 2285, so the view is genuinely further back as well
+ * as higher, which is play's whole sentence. Aimed AT him the same rig had him
+ * dead centre at 4009 out — the "очень далеко" being answered.
+ */
+const LOB_AHEAD = 1536 * MODEL_SCALE
 
 /**
  * …and it is the exe's 3500 OUTRIGHT rather than a ratio against the chase.
@@ -296,26 +335,36 @@ export type View =
 
 /**
  * Where each view stands on the one rig: how much of the chase's distance it
- * keeps, and how high it sits over the point it is looking at. A negative
- * distance is IN FRONT — that is the whole of what makes the drop-in a face.
+ * keeps, how high it sits over the point it is looking at, and how far PAST the
+ * pig that point is. A negative distance is IN FRONT — that is the whole of
+ * what makes the drop-in a face.
  *
  * `scope` is in here for completeness and is never read: that view is first
  * person and leaves `want` before any of this (it is bolted to the hand).
  */
-const RIG: Record<View, { close: number; lift: number | null; pitch?: number; floor: boolean }> =
-  {
-    chase: { close: 1, lift: LIFT, floor: true },
-    face: { close: -1, lift: FACE_LIFT, floor: true },
-    melee: { close: MELEE_CLOSE, lift: LIFT, floor: true },
-    rifle: { close: RIFLE_CLOSE, lift: LIFT, floor: true },
-    // Back and RAISED, and both numbers are mode 4's own row: 3500 out at up to
-    // 29.2° above level, against the chase's 3072 at 22.5° (`elevationOf`).
-    lob: { close: LOB_CLOSE, lift: null, pitch: elevationOf(LOB_CEILING), floor: true },
-    // …and the TR cam is the one view the exe lets under the ground floor,
-    // which is what makes its 400 over the pig mean 400 over the pig.
-    throw: { close: THROW_CLOSE, lift: THROW_RISE, floor: false },
-    scope: { close: 0, lift: 0, floor: true }
-  }
+const RIG: Record<
+  View,
+  { close: number; lift: number | null; pitch?: number; ahead?: number; floor: boolean }
+> = {
+  chase: { close: 1, lift: LIFT, floor: true },
+  face: { close: -1, lift: FACE_LIFT, floor: true },
+  melee: { close: MELEE_CLOSE, lift: LIFT, floor: true },
+  rifle: { close: RIFLE_CLOSE, lift: LIFT, floor: true },
+  // Back, RAISED and looking PAST him — all three of mode 4's own numbers:
+  // 3500 out at up to 29.2° above level, aimed 1536 beyond the pig, against
+  // the chase's 3072 at 22.5° aimed AT him (`elevationOf`, `LOB_AHEAD`).
+  lob: {
+    close: LOB_CLOSE,
+    lift: null,
+    pitch: elevationOf(LOB_CEILING),
+    ahead: LOB_AHEAD,
+    floor: true
+  },
+  // …and the TR cam is the one view the exe lets under the ground floor,
+  // which is what makes its 400 over the pig mean 400 over the pig.
+  throw: { close: THROW_CLOSE, lift: THROW_RISE, floor: false },
+  scope: { close: 0, lift: 0, floor: true }
+}
 
 export interface Chase {
   /**
@@ -456,30 +505,38 @@ export function createChase(
     }
     const face = view === 'face'
     const waterline = -query.surface(at.x, at.z)
+    // Behind the shoulders normally; ahead of the snout on the way down; round
+    // to one side and close in for a swing; over him and past him for a lob.
+    const stand = RIG[view]
+    const from = view === 'melee' ? at.heading + MELEE_TURN : at.heading
+    // WHERE THE RIG POINTS, in game space. Every view but the lob's points at
+    // the pig; the lob's points `ahead` PAST him along the same yaw and at his
+    // own height — the exe offsets x and z and nothing else — which is what
+    // drops him to the bottom of the frame.
+    const aimX = at.x + Math.sin(from) * (stand.ahead ?? 0)
+    const aimZ = at.z + Math.cos(from) * (stand.ahead ?? 0)
     // Looking a pig in the face means looking at the PIG: the canopy over it
     // is out of frame on purpose, so `rise` is ignored on this side.
     const target = new THREE.Vector3(
-      at.x,
+      aimX,
       Math.max(-framedY(at, nodeY), waterline) + GAZE + (face ? 0 : rise / 2),
-      -at.z
+      -aimZ
     )
     // The pull-back that fits `rise` more height at this vertical field of
     // view — half the extra height over the tangent of half the angle. The
     // rig is built round a pig, so anything three times its height (a
     // canopy) needs the frame saying so rather than being cropped off.
     const back = face ? BACK : BACK + rise / (2 * Math.tan((camera.fov * Math.PI) / 360))
-    // Behind the shoulders normally; ahead of the snout on the way down; round
-    // to one side and close in for a swing; over him for a lob.
-    const stand = RIG[view]
     const reach = back * stand.close
     // A view with an ELEVATION is placed by angle, the way the exe's own spring
-    // places it: how high it stands follows how far out it is.
+    // places it: how high it stands follows how far out it is. Both are
+    // measured against what it LOOKS at rather than against the pig — for the
+    // lob those are 1536 apart, and that difference is the whole framing.
     const lift = stand.pitch === undefined
       ? (stand.lift ?? 0)
       : Math.abs(reach) * Math.tan(stand.pitch)
-    const from = view === 'melee' ? at.heading + MELEE_TURN : at.heading
-    const behindX = at.x - Math.sin(from) * reach
-    const behindZ = at.z - Math.cos(from) * reach
+    const behindX = aimX - Math.sin(from) * reach
+    const behindZ = aimZ - Math.cos(from) * reach
     const terrainAtCamera = -query.surface(behindX, behindZ)
     const position = new THREE.Vector3(
       behindX,

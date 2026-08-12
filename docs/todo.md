@@ -143,6 +143,18 @@ by play. In the order they turn up:
    `charging` control set carries the sight key through the way the exe's aim
    branch does.
 
+   **The lob view LOOKS PAST HIM (2026-08-12), and that is the framing play
+   was describing.** "В оригинале он поднимается выше и отдаляется — свин у
+   нижней границы экрана; у нас он в центре экрана." Mode 4's thrown branch
+   makes one call its blade branch does not — `0x44E620(0x600, [cam+0x8C],
+   &dx, &dz)` at 0x4a2307, 1536 along the camera's own FORWARD yaw (mode 0
+   springs that field toward `subjectYaw − column2`, and the chase's column 2
+   is zero) — and the PC build then never reads the result: the target is
+   stamped from the subject outright. Applied here as `LOB_AHEAD`, it puts the
+   camera 1964 behind the pig and 1954 over him with the pig 15.7° under the
+   view axis, seven tenths of the way to the bottom edge of a 45° frame, at
+   2771 from the lens against the chase's 2285. `weapons/fire.md`.
+
    Two numbers that were invented and are not any more: `CLEARANCE` is the exe's
    **ground + 768** (0x4a0c12, the tail every mode ends with), and **column 1 of
    the mode table is the elevation CEILING** (`0x4A0900`, 0x400 = level, smaller
