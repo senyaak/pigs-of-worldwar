@@ -211,9 +211,10 @@ export const isPlanted = (skill: number | null): boolean =>
  * same table the bayonet's four strikes come out of (`weapons/melee.md`) — is
  *
  * ```
- *  584  id 2     ; a footstep, sound 0x2d
+ *  584  id 2     ; a footstep (lib/game/footsteps.ts) -- the 0x2d beside it is
+ *                ; the VOLUME the arm pushes, not a sound index
  * 1314  id 65    ; -> Pig::Shoot (0x479f60) -- THE CHARGE GOES DOWN
- * 3796  id 2     ; ...and the other foot
+ * 3796  id 2     ; ...and the same foot again, standing back up
  * ```
  *
  * Event 65's arm is three instructions (0x474da8) and the middle one is the shot

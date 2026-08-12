@@ -44,7 +44,7 @@
 // | 975 | 22 | bone 5 |
 // | 1800 | 43 | bone 6, on a coin flip |
 // | **1950** | **68** | the glide STARTS |
-// | 3300 | 3, **69** | a footstep (sound 0x2D) — and the glide ENDS |
+// | 3300 | 3, **69** | a footstep (lib/game/footsteps.ts) — and the glide ENDS |
 //
 // So the pig crouches for the first 48% of the clip, travels over the next 33%,
 // and lands still for the last 19%.

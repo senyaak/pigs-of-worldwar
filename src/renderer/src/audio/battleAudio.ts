@@ -14,7 +14,7 @@ import { handling } from '../../../lib/game/events'
 import type { Emit } from '../../../lib/game/events'
 import { meleeOf } from '../../../lib/game/melee'
 import { isGun } from '../../../lib/game/projectile'
-import { BARREL_SOUND, BATTLE_SOUNDS, playCue } from './battle'
+import { BARREL_SOUND, BATTLE_SOUNDS, playCue, stepCue, underlayCue } from './battle'
 import type { Bank } from './bank'
 
 export interface BattleAudio {
@@ -64,6 +64,15 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       splashed: () => playCue(bank(), BATTLE_SOUNDS.splash),
       skimmed: () => playCue(bank(), BATTLE_SOUNDS.skim),
       doused: () => playCue(bank(), BATTLE_SOUNDS.doused),
+
+      // ——— the frame ———
+      // A hoof landing. WHEN is the clip's own key-frame event
+      // (lib/game/footsteps.ts) and WHAT is the tile under it — the material
+      // over the exe's own sand layer, both at the same mix (audio/battle.ts).
+      stepped: ({ surface, foot, soft }) => {
+        playCue(bank(), stepCue(surface, foot, soft))
+        playCue(bank(), underlayCue(foot, soft))
+      },
 
       // ——— the map ———
       // The pig cheers: the exe plays 0x5E at its own position the moment the

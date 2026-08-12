@@ -133,6 +133,10 @@ export interface DebugHooks {
   currentPig(): { x: number; z: number }
   currentHeading(): number
   currentNodeY(): number
+  /** The terrain TYPE the acting pig is standing on — the tile byte's low five
+   * bits (lib/game/terrain.ts). What its footsteps are picked by, and the only
+   * way a spec can tell a stone one from a grass one (audio/battle.ts). */
+  surface(): number
   /** What the dashboard is saying: whose turn, which pig, how it stands. */
   hud(): {
     turn: number

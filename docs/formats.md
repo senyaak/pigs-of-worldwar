@@ -158,10 +158,11 @@ swings it along X.
 
 The leading field is **signed** and traces a smooth ramp up and back down
 (`0,0,2,4,7,10,12,12,11,…,-1,-2,-5,-9,…`), never a spike — a per-frame root
-offset, not an event marker; 41 of the 93 clips use it. Worth knowing because
-it rules out an animation event channel: footstep and weapon-release timings
-have to be **derived** from the skeleton, which works cleanly
-(`anim/audio-events.md`).
+offset, not an event marker; 41 of the 93 clips use it. There IS an event
+channel, and it is not in this file: each clip's `(phase, id, id)` rows live
+in the animation library (`_d3d.dll`, `afGetKeyFrameList`), which is where
+footsteps, the grenade release and the blade's strikes all come from
+(`anim/audio-events.md`, `anim/key-events.js`).
 
 Playback rate is a guess (25 fps); the branch positions are small per-frame
 deltas whose exact meaning is still uninvestigated — clips play fine with
@@ -334,8 +335,9 @@ mono at 22050; the music in `MUSIC/` is Ogg Vorbis. Chromium decodes both.
 
 The thirteen footsteps sit at ids 14-26, one per surface material (GRASS,
 ICE, LAVA, METAL, MUD, QUAG, ROCK, SAND, SNOW, STONE, SWIM, WATER, WOOD).
-WHICH terrain type picks which is not decoded — see
-`anim/audio-events.md`.
+WHICH terrain type picks which is decoded — a twelve-way switch on the tile's
+low five bits, with stone as the fall-through (`anim/audio-events.md`, and
+the table lives in `audio/battle.ts`).
 
 ## MGL — frontend images (FEBmps/FEBMP.MAD)
 

@@ -164,6 +164,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
     debug: {
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
+      surface: () => query.tileType(game.currentPig.position.x, game.currentPig.position.z),
       /** Whose turn it is and how it stands. */
       hud: () => ({
         turn: game.turn,

@@ -14,9 +14,9 @@
 // than picked by name. What is still a name pick says so at the field, and
 // `pow.sfx` in the console is how those get settled (audio/console.ts).
 //
-// Footsteps are deliberately absent. They want the hoof-contact frames the
-// notes derive from the skeleton, and until they are wired a footstep on a
-// timer would be a stand-in nobody asked for.
+// FOOTSTEPS are at the bottom of this file, and nothing about them is a pick:
+// the clip says when a hoof lands (lib/game/footsteps.ts) and the ground says
+// what it lands on.
 
 import type { LocomotionState } from '../../../lib/game/locomotion'
 import type { Bank } from './bank'
@@ -32,6 +32,10 @@ export interface Cue {
   /** A pitch spread, `rand() & jitter` added — how the exe stops a repeated
    * sound being identical every time. */
   jitter?: number
+  /** …and the other kind of spread: `rand() & duck` taken OFF the VOLUME,
+   * which is what the footstep handler does (`45 − (rand & 15)`, 0x4753b3)
+   * where the jump jitters its pitch instead. */
+  duck?: number
 }
 
 /**
@@ -240,8 +244,96 @@ export const BARREL_SOUND: Record<number, 'pistol' | 'rifle' | 'bazooka'> = {
  */
 export function playCue(bank: Bank, cue: Cue, random: () => number = Math.random): void {
   const spread = cue.jitter ? Math.floor(random() * (cue.jitter + 1)) : 0
-  bank.play(cue.sound, { gain: cue.volume / 100, rate: (cue.pitch + spread) / 100 })
+  const off = cue.duck ? Math.floor(random() * (cue.duck + 1)) : 0
+  bank.play(cue.sound, {
+    gain: Math.max(0, cue.volume - off) / 100,
+    rate: (cue.pitch + spread) / 100
+  })
 }
+
+/**
+ * WHAT THE GROUND SOUNDS LIKE — the tile's terrain type to one of the bank's
+ * thirteen `FT_*`, and every row of it is DECODED.
+ *
+ * The footstep handler is `0x475010`, reached from the clip's own key-frame
+ * events (lib/game/footsteps.ts). It takes the pig's tile, masks the type byte
+ * with `0x1F` — the same low five bits the scramble test and the material
+ * lookup take (lib/game/terrain.ts) — and jumps through a twelve-entry table
+ * at `0x4754B8`. Each arm loads three registers; the first is the sound index,
+ * and the other two are the puff of dust it throws, which is not built here.
+ *
+ * ```
+ *  0  esi=0x0E FT_GRASS      6  -> default
+ *  1  esi=0x0E FT_GRASS      7  esi=0x15 FT_SAND
+ *  2  esi=0x11 FT_METAL      8  esi=0x0F FT_ICE
+ *  3  esi=0x1A FT_WOOD       9  esi=0x16 FT_SNOW
+ *  4  esi=0x19 FT_WATER     10  esi=0x19 FT_WATER
+ *  5  -> default            11  esi=0x10 FT_LAVA
+ * ```
+ *
+ * The shipped maps agree with it type by type, which is the check that matters
+ * more than any single arm: MAZE and both training grounds are wall-to-wall
+ * type 1 (grass), OASIS and ZULUS are type 7 (sand), ICE is mostly 9 (snow),
+ * ICEFLOW carries the only 8s (ice), ISLAND and LAKE are 4 where the water is,
+ * and type 6 — the commonest tile in the game — falls through to stone.
+ *
+ * Type 11 is the odd one: it is the CLIMBING tile (lib/game/terrain.ts) and it
+ * plays lava. That is what the arm says, and ICEFLOW's climbable walls are
+ * where it will be heard.
+ */
+export const SURFACE_SOUNDS: Readonly<Record<number, string>> = {
+  0: 'FT_GRASS',
+  1: 'FT_GRASS',
+  2: 'FT_METAL',
+  3: 'FT_WOOD',
+  4: 'FT_WATER',
+  7: 'FT_SAND',
+  8: 'FT_ICE',
+  9: 'FT_SNOW',
+  10: 'FT_WATER',
+  11: 'FT_LAVA'
+}
+
+/** Types 5 and 6 jump straight to it, and so does anything past 11 — and
+ * anything at all when the pig's feet are not down (`[pig+0x382] != 1`,
+ * 0x4750e0). */
+export const SURFACE_DEFAULT = 'FT_STONE'
+
+/**
+ * …and the layer UNDER every one of them: the handler plays index **0x15
+ * FT_SAND** a second time, at the same volume and pitch (0x4753fd), unless the
+ * event's own arm asks it not to. Two of the seventy-four ids do; none of the
+ * footstep ones do.
+ *
+ * So a step on stone is stone over sand and a step on sand is sand twice. It
+ * reads as a scuff under the material, which is what a hoof on loose ground
+ * is — and if play says otherwise it is one line to drop.
+ */
+export const STEP_UNDERLAY = 'FT_SAND'
+
+/** WHICH hoof, heard: the handler writes the pitch into the slot it plays with
+ * — 100 for a whole-body scuff, 92 for foot 1 and 108 for foot 2 (0x475275,
+ * 0x4752f6, 0x475374), so the two feet sit 8% either side of nominal. */
+export const FOOT_PITCH: Readonly<Record<number, number>> = { 0: 100, 1: 92, 2: 108 }
+
+/** The volume the dispatcher's arms push — 45 for the loud ids, 30 for the
+ * quiet ones — and the spread taken off it, `rand() & 15`. */
+export const STEP_VOLUME = { loud: 45, soft: 30 }
+export const STEP_DUCK = 15
+
+/** The cue a footfall plays: the ground picks the file, the hoof the pitch. */
+export const stepCue = (surface: number, foot: number, soft: boolean): Cue => ({
+  sound: SURFACE_SOUNDS[surface] ?? SURFACE_DEFAULT,
+  volume: soft ? STEP_VOLUME.soft : STEP_VOLUME.loud,
+  pitch: FOOT_PITCH[foot] ?? 100,
+  duck: STEP_DUCK
+})
+
+/** …and the sand under it, at the same mix. */
+export const underlayCue = (foot: number, soft: boolean): Cue => ({
+  ...stepCue(-1, foot, soft),
+  sound: STEP_UNDERLAY
+})
 
 export interface BattleSounds {
   /** Call once per frame with the acting pig's state. */

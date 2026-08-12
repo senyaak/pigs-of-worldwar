@@ -27,6 +27,7 @@ import { createAirDrops } from './airDrop'
 import type { AirDrops } from './airDrop'
 import { createAnim } from './anim'
 import type { Anim } from './anim'
+import { createFootsteps } from './footsteps'
 import { NO_DROP_IN, createDropIn } from './dropIn'
 import type { DropIn } from './dropIn'
 import { createStrikes } from './strikes'
@@ -238,6 +239,10 @@ export function createEngine(parts: EngineParts): Engine {
   /** …and where that puts its bones. The blade, the muzzle and the scope's eye
    * are the same question, asked of the engine now (lib/game/bonePose.ts). */
   const bones = createBonePose({ skeleton: world.skeleton, clips: world.clips, anim })
+  /** …and what the hooves do on the way: a footstep is a key-frame event on the
+   * clip, so the cursor above is the whole of what it needs
+   * (lib/game/footsteps.ts). */
+  const footsteps = createFootsteps({ pigs, anim, clips: world.clips, query }, bus.emit)
   const pose: Pose = parts.pose ?? bones
   /** The rings a blow throws, and the numbers that float off it. */
   const effects = createEffectField(random)
@@ -414,6 +419,9 @@ export function createEngine(parts: EngineParts): Engine {
   const step = (): void => {
     battle.update(STEP_SECONDS)
     anim.update(STEP_SECONDS)
+    // Straight after the clips, because it reads their cursors: the hooves
+    // that landed during the step just taken (lib/game/footsteps.ts).
+    footsteps.update()
     numbers.update(STEP_SECONDS)
     effects.update(STEP_SECONDS)
     shots.update(STEP_SECONDS)

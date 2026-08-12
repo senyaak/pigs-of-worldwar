@@ -95,6 +95,16 @@ export type BattleEvent =
   // ——— the frame ———
   /** Wear this clip; `once` plays it through and holds the last frame. */
   | { kind: 'clip'; pig: PigId; index: number; once: boolean }
+  /**
+   * A HOOF has landed — the clip's own key-frame event, not a timer
+   * (lib/game/footsteps.ts). `surface` is the tile's terrain type, which is
+   * what picks the sound: the exe's footstep handler switches on exactly that
+   * and plays one of the bank's thirteen `FT_*` (audio/battle.ts).
+   *
+   * The mix is on the event because the exe authors it per row: `foot` 0/1/2
+   * is which hoof and pitches it, `soft` is the quiet arm.
+   */
+  | { kind: 'stepped'; at: Point; surface: number; foot: number; soft: boolean }
   /** Put the camera behind the pig NOW — it teleports rather than flying. */
   | { kind: 'cameraReset' }
   /** SKIP TURN was used. */

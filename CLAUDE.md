@@ -725,9 +725,13 @@ plain text (docs/formats.md). The exe names a sound by INDEX, so anything
 decoded later drops straight in — but WHICH sound belongs to which moment is
 NOT decoded for the pig noises, and `audio/battle.ts` picks by name and says
 so. Correct those in play; the spec pins the plumbing, not the choice.
-Footsteps are deliberately not wired: they want the hoof-contact frames
-`anim/audio-events.md` derives, and a footstep on a timer
-would be a stand-in nobody asked for.
+
+**FOOTSTEPS are decoded end to end** and are not a pick at all — see "A HOOF
+KNOWS WHAT IT IS STANDING ON" below. When the hoof lands is a key-frame event
+on the clip (`lib/game/footsteps.ts`), what it lands on is the tile's terrain
+type through a twelve-way switch (`SURFACE_SOUNDS` in `audio/battle.ts`), and
+the mix — 45 or 30 minus `rand()&15`, pitched 92/100/108 by which hoof — is
+the exe's own.
 
 ### The SHOT, end to end
 
@@ -1881,10 +1885,9 @@ water's own damage exempts class 4 and 14..16 and nothing else
 (`lib/game/drowning.ts`) — but what the exe does to a non-swimmer's HEIGHT is
 still not, and the sink is unchanged.
 
-**4. There are no FOOTSTEP sounds.** Deliberate so far and written up under the
-sound section: they want the hoof-contact frames `anim/audio-events.md`
-derives, and a footstep on a timer is a stand-in nobody asked for. Play has now
-asked for them, so the next pass is the contact frames rather than the timer.
+**4. There are no FOOTSTEP sounds.** ~~Deliberate so far~~ **DONE, 2026-08-12** —
+and the contact frames turned out not to be needed: the clips carry the footfalls
+themselves. "A HOOF KNOWS WHAT IT IS STANDING ON" below.
 
 **5. The SKIP TURN animation is wrong, and it is the VICTORY clip.** Play, at a
 glance: "анимация пропуска хода кривая, и она на победу". `ANIM.THINKING = 46` was
@@ -3562,6 +3565,60 @@ it will land. `chase.watch` is mode 1, `chase.pursue` is 0x0D, and `chase.ride`
 stays what it was for the CRATE (mode 0, 0x4661c2). Mode 0x0A is read and NOT
 built — 1024 ahead of the subject's heading, then the usual three springs — and
 nothing that reaches it (34, 50 JETPACK) exists here yet.
+
+### A HOOF KNOWS WHAT IT IS STANDING ON — footsteps, 2026-08-12
+
+Play asked for them and asked the right question with it: "насколько помню
+зависит от того на какой поверхности они едут?" It does, and everything about
+it is authored rather than guessable. The note that stood here for a week — that
+footsteps want hoof-contact frames DERIVED from the skeleton — was aiming at the
+wrong thing twice over.
+
+**WHEN a hoof lands is a key-frame event on the clip.** The same six-row
+`(phase, id, id)` channel the bayonet's strikes, the charge's placing and the
+doorway's glide come out of (`_d3d.dll`, `afGetKeyFrameList`, 0x1002c778 +
+clip*88). **Ids 1..6 — and 9/10, which are byte-for-byte aliases of 4/5 — all
+call one function**, 0x475010, and what the dispatcher's arm pushes is which
+hoof (1, 2, or 0 for a whole-body scuff) and how loud (45 for ids 1..3, 30 for
+the rest). So the run cycle steps twice a lap, the swim kicks four times
+quietly, and a pig laying a charge scuffs going down and coming up. Twenty-two
+clips carry them; `anim/key-events.js` dumps the table and
+`lib/game/footsteps.ts` holds it. **Scrambling is silent** — clip 11 has no
+footfall — and so is standing still, which is the original's own answer to the
+worry that a height-based detector would fire four times a swim stroke.
+
+**WHAT it lands on is the tile's terrain type**, masked to its low five bits the
+same way the scramble test and the material table take it, and switched
+twelve ways at 0x4754B8: grass for 0 and 1, metal 2, wood 3, water 4 and 10,
+sand 7, ice 8, snow 9, lava 11, and **stone for 5, 6 and anything else** — 6
+being the commonest tile in the game. The shipped maps agree type by type
+(MAZE and both training grounds are wall-to-wall grass, OASIS and ZULUS sand,
+ICE snow, ICEFLOW the only ice, ISLAND and LAKE water where the water is), which
+is a stronger check than any single arm. The odd row is 11: it is the CLIMBING
+tile and it plays LAVA.
+
+**The mix is the exe's, including two things nobody would have invented.** The
+volume is `45 − (rand() & 15)` — the jitter is on the VOLUME here, where the
+jump jitters its pitch, so `Cue.duck` joins `Cue.jitter` in `audio/battle.ts`.
+And the pitch says WHICH hoof: the handler writes 92, 108 or 100 into the slot
+it plays with (0x475275, 0x4752f6, 0x475374), so the two feet sit 8% either side
+of nominal. There is also a SECOND play every step — index 0x15 `FT_SAND` at the
+same volume and pitch (0x4753fd), unless the event's arm suppresses it, which no
+footstep id does. A step on stone is stone over sand. It reads as a scuff under
+the material; if play hears it as doubling, `STEP_UNDERLAY` is one line to drop.
+
+**One correction falls out of this.** `melee.md` and two code comments read the
+`0x2d` beside a footstep event as a sound index — index 45 is `L_SHOTG`, which
+should have been the tell. It is the VOLUME argument, and the sound comes from
+the ground.
+
+Wiring: the domain announces `stepped` on the bus (`lib/game/events.ts`) with
+the position, the surface, the hoof and how hard; `audio/battleAudio.ts` is the
+only thing that turns that into a file. The cursor lives in `footsteps.ts` and
+nowhere else — a footstep is not a rule, and nothing in the battle branches on
+it. Held by `e2e/002/audio.spec.ts`, which turns a pig on the spot (clip 4 steps
+twice a lap and a turning pig cannot walk onto a different material) and reads
+the material and the sand under it, in pairs, against the tile it is standing on.
 
 ### What is still not read
 
