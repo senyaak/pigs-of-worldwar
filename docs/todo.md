@@ -143,11 +143,12 @@ by play. In the order they turn up:
    its arm sets a target and three springs glide onto it, and what holds the
    camera up is the tail's floor of **ground + 768** (0x4a0c12), from which the
    TR cam alone is exempt (0x4a0bd4). So `CLEARANCE` is the exe's 768 now and
-   `LOB_RISE` is **play's own**: level at 3500 is what the read gives (mode 4's
-   pitch spring drives toward the subject's own) and play looked at it — "граната
-   не та камера" — so the in-hand view carries a second `LIFT` on top of the
-   rig's. That constant is the knob if it still reads wrong; nothing else moves
-   with it. **The charge no longer cancels the view** — the `charging` control
+   the HEIGHT is read too: **column 1 of the mode table is the camera's
+   elevation ceiling** (`0x4A0900`, 0x400 = level, smaller = higher), and
+   `0x49F6F0` stamps it beside the distance — **692 = 29.2°** for anything
+   thrown against the chase's 768 = 22.5°, and 800 = 19.7° for a blade. So the
+   lob view is placed by that ANGLE and has no lift of its own; `LOB_CEILING` is
+   the number if it ever wants moving. **The charge no longer cancels the view** — the `charging` control
    set carries the sight key through, which is what the exe does. Still not
    modelled: the exe lets the player PITCH the TR cam (±700 of 4096,
    `[cam+0x76]`) and nothing here is bound to a camera pitch.

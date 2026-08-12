@@ -124,33 +124,59 @@ const RIFLE_CLOSE = 2048 / 3072
  * is what the remake borrows for play's "выше, чтобы удобно целиться".
  */
 const LOB_CLOSE = 3500 / 3072
+
 /**
- * …and it has NO LIFT of its own, which is the correction that came out of
- * reading the branch to its end rather than stopping at the first `add`.
+ * **COLUMN 1 OF THE MODE TABLE IS HOW HIGH THE CAMERA MAY STAND**, and that is
+ * the answer to "выше" — it is the exe's own number, not a taste.
  *
- * Mode 4's arm sets a target and three SPRINGS glide the camera onto it — the
- * distance (`0x4A0960`, which is where the row's 3500 is actually used: it takes
- * the current separation, subtracts the row, and steps the difference), the
- * pitch (0x4A0870, an angle spring with 4096-per-circle wrap) and the yaw
- * (0x4A0900). Not one of them carries a height. **What holds the camera up is
- * the shared 768 floor** (`CLEARANCE`), so on flat ground the lob view is level
- * with the pig at 3500 out and standing 768 over the terrain.
+ * The column had been guessed at as "a zoom in 1024ths" since the rifle cam was
+ * read. It is not: `0x4A0900` is the camera's elevation spring and the column is
+ * its CEILING.
  *
- * The `+300` this file claimed for a commit is real but belongs to mode 4's
- * OTHER branch (0x4a2246) — the one a SNAPPING camera takes, `[cam+0x60]`
- * non-zero — and `0x49f740(4, 0)` leaves that zero, so a weapon in the hand
- * never reaches it.
+ * ```
+ * 4a0908  ecx = (current + 0x400) & 0xFFF     ; 0x400 is LEVEL
+ * 4a090e  eax = (wanted  + 0x400) & 0xFFF
+ * 4a0926  edx = [0x4D952A + mode*6]           ; column 1
+ * 4a092e  if (eax > edx)     eax = edx        ; ...the ceiling
+ * 4a0936  if (eax < 0x100)   eax = 0x100      ; ...and the floor
+ * 4a0942  return (ecx - eax) * scale
+ * ```
  *
- * **So the LIFT here is play's, and it has to be.** Read as it stands, mode 4
- * puts the camera at the pig's own level and 3500 out — its pitch spring drives
- * toward the SUBJECT's own pitch (`vtable+0x44`, which is the orientation, not
- * the position) — and level at 3500 is not what play remembers: "1 выше, чтобы
- * удобно целиться", and then, of the level version, "граната не та камера".
- * Twice the chase's own lift is what that reads as. The exe's contribution is
- * the DISTANCE and the floor; this number is the remake's and is the one knob
- * to turn if the view still sits wrong.
+ * So a SMALLER column is a HIGHER camera, and the shipped rows read straight
+ * off: the chase's 768 is 22.5° above level, the melee's and the barrel cam's
+ * 924 is 8.8°, the rifle cam and the TR cam are 1024 — dead level — and the MAP
+ * VIEW's 50 is **85.6°**, which is what settles the sign and the bias beyond
+ * argument.
+ *
+ * And `0x49F6F0` stamps THIS as well as the distance, which is the half this
+ * repo missed the first time through those nine instructions: a thrown weapon
+ * gets **3500 and 692**, a blade **1500 and 800**. 692 is **29.2°** against the
+ * chase's 22.5° — so a grenade in the hand really is watched from further back
+ * AND higher, exactly as play described it, and a blade from closer and lower.
+ *
+ * The check that the remake's own rig is in the same world: `atan(LIFT / BACK)`
+ * is 23.2°, which is the chase's own 22.5° to within a degree. Those two numbers
+ * were picked by eye years apart.
  */
-const LOB_RISE = LIFT
+const elevationOf = (ceiling: number): number => ((0x400 - ceiling) / 4096) * 2 * Math.PI
+
+/** …and the ceiling `0x49F6F0` stamps for anything THROWN. */
+const LOB_CEILING = 692
+/**
+ * **Its arm carries no height, and it does not need one** — the ROW does.
+ *
+ * Mode 4's arm sets a target and three SPRINGS glide the camera onto it: the
+ * distance (`0x4A0960`, which is where 3500 is really used — it takes the
+ * current separation, subtracts the row, and steps the difference), the yaw
+ * (0x4A0870, an angle spring that wraps by 0xFFF), and the ELEVATION
+ * (`0x4A0900`), which is the one that reads the row's second column and is
+ * `elevationOf` above. The `+300` this file quoted for a commit is real but
+ * belongs to mode 4's OTHER branch (0x4a2246) — the one a SNAPPING camera takes,
+ * `[cam+0x60]` non-zero, and `0x49f740(4, 0)` leaves that zero, so a weapon in
+ * the hand never reaches it.
+ *
+ * The common tail then holds the whole thing off the ground (`CLEARANCE`).
+ */
 
 /**
  * …and the camera the VIEW KEY holds — the exe's mode **0x12, "TR cam"**
@@ -267,18 +293,20 @@ export type View =
  * `scope` is in here for completeness and is never read: that view is first
  * person and leaves `want` before any of this (it is bolted to the hand).
  */
-const RIG: Record<View, { close: number; lift: number; floor: boolean }> = {
-  chase: { close: 1, lift: LIFT, floor: true },
-  face: { close: -1, lift: FACE_LIFT, floor: true },
-  melee: { close: MELEE_CLOSE, lift: LIFT, floor: true },
-  rifle: { close: RIFLE_CLOSE, lift: LIFT, floor: true },
-  // Back and RAISED: the distance is mode 4's own, the lift is play's
-  // (`LOB_RISE`), and the ground floor holds it up over a dip either way.
-  lob: { close: LOB_CLOSE, lift: LIFT + LOB_RISE, floor: true },
-  // …and the TR cam is the one view the exe lets under the floor.
-  throw: { close: THROW_CLOSE, lift: THROW_RISE, floor: false },
-  scope: { close: 0, lift: 0, floor: true }
-}
+const RIG: Record<View, { close: number; lift: number | null; pitch?: number; floor: boolean }> =
+  {
+    chase: { close: 1, lift: LIFT, floor: true },
+    face: { close: -1, lift: FACE_LIFT, floor: true },
+    melee: { close: MELEE_CLOSE, lift: LIFT, floor: true },
+    rifle: { close: RIFLE_CLOSE, lift: LIFT, floor: true },
+    // Back and RAISED, and both numbers are mode 4's own row: 3500 out at up to
+    // 29.2° above level, against the chase's 3072 at 22.5° (`elevationOf`).
+    lob: { close: LOB_CLOSE, lift: null, pitch: elevationOf(LOB_CEILING), floor: true },
+    // …and the TR cam is the one view the exe lets under the ground floor,
+    // which is what makes its 400 over the pig mean 400 over the pig.
+    throw: { close: THROW_CLOSE, lift: THROW_RISE, floor: false },
+    scope: { close: 0, lift: 0, floor: true }
+  }
 
 export interface Chase {
   /**
@@ -435,6 +463,11 @@ export function createChase(
     // to one side and close in for a swing; over him for a lob.
     const stand = RIG[view]
     const reach = back * stand.close
+    // A view with an ELEVATION is placed by angle, the way the exe's own spring
+    // places it: how high it stands follows how far out it is.
+    const lift = stand.pitch === undefined
+      ? (stand.lift ?? 0)
+      : Math.abs(reach) * Math.tan(stand.pitch)
     const from = view === 'melee' ? at.heading + MELEE_TURN : at.heading
     const behindX = at.x - Math.sin(from) * reach
     const behindZ = at.z - Math.cos(from) * reach
@@ -442,8 +475,8 @@ export function createChase(
     const position = new THREE.Vector3(
       behindX,
       stand.floor
-        ? Math.max(target.y + stand.lift, terrainAtCamera + CLEARANCE)
-        : target.y + stand.lift,
+        ? Math.max(target.y + lift, terrainAtCamera + CLEARANCE)
+        : target.y + lift,
       -behindZ
     )
     return { position, target }

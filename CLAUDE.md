@@ -3377,12 +3377,25 @@ and **mode 0x12 is exempt by name** (0x4a0bd4), which is what lets the TR cam si
 exe's 768 now — the last invented number in it — and the TR cam is the one view
 allowed under it.
 
-**The lob view's LIFT is therefore play's, and it says so at the constant.** Level
-at 3500 is what the read gives and it is not what play wants — "1 выше, чтобы
-удобно целиться", and of the level version, "граната не та камера" — so
-`LOB_RISE` is a second `LIFT` on top of the rig's own. The exe's contribution to
-that view is the distance and the floor; the height is the remake's and is the
-one knob to turn if it still reads wrong.
+**And the lift is the exe's after all — COLUMN 1 OF THE MODE TABLE IS THE
+CAMERA'S ELEVATION CEILING.** That column had been written down as "looks like a
+zoom in 1024ths" since the rifle cam was read, and it is nothing of the kind:
+`0x4A0900` is the elevation spring, it biases both angles by 0x400 — which is
+LEVEL — and clamps the wanted one into `[0x100, column1]`. **A smaller column is
+a higher camera**, and every shipped row reads off at once: the chase 22.5°
+above level, the melee and the barrel cam 8.8°, the rifle cam and the TR cam dead
+level, and the **MAP VIEW 85.6°**, which is the check — nothing but a real
+overhead camera would land there.
+
+So `0x49F6F0` was stamping the height all along, in the same nine instructions
+this file already quoted for the distance: a thrown weapon gets **3500 and 692**
+— 29.2° above level — and a blade **1500 and 800**, 19.7°. Further back AND
+higher for a grenade, closer and lower for a knife, against the chase's 3072 at
+22.5°. That is play's "выше, чтобы удобно целиться", read rather than chosen, and
+`three/chase.ts` places the lob view by that ANGLE instead of by a lift of its
+own. The remake's own rig turns out to be in the same world: `atan(LIFT / BACK)`
+is 23.2°, within a degree of the chase's own 22.5°, and those two numbers were
+picked by eye years apart.
 
 **And the CHARGE does not take the aim view away.** Play: "она отменяется когда
 нажимаешь f — и вот тут должна переживать пока зарядка идёт." A filling gauge is
