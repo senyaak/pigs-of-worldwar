@@ -3365,10 +3365,17 @@ shoulder while the key is down. `weapons/fire.md` has both reads and the
 correction. **The fire button touches neither** — it did for one commit and that
 was a bug, not a feature.
 
-What is NOT read is mode 4's LIFT on the branch a thrown weapon takes: it uses
-the subject's y as it stands and the common tail only clamps it 768 off the
-ground. The remake borrows the **+300** mode 4's other branch adds, which is
-play's "выше". `three/chase.ts` carries all of it, the rig's six views are one
+**Mode 4 has no lift of its own**, which is what came of reading its branch to
+the end instead of stopping at the first `add`: its arm sets a TARGET and three
+springs glide the camera onto it — the distance (`0x4A0960`, which is where the
+row's 3500 is really used: current separation minus the row, stepped), the pitch
+and the yaw — and not one of them carries a height. What holds the camera up is
+the common tail's floor: `0x4A0B50` raises it to **ground + 768** whenever it is
+lower (0x4a0c12), and **mode 0x12 is exempt by name** (0x4a0bd4), which is what
+lets the TR cam sit 400 over a pig rather than 768 over the terrain. So the rig's
+`CLEARANCE` is the exe's 768 now — the last invented number in it — the lob view
+rides level with the gaze on that floor, and the TR cam is the one view allowed
+under it. `three/chase.ts` carries all of it, the rig's six views are one
 table there now, and `pow.debug.view()` is how a spec tells them apart — a camera
 POSITION cannot say why it is where it is, and the rig eases between two views so
 a reading taken on the frame the view changed is still the last one's.

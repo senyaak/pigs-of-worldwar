@@ -16,10 +16,20 @@ const CHASE_DELAY = 0.5
 /** How far back and how high the rig sits, in the pig's own units. */
 const BACK = 2100 * MODEL_SCALE
 const LIFT = 900 * MODEL_SCALE
-/** Where the gaze rests on the pig, and how far the camera keeps off the
- * ground behind it. */
+/** Where the gaze rests on the pig. The remake's own. */
 const GAZE = 300 * MODEL_SCALE
-const CLEARANCE = 500 * MODEL_SCALE
+/**
+ * How far the camera keeps off the ground — **the exe's own 0x300 = 768**, and
+ * the last invented number in this rig to go.
+ *
+ * It is in the tail every mode's handler ends with (0x4A0B50): inside the map's
+ * ±15000 bounds it samples the ground under the camera and raises it to
+ * `ground + 0x300` (0x4a0c12) whenever it is lower. **Mode 0x12 is exempt by
+ * name** — `cmp [game+0x84],12h; je` at 0x4a0bd4, the first thing the tail does
+ * — which is what lets the TR cam sit 400 over a pig rather than 768 over the
+ * ground, and is why `RIG` carries a `floor` flag.
+ */
+const CLEARANCE = 768 * MODEL_SCALE
 /**
  * The drop-in view: the camera stands IN FRONT of a pig on a canopy and looks
  * it in the face, which is what play remembers of the original's opening.
@@ -114,7 +124,25 @@ const RIFLE_CLOSE = 2048 / 3072
  * is what the remake borrows for play's "выше, чтобы удобно целиться".
  */
 const LOB_CLOSE = 3500 / 3072
-const LOB_RISE = 300 * MODEL_SCALE
+/**
+ * …and it has NO LIFT of its own, which is the correction that came out of
+ * reading the branch to its end rather than stopping at the first `add`.
+ *
+ * Mode 4's arm sets a target and three SPRINGS glide the camera onto it — the
+ * distance (`0x4A0960`, which is where the row's 3500 is actually used: it takes
+ * the current separation, subtracts the row, and steps the difference), the
+ * pitch (0x4A0870, an angle spring with 4096-per-circle wrap) and the yaw
+ * (0x4A0900). Not one of them carries a height. **What holds the camera up is
+ * the shared 768 floor** (`CLEARANCE`), so on flat ground the lob view is level
+ * with the pig at 3500 out and standing 768 over the terrain.
+ *
+ * The `+300` this file claimed for a commit is real but belongs to mode 4's
+ * OTHER branch (0x4a2246) — the one a SNAPPING camera takes, `[cam+0x60]`
+ * non-zero — and `0x49f740(4, 0)` leaves that zero, so a weapon in the hand
+ * never reaches it. Kept at zero and named because it is the knob if play says
+ * the view sits too low.
+ */
+const LOB_RISE = 0
 
 /**
  * …and the camera the VIEW KEY holds — the exe's mode **0x12, "TR cam"**
@@ -131,6 +159,9 @@ const LOB_RISE = 300 * MODEL_SCALE
  * of **200** and **+400 straight up** (`add eax,190h` at 0x4a4740, and +y is up
  * in the exe's world), with a nominal distance of **1700** in its row. Close in
  * and over his back, which is what play calls "из-за спины".
+ *
+ * It is also the ONE mode the common tail lets under the ground clearance
+ * (`CLEARANCE`), which is what makes 400 over the pig mean 400 over the pig.
  *
  * Two things the handler does that the remake does not. The distance is
  * DYNAMIC — when the camera would come within 768 of the ground it writes a
@@ -228,14 +259,17 @@ export type View =
  * `scope` is in here for completeness and is never read: that view is first
  * person and leaves `want` before any of this (it is bolted to the hand).
  */
-const RIG: Record<View, { close: number; lift: number }> = {
-  chase: { close: 1, lift: LIFT },
-  face: { close: -1, lift: FACE_LIFT },
-  melee: { close: MELEE_CLOSE, lift: LIFT },
-  rifle: { close: RIFLE_CLOSE, lift: LIFT },
-  lob: { close: LOB_CLOSE, lift: LIFT + LOB_RISE },
-  throw: { close: THROW_CLOSE, lift: LIFT + THROW_RISE },
-  scope: { close: 0, lift: 0 }
+const RIG: Record<View, { close: number; lift: number; floor: boolean }> = {
+  chase: { close: 1, lift: LIFT, floor: true },
+  face: { close: -1, lift: FACE_LIFT, floor: true },
+  melee: { close: MELEE_CLOSE, lift: LIFT, floor: true },
+  rifle: { close: RIFLE_CLOSE, lift: LIFT, floor: true },
+  // Level with the gaze: mode 4 has no lift and the ground floor is what
+  // raises it (`LOB_RISE`).
+  lob: { close: LOB_CLOSE, lift: LOB_RISE, floor: true },
+  // …and the TR cam is the one view the exe lets under the floor.
+  throw: { close: THROW_CLOSE, lift: THROW_RISE, floor: false },
+  scope: { close: 0, lift: 0, floor: true }
 }
 
 export interface Chase {
@@ -399,7 +433,9 @@ export function createChase(
     const terrainAtCamera = -query.surface(behindX, behindZ)
     const position = new THREE.Vector3(
       behindX,
-      Math.max(target.y + stand.lift, terrainAtCamera + CLEARANCE),
+      stand.floor
+        ? Math.max(target.y + stand.lift, terrainAtCamera + CLEARANCE)
+        : target.y + stand.lift,
       -behindZ
     )
     return { position, target }

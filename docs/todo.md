@@ -139,10 +139,14 @@ by play. In the order they turn up:
    200 out, 400 up, nominal 1700 — close over his back. **The fire button does
    not touch the camera**; it did for one commit and that was the bug. The knobs
    are `LOB_CLOSE`/`LOB_RISE` and `THROW_CLOSE`/`THROW_RISE` in three/chase.ts,
-   and `pow.debug.view()` says which is live. Two things not modelled: mode 4's
-   lift on the branch a thrown weapon takes is not read (the +300 the remake uses
-   is its other branch's), and the exe lets the player PITCH the TR cam (±700 of
-   4096, `[cam+0x76]`) where nothing here is bound to a camera pitch.
+   and `pow.debug.view()` says which is live. **Mode 4 has no lift of its own** —
+   its arm sets a target and three springs glide onto it, and what holds the
+   camera up is the tail's floor of **ground + 768** (0x4a0c12), from which the
+   TR cam alone is exempt (0x4a0bd4). So `CLEARANCE` is the exe's 768 now and
+   `LOB_RISE` is 0: if the in-hand view reads too LOW in play, that constant is
+   the knob and nothing else has to move. Still not modelled: the exe lets the
+   player PITCH the TR cam (±700 of 4096, `[cam+0x76]`) and nothing here is bound
+   to a camera pitch.
 
 ## B. PLAY'S REPORTS, still open
 
