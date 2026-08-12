@@ -21,7 +21,7 @@ import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
 import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
-import { SCOPE_BONE, SCOPE_MAGNIFY, SCOPE_MOUNT, createChase } from './chase'
+import { SCOPE_BONE, SCOPE_MAGNIFY, SCOPE_MOUNT, TRACKS_ITS_SHOT, createChase } from './chase'
 import type { View } from './chase'
 import { createDropInArt } from './dropIn'
 import { buildMarker } from './marker'
@@ -310,21 +310,22 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
 
   const watch = (soldier: Soldier, delta: number | null): void => {
     const acting = soldier.pig.id === now.acting
-    // A bullet in the air takes the camera off the pig altogether: the shot's
-    // own tail hands the camera the projectile and asks for mode 1
-    // (0x47ad99). Only the acting pig's shot does this, and only while there
-    // is something left to watch. The NEWEST is the one it watches.
-    //
-    // **And mode 1 does not MOVE the camera** — it turns it and nothing else
-    // (three/chase.ts `watch`, read instruction by instruction). So the view
-    // the throw was made from stands still and follows the flight round, which
-    // is why nothing here has a heading to pass any more.
+    // Something of the acting pig's is in the air, and what the camera does
+    // about it is the WEAPON's own answer — `TRACKS_ITS_SHOT` in three/chase.ts
+    // has the whole table off the fire dispatcher. A pistol or a sniper rifle
+    // asks for mode 1, which stands still and TURNS after the bullet; a thrown
+    // weapon asks for **mode 0x0B, whose handler is a bare `ret`**, so the
+    // picture freezes exactly as the throw left it; a plain rifle asks for
+    // nothing at all, which comes to the same thing. Either way the camera does
+    // not MOVE, and the NEWEST projectile is the one it answers for.
     const flying = now.bullets.length > 0 ? now.bullets : now.lobs
     const bullet = now.firing?.phase === 'flight' ? (flying[flying.length - 1] ?? null) : null
     if (bullet && acting) {
-      chase.watch(drawnAt(`${now.bullets.length > 0 ? 'shot' : 'lob'}:${bullet.id}`, bullet))
+      const holding = pigShot(soldier.pig.id)?.holding ?? null
+      const tracks = holding !== null && TRACKS_ITS_SHOT.includes(holding)
+      if (tracks) chase.watch(drawnAt(`${now.bullets.length > 0 ? 'shot' : 'lob'}:${bullet.id}`, bullet))
       soldier.node.visible = true
-      lastView = 'ride'
+      lastView = tracks ? 'watch' : 'frozen'
       return
     }
     // …and so does what the blow left behind. Mode 0 on the crate, which is

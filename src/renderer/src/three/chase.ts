@@ -371,6 +371,44 @@ export const SCOPE_MAGNIFY = 4
 /** The bone it hangs off. The same one a barrel and a blade do. */
 export const SCOPE_BONE = 5
 
+/**
+ * **WHICH WEAPONS HAND THE CAMERA THEIR PROJECTILE — and "a grenade is not a
+ * gun" is play's, ahead of the read.** "Ты разобрал камеру для снайперки итд.
+ * а для гранат и базук она другая)". It is, and so is a rifle's.
+ *
+ * Every weapon fires through one jump table — `eax = skill − 6`, `ja` past
+ * 0x37, `jmp [eax*4 + 0x47CF8C]` (0x47a233) — and each arm decides for itself
+ * whether the camera is told anything at all. Following every arm through its
+ * branches and shared tails (the guns' is 0x47ad71, the thrown family's
+ * 0x47b853), there are four answers and no more:
+ *
+ * | | asks for | what that mode does |
+ * | - | - | - |
+ * | **6 PISTOL, 11 SNIPER RIFLE, 12, 13, 15, 17, 18** | **mode 1** | stands still and TURNS (`watch`) |
+ * | **19..27 GRENADES, 28 MORTAR, 29 BAZOOKA, 30..33, 39..44, 47..49** | **mode 0x0B** | nothing at all — see below |
+ * | 34, 50 JETPACK | mode 0x0A | its own rig, 1024 ahead of the subject — not built |
+ * | 51 SUICIDE | mode 2 | not built |
+ * | **7 RIFLE, 8, 9 MACHINE GUN, 10 HEAVY M-GUN, 14, 16**, 35..38, 45, 46, 52..55, 60, 61 | nothing | the camera is not told, so it holds whatever view it was in |
+ *
+ * **Mode 0x0B's handler is `0x4199C0`, which is one instruction: `ret`.** Its
+ * setup arm (0x49f912, the slot the byte map at 0x49FE84 gives modes 0x0B,
+ * 0x0C and 0x0D) only REMEMBERS things — the camera's own position into
+ * `[cam+0xA8]` and `[cam+0x6E]`, its distance to the subject into `[cam+0x7A]`
+ * — and moves nothing. So a thrown weapon FREEZES the picture where it stood
+ * at the throw: it does not follow the grenade and does not even turn after
+ * it.
+ *
+ * Which is the other half of why mode 4 aims 1536 PAST the pig (`LOB_AHEAD`).
+ * The view a throw is made from is already looking down-range, so a frozen
+ * frame still has the landing in it. The two readings were made a day apart
+ * and each explains the other.
+ *
+ * (One transient is not modelled: entering 0x0B sets `[cam+0x7C]` to 0x46, and
+ * leaving any mode copies that into `[cam+0x6C]`, the tail's own pitch offset
+ * — so the NEXT view starts 6.2° off and springs back over a few frames.)
+ */
+export const TRACKS_ITS_SHOT = [6, 11, 12, 13, 15, 17, 18]
+
 /** Where a pig is being drawn, and which way it faces. Not the pig itself: the
  * rig frames what is on SCREEN (three/tween.ts). */
 export interface Stance {
@@ -483,7 +521,8 @@ export interface Chase {
     eye?: { x: number; y: number; z: number } | null
   ): void
   /**
-   * **WATCH a bullet — the camera does NOT go with it.**
+   * **WATCH a bullet — the camera does NOT go with it**, and only the weapons
+   * in `TRACKS_ITS_SHOT` ask for even this much.
    *
    * The moment a shot leaves, the exe hands the camera the PROJECTILE as its
    * subject (`0x49ec20`, from the shot's own tail at 0x47ad99) and puts it in

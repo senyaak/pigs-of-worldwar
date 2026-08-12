@@ -194,6 +194,26 @@ by play. In the order they turn up:
    nothing to swing. `chase.watch` is that, and `chase.ride` stays for the
    CRATE, which is mode 0 and really does move (0x4661c2).
 
+   **And mode 1 is NOT what a grenade asks for.** Play, before the read: "ты
+   разобрал камеру для снайперки итд. а для гранат и базук она другая)". The
+   fire dispatcher (`jmp [eax*4 + 0x47CF8C]`, skill − 6) gives four answers,
+   one per arm, tails followed: **6 PISTOL / 11 SNIPER RIFLE / 12 / 13 / 15 /
+   17 / 18 → mode 1**; **19..27 GRENADES, 28 MORTAR, 29 BAZOOKA, 30..33,
+   39..44, 47..49 → mode 0x0B**; 34 and 50 JETPACK → mode 0x0A; 51 SUICIDE →
+   mode 2; and **7 RIFLE, 8, 9, 10, 14, 16 and the planted charges ask for
+   nothing at all**. `TRACKS_ITS_SHOT` in three/chase.ts is that table.
+
+   **Mode 0x0B's handler is `0x4199C0` — one instruction, `ret`.** Its setup
+   arm only remembers numbers. So a thrown weapon FREEZES the picture where the
+   throw left it: no follow, not even a turn. Which is the other half of why
+   mode 4 aims 1536 past the pig — the view is already looking down-range, so
+   a frozen frame still has the landing in it.
+
+   **Mode 0x0A is read and NOT built** (0x4a43c0): the look point 1024 ahead of
+   the subject's own heading, then the three springs and the tail — mode 4's
+   shape, aimed ahead of something moving. Skills 34 and 50 JETPACK reach it,
+   and neither is built.
+
    It also explains an old empty search: `lib/game/sightline.ts` dodges walls
    because watching a grenade through one is no use, and the exe was found to
    have no line-of-sight test anywhere in its camera code. A camera that does
