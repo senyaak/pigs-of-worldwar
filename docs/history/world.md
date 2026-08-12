@@ -496,6 +496,100 @@ handed over bare came out several shades light — 248 read back as 252. It is
 `setRGB(…, THREE.SRGBColorSpace)` in and `getHexString(THREE.SRGBColorSpace)`
 out. A debug hook caught it, not the eye.
 
+## AND THE SNOW, which was nearly written off as removed
+
+The same record decides it, and the loader is plain enough: `snow.mtd` for the
+cold mood and `rain.mtd` for every other one, into `[+0x41C]` at 0x4853A9. Then
+0x4854CE looks exactly like the start — `(1, 0)` for cold, `(0, 0)` for
+ominous, every other mood skipping the call — and the function it lands on,
+0x4A9ED0, **is a folded `ret 8`**. I reported that as a finding: the weather is
+gone from the PC build. Play answered with a screenshot of CAMP with snow
+falling on it, and was right. A stub means the wrong function was found. It is
+the second time in this repo — the camera's mode 0x0B was the first — and the
+rule was already written down.
+
+**The drawing is at 0x44F9B0**, called from 0x44E577, switching on the same
+`[0x520708]`: mood 0 → 0x44FE00 (snow), mood 5 → 0x44FA50 (rain), anything else
+nothing. So the forty-odd other maps load the rain art and never show it.
+
+It is a **2D effect end to end**, and that is what makes it cheap to carry over:
+128 quads 16 units wide, wrapped against the screen's own width and height
+(`[0x520668+0x44C]`/`[+0x450]`), handed to `afAdd2dPolyToSortList` in one batch.
+The depth is a fiction of eight layers — `i & 7` picks the image (four, one per
+two layers), the brightness (grey `(8 − phase) * 8`, near layer brightest) and
+how much of the camera's own turn the flake takes, which the exe divides by
+`phase + 1`. 0x44F9B0 keeps last frame's camera to work that delta out.
+
+**The first pass of `three/weather.ts` invented four of those numbers** — the
+flake's size, its fall, its drift and the parallax gain — on the argument that
+the exe's are tied to a frame rate this project does not share. It came back
+wrong twice over and the answer was the same both times: read the exe.
+
+It hung still and could barely be seen, and that was mine alone: a layer
+decides four things, and I had brightness and parallax calling layer 0 the
+nearest while speed and size called layer 7 the nearest. So the visible flakes
+crawled — 36 seconds to cross the screen — and the moving ones sat at a
+sixteenth alpha. Then it read as a PATTERN, because I had spread the field by a
+golden-ratio walk over the index rather than scattering it.
+
+Both are in the exe, plainly, and neither needed inventing. **The initialiser
+(0x44E1B9) is three `rand()` calls a flake** — `% screenWidth`, `% screenHeight`
+and `% 3000`, the third read by neither drawer. **The step is integer
+arithmetic on a 640×480 virtual screen** (`push 1E0h; push 280h`, 0x44E0FE):
+`x += (driftStep * m) >> shift`, the same for y, then the camera's turn divided
+by `8 − phase` — the FAR layer taking the most of it, which is the opposite of
+what a parallax argument would have guessed — then `y += 1` unconditionally,
+then a wrap by one screen. `driftStep` and `fallStep` are
+`ftol(cos(angle) * 16)` and `ftol(sin(angle) * 32)` off the two trig tables the
+same init builds, and `reach`/`shift` are 4/4 for snow against 5/2 for rain.
+The quad is 32 wide and as tall as the fall step, which is what makes rain
+streak. Every number of that is in `sky/notes.md`.
+
+`three/weather.ts` now runs exactly that, in whole `EXE_FRAME_SECONDS` steps,
+mapping the 640×480 field onto whatever the canvas is. It draws with three's
+sprites and `sizeAttenuation` off — the one part of three that is already
+screen-relative — and hangs off the SCENE rather than `root`, since the flip
+into game space has nothing to say about a screen effect.
+
+**Then it fell UP.** The battle's camera looks down, so the pitch is negative,
+so `sin` of it is negative, so the fall was. The fix is a convention rather
+than a formula: **the game's elevation field is a quarter turn off ours —
+1024 is level, not 0** — which is the only reading that makes the exe's own
+choice of functions work, `sin` at its maximum for a level camera and easing
+off as the view tips. The quarter turn is the remake's, marked at `angles()`;
+which of the two fields is yaw and which is pitch is still behind the virtual
+call nobody has followed (0x44E2FC). What CAUGHT it is worth more than the fix:
+`fallen` in the debug hook had been an absolute value, and made signed it fails
+the moment the field rises.
+
+**Then it looked dirty, and then it looked flat, and both were the same
+mistake read two ways.** The exe modulates the quad by grey `(8 − phase) * 8`.
+Carried as an OPACITY the far layers sat at a sixteenth and were not there at
+all, so every flake on screen came from the two near layers and the field read
+as one brightness. Carried as an ordinary COLOUR they became dark grey specks
+on pale ice — "грязно, слишком серые". The art settles it: every one of the
+sixteen palette entries in `Snow0..3` carries the **PSX semi-transparency bit**,
+the same 0x8000 this project already decodes as translucency in ground art, over
+glyphs of grey 148..206 on a transparent field. It is ADDED. Added, the ramp can
+only brighten, and nothing on screen ever goes darker than what was there.
+
+**And the clusters were the frame rate.** The field steps in whole 1/30ths and
+the window paints at 60 or more, so half the frames moved nothing and the rest
+moved all 128 at once. The state stays the exe's integers; the DRAWING carries
+the fraction of a frame still owed. Underneath it there is a real lockstep that
+is the exe's own — `m = reach − (i & 3)` gives four speeds, and the layer
+changes nothing while the camera is still, so 32 flakes genuinely move as one.
+The third value the initialiser rolls per flake (`rand() % 3000`) is read by
+NEITHER drawer, so there is nothing in the original to break it up with either.
+
+Two numbers on top are play's and say so: `FALL_GAIN` 1.35 and `SIZE_GAIN` 0.8,
+kept as separate constants rather than edits to the exe's 32 and 32 so that what
+was read stays readable.
+
+One arithmetic detail, since it bit once: `cdq; and edx,0Fh; add eax,edx;
+sar eax,4` is the compiler's signed divide by sixteen and it rounds toward
+ZERO, not down. `Math.floor` is the wrong shape for it.
+
 **Two things the verification cost, worth not paying twice.** `#battle-canvas`
 holds `<canvas id="battle-hud">` FIRST and the scene's canvas after it, so
 `querySelector('canvas')` reads the dashboard overlay back and reports a black

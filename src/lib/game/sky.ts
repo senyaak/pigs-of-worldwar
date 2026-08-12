@@ -181,3 +181,23 @@ export const SKY_FOG: readonly SkyFog[] = [
 export function skyFogFor(map: string): SkyFog {
   return SKY_FOG[moodOf(map)]
 }
+
+/**
+ * The WEATHER a map gets, and the archive it falls out of — or null, which is
+ * most of them.
+ *
+ * The mood decides this too, and only twice: the loader reads
+ * `language\tims\snow.mtd` for mood 0 and `language\tims\rain.mtd` for every
+ * other mood (0x4853A9), but the per-frame dispatcher (0x44F9B0) draws for
+ * **mood 0 only** — snow — and **mood 5 only** — rain. Every other map loads
+ * the rain art and never shows it. So it snows on the ten cold maps, rains on
+ * the five ominous ones, and nowhere else.
+ *
+ * Worth knowing about the search: the call that LOOKS like the start (0x4854CE,
+ * `(1, 0)` for cold and `(0, 0)` for ominous) lands on 0x4A9ED0, which is a
+ * folded `ret 8`. The drawing is somewhere else entirely. `sky/notes.md`.
+ */
+export function weatherFor(map: string): 'snow' | 'rain' | null {
+  const mood = moodOf(map)
+  return mood === 0 ? 'snow' : mood === 5 ? 'rain' : null
+}

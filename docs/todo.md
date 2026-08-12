@@ -800,15 +800,27 @@ not pulled, written here so nobody has to remember an address.
   because a new UI wants the original's coordinates rather than fresh eyework.
   Note the remake's own constraint from play: a real pause is single-player
   only, and multiplayer must never stop (docs/history/status.md, "Threads left mid-pull").
-- **SNOW and RAIN.** The dome is in (`three/sky.ts`, `lib/game/sky.ts`) and the
-  mood's fog is read, built and REJECTED by play — do not bring it back
-  (CLAUDE.md). The weather itself is not built. The battle loader picks the
-  sheet by mood — `language\tims\snow.mtd` for cold, `language\tims\rain.mtd`
-  for everything else, into `[+0x41C]` at 0x4853A9 — and STARTS one only for
-  two of them (0x4854CE): `(1, 0)` for cold, `(0, 0)` for ominous, and every
-  other mood skips the call. So it snows on the ten cold maps, rains on the
-  five ominous ones, and nowhere else. What 0x4A9ED0 does with those two
-  arguments is not decoded, and neither is what draws the sheet.
+- **The sky's four loose ends.** The dome, the mood's fog and the weather are
+  all in (`three/sky.ts`, `three/weather.ts`, `lib/game/sky.ts`), and the
+  weather is the exe's arithmetic end to end — 640×480 virtual pixels, `rand()`
+  scatter, `(step * m) / (1 << shift)` rounding toward zero, the `+1` a frame,
+  the wrap, the 32-wide quad stretched by the fall step, the grey ramp added
+  rather than painted. What is NOT read, each marked at its own line:
+  - **which camera angle is which.** The drawer takes `cos([view+0x11758])` for
+    the drift and `sin([view+0x11754])` for the fall, and one virtual call
+    fills both (0x44E2FC, not followed). `angles()` also carries a quarter-turn
+    convention — 1024 is level — which is what stops the snow falling upward.
+  - **`FOG_SCALE`**, standing in for the undecoded factor between the library's
+    z and the world's (`scale/notes.md`).
+  - **`FALL_GAIN` and `SIZE_GAIN`**, play's two on top of the exe's amplitudes.
+  - **the brightness divisor**: the exe's ramp is `(8 − phase) * 8` and this
+    normalises it against its own 64 rather than the engine's 128.
+
+  One thing that CANNOT be fixed by reading further: with the camera still the
+  field has only four distinct velocities and 32 flakes move as one, because
+  `m = reach − (i & 3)` and the third random the initialiser rolls per flake is
+  read by neither drawer. If play wants that broken up it is a divergence, not
+  a bug.
 - **Fall damage** (`P_LAND1` is the impact that hurts, and nothing plays it).
 - **The melee's own battle cry** — the same `0x43af70` call, not yet wired to a
   swing.

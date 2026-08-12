@@ -243,6 +243,9 @@ export interface DebugHooks {
    * has drifted off the camera — which is meant to be nothing (three/sky.ts).
    * Null on a map whose dome would not load. */
   sky(): { mood: string; triangles: number; skins: number; offEye: number; radius: number } | null
+  /** Snow or rain and how much of it, or null on a map whose mood draws
+   * neither (three/weather.ts). */
+  weather(): { kind: string; flakes: number; layers: number; onScreen: number; fallen: number } | null
   /** How many mines are drawn, and how many of those are TRODDEN ones wearing
    * the engine's own `WE_APMIN` out of the map's archive (three/mineArt.ts). */
   minesTripped(): number

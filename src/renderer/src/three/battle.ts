@@ -20,6 +20,7 @@ import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
 import { buildSky } from './sky'
+import { buildWeather } from './weather'
 import { skyFogFor } from '../../../lib/game/sky'
 import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
@@ -78,6 +79,9 @@ export interface BattleAssets {
    * (lib/game/sky.ts). Null is fine: the battle falls back on the flat clear
    * colour it had before there was a sky at all. */
   sky: Sky | null
+  /** `Snow0..3` or `Rain0..3`, and which of the two — null on the forty-odd
+   * maps whose mood draws no weather at all (lib/game/sky.ts). */
+  weather: { kind: 'snow' | 'rain'; images: Texture[] } | null
 }
 
 export interface BattleScene {
@@ -163,6 +167,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   // will not load gets neither, which is the one case where the two are tied.
   const sky = assets.sky
     ? buildSky({ root, scene: host.scene, sky: assets.sky, fog: skyFogFor(map) })
+    : null
+  // …and what falls out of it. NOT under `root`: the weather is a SCREEN
+  // effect and lives on the camera's own plane, so the game-space flip has
+  // nothing to say about it (three/weather.ts).
+  const weather = assets.weather
+    ? buildWeather({ scene: host.scene, camera: host.camera, ...assets.weather })
     : null
 
   const terrain: Terrain = buildTerrain(assets.blocks, assets.terrainTextures)
@@ -680,6 +690,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // moved the camera this frame.
     root.worldToLocal(eyeInGame.copy(host.camera.position))
     sky?.follow(eyeInGame)
+    // The weather rides the camera the same way, and takes its own drift off
+    // how far the camera turned this frame — so it goes after `show` too.
+    weather?.draw(delta)
     const watched = squad.of(game.currentPig.id)
     if (watched) {
       const { x, y, z } = game.currentPig.position
@@ -711,6 +724,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // Measured against the eye as it stood at the end of the last frame,
     // which is what `follow` was given.
     sky: () => sky?.state(eyeInGame) ?? null,
+    weather: () => weather?.state() ?? null,
     sounds: () => sounds.played(),
     barks: () => sounds.spoken(),
     still: () => battle.view().still,
@@ -816,6 +830,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       host.onFrame.delete(onFrame)
       host.scene.remove(root)
       sky?.dispose()
+      weather?.dispose()
       terrain.dispose()
       props.dispose()
       dropInArt.dispose()

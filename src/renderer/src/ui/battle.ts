@@ -42,7 +42,7 @@ import { lobOf } from '../../../lib/game/grenade'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../../../lib/game/scenery'
 import { give } from '../../../lib/game/inventory'
-import { skyArchiveFor } from '../../../lib/game/sky'
+import { skyArchiveFor, weatherFor } from '../../../lib/game/sky'
 import { byId } from './dom'
 
 // The training ground — the first map the original ever shows a player, and
@@ -528,6 +528,19 @@ export function initBattle(onLeave: () => void): BattleView {
     const skyResult = await window.api.loadSky(skyArchiveFor(name))
     if (!skyResult.ok) console.log(`${name} without a sky: ${skyResult.error}`)
 
+    // …and what falls out of it, on the two moods that draw any: the ten cold
+    // maps snow and the five ominous ones rain (lib/game/sky.ts). Ordinary TIM
+    // archives, so no loader of their own.
+    const falling = weatherFor(name)
+    const weatherResult = falling
+      ? await window.api.loadTims(`Language/Tims/${falling}.mtd`)
+      : null
+    if (weatherResult && !weatherResult.ok) {
+      console.log(`${name} without its ${falling}: ${weatherResult.error}`)
+    }
+    const weather =
+      falling && weatherResult?.ok ? { kind: falling, images: weatherResult.images } : null
+
     // The squads, standing (lib/game/muster.ts). All the renderer supplies is
     // the MEASUREMENT — how big a pig of this class is, off its own art
     // (lib/game/body.ts), which used to be the mesh's alone and is what made
@@ -629,7 +642,8 @@ export function initBattle(onLeave: () => void): BattleView {
         propTextures: objectsResult.ok ? objectsResult.textures : [],
         strings: battleText,
         canopy,
-        sky: skyResult.ok ? skyResult.sky : null
+        sky: skyResult.ok ? skyResult.sky : null,
+        weather
       },
       game,
       onGameChanged: updateTileText,

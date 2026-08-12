@@ -123,6 +123,15 @@ export interface DebugParts {
    * has not drifted off the camera.
    */
   sky: () => { mood: string; triangles: number; skins: number; offEye: number; radius: number } | null
+  /** Snow or rain and how much of it, or null on a map whose mood draws
+   * neither — which is most of them (three/weather.ts). */
+  weather: () => {
+    kind: string
+    flakes: number
+    layers: number
+    onScreen: number
+    fallen: number
+  } | null
   /** Whether the beat after a blow is still running. */
   aftermath: () => boolean
   /**
@@ -256,6 +265,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
        * is stopped and the camera is off the pig (lib/game/aftermath.ts). */
       shelter: () => parts.shelter(),
       sky: () => parts.sky(),
+      weather: () => parts.weather(),
       frame: () => parts.frame(),
       aftermath: () => parts.aftermath(),
       /** True while the turn is ENDING: the exe's mode 13, WALK AWAY. Nobody

@@ -19,7 +19,7 @@ import { PHASE_ENV, GAME_DIR } from '../launch'
 import { hold, swapMap } from '../controller'
 import { startGame } from '../menu'
 import type { Page } from '@playwright/test'
-import { MAP_SKY, SKY_ARCHIVES, skyArchiveFor } from '../../src/lib/game/sky'
+import { MAP_SKY, SKY_ARCHIVES, skyArchiveFor, weatherFor } from '../../src/lib/game/sky'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseModel } from '../../src/lib/formats/model'
 import { parseTim } from '../../src/lib/formats/tim'
@@ -46,6 +46,39 @@ test('the mission table says which mood a map wears', () => {
   // the remake's own fallback, which nothing rests on.
   expect(Object.keys(MAP_SKY)).toHaveLength(53)
   expect(skyArchiveFor('GENSNOW')).toBe('sunny')
+})
+
+test('the weather is the same field, and only two moods draw any', () => {
+  // The loader reads snow.mtd for cold and rain.mtd for everything else, but
+  // the per-frame dispatcher (0x44F9B0) draws for mood 0 and mood 5 alone. So
+  // most of the game loads the rain art and never shows it.
+  expect(weatherFor('CAMP')).toBe('snow')
+  expect(weatherFor('ICEFLOW')).toBe('snow')
+  expect(weatherFor('TRENCH')).toBe('rain')
+  expect(weatherFor('FINAL')).toBe('rain')
+  expect(weatherFor('ARTGUN')).toBeNull()
+  expect(weatherFor('LUNAR1')).toBeNull()
+  const maps = Object.keys(MAP_SKY)
+  expect(maps.filter((one) => weatherFor(one) === 'snow'), 'the cold ten').toHaveLength(10)
+  expect(maps.filter((one) => weatherFor(one) === 'rain'), 'the ominous five').toHaveLength(5)
+})
+
+test('four flakes apiece, and both archives ship', () => {
+  for (const kind of ['snow', 'rain']) {
+    const data = readFileSync(path.join(GAME_DIR, 'Language', 'Tims', `${kind}.mtd`))
+    const { entries } = parseArchive(data)
+    expect(entries.map((one) => one.name.toLowerCase()), kind).toEqual([
+      `${kind}0.tim`,
+      `${kind}1.tim`,
+      `${kind}2.tim`,
+      `${kind}3.tim`
+    ])
+    // 32×32 at four bits, the same 576 bytes a ground tile's art takes.
+    for (const entry of entries) {
+      const tim = parseTim(data.subarray(entry.offset, entry.offset + entry.size))
+      expect([tim.width, tim.height], `${kind}/${entry.name}`).toEqual([32, 32])
+    }
+  }
 })
 
 test('every mood ships, and each is four 250×250 skins', () => {
@@ -110,6 +143,22 @@ const skyState = (page: Page): Promise<SkyReading | null> =>
     return pow.debug.sky() as SkyReading | null
   })
 
+interface WeatherReading {
+  kind: string
+  flakes: number
+  layers: number
+  onScreen: number
+  fallen: number
+}
+
+/** …and about what is falling out of it. */
+const weatherState = (page: Page): Promise<WeatherReading | null> =>
+  page.evaluate(() => {
+    const pow = (window as unknown as { pow?: { debug?: { weather(): unknown } } }).pow
+    if (!pow?.debug) throw new Error('no battle scene is up — window.pow.debug is missing')
+    return pow.debug.weather() as WeatherReading | null
+  })
+
 test('the battle comes up under it, and it rides the eye', async ({ app }) => {
   const { page } = app
   await startGame(page)
@@ -127,9 +176,26 @@ test('the battle comes up under it, and it rides the eye', async ({ app }) => {
     radius: 40_000
   })
 
-  // A swap is a fresh battle, and it brings its own mood with it.
+  // …and it is snowing on it, which is the training ground's own mood.
+  const falling = await weatherState(page)
+  expect(falling).toMatchObject({ kind: 'snow', flakes: 128, layers: 8, onScreen: 128 })
+  // **AND IT IS ACTUALLY FALLING.** The first pass of this drew a perfectly
+  // correct field of flakes that hung still, because the layer that was
+  // brightest was also the slowest — a count of sprites says nothing about
+  // that and neither does one frame (three/weather.ts).
+  await page.waitForTimeout(400)
+  const later = await weatherState(page)
+  // Virtual pixels DOWN a 480-tall screen, and the sign is the point: handed
+  // the camera's pitch bare the whole field rose, which is what a signed
+  // measurement catches and a count of sprites never would. The exe's own rate
+  // is about a screen every two seconds, so 0.4s owes well over ten.
+  expect(later!.fallen - falling!.fallen, 'pixels down in 0.4s').toBeGreaterThan(10)
+
+  // A swap is a fresh battle, and it brings its own mood with it — and ARTGUN's
+  // draws no weather at all, which is what most of the game does.
   expect(await swapMap(page, 'ARTGUN')).toBe(true)
   expect((await skyState(page))?.mood).toBe('sunny')
+  expect(await weatherState(page)).toBeNull()
   // …and the dome still has not been left behind after a level's worth of
   // camera work.
   await hold(page, 'walkForward', 600)
