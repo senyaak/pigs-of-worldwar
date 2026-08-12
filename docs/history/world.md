@@ -458,14 +458,29 @@ at each:
   vertices are absolute and all carry bone 0, so that would have moved the whole
   sky by the pig's root. `loadSky` is its own path for both reasons.
 
-**And the reason so little of it shows is the FOG, which is not built.** The
-same record gives a fog colour and a near/far per mood — 238 out to about 4048
-units, which is eight tiles against a 16384-unit map — so the original hides its
-distance and the terrain's silhouette sits low. The remake draws the whole plate
-to a 100 000 far plane, and the sky comes out as a band at the top of CAMP and
-nothing at all over ARTGUN. Every number is in `sky/notes.md`; so are the snow
-and rain, which are the same field's (cold snows, ominous rains, nothing else
-does).
+**And the reason so little of it showed was the FOG** — the same record's, one
+`switch` arm per mood, and it went in the same day. The doubt worth recording is
+the one that nearly stopped it: 238 to 4048 looked too short to be world units,
+because the chase camera sits about 2100 behind the pig and that would haze the
+pig itself. `afSetFog` settles it and takes four instructions to do so
+(`_d3d.dll` 0x100096F0): FOGENABLE, FOGCOLOR, FOGTABLEMODE = `D3DFOG_LINEAR`,
+then FOGSTART and FOGEND with the caller's floats passed straight through. 238.0
+cannot be device z, which is 0..1, so the fog is eye-relative distance — and the
+library's own reset writes 30000.0 into both, just past the diagonal of a
+16384-unit map. The original really does bury everything inside eight tiles, and
+the acting pig really is lightly hazed. `three/sky.ts` sets `scene.fog` from
+`SKY_FOG` and clears it on dispose, because the scene outlives the battle and
+the asset viewers draw in it too.
+
+One colour-management trap on the way: `new THREE.Color(r, g, b)` takes its
+three numbers in three's WORKING space, which is linear, so the exe's bytes
+handed over bare came out several shades light — 248 read back as 252. It is
+`setRGB(…, THREE.SRGBColorSpace)` in and `getHexString(THREE.SRGBColorSpace)`
+out, and `pow.debug.sky().fog` is what caught it.
+
+What is left of the mood is the weather itself: cold loads `snow.mtd` and
+everything else `rain.mtd`, and only cold and ominous ever start one
+(`docs/todo.md`).
 
 **Two things the verification cost, worth not paying twice.** `#battle-canvas`
 holds `<canvas id="battle-hud">` FIRST and the scene's canvas after it, so

@@ -129,6 +129,13 @@ reasoning, the false starts and the sessions behind them are in
   paired to the map names at 0x4D1990 — `lib/game/sky.ts` carries the whole
   table, `three/sky.ts` draws it. The exe's `afSetSky` and `afAddSkyToSortList`
   are resolved and never called. `sky/notes.md`. `[exe]`
+- **The mood's FOG is LINEAR and eye-relative, in world units.** `afSetFog`
+  (`_d3d.dll` 0x100096F0) is four `SetRenderState` calls — FOGENABLE, FOGCOLOR,
+  FOGTABLEMODE = `D3DFOG_LINEAR`, then FOGSTART and FOGEND with the exe's
+  floats passed straight through — which is three's `Fog` exactly. `SKY_FOG` in
+  `lib/game/sky.ts` carries an arm per mood, 238 out to 2125..4524 against a
+  16384-unit map, so the ground is buried inside eight tiles and the acting pig
+  is itself lightly hazed. Both are the exe's numbers. `[exe]`
 - **The POG stores true world coordinates**, paired to geometry in the map's own
   `.MAD` by NAME, with y an ELEVATION of the model's CENTRE — so props hover
   their own half-height by design. The turn is `phi = yaw − π/2`, pinned to the
@@ -554,13 +561,10 @@ and the weakest of them were invented here:
   of 40 000, centred on the camera every frame, with depth testing off and the
   first place in the draw order. That is the same picture in the limit and the
   ordinary skybox trick, but the radius is the remake's own number.
-- `[gap]` **The mood's FOG, snow and rain are decoded and not built.** The same
-  record that picks the dome gives a fog colour and a near/far per mood (238 to
-  about 4048 units, which is eight tiles), and turns snow on for the ten cold
-  maps and rain for the five ominous ones. `sky/notes.md` has every number. The
-  distance matters for more than weather: the original hides its far ground,
-  which is why its screenshots show far more sky than ours does over the same
-  map.
+- `[gap]` **The mood's SNOW and RAIN are decoded and not built.** The same
+  record that picks the dome loads `snow.mtd` for the ten cold maps and
+  `rain.mtd` for everything else, and starts one only for cold and ominous
+  (0x4854CE). `sky/notes.md`.
 - `[CHECK — remake]` **The wall envelope is an inference.** Whether wall
   geometry sits in the exe's collision world is still open (0x406bb0
   undecoded); the remake builds the play-observed behaviour from the decoded

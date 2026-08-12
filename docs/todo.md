@@ -800,14 +800,14 @@ not pulled, written here so nobody has to remember an address.
   because a new UI wants the original's coordinates rather than fresh eyework.
   Note the remake's own constraint from play: a real pause is single-player
   only, and multiplayer must never stop (docs/history/status.md, "Threads left mid-pull").
-- **The sky's WEATHER.** The dome is in (`three/sky.ts`, `lib/game/sky.ts`) and
-  the rest of what the mood decides is decoded and not built: a fog colour and
-  a near/far per mood, snow on the ten cold maps, rain on the five ominous
-  ones — every number in `sky/notes.md`. Fog first, and not only for weather:
-  the original's far is about 4048 units against a 16384-unit map, so it hides
-  its distance, and that is why the shipped game shows a broad band of sky
-  where the remake shows a sliver. Worth measuring what the unit actually is
-  before turning it on.
+- **SNOW and RAIN.** The dome and the mood's fog are in (`three/sky.ts`,
+  `lib/game/sky.ts`); the weather itself is not. The battle loader picks the
+  sheet by mood — `language\tims\snow.mtd` for cold, `language\tims\rain.mtd`
+  for everything else, into `[+0x41C]` at 0x4853A9 — and STARTS one only for
+  two of them (0x4854CE): `(1, 0)` for cold, `(0, 0)` for ominous, and every
+  other mood skips the call. So it snows on the ten cold maps, rains on the
+  five ominous ones, and nowhere else. What 0x4A9ED0 does with those two
+  arguments is not decoded, and neither is what draws the sheet.
 - **Fall damage** (`P_LAND1` is the impact that hurts, and nothing plays it).
 - **The melee's own battle cry** — the same `0x43af70` call, not yet wired to a
   swing.
