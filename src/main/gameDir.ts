@@ -9,11 +9,22 @@ import path from 'node:path'
 
 export const GAME_EXE = 'warhogs_.exe'
 const ENV_KEY = 'GAME_DIR'
-// In dev this resolves to the project root. Packaged builds will need a
-// writable location instead (app.getPath('userData')) — revisit then.
-// POW_ENV_FILE redirects it entirely so tests never touch the real .env
-// (docs/testing.md, "Isolation").
-const ENV_FILE = process.env['POW_ENV_FILE'] ?? path.join(app.getAppPath(), '.env')
+/**
+ * Where the remembered game folder is written.
+ *
+ * In dev that is the project root, beside the sources, which is what a
+ * checkout wants. **A PACKAGED build cannot use it**: `getAppPath` there is
+ * inside `app.asar`, which is read-only — the first-launch picker would find
+ * the folder and then throw writing it down, and every later start would ask
+ * again. So a packaged app keeps it in `userData`, the one place the platform
+ * guarantees is writable and survives an upgrade.
+ *
+ * POW_ENV_FILE redirects it entirely so tests never touch the real .env
+ * (docs/testing.md, "Isolation").
+ */
+const ENV_FILE =
+  process.env['POW_ENV_FILE'] ??
+  path.join(app.isPackaged ? app.getPath('userData') : app.getAppPath(), '.env')
 
 // Directories that may live inside the game folder but are not game data.
 // Naming them one by one stopped working the day either repo got a WORKTREE

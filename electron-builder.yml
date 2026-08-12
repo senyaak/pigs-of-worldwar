@@ -1,0 +1,45 @@
+# Packaging — what a release of this repo actually is.
+#
+# The app is an ENGINE and nothing else: every model, map, texture and sound
+# is read at runtime out of the player's own installation of the original
+# (README, "Game folder"). So a build carries no game data, and there is
+# nothing here that copies any.
+#
+# Windows only, deliberately. The original is a Windows title and the folder
+# it is read from is a Windows install; a Linux target is one entry in `linux:`
+# the day somebody plays it through Proton and asks.
+
+appId: dev.senyaak.pigs-of-worldwar
+productName: Pigs of Worldwar
+copyright: Fan remake. Hogs of War is the property of its rights holders.
+
+directories:
+  output: dist
+
+# Everything is BUNDLED by electron-vite — `out/main/index.js` and the preload
+# require nothing but `electron` and node builtins, and the renderer's three.js
+# is inside its own chunk. So node_modules has no business in the package, and
+# leaving it out is what keeps the download a few tens of megabytes.
+files:
+  - out/**
+  - package.json
+  - '!node_modules/**'
+
+win:
+  # An INSTALLER for people who want one and a ZIP for people who do not.
+  # No icon is shipped: the original's `warhogsi.ico` is a game asset and this
+  # project distributes none of those, so the build wears Electron's own until
+  # somebody draws one.
+  target:
+    - nsis
+    - zip
+  artifactName: pigs-of-worldwar-${version}-${arch}.${ext}
+
+nsis:
+  # Per-user, so no elevation prompt, and let people choose where it lands.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  # The remembered game folder lives in userData, not beside the binary
+  # (src/main/gameDir.ts), so an uninstall leaves it and a reinstall finds it.
+  deleteAppDataOnUninstall: false

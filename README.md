@@ -151,7 +151,9 @@ maps like ARTGUN and ICEFLOW.)
 npm install
 npm run dev        # start with HMR
 npm run typecheck  # TypeScript check
-npm run test:e2e   # build + Playwright end-to-end tests
+npm run test:pure  # the specs that need no game installed
+npm run test:e2e   # build + the WHOLE suite, against your own installation
+npm run dist       # package a Windows installer and zip into dist/
 ```
 
 The game launches borderless fullscreen. `--windowed` keeps a desktop
@@ -163,6 +165,35 @@ whatever is fullscreen. Background throttling goes off with it, since the
 window still has to draw where nobody can see it. The one exception is the
 spec that checks the real fullscreen launch — a fullscreen window cannot be
 moved off the display it fills, and that spec is about exactly that.
+
+## Builds and releases
+
+`npm run dist` packages the app with electron-builder
+([electron-builder.yml](electron-builder.yml)) into `dist/`: a per-user NSIS
+installer and the same build as a portable zip. **Neither carries any game
+data** — the engine reads your own installation at runtime, which is the whole
+point of the folder resolution above. A packaged build remembers that folder
+in `userData` rather than beside the binary, since an installed app cannot
+write into itself.
+
+Two workflows, both Windows, both in [.github/workflows](.github/workflows):
+
+- **CI** on every push and pull request — the domain boundaries, TypeScript,
+  the build, and `npm run test:pure`.
+- **Release** on a `v*` tag — the same checks, then the installer and the zip,
+  attached to a GitHub Release. Run it by hand from the Actions tab and it
+  builds the artifacts without publishing anything.
+
+```bash
+npm version 0.1.0 --no-git-tag-version   # the tag and package.json must agree
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+**The whole e2e suite cannot run on a build server** and is not asked to: it
+drives the real game's own files (docs/testing.md). What CI runs is the engine
+half — the specs that neither launch the app nor read `GAME_DIR`, worked out by
+[scripts/pure-specs.mjs](scripts/pure-specs.mjs) rather than kept in a list
+that would drift. The rest runs here, against a real installation.
 
 ## Status
 

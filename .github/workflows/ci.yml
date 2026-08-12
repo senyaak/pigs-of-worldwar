@@ -1,0 +1,46 @@
+# What a build server can actually hold this repo to.
+#
+# Not the whole suite: e2e/ is written against a REAL installation of the
+# original game (docs/testing.md) — most of it launches the app and reads the
+# player's own Maps/, and a runner has neither. What it CAN run is the engine
+# half, which is a good third of the specs and all of the rules:
+# `scripts/pure-specs.mjs` works out which those are rather than keeping a list
+# that would drift.
+#
+# Windows, because that is the platform the app targets and the one whose path
+# handling this codebase gets wrong when it gets anything wrong.
+
+name: CI
+
+on:
+  push:
+    branches: [master, net]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The domain split is checked BEFORE the build, the way `test:e2e` does
+      # it: a breach here is an architecture failure, not a type error, and
+      # TypeScript has never caught one of them (scripts/boundaries.mjs).
+      - run: npm run boundaries
+
+      - run: npm run typecheck
+
+      - run: npm run build
+
+      # No `playwright install` — these specs never open a browser. They step
+      # the engine directly and assert numbers.
+      - run: npm run test:pure

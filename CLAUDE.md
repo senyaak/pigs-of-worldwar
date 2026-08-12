@@ -278,6 +278,15 @@ as floors where savegame churn could move them and exactly where it cannot.
 npm run typecheck && npm run build && npx playwright test
 ```
 
+**A build server runs the half of that suite it can.** `npm run test:pure`
+runs every spec that neither takes the `app` fixture nor names `GAME_DIR` —
+worked out by `scripts/pure-specs.mjs`, never kept as a list — and that is
+what `.github/workflows/ci.yml` runs beside the boundaries, the typecheck and
+the build. The rest needs the installation and stays here. **A `v*` tag builds
+a release** (`.github/workflows/release.yml`, `electron-builder.yml`): a
+Windows installer and a zip, carrying no game data, with the tag checked
+against `package.json` before anything is published.
+
 ## The history is in `docs/history/`, one file per subsystem
 
 This file is INSTRUCTIONS — what to do, what never to do again, and what is
