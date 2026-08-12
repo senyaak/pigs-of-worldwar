@@ -2500,14 +2500,19 @@ is comes off the type-keyed table at 0x4a90cc: slot 0 is shape kind 2 with
 `esi = 0xAA`, and slot 7 gives the blast effect the 35 this engine already draws
 with. So the pig keeps a radius, and it is now the game's own number.
 
-**A WEAPON crate takes what you were carrying — a MEDKIT does not.** Play, asked
-and answered: "тнт не забирается когда аптечку в доме подбираешь… должен."
-Measured first — the medkit IS collected (50→100 with `I_PICKUP` and `P_SIGH`)
-and the TNT survived it — so this is play's rule going in on top of the exe's,
-whose own `ClearInventory` (0x468f50) is called from the PLACEMENT arm alone.
-One weapon at a time, which is the tutorial's whole shape.
+**A WEAPON crate takes what you were carrying — a MEDKIT does not.** One weapon
+at a time is the tutorial's own shape, and it is the remake's line: the exe's
+`ClearInventory` (0x468f50) is called from the PLACEMENT arm alone.
 
-**The health half of it was corrected 2026-08-12, because it DEAD-ENDED the
+**"Тнт не забирается когда аптечку в доме подбираешь… должен" was read
+BACKWARDS here, and it cost a dead-ended tutorial.** It was a report that the
+TNT survives a medkit and should — not a request that it be taken. Play settled
+it in one line after the level hung on it: **"должен оставаться — я сказал"**.
+Worth keeping as a shape: a sentence of play's that describes what the game DOES
+is not automatically a request to change it, and the cheap check — asking what
+the line would BREAK if applied — was available before the code was written.
+
+**The health half was corrected 2026-08-12, because it DEAD-ENDED the
 training ground.** Play: "если сломать не дверь динамитом — туториал багуется —
 я сломал стену, взял аптечку, и там пропал динамит и не появилась базука." The
 arithmetic, all of it read off CAMP's own records: the DOOR (record 45,

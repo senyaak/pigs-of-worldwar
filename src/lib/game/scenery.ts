@@ -177,12 +177,17 @@ export function createScenery(
         let given = worth
         // **A WEAPON CRATE TAKES WHAT YOU WERE CARRYING — A MEDKIT DOES NOT.**
         //
-        // Play asked for the first half plainly ("тнт не забирается когда аптечку
-        // в доме подбираешь… должен") and it is the tutorial's whole shape: one
-        // weapon at a time. Applied to a HEALTH crate as well, it dead-ends the
-        // training ground, which is what play then hit: "если сломать не дверь
-        // динамитом — туториал багуется — я сломал стену, взял аптечку, и там
-        // пропал динамит и не появилась базука."
+        // The medkit half was this repo READING PLAY BACKWARDS. "Тнт не
+        // забирается когда аптечку в доме подбираешь… должен" was taken for a
+        // request that it be taken; it was a report that it survives, and that
+        // it should. Play, after the training ground dead-ended on it — "если
+        // сломать не дверь динамитом — туториал багуется — я сломал стену, взял
+        // аптечку, и там пропал динамит и не появилась базука", then flatly:
+        // **"должен оставаться — я сказал"**. A heal is not a weapon swap.
+        //
+        // What stands for a WEAPON crate is the tutorial's own shape, one weapon
+        // at a time — and it is still the remake's own, since the exe clears on
+        // PLACEMENT alone.
         //
         // The arithmetic behind that, and it is all read: CAMP's own door
         // (record 45, `STW04_D2`) is the ONE piece of the house with a health of
