@@ -3027,9 +3027,15 @@ above was that the shelter wanted a trigger of its own. It does not. **Nothing i
 the original's training script fires on entering a building**, and the two lines
 that mention one are an ordinary pair of crates: "USE BACKSPACE BUTTON TO ENTER
 AND EXIT BUILDINGS OR VEHICLES" is the health×25 crate being COLLECTED, and
-"ENTER THE BUILDING AND COLLECT THE CRATE" is the bazooka crate being PLACED —
-inside it. Walking in is never a step; collecting what is in there is the next
-one.
+"ENTER THE BUILDING AND COLLECT THE CRATE" is the bazooka crate being PLACED.
+Walking in is never a step; collecting is.
+
+**"— inside it" used to end that sentence and it was never read.** Measured off
+CAMP.POG (2026-08-12): the bazooka crate #19 stands in the open at
+(−5376, 11008), the nearest building on the map is the SHELTER **5894** units
+away, and what stands beside the shelter is the health×25 crate #56, 1305 from
+it. The LINE is the game's; where it sends you is undecoded, and the map does not
+agree with the obvious guess. One for play.
 
 What was actually missing is the whole other HALF of the script. Everything the
 remake could say hung on a crate being collected, and **a collected crate signals

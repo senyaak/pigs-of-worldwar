@@ -15,6 +15,25 @@ The script MOVES now: a crate collected speaks, a crate PLACED speaks, and the
 menu counts (CLAUDE.md, "THE TRAINING SCRIPT MOVES"). The END of it is built too
 (A1, done). What is left is one line and the camera.
 
+**And it can be JUMPED to a step** — F12 on, F11 back, `pow.step(9)` for the
+bazooka (`lib/game/training.ts`, CLAUDE.md, README). Anything below that says
+"play the tutorial to the TNT" is a keypress now.
+
+### A4. WHICH BUILDING clip 22 means — open, and the map disagrees with the guess
+
+"ENTER THE BUILDING AND COLLECT THE CRATE" fires when the BAZOOKA crate is
+PLACED; that half is read (`tutorial/notes.md`). Where it sends you is NOT, and
+this file's own note used to say "inside it" as though it were. Measured off
+CAMP.POG 2026-08-12: crate #19 stands in the open at (−5376, 11008), the nearest
+building is the SHELTER 5894 units away, and the house is 11000 and more. What
+stands beside the shelter is the health×25 crate #56 (1305 away), whose line is
+clip 24, the BACKSPACE one.
+
+So either the line is generic and the crate is simply the next one along the
+path, or it means a building the remake has not identified. **This is a question
+for play** — one run to the bazooka step (F12 to 9) with an eye on where the
+original sends you settles it.
+
 ### A1. Killing the last dummy must END the mission — DONE 2026-08-11
 
 Play: "убить последний манекен — не заканчивает миссию… очевидно что заканчивает
@@ -570,6 +589,27 @@ range applies to the ground AND the map view, and the enemy is not shown them at
 all. What is built instead is the `WE_MINE` model for the engineer family (5, 6,
 7) inside 1024 on the ground. Play parked it twice — "индикатор мин пока рано, у
 нас нет инженеров щас" — so it waits on the classes.
+
+### B12. Two specs are FLAKY, and they were flaky before the step jump
+
+Found 2026-08-12 while running phase 002 over the training-step work, and both
+were checked against the tree WITHOUT it — `git stash`, rebuild, same two fail.
+So neither is a regression, and neither is written down anywhere else.
+
+- **`002/grenade.spec.ts:89`**, "the gauge fills while F is held": the thrown
+  grenade's fuse read **4.25** against a floor of 4.5 (the window is 4.5..5.5
+  for a fuse of 150 exe frames plus `rand() & 7`). It is measured after the
+  throw over a round trip, so what the spec is really asserting is "the fuse has
+  not burned much yet" — the read is late on a busy machine. Either measure the
+  fuse against the moment the lob appeared, or widen the floor and say why.
+- **`002/mines.spec.ts:494`**, "TNT goes down IN FRONT of the pig": it polls for
+  the lay clip and then asserts nothing is planted yet, but the charge goes down
+  on the clip's own event at phase 1314 of 4096 — about a third of the way in —
+  so a poll that lands late finds one already down. It wants the assertion taken
+  at a phase rather than at "the clip is up".
+
+Neither has been touched: they are timing in the SPECS, not behaviour, and the
+fix is a measurement each rather than a tuned number.
 
 ### B11. `002/camera-smooth.spec.ts`'s opening drop scores worse near 60 fps
 

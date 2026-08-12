@@ -31,8 +31,14 @@
 // the two building lines are an ordinary crate pair. "USE BACKSPACE BUTTON
 // TO ENTER AND EXIT BUILDINGS OR VEHICLES" is the health×25 crate being
 // COLLECTED, and "ENTER THE BUILDING AND COLLECT THE CRATE" is the BAZOOKA
-// crate being PLACED — inside it. Walking in is never a trigger; collecting
-// what is in there is the next one.
+// crate being PLACED. Walking in is never a trigger; collecting is.
+//
+// The words "inside it" used to end that sentence and they are NOT the read —
+// measured off CAMP.POG (2026-08-12), the bazooka crate #19 stands in the open
+// at (−5376, 11008) and the nearest building on the map is the SHELTER, 5894
+// units away; what stands beside the shelter is the health×25 crate #56, 1305
+// from it. So the LINE is the game's and where it sends you is not decoded —
+// which of CAMP's buildings it means, if any, is a question for play.
 
 /** The map that IS the training ground; the exe reaches it as level 0. */
 export const TRAINING_MAP = 'CAMP'
