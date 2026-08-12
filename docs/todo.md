@@ -294,7 +294,7 @@ trail (B4), the rocket that went off on the fire key (B1), and the victory — t
 card, the empty hands and the dance (A1's ending). What is left in this section
 is everything NOT in that batch.
 
-### B00. A MEDKIT NO LONGER DISARMS YOU — fixed 2026-08-12, NOT PINNED
+### B00. A COLLECTED CRATE TAKES NOTHING — fixed 2026-08-12, NOT PINNED
 
 Play: "если сломать не дверь динамитом — туториал багуется — я сломал стену,
 взял аптечку, и там пропал динамит и не появилась базука."
@@ -309,7 +309,15 @@ COLLECTION, which is play's own earlier rule on top of the exe (whose
 `ClearInventory` fires from the PLACEMENT arm alone, 0x4aa6cb, unconditional).
 Every skill on the training ground is UNLIMITED, so the TNT should have survived
 a wasted charge — and there is no second TNT crate, record 52 being the only one.
-Now only a crate with a SKILL in it clears; a medkit heals and leaves you armed.
+
+**The whole rule is gone now, weapon crates included** — "ящик с оружием при
+подборе всё ещё забирает то, что несёшь — а вот это давай сразу почистим" — and
+nothing is lost with it: "one weapon at a time" rides the PLACEMENTS, which is
+where the exe puts it (0x4aa6cb, the pickup branch only). **And that can only
+ever fire on CAMP**, measured over all 61 shipped POGs: it is the only map whose
+crates WAIT to be placed (eight of them). Eight other maps run script steps —
+BHILL, BRIDGE, GENMUD, MASHED, OASIS, SNAKE, SNIPER, TRENCH — but what they hold
+back is scenery, never a pickup.
 
 **What is missing is the pin.** Nothing in `e2e/` asserts on the inventory after
 a collection at all, which is why a rule that empties a pig could be added and

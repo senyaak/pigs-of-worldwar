@@ -2500,32 +2500,39 @@ is comes off the type-keyed table at 0x4a90cc: slot 0 is shape kind 2 with
 `esi = 0xAA`, and slot 7 gives the blast effect the 35 this engine already draws
 with. So the pig keeps a radius, and it is now the game's own number.
 
-**A WEAPON crate takes what you were carrying — a MEDKIT does not.** One weapon
-at a time is the tutorial's own shape, and it is the remake's line: the exe's
-`ClearInventory` (0x468f50) is called from the PLACEMENT arm alone.
+**COLLECTING a crate takes NOTHING away — only PLACING one does**, which is the
+exe: `Pig::ClearInventory` (0x468f50, unconditional, no training-ground guard in
+it) is called from the placement arm at 0x4aa6cb, and only on its PICKUP branch,
+the other jumping clean over it at 0x4aa659.
 
-**"Тнт не забирается когда аптечку в доме подбираешь… должен" was read
-BACKWARDS here, and it cost a dead-ended tutorial.** It was a report that the
-TNT survives a medkit and should — not a request that it be taken. Play settled
-it in one line after the level hung on it: **"должен оставаться — я сказал"**.
-Worth keeping as a shape: a sentence of play's that describes what the game DOES
-is not automatically a request to change it, and the cheap check — asking what
-the line would BREAK if applied — was available before the code was written.
+**A rule that took your weapon on every collection stood here for a pass, and
+it began as this repo reading play BACKWARDS.** "Тнт не забирается когда аптечку
+в доме подбираешь… должен" was taken for a request that it BE taken; it was a
+report that the TNT survives a medkit, and that it should. Play settled it in
+one line — **"должен оставаться — я сказал"** — and then had the second half
+out too: "ящик с оружием при подборе всё ещё забирает то, что несёшь — а вот
+это давай сразу почистим." Worth keeping as a shape rather than as a fact: a
+sentence of play's describing what the game DOES is not automatically a request
+to change it, and the cheap check — asking what the line would BREAK if applied
+— was available before the code was written.
 
-**The health half was corrected 2026-08-12, because it DEAD-ENDED the
-training ground.** Play: "если сломать не дверь динамитом — туториал багуется —
-я сломал стену, взял аптечку, и там пропал динамит и не появилась базука." The
-arithmetic, all of it read off CAMP's own records: the DOOR (record 45,
-`STW04_D2`) is the one piece of the house with a health of its own — **50**,
-exactly TNT's damage at the core, where every wall beside it takes the table's
-60 — and the only one carrying a command (opcode 22, waiting on 89, signalling
-**7**), which is what the bazooka crate (18) and the health crate inside the
-house (55) wait on. Breaking a WALL therefore places nothing, correctly; and
-since every skill on the training ground is UNLIMITED the player still has the
-TNT and can go and blow the door — unless a medkit has emptied their pockets on
-the way. There is no second TNT crate: record 52 is the only one and it waits on
-label 6. So a crate with a SKILL in it swaps your weapon and a crate with none
-is a heal that leaves you armed. **Not pinned by a spec yet** — `docs/todo.md`.
+What it broke was the training ground, and the arithmetic is all in CAMP's own
+records. The DOOR (record 45, `STW04_D2`) is the one piece of the house with a
+health of its own — **50, exactly TNT's damage at the core**, where every wall
+beside it takes the table's 60 — and the only one carrying a command (opcode 22,
+waiting on 89, signalling **7**), which the bazooka crate (18) and the house's
+own medkit (55) wait on. So breaking a WALL places nothing, correctly; every
+skill on the training ground being UNLIMITED, the player still has the TNT and
+can go and blow the door — unless a medkit has emptied their pockets on the way,
+there being no second TNT crate (record 52 is the only one, waiting on label 6).
+
+**And the confiscation can only ever happen on CAMP — measured over all 61
+shipped POGs.** Only CAMP has crates that WAIT to be placed (eight of them);
+every other map's crates stand on their ground from the start, so the pickup
+branch that clears is never reached. Eight maps besides it do run script steps
+(BHILL, BRIDGE, GENMUD, MASHED, OASIS, SNAKE, SNIPER, TRENCH have waiting
+records), but what they hold back is scenery, not pickups. **Not pinned by a
+spec** — `docs/todo.md`.
 
 **A steep throw goes IN.** "Если вертикальная скорость выше горизонтальной —
 прожектайл тонет." The skip already needed 150 along the surface; it now also needs
