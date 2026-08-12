@@ -319,12 +319,25 @@ crates WAIT to be placed (eight of them). Eight other maps run script steps —
 BHILL, BRIDGE, GENMUD, MASHED, OASIS, SNAKE, SNIPER, TRENCH — but what they hold
 back is scenery, never a pickup.
 
-**What is missing is the pin.** Nothing in `e2e/` asserts on the inventory after
-a collection at all, which is why a rule that empties a pig could be added and
-nobody noticed it could empty him at the wrong moment. The spec wants the whole
-path — collect the TNT, plant one at a wall, collect a medkit, assert the TNT is
-still in `carrying` — and it belongs beside `002/strike.spec.ts`, which already
-drives the crate path end to end.
+**PINNED — `e2e/002/crate.spec.ts`**, which play sized itself: "спавни ящик
+прям перед свином — путь пройдёт… потом используй, и если бесконечное не
+пропало, если конечное пропало — норм?" Two tests, both on shipped maps and no
+new debug write:
+
+- CAMP — a grenade in the pockets first (`pow.give`), then the bayonet crate
+  WALKED into from a stride away, which is `reached` doing its own job. The
+  grenade survives the collection (the pin this section exists for), the bayonet
+  arrives UNLIMITED, and it is still there and still unlimited after a swing.
+- GUNS — its TNT crate, the one charge, on a map that is not the training
+  ground so a slot carries the record's own count. Planted once, and the slot is
+  GONE (`spend` drops it at zero) — TNT being the weapon that does not hand the
+  turn over, so one press settles it.
+
+One thing the writing of it turned up, and it is in the spec at `useUntil`: a
+FIRE press on the frame the skill menu is still up is read by a control set that
+does not carry the fire key, and the latch goes with it. One frame either way,
+so a spec that presses once passes and fails on alternate runs. It presses until
+the blow starts instead; four runs, four passes.
 
 ### B0. THE BLACK SMOKE IS DROWNED, NOT MISSING — diagnosed 2026-08-11
 
