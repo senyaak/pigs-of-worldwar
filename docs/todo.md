@@ -226,17 +226,26 @@ fired rocket's art comes from) is thirteen vertices with its long axis on **Y**,
 hexagonal body. So the nose is model **−Y**, and the pose is that axis turned onto
 the velocity rather than the yaw-and-pitch pair that assumed +Z.
 
-**And the trail is the REMAKE's, against a clean negative.** Both of the exe's
-trail sites were read and neither answers a bazooka: the constructor's dispatch is
-`kind − 0x15` over 0x21 entries, so kinds **21..53 only** (and the map at 0x4326E8
-sends the grenade family to id 0x15 and the charges to 0x1D), while the update's
-every-fifth-frame one is `kind − 4` and sends kind 10 to the exit. The bazooka is
-kind 10. The same read corrects an old claim in CLAUDE.md: a BULLET's trail is not
-the engine's either — kinds 4..20 are outside that dispatch too.
+**And the trail is the ENGINE's — effect id 0x14.** A first pass answered "the exe
+hangs nothing on a bazooka" off two dispatches; play refused it flat ("ВРЁШЬ!!!")
+and was right. The projectile's UPDATE has **two** per-kind dispatches and the
+pass read the wrong one: 0x436596 sends every kind outside 26..28 to 0x436727,
+where the map at 0x436D68 is indexed by the KIND straight and kind 10 lands on
+0x43676D — `new(0xE4); push 14h; push esi; 0x487620(…)`, the same parented-effect
+call the grenade's constructor makes with 0x15.
 
-So `ROCKET_TRAIL` is a row of its own, on play's word: white where the engine's
-grey is sixteen of thirty-one, twice the puffs at twice the size, living twice as
-long, because a rocket outruns anything a grenade's six-a-frame leaves.
+**And it corrected the grenade with it.** `[0x48BF90 + id − 1]` → `[0x48BF24 +
+slot*4]` puts id 0x14 on 0x48B024 (÷6, particle 0x16) and id 0x15 on 0x48B0F5
+(÷3, particle 0x19) — so the "six a frame" every note called the grenade's is the
+ROCKET's, and a grenade lays three. `LOB_TRAIL` is fixed to match.
+
+Two numbers in `ROCKET_TRAIL` are still not the engine's and say so: the setter
+gives both trails grey 0x4210 at size 8, and play asked for WHITE. Our puff is a
+canvas blob rather than the original's textured additive particle, so grey-on-grey
+reads as nothing at all.
+
+**The lesson, and it is the one already written down**: "I could not find it" is
+never "it is not there". Two dispatches read is not the same as the site read.
 
 ### B5. The wall and the ceiling want to be a little more see-through — 2026-08-11
 

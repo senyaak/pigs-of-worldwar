@@ -2517,11 +2517,20 @@ a sixth of a pig, invisible beside a fireball. It takes the fireball's own colou
 law now (`cloudChannel(16)` = 100 of 255) at a size where fourteen of them read as
 a cloud. And a bullet lays the same trail a grenade does, from the same pool —
 though **the reason given here was wrong** and is corrected 2026-08-11: the
-constructor's trail dispatch is `kind − 0x15` over 0x21 entries, so it answers
-kinds 21..53 and a BULLET (4..20) is outside it, as is the bazooka's rocket (10).
-The engine hangs a trail on the grenade family and the charges and on nothing
-else; a bullet's is the remake's, like the rocket's own white one
-(`ROCKET_TRAIL`, lib/game/trail.ts).
+CONSTRUCTOR's trail dispatch is `kind − 0x15` over 0x21 entries, so it answers
+kinds 21..53 and a BULLET (4..20) is outside it. A bullet's trail is the
+remake's.
+
+**The ROCKET's is not**, and getting that wrong is the pass worth remembering.
+The same reading was offered as "the exe hangs nothing on a bazooka either" and
+play refused it in one word — "ВРЁШЬ!!!" — and was right: the projectile's UPDATE
+has TWO per-kind dispatches, and the one that was not read (0x436596 → 0x436727,
+the map at 0x436D68 indexed by the kind STRAIGHT) hangs effect **0x14** on kind 10
+on its second frame. Reading it also corrected the grenade: the id → update map
+(`[0x48BF90 + id − 1]`) puts 0x14 on the ÷6 arm and 0x15 on the ÷3 one, so the
+"six a frame of type 0x16" this repo called a grenade's trail is the rocket's, and
+a grenade lays **three** of type 0x19. `lib/game/trail.ts` carries both, with the
+white and the size flagged as the two numbers that are ours.
 
 **The flight ANIMATES.** "Отбрасывание не запускает анимацию полёта. падение не
 запускает анимацию подьёма после полёта." Both were one line: the frame dresses

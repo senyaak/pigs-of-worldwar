@@ -31,17 +31,26 @@
 // ```
 //
 // `[+0xB0..0xB4]` is where the effect was LAST frame and `[+0xA8..0xAC]` where it
-// is now, so the six are laid evenly along the segment the grenade travelled —
-// which is why the trail does not come apart at throwing speed.
+// is now, so they are laid evenly along the segment the grenade travelled — which
+// is why the trail does not come apart at throwing speed.
 //
-// Particle type 0x16 (0x486f8d → `0x486B30(1, 1, -1, 0x14, 0, 0, 0, 0, 0,
-// 0x4210, 8)`) is the whole of what one looks like: colour **0x4210**, the mid
-// grey that is the setter's own default; age step **0x14**, so it lives
-// `100/20 =` **five frames**; and no jitter, no gravity and no velocity at all.
-// It sits where it was put and fades.
+// **AND THE ARM ABOVE IS NOT THE GRENADE'S** — corrected 2026-08-11, after play
+// refused a flat "the engine gives the rocket nothing" ("ВРЁШЬ!!!"). They were
+// right, and the two mistakes behind it are worth keeping:
 //
-// Six a frame for five frames is thirty alive, which is exactly the capacity
-// effect id 0x15 draws from the count table. Nothing here is inferred.
+//  1. `0x48B024` is the update arm of effect id **0x14**, not 0x15. The id → arm
+//     map is `byte [0x48BF90 + id − 1]` into `[0x48BF24 + slot*4]`: id 0x14 lands
+//     on 0x48B024 (`edi = 6`, the ÷6 magic 0x2AAAAAAB, particle type **0x16**)
+//     and id 0x15 on **0x48B0F5** (`÷3`, particle type **0x19**). The grenade's
+//     constructor arm pushes 0x15 (0x4324AC), so a GRENADE lays **three** a
+//     frame and the six belong to whatever uses 0x14.
+//  2. What uses 0x14 is the ROCKET, and it comes from a third dispatch nobody
+//     had read — see `ROCKET_TRAIL`.
+//
+// Both particle types resolve to the SAME setter (0x486F8D, the table at
+// 0x4871D0): colour **0x4210**, the mid grey that is the setter's own default;
+// age step **0x14**, so one lives `100/20 =` **five frames**; size 8; and no
+// jitter, no gravity and no velocity at all. It sits where it was put and fades.
 //
 // **There is no FIRE in it.** Play asked for smoke and fire; the engine's trail
 // is grey smoke and nothing else, so that is what this is.
@@ -70,14 +79,17 @@ export interface TrailKind {
 }
 
 /**
- * **A GRENADE's trail** — effect 0x15, six a frame of particle type 0x16, mid
- * grey, size 8 (0x48b038, 0x486f8d).
+ * **A GRENADE's trail** — effect 0x15, and **three** a frame of particle type
+ * 0x19, mid grey, size 8 (0x48B0F5, 0x486F8D).
+ *
+ * The six this used to carry were read off the wrong arm; see the head of this
+ * file. Three a frame for five frames is fifteen alive.
  */
 export const LOB_TRAIL: TrailKind = {
   id: 0x15,
-  steps: 6,
+  steps: 3,
   ageStep: 0x14,
-  particle: 0x16,
+  particle: 0x19,
   colour: [16, 16, 16],
   size: 8
 }
@@ -123,35 +135,41 @@ export const FUSE_TRAIL: TrailKind = {
 export const FUSE_LIFT = 0x3c
 
 /**
- * **A ROCKET's smoke — and this one is the REMAKE's, against a clean negative.**
+ * **A ROCKET's smoke — effect id 0x14, and the ENGINE lays it.**
  *
- * Play: "нет белого густого дыма за снарядом базуки." The exe hangs nothing on
- * it, and both of its trail sites were read to be sure:
+ * Play: "нет белого густого дыма за снарядом базуки", and then, when a first
+ * pass came back with "the exe hangs nothing on a bazooka": "ВРЁШЬ!!!" They were
+ * right. The trail is there and it comes from a THIRD dispatch — the projectile
+ * update has two, not one, and the first pass read the other:
  *
- * - the CONSTRUCTOR's trail dispatch is `kind − 0x15` against a 0x21-entry byte
- *   map (0x4323F3), so it answers **kinds 21..53 only** — the grenade family to
- *   0x43247B (id 0x15) and the charges to 0x432414 (id 0x1D). The bazooka is
- *   kind **10** and falls out of range before the map is even read;
- * - the UPDATE's every-fifth-frame trail is `kind − 4` against its own map
- *   (0x436607), and kind 10's slot is 4 — the exit. Only kinds 26 and 27, the
- *   guided family, lay one there.
+ * ```
+ * 43658a  cmp eax,1Ah / 1Ch          ; eax is the KIND
+ * 436596  jne 00436727h              ; …anything outside 26..28 goes here
+ * 436727  ecx = [proj+0xB4]          ; the state: 0, 2 or 5 only
+ * 43673e  edi = ++[proj+0xA4]        ; …and only as the counter first reaches 0
+ * 436755  cmp eax,36h                ; the KIND, straight — no subtraction
+ * 436760  dl = [eax + 0x436D68]      ; kind 10 -> slot 1
+ * 436766  jmp [edx*4 + 0x436D24]     ;          -> 0x43676D
+ * 43676d  new(0xE4); push 14h; push esi; 0x487620(...)
+ * ```
  *
- * So the original's rocket leaves nothing behind it, and this row exists because
- * play asked for one. It is the grenade's shape with the two things play named:
- * WHITE (thirty-one of thirty-one, where the engine's own default grey is
- * sixteen) and THICK — twice the puffs a grenade lays, at twice the size and
- * living twice as long, since a rocket outruns anything a grenade's six-a-frame
- * would leave.
+ * So a parented effect **0x14** is hung on the rocket on its second frame, at
+ * offset zero — the same call and the same `(1, 0x3E8, 0x19, 1, 2)` tail the
+ * grenade's own gets. Its update arm is the ÷6 one (0x48B024): **six a frame**
+ * of particle type 0x16, against a grenade's three. Twice the smoke, off the
+ * engine's own table, which is what "густой" is.
  *
- * (The same reading corrects this file's old claim that a BULLET takes the
- * grenade's trail "from the same pool, because the engine hangs that effect off
- * a projectile in its constructor": kinds 4..20 are outside that dispatch too.
- * A bullet's trail is the remake's as well.)
+ * The COLOUR and the SIZE are the two numbers here that are not the engine's,
+ * and they say so: the setter gives both trails 0x4210 and 8 — mid grey — and
+ * play asked for WHITE. Our puff is a soft canvas blob rather than the
+ * original's textured additive particle (`three/lobTrail.ts`), so grey-on-grey
+ * reads as nothing at all; 31/31/31 at twice the size is that difference made
+ * up. Move them in play.
  */
 export const ROCKET_TRAIL: TrailKind = {
-  id: 0x15,
-  steps: 12,
-  ageStep: 0x0a,
+  id: 0x14,
+  steps: 6,
+  ageStep: 0x14,
   particle: 0x16,
   colour: [31, 31, 31],
   size: 0x10

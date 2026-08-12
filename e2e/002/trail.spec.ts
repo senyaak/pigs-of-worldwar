@@ -11,6 +11,7 @@ import {
   FUSE_LIFT,
   FUSE_TRAIL,
   LOB_TRAIL,
+  ROCKET_TRAIL,
   TRAIL_DEAD,
   advanceTrail,
   beginTrail,
@@ -23,17 +24,43 @@ const TRAIL_STEPS = LOB_TRAIL.steps
 const TRAIL_ROOM = trailRoom(LOB_TRAIL)
 
 test('the numbers are the engine own', () => {
-  // Six a frame (0x48b038), an age step of 0x14 so five frames of life
-  // (0x486f9b), and 0x4210 — the setter's own default grey (0x486f8f).
-  expect(LOB_TRAIL.steps).toBe(6)
+  // THREE a frame, and that is a correction: `0x48B024`, the ÷6 arm this repo
+  // used to quote, belongs to effect id **0x14** — the map is
+  // `[0x48BF90 + id − 1]` into `[0x48BF24 + slot*4]`, and 0x15 lands on 0x48B0F5
+  // instead, whose magic is the ÷3 one and whose particle is 0x19.
+  expect(LOB_TRAIL.id).toBe(0x15)
+  expect(LOB_TRAIL.steps).toBe(3)
+  expect(LOB_TRAIL.particle).toBe(0x19)
+  // …and both particle types share one setter (0x486F8D, the table at 0x4871D0):
+  // an age step of 0x14 so five frames of life, 0x4210 — the setter's own default
+  // grey — and size 8.
   expect(LOB_TRAIL.ageStep).toBe(0x14)
   expect(LOB_TRAIL.colour).toEqual([16, 16, 16])
-  expect(LOB_TRAIL.particle).toBe(0x16)
   expect(LOB_TRAIL.size).toBe(8)
-  // …and six a frame for five frames is thirty alive, which is exactly the
-  // capacity effect id 0x15 draws from Init's count table. That agreement is the
-  // check on the whole read.
-  expect(TRAIL_ROOM).toBe(30)
+  expect(TRAIL_ROOM).toBe(15)
+})
+
+test('A ROCKET carries one too, and it is the ENGINE that lays it', () => {
+  // Play: "нет белого густого дыма за снарядом базуки", and then "ВРЁШЬ" at a
+  // first pass that said the exe hangs nothing on a bazooka. It does — from the
+  // projectile update's SECOND per-kind dispatch, which that pass never read:
+  // 0x436596 sends every kind outside 26..28 to 0x436727, where the map at
+  // 0x436D68 is indexed by the KIND straight and kind 10 lands on 0x43676D —
+  // `new(0xE4); push 14h; push esi; 0x487620(…)`, the same parented-effect call
+  // the grenade's constructor makes with 0x15.
+  expect(ROCKET_TRAIL.id).toBe(0x14)
+  // …and 0x14's update arm is the ÷6 one, so a rocket lays TWICE what a grenade
+  // does. That is the "густой" half, and it is read.
+  expect(ROCKET_TRAIL.steps).toBe(6)
+  expect(ROCKET_TRAIL.steps).toBe(LOB_TRAIL.steps * 2)
+  expect(ROCKET_TRAIL.particle).toBe(0x16)
+  expect(ROCKET_TRAIL.ageStep).toBe(LOB_TRAIL.ageStep)
+  // The colour and the size are the two that are NOT the engine's — it gives
+  // both trails grey 0x4210 at size 8 — and they say so where they live: our
+  // puff is a canvas blob, not the original's textured additive particle, so
+  // grey-on-grey reads as nothing (lib/game/trail.ts).
+  expect(ROCKET_TRAIL.colour).toEqual([31, 31, 31])
+  expect(ROCKET_TRAIL.size).toBe(0x10)
 })
 
 test('A CHARGE CARRIES ONE TOO, and its fuse is where it hangs', () => {
@@ -76,14 +103,20 @@ test('the first frame lays nothing — there is no segment yet', () => {
   expect(trail.puffs).toHaveLength(0)
 })
 
-test('then six a frame, spread ALONG the step and not heaped at the end', () => {
+test('then a frame’s worth, spread ALONG the step and not heaped at the end', () => {
   const trail = beginTrail()
   advanceTrail(trail, { x: 0, y: 0, z: 0 })
   advanceTrail(trail, { x: 600, y: 0, z: 0 })
-  expect(trail.puffs).toHaveLength(6)
-  // Evenly, one per sixth: this is what keeps the trail whole at throwing speed
-  // instead of leaving a bead a frame.
-  expect(trail.puffs.map((p) => p.x)).toEqual([100, 200, 300, 400, 500, 600])
+  // A grenade's three, evenly — this is what keeps the trail whole at throwing
+  // speed instead of leaving a bead a frame.
+  expect(trail.puffs).toHaveLength(3)
+  expect(trail.puffs.map((p) => p.x)).toEqual([200, 400, 600])
+  // …and a ROCKET's six over the same step, which is the engine's own difference
+  // between the two arms and the whole of "густой".
+  const rocket = beginTrail(ROCKET_TRAIL)
+  advanceTrail(rocket, { x: 0, y: 0, z: 0 })
+  advanceTrail(rocket, { x: 600, y: 0, z: 0 })
+  expect(rocket.puffs.map((p) => p.x)).toEqual([100, 200, 300, 400, 500, 600])
 })
 
 test('a puff is STILL — type 0x16 carries no velocity and no gravity', () => {
