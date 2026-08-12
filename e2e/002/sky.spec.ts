@@ -19,7 +19,7 @@ import { PHASE_ENV, GAME_DIR } from '../launch'
 import { hold, swapMap } from '../controller'
 import { startGame } from '../menu'
 import type { Page } from '@playwright/test'
-import { MAP_SKY, SKY_ARCHIVES, SKY_FOG, skyArchiveFor, skyFogFor } from '../../src/lib/game/sky'
+import { MAP_SKY, SKY_ARCHIVES, skyArchiveFor } from '../../src/lib/game/sky'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseModel } from '../../src/lib/formats/model'
 import { parseTim } from '../../src/lib/formats/tim'
@@ -46,23 +46,6 @@ test('the mission table says which mood a map wears', () => {
   // the remake's own fallback, which nothing rests on.
   expect(Object.keys(MAP_SKY)).toHaveLength(53)
   expect(skyArchiveFor('GENSNOW')).toBe('sunny')
-})
-
-test('the haze comes off the same field, one arm per mood', () => {
-  // Eleven arms and no default: `cmp eax,0Ah; ja` only reaches the fog-off arm
-  // for an index the table cannot produce.
-  expect(SKY_FOG).toHaveLength(SKY_ARCHIVES.length)
-  // Ominous is the odd one twice over — the only haze that starts late and the
-  // only one that is total inside three tiles.
-  expect(skyFogFor('TRENCH')).toEqual({ near: 425, far: 2125, color: [143, 175, 205] })
-  // Night and space fade to BLACK, which is the dark doing the work.
-  expect(skyFogFor('CREEPY2').color).toEqual([0, 0, 0])
-  expect(skyFogFor('LUNAR1').color).toEqual([0, 0, 0])
-  // The training ground's is the white-out, and the farthest of the lot.
-  expect(skyFogFor('CAMP')).toEqual({ near: 238, far: 4524, color: [248, 248, 248] })
-  // Every one of them buries the ground well inside the 16384-unit map — which
-  // is the point, and the reason the shipped game shows the sky it does.
-  for (const fog of SKY_FOG) expect(fog.far).toBeLessThan(16384 / 3)
 })
 
 test('every mood ships, and each is four 250×250 skins', () => {
@@ -117,10 +100,9 @@ interface SkyReading {
   skins: number
   offEye: number
   radius: number
-  fog: { color: string; near: number; far: number } | null
 }
 
-/** What the scene says about its dome and its haze (three/debug.ts). */
+/** What the scene says about its dome (three/debug.ts). */
 const skyState = (page: Page): Promise<SkyReading | null> =>
   page.evaluate(() => {
     const pow = (window as unknown as { pow?: { debug?: { sky(): unknown } } }).pow
@@ -142,18 +124,12 @@ test('the battle comes up under it, and it rides the eye', async ({ app }) => {
     triangles: 544,
     skins: 4,
     offEye: 0,
-    radius: 40_000,
-    // The cold arm's own white-out, straight off 0x48570D — and the distances
-    // are eye-relative world units, which is what `afSetFog` turns out to pass
-    // through to D3D's FOGSTART/FOGEND (lib/game/sky.ts).
-    fog: { color: '#f8f8f8', near: 238, far: 4524 }
+    radius: 40_000
   })
 
-  // A swap is a fresh battle, and it brings its own mood and its own haze.
+  // A swap is a fresh battle, and it brings its own mood with it.
   expect(await swapMap(page, 'ARTGUN')).toBe(true)
-  const sunny = await skyState(page)
-  expect(sunny?.mood).toBe('sunny')
-  expect(sunny?.fog).toEqual({ color: '#d0d7e0', near: 238, far: 4048 })
+  expect((await skyState(page))?.mood).toBe('sunny')
   // …and the dome still has not been left behind after a level's worth of
   // camera work.
   await hold(page, 'walkForward', 600)

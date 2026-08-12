@@ -20,7 +20,6 @@ import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
 import { buildSky } from './sky'
-import { skyFogFor } from '../../../lib/game/sky'
 import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
 import { SCOPE_BONE, SCOPE_MAGNIFY, SCOPE_MOUNT, createChase } from './chase'
@@ -159,11 +158,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
 
   // The sky goes in FIRST so it is the scene's first child, though what
   // actually keeps it behind everything is its own render order (three/sky.ts).
-  // The mood's HAZE rides with it: same record, same failure — a map whose dome
-  // will not load gets neither, which is the one case where the two are tied.
-  const sky = assets.sky
-    ? buildSky({ root, scene: host.scene, sky: assets.sky, fog: skyFogFor(map) })
-    : null
+  const sky = assets.sky ? buildSky(root, assets.sky) : null
 
   const terrain: Terrain = buildTerrain(assets.blocks, assets.terrainTextures)
   // buildTerrain wraps in its own converted group; unwrap into ours. Its

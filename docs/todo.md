@@ -800,8 +800,9 @@ not pulled, written here so nobody has to remember an address.
   because a new UI wants the original's coordinates rather than fresh eyework.
   Note the remake's own constraint from play: a real pause is single-player
   only, and multiplayer must never stop (docs/history/status.md, "Threads left mid-pull").
-- **SNOW and RAIN.** The dome and the mood's fog are in (`three/sky.ts`,
-  `lib/game/sky.ts`); the weather itself is not. The battle loader picks the
+- **SNOW and RAIN.** The dome is in (`three/sky.ts`, `lib/game/sky.ts`) and the
+  mood's fog is read, built and REJECTED by play — do not bring it back
+  (CLAUDE.md). The weather itself is not built. The battle loader picks the
   sheet by mood — `language\tims\snow.mtd` for cold, `language\tims\rain.mtd`
   for everything else, into `[+0x41C]` at 0x4853A9 — and STARTS one only for
   two of them (0x4854CE): `(1, 0)` for cold, `(0, 0)` for ominous, and every

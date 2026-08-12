@@ -117,49 +117,12 @@ export function skyArchiveFor(map: string): string {
   return SKY_ARCHIVES[moodOf(map)]
 }
 
-export interface SkyFog {
-  /** World units from the EYE where the haze starts and where it is total.
-   * D3D's `FOGSTART`/`FOGEND` under `FOGTABLEMODE = D3DFOG_LINEAR`, which is
-   * three's `Fog` exactly. */
-  near: number
-  far: number
-  /** The colour everything fades into, 0..255. */
-  color: readonly [number, number, number]
-}
-
-/**
- * The haze each mood hangs over the ground — the `switch` on the same index at
- * 0x4856A6, one arm per mood, through the jump table at 0x485ED4. Each arm
- * writes near to `[+0x4A4]`, far to `[+0x4A8]` and R/G/B to `[+0x498..+0x4A0]`;
- * 0x4859A4 then packs them ARGB and calls `afSetFog(on, near, far, argb)`.
- *
- * **The units are the WORLD's, and it is worth knowing why.** `afSetFog`
- * (`_d3d.dll` 0x100096F0) does four `SetRenderState` calls and nothing else:
- * `0x1C` FOGENABLE, `0x22` FOGCOLOR, `0x23` FOGTABLEMODE = 3 (LINEAR), then
- * `0x24` FOGSTART and `0x25` FOGEND with the caller's floats passed straight
- * through. Values like 238.0 and 4048.0 cannot be device z, which is 0..1, so
- * the fog is eye-relative — and the library's own reset writes 30000.0 into
- * both, which is just past the diagonal of a 16384-unit map. So the original
- * really does bury everything past EIGHT TILES, and that is most of why its
- * screenshots show so much sky over so little ground.
- *
- * `[exe]`. `sky/notes.md` has the table arm by arm.
- */
-export const SKY_FOG: readonly SkyFog[] = [
-  { near: 238, far: 4524, color: [248, 248, 248] }, // 0 cold — a white-out
-  { near: 238, far: 3571, color: [252, 192, 116] }, // 1 desert — sand in the air
-  { near: 238, far: 2749, color: [0, 0, 0] }, // 2 night — the dark IS the fog
-  { near: 238, far: 2749, color: [0, 0, 0] }, // 3 night
-  { near: 238, far: 2749, color: [0, 0, 0] }, // 4 night
-  { near: 425, far: 2125, color: [143, 175, 205] }, // 5 ominous — the thickest, and the only one that starts late
-  { near: 238, far: 4048, color: [208, 215, 224] }, // 6 sunny
-  { near: 238, far: 4048, color: [229, 191, 128] }, // 7 sunrise
-  { near: 238, far: 4048, color: [255, 208, 159] }, // 8 sunset
-  { near: 238, far: 4048, color: [192, 255, 255] }, // 9 toy
-  { near: 238, far: 2749, color: [0, 0, 0] } // 10 space
-]
-
-/** The haze a map stands in. */
-export function skyFogFor(map: string): SkyFog {
-  return SKY_FOG[moodOf(map)]
-}
+// **THE MOOD'S FOG IS NOT DRAWN, and that is play's ruling.** The record's own
+// arm gives a colour and a near/far per mood — 238 out to 2125..4524, which
+// buries the ground inside eight tiles — and `afSetFog` passes them to D3D as
+// FOGSTART/FOGEND under a LINEAR table mode, so they are eye-relative world
+// units and the reading is not in doubt. It was built, and play threw it out on
+// sight against footage of the shipped game. What the binary cannot say is
+// whether the driver ever applied table fog to this engine's pre-transformed
+// vertices. The numbers stay in `sky/notes.md` and nowhere else; do not build
+// it again without new evidence about what the original actually showed.

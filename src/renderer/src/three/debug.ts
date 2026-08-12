@@ -122,14 +122,7 @@ export interface DebugParts {
    * is this: which mood loaded, that it is the whole dome, and that its centre
    * has not drifted off the camera.
    */
-  sky: () => {
-    mood: string
-    triangles: number
-    skins: number
-    offEye: number
-    radius: number
-    fog: { color: string; near: number; far: number } | null
-  } | null
+  sky: () => { mood: string; triangles: number; skins: number; offEye: number; radius: number } | null
   /** Whether the beat after a blow is still running. */
   aftermath: () => boolean
   /**
