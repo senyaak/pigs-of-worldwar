@@ -167,9 +167,6 @@ reasoning, the false starts and the sessions behind them are in
 - **Do not re-propose `FRAME_SECONDS` at 1/20 or 1/25, or `HEIGHT_SCALE`
   doubled.** Both were built, shown to play and answered — the reasoning is in
   `docs/history/why.md`.
-- **Never take a distance the LIBRARY is handed for a world distance.** Its z
-  is scaled and the factor is not decoded; the fog was built 1:1 once and had
-  to be redone. `sky/notes.md`.
 - **Do not tune the tile turn table by eye, and do not make it a setting.** It
   is pinned byte by byte in `e2e/000/terrain-viewer.spec.ts`.
 site that plays it), never off the table. `animations/notes.md`
