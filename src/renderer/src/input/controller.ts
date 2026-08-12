@@ -341,6 +341,11 @@ declare global {
        * `pow.give(19)` for a grenade. The remake's own: no crate on the
        * training ground carries one, so nothing else can reach it. */
       give?(skill?: number, amount?: number): boolean
+      /** Console command: go to one of the training ground's steps —
+       * `pow.step(9)` for the bazooka, no argument to list them and say where
+       * the battle stands. The same jump F11 and F12 make
+       * (lib/game/training.ts). */
+      step?(want?: number): Promise<number>
       /** Which map the battle is on. */
       map?(): string
     }

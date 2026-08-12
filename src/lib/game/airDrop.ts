@@ -67,11 +67,27 @@ export interface AirDrops {
    * same key ends it. The exe has not been read on whether it lets you.
    */
   cut(): void
+  /**
+   * Put every descent on its ground NOW, landing and all.
+   *
+   * The remake's own, and it has one caller: jumping the training ground's
+   * script to a step (lib/game/training.ts) breaks nine records in one go, and
+   * nine canopies coming down from 0xC00 is half a minute of watching the sky.
+   * It ends each descent exactly where `update` would have — the same
+   * `crateLanded`, so the collision world, the art and the dust all follow.
+   */
+  land(): void
   clear(): void
 }
 
 export function createAirDrops(world: AirDropWorld, emit: Emit): AirDrops {
   const live: Descent[] = []
+
+  /** One descent over: off the list, and everything told where it came down. */
+  const landed = (one: Descent): void => {
+    const at = world.at(one.id)
+    emit({ kind: 'crateLanded', id: one.id, at: { x: at?.x ?? 0, y: one.ground, z: at?.z ?? 0 } })
+  }
 
   return {
     send(id, fromY) {
@@ -95,8 +111,7 @@ export function createAirDrops(world: AirDropWorld, emit: Emit): AirDrops {
         updateDrop(one.drop, one.ground, delta)
         if (!one.drop.landed) continue
         live.splice(i, 1)
-        const at = world.at(one.id)
-        emit({ kind: 'crateLanded', id: one.id, at: { x: at?.x ?? 0, y: one.ground, z: at?.z ?? 0 } })
+        landed(one)
       }
     },
     falling: () => live.length,
@@ -112,6 +127,13 @@ export function createAirDrops(world: AirDropWorld, emit: Emit): AirDrops {
       for (const one of live) {
         if (!one.drop.chute) continue
         cutChute(one.drop)
+      }
+    },
+    land() {
+      for (const one of live.splice(0, live.length)) {
+        one.drop.y = one.ground
+        one.drop.landed = true
+        landed(one)
       }
     },
     clear() {

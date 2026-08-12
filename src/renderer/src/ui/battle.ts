@@ -36,6 +36,7 @@ import {
   lineFor
 } from '../../../lib/game/tutorial'
 import type { Cue } from '../../../lib/game/tutorial'
+import { LAST_TRAINING_STEP, TRAINING_STEPS, clampStep } from '../../../lib/game/training'
 import { SKILL, skillName } from '../../../lib/game/skills'
 import { lobOf } from '../../../lib/game/grenade'
 import { UNLIMITED } from '../../../lib/game/inventory'
@@ -168,6 +169,25 @@ export function initBattle(onLeave: () => void): BattleView {
    * and CLEARS it (lib/game/tutorial.ts). Once per minefield.
    */
   let mineLineArmed = false
+  /**
+   * Which of the training ground's steps the battle has been jumped to, and one
+   * waiting to be applied once the level's opening drop is out of the way
+   * (lib/game/training.ts).
+   *
+   * A jump BACK is the level starting over — the chain runs one way — and a
+   * battle that has just started is still under its canopies, where the pig
+   * cannot be stood anywhere. So the step is WANTED first and paid in the paint
+   * loop, which is the one place that knows the drop has finished, and the want
+   * is what a second press counts from: F12 twice while the canopies are still
+   * up is two steps and not one.
+   */
+  let trainingStep = 0
+  let stepWanted: number | null = null
+  /** …and whether the battle a want is meant for is still LOADING. Without it
+   * the paint loop pays the want into the battle being replaced — which, being
+   * a step or two further on already, has nothing left to collect and hands the
+   * pig whatever it was carrying instead. */
+  let reloading = false
 
   /**
    * The tutorial speaking: the clip out of `Speech/Sku1/Train1`, and its line
@@ -242,6 +262,63 @@ export function initBattle(onLeave: () => void): BattleView {
     scene?.focus(game.currentPig)
   }
 
+  /** Which step the battle is on, counting one that has been asked for and not
+   * paid yet. */
+  const standingStep = (): number => stepWanted ?? trainingStep
+
+  /** Run the script to `step` and say so. The scene owns the jump itself, since
+   * standing a pig somewhere is a picture as well as a position — and it refuses
+   * on any map but the training ground, where there is no such script. */
+  const applyStep = (step: number): void => {
+    if (!scene?.trainingStep(step)) return
+    trainingStep = step
+    console.log(`training step ${step}/${LAST_TRAINING_STEP} — ${TRAINING_STEPS[step].name}`)
+    updateHud()
+  }
+
+  /**
+   * **Go to one of the training ground's steps** — F11 and F12, and `pow.step(n)`
+   * from the console.
+   *
+   * Forward is the chain running on. BACK cannot be: a dummy that has been broken
+   * does not stand up again, so the level starts over and runs to the step
+   * behind — which is also why the jump is remembered rather than applied, the
+   * fresh battle being under its canopies for the next few seconds.
+   */
+  const goToStep = async (want: number): Promise<boolean> => {
+    if (!scene || !game) {
+      console.log('no battle is up — start one from the menu first')
+      return false
+    }
+    if (!isTrainingGround(map)) {
+      console.log(`${map} is not the training ground — its steps are CAMP's`)
+      return false
+    }
+    const step = clampStep(want)
+    const back = step < standingStep()
+    stepWanted = step
+    // The level over again — and the want is set BEFORE the reload so a second
+    // press counts from it, while `reloading` keeps the paint loop off it until
+    // the battle it belongs to exists.
+    if (back) {
+      reloading = true
+      const opened = await start(map)
+      reloading = false
+      if (!opened) {
+        stepWanted = null
+        return false
+      }
+      stepWanted = step
+    }
+    // …and a squad still coming down has nowhere to be stood: the paint loop
+    // pays the want the moment the canopies are off.
+    if (!scene.dropping()) {
+      stepWanted = null
+      applyStep(step)
+    }
+    return true
+  }
+
   // The dashboard is drawn over the 3D view, on its own canvas, for as long
   // as the battle is the view. It keeps its own clock: the scene's frame loop
   // is three's, and the bar's slide belongs to the dashboard. It DRAWS and
@@ -257,6 +334,15 @@ export function initBattle(onLeave: () => void): BattleView {
     // The script's first two beats: the sergeant starts talking over the
     // drop, and picks up again the moment the round is under way.
     cue(scene.dropping() ? 'drop' : 'round')
+    // …and a step jumped BACK to is paid as soon as the squad is on the ground:
+    // a pig still on its canopy has nowhere to be stood.
+    if (stepWanted !== null && !reloading && !scene.dropping()) {
+      const step = stepWanted
+      // Cleared whether the scene takes it or not — a want left standing on a map
+      // that has no such script would block every jump after it.
+      stepWanted = null
+      applyStep(step)
+    }
     /** The mission being over, which is a card of its own (lib/game/endOfGame.ts). */
     const ended = scene.battle.view().ending
     hud.draw({
@@ -334,6 +420,17 @@ export function initBattle(onLeave: () => void): BattleView {
   })
   controller.bindKeyboard(isBattleUp)
 
+  // F11 and F12: back a training step and on one. They come through the
+  // controller like every other key and stop HERE — the battle's own poll drops
+  // them (input/actions.ts, `DEBUG_ACTIONS`), because this is not something a
+  // pig does. Restarting the level is what a step back is, and only this file
+  // can do that.
+  controller.onAction((action) => {
+    if (!isBattleUp()) return
+    if (action === 'trainingBack') void goToStep(standingStep() - 1)
+    if (action === 'trainingNext') void goToStep(standingStep() + 1)
+  })
+
   /** Put the battle away: the LEAVE button, and the end of a mission. */
   const leave = (): void => {
     controller.releaseAll()
@@ -381,6 +478,10 @@ export function initBattle(onLeave: () => void): BattleView {
     speech.stop()
     cued = new Set()
     step = 0
+    // A fresh level is the tutorial's first rung again, whoever asked for it —
+    // the menu, `pow.swapMap`, or a step BACK, which sets its own want on the
+    // far side of this.
+    trainingStep = 0
     // Disarmed, the way the game object is BUILT (0x48F073): nothing is said
     // about mines until a crate sends the pig into a minefield.
     mineLineArmed = false
@@ -564,6 +665,22 @@ export function initBattle(onLeave: () => void): BattleView {
     // runs on speech, so this is the only way to watch it work. Read-only, and
     // the same list `Speech.spoken()` keeps (audio/speech.ts).
     spoken: () => speech.spoken(),
+    /**
+     * **The training ground, step by step.** `pow.step()` says where it stands,
+     * `pow.step(9)` goes to the bazooka — the same jump F11 and F12 make
+     * (lib/game/training.ts). The nine steps are CAMP's own chain: the bayonet,
+     * the rifle, the sniper rifle, the two grenades, the gap in the bridge, the
+     * TNT, the shelter and the bazooka.
+     */
+    step: async (want?: number) => {
+      if (want === undefined) {
+        const names = TRAINING_STEPS.map((one, index) => `${index} ${one.name}`).join(', ')
+        console.log(`training step ${standingStep()} — usage: pow.step(9). ${names}`)
+      } else {
+        await goToStep(want)
+      }
+      return standingStep()
+    },
     // …and the console is how a weapon nobody's crate carries gets tried.
     // The training ground hands out a bayonet and then a rifle and that is
     // the whole of it, so a GRENADE cannot be reached by playing at all —

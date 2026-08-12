@@ -18,10 +18,24 @@ export const ACTIONS = [
   'menuSelect',
   'menuBack',
   'skills',
-  'assets'
+  'assets',
+  'trainingBack',
+  'trainingNext'
 ] as const
 
 export type Action = (typeof ACTIONS)[number]
+
+/**
+ * Actions the RULES never see — the remake's own conveniences, which go through
+ * the controller so that the e2e suite drives them the way a player does
+ * (docs/testing.md) and stop there.
+ *
+ * They are filtered out of the battle's own poll (`input/battleInput.ts`), and
+ * that is not tidiness: a queued verb is what ends the beat at the top of a turn
+ * ("press any key"), so jumping the tutorial a step would also have started the
+ * turn it landed in.
+ */
+export const DEBUG_ACTIONS: readonly Action[] = ['assets', 'trainingBack', 'trainingNext']
 
 /**
  * The keys that DRIVE — the axes, as opposed to the verbs.
@@ -99,7 +113,14 @@ export const DEFAULT_BINDINGS: Record<string, Action> = {
   // The ORIGINAL puts it in the menu instead — skill 61 BUILDING INOUT — which is
   // still where it belongs the day the other five buildings are worth entering
   // (lib/game/buildings.ts). A key is the remake's, and this is where it says so.
-  KeyC: 'enter'
+  KeyC: 'enter',
+  // **The training ground's own steps, back and forward.** The remake's, like
+  // F1 and `pow.swapMap`: the tutorial is a chain nine dummies long and the
+  // thing being fixed is usually the last link of it (lib/game/training.ts).
+  // Forward runs the script on; back is the level starting over and running to
+  // the step behind, because a broken dummy does not stand up again.
+  F11: 'trainingBack',
+  F12: 'trainingNext'
   // …and there is no key for ENDING a turn. That is a SKILL — 65, SKIP TURN,
   // always in the menu whatever the pig carries — taken in hand from the menu
   // like a weapon and applied with FIRE (lib/game/controls.ts). Enter used to be

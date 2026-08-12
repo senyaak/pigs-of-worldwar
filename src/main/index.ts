@@ -1,11 +1,44 @@
 // App lifecycle only — game location logic lives in gameDir.ts, the IPC
 // surface in ipc.ts, asset loading in assets.ts.
 
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import path from 'node:path'
 
 import { resolveGameDir } from './gameDir'
 import { registerIpc } from './ipc'
+
+/**
+ * Electron's own menu, minus ONE accelerator: **F11**.
+ *
+ * The default menu binds it to Toggle Full Screen, and a menu accelerator is
+ * dispatched over the page's head — `preventDefault` in a keydown handler does
+ * not stop it (that is what `before-input-event` exists for). F11 is the
+ * training ground's step BACK (input/actions.ts), so it has to reach the game,
+ * and the window is borderless fullscreen to begin with. Everything else the
+ * default menu carries stays, Ctrl+Shift+I among it: measured by reading
+ * `Menu.getApplicationMenu()` out of a launched build rather than assumed.
+ */
+function useMenuWithoutF11(): void {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      { role: 'fileMenu' },
+      { role: 'editMenu' },
+      {
+        label: 'View',
+        submenu: [
+          { role: 'reload' },
+          { role: 'forceReload' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+          { role: 'resetZoom' },
+          { role: 'zoomIn' },
+          { role: 'zoomOut' }
+        ]
+      },
+      { role: 'windowMenu' }
+    ])
+  )
+}
 
 function createWindow(): void {
   // The game runs borderless fullscreen. --windowed (or POW_WINDOWED=1, for
@@ -73,6 +106,7 @@ function createWindow(): void {
 void app.whenReady().then(() => {
   resolveGameDir()
   registerIpc()
+  useMenuWithoutF11()
   createWindow()
 
   app.on('activate', () => {

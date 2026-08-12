@@ -121,6 +121,24 @@ pow.sfx.set('splash', 'I_SPLASH', {pitch: 120}) // rebind live, and hear it
 pow.sfx.print()                                // paste into audio/battle.ts
 ```
 
+The training ground is a chain nine dummies long, and whatever is being worked
+on is usually at the far end of it. **`F12` goes on a step, `F11` goes back
+one** — or name one from the console:
+
+```js
+pow.step()   // where it stands, and what the ten steps are
+pow.step(9)  // straight to the BAZOOKA
+```
+
+The steps are the map's own: 0 the level opening, 1 the bayonet, 2 the rifle,
+3 the sniper rifle, 4 and 5 the two grenades, 6 the gap in the bridge, 7 the
+TNT, 8 the shelter, 9 the bazooka. Going FORWARD breaks exactly what a player
+would have broken — in the chain's own order, so every crate is placed by the
+thing that places it — lands the canopies and stands the pig on that step's
+crate, which the engine then collects the ordinary way. Going BACK is the level
+starting over and running up to the step behind, because a broken dummy does
+not stand up again.
+
 The battle opens on CAMP. To play another map, open the devtools console
 (`Ctrl+Shift+I`) and type `pow.swapMap('ARTGUN')` — the battle restarts
 there with fresh spawns. `pow.swapMap()` with no argument lists every map

@@ -28,6 +28,10 @@ export type Action =
   | 'menuSelect'
   | 'menuBack'
   | 'assets'
+  // F11 and F12: the training ground's own steps, back and on
+  // (lib/game/training.ts).
+  | 'trainingBack'
+  | 'trainingNext'
 
 /**
  * Drive one method, then WAIT OUT A FRAME before handing control back.

@@ -3088,6 +3088,37 @@ the briefing bar only ever carries the key press. `e2e/002/tutorial.spec.ts`
 drives the first steps on the real map and reads the clips back in order:
 3 collected, **4 the menu opened**, 5 chosen, 6 placed.
 
+### …AND THE SCRIPT CAN BE PUT WHERE YOU WANT IT — F11/F12, 2026-08-12
+
+The tutorial is a chain nine dummies long and the thing being fixed is usually
+its last link, so `lib/game/training.ts` is a JUMP: **F12 on a step, F11 back
+one**, `pow.step(9)` for the bazooka. The remake's own, like `pow.swapMap` and
+`pow.give`, and it invents no mechanism — a step opens when something BREAKS
+(a crate signals nothing), so a jump breaks exactly what a player would have
+broken, in the chain's own order, and then stands the pig ON that step's crate
+and lets `Scenery.collect` hand it over. The table is CAMP's own file and
+`e2e/002/trainingStep.spec.ts` checks it against the shipped .POG: a step's
+crate must wait on the label the last thing it breaks signals, and a GUARDED
+group must be broken whole — with the crates left out of the group, because
+placing one spends its command where a placed dummy keeps its own.
+
+Three things it costs, each written where it lives. `AirDrops.land()` puts every
+canopy down at once (nine descents from 0xC00 is half a minute of sky).
+`DEBUG_ACTIONS` in `input/actions.ts` keeps these keys out of the battle's own
+poll — a queued verb is what ends the beat at the top of a turn, so F12 would
+have started the turn it jumped into. And **`main/index.ts` now sets a menu
+without F11 on it**: Electron's default menu binds it to Toggle Full Screen, and
+a menu accelerator goes over the page's head — `preventDefault` in a keydown
+handler does not stop it. Everything else the default menu carries stays.
+
+Two shapes worth keeping. A jump BACK is a RELOAD, and the want has to be
+remembered across it — set before the reload so a second press counts from it,
+and paid only once the new battle is up and its squad off its canopies; paying
+it into the battle being replaced hands the pig whatever it was already
+carrying, since the crate it warps to has already been collected. And a want is
+cleared whether the scene takes it or not, or one asked for on a map that has no
+such script blocks every jump after it.
+
 ### …AND THE LAST DUMMY ENDS IT — the exe's mode 2, 2026-08-11
 
 Play: "убить последний манекен — не заканчивает миссию… очевидно что заканчивает

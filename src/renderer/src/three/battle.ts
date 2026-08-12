@@ -45,6 +45,7 @@ import { createGrenadeArt } from './grenades'
 import { createMineArt } from './mineArt'
 import { PIG_HEIGHT, PIG_HOLD, PIG_RADIUS } from '../../../lib/game/obstacles'
 import { weaponLayer } from '../../../lib/game/controls'
+import { advanceTraining, nextBreak } from '../../../lib/game/training'
 import { exposeBattleDebug } from './debug'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SceneHost } from './scene'
@@ -106,6 +107,15 @@ export interface BattleScene {
   /** Where the weapon in hand points, in the game's own angle units, or null
    * when the pig is holding nothing that aims (lib/game/aim.ts). */
   aim(): number | null
+  /**
+   * Run the training ground's script to one of its steps and stand the pig on
+   * the crate that step hands over (lib/game/training.ts). False on any map that
+   * is not the training ground, which has no such script.
+   *
+   * Only FORWARD — a broken dummy does not stand back up, so a step behind the
+   * one the battle is on is a battle starting over (ui/battle.ts).
+   */
+  trainingStep(step: number): boolean
   dispose(): void
 }
 
@@ -430,6 +440,51 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     after = stanceNow()
     before = after
   }
+
+  /**
+   * Put the acting pig somewhere, and the picture with it — the debug surface's
+   * ONE write (three/debug.ts), and the training jump below uses the same one.
+   */
+  const warp = (x: number, z: number, heading: number): void => {
+    battle.warp(x, z, heading)
+    settle()
+    const pig = game.currentPig
+    squad.of(pig.id)?.place(pig.position.x, pig.position.y, pig.position.z, pig.heading)
+  }
+
+  /**
+   * **Jump the training ground to one of its steps** — the console's and F11/F12's
+   * (ui/battle.ts). The chain itself is `lib/game/training.ts`; what belongs here
+   * is the standing and the collecting, since a warp is a picture as well as a
+   * position.
+   *
+   * The crate is COLLECTED rather than conjured: the pig is stood on it and
+   * `Scenery.collect` is the very call the frame makes, so the inventory, the
+   * briefing bar and the sergeant's line all come out of the ordinary path. What
+   * IS the remake's own is putting the thing in the pig's hands afterwards —
+   * the original wants the skill menu for that, and a jump exists to skip the
+   * walking, not to make a point.
+   */
+  const trainingStep = (step: number): boolean => {
+    if (!engine.training) return false
+    const at = advanceTraining(step, { targets: engine.targets, scenery, airDrops })
+    if (!at) return true
+    // Facing whatever the step asks to be broken next, so the jump lands looking
+    // at the job rather than at the sky.
+    const target = engine.targets.find((one) => one.id === nextBreak(step))
+    const heading = target
+      ? Math.atan2(target.x - at.x, target.z - at.z)
+      : game.currentPig.heading
+    warp(at.x, at.z, heading)
+    scenery.collect(game.currentPig)
+    // Whatever that just handed over goes into the hands — a health crate hands
+    // over nothing to hold, and leaves them empty.
+    const holding = game.currentPig.carrying[game.currentPig.carrying.length - 1]
+    game.currentPig.holding = holding?.skill ?? null
+    onGameChanged()
+    return true
+  }
+
   /**
    * …and everything else the engine moves that has an IDENTITY: what is in the
    * air, what is coming down under a canopy, and the spot a blow left behind
@@ -721,12 +776,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     },
     targetsLeft: () => engine.targetsLeft(),
     cutTurnBeat: () => battle.cutTurnBeat(),
-    warp: (x, z, heading) => {
-      battle.warp(x, z, heading)
-      settle()
-      const pig = game.currentPig
-      squad.of(pig.id)?.place(pig.position.x, pig.position.y, pig.position.z, pig.heading)
-    }
+    warp
   })
 
   return {
@@ -739,6 +789,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     charging: battle.charging,
     scoped: () => now.scoped,
     aim: battle.aim,
+    trainingStep,
     dispose() {
       host.onFrame.delete(onFrame)
       host.scene.remove(root)
