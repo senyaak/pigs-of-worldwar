@@ -139,10 +139,18 @@ const LOB_CLOSE = 3500 / 3072
  * The `+300` this file claimed for a commit is real but belongs to mode 4's
  * OTHER branch (0x4a2246) — the one a SNAPPING camera takes, `[cam+0x60]`
  * non-zero — and `0x49f740(4, 0)` leaves that zero, so a weapon in the hand
- * never reaches it. Kept at zero and named because it is the knob if play says
- * the view sits too low.
+ * never reaches it.
+ *
+ * **So the LIFT here is play's, and it has to be.** Read as it stands, mode 4
+ * puts the camera at the pig's own level and 3500 out — its pitch spring drives
+ * toward the SUBJECT's own pitch (`vtable+0x44`, which is the orientation, not
+ * the position) — and level at 3500 is not what play remembers: "1 выше, чтобы
+ * удобно целиться", and then, of the level version, "граната не та камера".
+ * Twice the chase's own lift is what that reads as. The exe's contribution is
+ * the DISTANCE and the floor; this number is the remake's and is the one knob
+ * to turn if the view still sits wrong.
  */
-const LOB_RISE = 0
+const LOB_RISE = LIFT
 
 /**
  * …and the camera the VIEW KEY holds — the exe's mode **0x12, "TR cam"**
@@ -264,9 +272,9 @@ const RIG: Record<View, { close: number; lift: number; floor: boolean }> = {
   face: { close: -1, lift: FACE_LIFT, floor: true },
   melee: { close: MELEE_CLOSE, lift: LIFT, floor: true },
   rifle: { close: RIFLE_CLOSE, lift: LIFT, floor: true },
-  // Level with the gaze: mode 4 has no lift and the ground floor is what
-  // raises it (`LOB_RISE`).
-  lob: { close: LOB_CLOSE, lift: LOB_RISE, floor: true },
+  // Back and RAISED: the distance is mode 4's own, the lift is play's
+  // (`LOB_RISE`), and the ground floor holds it up over a dip either way.
+  lob: { close: LOB_CLOSE, lift: LIFT + LOB_RISE, floor: true },
   // …and the TR cam is the one view the exe lets under the floor.
   throw: { close: THROW_CLOSE, lift: THROW_RISE, floor: false },
   scope: { close: 0, lift: 0, floor: true }

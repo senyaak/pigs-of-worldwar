@@ -263,9 +263,19 @@ export function readControls(mode: ControlMode, held: Held): Intent {
       cursor: { x: held.turn, y: held.walk > 0 ? -1 : held.walk < 0 ? 1 : 0 }
     }
   }
-  // The two sets whose only business is the fire button.
+  // The two sets whose only business is the fire button — and the aim VIEW is
+  // not the fire button's to take away.
+  //
+  // Play: "она отменяется когда нажимаешь f — и вот тут должна переживать пока
+  // зарядка идёт." The exe agrees and it is not a special case: the aim branch
+  // is entered on the pad BIT alone (0x4928dc), `Pig::MayAct` going false only
+  // picks a different arm of it — mode 0x12 rather than the rifle cam — and the
+  // remembered camera is not restored until the bit goes UP (0x4928e5,
+  // 0x492915). So the key still says what the camera is; what the set takes away
+  // is the AXES, which is the exe's own `Pig::Aim` bailing on the same
+  // `MayAct`.
   if (mode === 'charging' || mode === 'armed') {
-    return { ...STILL, firing: held.firing, fired: held.fired }
+    return { ...STILL, sighting: held.sighting, firing: held.firing, fired: held.fired }
   }
   // …and `ending` beside them for the same reason `starting` is there: any input
   // resolves the beat and the axes are never asked for in it.

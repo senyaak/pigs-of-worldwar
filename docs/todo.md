@@ -143,10 +143,14 @@ by play. In the order they turn up:
    its arm sets a target and three springs glide onto it, and what holds the
    camera up is the tail's floor of **ground + 768** (0x4a0c12), from which the
    TR cam alone is exempt (0x4a0bd4). So `CLEARANCE` is the exe's 768 now and
-   `LOB_RISE` is 0: if the in-hand view reads too LOW in play, that constant is
-   the knob and nothing else has to move. Still not modelled: the exe lets the
-   player PITCH the TR cam (±700 of 4096, `[cam+0x76]`) and nothing here is bound
-   to a camera pitch.
+   `LOB_RISE` is **play's own**: level at 3500 is what the read gives (mode 4's
+   pitch spring drives toward the subject's own) and play looked at it — "граната
+   не та камера" — so the in-hand view carries a second `LIFT` on top of the
+   rig's. That constant is the knob if it still reads wrong; nothing else moves
+   with it. **The charge no longer cancels the view** — the `charging` control
+   set carries the sight key through, which is what the exe does. Still not
+   modelled: the exe lets the player PITCH the TR cam (±700 of 4096,
+   `[cam+0x76]`) and nothing here is bound to a camera pitch.
 
 ## B. PLAY'S REPORTS, still open
 

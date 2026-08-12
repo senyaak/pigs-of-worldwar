@@ -264,18 +264,27 @@ test('a thrown weapon has a camera of its own, and two of them', async ({ app })
   // holds its own on a pad bit (input/actions.ts).
   await release(page, 'aimMode')
   await expect.poll(view, { timeout: 2000 }).toBe('lob')
+  // …and it stands OVER the ordinary chase, which is what "выше, чтобы удобно
+  // целиться" asks for. The lift is the remake's and three/chase.ts says why.
+  expect(aiming.y, 'the in-hand view is the raised one').toBeGreaterThan(behind.y)
 
-  // **And the FIRE button does not touch the camera.** Holding it fills the
-  // gauge and the view stays exactly where the hands put it; letting go throws,
-  // so the reading ends there.
+  // **And the CHARGE does not take the view away.** Play: "она отменяется когда
+  // нажимаешь f — и вот тут должна переживать пока зарядка идёт." The filling
+  // gauge is its own control set and it sits ABOVE the sights in the priority
+  // list (lib/game/controls.ts), which is what used to drop the flag; the exe
+  // holds its own aim camera on the pad bit alone. Letting go of F throws, so
+  // the reading ends there.
+  await press(page, 'aimMode')
+  await expect.poll(view, { timeout: 2000 }).toBe('throw')
   await press(page, 'fire')
   try {
     await expect
       .poll(async () => (await look(page)).charge ?? 0, { timeout: 4000 })
       .toBeGreaterThan(0.2)
-    expect(await view(), 'the trigger is not a camera key').toBe('lob')
+    expect(await view(), 'the charge kept the view').toBe('throw')
   } finally {
     await release(page, 'fire')
+    await release(page, 'aimMode')
   }
   expect(app.errors()).toEqual([])
 })

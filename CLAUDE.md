@@ -3369,13 +3369,31 @@ was a bug, not a feature.
 the end instead of stopping at the first `add`: its arm sets a TARGET and three
 springs glide the camera onto it — the distance (`0x4A0960`, which is where the
 row's 3500 is really used: current separation minus the row, stepped), the pitch
-and the yaw — and not one of them carries a height. What holds the camera up is
-the common tail's floor: `0x4A0B50` raises it to **ground + 768** whenever it is
-lower (0x4a0c12), and **mode 0x12 is exempt by name** (0x4a0bd4), which is what
-lets the TR cam sit 400 over a pig rather than 768 over the terrain. So the rig's
-`CLEARANCE` is the exe's 768 now — the last invented number in it — the lob view
-rides level with the gaze on that floor, and the TR cam is the one view allowed
-under it. `three/chase.ts` carries all of it, the rig's six views are one
+(toward the SUBJECT's own, `vtable+0x44` being the orientation) and the yaw — and
+not one of them carries a height. What holds the camera up is the common tail's
+floor: `0x4A0B50` raises it to **ground + 768** whenever it is lower (0x4a0c12),
+and **mode 0x12 is exempt by name** (0x4a0bd4), which is what lets the TR cam sit
+400 over a pig rather than 768 over the terrain. So the rig's `CLEARANCE` is the
+exe's 768 now — the last invented number in it — and the TR cam is the one view
+allowed under it.
+
+**The lob view's LIFT is therefore play's, and it says so at the constant.** Level
+at 3500 is what the read gives and it is not what play wants — "1 выше, чтобы
+удобно целиться", and of the level version, "граната не та камера" — so
+`LOB_RISE` is a second `LIFT` on top of the rig's own. The exe's contribution to
+that view is the distance and the floor; the height is the remake's and is the
+one knob to turn if it still reads wrong.
+
+**And the CHARGE does not take the aim view away.** Play: "она отменяется когда
+нажимаешь f — и вот тут должна переживать пока зарядка идёт." A filling gauge is
+its own control set and it sits ABOVE the sights in `modeOf`'s priority, so
+`readControls` was reporting `sighting: false` for it and the camera fell back the
+instant F went down. The exe does not work that way and it is not a special case:
+its aim branch is entered on the pad BIT alone (0x4928dc), `Pig::MayAct` going
+false only picks a different arm of it, and the remembered camera is not restored
+until the bit goes UP. So the `charging` set carries the key through — the VIEW
+survives, the AXES do not, which is the exe's own `Pig::Aim` bailing on that same
+`MayAct`. `three/chase.ts` carries all of it, the rig's six views are one
 table there now, and `pow.debug.view()` is how a spec tells them apart — a camera
 POSITION cannot say why it is where it is, and the rig eases between two views so
 a reading taken on the frame the view changed is still the last one's.
