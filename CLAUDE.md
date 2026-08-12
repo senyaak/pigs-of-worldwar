@@ -3322,6 +3322,53 @@ animation steps' repeat count and signed playback rate (`weapons/fire.md`).
    count), and the ending is the exe's own mode 2 with its tour, its three-second
    hold and its twenty-second bail.
 
+### THE FADE STOPS GUESSING, AND A THROWN WEAPON GETS ITS OWN CAMERA (2026-08-12)
+
+**What fades is measured against the pig's own SILHOUETTE now, and the margin
+is gone.** Play: "всё ещё становятся прозрачными вещи, которые не перекрывают
+свина — то есть стоят не между ним и камерой." The cause was `SIGHT_MARGIN`:
+every box in the world was grown by 256 — half a tile — before the segment test,
+so a dummy at his shoulder, a coil of wire at his heel or a tree beside him
+counted as being in front of him, and the three rays could not tell the
+difference because they all converge on the same point and a box beside that
+line crosses all three. The margin was there for a real want — a box hiding half
+of him has to fade even when a ray to his middle misses it — and `silhouetteOf`
+(lib/game/seeThrough.ts) is that want done honestly: nine points, three rows up
+his body by three columns across it, the columns laid ACROSS the line of sight
+so the outline always faces the camera. A box has to cross five of the nine and
+is tested at its true size. Same majority rule as before, better question.
+
+**And the grenade and the bazooka have a camera of their own — two of them.**
+Play: "для гранаты и для базуки отдельная камера — 2 режима: 1 выше, чтобы
+удобно целиться; 2 при нажатой кнопки из-за спины." The first is the exe's and
+this repo had it written down WRONG: the aim-bit branch does not fall back to
+the ordinary chase for a weapon that is not a gun, it goes to **mode 0x12, "TR
+cam"** (0x492e7a, name at 0x4d8e7c) — the grenade family and the bazooka, and
+also anything at all once MayAct is false, which is from the fire press onward.
+Its handler (0x4a4620) puts the camera **400 above its subject** at a nominal
+distance of **1700** against the chase's 3072 — the table's own 1600 is a value
+the handler WRITES back when the ground is close, so the file is a scratchpad —
+and lets the player pitch it, `[cam+0x76]`, clamped to ±700 of 4096 by a branch
+that names this mode alone. `weapons/fire.md` has the whole read and the
+correction.
+
+The second mode is play's own and says so at the constant: the exe leaves the TR
+cam up while the gauge fills, and what play remembers is the shoulder view. So
+the placement is borrowed rather than invented — the **rifle cam's own 2048**,
+the engine's one number for "behind the shoulder, sighting a weapon" — and the
+two read as play describes them: high and close to see the arc, back and low
+over the shoulder to aim the throw. `three/chase.ts` carries both, the rig's six
+views are one table there now, and `pow.debug.view()` is how a spec tells them
+apart — a camera POSITION cannot say why it is where it is, and the rig eases
+between two views so a reading taken on the frame the view changed is still the
+last one's.
+
+Two seams came with it. `Sights.sighting(holding)` is "the aim view is up at
+all", beside `scoped`, which is the first-person half and answers for guns
+alone; and the view carries `charging` — whether the gauge is filling — beside
+`charging()`, which is how FULL it is. Both are on the snapshot, because the
+camera is drawn from a snapshot and nothing else.
+
 ### What is still not read
 
 **Swept 2026-08-11 — docs/todo.md section D is the live list now**, and most of

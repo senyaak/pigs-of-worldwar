@@ -115,6 +115,15 @@ export interface DebugParts {
   shelter: () => { inside: number | null; doorway: number | null; drawn: boolean }
   /** Whether the beat after a blow is still running. */
   aftermath: () => boolean
+  /**
+   * WHICH WAY the camera is pointing at the pig from, this frame — one of the
+   * rig's views (three/chase.ts).
+   *
+   * A screenshot cannot be held to a camera and a position alone cannot say
+   * WHY the camera is where it is: the two a thrown weapon gets differ by a
+   * lift and a distance, which the terrain clamp can eat on a slope.
+   */
+  view: () => string
   /** The beat at the END of a turn, and how many pigs are still in the water
    * (lib/game/walkAway.ts). Null while a turn is being played. */
   walkAway: () => { swimming: number } | null
@@ -298,6 +307,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** Where the chase camera actually is, world space — the only way a
        * spec can tell "swimming" from "the view has gone under the water". */
       camera: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
+      /** …and which of the rig's views put it there (three/chase.ts). */
+      view: () => parts.view(),
       /**
        * Where the camera is LOOKING, as a unit vector.
        *

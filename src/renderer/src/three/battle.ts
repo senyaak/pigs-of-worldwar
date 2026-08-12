@@ -40,10 +40,11 @@ import type { SceneSound } from '../contracts/sound'
 import type { Collected } from '../../../lib/game/scenery'
 import { FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBulletArt } from './shots'
-import { SIGHT_MARGIN, crossedTowards, nearSideOf, sightBlockers } from '../../../lib/game/seeThrough'
+import { crossedTowards, sightBlockers, silhouetteOf } from '../../../lib/game/seeThrough'
 import { createGrenadeArt } from './grenades'
 import { createMineArt } from './mineArt'
-import { PIG_HEIGHT, PIG_HOLD } from '../../../lib/game/obstacles'
+import { PIG_HEIGHT, PIG_HOLD, PIG_RADIUS } from '../../../lib/game/obstacles'
+import { weaponLayer } from '../../../lib/game/controls'
 import { exposeBattleDebug } from './debug'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SceneHost } from './scene'
@@ -303,6 +304,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     return heldEye
   }
 
+  /** Which view the ACTING pig was last watched from — the debug surface's, so
+   * a spec can tell the rig's views apart (three/debug.ts, `view`). */
+  let lastView = 'chase'
+
   const watch = (soldier: Soldier, delta: number | null): void => {
     const acting = soldier.pig.id === now.acting
     // A bullet in the air takes the camera off the pig altogether: the shot's
@@ -318,6 +323,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         delta
       )
       soldier.node.visible = true
+      lastView = 'ride'
       return
     }
     // …and so does what the blow left behind. Mode 0 on the crate, which is
@@ -326,8 +332,13 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     if (now.aftermath && acting) {
       chase.ride(drawnAt('aftermath', now.aftermath.at), soldier.pig.heading, delta)
       soldier.node.visible = true
+      lastView = 'ride'
       return
     }
+    // A THROWN weapon has a camera of its own, and two of them: the exe's TR
+    // cam over his shoulder while it is aimed, and — play's own — the shoulder
+    // view for as long as the throw is being charged (three/chase.ts).
+    const lobbing = acting && weaponLayer(pigShot(soldier.pig.id)?.holding ?? null) === 'lob'
     const view: View = pigShot(soldier.pig.id)?.underCanopy
       ? 'face'
       : acting && now.swinging
@@ -337,7 +348,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
           // the melee camera is gated on, which is false through a swing.
           acting && now.scoped
           ? 'scope'
-          : 'chase'
+          : lobbing && now.charging
+            ? 'throw'
+            : lobbing && now.sighting
+              ? 'lob'
+              : 'chase'
+    if (acting) lastView = view
     chase.follow(
       drawnStance(soldier),
       soldier.node.position.y,
@@ -594,15 +610,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         crossedTowards(
           blockers,
           eyeInGame,
-          // THE BODY, and each ray stopped at his NEAR SIDE. Y-DOWN, so the
-          // crown is the smaller number — and the SOLES are deliberately not in
-          // here: a ray that ends at his feet ends inside whatever he is
-          // standing on, which is how the bridge under him went see-through
-          // ("мост пропадает когда встаю на него").
-          [PIG_HEIGHT, PIG_HEIGHT * 0.66, PIG_HEIGHT * 0.33].map((up) =>
-            nearSideOf(eyeInGame, { x, y: y - up, z }, PIG_HOLD / 2)
-          ),
-          SIGHT_MARGIN
+          // HIS OWN SILHOUETTE — nine points of it, each ray stopped at his
+          // NEAR SIDE, and a box has to cover half of them to be in the way
+          // (lib/game/seeThrough.ts). Nothing is grown before the test: the
+          // margin that used to be here faded whatever stood BESIDE him.
+          silhouetteOf(eyeInGame, { x, y, z }, PIG_HEIGHT, PIG_RADIUS, PIG_HOLD / 2)
         )
       )
     }
@@ -646,6 +658,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       return { inside: view.inside?.id ?? null, doorway: view.doorway?.id ?? null, drawn }
     },
     frame: () => lastFrame,
+    view: () => lastView,
     aftermath: () => battle.view().aftermath !== null,
     /**
      * The acting pig's POSE, from BOTH ends of the chain.

@@ -25,6 +25,7 @@ import type { Random } from './random'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from './zoom'
 import { FRAME_SECONDS } from './ballistics'
 import { isGun } from './projectile'
+import { layerSights, weaponLayer } from './controls'
 import { weaponOf } from './weapons'
 
 export interface SightsFrame {
@@ -71,6 +72,18 @@ export interface Sights {
   angle(): number
   /** Whether the view is actually down the barrel. */
   scoped(holding: number | null): boolean
+  /**
+   * Whether the aim view is up AT ALL, whatever is in hand.
+   *
+   * The exe picks a camera mode by weapon while the aim bit is held and every
+   * weapon that aims gets one (0x492dfa, and `weapons/fire.md` has the
+   * branch): a GUN takes mode 0x0E "rifle cam", skills 45/46 mode 0x11 "barrel
+   * cam", and **everything else — the grenade family and the bazooka — mode
+   * 0x12, "TR cam"**. `scoped` is the first-person half of the same thing and
+   * answers for the guns alone; this says the view has changed at all, which is
+   * what the camera reads to tell the two apart (three/chase.ts).
+   */
+  sighting(holding: number | null): boolean
   /** How far the sniper has zoomed, 0..1. */
   zoom(): number
 }
@@ -169,6 +182,7 @@ export function createSights(random: Random = Math.random): Sights {
     },
     angle: () => aim.angle,
     scoped: (holding) => held && isGun(holding),
+    sighting: (holding) => held && layerSights(weaponLayer(holding)),
     zoom: () => zoomFraction(zoom)
   }
 }

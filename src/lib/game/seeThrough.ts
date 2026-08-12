@@ -51,19 +51,17 @@ export const sightBlockers = (objects: MapObject[]): Obstacle[] =>
     .map(boxOf)
 
 /**
- * How far OUTSIDE the sight line a box still counts as being in the way.
+ * The pig's own SILHOUETTE, sampled: the rows up his body and the columns
+ * across it that a sight line is drawn to.
  *
- * Play: "просвечивается крыша и стены слишком мало — надо больше." One ray from
- * the eye to a point inside the pig fades exactly the pieces it happens to
- * skewer, and a house is eighteen of them — so the panel the pig is behind went
- * see-through while its neighbours stayed solid and the pig was still hidden.
- * Every box is grown by this before the segment is tested, which fades the piece
- * beside the one in the way as well.
- *
- * The remake's own number, like the rest of this file: half a tile, which is
- * about a pig and a half across.
+ * Y-DOWN, so a row is measured UP from the soles as a fraction of his height —
+ * and **the soles themselves are deliberately not among them**: a ray that ends
+ * at his feet ends inside whatever he is standing on, which is how the bridge
+ * under him went see-through ("мост пропадает когда встаю на него"). A column
+ * is a fraction of his RADIUS, across the line of sight.
  */
-export const SIGHT_MARGIN = 256
+export const SIGHT_ROWS = [1, 0.66, 0.33]
+export const SIGHT_COLUMNS = [-1, 0, 1]
 
 /** Which of them the segment `from`→`to` passes through, by record id — each box
  * grown by `margin` first. */
@@ -82,18 +80,23 @@ export function crossedBy(
  * The same, over SEVERAL points on the thing being looked at — and it takes a
  * MAJORITY of them, not any one.
  *
- * Two reports, and they pull in opposite directions. First: "текстура наверху
+ * Three reports, and they pull in opposite directions. First: "текстура наверху
  * прозрачная, а внизу еле-еле" — one ray to the pig's middle fades the piece
  * that middle is behind and nothing else, and a wall is built of pieces stacked
  * up the wall. Then, with three rays and ANY of them counting: "манекен
  * пропадает когда я подхожу вплотную… колючая проволока пропадает когда стоит за
- * мной — но ни кусочек свина не загорожен, камера его полностью видит."
+ * мной — но ни кусочек свина не загорожен, камера его полностью видит." Then,
+ * with the majority in and every box still GROWN by half a tile first: "всё ещё
+ * становятся прозрачными вещи, которые не перекрывают свина — то есть стоят не
+ * между ним и камерой."
  *
- * Both are the same question asked properly: **does this box hide the pig, or
- * does it clip a corner of him?** A wall panel between the camera and the pig
- * covers every ray; a dummy at his shoulder, a coil of wire at his heel or a
- * tree beside him covers one. So: half the points or more, and one is not
- * enough.
+ * All three are the same question asked properly: **does this box hide the pig,
+ * or does it stand near him?** A wall panel between the camera and the pig
+ * covers most of his silhouette; a dummy at his shoulder, a coil of wire at his
+ * heel or a tree beside him covers a corner of it. So: the rays go to the
+ * silhouette (`silhouetteOf`), the boxes are tested at their true size — the
+ * margin that used to fatten every one of them by 256 is what was fading the
+ * things standing beside him — and half the points or more have to be crossed.
  */
 export function crossedTowards(
   boxes: readonly Obstacle[],
@@ -134,6 +137,55 @@ export function nearSideOf(from: Spot, at: Spot, back: number): Spot {
   if (span <= back || span === 0) return { x: at.x, y: at.y, z: at.z }
   const t = back / span
   return { x: at.x + dx * t, y: at.y + dy * t, z: at.z + dz * t }
+}
+
+/**
+ * WHERE THE SIGHT LINES GO: the pig's silhouette as the camera sees it, nine
+ * points of it — three rows up his body by three columns across it.
+ *
+ * This is what replaced the margin, and it is the same want done honestly. What
+ * the margin was for is that a box hiding HALF of him has to fade even when a
+ * ray to his middle misses it; what it did instead was fatten every box in the
+ * world by half a tile in every direction, so a dummy or a tree standing beside
+ * him counted as being in front of him. Sampling his own outline asks the
+ * question the fade is actually about — how much of him this box covers — and a
+ * box only has to be as big as it is.
+ *
+ * `feet` is his position (game space, the model's origin), `radius` how wide he
+ * is (`PIG_RADIUS`) and `back` how much of him to leave out of the line
+ * (`nearSideOf`). The columns are laid ACROSS the line of sight, so the
+ * silhouette faces the camera wherever it stands.
+ */
+export function silhouetteOf(
+  from: Spot,
+  feet: Spot,
+  height: number,
+  radius: number,
+  back: number
+): Spot[] {
+  const dx = feet.x - from.x
+  const dz = feet.z - from.z
+  const span = Math.hypot(dx, dz)
+  // Straight overhead there is no across to speak of; any axis will do.
+  const acrossX = span === 0 ? 1 : -dz / span
+  const acrossZ = span === 0 ? 0 : dx / span
+  const out: Spot[] = []
+  for (const row of SIGHT_ROWS) {
+    for (const column of SIGHT_COLUMNS) {
+      out.push(
+        nearSideOf(
+          from,
+          {
+            x: feet.x + acrossX * radius * column,
+            y: feet.y - height * row,
+            z: feet.z + acrossZ * radius * column
+          },
+          back
+        )
+      )
+    }
+  }
+  return out
 }
 
 /**

@@ -81,6 +81,54 @@ const MELEE_CLOSE = 1700 / 3072
 const RIFLE_CLOSE = 2048 / 3072
 
 /**
+ * THE THROWN WEAPON'S OWN CAMERA — the exe's mode 0x12, its debug name
+ * **"TR cam"** (0x4d8e7c), and it is picked exactly where the rifle cam is.
+ *
+ * The aim-bit-held handler dispatches three ways (0x492ddd onwards, in full in
+ * `weapons/fire.md`): a GUN — skills 6..15, 17, 18, 64 — takes mode 0x0E, the
+ * pillbox's own 45 and 46 take mode 0x11 "barrel cam", and **everything else
+ * takes mode 0x12**, which on a pig holding something is the grenade family and
+ * the bazooka. Nothing else in the binary asks for either of the two: both
+ * pushes are in this one function.
+ *
+ * Its row of the table at 0x4d9528 is **1700** against the chase's 3072 — the
+ * melee camera's own distance, so it comes in to a little over half — and its
+ * handler (0x4a4620) builds the camera at the subject's position plus a bearing
+ * offset and **+400 straight up** (`add eax,190h` at 0x4a4740, and +y is up in
+ * the exe's world). So: closer than the chase and standing over it, which is
+ * play's "выше — чтобы удобно целиться".
+ *
+ * Two things the handler does that the remake does not. The distance is
+ * DYNAMIC — when the camera would come within 768 of the ground it writes a
+ * reduced figure back into its own table slot (0x4a482e writes `0x6A4 − excess`
+ * to 0x4d9594, which is where the shipped 1600 in the file comes from), where
+ * the rig here clamps its own height against the terrain instead. And the whole
+ * placement rides a camera PITCH the player may drive, `[cam+0x76]`, which this
+ * mode alone clamps to ±700 of 4096 rather than the usual window (0x49f606) —
+ * there is no key bound to a camera pitch here.
+ */
+const LOB_CLOSE = 1700 / 3072
+const LOB_RISE = 400 * MODEL_SCALE
+
+/**
+ * …and the camera while the throw is being CHARGED: behind the back.
+ *
+ * **The MODE is play's**: "для гранаты и для базуки отдельная камера — 2
+ * режима: 1 выше, чтобы удобно целиться; 2 при нажатой кнопки из-за спины." The
+ * exe has nothing of the kind — its aim-bit branch lands on the TR cam whether
+ * the trigger is down or not, and the fire handler that fills the gauge
+ * (0x493796) never touches the camera — so what this is is the ordinary
+ * shoulder view held for as long as the button is.
+ *
+ * The PLACEMENT is not invented, though: it is the rifle cam's own row, 2048,
+ * which is the engine's one number for "behind the shoulder, sighting a
+ * weapon", and the rig's ordinary lift under it. So the two modes differ the
+ * way play describes them — high and close in to see the arc, back and low over
+ * the shoulder to aim the throw.
+ */
+const THROW_CLOSE = RIFLE_CLOSE
+
+/**
  * The SCOPE: the view down the weapon, and it is BOLTED TO THE HAND.
  *
  * The mode's own handler was read properly the second time round and it
@@ -148,8 +196,30 @@ export type View =
   | 'melee'
   /** Straight behind and closer: sighting a gun. */
   | 'rifle'
+  /** Over him and close in: aiming something THROWN — the exe's TR cam. */
+  | 'lob'
+  /** Behind the back, low: the throw being charged. */
+  | 'throw'
   /** Down the barrel: first person, looking where the weapon points. */
   | 'scope'
+
+/**
+ * Where each view stands on the one rig: how much of the chase's distance it
+ * keeps, and how high it sits over the point it is looking at. A negative
+ * distance is IN FRONT — that is the whole of what makes the drop-in a face.
+ *
+ * `scope` is in here for completeness and is never read: that view is first
+ * person and leaves `want` before any of this (it is bolted to the hand).
+ */
+const RIG: Record<View, { close: number; lift: number }> = {
+  chase: { close: 1, lift: LIFT },
+  face: { close: -1, lift: FACE_LIFT },
+  melee: { close: MELEE_CLOSE, lift: LIFT },
+  rifle: { close: RIFLE_CLOSE, lift: LIFT },
+  lob: { close: LOB_CLOSE, lift: LIFT + LOB_RISE },
+  throw: { close: THROW_CLOSE, lift: LIFT },
+  scope: { close: 0, lift: 0 }
+}
 
 export interface Chase {
   /**
@@ -302,22 +372,17 @@ export function createChase(
     // rig is built round a pig, so anything three times its height (a
     // canopy) needs the frame saying so rather than being cropped off.
     const back = face ? BACK : BACK + rise / (2 * Math.tan((camera.fov * Math.PI) / 360))
-    // Behind the shoulders normally; ahead of the snout on the way down; and
-    // round to one side, close in, for a swing.
-    const reach = face
-      ? -back
-      : view === 'melee'
-        ? back * MELEE_CLOSE
-        : view === 'rifle'
-          ? back * RIFLE_CLOSE
-          : back
+    // Behind the shoulders normally; ahead of the snout on the way down; round
+    // to one side and close in for a swing; over him for a lob.
+    const stand = RIG[view]
+    const reach = back * stand.close
     const from = view === 'melee' ? at.heading + MELEE_TURN : at.heading
     const behindX = at.x - Math.sin(from) * reach
     const behindZ = at.z - Math.cos(from) * reach
     const terrainAtCamera = -query.surface(behindX, behindZ)
     const position = new THREE.Vector3(
       behindX,
-      Math.max(target.y + (face ? FACE_LIFT : LIFT), terrainAtCamera + CLEARANCE),
+      Math.max(target.y + stand.lift, terrainAtCamera + CLEARANCE),
       -behindZ
     )
     return { position, target }

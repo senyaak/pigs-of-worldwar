@@ -106,6 +106,13 @@ export interface BattleView {
   aimAngle: number
   /** Whether the view is down the barrel. */
   scoped: boolean
+  /** Whether the aim view is up at all — a THROWN weapon gets one too, and it
+   * is a camera of its own (lib/game/sights.ts, three/chase.ts). */
+  sighting: boolean
+  /** Whether the power gauge is filling right now: the button is down and the
+   * throw has not left. The camera changes for it (three/chase.ts) and the
+   * dashboard's own reading is `charging()`, which is how FULL it is. */
+  charging: boolean
   /** How far the sniper has zoomed in, 0..1. */
   zoom: number
   /** Seconds left of the getting-it-out clip — the model is not in the hand
@@ -1187,6 +1194,8 @@ export function createBattle(parts: BattleParts): Battle {
       loco,
       aimAngle: sights.angle(),
       scoped: sights.scoped(holding) && !dropIn.running(),
+      sighting: sights.sighting(holding) && !dropIn.running(),
+      charging: attack.charging(),
       zoom: sights.zoom(),
       readying,
       holding,

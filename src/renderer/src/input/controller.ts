@@ -228,6 +228,10 @@ export interface DebugHooks {
   /** Where it is LOOKING, as a unit vector — the rig eases its position and
    * not its aim, so a shake in the view lives here (three/debug.ts). */
   facing(): { x: number; y: number; z: number }
+  /** WHICH of the rig's views put it there: `chase`, `face`, `melee`, `scope`,
+   * the two a thrown weapon gets — `lob` and `throw` — or `ride`, which is the
+   * camera off the pig altogether (three/chase.ts). */
+  view(): string
   /** Which building the acting pig is in and which it could jump into, by record
    * id, plus whether its model is drawn (three/battle.ts). */
   shelter(): { inside: number | null; doorway: number | null; drawn: boolean }

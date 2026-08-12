@@ -113,6 +113,12 @@ by play. In the order they turn up:
    opacity). A wall between the camera and the pig fades; a dummy, a tree, a coil
    of wire or the bridge he is standing on should not. `SEE_THROUGH` is 0.4 —
    `pow.hud` has no knob for it, so say the word and it moves.
+   **2026-08-12**: the second half of that — "становятся прозрачными вещи,
+   которые не перекрывают свина" — was the MARGIN, which grew every box by half
+   a tile before the test. It is gone; the rays go to nine points of his own
+   silhouette and a box has to cover five of them (lib/game/seeThrough.ts). What
+   to watch for now is the OPPOSITE failure: a wall that hides him and does not
+   fade. The knob for that is the majority in `crossedTowards`.
 3. **The LENS**: `pow.hud.layout.gauge.lens.fill` — it is 1 against a disc that is
    measured (rows 2..29 of `pcpie4`), so a grenade shows half of the red. If it
    still reads as three quarters, that field is the one to type at.
@@ -125,6 +131,14 @@ by play. In the order they turn up:
 7. **The ROCKET**: nose along its flight, and its smoke six a frame (twice a
    grenade's) drawn bigger and thicker than the row asks. Fire does not set it
    off in the air any more.
+8. **THE THROWN WEAPON'S TWO CAMERAS (2026-08-12).** Hold **G** with a grenade
+   or the bazooka and the view goes high and close — the exe's own TR cam, mode
+   0x12, 400 over the pig at 1700 of the chase's 3072. Hold **F** and it drops
+   behind the shoulder for as long as the button is down, which is play's own
+   mode on the rifle cam's 2048. Both distances and the lift are the only knobs
+   (`LOB_CLOSE`, `LOB_RISE`, `THROW_CLOSE` in three/chase.ts) and `pow.debug.view()`
+   says which one is live. Not modelled: the exe lets the player PITCH the TR cam
+   (±700 of 4096, `[cam+0x76]`) and there is no key bound to a camera pitch here.
 
 ## B. PLAY'S REPORTS, still open
 

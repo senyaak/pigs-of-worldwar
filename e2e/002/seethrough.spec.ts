@@ -42,7 +42,14 @@ import { parsePmg } from '../../src/lib/formats/pmg'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
 import { boxOf, isSolid } from '../../src/lib/game/obstacles'
 import { isRamp } from '../../src/lib/game/ramps'
-import { SIGHT_MARGIN, crossedBy, crosses, sightBlockers } from '../../src/lib/game/seeThrough'
+import {
+  crossedBy,
+  crossedTowards,
+  crosses,
+  sightBlockers,
+  silhouetteOf
+} from '../../src/lib/game/seeThrough'
+import { PIG_HEIGHT, PIG_HOLD, PIG_RADIUS } from '../../src/lib/game/obstacles'
 
 type Page = import('@playwright/test').Page
 
@@ -135,7 +142,7 @@ test('the app fades the house round a pig inside it, and nothing in the open', a
   expect(app.errors()).toEqual([])
 })
 
-test('a RAMP is never in the way, and the fade has a MARGIN round the ray', () => {
+test('a RAMP is never in the way, and only what COVERS the pig fades', () => {
   // Play: "просвечивание включается на рампе — не должно, ведь она за свином, не
   // между ним и камерой." A ramp's box is the whole triangular prism
   // (lib/game/ramps.ts), so a pig on its LOW end has its middle well below the
@@ -150,20 +157,39 @@ test('a RAMP is never in the way, and the fade has a MARGIN round the ray', () =
     )
   }
 
-  // …and the MARGIN. Play: "просвечивается крыша и стены слишком мало — надо
-  // больше." One ray fades exactly what it skewers, and a house is eighteen
-  // pieces, so the panel beside the one in the way stayed solid. Every box is
-  // grown by `SIGHT_MARGIN` before the test.
-  expect(SIGHT_MARGIN).toBeGreaterThan(0)
-  const wall = boxOf(CAMP.find((one) => one.name === 'STW04_D2')!)
-  // A ray that passes clear of the wall by less than the margin now counts.
-  const past = {
-    x: wall.x + wall.halfX + SIGHT_MARGIN / 2,
-    y: (wall.top + wall.bottom) / 2,
-    z: wall.z
+  // …and the other half, which is the same dummy seen from two sides. Play:
+  // "манекен пропадает когда я подхожу вплотную", and then "всё ещё становятся
+  // прозрачными вещи, которые не перекрывают свина — то есть стоят не между ним
+  // и камерой." A box is in the way when it covers HALF his silhouette, and a
+  // box beside him covers none of it.
+  const dummy = CAMP.find((one) => one.name.toUpperCase() === 'DUMMY')!
+  const target = boxOf(dummy)
+  expect(blockers.some((one) => one.id === dummy.id), 'a dummy blocks sight at all').toBe(true)
+  // The camera behind (+z) and above, the way the chase rig stands.
+  type Spot = { x: number; y: number; z: number }
+  const look = (feet: { x: number; z: number }): { eye: Spot; body: Spot } => {
+    const body = { x: feet.x, y: target.bottom, z: feet.z }
+    return { eye: { x: body.x, y: body.y - 1000, z: body.z + 2200 }, body }
   }
-  const from = { x: past.x, y: past.y, z: wall.z - 4096 }
-  const to = { x: past.x, y: past.y, z: wall.z + 4096 }
-  expect(crosses(wall, from, to), 'it really is clear of the wall').toBe(false)
-  expect(crosses(wall, from, to, SIGHT_MARGIN), 'the margin did not widen it').toBe(true)
+  const seen = (feet: { x: number; z: number }): number[] => {
+    const { eye, body } = look(feet)
+    return crossedTowards(
+      blockers,
+      eye,
+      silhouetteOf(eye, body, PIG_HEIGHT, PIG_RADIUS, PIG_HOLD / 2)
+    )
+  }
+
+  // Standing the far side of it: the dummy is between him and the camera.
+  expect(seen({ x: target.x, z: target.z - 400 }), 'the dummy in front of him').toContain(dummy.id)
+  // …and standing BESIDE it, close enough to swing at, it hides nothing.
+  const beside = { x: target.x + 300, z: target.z }
+  expect(seen(beside), 'a dummy at his shoulder').not.toContain(dummy.id)
+  // And this is exactly what the margin used to do: grown by half a tile the
+  // very same box counts as being in front of him.
+  const { eye, body } = look(beside)
+  expect(
+    crossedTowards(blockers, eye, silhouetteOf(eye, body, PIG_HEIGHT, PIG_RADIUS, PIG_HOLD / 2), 256),
+    'the old margin is what faded it'
+  ).toContain(dummy.id)
 })
