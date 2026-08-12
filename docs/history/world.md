@@ -458,43 +458,43 @@ at each:
   vertices are absolute and all carry bone 0, so that would have moved the whole
   sky by the pig's root. `loadSky` is its own path for both reasons.
 
-## THE FOG WAS BUILT THE SAME DAY AND THROWN OUT — play, 2026-08-12
+## THE FOG, AND THE UNITS THAT ARE NOT OURS — 2026-08-12
 
-I had blamed the thin band of sky on the missing fog, and the exe backed it: one
-`switch` arm per mood off the same record, 238 out to 2125..4524, which buries a
-16384-unit map inside eight tiles. So it went in. Play looked at it and answered
-in five words — "туман говно какое-то… я вот не вижу на видео" — and that is the
-end of it. `[play]` over `[exe]`, the way the rule reads.
-
-**The reading was checked before it was taken out, and it is not the problem.**
-`afSetFog` is called exactly once a battle (0x4859E2, the only `ff 15` against
-slot 0x538058 in the whole `.text`) and never disabled; `afSetWeatherValues`
-sets FOGENABLE again right after it (`_d3d.dll` 0x1000FBFE) with the same flag,
-which the arm always writes as 1. The push order is unambiguous —
-`(enable, [+0x4A4], [+0x4A8], argb)` — and `afSetFog` (0x100096F0) is four
+The mood's own `switch` arm gives a fog colour and a near/far, 238 out to
+2125..4524, and `afSetFog` (`_d3d.dll` 0x100096F0) turns them into four
 `SetRenderState` calls and nothing else: FOGENABLE, FOGCOLOR, FOGTABLEMODE =
 `D3DFOG_LINEAR`, then FOGSTART and FOGEND with the caller's floats passed
-straight through. 238.0 cannot be device z, which is 0..1, so the distances are
-eye-relative world units; the library's own reset writes 30000.0 into both, just
-past the diagonal of the map.
+straight through. Linear and eye-relative, which is three's `Fog` exactly. It is
+called once a battle (0x4859E2, the only `ff 15` against slot 0x538058 in the
+whole `.text`), never disabled, and `afSetWeatherValues` sets FOGENABLE again
+right after with the same flag.
 
-**What the binary cannot say is whether it ever SHOWED.** This engine transforms
-its own vertices and hands D3D pre-transformed ones, and table fog on those
-depends on the driver taking the vertex's `w` — which is exactly the kind of
-thing that works on one card and does nothing on the next. That is the honest
-gap, and it is why re-reading the disassembly will not produce a different
-answer. The numbers live in `sky/notes.md` and nowhere in the code; CLAUDE.md
-lists it with the other things not to re-propose.
+**So I read the distances as WORLD units, and that was wrong twice over.** Built
+that way it buries a 16384-unit map inside eight tiles and hazes the acting pig,
+which play answered with a screenshot of the shipped game and five words:
+"молоко через пол шага", against a picture with a light haze about half a map
+out and nothing near the pig at all.
 
-One colour-management trap is worth keeping out of the bin: `new THREE.Color(r,
-g, b)` takes its three numbers in three's WORKING space, which is linear, so the
-exe's bytes handed over bare came out several shades light — 248 read back as
-252. It is `setRGB(…, THREE.SRGBColorSpace)` in and
-`getHexString(THREE.SRGBColorSpace)` out. A debug hook caught it, not the eye.
+**The proof was in the same function all along.** `afSetFog` does not only set
+render states — it builds a matrix at 0x10009660 out of three immediates and
+hands it to `SetTransform(D3DTRANSFORMSTATE_PROJECTION)`: **zn = 100, zf = 500**,
+fov π/4. A map 16384 across cannot be drawn through a 500-unit far plane, so
+vertices reach the library ALREADY SCALED DOWN and its z is not ours. (The
+vtable offsets are what name those calls: `+0x2C` SetTransform and `+0x50`
+SetRenderState is `IDirect3DDevice7`, which also settles that the engine hands
+over untransformed vertices.) The factor itself is not decoded. `FOG_SCALE` in
+`lib/game/sky.ts` stands in for it at 8 — one number, `[play]`, set against the
+original's own picture — and the COLOURS and the ratios between the moods stay
+the exe's.
 
-What is left of the mood is the weather itself: cold loads `snow.mtd` and
-everything else `rain.mtd`, and only cold and ominous ever start one
-(`docs/todo.md`).
+The rule that came out of it is general and now in CLAUDE.md: **never take a
+distance the library is handed for a world distance.**
+
+One colour-management trap on the way: `new THREE.Color(r, g, b)` takes its
+three numbers in three's WORKING space, which is linear, so the exe's bytes
+handed over bare came out several shades light — 248 read back as 252. It is
+`setRGB(…, THREE.SRGBColorSpace)` in and `getHexString(THREE.SRGBColorSpace)`
+out. A debug hook caught it, not the eye.
 
 **Two things the verification cost, worth not paying twice.** `#battle-canvas`
 holds `<canvas id="battle-hud">` FIRST and the scene's canvas after it, so

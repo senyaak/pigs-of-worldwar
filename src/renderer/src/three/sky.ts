@@ -7,6 +7,7 @@
 
 import * as THREE from 'three'
 import type { Model, Sky, Texture } from '../api'
+import type { SkyFog } from '../../../lib/game/sky'
 
 /**
  * The dome's radius across, in world units, and the height it is squashed to.
@@ -113,8 +114,34 @@ function buildHalf(model: Model, maps: THREE.DataTexture[]): THREE.Mesh {
   return mesh
 }
 
-export function buildSky(root: THREE.Object3D, sky: Sky): SkyArt {
+export interface SkyParts {
+  /** The battle's converted root: game space, Y-down. */
+  root: THREE.Object3D
+  /** The scene the HAZE goes on — three's fog is the whole scene's, not an
+   * object's, exactly as D3D's render state is. */
+  scene: THREE.Scene
+  sky: Sky
+  /** The mood's own haze (lib/game/sky.ts). */
+  fog: SkyFog
+}
+
+export function buildSky({ root, scene, sky, fog }: SkyParts): SkyArt {
   const maps = sky.textures.map(skin)
+  // The mood's haze, with the DOME left out of it — a sky 40 000 units away
+  // inside a fog that is total well before that would be one flat sheet of the
+  // fog colour, and the original's four sky skins would never be seen.
+  // `three/shots.ts` opts a bullet out the same way.
+  //
+  // The colour goes in as sRGB and says so: `new Color(r, g, b)` takes its
+  // three numbers in three's WORKING space, which is linear, so the exe's
+  // bytes handed over bare come out several shades light.
+  const haze = new THREE.Color().setRGB(
+    fog.color[0] / 255,
+    fog.color[1] / 255,
+    fog.color[2] / 255,
+    THREE.SRGBColorSpace
+  )
+  scene.fog = new THREE.Fog(haze, fog.near, fog.far)
   const group = new THREE.Group()
   const scale = SKY_RADIUS / 15778
   group.scale.set(scale, scale * SQUASH, scale)
@@ -140,6 +167,9 @@ export function buildSky(root: THREE.Object3D, sky: Sky): SkyArt {
       radius: SKY_RADIUS
     }),
     dispose() {
+      // The scene outlives the battle — the asset viewers draw in it too, and
+      // a haze left behind would follow them in.
+      scene.fog = null
       root.remove(group)
       for (const half of halves) {
         half.geometry.dispose()

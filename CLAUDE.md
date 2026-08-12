@@ -129,14 +129,6 @@ reasoning, the false starts and the sessions behind them are in
   paired to the map names at 0x4D1990 — `lib/game/sky.ts` carries the whole
   table, `three/sky.ts` draws it. The exe's `afSetSky` and `afAddSkyToSortList`
   are resolved and never called. `sky/notes.md`. `[exe]`
-- **The mood's FOG is read and NOT drawn**, and that is play's ruling against
-  footage of the shipped game: "тумана на видео не видно". The exe does call
-  `afSetFog` once a battle, never disables it, and `afSetWeatherValues` sets
-  FOGENABLE again right after; the arm gives 238 out to 2125..4524 in
-  eye-relative world units, which would bury a 16384-unit map inside eight
-  tiles. What the binary cannot say is whether a driver ever applied D3D table
-  fog to this engine's pre-transformed vertices. Numbers in `sky/notes.md`.
-  `[play]` over `[exe]`
 - **The POG stores true world coordinates**, paired to geometry in the map's own
   `.MAD` by NAME, with y an ELEVATION of the model's CENTRE — so props hover
   their own half-height by design. The turn is `phi = yaw − π/2`, pinned to the
@@ -175,9 +167,9 @@ reasoning, the false starts and the sessions behind them are in
 - **Do not re-propose `FRAME_SECONDS` at 1/20 or 1/25, or `HEIGHT_SCALE`
   doubled.** Both were built, shown to play and answered — the reasoning is in
   `docs/history/why.md`.
-- **Do not re-propose the mood's FOG.** Built off the exe's own arm, shown, and
-  thrown out on sight against footage of the original. The reading is not the
-  problem and re-reading it will not change the answer.
+- **Never take a distance the LIBRARY is handed for a world distance.** Its z
+  is scaled and the factor is not decoded; the fog was built 1:1 once and had
+  to be redone. `sky/notes.md`.
 - **Do not tune the tile turn table by eye, and do not make it a setting.** It
   is pinned byte by byte in `e2e/000/terrain-viewer.spec.ts`.
 site that plays it), never off the table. `animations/notes.md`

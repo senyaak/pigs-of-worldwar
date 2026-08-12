@@ -117,12 +117,67 @@ export function skyArchiveFor(map: string): string {
   return SKY_ARCHIVES[moodOf(map)]
 }
 
-// **THE MOOD'S FOG IS NOT DRAWN, and that is play's ruling.** The record's own
-// arm gives a colour and a near/far per mood — 238 out to 2125..4524, which
-// buries the ground inside eight tiles — and `afSetFog` passes them to D3D as
-// FOGSTART/FOGEND under a LINEAR table mode, so they are eye-relative world
-// units and the reading is not in doubt. It was built, and play threw it out on
-// sight against footage of the shipped game. What the binary cannot say is
-// whether the driver ever applied table fog to this engine's pre-transformed
-// vertices. The numbers stay in `sky/notes.md` and nowhere else; do not build
-// it again without new evidence about what the original actually showed.
+export interface SkyFog {
+  /** Distance from the EYE, WORLD units, where the haze starts and where it is
+   * total — the exe's own pair times `FOG_SCALE`. */
+  near: number
+  far: number
+  /** The colour everything fades into, 0..255. The exe's, untouched. */
+  color: readonly [number, number, number]
+}
+
+/**
+ * **The exe's fog distances are the LIBRARY's units, not the world's, and the
+ * factor between them is not decoded.** This is what stands in for it.
+ *
+ * The arm at 0x4856A6 hands `afSetFog` 238 out to 2125..4524, and `afSetFog`
+ * passes those to D3D as `FOGSTART`/`FOGEND` under `FOGTABLEMODE =
+ * D3DFOG_LINEAR` — eye-relative, linear, which is three's `Fog` exactly. Taking
+ * them for world units was tried and is WRONG on sight: it buries a
+ * 16384-unit map inside eight tiles and hazes the acting pig. What says so
+ * besides the picture is the projection `afSetFog` sets in the same breath
+ * (`SetTransform(D3DTRANSFORMSTATE_PROJECTION)`, the matrix built at
+ * `_d3d.dll` 0x10009660): **zn = 100, zf = 500**, against a map 16384 across.
+ * Vertices reach the library already scaled down, so its z is not ours.
+ *
+ * Eight is `[play]`: the original shows a light haze about half a map out and
+ * nothing near the pig, and this is the one number that sets that. The exe's
+ * per-mood COLOURS and the ratios between the moods are its own and untouched.
+ * If the factor is ever read out of the transform path, this constant is where
+ * it goes.
+ */
+export const FOG_SCALE = 8
+
+const arm = (near: number, far: number, color: readonly [number, number, number]): SkyFog => ({
+  near: near * FOG_SCALE,
+  far: far * FOG_SCALE,
+  color
+})
+
+/**
+ * The haze each mood hangs over the ground — the `switch` on the same index at
+ * 0x4856A6, one arm per mood, through the jump table at 0x485ED4. Each arm
+ * writes near to `[+0x4A4]`, far to `[+0x4A8]` and R/G/B to `[+0x498..+0x4A0]`;
+ * 0x4859A4 packs them ARGB and calls `afSetFog(on, near, far, argb)`.
+ *
+ * `[exe]` for every number below, `[play]` for `FOG_SCALE` on the distances.
+ * `sky/notes.md` has the table arm by arm.
+ */
+export const SKY_FOG: readonly SkyFog[] = [
+  arm(238, 4524, [248, 248, 248]), // 0 cold — the farthest of the lot
+  arm(238, 3571, [252, 192, 116]), // 1 desert — sand in the air
+  arm(238, 2749, [0, 0, 0]), // 2 night — the dark IS the fog
+  arm(238, 2749, [0, 0, 0]), // 3 night
+  arm(238, 2749, [0, 0, 0]), // 4 night
+  arm(425, 2125, [143, 175, 205]), // 5 ominous — the thickest, and the only one that starts late
+  arm(238, 4048, [208, 215, 224]), // 6 sunny
+  arm(238, 4048, [229, 191, 128]), // 7 sunrise
+  arm(238, 4048, [255, 208, 159]), // 8 sunset
+  arm(238, 4048, [192, 255, 255]), // 9 toy
+  arm(238, 2749, [0, 0, 0]) // 10 space
+]
+
+/** The haze a map stands in. */
+export function skyFogFor(map: string): SkyFog {
+  return SKY_FOG[moodOf(map)]
+}
