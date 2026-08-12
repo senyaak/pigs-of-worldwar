@@ -199,7 +199,7 @@ export const ANIM = {
   LAND: 10,
   /** Trying to climb. Not a movement state: `UpdateGroundState` raises a
    * flag whenever the pig stands on terrain type 11 under the low-5-bit
-   * mask (`and edx,1Fh; cmp ecx,0Bh`, exe 0x46fde1/0x470082), and the
+   * mask (`and edx,1Fh; cmp ecx,0Bh`, exe 0x46fde4/0x470082), and the
    * animation picker (0x467ec0) answers with this clip in EVERY band —
    * standing, turning or walking. Type 11 is the grippiest ground in the
    * material table, which is exactly what you climb. */

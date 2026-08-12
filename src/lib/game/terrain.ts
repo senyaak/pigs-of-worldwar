@@ -461,7 +461,7 @@ export class TerrainQuery {
 
   /**
    * The tile's terrain type — its LOW 5 BITS, as the exe reads it: the
-   * scramble test masks with `and edx,1Fh` (0x46fde1) and the material
+   * scramble test masks with `and edx,1Fh` (0x46fde4) and the material
    * lookup with `and ecx,1fh` (0x4155dc) before comparing or indexing.
    * The bits above are flags (0x20 water, 0x40 mine, 0x80 wall), and
    * comparing the whole byte is exactly the bug that hid Scramble: nearly
