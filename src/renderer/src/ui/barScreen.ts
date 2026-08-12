@@ -8,12 +8,19 @@
 // FEBmps/FEBMP.MAD, the letters out of FEText, the labels out of
 // Language/Text/fetext.bin.
 //
-// WHERE each piece sits is the game's now, not the remake's. The exe computes
-// its screen coordinates in the frontend's draw code rather than storing them,
-// and the MAIN MENU's arm has been read blit by blit (frontend/notes.md, in
-// the disasm repo), so `LAYOUT` below carries the original's own numbers with
-// the address each came from. What is still eyework says so: both TRACKS,
-// whose blitter's convention is undecoded.
+// WHERE each piece sits is the game's now, not the remake's, and so is WHEN
+// each piece moves. The exe computes its screen coordinates in the frontend's
+// draw code rather than storing them, and the MAIN MENU's arm has been read
+// blit by blit (frontend/notes.md, in the disasm repo), so `LAYOUT` below
+// carries the original's own numbers with the address each came from —
+// nothing on this screen is placed by eye any more.
+//
+// Nor does anything on it move by itself. Three things animate and each is a
+// widget the original asks for a new FRAME of: the plates and title turning
+// over, the dial's needle walking to the lit row, and that row's lamp
+// blinking. The cogs are still pictures. What a player remembers turning is
+// the plates; what they remember hearing is `cog.wav`, one tooth a tick,
+// while the machine drives in.
 //
 // There is NO carriage here. The remake used to run one — `selcog`, the arrow
 // with a cog above and below — up and down the column, and play threw it out
@@ -39,14 +46,22 @@ import { SILENT, loadBank } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
-import { entrance } from './entrance'
-import { frameWalk } from './frames'
+import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
+import { drive } from './drive'
+import { LAMP_BLINK, widget } from './frames'
 
 /** The frontend's own bank — 27 sounds, the menu's clicks among them. */
 const FRONTEND_SOUNDS = 'FESounds/Fesounds.srl'
-/** What a menu bar says when it moves. Chosen by name out of that bank;
- * which index the original uses where is not decoded. */
-const CLICK = 'CLICK5'
+/**
+ * The three sounds screen 1 makes, and the exe names each of them by its
+ * INDEX in the bank above — 0, 1 and 5 — which is what turns into these
+ * names. The volumes are its own too (0x420060's second argument, out of a
+ * hundred). Moving the light makes no sound of its own: the click a player
+ * hears is the needle landing.
+ */
+const NEEDLE = { name: 'INDU006', gain: 0.5 }
+const FLIP = { name: 'CLICK5', gain: 1 }
+const COG = { name: 'COG', gain: 0.2 }
 
 /** The frontend is authored for 640×480 and drawn at it, then scaled. */
 export const SCREEN = { width: 640, height: 480 }
@@ -69,7 +84,7 @@ export const LAYOUT = {
    * 0x41c47d). 25 at 0 was 56 at 128 by eye, and the 128 is exactly why the
    * grille sat below the plates.
    */
-  machine: { x: 25, y: 0, seam: 340, column: 2 },
+  machine: { x: 25, y: 0, seam: 340, column: 2, cap: 50 },
   /** The title plate, `title1..6` 208×64, stretched the plates' way — except
    * that its two halves OVERLAP by ten columns rather than abutting, which is
    * the exe's own doing (0x41c29b at 261 and 0x41c2f0 at 341, seam 40). */
@@ -103,18 +118,22 @@ export const LAYOUT = {
    */
   lamp: { x: 493, y: 176, band: 38 },
   /**
-   * The toothed rack, and it is the ONE piece of furniture still placed by
-   * eye. The exe blits `track` twice through `0x41AF70(x, y, sprite, rect,
-   * w, h)` — a blitter with an explicit destination size, stretching the
-   * 64×480 art to 638 tall — at y -272 and -222, and both of its x values
-   * land off the screen when read literally. That function's convention is
-   * not decoded, so this stays the remake's until it is.
+   * The toothed racks, one down each edge, and they are READ now — the last
+   * piece of this screen that was placed by eye.
+   *
+   * The exe blits `track` twice through `0x41AF70(x, y, sprite, rect, w, h)`,
+   * the blitter with an explicit destination size, stretching the 64×480 art
+   * to **638 tall**. Both land mostly OFF the screen and the flush clips them
+   * (it trims against 639×479, which is also what settles that a blit's x/y
+   * is its top left corner): about thirty pixels of the left rack show and
+   * twenty-three of the right. The right one's WIDTH is negated, which the
+   * flush reads as a MIRROR, so the two are handed.
+   *
+   * Neither rides the vertical entrance — their y is pushed as a literal —
+   * and they have a horizontal one of their own instead (`drive.ts`).
    */
-  track: { x: 0, y: 0 },
-  /** The second one, down the RIGHT edge — the rack the pair of cogs runs on,
-   * which play pointed at. The exe blits `track` TWICE, which is why there are
-   * two of them here; where each lands is eyework for the same reason. */
-  rightTrack: { x: 576, y: 0 },
+  track: { x: -34, y: -272, width: 64, height: 638 },
+  rightTrack: { x: 681, y: -222 },
   /** Read: the dial at (105, 192), one `cog` at (9, 192), and `cogb` — 96×208,
    * which is TWO cogs stacked in one sprite — at (539, 160) on the right.
    * Play named the missing pair before the disassembly did. */
@@ -147,25 +166,32 @@ const PLATE_BUILT_ON = 2
 const PLATE_TURNS_TO = 6
 const FLIP_AT = -50
 /**
- * How long the machine takes to move the light one bar, and so how soon the
- * next bar may be reached. It is not instant: a held key or a mouse dragged
- * down the column steps one bar at a time, and the click has room to be heard
- * instead of being cut off by the next one. The remake's own number.
+ * Leaving turns them the other way: the screen's own leave arm puts the
+ * widget back on frame 0 and asks for 3, so the plates turn as it flies off
+ * (exe 0x4254F5).
  */
-const TRAVEL_SECONDS = 0.3
-/** The machine idles at this many frames a second. */
-const COG_FPS = 12
-/** How fast the active item's lamp blinks, in full cycles a second. */
-const LAMP_FPS = 8
+const PLATE_LEAVES_ON = 0
+const PLATE_TURNS_OUT_TO = 3
+/** The frontend's own tick — one update, one walk of every widget, one draw. */
+const TICK_MS = EXE_FRAME_SECONDS * 1000
+/** A window that was hidden comes back to a SETTLED screen, not to a
+ * fast-forward of everything it missed. */
+const MOST_TICKS = 4
 
+/**
+ * What this screen wears. The original's loader arm decompresses more —
+ * `cog0..5` and `cogb00..05` are six frames each — but its own builder only
+ * ever asks for frame 0 of either, so the other ten are archive entries
+ * nothing on this screen can show.
+ */
 const ART = [
   'pigbkpc1',
   'fullmenu',
   'track',
   'chose1', 'chose2', 'chose3', 'chose4', 'chose5', 'chose6',
   'title1', 'title2', 'title3', 'title4', 'title5', 'title6',
-  'cog0', 'cog1', 'cog2', 'cog3', 'cog4', 'cog5',
-  'cogb00', 'cogb01', 'cogb02', 'cogb03', 'cogb04', 'cogb05',
+  'cog0',
+  'cogb00',
   'light1', 'light2', 'light3',
   'dial0001', 'dial0002', 'dial0003', 'dial0004', 'dial0005', 'dial0006',
   'dial0007', 'dial0008', 'dial0009', 'dial0010', 'dial0011', 'dial0012'
@@ -299,9 +325,6 @@ export function initBarScreen(config: {
   let lit: Font | null = null
   let plain: Font | null = null
   let off: Font | null = null
-  let cogs: Sprite[] = []
-  /** `cogb00..05` — 96×208, which is TWO cogs stacked in one sprite. */
-  let cogbs: Sprite[] = []
   let dials: Sprite[] = []
   let plates: Sprite[] = []
   let titles: Sprite[] = []
@@ -309,33 +332,48 @@ export function initBarScreen(config: {
 
   let selection = 0
   let visible = false
-  let started = 0
-  /** The light on its way from one bar to the next. It is what refuses a
-   * second press, and what the dial's needle sweeps along with. */
-  let travel: { from: number; until: number } | null = null
-  /** The bar the mouse is over, taken up as soon as the machine will move. */
+  /** The bar the mouse is over, taken up one bar a tick. */
   let hovered = -1
-  /** The screen's own arrival: one y displacement added to everything the
-   * machine draws. The backdrop is NOT displaced — the exe blits it before
-   * the switch that applies this (`entrance.ts`). */
-  const driveOn = entrance(config.entersFrom ?? 0)
-  /** The plates and the title, which are one widget and turn together. */
-  let plate = frameWalk(PLATE_BUILT_ON, 6)
-  /** What that displacement is right now. Read once a frame and shared with
-   * the mouse, so a click during the arrival hits the bar it looks at. */
+  /** The screen's own arrival and departure: one y displacement added to
+   * everything the machine draws, and one the tracks carry. The backdrop is
+   * NOT displaced — the exe blits it before the switch that applies this. */
+  const driveOn = drive(config.entersFrom ?? 0)
+  /** The plates and the title, which are ONE widget (7) and turn together. */
+  const plate = widget(PLATE_BUILT_ON)
+  /** The dial's needle (widget 4), which walks to the lit row a frame a tick. */
+  const dial = widget(0)
+  /** One per row (widgets 0..3): the frame IS which of `light1..3` its lamp
+   * wears, and only the lit row's is given a script. */
+  const rowLamps = bars.map(() => widget(0))
+  /** What the vertical displacement is right now. Read once a tick and shared
+   * with the mouse, so a click during the arrival hits the bar it looks at. */
   let arrivalOffset = 0
+  /** Where the screen is going once it has finished clearing out. */
+  let leaving: (() => void) | null = null
 
-  const travelling = (now: number): boolean => travel !== null && now < travel.until
+  /**
+   * The SELECTION changed — exe 0x427C90, and the whole of what it does: aim
+   * the needle at the new row, give that row's lamp the blink, and walk every
+   * other lamp back down to `light1`.
+   */
+  const relight = (): void => {
+    dial.goTo(needleFrame(selection))
+    for (let i = 0; i < rowLamps.length; i++) {
+      if (i === selection) rowLamps[i].play(LAMP_BLINK)
+      else rowLamps[i].goTo(0)
+    }
+  }
 
-  /** Move one bar, unless the light is still on its way. */
+  /**
+   * Move one bar. It WRAPS and it is not gated on anything — the original's
+   * up and down arms are two lines each (0x42a739, 0x42a8a9), with no travel
+   * to wait out and no click of their own.
+   */
   const step = (by: number): void => {
-    const now = performance.now()
-    if (travelling(now)) return
     const next = (selection + by + bars.length) % bars.length
     if (next === selection) return
-    travel = { from: selection, until: now + TRAVEL_SECONDS * 1000 }
     selection = next
-    bank.play(CLICK)
+    relight()
   }
 
   /**
@@ -353,11 +391,24 @@ export function initBarScreen(config: {
    */
   const navigate = (go: () => void): void => queueMicrotask(go)
 
+  /**
+   * Choose the lit bar — and on a screen that DRIVES, that starts the exit
+   * rather than swapping the view: the plates turn the other way, the machine
+   * climbs back out of the top of the screen and the tracks walk out after
+   * it, and only then does the next screen get its press (exe 0x425467).
+   */
   const choose = (): void => {
     const bar = bars[selection]
     if (!bar.enabled() || !bar.choose) return
-    bank.play(CLICK)
-    navigate(bar.choose)
+    if (driveOn.phase() !== 'here') return
+    if (config.entersFrom === undefined) {
+      navigate(bar.choose)
+      return
+    }
+    leaving = bar.choose
+    driveOn.leave()
+    plate.set(PLATE_LEAVES_ON)
+    plate.goTo(PLATE_TURNS_OUT_TO)
   }
 
   controller.onAction((action) => {
@@ -437,37 +488,30 @@ export function initBarScreen(config: {
     )
   }
 
-  // `now` is the frame's own timestamp, and rAF hands out the time the frame
-  // BEGAN — which can predate the `performance.now()` taken when the art
-  // finished loading. One negative millisecond floors to -1, and `-1 % n` is
-  // -1 in JS, so the first frame drew `undefined` and threw. Clamp the age
-  // rather than the index: an animation cannot start before it starts.
-  const frameAt = (frames: Sprite[], now: number): Sprite =>
-    frames[Math.floor((Math.max(0, now - started) / 1000) * COG_FPS) % frames.length]
-
   /**
-   * The dial's NEEDLE, pointing at the lit row.
+   * Which frame of the dial POINTS at a row.
    *
-   * Play's word — "именно она показывает на активное меню, а не ездит как
-   * попало" — and the remake's own mechanism. The exe builds this widget once,
-   * on entry, at frame 0 (`0x41F110(screen, 4, 0)`), and nothing found so far
-   * moves it after that; what drives it in the original is not decoded. So the
-   * twelve frames are spread evenly over the rows and the needle sweeps with
-   * the selection, over the same travel the light takes.
+   * The needle following the lit bar is the exe's, not an invention to be
+   * corrected: the screen's selection handler aims it with
+   * `0x423E10(1, 4, 4*row - (4*row > 4 ? 1 : 0), 1, 1)`, which for the four
+   * rows is frames 0, 4, 7 and 11 of twelve — and the widget walks there one
+   * frame a tick, so it SWEEPS. Spreading the frames evenly over the rows
+   * gives exactly those four back, and gives a sensible answer on a screen
+   * with a different number of bars, whose own arm has not been read.
    */
-  const needle = (row: number): Sprite => {
-    if (dials.length === 0) return dials[0]
+  const needleFrame = (row: number): number => {
     const across = bars.length > 1 ? row / (bars.length - 1) : 0
-    return dials[Math.round(across * (dials.length - 1))]
+    return Math.round(across * 11)
   }
 
-  const draw = (now: number): void => {
+  const draw = (): void => {
     const context = canvas.getContext('2d')
     if (!context || !art || !big || !lit || !plain || !off) return
     // Everything the machine draws is displaced by the arrival — everything
     // except the backdrop, which the exe blits before the switch that applies
-    // it, so the sky stays put while the machine drives on.
-    arrivalOffset = driveOn.offset(now)
+    // it, so the sky stays put while the machine drives on. And except the
+    // TRACKS, whose y the draw arm pushes as a plain literal.
+    arrivalOffset = driveOn.offset()
     const blit = (sprite: Sprite, x: number, y: number): void =>
       context.drawImage(sprite.image, x, y + arrivalOffset)
     /** A plate — a row's, or the title's — in two halves, so it comes out
@@ -489,7 +533,7 @@ export function initBarScreen(config: {
      * a different picture — a grille gains bars rather than a wider bar.
      */
     const drawMachine = (sprite: Sprite, x: number, y: number): void => {
-      const { seam, column } = layout.machine
+      const { seam, column, cap } = layout.machine
       context.drawImage(sprite.image, 0, 0, seam, sprite.height, x, y, seam, sprite.height)
       let at = x + seam
       for (let done = 0; done < layout.bars.stretch; done += column) {
@@ -501,6 +545,25 @@ export function initBarScreen(config: {
       }
       const right = sprite.width - seam
       context.drawImage(sprite.image, seam, 0, right, sprite.height, at, y, right, sprite.height)
+      // And a fourth blit nobody would guess at: the machine's own top `cap`
+      // rows again, 48 pixels ABOVE it (exe 0x41c389). Two visible pixels once
+      // the screen has landed, and what fills the gap over its head while it
+      // is still driving in.
+      context.drawImage(sprite.image, 0, 0, seam, cap, x, y - 48, seam, cap)
+    }
+    /**
+     * A TRACK — the toothed rack down a screen edge, blitted through the
+     * stretching blitter and mirrored where the exe negates its width. Most
+     * of it is off the screen and the canvas clips it exactly as the flush
+     * does.
+     */
+    const drawTrack = (sprite: Sprite, x: number, y: number, mirror: boolean): void => {
+      const { width, height } = layout.track
+      context.save()
+      context.translate(x, 0)
+      if (mirror) context.scale(-1, 1)
+      context.drawImage(sprite.image, 0, y, width, height)
+      context.restore()
     }
     /** One lamp out of the rack of four, chosen by ROW rather than by frame.
      * A screen with more rows than the rack has lamps repeats it — the exe
@@ -511,30 +574,25 @@ export function initBarScreen(config: {
       context.drawImage(sprite.image, 0, top, sprite.width, band, x, y, sprite.width, band)
     }
 
-    // Which row the machine is pointing at — a fraction while the selection
-    // is on its way, so the needle SWEEPS rather than jumps. Wanted before the
-    // furniture is drawn, because the dial reads it.
-    const pointingAt = ((): number => {
-      if (travel === null || now >= travel.until) return selection
-      const through = 1 - (travel.until - now) / (TRAVEL_SECONDS * 1000)
-      return travel.from + (selection - travel.from) * through
-    })()
-
+    const shift = driveOn.trackShift()
     context.drawImage(art.get('pigbkpc1').image, 0, 0)
     drawMachine(art.get('fullmenu'), layout.machine.x, layout.machine.y + arrivalOffset)
-    blit(art.get('track'), layout.track.x, layout.track.y)
-    blit(art.get('track'), layout.rightTrack.x, layout.rightTrack.y)
-    blit(needle(pointingAt), layout.dial.x, layout.dial.y)
-    blit(frameAt(cogs, now), layout.cog.x, layout.cog.y)
-    blit(frameAt(cogbs, now), layout.cogb.x, layout.cogb.y)
+    drawTrack(art.get('track'), layout.track.x + shift, layout.track.y, false)
+    drawTrack(art.get('track'), layout.rightTrack.x - shift, layout.rightTrack.y, true)
+    blit(dials[dial.frame() % dials.length], layout.dial.x, layout.dial.y)
+    // The cogs are STILL PICTURES. Both widgets are built on frame 0 and no
+    // call site on this screen ever asks either for another — what a player
+    // remembers turning is the plates, and what they remember hearing is the
+    // machine's own cog ratcheting as the screen drives in.
+    blit(art.get('cog0'), layout.cog.x, layout.cog.y)
+    blit(art.get('cogb00'), layout.cogb.x, layout.cogb.y)
 
-    // The plates and the title are one widget and turn together. The request
-    // to turn is made here, on the exe's own two guards — see PLATE_TURNS_TO.
-    if (driveOn.raw() > FLIP_AT) plate.goTo(now, PLATE_TURNS_TO)
-    const face = plates[plate.at(now)]
+    // The plates and the title are one widget and turn together; which frame
+    // they are on is walked in `advance` on the exe's own guards.
+    const face = plates[plate.frame() % plates.length]
     const turning = plate.walking()
 
-    const title = titles[plate.at(now)]
+    const title = titles[plate.frame() % titles.length]
     drawPlate(title, layout.title.x, layout.title.y + arrivalOffset, layout.title.seam)
     // Mid-turn a plate is edge-on to what it used to say, so it says nothing.
     if (!turning) {
@@ -550,13 +608,11 @@ export function initBarScreen(config: {
       const row = rowBox(i, face)
       drawPlate(face, row.x, row.y)
 
-      // One lamp per row, to the right of its plate; only the lit one blinks,
-      // the rest sit at the dimmest frame the rack has.
+      // One lamp per row, to the right of its plate. WHICH of `light1..3` it
+      // wears is its widget's frame, and only the lit row's widget is given a
+      // script — everything else is walked back down to the dimmest.
       if (lamps.length > 0) {
-        const lamp =
-          i === selection
-            ? lamps[Math.floor((Math.max(0, now - started) / 1000) * LAMP_FPS) % lamps.length]
-            : lamps[0]
+        const lamp = lamps[Math.min(rowLamps[i].frame(), lamps.length - 1)]
         drawLamp(lamp, i, layout.lamp.x, layout.lamp.y + i * layout.bars.step + arrivalOffset)
       }
 
@@ -582,25 +638,69 @@ export function initBarScreen(config: {
 
   }
 
-  // The machine only turns while it is on screen: an app parked behind a
-  // battle — or behind another app, during a test run — costs nothing. And
-  // it is repainted at the game's own 25 a second rather than at whatever
-  // the display runs at; the art itself is animated slower than that.
-  const FRAME_MS = 1000 / 25
-  let frame = 0
-  let painted = 0
-  const tick = (now: number): void => {
-    frame = requestAnimationFrame(tick)
-    if (now - painted < FRAME_MS) return
-    painted = now
+  /**
+   * ONE frontend tick: the screen's own update, then the pass that walks
+   * every widget one step and rebuilds what changed. That order is the exe's
+   * (0x423E70 out of the state machine, 0x41FEC0 in the per-frame function),
+   * and so is everything in it.
+   */
+  const advance = (): void => {
+    driveOn.tick()
+    if (driveOn.rumbled()) bank.play(COG.name, { gain: COG.gain })
+
+    // The flip: once the screen has nearly landed and the widget is not
+    // already walking, the plates and the title are asked for frame 6, which
+    // is six of six and wraps back to the first (exe 0x423f57). If the screen
+    // has fully arrived by then it is heard as well.
+    if (
+      driveOn.phase() !== 'leaving' &&
+      driveOn.phase() !== 'gone' &&
+      driveOn.raw() > FLIP_AT &&
+      !plate.walking() &&
+      plate.frame() !== PLATE_TURNS_TO
+    ) {
+      plate.goTo(PLATE_TURNS_TO)
+      if (driveOn.raw() === 0) bank.play(FLIP.name, { gain: FLIP.gain })
+    }
+
+    plate.tick()
+    // The needle clicks when it LANDS, not once per row it passes: the dial's
+    // builder plays it on the step that reaches the frame it was aimed at.
+    if (dial.tick() && !dial.walking()) bank.play(NEEDLE.name, { gain: NEEDLE.gain })
+    for (const lamp of rowLamps) lamp.tick()
+
+    // The mouse is the remake's own convenience, and it moves the light the
+    // only way the machine can: a bar at a time.
     if (hovered >= 0) {
       if (hovered === selection) hovered = -1
       else step(hovered > selection ? 1 : -1)
     }
-    draw(now)
+
+    if (driveOn.phase() === 'gone' && leaving) {
+      const go = leaving
+      leaving = null
+      navigate(go)
+    }
+  }
+
+  // The machine only turns while it is on screen: an app parked behind a
+  // battle — or behind another app, during a test run — costs nothing.
+  let frame = 0
+  let ticked = 0
+  const paint = (now: number): void => {
+    frame = requestAnimationFrame(paint)
+    let due = Math.floor((now - ticked) / TICK_MS)
+    if (due <= 0) return
+    ticked += due * TICK_MS
+    if (due > MOST_TICKS) due = MOST_TICKS
+    for (let i = 0; i < due; i++) advance()
+    draw()
   }
   const run = (on: boolean): void => {
-    if (on && loaded && frame === 0) frame = requestAnimationFrame(tick)
+    if (on && loaded && frame === 0) {
+      ticked = performance.now()
+      frame = requestAnimationFrame(paint)
+    }
     if (!on && frame !== 0) {
       cancelAnimationFrame(frame)
       frame = 0
@@ -619,8 +719,6 @@ export function initBarScreen(config: {
         lit = pieces.lit
         plain = pieces.plain
         off = pieces.off
-        cogs = art.frames('cog', 0, 5)
-        cogbs = art.frames('cogb', 0, 5, 2)
         dials = art.frames('dial', 1, 12, 4)
         plates = art.frames('chose', 1, 6)
         titles = art.frames('title', 1, 6)
@@ -631,8 +729,8 @@ export function initBarScreen(config: {
         console.warn(String(error))
         return
       }
-      started = performance.now()
       loaded = true
+      relight()
       run(visible)
     },
     leave() {
@@ -641,23 +739,24 @@ export function initBarScreen(config: {
     },
     enter() {
       visible = true
-      // Arriving IS the content change, so the plates turn over for it — and
-      // the machine drives on underneath them at the same moment.
-      const now = performance.now()
-      driveOn.restart(now)
-      plate = frameWalk(PLATE_BUILT_ON, 6)
-      travel = null
+      // Entering CLEARS every widget's frame and builds them again: the
+      // plates and title on frame 2 — arriving IS the content change, so they
+      // turn over for it — the dial on 0 and the lamps dark, which is why the
+      // needle sweeps up to the lit row from the top rather than being there
+      // already.
+      driveOn.restart()
+      plate.set(PLATE_BUILT_ON)
+      dial.set(0)
+      for (const lamp of rowLamps) lamp.set(0)
+      leaving = null
+      relight()
       run(true)
     },
     selected: () => selection,
-    // "Busy": the light is on its way, or the screen is still turning
-    // over. Either refuses a press, so either is what a spec must wait out.
-    flipping() {
-      const now = performance.now()
-      return (
-        travelling(now) || plate.walking() || driveOn.moving()
-      )
-    },
+    // "Busy": the plates are turning over, or the screen is not standing
+    // still. A press during either is not refused — the original refuses
+    // nothing — but a spec measuring the machine wants it settled first.
+    flipping: () => plate.walking() || driveOn.phase() !== 'here',
     labels: () => bars.map((bar) => bar.label()),
     values: () => bars.map((bar) => bar.value?.() ?? null),
     layout

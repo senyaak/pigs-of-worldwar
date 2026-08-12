@@ -50,9 +50,9 @@ export const values = (page: Page, screen: Screen = 'menu'): Promise<(string | n
   }, screen)
 
 /**
- * One bar up or down. The machine refuses to move again while a bar is still
- * turning, so this presses until the press takes — the same thing a player's
- * finger does, and it fails fast if the bar never moves.
+ * One bar up or down. The press takes at once — nothing on the original's
+ * menu gates one — but the screen may not be LISTENING yet, so this presses
+ * until the bar moves and fails fast if it never does.
  */
 export async function nudge(
   page: Page,
@@ -105,10 +105,9 @@ export async function lightBar(
   for (let at = await selection(page, screen); at !== wanted; at = await selection(page, screen)) {
     await nudge(page, wanted > at ? 'menuDown' : 'menuUp', screen)
   }
-  // And leave the machine SETTLED. `nudge` returns the instant the bar starts
-  // turning, and for the next third of a second the machine refuses to move —
-  // so a spec that pressed straight after this would be measuring the flip it
-  // caused rather than what it meant to test.
+  // And leave the machine SETTLED: a screen that is still driving in — or
+  // still turning its plates over — refuses to be CHOSEN, which is the one
+  // thing the original does gate (its leave arm only runs from a standstill).
   await expect
     .poll(
       () =>

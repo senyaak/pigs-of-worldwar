@@ -645,6 +645,28 @@ The SHELTER is done end to end. What is left round it:
 
 ## D. WHAT IS STILL NOT READ (disassembly gaps)
 
+- **The frontend's OTHER screens.** Screen 1 is now read end to end — enter,
+  update, leave, draw and the selection handler, with every sound and every
+  frame walk (`frontend/notes.md`, and what it cost is in
+  [docs/history/frontend.md](history/frontend.md)). Play asked for all of
+  them, in order, so the next one is MULTI-PLAYER: it is **screen 7**, it
+  shares screen 1's enter arm and its widget builder — which is why the enter
+  arm builds a widget 8 that screen 1 never draws — and it has a draw arm of
+  its own at 0x41DEE3 and a selection arm of its own. Everything needed to
+  read it is in the tables already transcribed.
+- **Where the frontend's WORDS land.** Screen 1's labels go through a
+  text-object printer with a per-screen box out of four `.data` tables
+  (0x4C1548, 0x4C15A8, 0x4C1608, 0x4C1668), and the box's numbers do not read
+  as screen pixels, so the space they are in is unaccounted for. Ours are
+  centred on the plates by eye and look right; the tables are what a screen we
+  have NOT built would want.
+- **What the plate widget's two per-frame numbers do to those words.** It
+  writes a pair out of tables it carries — `[0, 100, 100, -70, -20, 0, 0]` and
+  `[0, 30, 90, -90, -40, 0, 0]` — and the per-frame function hands the second
+  to the text object as `[+0x1C]`/`[+0x20]`. They are non-zero on exactly the
+  mid-turn frames, so the original skews its letters as a plate goes over
+  where we stop drawing them.
+
 **A sweep on 2026-08-11 closed most of this list** — the reads are in the
 disasm repo; what survives of each item is the WIRING, which waits for play to
 ask. And one discovery reshapes the leftovers: **`wh32LIB.DLL` is the LaserLok

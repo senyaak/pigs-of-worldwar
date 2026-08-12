@@ -315,6 +315,7 @@ task lands in that subsystem:
 | [turns.md](docs/history/turns.md) | the clock and the beats around it, what ends a turn, how input is polled |
 | [view.md](docs/history/view.md) | the chase camera, the fades, the thrown weapon's own view, the judder measure |
 | [training.md](docs/history/training.md) | CAMP's script, where it can be put, and the dummy that ends the mission |
+| [frontend.md](docs/history/frontend.md) | the menu's machine: what moves on it, what it sounds like, how a screen arrives and leaves |
 | [status.md](docs/history/status.md) | where the remake stands, the lists play has given, what is still not read |
 
 Two rules about it. **A finished piece of work is written up THERE, not here** —
@@ -421,10 +422,31 @@ and the weakest of them were invented here:
   the flip at that moment already, from play's word alone, and this replaced
   a 0.3-second timer with the mechanism.
 
-  **The dial's needle points at the lit row**, and that is play's word rather
-  than the exe's: the widget is built once at frame 0 and nothing found so far
-  moves it, so the twelve frames are spread over the rows and the needle
-  sweeps with the selection. Flagged at `needle` in `ui/barScreen.ts`.
+  **The dial's needle points at the lit row**, and that is the exe's: the
+  selection handler (0x427C90) aims widget 4 at frames 0, 4, 7 and 11 for the
+  four rows, and the widget walks there one frame a tick. Spreading twelve
+  frames evenly over the rows gives those four back exactly, which is what
+  `needleFrame` does.
+
+  **NOTHING on this screen animates by itself.** Three widgets move and each
+  moves because something asked it to: the plates and title turning over, the
+  needle, and the lit row's lamp on script 1002 (`light2` 1 tick, `light3`
+  10, `light2` 1, `light1` 5, looping). **The cogs are STILL PICTURES** — both
+  are built on frame 0 and no call site asks for another. What turns is the
+  plates; what is heard is `cog.wav`, one 32 ms tooth a tick, while the screen
+  drives in or out.
+
+  **A press is never gated and the light WRAPS.** The up and down arms are two
+  lines each with no travel to wait out and no click of their own — the click
+  a player hears on a move is the needle ARRIVING (`Indu006` at half volume).
+
+  **A screen leaves the way it arrives.** Choosing a bar starts the leave arm,
+  not a view swap: the plates turn back the other way (frame 0, walked to 3),
+  the machine climbs out of the top under constant acceleration, and only once
+  it is gone do the tracks walk out sideways. Same for the arrival, in the
+  other order — **the tracks slide in BEFORE the screen falls**, and while
+  they are moving the update arm does nothing else at all. `ui/drive.ts`, on
+  the three integer routines in `ui/springs.ts`.
 
   **There is NO carriage on the menu.** The remake ran one — `selcog`, the
   arrow with a cog above and below — up and down the column, and play threw
@@ -435,9 +457,13 @@ and the weakest of them were invented here:
   is left out on the same evidence. The lit bar is told apart by its lighter
   letters and by its lamp, which is the original's own way.
 
-  Still eyework, and it says so at the field: BOTH TRACKS — the exe blits
-  `track` twice through `0x41AF70`, a blitter with an explicit destination
-  size whose convention is undecoded and whose two x values read off-screen.
+  **The TRACKS are read too, and they hang off the screen on purpose**: 64
+  wide by 638 tall out of 64×480 art, at x -34 and 681 of a 640-wide screen,
+  the right one's WIDTH negated so it is drawn mirrored, and the flush clips
+  the rest. Reading them literally had looked wrong; it is not. The same
+  reading settles the blitter's convention, which this file used to argue from
+  the plate and the lamp abutting: the clipper moves a blit's source rect by
+  exactly what it moves the destination, so **x/y is the TOP LEFT corner**.
 
 - `[deliberate]` **The mouse works the menu, and the original's does not.**
   Hovering lights a bar, clicking chooses it. The original is keyboard and pad

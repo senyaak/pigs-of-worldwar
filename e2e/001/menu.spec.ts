@@ -56,7 +56,7 @@ test('the menu is the original screen, in the original letters', async ({ app })
   expect(app.errors()).toEqual([])
 })
 
-test('the lit bar moves one at a time, and wraps', async ({ app }) => {
+test('the lit bar moves on every press, and wraps', async ({ app }) => {
   const { page } = app
   // Start from the top DELIBERATELY. A screen is come back to wherever it was
   // left, and the suite's file order is not fixed, so a spec that reaches the
@@ -65,14 +65,17 @@ test('the lit bar moves one at a time, and wraps', async ({ app }) => {
   await lightBar(page, 'ONE PLAYER')
   expect(await selection(page)).toBe(0)
 
-  // The machine will not move again while a bar is still turning, so a
-  // second press on its heels does nothing — held keys and a mouse dragged
-  // down the column both step one bar at a time.
+  // Nothing gates a press. The original's up and down arms are two lines
+  // each and neither waits for anything, so two presses on each other's heels
+  // move two bars — the machine catching up is the needle's business, not the
+  // selection's (frontend/notes.md, 0x42a739 and 0x42a8a9).
   await tap(page, 'menuDown')
   await tap(page, 'menuDown')
-  expect(await selection(page), 'the second press came too soon').toBe(1)
+  expect(await selection(page), 'both presses took').toBe(2)
+  await nudge(page, 'menuUp')
+  expect(await selection(page)).toBe(1)
 
-  // Once it settles it takes the next one, and off the top it wraps round.
+  // Off the top it wraps round.
   await nudge(page, 'menuUp')
   await nudge(page, 'menuUp')
   expect(await selection(page), 'up from the top wraps to the bottom').toBe(3)
