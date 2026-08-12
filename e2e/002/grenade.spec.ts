@@ -205,11 +205,13 @@ test('a thrown weapon has a camera of its own, and two of them', async ({ app })
   const { page } = app
   await armed(page, 900)
 
-  // Play: "для гранаты и для базуки отдельная камера — 2 режима: 1 выше, чтобы
-  // удобно целиться; 2 при нажатой кнопки из-за спины." The first is the exe's
-  // own — the aim-bit branch sends every weapon that is not a gun and not the
-  // pillbox's two to camera mode 0x12, "TR cam" (0x492e7f, three/chase.ts) —
-  // and the second is play's, on the exe's rifle-cam distance.
+  // Play: "когда в руки берёшь оружие — меняется камера", and "есть отдельная
+  // кнопка, которая меняет вид пока держишь (у нас G)". Both are the exe's own
+  // (three/chase.ts): taking a thrown weapon in HAND runs 0x493BB0's dispatch,
+  // which asks for camera mode 4 at 3500, and the VIEW KEY gives mode 0x12, the
+  // TR cam, at 1700 and close over his back. **The fire button is not part of
+  // it**, which is what this spec is really pinning: it was, for one commit,
+  // and that was the bug.
   const view = (): Promise<string> =>
     page.evaluate(() => (window as unknown as { pow: { debug: { view(): string } } }).pow.debug.view())
   const eye = (): Promise<{ x: number; y: number; z: number }> =>
@@ -237,35 +239,43 @@ test('a thrown weapon has a camera of its own, and two of them', async ({ app })
     return last
   }
 
-  expect(await view(), 'a grenade in hand is not an aim view by itself').toBe('chase')
-  const chased = await settled()
-
-  await press(page, 'aimMode')
-  await expect.poll(view, { timeout: 2000 }).toBe('lob')
+  // Nothing pressed: the grenade is in his hands and that is enough.
+  expect(await view(), 'the weapon in hand changes the view').toBe('lob')
   const aiming = await settled()
-  // Higher than the chase, and nearer: 1700 of the chase's 3072, plus the
-  // handler's own 400 up.
-  expect(aiming.y, 'the aim view stands over him').toBeGreaterThan(chased.y)
-  const span = (at: { x: number; z: number }): number =>
-    Math.hypot(at.x - chased.x, at.z - chased.z)
-  expect(span(aiming), 'and it comes in').toBeGreaterThan(1)
+  // Where the pig is, to measure both cameras' distance from. Game space is
+  // Y-down and the rig is Y-up, hence the z sign in `outFrom` below.
+  const subject = await page.evaluate(() =>
+    (window as unknown as { pow: { debug: { currentPig(): { x: number; z: number } } } })
+      .pow.debug.currentPig()
+  )
 
-  // Letting the aim key go puts the ordinary chase back — the view is HELD, the
-  // way the exe holds its own on a pad bit (input/actions.ts).
-  await release(page, 'aimMode')
-  await expect.poll(view, { timeout: 2000 }).toBe('chase')
-
-  // …and the FIRE button takes it behind the shoulder for as long as it is
-  // down. Releasing it throws, so that is the end of the reading.
   await press(page, 'aimMode')
+  await expect.poll(view, { timeout: 2000 }).toBe('throw')
+  const behind = await settled()
+  // The key-held view COMES IN: 1700 against the in-hand view's 3500, which is
+  // the two modes' own rows and the sharpest difference between them.
+  const outFrom = (at: { x: number; z: number }): number =>
+    Math.hypot(at.x - subject.x, at.z + subject.z)
+  expect(outFrom(behind), 'the view key brings the camera in').toBeLessThan(
+    outFrom(aiming) - 1
+  )
+
+  // Letting the key go brings the raised view back — it is HELD, the way the exe
+  // holds its own on a pad bit (input/actions.ts).
+  await release(page, 'aimMode')
+  await expect.poll(view, { timeout: 2000 }).toBe('lob')
+
+  // **And the FIRE button does not touch the camera.** Holding it fills the
+  // gauge and the view stays exactly where the hands put it; letting go throws,
+  // so the reading ends there.
   await press(page, 'fire')
   try {
-    await expect.poll(view, { timeout: 2000 }).toBe('throw')
-    const throwing = await settled()
-    expect(throwing.y, 'the throw is watched from lower down').toBeLessThan(aiming.y)
+    await expect
+      .poll(async () => (await look(page)).charge ?? 0, { timeout: 4000 })
+      .toBeGreaterThan(0.2)
+    expect(await view(), 'the trigger is not a camera key').toBe('lob')
   } finally {
     await release(page, 'fire')
-    await release(page, 'aimMode')
   }
   expect(app.errors()).toEqual([])
 })

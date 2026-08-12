@@ -3338,36 +3338,45 @@ his body by three columns across it, the columns laid ACROSS the line of sight
 so the outline always faces the camera. A box has to cross five of the nine and
 is tested at its true size. Same majority rule as before, better question.
 
-**And the grenade and the bazooka have a camera of their own — two of them.**
-Play: "для гранаты и для базуки отдельная камера — 2 режима: 1 выше, чтобы
-удобно целиться; 2 при нажатой кнопки из-за спины." The first is the exe's and
-this repo had it written down WRONG: the aim-bit branch does not fall back to
-the ordinary chase for a weapon that is not a gun, it goes to **mode 0x12, "TR
-cam"** (0x492e7a, name at 0x4d8e7c) — the grenade family and the bazooka, and
-also anything at all once MayAct is false, which is from the fire press onward.
-Its handler (0x4a4620) puts the camera **400 above its subject** at a nominal
-distance of **1700** against the chase's 3072 — the table's own 1600 is a value
-the handler WRITES back when the ground is close, so the file is a scratchpad —
-and lets the player pitch it, `[cam+0x76]`, clamped to ±700 of 4096 by a branch
-that names this mode alone. `weapons/fire.md` has the whole read and the
-correction.
+**And the grenade and the bazooka have a camera of their own — two of them, and
+BOTH are the exe's.** Play: "для гранаты и для базуки отдельная камера — 2
+режима: 1 выше, чтобы удобно целиться; 2 при нажатой кнопки из-за спины", and
+then, when the first attempt hung the second on the trigger: **"я не говорил про
+огонь! там есть отдельная кнопка, которая меняет вид пока держишь (у нас G)… я
+сказал, когда в руки берёшь оружие — меняется камера."** Right on both counts,
+and the exe has each of them:
 
-The second mode is play's own and says so at the constant: the exe leaves the TR
-cam up while the gauge fills, and what play remembers is the shoulder view. So
-the placement is borrowed rather than invented — the **rifle cam's own 2048**,
-the engine's one number for "behind the shoulder, sighting a weapon" — and the
-two read as play describes them: high and close to see the arc, back and low
-over the shoulder to aim the throw. `three/chase.ts` carries both, the rig's six
-views are one table there now, and `pow.debug.view()` is how a spec tells them
-apart — a camera POSITION cannot say why it is where it is, and the rig eases
-between two views so a reading taken on the frame the view changed is still the
-last one's.
+- **TAKING IT IN HAND is a camera change, `0x493BB0`.** It runs on every write
+  of `[game+0x458]` — the skill in hand — and dispatches on the skill through
+  `[0x493DC4 + skill − 1]`. The thrown family (14, 19..33, 35..50, 56, 60, 61,
+  63) and the five melee both ask for **mode 4**, and **a GUN asks for nothing**
+  (0x493c9d jumps past the block), which is why a rifle only ever moves the view
+  on the aim key. What separates the two is `0x49F6F0`, which STAMPS mode 4's own
+  row: **3500** for anything thrown against **1500** for a blade — so the
+  1500/2000 the shipped file carries is where the last run left it.
+- **HOLDING THE VIEW KEY is mode 0x12, "TR cam"** (0x492e7a, name at 0x4d8e7c),
+  and this repo had that written down WRONG as "else → the ordinary chase". Its
+  handler (0x4a4620) sits **200 out and 400 up** at a nominal 1700, close in over
+  his back, with a pitch the player may drive (`[cam+0x76]`, clamped to ±700 of
+  4096 by a branch that names this mode alone).
 
-Two seams came with it. `Sights.sighting(holding)` is "the aim view is up at
+So the two are the exe's own: back and raised while it is out, in over the
+shoulder while the key is down. `weapons/fire.md` has both reads and the
+correction. **The fire button touches neither** — it did for one commit and that
+was a bug, not a feature.
+
+What is NOT read is mode 4's LIFT on the branch a thrown weapon takes: it uses
+the subject's y as it stands and the common tail only clamps it 768 off the
+ground. The remake borrows the **+300** mode 4's other branch adds, which is
+play's "выше". `three/chase.ts` carries all of it, the rig's six views are one
+table there now, and `pow.debug.view()` is how a spec tells them apart — a camera
+POSITION cannot say why it is where it is, and the rig eases between two views so
+a reading taken on the frame the view changed is still the last one's.
+
+One seam came with it: `Sights.sighting(holding)` is "the aim view is up at
 all", beside `scoped`, which is the first-person half and answers for guns
-alone; and the view carries `charging` — whether the gauge is filling — beside
-`charging()`, which is how FULL it is. Both are on the snapshot, because the
-camera is drawn from a snapshot and nothing else.
+alone. It is on the snapshot, because the camera is drawn from a snapshot and
+nothing else.
 
 ### What is still not read
 

@@ -335,9 +335,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       lastView = 'ride'
       return
     }
-    // A THROWN weapon has a camera of its own, and two of them: the exe's TR
-    // cam over his shoulder while it is aimed, and — play's own — the shoulder
-    // view for as long as the throw is being charged (three/chase.ts).
+    // A THROWN weapon has a camera of its own, and two of them — BOTH the exe's
+    // (three/chase.ts). Taking one in HAND is what changes the view, which is
+    // 0x493BB0's own dispatch and mode 4; holding the VIEW key is the TR cam,
+    // mode 0x12. **The fire button has nothing to do with either of them**, and
+    // a gun changes nothing on either count — 0x493BB0 skips it outright.
     const lobbing = acting && weaponLayer(pigShot(soldier.pig.id)?.holding ?? null) === 'lob'
     const view: View = pigShot(soldier.pig.id)?.underCanopy
       ? 'face'
@@ -348,9 +350,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
           // the melee camera is gated on, which is false through a swing.
           acting && now.scoped
           ? 'scope'
-          : lobbing && now.charging
+          : lobbing && now.sighting
             ? 'throw'
-            : lobbing && now.sighting
+            : lobbing
               ? 'lob'
               : 'chase'
     if (acting) lastView = view

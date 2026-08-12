@@ -505,7 +505,6 @@ export function createEngine(parts: EngineParts): Engine {
         aimAngle: view.aimAngle,
         scoped: view.scoped,
         sighting: view.sighting,
-        charging: view.charging,
         zoom: view.zoom,
         readying: view.readying,
         still: view.still,

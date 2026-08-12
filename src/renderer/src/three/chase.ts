@@ -81,52 +81,68 @@ const MELEE_CLOSE = 1700 / 3072
 const RIFLE_CLOSE = 2048 / 3072
 
 /**
- * THE THROWN WEAPON'S OWN CAMERA — the exe's mode 0x12, its debug name
- * **"TR cam"** (0x4d8e7c), and it is picked exactly where the rifle cam is.
+ * **A WEAPON IN THE HAND CHANGES THE CAMERA, and the original does it in
+ * `0x493BB0`.** Play: "я сказал, когда в руки берёшь оружие — меняется камера",
+ * and they were right — this is the exe's, not the remake's.
  *
- * The aim-bit-held handler dispatches three ways (0x492ddd onwards, in full in
- * `weapons/fire.md`): a GUN — skills 6..15, 17, 18, 64 — takes mode 0x0E, the
- * pillbox's own 45 and 46 take mode 0x11 "barrel cam", and **everything else
- * takes mode 0x12**, which on a pig holding something is the grenade family and
- * the bazooka. Nothing else in the binary asks for either of the two: both
- * pushes are in this one function.
+ * That function runs on every take-in-hand and put-away (its argument is which),
+ * and it dispatches on the SKILL through `[0x493DC4 + skill − 1]` into the jump
+ * table at 0x493DA0. Four answers, and they are the whole of it:
  *
- * Its row of the table at 0x4d9528 is **1700** against the chase's 3072 — the
- * melee camera's own distance, so it comes in to a little over half — and its
- * handler (0x4a4620) builds the camera at the subject's position plus a bearing
- * offset and **+400 straight up** (`add eax,190h` at 0x4a4740, and +y is up in
- * the exe's world). So: closer than the chase and standing over it, which is
- * play's "выше — чтобы удобно целиться".
+ * - **the thrown family** — 14, 19..33 (the grenades, the BAZOOKA), 35..50, 56,
+ *   60, 61, 63 — takes `0x49F6F0(1)` and then **camera mode 4** (0x493c82);
+ * - the five MELEE (1..5) and 51..55 take the same mode 4 with `0x49F6F0(0)`;
+ * - **a GUN — 6..13, and 15..18 — changes nothing at all** (0x493c9d jumps
+ *   straight past the camera block), which is why a rifle only ever moves the
+ *   view when the aim key is held;
+ * - 34 and 57..59 take mode 9, remembering the mode they came from in
+ *   `[game+0x51C]`.
+ *
+ * **`0x49F6F0` is where the distance comes from, and it STAMPS the table.** It
+ * writes mode 4's own row — 0x4D9540 is `0x4d9528 + 4*6` — with **3500** for a
+ * thrown weapon and **1500** for a blade (columns 1: 692 and 800), and sets
+ * `[cam+0x94]`, which picks the branch mode 4's handler takes (0x4a2277): a
+ * thrown weapon's non-zero puts the camera **1536 out from the subject**
+ * (0x4a2307), a blade's zero puts it at the subject itself. So the shipped
+ * file's 1500/2000 is whatever the last run left there, exactly as the TR cam's
+ * row is.
+ *
+ * 3500 against the chase's 3072 is the ratio here. The LIFT is the one part
+ * that is not read: this branch takes the subject's y as it stands and the
+ * common tail (0x4A0B50) only clamps it 768 above the ground. Mode 4's OTHER
+ * branch — the one a smoothed camera takes, 0x4a2246 — adds **300**, and that
+ * is what the remake borrows for play's "выше, чтобы удобно целиться".
+ */
+const LOB_CLOSE = 3500 / 3072
+const LOB_RISE = 300 * MODEL_SCALE
+
+/**
+ * …and the camera the VIEW KEY holds — the exe's mode **0x12, "TR cam"**
+ * (0x4d8e7c). Play: "там есть отдельная кнопка, которая меняет вид пока
+ * держишь (у нас G)", and "2 при нажатой кнопки из-за спины".
+ *
+ * The aim-bit branch dispatches three ways (0x492ddd onwards, in full in
+ * `weapons/fire.md`): a GUN takes mode 0x0E, the pillbox's 45 and 46 take mode
+ * 0x11 "barrel cam", and **everything else takes 0x12** — which on a pig
+ * holding something is the grenade family and the bazooka. Nothing else in the
+ * image asks for either: both pushes are in that one function.
+ *
+ * Its handler (0x4a4620) builds the camera at the subject plus a bearing offset
+ * of **200** and **+400 straight up** (`add eax,190h` at 0x4a4740, and +y is up
+ * in the exe's world), with a nominal distance of **1700** in its row. Close in
+ * and over his back, which is what play calls "из-за спины".
  *
  * Two things the handler does that the remake does not. The distance is
  * DYNAMIC — when the camera would come within 768 of the ground it writes a
  * reduced figure back into its own table slot (0x4a482e writes `0x6A4 − excess`
- * to 0x4d9594, which is where the shipped 1600 in the file comes from), where
- * the rig here clamps its own height against the terrain instead. And the whole
- * placement rides a camera PITCH the player may drive, `[cam+0x76]`, which this
- * mode alone clamps to ±700 of 4096 rather than the usual window (0x49f606) —
- * there is no key bound to a camera pitch here.
+ * to 0x4d9594, which is where the shipped 1600 comes from), where the rig here
+ * clamps its own height against the terrain instead. And the placement rides a
+ * camera PITCH the player may drive, `[cam+0x76]`, which this mode alone clamps
+ * to ±700 of 4096 rather than the usual window (0x49f606) — there is no key
+ * bound to a camera pitch here.
  */
-const LOB_CLOSE = 1700 / 3072
-const LOB_RISE = 400 * MODEL_SCALE
-
-/**
- * …and the camera while the throw is being CHARGED: behind the back.
- *
- * **The MODE is play's**: "для гранаты и для базуки отдельная камера — 2
- * режима: 1 выше, чтобы удобно целиться; 2 при нажатой кнопки из-за спины." The
- * exe has nothing of the kind — its aim-bit branch lands on the TR cam whether
- * the trigger is down or not, and the fire handler that fills the gauge
- * (0x493796) never touches the camera — so what this is is the ordinary
- * shoulder view held for as long as the button is.
- *
- * The PLACEMENT is not invented, though: it is the rifle cam's own row, 2048,
- * which is the engine's one number for "behind the shoulder, sighting a
- * weapon", and the rig's ordinary lift under it. So the two modes differ the
- * way play describes them — high and close in to see the arc, back and low over
- * the shoulder to aim the throw.
- */
-const THROW_CLOSE = RIFLE_CLOSE
+const THROW_CLOSE = 1700 / 3072
+const THROW_RISE = 400 * MODEL_SCALE
 
 /**
  * The SCOPE: the view down the weapon, and it is BOLTED TO THE HAND.
@@ -196,9 +212,10 @@ export type View =
   | 'melee'
   /** Straight behind and closer: sighting a gun. */
   | 'rifle'
-  /** Over him and close in: aiming something THROWN — the exe's TR cam. */
+  /** Back and raised: something THROWN is in his hands — the exe's mode 4. */
   | 'lob'
-  /** Behind the back, low: the throw being charged. */
+  /** Close in over his back: the view key, held, with a thrown weapon out —
+   * the exe's TR cam. */
   | 'throw'
   /** Down the barrel: first person, looking where the weapon points. */
   | 'scope'
@@ -217,7 +234,7 @@ const RIG: Record<View, { close: number; lift: number }> = {
   melee: { close: MELEE_CLOSE, lift: LIFT },
   rifle: { close: RIFLE_CLOSE, lift: LIFT },
   lob: { close: LOB_CLOSE, lift: LIFT + LOB_RISE },
-  throw: { close: THROW_CLOSE, lift: LIFT },
+  throw: { close: THROW_CLOSE, lift: LIFT + THROW_RISE },
   scope: { close: 0, lift: 0 }
 }
 

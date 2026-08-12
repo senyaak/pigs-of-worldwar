@@ -105,9 +105,6 @@ export interface BattleSnapshot {
   /** Whether the aim view is up at all — every weapon that aims gets one and a
    * THROWN weapon's is its own camera (lib/game/sights.ts, three/chase.ts). */
   sighting: boolean
-  /** Whether the power gauge is filling: the fire button is down and the throw
-   * has not left yet. */
-  charging: boolean
   zoom: number
   readying: number
   still: number
