@@ -33,7 +33,7 @@ import { FALL_SPEED_FACTOR, STEP_DOWN, WALK_BACK_SPEED, WALK_SPEED, step } from 
 import { MODEL_SCALE } from './scale'
 import { clampToWorld, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
-import { NO_OBSTACLES } from './obstacles'
+import { NO_OBSTACLES, STANDING_ON } from './obstacles'
 import type { Obstruction } from './obstacles'
 
 /**
@@ -370,7 +370,7 @@ const footingY = (
 ): number | null => {
   if (!footing) return null
   const on = footing.obstruction.standOn(x, z, footing.y, 0)
-  return on !== null && Math.abs(on - footing.y) < 1 ? on : null
+  return on !== null && Math.abs(on - footing.y) < STANDING_ON ? on : null
 }
 
 export function createLocomotion(
@@ -785,7 +785,7 @@ function ground(
  */
 function standing(state: LocomotionState, obstruction: Obstruction): boolean {
   const on = obstruction.standOn(state.x, state.z, state.y, 0)
-  return on !== null && Math.abs(on - state.y) < 1
+  return on !== null && Math.abs(on - state.y) < STANDING_ON
 }
 
 /**

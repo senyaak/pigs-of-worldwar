@@ -33,6 +33,7 @@ import {
 } from '../../src/lib/game/obstacles'
 import type { MapObject } from '../../src/lib/formats/pog'
 import type { TerrainQuery } from '../../src/lib/game/terrain'
+import { WOOD } from '../../src/lib/game/underfoot'
 import type { Obstruction } from '../../src/lib/game/obstacles'
 import { terrain } from './fixture'
 
@@ -172,6 +173,42 @@ test('a low object is a step onto, not a wall', () => {
   expect(state.z).toBeGreaterThan(1024)
   expect(state.z).toBeLessThan(3072)
   expect(state.y).toBeCloseTo(-WALL_CLIMB, 3)
+})
+
+test('a bridge deck is what a hoof lands on, and it is not the tile under it', () => {
+  // The FOOTSTEP's question (lib/game/underfoot.ts): the exe asks the tile and
+  // nothing else, and no shipped map carries a wooden tile at all, so a bridge
+  // sounding like a bridge is the remake's own line and this is where it is
+  // pinned.
+  const query = flat()
+  const deck = record({
+    name: 'BRIDGE_C',
+    x: 0,
+    y: WALL_CLIMB / 2,
+    z: 2048,
+    box: { x: 4096, y: WALL_CLIMB, z: 2048 }
+  })
+  const field = new ObstacleField([deck])
+  const state = createLocomotion(query, 0, 0, NORTH)
+  run(state, query, field, { walk: 1 }, 1.5)
+
+  // Standing ON it — the same test `standing` makes — and it sounds like wood.
+  expect(state.y).toBeCloseTo(-WALL_CLIMB, 3)
+  expect(field.underfoot(state.x, state.z, state.y)).toBe(WOOD)
+
+  // Off the deck, on the ground beside it, the deck has nothing to say: the
+  // tile answers, which is every other step in the game.
+  expect(field.underfoot(0, 0, 0)).toBeNull()
+  // …and neither has the deck a pig is standing UNDER, or walking past on the
+  // ground: `underfoot` is what holds the feet up, not what is nearby.
+  expect(field.underfoot(state.x, state.z, 0)).toBeNull()
+
+  // Nothing else on a map carries a material of its own. A crate is wooden and
+  // sounds like the ground it sits on, because nobody has ruled otherwise.
+  const crate = new ObstacleField([
+    record({ name: 'CRATE1', x: 0, y: WALL_CLIMB / 2, z: 2048, box: { x: 4096, y: WALL_CLIMB, z: 2048 } })
+  ])
+  expect(crate.underfoot(state.x, state.z, state.y)).toBeNull()
 })
 
 test('an object over the pig’s head is walked under', () => {

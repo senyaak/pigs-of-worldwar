@@ -21,9 +21,14 @@
 // dumps the table this file holds.
 //
 // WHICH sound a step makes is the ground's business and is decoded beside the
-// table: `stepSound` in `audio/battle.ts` takes the tile's terrain type. This
+// table: `stepCue` in `audio/battle.ts` takes the tile's terrain type. This
 // module says only that a hoof landed, whose it was, and how hard — the bus
 // carries data, never a file name (lib/game/events.ts).
+//
+// The one thing the tile cannot answer is a BRIDGE, which the pig is over
+// rather than on. The exe does not ask anything else and the shipped maps
+// carry no wooden tile at all, so a deck sounding like a deck is the remake's
+// own line — the whole of it is `lib/game/underfoot.ts`.
 //
 // Pure, like the rest of lib/game: clips and a terrain query in, events out.
 
@@ -33,6 +38,7 @@ import type { ClipTiming } from './clips'
 import type { Emit } from './events'
 import type { Pig } from './game'
 import { PHASE_UNITS } from './melee'
+import type { Obstruction } from './obstacles'
 import type { TerrainQuery } from './terrain'
 
 /** One authored footfall: where in the clip, which hoof, and how hard. */
@@ -158,14 +164,35 @@ interface Parts {
   anim: Anim
   clips: ClipTiming[]
   query: TerrainQuery
+  /** What is under the hoof when the ground is not: a bridge. */
+  obstruction: Obstruction
 }
+
+/**
+ * WHAT this hoof landed on, in the tile's own alphabet: the deck the pig is
+ * standing on where there is one, and the tile it is over otherwise.
+ *
+ * Positional, so it answers for every pig on the map and not only the one
+ * being driven — the acting pig's `swimming` flag is the same question asked
+ * once a frame, and a footfall can come off a clip any pig is wearing.
+ */
+export const surfaceUnder = (
+  query: TerrainQuery,
+  obstruction: Obstruction,
+  pig: Pig
+): number =>
+  obstruction.underfoot(pig.position.x, pig.position.z, pig.position.y) ??
+  query.tileType(pig.position.x, pig.position.z)
 
 /**
  * The cursor is kept HERE rather than on the pig, because it is not a rule:
  * nothing in the battle branches on how far into a clip a pig is except the
  * two that already carry their own phase (the charge, the doorway).
  */
-export function createFootsteps({ pigs, anim, clips, query }: Parts, emit: Emit): Footsteps {
+export function createFootsteps(
+  { pigs, anim, clips, query, obstruction }: Parts,
+  emit: Emit
+): Footsteps {
   /** Where each pig's clip cursor was last frame, in absolute phase — and
    * which REVISION it belonged to, so a restarted clip starts over rather
    * than picking up where the last one stopped (lib/game/anim.ts). */
@@ -198,7 +225,7 @@ export function createFootsteps({ pigs, anim, clips, query }: Parts, emit: Emit)
     // Never look back further than one lap. A frame that swallowed a whole
     // cycle (a stall, a warp) owes at most one step per foot, not a burst.
     const from = Math.max(before, now - PHASE_UNITS)
-    const surface = query.tileType(pig.position.x, pig.position.z)
+    const surface = surfaceUnder(query, obstruction, pig)
     for (const fall of falls) {
       const lapsIn = Math.floor((now - fall.phase) / PHASE_UNITS)
       if (lapsIn < 0) continue

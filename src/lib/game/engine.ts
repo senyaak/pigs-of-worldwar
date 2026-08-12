@@ -239,10 +239,6 @@ export function createEngine(parts: EngineParts): Engine {
   /** …and where that puts its bones. The blade, the muzzle and the scope's eye
    * are the same question, asked of the engine now (lib/game/bonePose.ts). */
   const bones = createBonePose({ skeleton: world.skeleton, clips: world.clips, anim })
-  /** …and what the hooves do on the way: a footstep is a key-frame event on the
-   * clip, so the cursor above is the whole of what it needs
-   * (lib/game/footsteps.ts). */
-  const footsteps = createFootsteps({ pigs, anim, clips: world.clips, query }, bus.emit)
   const pose: Pose = parts.pose ?? bones
   /** The rings a blow throws, and the numbers that float off it. */
   const effects = createEffectField(random)
@@ -307,6 +303,15 @@ export function createEngine(parts: EngineParts): Engine {
     bus.emit
   )
   const obstacles = scenery.obstacles
+  /** …and what the hooves do on the way: a footstep is a key-frame event on the
+   * clip, so the cursor above is most of what it needs (lib/game/footsteps.ts).
+   * The rest is the collision world, because a hoof on a BRIDGE is not on the
+   * tile under it (lib/game/underfoot.ts) — which is why this is built here,
+   * after the scenery, rather than beside the clips. */
+  const footsteps = createFootsteps(
+    { pigs, anim, clips: world.clips, query, obstruction: obstacles },
+    bus.emit
+  )
   /** Crates that come down under a canopy, because the script says they are
    * pickups and the placer drops those from 0xC00 up — the DESCENT is the
    * engine's, because the beat after a blow waits on it (lib/game/airDrop.ts). */

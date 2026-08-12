@@ -525,6 +525,18 @@ and the weakest of them were invented here:
     with it is 52, which steps clean over the two-unit window. Every walk in
     `e2e/002/ramp.spec.ts` therefore runs at `STEP_SECONDS`, and the bridge one
     fails without the fix.
+- `[CHECK — remake]` **A BRIDGE SOUNDS LIKE WOOD, and the exe has no such
+  sound to give.** `Pig::Footstep` (0x475010) reads the pig's TILE and nothing
+  else, and measured over the shipped Maps folder there is **no tile of type 3
+  or type 2 on any of the 61 maps** — two arms of its own twelve-way switch are
+  unreachable and `FT_WOOD` ships unplayed, while the 1183 tiles under the
+  bridge pieces are grass, stone, water, sand, snow, lava and ice. So the
+  original crosses a deck to the sound of the ditch and splashes over ISLAND's
+  spans. Nothing stamps a tile at runtime either: the 3×3 `Map::SetTile` block
+  that looked like it might is the MINE REVEAL, on a pig of class 4, 5..7 or
+  0x0E. `lib/game/underfoot.ts` is the whole divergence — a name table, and
+  `Obstruction.underfoot` asking `standing`'s own question for a material.
+  Correct it in play; a piece becomes stone in one line.
 - `[gap]` **The three ARCH bridges are still fallen through** — `STR06PPP` on
   MASHED, `W1R06PPP` on BAY, `SNR05PPP` on DEMO2 and ICEFLOW. Their collider is
   198.5 above the deck they draw, so walking them on the box would hold a pig

@@ -716,6 +716,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   exposeBattleDebug({
     game,
     query,
+    obstruction: engine.obstacles,
     squad,
     dropIn,
     props,

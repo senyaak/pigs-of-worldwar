@@ -24,6 +24,7 @@ import { isRamp, isWalkway } from './ramps'
 import { MODEL_SCALE } from './scale'
 import { isSpawnMarker } from './spawns'
 import { HEIGHT_SCALE } from './terrain'
+import { surfaceOf } from './underfoot'
 
 /**
  * **The pig's own body: a SPHERE of radius 0xAA = 170, and it is READ.**
@@ -186,6 +187,11 @@ export interface Obstacle {
    * `top` is the whole face.
    */
   sloped: boolean
+  /**
+   * What this face SOUNDS like, as a terrain type — or null for "ask the
+   * ground", which is every record but a bridge (lib/game/underfoot.ts).
+   */
+  surface: number | null
 }
 
 /** What locomotion asks about the things in its way. */
@@ -221,6 +227,16 @@ export interface Obstruction {
    * (lib/game/bullets.ts).
    */
   stopper(x: number, y: number, z: number): number | null
+  /**
+   * What the pig's feet are ON, as a terrain type, where that is one of OUR
+   * faces and it has a material of its own — null everywhere else, and the
+   * landscape's own tile answers instead (lib/game/underfoot.ts).
+   *
+   * The test is `standing`'s, not `standOn`'s: the face has to come back LEVEL
+   * with the feet. A deck the pig is falling past is not what it is standing
+   * on, and neither is the one under a ramp it is climbing.
+   */
+  underfoot(x: number, z: number, footY: number): number | null
 }
 
 /** Nothing in the way — the default when a map's objects failed to load. */
@@ -228,7 +244,8 @@ export const NO_OBSTACLES: Obstruction = {
   standOn: () => null,
   blocks: () => false,
   solid: () => false,
-  stopper: () => null
+  stopper: () => null,
+  underfoot: () => null
 }
 
 /** The obstacle a POG record makes, or null when it is not solid. */
@@ -258,7 +275,8 @@ export function boxOf(object: MapObject): Obstacle {
     halfX: (across ? object.box.z : object.box.x) / 2,
     halfZ: (across ? object.box.x : object.box.z) / 2,
     turn: modelRotationY(object.yaw),
-    sloped: isRamp(object.name)
+    sloped: isRamp(object.name),
+    surface: surfaceOf(object.name)
   }
 }
 
@@ -350,6 +368,15 @@ export function penetrates(
   return gapX * gapX + gapZ * gapZ <= radius * radius
 }
 
+/**
+ * How near a face has to come to the feet to BE what they are standing on.
+ *
+ * One unit of a world whose tile is 512 and whose pig is 320 tall: this is the
+ * "same height" test and nothing more, so it stays a unit rather than becoming
+ * a tolerance anybody is tempted to tune.
+ */
+export const STANDING_ON = 1
+
 /** Tiles the buckets are this wide — a tile, like everything else. */
 const BUCKET = 512
 
@@ -422,14 +449,31 @@ export class ObstacleField implements Obstruction {
    * hold a pig by its feet.
    */
   standOn(x: number, z: number, footY: number, reach: number): number | null {
-    let best: number | null = null
+    const on = this.highestUnder(x, z, footY, reach)
+    return on === null ? null : topAt(on, x, z)
+  }
+
+  /** …and WHICH box that top belongs to. Y counts down, so the highest face is
+   * the smallest number. */
+  private highestUnder(x: number, z: number, footY: number, reach: number): Obstacle | null {
+    let best: Obstacle | null = null
+    let bestTop = 0
     for (const obstacle of this.near(x, z)) {
       const top = topAt(obstacle, x, z)
       if (top < footY - reach) continue // too tall to step onto
       if (!penetrates(obstacle, x, z, holdReachOf(obstacle))) continue
-      if (best === null || top < best) best = top
+      if (best === null || top < bestTop) {
+        best = obstacle
+        bestTop = top
+      }
     }
     return best
+  }
+
+  underfoot(x: number, z: number, footY: number): number | null {
+    const on = this.highestUnder(x, z, footY, 0)
+    if (on === null) return null
+    return Math.abs(topAt(on, x, z) - footY) < STANDING_ON ? on.surface : null
   }
 
   blocks(x: number, z: number, footY: number, reach: number): boolean {
@@ -520,6 +564,8 @@ export function withPigs(field: Obstruction, pigs: PigBody[]): Obstruction {
     solid: (x, y, z) => field.solid(x, y, z),
     // A PIG is not a record and has no id, so it can never be the stopper: a
     // bullet is resolved against bodies by its own test (lib/game/bullets.ts).
-    stopper: (x, y, z) => field.stopper(x, y, z)
+    stopper: (x, y, z) => field.stopper(x, y, z),
+    // …and a pig is not a surface either: nothing stands on one.
+    underfoot: (x, z, footY) => field.underfoot(x, z, footY)
   }
 }

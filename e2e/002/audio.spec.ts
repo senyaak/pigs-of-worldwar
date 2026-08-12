@@ -23,7 +23,8 @@ import {
   SURFACE_DEFAULT,
   SURFACE_SOUNDS
 } from '../../src/renderer/src/audio/battle'
-import { press, release, tap, warp } from '../controller'
+import { WOOD } from '../../src/lib/game/underfoot'
+import { beginTurn, debugState, hold, press, release, releaseAll, tap, warp } from '../controller'
 import { startGame } from '../menu'
 
 const bank = (relPath: string): ReturnType<typeof parseSrl> =>
@@ -133,5 +134,47 @@ test('a walking pig sounds like the ground it is on', async ({ app }) => {
     expect(steps[i + 1]).toBe(STEP_UNDERLAY)
   }
 
+  expect(app.errors()).toEqual([])
+})
+
+test('…and on a BRIDGE it sounds like the bridge, not like the ditch', async ({ app }) => {
+  // The exe cannot do this: its footstep reads the pig's TILE and nothing else
+  // (0x475010), and no shipped map carries a tile of type 3 — over all 61 of
+  // them the WOOD and METAL arms of its own switch are unreachable, and
+  // `FT_WOOD.wav` ships unplayed. So crossing CAMP's deck the original hears
+  // the ditch, and ISLAND's spans splash. This is the remake's line
+  // (lib/game/underfoot.ts), and it is one table to correct in play.
+  const { page } = app
+  await startGame(page)
+  await expect(page.locator('#battle')).toBeVisible()
+
+  const heard = (): Promise<string[]> => page.evaluate(() => window.pow!.debug!.sounds())
+  await expect.poll(async () => (await heard()) !== null).toBe(true)
+
+  // The route 002/ramp.spec.ts walks: from the bank, west onto the near deck
+  // of CAMP's first bridge — well onto it and well short of the GAP.
+  await warp(page, 800, 7424, -Math.PI / 2)
+  await beginTurn(page)
+  await hold(page, 'walkForward', 1400)
+  expect((await debugState(page)).x, 'it walked onto the bridge').toBeLessThan(256)
+
+  // What a hoof landing here would play — the deck, and not the tile it spans.
+  expect(await page.evaluate(() => window.pow!.debug!.surface())).toBe(WOOD)
+
+  // And it is heard. Turning on the spot rather than walking on: clip 4 carries
+  // two footfalls a lap (lib/game/footsteps.ts) and the pig stays on the deck.
+  const before = (await heard()).length
+  await press(page, 'turnLeft')
+  await page.waitForTimeout(900)
+  await release(page, 'turnLeft')
+  const steps = (await heard()).slice(before)
+
+  expect(steps.length, 'the hooves').toBeGreaterThan(2)
+  for (let i = 0; i < steps.length; i += 2) {
+    expect(steps[i]).toBe(SURFACE_SOUNDS[WOOD])
+    expect(steps[i + 1]).toBe(STEP_UNDERLAY)
+  }
+
+  await releaseAll(page)
   expect(app.errors()).toEqual([])
 })

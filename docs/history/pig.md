@@ -91,3 +91,46 @@ is the switch's own odd row and audible on ICEFLOW; and **`FT_SAND` plays under
 every step**, at the same mix, because the handler plays it a second time. That
 last one is the only thing here play might overrule — `STEP_UNDERLAY` is one
 line to drop.
+
+## …AND A BRIDGE IS THE ONE THING THE TILE CANNOT SAY — 2026-08-12
+
+Play named it and it was not started: the sound of walking over a bridge. The
+exe has no answer to give. `Pig::Footstep` (0x475010) reads the pig's TILE out
+of the map array and nothing else — there is no object under the hoof anywhere
+in the function — so the original crosses a deck to the sound of what is under
+the deck, and over ISLAND's spans that is a splash.
+
+The data closes it from the other side, measured over the shipped Maps folder
+by `objects/deck-tiles.js` in the disasm repo:
+
+- of the **1183 tiles the bridge pieces of all 61 maps stand on**, grass 481,
+  stone 266, water 243, sand 105, snow 50, lava 20, ice 18 — and **not one of
+  type 3**;
+- over **all 249 856 tiles in the game** the type histogram is 0, 1, 4, 5, 6,
+  7, 8, 9 and 11 only. Types 2 and 3 never occur, so two arms of the exe's own
+  switch are unreachable and **`FT_METAL` and `FT_WOOD` ship unplayed**.
+
+Nothing writes a tile type at runtime either. The one mechanism that looked
+like it might — a 3×3 block of tile values saved at `[obj+0x182]` and stamped
+back through `Map::SetTile` — turned out to be the MINE REVEAL, on a PIG of
+class 4, 5..7 or 0x0E: the tail walks the same nine cells testing bit 0x40.
+`objects/notes.md` carried it as "the only mechanism seen by which an object
+reaches the ground a pig walks on" and no longer does.
+
+**So the remake draws its own line, and it is one table wide.** A record that
+is part of a bridge answers `WOOD` for the face a pig stands on; everything
+else answers nothing and the tile is asked, exactly as before
+(`lib/game/underfoot.ts`). The collision world carries it — `Obstacle.surface`,
+and `Obstruction.underfoot` is `standing`'s own test asked for a material — so
+it works for any pig on the map rather than only the driven one, and the bus
+still carries a terrain TYPE and never a file name. The names are measured:
+the six decks (`BRIDGE_C`, `BRIDG_C2`, `BRID2_C`, `BRID2_C1`, `BRID2C3`,
+`BRID2_S2` — every one of them 64 units thick, a plank) plus the six walkway
+pieces `isWalkway` already names. A crate, a wall top and a pillbox roof are
+each a separate ruling and none of them was asked for.
+
+Two specs: `e2e/002/obstacles.spec.ts` pins the rule itself (standing on a deck
+is wood, walking past it or under it is not, and a crate is not), and
+`e2e/002/audio.spec.ts` walks CAMP's first bridge and hears `FT_WOOD` over the
+exe's own sand layer. `pow.debug.surface()` now answers what a hoof landing
+NOW would play rather than the raw tile, which is what makes that assertable.

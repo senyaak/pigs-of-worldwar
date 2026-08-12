@@ -14,6 +14,8 @@ import type { Game } from '../../../lib/game/game'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { controller } from '../input/controller'
 import { inWater } from '../../../lib/game/locomotion'
+import { surfaceUnder } from '../../../lib/game/footsteps'
+import type { Obstruction } from '../../../lib/game/obstacles'
 import type { DropIn } from '../../../lib/game/dropIn'
 import type { MapProps } from './props'
 import type { Squad } from './squad'
@@ -22,6 +24,9 @@ import { skillName } from '../../../lib/game/skills'
 export interface DebugParts {
   game: Game
   query: TerrainQuery
+  /** The collision world, for the ONE question the landscape cannot answer:
+   * what the acting pig is standing on (lib/game/underfoot.ts). */
+  obstruction: Obstruction
   squad: Squad
   dropIn: DropIn
   props: MapProps
@@ -177,13 +182,16 @@ export interface DebugParts {
 /** Hang the battle's debug surface off `window.pow`, keeping whatever else
  * is already there (the controller, the map selector, the HUD layout). */
 export function exposeBattleDebug(parts: DebugParts): void {
-  const { game, query, squad, dropIn, props, camera } = parts
+  const { game, query, obstruction, squad, dropIn, props, camera } = parts
   window.pow = {
     ...(window.pow ?? { controller }),
     debug: {
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
-      surface: () => query.tileType(game.currentPig.position.x, game.currentPig.position.z),
+      // What a hoof landing NOW would sound like — the deck under the pig where
+      // there is one and the tile it is over otherwise, which is the footstep's
+      // own question (lib/game/footsteps.ts).
+      surface: () => surfaceUnder(query, obstruction, game.currentPig),
       /** Whose turn it is and how it stands. */
       hud: () => ({
         turn: game.turn,
