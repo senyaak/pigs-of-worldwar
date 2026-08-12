@@ -53,6 +53,46 @@ export function lineFor(strings: string[], clip: number): string {
   return strings[LINE_BASE + clip] ?? ''
 }
 
+// ——— the two lines that are not steps at all ———
+//
+// Both were filed as "closers" for years because their strings are blank, and
+// neither ends anything (`tutorial/notes.md`).
+
+/**
+ * **Clip 21 — the first MINE, and it is armed by the crate that sends you in.**
+ *
+ * Its call site is the PROJECTILE CONSTRUCTOR (0x431FDD): a mine going off
+ * builds one, and `[proj+0x88] = skill − 0x184` is the ammo row, of which
+ * **0x28 and 0x29 are the two `WE_APMIN`** a foot sets off. So it answers a mine
+ * however it was set off — trodden on or hit by something thrown.
+ *
+ * `[gameMode+0x330]` is its flag and the three sites read as a rule: the game
+ * object is built with it **set** (0x48F073, so the line is disarmed at level
+ * start), each of the two MINEFIELD crates CLEARS it as it speaks its own line
+ * (0x465D72 and 0x465DBD — the health×15 and health×20 arms, both of which say
+ * "FOLLOW THE PATH THROUGH THE MINEFIELD"), and the line sets it back after
+ * speaking. **Once per minefield**, and only after being told to walk into one.
+ */
+export const MINE_LINE = 21
+
+/** Whether this crate ARMS the mine line — the two that send the pig into a
+ * minefield, by their own amounts (lib/game/pickups.ts). */
+export function armsMineLine(skill: number | null, amount: number): boolean {
+  return skill === null && (amount === 15 || amount === 20)
+}
+
+/**
+ * **Clip 26 — the turn you WASTED.**
+ *
+ * It lives inside the mode machine's own "the clock has run out" block
+ * (0x4900F4) and it is gated on `[gameMode+0x334]`, which is a count of WEAPON
+ * USES this turn: the fire dispatcher increments it (0x493E7A, the function that
+ * hands a skill to `Pig::Fire`) and `Game::NextTurn` zeroes it at every handover
+ * — but only from 1 or less (0x48F50C). Speaking sets it to **2**, which is
+ * exactly the value the reset refuses, so the line is once a level.
+ */
+export const WASTED_TURN_LINE = 26
+
 // ——— the END of it, which is two clips and a count ———
 //
 // `Game::NextTurn` speaks one of them on the winning answer (0x48FA81, and the

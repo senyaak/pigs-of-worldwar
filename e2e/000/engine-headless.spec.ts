@@ -292,6 +292,39 @@ test('the last dummy ENDS the training mission, and three seconds later it lets 
   ).toBe(true)
 })
 
+/**
+ * **A TURN NOBODY DID ANYTHING WITH.** The exe counts weapon uses in
+ * `[gameMode+0x334]` and says something when the clock runs out with the count
+ * at nought (0x4900A2, `lib/game/tutorial.ts`) — the training ground's clip 26,
+ * which this repo had filed as one of the mission's closers for months.
+ *
+ * Driven here rather than in the app because the training ground's clock is 99
+ * seconds and `hurryTurn` is not something a player can do.
+ */
+test('the clock running out on an idle turn is announced — once', async () => {
+  if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
+    test.skip(true, `no game install at ${GAME_DIR}`)
+  }
+  const { engine, game, heard } = await buildHeadless(7)
+  while (engine.dropIn.running()) engine.update(FRAME)
+
+  const wasted = (): number => heard.filter((event) => event.kind === 'turnWasted').length
+
+  game.beginTurn()
+  game.hurryTurn(0.1)
+  for (let frame = 0; frame < 10; frame++) engine.update(FRAME)
+  expect(wasted(), 'a turn spent walking about is a turn wasted').toBe(1)
+
+  // …and never again: speaking writes 2 into the count, which is the one value
+  // the handover's reset refuses (0x48F50C). Take the beat, then run another
+  // clock out.
+  engine.battle.cutTurnBeat()
+  game.beginTurn()
+  game.hurryTurn(0.1)
+  for (let frame = 0; frame < 10; frame++) engine.update(FRAME)
+  expect(wasted(), 'the line is once a level').toBe(1)
+})
+
 test('it steps: the drop lands, the clock runs, and the pig walks where it is told', async () => {
   if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
     test.skip(true, `no game install at ${GAME_DIR}`)

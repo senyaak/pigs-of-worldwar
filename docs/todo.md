@@ -44,11 +44,25 @@ its own — puts the battle away (mode 18, QUIT). The sergeant signs off with cl
 handover count).
 
 **Two of the four "closers" turned out to be nothing of the kind**, and the
-todo's own premise was wrong about them: clip **21** is the first MINE going off
-on the training ground (the projectile constructor, ammo rows 0x28/0x29), and
-clip **26** is a turn whose clock ran out with **no weapon used** — `[+0x334]` is
-incremented by the fire dispatcher and zeroed at the top of each turn. Neither is
-built; both are one line each now that they are read.
+todo's own premise was wrong about them. Both are BUILT now:
+
+- clip **21** is the first MINE going off — its call site is the projectile
+  constructor, gated on ammo rows 0x28/0x29 (the two `WE_APMIN`), so it answers a
+  mine trodden on or hit by something thrown alike. Its flag `[+0x330]` is the
+  other way up from what it looks: the game object is built with it SET, each of
+  the two MINEFIELD crates CLEARS it as it speaks its own line (0x465D72,
+  0x465DBD — the health×15 and ×20 arms), and speaking sets it back. **Once per
+  minefield, and only after being told to walk into one.**
+- clip **26** is a turn whose clock ran out with **no weapon used**. `[+0x334]`
+  is incremented by the fire dispatcher, zeroed at each handover but only from 1
+  or less, and the line writes **2** — the one value the reset refuses, so it is
+  once a level.
+
+`armsMineLine`/`MINE_LINE`/`WASTED_TURN_LINE` in `lib/game/tutorial.ts`,
+`weaponUses` in `lib/game/battle.ts`, and the `turnWasted` event. One half of the
+exe's guard is not modelled and says so at the field: it drops the wasted-turn
+line while the sergeant is talking and lets it come round later, where the remake
+counts it said.
 
 **What is NOT pinned**: the honest eleven-dummy path. `e2e/000/engine-headless.spec.ts`
 drives the whole seam — handover, ending, the three-second hold, the battle being

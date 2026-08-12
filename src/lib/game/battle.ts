@@ -310,6 +310,23 @@ export function createBattle(parts: BattleParts): Battle {
    * charge. SKIP TURN is not a weapon and is never refused.
    */
   let struck = false
+  /**
+   * How many weapons have been used this turn — the exe's `[gameMode+0x334]`,
+   * and the whole of what the training ground's "you did nothing" line hangs on
+   * (lib/game/tutorial.ts, `WASTED_TURN_LINE`).
+   *
+   * Three sites, all of them the exe's: the fire dispatcher increments it
+   * (0x493E7A), the handover zeroes it but only from 1 or less (0x48F50C), and
+   * the line itself writes **2** — which is the one value the reset refuses, so
+   * it is said once a level.
+   *
+   * The exe also drops the line while the sergeant is still talking
+   * (`0x43BB10`), and that half is NOT here: the engine has no speech, and the
+   * clock running out is a moment nobody is being spoken to anyway. The listener
+   * keeps its own guard (`ui/battle.ts`); what diverges is only that the exe
+   * would let a dropped line come round on a later turn.
+   */
+  let weaponUses = 0
   /** Seconds left of the getting-it-out clip. */
   let readying = 0
   /** Seconds the acting pig has stood still, and where it stood. */
@@ -465,6 +482,9 @@ export function createBattle(parts: BattleParts): Battle {
     const standing = game.players.filter((player) =>
       player.pigs.some((pig) => !isDead(pig))
     ).length
+    // The turn's weapon count starts over — from 1 or less, because 2 is what
+    // the wasted-turn line writes and it must survive the handover (0x48F50C).
+    if (parts.training && weaponUses <= 1) weaponUses = 0
     const outcome = outcomeOf(parts.training, standing, parts.targetsLeft())
     if (outcome !== 'playing') {
       // The turn that has just been played is the count the closer is picked by —
@@ -671,7 +691,16 @@ export function createBattle(parts: BattleParts): Battle {
       aftermath !== null ||
       swings.running() ||
       grenades.thrown() > 0
-    if (!blowInProgress && (game.tick(delta) || isDead(game.currentPig))) {
+    const ranOut = !blowInProgress && game.tick(delta)
+    if (!blowInProgress && (ranOut || isDead(game.currentPig))) {
+      // **THE TURN NOBODY DID ANYTHING WITH.** The exe says a line about it, in
+      // this exact block and on this exact condition (0x4900A2): the clock ran
+      // out — not a pig dying, not a turn spent — and the weapon count is still
+      // at nought. Writing 2 is what makes it once a level.
+      if (ranOut && parts.training && weaponUses === 0) {
+        weaponUses = 2
+        emit({ kind: 'turnWasted' })
+      }
       // …and the turn does not hand over on the spot. `Game::EndTurn` goes into
       // mode 13 first — the beat above, which the next step runs.
       endTurnBeat()
@@ -912,6 +941,9 @@ export function createBattle(parts: BattleParts): Battle {
     // here.
     if (answered === 'used') {
       struck = true
+      // The exe counts it here too — this is the arm its own fire dispatcher
+      // increments `[gameMode+0x334]` from (0x493E7A).
+      weaponUses++
       if (endsTurn(acting.holding)) spent = true
       // A PLANTED charge keeps the turn and takes the clock down to four seconds
       // instead: enough to get clear of the thing, and not enough to do anything

@@ -100,6 +100,12 @@ export type BattleEvent =
   /** SKIP TURN was used. */
   | { kind: 'skillUsed' }
   /**
+   * The turn's CLOCK ran out with no weapon used all turn — the exe counts them
+   * in `[gameMode+0x334]` and the training ground has a line for it
+   * (lib/game/tutorial.ts). Only where there is a script to say it.
+   */
+  | { kind: 'turnWasted' }
+  /**
    * THE MISSION IS OVER — asked at the handover and nowhere else, which is where
    * the exe asks it (lib/game/endOfGame.ts). `turns` is how many were played, and
    * the training ground's sergeant picks his closing line by it.

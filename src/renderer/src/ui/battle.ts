@@ -24,6 +24,9 @@ import { createBus, handling } from '../../../lib/game/events'
 import {
   CLIP_FOR,
   MENU_ARMED,
+  MINE_LINE,
+  WASTED_TURN_LINE,
+  armsMineLine,
   clipForChosen,
   clipForClosing,
   clipForMenu,
@@ -143,6 +146,13 @@ export function initBattle(onLeave: () => void): BattleView {
    * (lib/game/tutorial.ts).
    */
   let step = 0
+  /**
+   * `[gameMode+0x330]`, the MINE line's own flag — and it is the other way up
+   * from what it looks: the game object is built with it SET, so the sergeant
+   * has nothing to say about mines until a crate sends the pig into a minefield
+   * and CLEARS it (lib/game/tutorial.ts). Once per minefield.
+   */
+  let mineLineArmed = false
 
   /**
    * The tutorial speaking: the clip out of `Speech/Sku1/Train1`, and its line
@@ -189,6 +199,10 @@ export function initBattle(onLeave: () => void): BattleView {
     // the pickup's own message is queued (lib/game/tutorial.ts). A crate line
     // starts the prompt counter over, whichever dispatcher spoke it.
     step = 0
+    // …and the two crates that say "FOLLOW THE PATH THROUGH THE MINEFIELD" ARM
+    // the mine line as they speak, which is what the exe does in the same two
+    // arms (0x465D72, 0x465DBD).
+    if (armsMineLine(skill, amount)) mineLineArmed = true
     sergeant(clipForPickup(skill, amount))
     if (skill === null) {
       hud.say((battleText[FOUND_PROVISIONS] ?? '').replace('>S', nameOf(pig)))
@@ -346,6 +360,9 @@ export function initBattle(onLeave: () => void): BattleView {
     speech.stop()
     cued = new Set()
     step = 0
+    // Disarmed, the way the game object is BUILT (0x48F073): nothing is said
+    // about mines until a crate sends the pig into a minefield.
+    mineLineArmed = false
     const teams = nations(textResult.strings)
     if (teams.length === 0) return refuse('the install names no teams')
 
@@ -431,6 +448,24 @@ export function initBattle(onLeave: () => void): BattleView {
           if (step < MENU_ARMED) return
           step += 1
           sergeant(clipForChosen(skill, step, speech.saying() === 0))
+        },
+        // **A MINE.** Once per minefield, and only after the crate that sent the
+        // pig into one — the flag is the exe's `[gameMode+0x330]` and it is
+        // spent by speaking. Its own site in the exe is the projectile
+        // constructor, so it answers a mine however it was set off.
+        mineTripped: () => {
+          if (!mineLineArmed) return
+          // The exe drops the line outright while the sergeant is mid-sentence
+          // and leaves the flag clear, so it comes round on the next mine.
+          if (speech.saying() !== 0) return
+          mineLineArmed = false
+          sergeant(MINE_LINE)
+        },
+        // **A TURN NOBODY DID ANYTHING WITH.** The clock ran out and no weapon
+        // was used all turn; the engine counts that the way the exe does
+        // (lib/game/battle.ts, `weaponUses`).
+        turnWasted: () => {
+          if (speech.saying() === 0) sergeant(WASTED_TURN_LINE)
         },
         // **THE LAST DUMMY IS DOWN.** The sergeant signs off — one of two lines,
         // by how many turns it took (lib/game/tutorial.ts) — over the beat the

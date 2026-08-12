@@ -3082,11 +3082,31 @@ Which of the two is the congratulation is LOCATED and not heard — both lines a
 blank, voice only.
 
 **Two of the four "closers" are nothing of the kind**, and this file had them
-filed wrong: clip **21** is the first MINE going off on the training ground —
-its call site is the PROJECTILE constructor, gated on ammo rows 0x28/0x29, the
-two `WE_APMIN` — and clip **26** is a turn whose clock ran out with **no weapon
-used**, `[gameMode+0x334]` being incremented by the fire dispatcher and zeroed at
-the top of each turn. Neither is built and both are one line each now.
+filed wrong. Both are built now, and each turned out to have a rule worth
+knowing:
+
+- **clip 21 is the first MINE.** Its call site is the PROJECTILE CONSTRUCTOR,
+  gated on the ammo row being 0x28 or 0x29 — the two `WE_APMIN` — so it answers a
+  mine trodden on and a mine set off by something thrown alike. Its flag
+  `[gameMode+0x330]` is **the other way up from what it looks**: the game object
+  is built with it SET, so the sergeant says nothing about mines until one of the
+  two MINEFIELD crates CLEARS it as it speaks its own line (0x465D72, 0x465DBD —
+  the health×15 and ×20 arms, both of which say "FOLLOW THE PATH THROUGH THE
+  MINEFIELD"), and speaking sets it back. **Once per minefield, and only after
+  being told to walk into one.**
+- **clip 26 is the turn you WASTED**: the clock ran out and no weapon was used
+  all turn. `[gameMode+0x334]` counts uses — the fire dispatcher increments it
+  (0x493E7A), the handover zeroes it but only from 1 or less (0x48F50C), and the
+  line writes **2**, which is exactly the value the reset refuses. So it is once
+  a LEVEL, and a turn in which two weapons were used (only the planted charges
+  allow it) disarms it just as permanently. An artefact of three lines rather
+  than a rule anybody wrote, and it is transcribed as such.
+
+`weaponUses` in `lib/game/battle.ts` is that counter and `turnWasted` the event;
+the mine's flag is `ui/battle.ts`'s, beside the script's other one. One half of
+the exe's guard is NOT modelled and says so at the field: it drops the
+wasted-turn line while the sergeant is talking and lets it come round on a later
+turn, where the remake counts it as said.
 
 `e2e/000/engine-headless.spec.ts` drives the whole seam in plain Node on a CAMP
 built with its DUMMY records left off — reaching the condition honestly is the

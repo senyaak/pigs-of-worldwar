@@ -29,7 +29,14 @@ import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { pickupsOf } from '../../src/lib/game/pickups'
-import { clipForMenu, clipForPlacement } from '../../src/lib/game/tutorial'
+import {
+  MINE_LINE,
+  WASTED_TURN_LINE,
+  armsMineLine,
+  clipForMenu,
+  clipForPickup,
+  clipForPlacement
+} from '../../src/lib/game/tutorial'
 import { createScript } from '../../src/lib/game/script'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
@@ -83,6 +90,31 @@ const give = (page: Page, skill: number): Promise<boolean> =>
 
 /** Where `clip` first appears, or −1 — the order is the whole assertion. */
 const at = (heard: number[], clip: number): number => heard.indexOf(clip)
+
+/**
+ * The two lines that are NOT steps, and were filed as the mission's closers
+ * until they were read (`tutorial/notes.md`). No app: this is the table.
+ *
+ * The mine line is the interesting one — its flag is the other way up from what
+ * it looks. The game object is built with `[gameMode+0x330]` SET, so the
+ * sergeant says nothing about mines until one of the two MINEFIELD crates
+ * clears it, and speaking sets it back: once per minefield, and only after being
+ * told to walk into one.
+ */
+test('the mine line is armed by the minefield crates and by nothing else', () => {
+  expect(MINE_LINE).toBe(21)
+  expect(WASTED_TURN_LINE).toBe(26)
+  // The two crates that say "FOLLOW THE PATH THROUGH THE MINEFIELD…", by their
+  // own amounts — and CAMP ships exactly those two.
+  expect(armsMineLine(null, 15)).toBe(true)
+  expect(armsMineLine(null, 20)).toBe(true)
+  expect(clipForPickup(null, 15)).toBe(19)
+  expect(clipForPickup(null, 20)).toBe(23)
+  // …and nothing else does: not the other health crates, not a weapon.
+  expect(armsMineLine(null, 10)).toBe(false)
+  expect(armsMineLine(null, 25)).toBe(false)
+  expect(armsMineLine(BAYONET, 15)).toBe(false)
+})
 
 test('the training script moves: collected, chosen, and then PLACED', async ({ app }) => {
   const { page } = app
