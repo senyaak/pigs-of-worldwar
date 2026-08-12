@@ -7,8 +7,12 @@
 # `scripts/pure-specs.mjs` works out which those are rather than keeping a list
 # that would drift.
 #
-# Windows, because that is the platform the app targets and the one whose path
-# handling this codebase gets wrong when it gets anything wrong.
+# LINUX, though the app targets Windows, and the reason is the bill: this repo
+# is private, where a Windows runner costs double. Nothing these steps do is
+# platform-specific — bundling, type checking and stepping the engine — and the
+# Windows path is walked on every release anyway, because release.yml runs the
+# same three checks on windows-latest before it packages. One word here moves
+# it back the day a path bug slips through.
 
 name: CI
 
@@ -20,7 +24,7 @@ on:
 
 jobs:
   check:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v5
