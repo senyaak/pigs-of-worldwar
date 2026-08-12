@@ -800,27 +800,27 @@ not pulled, written here so nobody has to remember an address.
   because a new UI wants the original's coordinates rather than fresh eyework.
   Note the remake's own constraint from play: a real pause is single-player
   only, and multiplayer must never stop (docs/history/status.md, "Threads left mid-pull").
-- **The sky's four loose ends.** The dome, the mood's fog and the weather are
-  all in (`three/sky.ts`, `three/weather.ts`, `lib/game/sky.ts`), and the
-  weather is the exe's arithmetic end to end — 640×480 virtual pixels, `rand()`
-  scatter, `(step * m) / (1 << shift)` rounding toward zero, the `+1` a frame,
-  the wrap, the 32-wide quad stretched by the fall step, the grey ramp added
-  rather than painted. What is NOT read, each marked at its own line:
-  - **which camera angle is which.** The drawer takes `cos([view+0x11758])` for
-    the drift and `sin([view+0x11754])` for the fall, and one virtual call
-    fills both (0x44E2FC, not followed). `angles()` also carries a quarter-turn
-    convention — 1024 is level — which is what stops the snow falling upward.
+- **The sky is DONE and shown — this entry is provenance, not work.** The dome,
+  the mood's fog and the weather are in and answered by play (2026-08-12);
+  nothing below is a defect and none of it is visible. It is here so the next
+  reader knows which numbers are the exe's and which are not.
+  - **Which of the exe's two angle fields is yaw and which is pitch.** NOT a
+    question about our camera, which is fine and untouched: the drawer takes
+    `sin([view+0x11754])` for the fall and `cos([view+0x11758])` for the drift,
+    and one virtual call fills both (0x44E2FC, not followed). Pitch on the
+    first and heading on the second is what `angles()` assumes, along with a
+    quarter-turn convention — 1024 is level — inferred from the fact that no
+    other reading puts the snow the right way up.
   - **`FOG_SCALE`**, standing in for the undecoded factor between the library's
     z and the world's (`scale/notes.md`).
   - **`FALL_GAIN` and `SIZE_GAIN`**, play's two on top of the exe's amplitudes.
   - **the brightness divisor**: the exe's ramp is `(8 − phase) * 8` and this
     normalises it against its own 64 rather than the engine's 128.
 
-  One thing that CANNOT be fixed by reading further: with the camera still the
-  field has only four distinct velocities and 32 flakes move as one, because
+  And one thing reading further cannot change: with the camera still the field
+  has only four distinct velocities and 32 flakes move as one, because
   `m = reach − (i & 3)` and the third random the initialiser rolls per flake is
-  read by neither drawer. If play wants that broken up it is a divergence, not
-  a bug.
+  read by neither drawer. Breaking that up would be a divergence, not a fix.
 - **Fall damage** (`P_LAND1` is the impact that hurts, and nothing plays it).
 - **The melee's own battle cry** — the same `0x43af70` call, not yet wired to a
   swing.
