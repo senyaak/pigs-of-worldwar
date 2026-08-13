@@ -120,9 +120,10 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        tick now.
      - ~~the PIG on the left is missing~~ **DONE** — a MODEL on the ordinary
        `ensureScene`/`buildPig` path, rendered to a canvas of its own and
-       blitted into the frontend one (`three/frontendPig.ts`): `pcgru_me` out
-       of `Chars/british.mad`, clip 27 idling, and the nation's skins swapped
-       on a row change. Where it sits is `[CHECK — remake]` and nudgeable.
+       blitted into the frontend one (`three/frontendPig.ts`): **`pchvy_hi`**
+       out of `Chars/british.mad`, clip 27 idling, and the nation's skins
+       swapped on a row change. Where it sits is `[CHECK — remake]` and
+       nudgeable; WHICH model is not — see the hats below.
      - ~~their HATS should differ~~ **DONE** — each nation has its own hat
        MODEL in `Chars/FHATS.MAD` (`br_hat`, `frhelm`, `am_h`, `rus_h`,
        `ja_ban`, `germh`, in the nation index's order) with `FHATS.MTD` for the
@@ -142,20 +143,17 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        behind the skull, which is what play saw as "on the belly"; turned it
        boxes x −49..209 and lands on it. `frontendPig.ts` turns and does not
        centre. `frontend/notes.md` carries the whole chain, exe to dll.
-     - **TWO hats: the model carries its own, and the ORIGINAL wears both.**
-       Play, 2026-08-13; measured the same day. There is **no hatless model** —
-       `british.mad` is 27 triples, nine classes at three levels of detail, and
-       every one carries its headgear as ONE texture group. On `pcgru_me` that
-       is 48 faces and 31 vertices, all on bone 2, textured `GR_H000.TIM`,
-       which is **92% khaki rgb(88,80,8)** — the uniform's colour, against pig
-       skin at rgb(216,176,128) — so `_H` is a hat and not a head. Nothing in
-       the drawing path drops a group either: `afDrawAnimModel` draws the body
-       whole and hangs the attachments on it. So the original stacks them, and
-       the nation hat is the bigger: turned, `br_hat` encloses the mesh one in
-       x and z and falls 13 units short of its crown. **Look at it in play
-       before dropping anything** — if the mesh hat still shows through, the
-       group is one line to skip in `three/modelMesh.ts`, and that is a
-       divergence to write down rather than a fix.
+     - ~~TWO hats: the model carries its own~~ **READ — and it was the wrong
+       MODEL, not a group to hide.** Play, 2026-08-13. Every class does carry
+       its headgear in the mesh as one texture group (the grunt's `GR_H000.TIM`
+       is 48 faces on bone 2, and that texture is 92% uniform khaki, so it is a
+       hat and not a head) — and nothing in the drawing path ever drops a
+       group. **The heavy gunner is the one model with a bare head**, which is
+       exactly why the engine hangs a nation hat only when the kind is 2:
+       SELECT TEAM forces class 1, the table at 0x4C2E50 turns that into kind
+       2, and the dll's registry gives kind 2 the `pchvy` triple, near level of
+       detail at the frontend's z of 1000. `frontendPig.ts` draws `pchvy_hi`
+       now. `frontend/notes.md` carries the chain link by link.
      - **the rest of the MACHINERY is missing too** — the original carries a
        good deal more moving metal round the console than we draw. Not read.
    - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with

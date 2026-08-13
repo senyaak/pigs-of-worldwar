@@ -49,9 +49,24 @@ export const NATION_SKINS: readonly (string | null)[] = [
   'Chars/GERMAN.MTD'
 ]
 
-/** Every pig starts a campaign a GRUNT — the manual says so and the roster
- * agrees — so the frontend's is dressed as one. */
-export const PIG_ART = 'pcgru_me'
+/**
+ * And the MODEL is the HEAVY GUNNER's, at its nearest level of detail.
+ *
+ * Not a guess and not the grunt this file once used. SELECT TEAM forces the
+ * display object's class to **1** (0x42667D), the class→kind table at 0x4C2E50
+ * turns that into kind **2**, and the dll's registry gives a kind three models
+ * — `[0x11C94860 + 12*kind + 0/4/8]`, filled straight through `british.mad` a
+ * triple at a time (0x1000d94b), so kind 2 is `pchvy_hi` / `pchvy_me` /
+ * `hv_hi`. Which of the three is by DEPTH: under 1500 the first, under 4500 the
+ * second, else the third (0x10011f8a), and the frontend stands its pig at
+ * z = 1000 (`[0x513030]`).
+ *
+ * **And that is the whole of the two-hats bug.** Every OTHER class carries its
+ * headgear in the mesh as one khaki texture group — the grunt's `GR_H000.TIM`
+ * is 48 faces on bone 2 — and the heavy is the one that does not. Which is why
+ * the engine hangs a nation hat only when the kind is 2: it is the bare head.
+ */
+export const PIG_ART = 'pchvy_hi'
 
 /**
  * And the six armies differ by HAT, which is a MODEL rather than a texture:
@@ -140,8 +155,8 @@ export function buildFrontendPig(
       // one with `afSetObjPos(hat, 0,0,0, 0, 0x800, 0)` — half of the 0x1000
       // circle, about the vertical (`three/heldWeapon.ts` carries the reading).
       //
-      // The measurement agrees, in the model's own units against `pcgru_me`:
-      // untorned `br_hat` boxes x −197..61 with the head at x −25..221, i.e.
+      // The measurement agrees, in the model's own units: untorned
+      // `br_hat` boxes x −197..61 with the head at x −25..221, i.e.
       // behind the skull — which is what play saw as "on the belly". Turned it
       // boxes x −49..209 and lands on the head. There is nothing to centre.
       mesh.rotation.y = Math.PI
