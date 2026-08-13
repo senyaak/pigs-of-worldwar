@@ -106,23 +106,31 @@ const LAYOUT = {
  * with the scrolling lists (records 44 and 46), which clamp the lit row to
  * four and carry the surplus as an offset (0x427d96).
  */
-const TEXT = {
-  title: { x: 101, y: 38, width: 425 },
-  /**
-   * **`x` is play's, not the exe's** — `[play]`, 2026-08-13, against a
-   * screenshot of the shipped screen. The table says 404, and 404 puts a
-   * 163-wide box at 404..567 while `counsele` (179 wide, plus the global 50)
-   * spans 335..564 — so the longest name runs past the console's own right
-   * edge, which is what play saw. 368 centres the box on the console. The
-   * exe's number is written down beside it because the disagreement is real
-   * and unexplained: every other box on this screen comes out of the same
-   * tables and lands correctly.
-   */
-  rows: [216, 238, 262, 286, 308, 332, 355, 379].map((y) => ({ x: 368, y, width: 163 }))
-}
+/**
+ * Where the list's words start. The exe's own table says **404** — records
+ * 5..12 at 0x4C1728, raw 687 through the same `x·640/1024 − 25` the main
+ * menu's boxes go through — and every other box on this screen comes out of
+ * those tables and lands right. But `counsele` is 179 wide and the console
+ * spans 335..564 with the global 50 in it, so a 163-wide box at 404 runs to
+ * 567 and the longest name goes past the console's own right edge, which is
+ * what play saw. Centring on the console gave 368; play looked at that and
+ * asked for **+12**. `[play]`, and the exe's number is kept below because the
+ * disagreement is real and unexplained.
+ *
+ * The boxes are in the screen's live layout too —
+ * `pow.screen.layout.team.text.rows[0].x` — so the next nudge is a console
+ * line and a `print()`, not an edit.
+ */
+const ROW_X = 380
 
 /** What the exe's own table says row x is, kept so the divergence is visible. */
 export const EXE_ROW_X = 404
+
+const TEXT = {
+  title: { x: 101, y: 38, width: 425 },
+  /** The pitch is the exe's; the x is `ROW_X`, which is play's. */
+  rows: [216, 238, 262, 286, 308, 332, 355, 379].map((y) => ({ x: ROW_X, y, width: 163 }))
+}
 
 /** fetext: the title, then the six armies. Record 3's own consecutive block. */
 const TITLE_TEXT = 24
