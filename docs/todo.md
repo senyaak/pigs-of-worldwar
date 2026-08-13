@@ -206,6 +206,13 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        gives 40 a row. So the panel is at **32** with its bands at 6 and −22,
        and the bar at **4**: a panel with the name bar inlaid across its top,
        not three things stacked down the screen.
+     - **the TITLE box's folding is wrong, and it is not this screen's alone.**
+       Record 15's raw (370, 94) 400 wide comes out (206, 55) 300 with the
+       stretch's +80/−25 in it, and play moved it to (170, 29) — where 170 with
+       a 300 box centres on **320, the screen's own middle**, against the read
+       box's 356. Every screen whose title is placed that way is suspect,
+       PLAYER's (161, 45) included. The `.data` tables are not in doubt; the
+       fold from them to pixels is.
      - ~~the caret plate the arm steps by its own table~~ **it was never a
        caret**: `[0x5128CC]` is slot 19, which widget 18's builder (0x41F8A3)
        fills from `alpha02..08`, and the table [51,35,35,19,3,3,3,3] is read

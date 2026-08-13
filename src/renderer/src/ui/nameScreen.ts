@@ -169,21 +169,36 @@ const LAYOUT = {
    * are bigger than the black screen" — the last column and the three keys sat
    * on the frame and past it.
    *
+   * **The numbers below are play's, and they are that window pulled EVENLY
+   * in** — 16 more on each side and 24 more top and bottom, so the grid keeps
+   * the window's centre and stops short of its edges. `[play]`, off the console
+   * against the running screen.
+   *
    * The `[CHECK — remake]` here is only the SPREAD: the exe's own grid is a
    * fixed 16-pixel step (`frontend/notes.md`), which does not fill the window
    * and disagrees with play's screenshot twice over. See `COLUMNS`.
    */
-  inner: { left: 29, right: 43, top: 100, bottom: 19 }
+  inner: { left: 45, right: 59, top: 124, bottom: 43 }
 }
 
-/** The words. Both boxes are the exe's, out of the per-kind tables at
- * 0x4C1548/0x4C15A8/0x4C1608 for the title — record 15 is raw (370, 94) 400
- * wide, which is (206, 55) 300 with the stretch's own +80/−25 folded in — and
- * the NAME is centred in the bar it is typed into, which is the remake's own
- * reading: the exe's item box for it is (150, 146), where the grid goes. */
+/**
+ * The words, and both boxes are `[play]` — set from the console against the
+ * running screen.
+ *
+ * The TITLE's box is the exe's in WIDTH only. Record 15's is raw (370, 94) 400
+ * wide out of the per-kind tables at 0x4C1548/0x4C15A8/0x4C1608, which is
+ * (206, 55) 300 across with the stretch's own +80/−25 folded in — and play put
+ * it at (170, 29). **170 with a width of 300 centres on 320, the screen's own
+ * middle, where the read box centres on 356**, so it is the +80/−25 folding
+ * that is wrong here rather than the table: worth re-reading before any other
+ * screen's title is placed from it.
+ *
+ * The NAME's box was never the exe's — its item box, (150, 146), is where the
+ * letter GRID goes — so its 268 is the bar's own width and the rest is play's.
+ */
 const TEXT = {
-  title: { x: 206, y: 55, width: 300 },
-  name: { x: 184, y: 26, width: 268 }
+  title: { x: 170, y: 29, width: 300 },
+  name: { x: 184, y: 90, width: 268 }
 }
 
 const TICK_MS = EXE_FRAME_SECONDS * 1000
