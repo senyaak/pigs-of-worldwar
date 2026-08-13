@@ -645,15 +645,21 @@ The SHELTER is done end to end. What is left round it:
 
 ## D. WHAT IS STILL NOT READ (disassembly gaps)
 
-- **The frontend's OTHER screens.** Screen 1 is now read end to end — enter,
-  update, leave, draw and the selection handler, with every sound and every
-  frame walk (`frontend/notes.md`, and what it cost is in
-  [docs/history/frontend.md](history/frontend.md)). Play asked for all of
-  them, in order, so the next one is MULTI-PLAYER: it is **screen 7**, it
-  shares screen 1's enter arm and its widget builder — which is why the enter
-  arm builds a widget 8 that screen 1 never draws — and it has a draw arm of
-  its own at 0x41DEE3 and a selection arm of its own. Everything needed to
-  read it is in the tables already transcribed.
+- **The frontend's OTHER screens — and there are FIFTY-TWO of them, wearing
+  23 layouts.** A "screen id" 0..0x16 is the layout; the menus themselves are
+  52 records of 72 bytes, built from tables in `.data`, and `frontend/menus.js`
+  in the disasm repo prints all of them: title, items, and what each item
+  DOES (an action and a parameter — 1 is navigation, 22 is a dead row, which
+  is where our greyed-out OPTIONS comes from in the original). The main menu
+  is record 1 of kind 1 and is read end to end. What that gives the next
+  screen:
+  - **MULTI-PLAYER is record 16 of kind 2** — the same layout as SELECT TEAM,
+    which is the family that loads `selcog` and `name0..5`, so that is where
+    the carriage belongs. And the original's is **six** items — TEAM A, B, C,
+    D, then DONE and NETWORK — where ours is four slots and three actions.
+  - the tree above it: ONE PLAYER → record 14 (NEW GAME → SELECT TEAM, LOAD
+    GAME → LOAD), OPTIONS → record 2 (AUDIO, CONTROLS → CONTROLLER SETUP,
+    CREDITS), QUIT APPLICATION → record 43, a REALLY QUIT APP? box.
 - ~~**Where the frontend's WORDS land**~~ — READ, and built: a box per line
   out of `.data` (four per-screen tables for a screen's own string, one table
   of 16-byte records at 0x4C1728 for the ITEMS, indexed by a running total of

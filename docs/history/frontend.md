@@ -127,3 +127,33 @@ the wrong shape.
 
 Still not read on this screen: two allocations in the update's tail, and a
 second lit row the loop supports and screen 1 never uses.
+
+## AND THE LEVEL ABOVE IT: 52 MENUS WEARING 23 LAYOUTS
+
+Reading on past the main menu turned up the thing every earlier pass had been
+one level below. **A "screen id" 0..0x16 is a LAYOUT, not a screen.** The
+frontend allocates 52 records of 72 bytes — one per menu — and fills them from
+tables in `.data`; each record names which of the 23 draw/enter/update/select
+arms it wears. The main menu is record 1 of kind 1. What these notes and this
+repo had been calling "screen 7, the MULTI-PLAYER" is kind 7, which is the
+VOLUME CONTROL.
+
+An ITEM is a pair: an action and a parameter. Action 1 is plain navigation
+with the parameter naming the record, 6 picks one of the six armies, and **22
+is a dead row** — which is what the item drawer greys, so a bar that leads
+nowhere is dead in the DATA rather than in the drawing. Our greyed-out OPTIONS
+is the same idea arrived at from play.
+
+The string ids are a chain rather than a table: title, then that screen's
+items, then the next screen, striding by `count + 1` — with six fix-ups, and
+without them the main menu comes out wearing the pad screen's four labels
+(…CONTROLS) instead of its own (…QUIT APPLICATION). The script in the disasm
+repo transcribes the fix-ups rather than the pattern, which is why its output
+can be trusted where it looks odd: the save-slot screens really do stride past
+their own words, because their items are named at runtime.
+
+Two things this hands the next piece of work. **MULTI-PLAYER is record 16 of
+KIND 2** — the same layout as SELECT TEAM, and that family is the one that
+loads `selcog` and `name0..5`, so the carriage this repo threw off the main
+menu belongs there. And the original's MULTI-PLAYER is **six** items — four
+teams, DONE, NETWORK — where ours is four slots and three actions.
