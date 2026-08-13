@@ -430,3 +430,35 @@ original has only the grid, and the grid still works.
 And the far end: accepting a name runs `newGame` and writes `savearmy0`. That
 is the first save this project has ever written from play rather than from a
 test.
+
+## The PLAYER screen, and the promotion tree under it (2026-08-13)
+
+Play asked for the screen after the name entry and, in the same breath, said
+what the ranks do: "в конце все идут командос герой". Both halves of that
+turned out to be readable, and the second was the better find.
+
+**The screen** is record 12, kind 5, and its arm draws the squad TWICE over one
+ragged grid — five across and then three, which is the squad of eight — from
+`team + 64*slot + 0x70`. The first pass is portraits, the second badges and
+stripes. Only one thing on it moves: the lit portrait's width and height come
+out of `fcos` on an angle that steps 100 of 4096 a frame, so it swells in place
+while everything else sits at unity.
+
+**The ranks are one byte.** `fetext` 467 + class names all fifteen — GRUNT,
+GUNNER, BOMBARDIER, PYROTECH, COMMANDO, SAPPER, ENGINEER, SABOTEUR, SCOUT,
+SNIPER, SPY, ORDERLY, MEDIC, SURGEON, HERO — and 0x4D29C0 turns the same byte
+into a career (six badges) and a step in it (0, 1 or 2, the first wearing no
+stripes). Then 0x4D29A8 and 0x4D2980 give the tree outright: a GRUNT has four
+ways out at one point each, everything else has exactly one, and a HERO has
+none. Every career runs three rungs at 2, 3 and 6 into **COMMANDO**, and
+COMMANDO becomes a **HERO** for 8 — so twenty points whichever way round, which
+is what play remembered. The manual says the same in words.
+
+That went into `lib/game/ranks.ts` with six tests rather than into the screen,
+because it is a rule about pigs and the squad screen is only the first place
+that shows it: PROMOTE and CAREER PATH are still to build and will want the
+same table.
+
+What the screen does NOT have is most of its furniture — `sqpic`, the dials,
+the name plates, the arrows, the medals — and every y on it is eyework, the
+same way the name entry's is and for the same reason.

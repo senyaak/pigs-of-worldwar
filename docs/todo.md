@@ -177,6 +177,25 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        is not drawn at all, and what `[0x5128CC]` names is not known.
      - the help line, `fetext` 770, carries `/Z(131,62)` and `/N`/`/S` markup
        nothing here parses yet.
+   - **the PLAYER screen** (record 12, kind 5) — **BUILT**, `ui/playerScreen.ts`
+     on `lib/game/ranks.ts`. The eight pigs in the arm's own ragged five-then-
+     three, each with its career badge and the stripes of its step, the lit
+     portrait swelling on the exe's own rate, and START MISSION under them.
+     Read and carried: the fifteen ranks are `fetext` 467 + class, the badge
+     and stripes come out of 0x4D29C0, and the promotion tree at 0x4D2980 is
+     four careers of three converging on COMMANDO and then HERO, twenty points
+     either way. What is left on it:
+     - **every y is eyework**, as on the name entry, and the row pitch with it.
+       Only the column pitch, 74, is the arm's.
+     - **which pair of stripes** the original uses is `[CHECK — remake]`:
+       `pip1/2` and `strp1/2` are both pairs and the slot array is unnamed.
+     - the screen's own furniture is not drawn at all — `sqpic`, `sqpics00..10`,
+       `sqdial01..06`, `sqname01..06`, `pigpro`, `parrow1..3`, `sqarmy`,
+       `sqoptsf`, the medals and the flags. Nor is the arm's THIRD loop
+       (0x41D70E on), which none of this has read.
+     - **SAVE TEAM does nothing** and PROMOTE is not there at all: the pig menu
+       (record 19) and CAREER PATH (record 25) are their own screens, and the
+       tree they drive is already in `ranks.ts` waiting for them.
    - and the autosave now has its first half: `newGame` runs on the way out of
      the name entry and writes `savearmy0` (`main.ts`). `finishMission` at the
      end of a mission is still to come, and nothing READS a save back yet —

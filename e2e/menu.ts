@@ -14,7 +14,13 @@ import type { Page } from '@playwright/test'
 import { beginTurn, landed, tap } from './controller'
 
 /** Which screen's bars to read. The names are the `window.pow` keys. */
-export type Screen = 'menu' | 'onePlayer' | 'teamScreen' | 'nameScreen' | 'multiPlayer'
+export type Screen =
+  | 'menu'
+  | 'onePlayer'
+  | 'teamScreen'
+  | 'nameScreen'
+  | 'playerScreen'
+  | 'multiPlayer'
 
 interface ScreenHooks {
   selected(): number
@@ -137,9 +143,10 @@ export const FIRST_ARMY = "TOMMY'S TROTTERS"
  * The menu to the battle and no further — the walk a spec wants when the drop
  * itself, or the beat at the top of the first turn, is the subject.
  *
- * It is four screens deep now: ONE PLAYER opens the screen of that name, NEW
+ * It is five screens deep now: ONE PLAYER opens the screen of that name, NEW
  * GAME opens SELECT TEAM, an army chosen there opens PLEASE NAME YOUR TEAM,
- * and a name accepted on that one starts the campaign.
+ * a name accepted raises the squad on the PLAYER screen, and START MISSION
+ * there opens the battle.
  */
 export async function toBattle(page: Page): Promise<void> {
   await choose(page, 'ONE PLAYER')
@@ -149,6 +156,8 @@ export async function toBattle(page: Page): Promise<void> {
   await choose(page, FIRST_ARMY, 'teamScreen')
   await expect(page.locator('#name')).toBeVisible()
   await nameTeam(page, TEST_TEAM)
+  await expect(page.locator('#player')).toBeVisible()
+  await startMission(page)
   await expect(page.locator('#battle')).toBeVisible()
 }
 
@@ -203,4 +212,19 @@ export async function startGame(page: Page): Promise<void> {
   // — see `beginTurn`. The spec that is about the beat opens the battle by
   // hand instead.
   await beginTurn(page)
+}
+
+/** START MISSION on the player screen, which opens on it already lit. */
+export async function startMission(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const hooks = (window as unknown as PowScreens).pow?.playerScreen
+          return hooks ? hooks.flipping() : true
+        }),
+      { message: 'the player screen is still driving in' }
+    )
+    .toBe(false)
+  await tap(page, 'menuSelect')
 }

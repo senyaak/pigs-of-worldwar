@@ -8,6 +8,7 @@ import { initMenu } from './ui/menu'
 import { initOnePlayer } from './ui/onePlayer'
 import { initTeamScreen } from './ui/teamScreen'
 import { initNameScreen } from './ui/nameScreen'
+import { initPlayerScreen } from './ui/playerScreen'
 import { initMultiPlayer } from './ui/multiPlayer'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
@@ -24,6 +25,7 @@ type View =
   | 'oneplayer'
   | 'team'
   | 'name'
+  | 'player'
   | 'multiplayer'
   | 'battle'
   | 'browser'
@@ -36,6 +38,7 @@ const panels: Record<View, HTMLElement[]> = {
   oneplayer: [byId('oneplayer')],
   team: [byId('team')],
   name: [byId('name')],
+  player: [byId('player')],
   multiplayer: [byId('multiplayer')],
   battle: [byId('battle')],
   browser: [byId('browser'), byId('file-list')],
@@ -134,6 +137,15 @@ const nameScreen = initNameScreen({
   onBack: () => show('team')
 })
 
+// …and the squad it raised is the PLAYER screen, record 12: eight pigs, their
+// ranks, and START MISSION.
+const playerScreen = initPlayerScreen({
+  onStart: () => {
+    void battle.open().then((ok) => ok && show('battle'))
+  },
+  onBack: () => show('name')
+})
+
 /**
  * Start a campaign: the name the player typed, the army they picked, and the
  * eight pigs that army fields.
@@ -155,8 +167,9 @@ async function startCampaign(name: string, nation: number): Promise<void> {
   const save = newGame(name, nation, squad, new Date().toISOString())
   const written = await window.api.writeSave(SLOT, serialise(save))
   if (!written.ok) console.warn(`the campaign was not saved: ${written.error}`)
-  const ok = await battle.open()
-  if (ok) show('battle')
+  playerScreen.show(save.squad, save.name)
+  show('player')
+  void playerScreen.load()
 }
 
 const multiPlayer = initMultiPlayer({
@@ -173,6 +186,7 @@ const screens = {
   oneplayer: onePlayer,
   team: teamScreen,
   name: nameScreen,
+  player: playerScreen,
   multiplayer: multiPlayer
 }
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
@@ -192,6 +206,7 @@ if (window.pow) {
   window.pow.onePlayer = view(onePlayer)
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }
+  window.pow.playerScreen = view(playerScreen)
   window.pow.multiPlayer = view(multiPlayer)
   // Each screen carries its OWN layout, so a nudge in the console moves the
   // screen being looked at rather than all of them.

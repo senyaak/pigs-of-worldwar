@@ -8,7 +8,7 @@
 import { expect } from '@playwright/test'
 
 import { test } from '../app'
-import { FIRST_ARMY, choose, selection } from '../menu'
+import { FIRST_ARMY, choose, selection, startMission } from '../menu'
 import { tap } from '../controller'
 
 const typed = (page: import('@playwright/test').Page): Promise<string> =>
@@ -108,10 +108,12 @@ test('the grid types, deletes and accepts', async ({ app }) => {
   await tap(page, 'menuSelect')
   await expect(page.locator('#name')).toBeVisible()
 
-  // With a name it goes through, and the battle opens on the far side.
+  // With a name it goes through, and the squad is raised on the far side.
   await type(page, 'PIGS')
   await expect.poll(() => typed(page)).toBe('PIGS')
   await tap(page, 'menuSelect')
+  await expect(page.locator('#player')).toBeVisible()
+  await startMission(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   expect(app.errors()).toEqual([])
