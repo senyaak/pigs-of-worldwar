@@ -20,13 +20,20 @@ has to match the original.
 army, the team's name, every pig's name and rank, and the PP tokens. There is
 no SAVE TEAM screen in our version — it **autosaves**.
 
-**Where it lives is play's call, not a rule.** The default written here is
-Electron's `userData`, for two reasons that are about us rather than about the
-original: every spec in this repo runs against the real installation
-**read-only**, and `--game-dir` can point at any copy of the game, so a save
-beside the game would follow whichever copy was opened. Against that, the
-original keeps `savearmy0` in its own folder, so putting ours there is
-defensible and is a one-line change.
+**It lives in the APP's own folder** — `saves/` at the root of the checkout in
+development, gitignored, and beside the executable in a packaged build
+(`path.dirname(app.getPath('exe'))`; electron-builder installs per-user, so
+that is writable). `POW_SAVE_DIR` overrides it, and the e2e fixture points
+that at `_tmp/` so a test run never touches a real save.
+
+Play settled this against a first draft that said `userData`, and each of that
+draft's reasons was answered: a file in the working tree is what `.gitignore`
+is for; a save PER CHECKOUT is a feature, not a hazard, because playing the
+`net` worktree then leaves the master save alone; and next to the executable
+is the same idea as next to the start script. The one thing left to know
+rather than to argue: a machine-wide install into `Program Files` would not be
+writable, and that is where a fallback to `userData` would go — one line, if
+it ever happens.
 
 **What the original keeps, for the shape to grow toward.** A team is a
 **680-byte record**: six of them sit at 0x51F128 with a stride of 0x2A8, and
