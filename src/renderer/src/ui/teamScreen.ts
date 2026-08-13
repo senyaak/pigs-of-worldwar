@@ -6,14 +6,17 @@
 // It was read blit by blit 2026-08-13 and every number below carries the
 // address it came from (`frontend/notes.md`, in the disasm repo).
 //
-// **The screen is a CONSOLE with one window in it.** Six armies, and yet only
-// ONE emblem and ONE lamp are ever drawn: `selec00..05` at (298, 170) and
-// `lit1..3` at (537, 202). What changes with the row is the FRAME — widget 0
-// walks FIVE frames per row and rebuilds the emblem at `frame % 6` on every
-// step, clicking on the one that lands — so the six emblems reel past in a
-// single window while the six NAMES sit in the console's own text boxes below.
-// The `selcog` carriage at (553, 180) does not move at all; the arm blits it
-// at a literal.
+// **The lit row is BRACKETED, and the brackets SLIDE.** `selec00..05` at
+// x 298 and `lit1..3` at x 537 sit either side of the console, and both take
+// their y from `[0x512C18]` — which is **widget 0's FRAME**, the same array
+// the band reads widget 5's out of at `[0x512C2C]`. Widget 0 walks FIVE frames
+// per row, so `2·scaleY(4·frame)` moves the pair about 23 pixels a row, which
+// is the text rows' own pitch: they travel down the list with the selection.
+// The first pass here read the two literals 170 and 202 as fixed positions and
+// the frame as the only thing that moved — play's screenshot showed the lamp
+// stranded at the top while the third name was lit, which is what put it
+// right. The `selcog` carriage at (553, 180) really does not move; the arm
+// blits it at a literal.
 //
 // Two things the arm does NOT draw, and neither is guessed at here:
 //
@@ -88,8 +91,10 @@ const LAYOUT = {
   band: { x: 98, repeat: 298, tail: 348, drop: 24, wobble: 8, wobbleOn: 3 },
   /** ONE track, the mirrored one, where the machine draws two (0x41d072). */
   track: { x: 651, y: 742, width: 64, height: 638 },
-  /** The army emblem and the lamp — one of each, changing FRAME (0x41eb1f,
-   * 0x41eb51). */
+  /** The two brackets round the lit row. Their y is
+   * `2·(scaleY(4·widget0.frame) + scaleY(entrance)) + literal` (0x41eb18 and
+   * 0x41eb51), so the literal is where row 0 puts them and the frame carries
+   * them down the list. */
   emblem: { x: 298, y: 170 },
   lamp: { x: 537, y: 202 }
 }
@@ -117,6 +122,10 @@ const ENTERS_FROM = -700
 /** Widget 0 walks five frames for every row it moves (0x41F34F). */
 const FRAMES_PER_ROW = 5
 const EMBLEMS = 6
+
+/** The frontend authors in 1024×820 and the screen is 640×480, so a y written
+ * in its units comes back through this — the exe's `0x41ADD0`. */
+const scaleY = (value: number): number => Math.trunc((value * SCREEN.height) / 820)
 
 const TICK_MS = EXE_FRAME_SECONDS * 1000
 const MOST_TICKS = 4
@@ -293,13 +302,15 @@ export function initTeamScreen(handlers: {
     context.drawImage(track.image, 0, -layout.track.y / 2, layout.track.width, layout.track.height)
     context.restore()
 
-    // 8. the one emblem and the one lamp — a FRAME each, not a position.
+    // 8. the two brackets round the lit row, which SLIDE: their y carries
+    // widget 0's own frame, and widget 0 is the reel.
+    const slide = twice + 2 * scaleY(4 * reel.frame())
     const emblem = art.get(`selec0${reel.frame() % EMBLEMS}`)
-    context.drawImage(emblem.image, layout.emblem.x, layout.emblem.y + offset)
+    context.drawImage(emblem.image, layout.emblem.x, layout.emblem.y + slide)
     context.drawImage(
       art.get(`lit${Math.min(lamp.frame(), 2) + 1}`).image,
       layout.lamp.x,
-      layout.lamp.y + offset
+      layout.lamp.y + slide
     )
 
     // The title wears this family's LIGHT shade — its enter arm sets the
@@ -382,6 +393,11 @@ export function initTeamScreen(handlers: {
       band.set(0)
       leaving = null
       lamp.play(LAMP_BLINK)
+      // Paint the UN-ARRIVED state before the first tick. Without this the
+      // canvas still holds the last frame drawn before `leave()` — the screen
+      // settled — so coming back to it flashed the finished menu and only then
+      // drove in from the top.
+      draw()
       run(true)
     },
     selected: () => selection,

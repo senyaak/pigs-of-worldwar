@@ -107,10 +107,25 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
      `selec` emblem at (298, 170) and one `lit` lamp at (537, 202), changing
      FRAME rather than position, five frames a row with a click on the one that
      lands — the six names in the console's own boxes, a static `selcog`
-     carriage, one track rather than two. The SQUAD panel the original shows
-     for the highlighted army is deliberately left out: `0x4824A0` is
-     `Team::SetNation` so `lib/game/roster.ts` could supply the eight, but where
-     `sqarmy`/`pigpro`/`standpc` land is not read.
+     carriage, one track rather than two.
+     **Three things play saw against the shipped screen, 2026-08-13**, two
+     fixed and one open:
+     - ~~the lamp stayed at the top while a lower name was lit~~ **fixed** —
+       both brackets take their y from widget 0's FRAME and SLIDE down the list
+       with the selection, 0/22/46/70/92/116 against the text rows' own
+       0/22/45/70/92/115. The notes had them as fixed positions.
+     - ~~the first frame was the SETTLED screen and the entrance played after
+       it~~ **fixed** — the canvas still held the last frame drawn before
+       `leave()`, so `enter()` paints the un-arrived state before the first
+       tick now.
+     - **the PIG on the left is missing, and so is most of the machinery.**
+       The original stands the chosen army's own pig on a green turntable at
+       the left and has a great deal more moving metal than we draw. The
+       turntable is `standpc`; the pig is a MODEL, not frontend art. Where any
+       of it lands is not read — `sqarmy`, `pigpro` and `standpc` were named by
+       the loader arm and nothing has been traced past that. **This is the next
+       read**, and it is what makes the screen look like the original rather
+       than like a list.
    - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with
      `chardel`/`charspc`/`charent`, the caret stepping by its own little table
      (0x41DC69).

@@ -255,3 +255,28 @@ Next is PLEASE NAME YOUR TEAM (record 15, kind 0) — the `alpha` alphabet with
 `chardel`/`charspc`/`charent` and a caret that steps by its own little table
 (0x41DC69). After it, `newGame` in `lib/game/save.ts` has everything it needs
 and the autosave finally has a campaign to write.
+
+### …and then play looked at it beside the original (2026-08-13)
+
+Three things, and the screenshot settled two of them on the spot.
+
+**The lamp did not follow the lit row.** It sat at the top of the list while
+the third name was lit — and the original brackets the lit name, a green bar
+either side of it. The `[0x512C18]` both brackets read is **widget 0's frame**,
+the same per-widget array the draw arm takes widget 5's out of twenty bytes
+along, and widget 0 walks five frames per row: `2·scaleY(4·frame)` puts them
+0, 22, 46, 70, 92, 116 down the list against the console's own text boxes at
+0, 22, 45, 70, 92, 115. Two unrelated tables agreeing to a pixel — which is
+the check the first reading never had, because it had assumed the literals
+were fixed positions.
+
+**The first frame was the finished screen.** The canvas still held the last
+frame drawn before `leave()`, so coming to the screen flashed it settled and
+only then drove in from the top. `enter()` paints the un-arrived state before
+the first tick now. Worth knowing for every screen that drives.
+
+**And the PIG is missing.** The original stands the chosen army's own pig on a
+green turntable at the left, and carries a great deal more moving metal than
+we draw. That is the piece this file already flagged as unread — `standpc` is
+the turntable, the pig is a MODEL rather than frontend art — and it is what
+makes the screen read as the original instead of as a list. Next read.
