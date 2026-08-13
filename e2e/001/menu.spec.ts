@@ -113,6 +113,11 @@ test('ONE PLAYER is a screen of its own — NEW GAME over LOAD GAME', async ({ a
 test('SELECT TEAM lists the six armies on the other layout', async ({ app }) => {
   const { page } = app
   await choose(page, 'ONE PLAYER')
+  // WAIT for the screen to arrive before driving it. A screen that has never
+  // been entered reports itself settled — its drive is at rest and its plates
+  // are not walking — so `lightBar` lets the next press fly while the screen
+  // BEFORE it is still leaving, and that press is dropped by both of them.
+  await expect(page.locator('#oneplayer')).toBeVisible()
   await choose(page, 'NEW GAME', 'onePlayer')
   await expect(page.locator('#team')).toBeVisible()
 

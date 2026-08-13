@@ -107,9 +107,22 @@ const LAYOUT = {
  * four and carry the surplus as an offset (0x427d96).
  */
 const TEXT = {
-  title: { x: 100, y: 38, width: 425 },
-  rows: [216, 238, 261, 286, 308, 331, 355, 378].map((y) => ({ x: 404, y, width: 162 }))
+  title: { x: 101, y: 38, width: 425 },
+  /**
+   * **`x` is play's, not the exe's** — `[play]`, 2026-08-13, against a
+   * screenshot of the shipped screen. The table says 404, and 404 puts a
+   * 163-wide box at 404..567 while `counsele` (179 wide, plus the global 50)
+   * spans 335..564 — so the longest name runs past the console's own right
+   * edge, which is what play saw. 368 centres the box on the console. The
+   * exe's number is written down beside it because the disagreement is real
+   * and unexplained: every other box on this screen comes out of the same
+   * tables and lands correctly.
+   */
+  rows: [216, 238, 262, 286, 308, 332, 355, 379].map((y) => ({ x: 368, y, width: 163 }))
 }
+
+/** What the exe's own table says row x is, kept so the divergence is visible. */
+export const EXE_ROW_X = 404
 
 /** fetext: the title, then the six armies. Record 3's own consecutive block. */
 const TITLE_TEXT = 24
@@ -134,7 +147,7 @@ const MOST_TICKS = 4
  * the one being looked at, exactly as `ui/barScreen.ts` does it — and this
  * screen wants it more than that one did, because its art was placed from a
  * fresh read and nobody has looked at it yet. */
-export type TeamLayout = typeof LAYOUT
+export type TeamLayout = typeof LAYOUT & { text: typeof TEXT }
 
 const cloneLayout = (): TeamLayout => ({
   console: { ...LAYOUT.console },
@@ -145,7 +158,11 @@ const cloneLayout = (): TeamLayout => ({
   band: { ...LAYOUT.band },
   track: { ...LAYOUT.track },
   emblem: { ...LAYOUT.emblem },
-  lamp: { ...LAYOUT.lamp }
+  lamp: { ...LAYOUT.lamp },
+  // The WORDS come along, because `rowX` is the one number here play has
+  // already had to correct — `pow.screen.layout.team.text.rows[0].x -= 4`,
+  // watch, `pow.screen.print()`.
+  text: { title: { ...TEXT.title }, rows: TEXT.rows.map((row) => ({ ...row })) }
 })
 
 export interface TeamScreen {
@@ -316,9 +333,9 @@ export function initTeamScreen(handlers: {
     // The title wears this family's LIGHT shade — its enter arm sets the
     // colour to (120, 120, 80), mean 107, and over 100 is the light one
     // (0x41B5F4, and 0x4317ed for the rule).
-    words(context, lit, feText(TITLE_TEXT), TEXT.title)
+    words(context, lit, feText(TITLE_TEXT), layout.text.title)
     for (let i = 0; i < NATIONS; i++) {
-      words(context, i === selection ? lit : plain, names[i] ?? '', TEXT.rows[i])
+      words(context, i === selection ? lit : plain, names[i] ?? '', layout.text.rows[i])
     }
   }
 
