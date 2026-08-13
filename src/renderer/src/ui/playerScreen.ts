@@ -62,6 +62,10 @@ const BADGE: Record<string, string> = {
   hero: 'pcmedal'
 }
 
+/** Class 0, which every pig starts as and which wears no class picture at all
+ * (`[play]`) — the promotion tree's own root, `lib/game/ranks.ts`. */
+const GRUNT = 0
+
 /** Step 1 and step 2 of a career. Step 0 draws none, which is the exe's own
  * `jbe` on the table's second byte. **Which pair of the two the original uses
  * is `[CHECK — remake]`** — `pip1/2` (36×24) and `strp1/2` (52×24) are both
@@ -278,7 +282,14 @@ export function initPlayerScreen(handlers: {
 
       // The CAREER's badge, and the stripes of its step — 0 wears none. Both
       // sit inboard of the portrait, on the column's own hand.
-      context.drawImage(badge.image, layout.badge.x[at.column], y + layout.badge.drop)
+      //
+      // **A GRUNT wears NO badge** (`[play]`): class 0 shares group 0 with the
+      // heavy career, so the table alone would give it that career's picture,
+      // and the original shows a pig with no class at all until it is promoted.
+      // The trapezoid stays — it is the plate's own leg, not the badge's.
+      if (pig.rank !== GRUNT) {
+        context.drawImage(badge.image, layout.badge.x[at.column], y + layout.badge.drop)
+      }
       const step_ = stepOf(pig.rank)
       if (step_ > 0) {
         const stripes = sprites.get(STRIPES[step_ - 1] ?? STRIPES[0])
