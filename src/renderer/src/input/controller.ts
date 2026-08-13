@@ -331,7 +331,7 @@ declare global {
       /** Where the frontend's furniture sits, live: nudge a piece in the
        * console and `print()` it back out to paste into ui/barScreen.ts.
        * Placing this art is eyework, the same as `pow.hud`. */
-      screen?: { layout: unknown; print(): unknown }
+      screen?: { layout: unknown; print(): unknown; reset(): void }
       /** The dashboard's layout, live: nudge a piece in the console and
        * `print()` it back out to paste into ui/hud.ts. */
       hud?: { layout: unknown; print(): unknown }

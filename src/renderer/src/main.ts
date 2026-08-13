@@ -195,6 +195,9 @@ byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('me
 // lit are only readable through here (docs/testing.md) — and where its
 // furniture sits is eyework, so the layout is editable from the console the
 // same way the dashboard's is.
+/** Where a session's console nudges are kept between runs. */
+const LAYOUT_KEY = 'pow.screen.layout'
+
 if (window.pow) {
   const view = (screen: (typeof screens)[keyof typeof screens]): BarScreenView => ({
     selected: screen.selected,
@@ -219,8 +222,45 @@ if (window.pow) {
         JSON.stringify(
           Object.fromEntries(Object.entries(screens).map(([n, s]) => [n, s.layout]))
         )
-      )
+      ),
+    /** Throw the saved nudges away and go back to what the code says. */
+    reset: () => {
+      localStorage.removeItem(LAYOUT_KEY)
+      location.reload()
+    }
   }
+
+  // **A nudge SURVIVES the window closing.** An evening of moving furniture in
+  // the console used to die with the app — the layouts live in the renderer's
+  // memory and nothing wrote them anywhere. They are stashed on the way out and
+  // laid back over the code's own numbers on the way in, so the only way to
+  // lose a session's tuning now is `pow.screen.reset()`.
+  const soak = (into: Record<string, unknown>, from: Record<string, unknown>): void => {
+    for (const [key, value] of Object.entries(from)) {
+      const there = into[key]
+      if (Array.isArray(there) && Array.isArray(value)) {
+        value.forEach((item, i) => (there[i] = item))
+      } else if (there && typeof there === 'object' && value && typeof value === 'object') {
+        soak(there as Record<string, unknown>, value as Record<string, unknown>)
+      } else if (typeof there === typeof value) {
+        into[key] = value
+      }
+    }
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? 'null')
+    if (saved) {
+      for (const [name, screen] of Object.entries(screens)) {
+        if (saved[name]) soak(screen.layout as Record<string, unknown>, saved[name])
+      }
+      console.info('pow: layout nudges restored — pow.screen.reset() throws them away')
+    }
+  } catch (error) {
+    console.warn(`pow: the saved layout would not load (${String(error)})`)
+  }
+  window.addEventListener('beforeunload', () => {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(window.pow?.screen?.print() ?? {}))
+  })
 }
 
 // A located game lands on the main menu; the asset browsers hang off it.
