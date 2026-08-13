@@ -346,3 +346,45 @@ absence**, and no reading of the binary outranks a picture of the game running.
 So the pig is real work and it is still to do: the model, that nation's
 uniform, clip 27 idling, and a turntable — the first frontend screen here that
 needs the scene beside its canvas.
+
+## The hats, three wrong answers and one right one (2026-08-13)
+
+Play: the nation hats land "либо на пузе либо в ногах", and the standard hats
+are not removed. Three passes, each one further into the same question.
+
+**First — a centring.** The hat's box came out behind the skull, so
+`frontendPig.ts` centred it on the head bone in x and z and called it
+`[CHECK — remake]`. Invented, and it hid the real thing.
+
+**Second — the half turn, which is the exe's.** Both attachment loaders end
+their model with `afSetObjPos(obj, 0,0,0, 0, 0x800, 0)`, half of the 0x1000
+circle, and the pig's body constructor never calls it at all — so the turn
+`heldWeapon.ts` had measured its way to for a WEAPON is a rule about
+attachments, and a hat gets it too. `afSetObjPos` does not put it in the
+object's matrix either (which `afDrawAnimModel` would then overwrite with the
+bone's): it calls a helper that walks the mesh and turns the VERTICES, once, at
+load. Untorned `br_hat` boxes x −197..61 against a head at x −25..221; turned,
+x −49..209, on the head.
+
+**Third — and this was the whole of the two hats: the wrong MODEL.** Every
+class carries its headgear in the mesh as one texture group, and the pig on
+SELECT TEAM is the one model that does not: the HEAVY GUNNER. `british.mtd` has
+no `HV_H` at all. Which is what the engine's `[obj+2] == 2` gate means — not
+"kind 2 wears a nation hat" but "kind 2 is the bare head". Record 3 forces the
+class to 1, 0x4C2E50 maps that to kind 2, `afLoadAnimModels` stores
+`british.mad` straight through a 0x48 record at a time so kind 2 is the `pchvy`
+triple, and the frontend's z of 1000 is inside the near threshold of 1500. So
+it is `pchvy_hi`, and there is nothing to hide.
+
+**Then a fourth report, which was not about placement at all**: scrolling the
+list, the hats sank one step per row. `buildModelGeometry` hands the geometry
+the parsed model's OWN `Float32Array` without copying it, and `unresolve`
+subtracts the bind offsets in place — so on a screen that rebuilds its hat on
+every change, each pass took bone 2's offset off again, 198 units a time.
+`unresolve` copies first now. The battle never showed it because
+`heldWeapon.ts` caches one geometry per weapon and unresolves once.
+
+Two lessons. **A measurement can be right and still be the wrong answer** — the
+box really was behind the skull, and centring it really did move it there, and
+none of that was the bug. And **a shared buffer handed out as a view is a trap
+that only shows up on the second call**; the fix belongs where the mutation is.

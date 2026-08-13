@@ -114,7 +114,15 @@ function bindOffset(bones: THREE.Bone[], index: number, out: THREE.Vector3): THR
  * bone-local and a bone's whole matrix can be handed over as the exe hands it.
  * Exported because a HAT is attached exactly the same way. */
 export function unresolve(model: Model, geometry: THREE.BufferGeometry, bones: THREE.Bone[]): void {
-  const position = geometry.getAttribute('position')
+  // FIRST take a copy of the positions, because they are not this geometry's.
+  // `buildModelGeometry` wraps the parsed model's own Float32Array without
+  // copying it, so subtracting in place edits the MODEL — and a second
+  // geometry built from it later starts already shifted. Play found it by
+  // scrolling the team list: the hat sank one bone-2 offset per row, "всё
+  // ниже и ниже", because SELECT TEAM rebuilds its hat on every change.
+  const source = geometry.getAttribute('position') as THREE.BufferAttribute
+  const position = new THREE.BufferAttribute(new Float32Array(source.array as Float32Array), 3)
+  geometry.setAttribute('position', position)
   const at = new THREE.Vector3()
   const offsets = new Map<number, THREE.Vector3>()
   for (let corner = 0; corner < position.count; corner++) {

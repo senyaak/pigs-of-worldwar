@@ -20,7 +20,7 @@
 import * as THREE from 'three'
 
 import { ensureScene } from './scene'
-import { buildModelGeometry, buildTextureMaterials } from './modelMesh'
+import { buildModelGeometry, buildTextureMaterials, disposeMesh } from './modelMesh'
 import { HEAD, unresolve } from './heldWeapon'
 import { buildPig } from './pig'
 import type { Pig } from './pig'
@@ -134,12 +134,20 @@ export function buildFrontendPig(
 
   let pig: Pig | null = null
   let player: Player | null = null
+  /** The hat's own art, which the pig does not own and so cannot free. */
+  let hat: { geometry: THREE.BufferGeometry; materials: THREE.Material[] } | null = null
 
-  const dress = (outfit: Outfit): void => {
+  const undress = (): void => {
     if (pig) {
       host3d.scene.remove(pig.group)
       pig.dispose()
     }
+    if (hat) disposeMesh(hat.geometry, hat.materials)
+    hat = null
+  }
+
+  const dress = (outfit: Outfit): void => {
+    undress()
     pig = buildPig(parts.model, outfit.textures, parts.skeleton)
     // The HAT, on bone 2 — the head — with the bone's whole matrix and no
     // offset of its own, which is how `three/heldWeapon.ts` decoded the
@@ -148,7 +156,9 @@ export function buildFrontendPig(
     if (outfit.hat) {
       const geometry = buildModelGeometry(outfit.hat.model, outfit.hat.textures)
       unresolve(outfit.hat.model, geometry, pig.bones)
-      const mesh = new THREE.Mesh(geometry, buildTextureMaterials(outfit.hat.model, outfit.hat.textures))
+      const materials = buildTextureMaterials(outfit.hat.model, outfit.hat.textures)
+      hat = { geometry, materials }
+      const mesh = new THREE.Mesh(geometry, materials)
       // THE SAME HALF TURN THE WEAPON GETS, and for the same reason: the exe
       // turns every attachment it loads and the body not at all. The hat loop
       // at 0x486340 walks `chars\fhats.mad` a triple at a time and ends each
@@ -177,10 +187,7 @@ export function buildFrontendPig(
     reskin: dress,
     dispose() {
       host3d.onFrame.delete(tick)
-      if (pig) {
-        host3d.scene.remove(pig.group)
-        pig.dispose()
-      }
+      undress()
       pig = null
       player = null
     }
