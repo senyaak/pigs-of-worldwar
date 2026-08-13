@@ -146,6 +146,37 @@ export const LAYOUT = {
 }
 
 /**
+ * Where the WORDS go — a box each, and the text is centred across it with its
+ * TOP at the box's own y.
+ *
+ * These are the exe's, out of `.data` rather than out of the draw code: a
+ * screen's own string has four parallel per-screen tables (0x4C1548 x,
+ * 0x4C15A8 y, 0x4C1608 w, 0x4C1668 h) and its ITEMS have one table of 16-byte
+ * records at 0x4C1728, which every screen indexes from a running total of the
+ * item counts at 0x4C16C8 — screen 1's four rows are records 1..4. The
+ * numbers are in the frontend's 1024×820, squeezed here to pixels, and every
+ * box is shifted by the frontend's own text origin (the screen's x offset
+ * less 50/2 in the wide space, which is -25 at rest and is folded in).
+ *
+ * The rows do NOT carry the plates' stagger: all four boxes are the same x,
+ * while rows 1 and 2 sit twelve pixels in. The words stay put and the plate
+ * moves under them.
+ */
+export const MENU_TEXT = {
+  /** exe (518, 227) 210+80 × 30 — one line of a 16-tall font in a 17-tall box. */
+  title: { x: 298, y: 132, width: 181 },
+  /** exe (528, 329/398/468/537) 205+80 wide. The pitch is 40, 41, 41 — the
+   * plates' own is a flat 40 with two rows nudged, so the two only agree at
+   * the ends. */
+  rows: [
+    { x: 305, y: 192, width: 178 },
+    { x: 305, y: 232, width: 178 },
+    { x: 305, y: 273, width: 178 },
+    { x: 305, y: 314, width: 178 }
+  ]
+}
+
+/**
  * Where a PLATE's two halves meet in the SOURCE image — the exe blits columns
  * `0 .. SEAM + stretch` at the row's x and columns `SEAM .. width` at
  * `x + SEAM + stretch`, so the two abut exactly and the columns just past the
@@ -172,6 +203,20 @@ const FLIP_AT = -50
  */
 const PLATE_LEAVES_ON = 0
 const PLATE_TURNS_OUT_TO = 3
+/**
+ * How the WORDS ride the turn, per plate frame. The widget's builder writes
+ * one of these two numbers out for the rows and the other for the title
+ * (0x41f289 and 0x41f2ed), and the glyph drawer reads it as `k = 100 - |v|`:
+ * a letter is CROPPED to `k` per cent of its height and dropped by what it
+ * lost, so the line collapses onto its own baseline and vanishes at k = 0.
+ * There is a second, smaller shift of `12v/100` on top (0x431879..0x4318a0).
+ *
+ * Walking 2 → 6 on the way in, the rows are gone for two frames and come back
+ * through 30 and 80 per cent; the title only ever dips to 10. Leaving walks
+ * 0 → 3, which is the same in reverse.
+ */
+const ROW_TURN = [0, 100, 100, -70, -20, 0, 0]
+const TITLE_TURN = [0, 30, 90, -90, -40, 0, 0]
 /** The frontend's own tick — one update, one walk of every widget, one draw. */
 const TICK_MS = EXE_FRAME_SECONDS * 1000
 /** A window that was hidden comes back to a SETTLED screen, not to a
@@ -271,7 +316,6 @@ export const feText = (index: number): string => strings[index] ?? ''
 let shared: Promise<{
   bank: Bank
   art: SpriteSet
-  big: Font
   lit: Font
   plain: Font
   off: Font
@@ -279,20 +323,21 @@ let shared: Promise<{
 
 function loadShared(): NonNullable<typeof shared> {
   shared ??= (async () => {
-    const [bank, sprites, text, bigFont, litFont, plainFont, offFont] = await Promise.all([
+    const [bank, sprites, text, litFont, plainFont, offFont] = await Promise.all([
       loadBank(FRONTEND_SOUNDS),
       loadSprites(ART),
       window.api.loadGameText('fetext'),
-      loadFont('BIG'),
-      // CHARS2 in its three shades: the light one for the chosen bar, the
-      // plain one for the rest, the dark one for a bar with nothing behind it.
+      // CHARS2 in its three shades and NOTHING else: the frontend builds one
+      // text object out of the three and writes every screen with it, title
+      // included (0x426AA6). The light one is the chosen bar, the plain one
+      // the rest and the title, the dark one a bar with nothing behind it.
       loadFont('chars2L'),
       loadFont('CHARS2'),
       loadFont('chars2D')
     ])
     if (!text.ok) throw new Error(text.error)
     strings = text.strings
-    return { bank, art: sprites, big: bigFont, lit: litFont, plain: plainFont, off: offFont }
+    return { bank, art: sprites, lit: litFont, plain: plainFont, off: offFont }
   })()
   return shared
 }
@@ -302,6 +347,10 @@ export function initBarScreen(config: {
   /** The plate at the top — the screen's own fetext string. */
   title: () => string
   bars: Bar[]
+  /** Where this screen's WORDS go, when its own boxes have been read off the
+   * exe — `MENU_TEXT` is screen 1's. Left out, a label is centred on its
+   * plate and hidden while the plate turns, which is the remake's own. */
+  text?: typeof MENU_TEXT
   /** Whether the rows carry the MAIN MENU's own stagger (`LAYOUT.stagger`).
    * It is read off that screen's draw arm and belongs to no other. */
   stagger?: boolean
@@ -314,14 +363,13 @@ export function initBarScreen(config: {
   /** F1, the remake's own asset browsers. */
   onAssets?: () => void
 }): BarScreen {
-  const { canvas, bars } = config
+  const { canvas, bars, text } = config
   const layout = cloneLayout()
   canvas.width = SCREEN.width
   canvas.height = SCREEN.height
 
   let bank: Bank = SILENT
   let art: SpriteSet | null = null
-  let big: Font | null = null
   let lit: Font | null = null
   let plain: Font | null = null
   let off: Font | null = null
@@ -489,6 +537,38 @@ export function initBarScreen(config: {
   }
 
   /**
+   * One line of words in one of the exe's own boxes: centred across it, its
+   * TOP at the box's y (0x430ED0's alignment mode 2, which every frontend box
+   * is set to), and CROPPED by however far the plate under it has turned —
+   * see `ROW_TURN`. A crop and a drop, not a squash: the letters lose their
+   * bottoms and fall by what they lost, so the line sinks into the plate.
+   */
+  const words = (
+    context: CanvasRenderingContext2D,
+    font: Font,
+    text: string,
+    box: { x: number; y: number; width: number },
+    turn: number
+  ): void => {
+    const left = Math.round(box.x + (box.width - font.measure(text)) / 2)
+    const top = box.y + arrivalOffset
+    const kept = 100 - Math.abs(turn)
+    if (kept <= 0) return
+    const shift = Math.trunc((12 * turn) / 100)
+    if (kept >= 100) {
+      font.draw(context, text, left, top + shift)
+      return
+    }
+    const lost = Math.round((font.height * (100 - kept)) / 100)
+    context.save()
+    context.beginPath()
+    context.rect(left, top + lost, box.width, font.height - lost)
+    context.clip()
+    font.draw(context, text, left, top + lost + shift)
+    context.restore()
+  }
+
+  /**
    * Which frame of the dial POINTS at a row.
    *
    * The needle following the lit bar is the exe's, not an invention to be
@@ -506,7 +586,7 @@ export function initBarScreen(config: {
 
   const draw = (): void => {
     const context = canvas.getContext('2d')
-    if (!context || !art || !big || !lit || !plain || !off) return
+    if (!context || !art || !lit || !plain || !off) return
     // Everything the machine draws is displaced by the arrival — everything
     // except the backdrop, which the exe blits before the switch that applies
     // it, so the sky stays put while the machine drives on. And except the
@@ -594,9 +674,17 @@ export function initBarScreen(config: {
 
     const title = titles[plate.frame() % titles.length]
     drawPlate(title, layout.title.x, layout.title.y + arrivalOffset, layout.title.seam)
-    // Mid-turn a plate is edge-on to what it used to say, so it says nothing.
-    if (!turning) {
-      centred(context, big, config.title(), {
+    // The whole frontend is written in CHARS2 — the screen builds ONE text
+    // object out of CHARS2, CHARS2L and CHARS2D and hands it to every screen
+    // but one (0x426AA6; screen 3 gets a CHARS3 of its own). Which of the
+    // three shades a line wears is decided by the MEAN of the colour it is
+    // asked for: under 50 the dark one, over 100 the light one, otherwise
+    // plain (0x4317ed..0x431823). The title's own colour is (100, 100, 60),
+    // so the title is always the plain shade.
+    const frame = plate.frame() % TITLE_TURN.length
+    if (text) words(context, plain, config.title(), text.title, TITLE_TURN[frame])
+    else if (!turning) {
+      centred(context, plain, config.title(), {
         x: layout.title.x,
         y: layout.title.y + arrivalOffset,
         width: title.width + layout.bars.stretch,
@@ -616,11 +704,19 @@ export function initBarScreen(config: {
         drawLamp(lamp, i, layout.lamp.x, layout.lamp.y + i * layout.bars.step + arrivalOffset)
       }
 
-      if (turning) continue
-
       const bar = bars[i]
+      // The lit row is asked for in (120, 120, 75) against the others'
+      // (80, 80, 45), and a row that leads nowhere has its colour divided by
+      // three — which is what puts the three shades on the three states
+      // (0x428DBD). The words are drawn on the row's own box, which does NOT
+      // carry the plate's stagger.
       const font = !bar.enabled() ? off : i === selection ? lit : plain
       const value = bar.value?.() ?? null
+      if (text && value === null) {
+        words(context, font, bar.label(), text.rows[i] ?? text.rows[0], ROW_TURN[frame])
+        continue
+      }
+      if (turning) continue
       if (value === null) {
         centred(context, font, bar.label(), { ...row, height: face.height })
         continue
@@ -715,7 +811,6 @@ export function initBarScreen(config: {
         const pieces = await loadShared()
         bank = pieces.bank
         art = pieces.art
-        big = pieces.big
         lit = pieces.lit
         plain = pieces.plain
         off = pieces.off

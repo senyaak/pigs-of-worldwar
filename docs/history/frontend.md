@@ -84,8 +84,46 @@ disassembly predicts, value for value, and the tracks come in in four ticks.
 SCRIPT — and `ui/drive.ts` replaced `entrance.ts`, which only knew how to
 arrive.
 
-Still not read, and so still ours: where the label TEXT lands (the words go
-through a text-object printer with a per-screen box in four `.data` tables),
-and what the two per-frame numbers the plate widget writes do to it — they are
-non-zero exactly on the mid-turn frames, so the original is skewing its
-letters as the plate goes over, where we simply stop drawing them.
+## AND THEN THE WORDS, which were the last thing we were placing by eye
+
+Play, on reading the above: that list ends with something unread — go and read
+it. So the text path was walked too, and it turns out to be `.data` rather
+than draw code: the frontend prints through one object per font, and a box is
+handed to it before every line.
+
+**The whole frontend is CHARS2, title included.** The frontend builds exactly
+two text objects on entry — CHARS2 with its light and dark siblings, and a
+CHARS3 that only screen 3 uses. Our title was drawn in BIG, 32 pixels tall,
+because it looked right; the game writes it in the same 16-pixel letters as
+the rows, in a box 17 tall. That is the one change here that will look like a
+regression until it is checked against the original.
+
+**The boxes are tables.** A screen's own string has four parallel per-screen
+tables; the ITEMS have one table of 16-byte records that every screen indexes
+from a running total of the per-screen item counts, summed at startup — so
+screen 1's four rows are records 1..4 of it. In pixels: the title at (298,
+132) 181 wide, the rows at x 305, 178 wide, tops 192, 232, 273 and 314. Two
+checks fell out of that. The title's box centres on 388.5 against the title
+plate's own 389 — which is what says the whole chain, including a constant -25
+the text origin carries, was read right. And **the rows do not carry the
+plates' stagger**: all four boxes share an x while rows 1 and 2 are nudged
+twelve pixels in, so in the original the words stay put and the plate moves
+under them. We had been centring each label on its own staggered plate.
+
+**One number picks the shade.** A row is asked for in (120, 120, 75) when it
+is lit and (80, 80, 45) when it is not, and a row that leads nowhere has that
+divided by three; the glyph drawer then picks the light atlas over a mean of
+100, the dark one under 50, and the plain one between. Our lit/plain/off
+mapping was right and is now the game's own rule rather than a convention.
+
+**And the two per-frame numbers the plate widget writes are the words riding
+the turn.** They are a crop and a drop: a letter is cut to `k = 100 - |v|` per
+cent of its height and dropped by exactly what it lost, so a line collapses
+onto its own baseline and is gone at k = 0. The rows and the title get
+DIFFERENT tables — walking in, the rows are invisible for two frames and come
+back through 30 and 80 per cent while the title only ever dips to 10. We had
+been hiding both outright for the whole turn, which was the right instinct and
+the wrong shape.
+
+Still not read on this screen: two allocations in the update's tail, and a
+second lit row the loop supports and screen 1 never uses.

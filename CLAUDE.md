@@ -436,6 +436,18 @@ and the weakest of them were invented here:
   plates; what is heard is `cog.wav`, one 32 ms tooth a tick, while the screen
   drives in or out.
 
+  **The WORDS have boxes of their own, and the whole frontend is CHARS2.**
+  The frontend builds one text object out of CHARS2/L/D and writes every
+  screen with it, title included — only screen 3 gets a CHARS3 — and which of
+  the three shades a line wears is the MEAN of the colour it is asked for
+  (over 100 light, under 50 dark). A line is centred across a box out of
+  `.data`, and the boxes ride the entrance: `MENU_TEXT` in `ui/barScreen.ts`
+  carries screen 1's, in pixels. **The rows' boxes do NOT carry the plates'
+  stagger** — the words stay put and the plate moves under them. And the two
+  per-frame numbers the plate widget writes are the words riding the turn: a
+  letter is cropped to `100 - |v|` per cent of its height and dropped by what
+  it lost, the rows and the title on different tables.
+
   **A press is never gated and the light WRAPS.** The up and down arms are two
   lines each with no travel to wait out and no click of their own — the click
   a player hears on a move is the needle ARRIVING (`Indu006` at half volume).

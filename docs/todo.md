@@ -654,18 +654,19 @@ The SHELTER is done end to end. What is left round it:
   arm builds a widget 8 that screen 1 never draws — and it has a draw arm of
   its own at 0x41DEE3 and a selection arm of its own. Everything needed to
   read it is in the tables already transcribed.
-- **Where the frontend's WORDS land.** Screen 1's labels go through a
-  text-object printer with a per-screen box out of four `.data` tables
-  (0x4C1548, 0x4C15A8, 0x4C1608, 0x4C1668), and the box's numbers do not read
-  as screen pixels, so the space they are in is unaccounted for. Ours are
-  centred on the plates by eye and look right; the tables are what a screen we
-  have NOT built would want.
-- **What the plate widget's two per-frame numbers do to those words.** It
-  writes a pair out of tables it carries — `[0, 100, 100, -70, -20, 0, 0]` and
-  `[0, 30, 90, -90, -40, 0, 0]` — and the per-frame function hands the second
-  to the text object as `[+0x1C]`/`[+0x20]`. They are non-zero on exactly the
-  mid-turn frames, so the original skews its letters as a plate goes over
-  where we stop drawing them.
+- ~~**Where the frontend's WORDS land**~~ — READ, and built: a box per line
+  out of `.data` (four per-screen tables for a screen's own string, one table
+  of 16-byte records at 0x4C1728 for the ITEMS, indexed by a running total of
+  the counts at 0x4C16C8), centred across the box, riding the entrance through
+  a text origin that carries a constant -25. The whole frontend is CHARS2 —
+  screen 3's CHARS3 is the only exception — and which of its three shades a
+  line wears is decided by the MEAN of the colour it is asked for. **The one
+  thing to check in play: our title was BIG and the game's is CHARS2**, half
+  the height.
+- ~~**What the plate widget's two per-frame numbers do**~~ — READ: a crop and
+  a drop on the words as the plate turns, `k = 100 - |v|` per cent of a
+  letter's height, dropped by what it lost. The rows and the title get
+  different tables, so they turn at different rates.
 
 **A sweep on 2026-08-11 closed most of this list** — the reads are in the
 disasm repo; what survives of each item is the WIRING, which waits for play to

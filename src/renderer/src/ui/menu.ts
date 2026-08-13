@@ -9,7 +9,7 @@
 // own dark variant, the way the original greys out what cannot be chosen.
 
 import { byId } from './dom'
-import { feText, initBarScreen } from './barScreen'
+import { MENU_TEXT, feText, initBarScreen } from './barScreen'
 import type { BarScreen } from './barScreen'
 
 export { SCREEN } from './barScreen'
@@ -34,6 +34,9 @@ export function initMenu(handlers: {
     // This screen's rows are staggered, and only this one: the two numbers
     // are read off its own draw arm (exe 0x41bf6c) and no other arm has been.
     stagger: true,
+    // And its WORDS have boxes of their own, out of the exe's `.data` — the
+    // words do not follow the stagger the plates carry.
+    text: MENU_TEXT,
     // Screen 1 comes DOWN, from 650 of the frontend's own units above its
     // resting place — the exe's per-screen table at 0x4C0A18 (`entrance.ts`).
     entersFrom: -650,
