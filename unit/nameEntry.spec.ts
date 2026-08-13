@@ -21,7 +21,9 @@ import {
 } from '../src/lib/game/nameEntry'
 import type { Alphabet, NameEntry } from '../src/lib/game/nameEntry'
 
-const GRID: Alphabet = { letters: ALPHABET, columns: 6, rows: 7 }
+/** Play's own layout, off a screenshot of the shipped game: seven letters
+ * across, six rows down, and the keys as an eighth column. */
+const GRID: Alphabet = { letters: ALPHABET, columns: 7, rows: 6 }
 
 const typed = (text: string): NameEntry => ({ name: text, cursor: 0 })
 const at = (cursor: number): NameEntry => ({ name: '', cursor })
@@ -67,14 +69,14 @@ test('ENTER refuses an empty name and otherwise hands it over', { tag: '@nodata'
 })
 
 test('the cursor wraps both ways over the grid', { tag: '@nodata' }, () => {
-  // Row 0 is A..F; one left of A is the keys' column.
+  // Row 0 is A..G; one left of A is the keys' column.
   expect(moveCursor(at(0), -1, 0, GRID).cursor).toBe(42)
-  // One right of F wraps to the keys' column too, then round to A.
-  expect(moveCursor(at(5), 1, 0, GRID).cursor).toBe(42)
+  // One right of G wraps to the keys' column too, then round to A.
+  expect(moveCursor(at(6), 1, 0, GRID).cursor).toBe(42)
   expect(moveCursor(at(42), 1, 0, GRID).cursor).toBe(0)
-  // Down a row is six along; up from the top row lands on the bottom one.
-  expect(moveCursor(at(0), 0, 1, GRID).cursor).toBe(6)
-  expect(moveCursor(at(0), 0, -1, GRID).cursor).toBe(36)
+  // Down a row is seven along; up from the top row lands on the bottom one.
+  expect(moveCursor(at(0), 0, 1, GRID).cursor).toBe(7)
+  expect(moveCursor(at(0), 0, -1, GRID).cursor).toBe(35)
 })
 
 test('the keys are a column three tall and wrap among themselves', { tag: '@nodata' }, () => {
@@ -84,7 +86,7 @@ test('the keys are a column three tall and wrap among themselves', { tag: '@noda
 })
 
 test('a place past the last letter lands on the last letter', { tag: '@nodata' }, () => {
-  // 42 letters in a 6 x 7 grid fill it exactly, so make one that does not.
+  // 42 letters in a 7 x 6 grid fill it exactly, so make one that does not.
   const ragged: Alphabet = { letters: 'ABCDEFGH', columns: 3, rows: 3 }
   // Row 2 is G, H and an empty place; moving down onto it lands on H.
   expect(moveCursor({ name: '', cursor: 5 }, 0, 1, ragged).cursor).toBe(7)

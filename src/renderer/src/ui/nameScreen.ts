@@ -10,14 +10,17 @@
 // tested; this file is the picture.
 //
 // **The art is read, the placement is not.** The three key plates are 24×28
-// and the arm stacks them 28 apart (0x41DD32/0x41DD5A/0x41DD70), the field is
-// `propoint` tiled — a cap at x 184, twelve middles from 204 stepping 20, and
-// a cap at 432 (0x41DDDB..0x41DEDE) — and `alpha02..08` are seven PLATES, one
-// per frame of the widget the builder walks (0x41F5E9), decoded here as solid
-// blocks with nothing drawn on them: the letters go on top as text. What the
-// arm does NOT give is a single y, because every one it computes is
-// `2·[0x512964] + k` off an entrance whose resting value is not read. So the
-// verticals below are eyework and say so.
+// (0x41DD32/0x41DD5A/0x41DD70), the field is `propoint` tiled — a cap at x 184,
+// twelve middles from 204 stepping 20, and a cap at 432 (0x41DDDB..0x41DEDE) —
+// and `alpha02..08` are seven PLATES, one per frame of the widget the builder
+// walks (0x41F5E9), decoded here as solid blocks with nothing drawn on them:
+// the letters go on top as text. What the arm does NOT give is a single y,
+// because every one it computes is `2·[0x512964] + k` off an entrance whose
+// resting value is not read. So the verticals below are eyework and say so.
+//
+// The GRID itself is play's, off a screenshot of the shipped game — seven
+// letters across and six down with the three keys as an eighth column, on
+// `alpha03`. See `COLUMNS`.
 
 import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
@@ -44,7 +47,7 @@ import {
 import type { Alphabet, NameEntry } from '../../../lib/game/nameEntry'
 
 /** What kind 0's loader arm (0x4228F9) brings that this screen blits. */
-const ART = ['pigbkpc1', 'propoint', 'alpha07', 'chardel', 'charspc', 'charent']
+const ART = ['pigbkpc1', 'propoint', 'alpha03', 'chardel', 'charspc', 'charent']
 
 /** `Fesounds.srl` entry 4 at volume 40 — every keypress (0x42AF71). */
 const KEYPRESS = { name: 'CLICK1', gain: 0.4 }
@@ -56,19 +59,26 @@ const TITLE_TEXT = 57
 const ENTERS_FROM = -700
 
 /**
- * The GRID, and it is `[CHECK — remake]`.
+ * The GRID: **seven letters across, six rows down**, and the three keys are an
+ * EIGHTH column on the same plate.
  *
- * The original does not store it — 0x431380 computes it from the box and the
- * font, `columns = scaleX(w + stretch)/(advance + spacing) − 7` and
- * `rows = 42/columns + 1` — and the two font metrics it reads (`[+0x3F40]` the
- * advance, `[+0x14]` the spacing) are filled at runtime by the text object's
- * constructor and are not decoded. What IS decoded is the art: `alpha07` is
- * 304×352, and 42 letters land on it as **6 across and 7 down** at a cell of
- * almost exactly 50×50, which is the one arrangement of the seven plates that
- * comes out square and uses every place. That is the argument for this number
- * and the whole of it.
+ * `[play]`, off a screenshot of the shipped game, and it settles what the
+ * disassembly could not: 0x431380 computes the shape from the box and the font
+ * and the two metrics it reads are filled at runtime, so there was nothing to
+ * read. The picture shows `А В С Д Е Ы Ш` and then the back-arrow, six such
+ * rows, with `_` and `OK` under the arrow — which is exactly the layout the
+ * cursor walk describes (0x42AE30 treats any index at or past the count as one
+ * more column, three tall).
+ *
+ * The ART agrees, which is the check. Eight columns and six rows want a plate
+ * whose sides are as 8:6 for a square cell, and of the seven `alpha` plates
+ * exactly one is: **`alpha03`, 352×256**, ratio 1.375, cell 44×42.7. The first
+ * pass here took `alpha07` and 6×7 and spread the letters half the screen
+ * apart, which is what play saw.
  */
-const COLUMNS = 6
+const COLUMNS = 7
+/** …and the keys' column is the one after the letters'. */
+const GRID_COLUMNS = COLUMNS + 1
 
 const ALPHABET_GRID: Alphabet = {
   letters: ALPHABET,
@@ -85,12 +95,11 @@ const LAYOUT = {
   /** `propoint` tiled: the cap at `x`, middles from `repeat` stepping `step`
    * while they fit before `tail`, and the far cap at `tail` (0x41DDDB on).
    * The x's are the arm's; `y` and `height` are `[CHECK — remake]`. */
-  field: { x: 184, repeat: 204, step: 20, tail: 432, cell: 20, y: 96, height: 40 },
-  /** The alphabet plate, `alpha07`. `[CHECK — remake]`. */
-  plate: { x: 168, y: 150 },
-  /** The three keys, 24×28 each and stacked 28 apart — the SPACING is the
-   * arm's (0x41DD32/0x41DD5A/0x41DD70), the corner is `[CHECK — remake]`. */
-  keys: { x: 490, y: 190, step: 28 }
+  field: { x: 184, repeat: 204, step: 20, tail: 432, cell: 20, y: 112, height: 44 },
+  /** The alphabet plate, `alpha03` — 352 wide, so centred it starts at 144.
+   * The y is `[CHECK — remake]`, placed under the field the way play's
+   * screenshot has it. */
+  plate: { x: 144, y: 176 }
 }
 
 /** The words. The title's box is the exe's, out of the per-kind tables at
@@ -98,7 +107,7 @@ const LAYOUT = {
  * 190 wide. The name's line is centred over the field. */
 const TEXT = {
   title: { x: 206, y: 56, width: 168 },
-  name: { x: 184, y: 108, width: 268 }
+  name: { x: 184, y: 126, width: 268 }
 }
 
 const TICK_MS = EXE_FRAME_SECONDS * 1000
@@ -109,7 +118,6 @@ export type NameLayout = typeof LAYOUT & { text: typeof TEXT }
 const cloneLayout = (): NameLayout => ({
   field: { ...LAYOUT.field },
   plate: { ...LAYOUT.plate },
-  keys: { ...LAYOUT.keys },
   text: { title: { ...TEXT.title }, name: { ...TEXT.name } }
 })
 
@@ -226,34 +234,42 @@ export function initNameScreen(handlers: {
     // The name, padded out to its maximum with dots.
     words(context, lit, padded(entry.name, TEAM_NAME_MAX), layout.text.name)
 
-    // The alphabet's plate, and the letters over it — the lit one in the
-    // light shade, which is how every other screen marks its selection.
-    const plate = art.get('alpha07')
+    // The alphabet's plate, and everything on it: eight columns by six rows,
+    // the letters in the first seven and the three keys in the last.
+    const plate = art.get('alpha03')
     context.drawImage(plate.image, layout.plate.x, layout.plate.y + offset)
-    const cellWidth = plate.width / grid.columns
+    const cellWidth = plate.width / GRID_COLUMNS
     const cellHeight = plate.height / grid.rows
+    /** The middle of a cell, in canvas coordinates. */
+    const cell = (column: number, row: number): { x: number; y: number } => ({
+      x: layout.plate.x + (column + 0.5) * cellWidth,
+      y: layout.plate.y + offset + (row + 0.5) * cellHeight
+    })
+
     for (let i = 0; i < grid.letters.length; i++) {
       const letter = grid.letters[i]
-      const column = i % grid.columns
-      const row = Math.floor(i / grid.columns)
+      const middle = cell(i % grid.columns, Math.floor(i / grid.columns))
       const font = i === entry.cursor ? lit : plain
       font.draw(
         context,
         letter,
-        Math.round(layout.plate.x + (column + 0.5) * cellWidth - font.measure(letter) / 2),
-        Math.round(layout.plate.y + offset + (row + 0.5) * cellHeight - font.height / 2)
+        Math.round(middle.x - font.measure(letter) / 2),
+        Math.round(middle.y - font.height / 2)
       )
     }
 
-    // The three keys, in their own column beside the grid.
+    // The three keys — 24×28 sprites, one per row of the eighth column, and
+    // the lit one boxed the way the letters are told apart by their shade.
     const key = keyAt(entry, grid)
     KEYS.forEach((name, i) => {
       const sprite = art!.get(name === 'delete' ? 'chardel' : name === 'space' ? 'charspc' : 'charent')
-      const y = layout.keys.y + offset + i * layout.keys.step
-      context.drawImage(sprite.image, layout.keys.x, y)
+      const middle = cell(grid.columns, i)
+      const x = Math.round(middle.x - sprite.width / 2)
+      const y = Math.round(middle.y - sprite.height / 2)
+      context.drawImage(sprite.image, x, y)
       if (key === name) {
         context.strokeStyle = 'rgb(216, 216, 152)'
-        context.strokeRect(layout.keys.x - 0.5, y - 0.5, sprite.width + 1, sprite.height + 1)
+        context.strokeRect(x - 0.5, y - 0.5, sprite.width + 1, sprite.height + 1)
       }
     })
 

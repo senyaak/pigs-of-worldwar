@@ -161,12 +161,14 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
      0 and the cursor is an index into it, the three past its end are DELETE,
      SPACE and ENTER, a team name is eleven characters and a pig's seven, the
      field pads with dots, and ENTER refuses an empty name. What is left on it:
-     - **the GRID's shape is `[CHECK — remake]`.** 6 across and 7 down, which
-       is what 42 letters make on `alpha07` (304×352) at a square cell. The
-       exe computes it — `columns = scaleX(w + stretch)/(advance + spacing) − 7`
-       — and the two font metrics that feeds on are not decoded, so this is
-       arithmetic on the art rather than a reading. Nudge it and the plate
-       together.
+     - ~~the GRID's shape is `[CHECK — remake]`~~ **`[play]` settled it**: seven
+       letters across, six rows down, and the three keys as an EIGHTH column on
+       the same plate — a screenshot of the shipped game, which the disassembly
+       could not give because 0x431380 computes the shape from two font metrics
+       filled at runtime. The art agrees and is the check: eight columns by six
+       rows want sides as 8:6, and of the seven `alpha` plates only **`alpha03`,
+       352×256** is (1.375, cell 44×42.7). The first pass had `alpha07` and 6×7
+       and spread the letters half a screen apart.
      - **every y is eyework.** The x's are the arm's (the field's caps at 184
        and 432, twelve middles from 204 stepping 20; the keys 28 apart) but
        every y the arm computes is `2·[0x512964] + k` off an entrance whose
