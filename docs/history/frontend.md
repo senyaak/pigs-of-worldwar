@@ -315,3 +315,28 @@ SETTLED — its drive is at rest and its plates are not walking — so `lightBar
 let a press fly while the screen BEFORE it was still leaving, and both dropped
 it. The test only passed because the one above it happened to leave ONE PLAYER
 mid-walk. Wait for the panel to be visible before driving a screen.
+
+### "иди сравнивай" — and the pig turned out not to exist (2026-08-13)
+
+The comparison was worth ordering, and it caught the same mistake twice over.
+
+Both frontend functions that work the pig-display block — `0x426610` which
+sets it up and `0x418C50` which draws it — dispatch on `screen − 3` through a
+byte map into a pointer table. The first read had taken **the arm next to the
+right one** in each: screen 3's arms are `0x42667D` and `0x418D38`, which hand
+the block a CONSTANT 1 and the shared defaults. The class read out of
+`[team + 0x71 + 64*slot]`, and the numbers **290, 320, 378, 405**, belong to
+the SQUAD screens — records 12, 14, 19 and 34 — and were never SELECT TEAM's.
+Both byte maps are written out in `frontend/notes.md` now, because an arm
+reached by a table is easy to attribute to whoever you happened to be reading.
+
+And then the thing that settles it, which play had already said plainly —
+**`0x482510` is a stub.** `xor eax, eax; ret 4`, and its only two callers are
+those arms. The PC build looks a pig up and gets nothing, on every screen that
+asks. So there is no pig on SELECT TEAM to build, and the previous entry here
+promising "the first frontend screen that needs the scene" was promising work
+that does not exist. Whatever stands on a turntable in a PSX capture does not
+stand there in this build.
+
+What IS still missing from the screen is the rest of the machinery round the
+console, and that is a real gap with a real read behind it.

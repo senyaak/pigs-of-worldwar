@@ -118,14 +118,16 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        it~~ **fixed** — the canvas still held the last frame drawn before
        `leave()`, so `enter()` paints the un-arrived state before the first
        tick now.
-     - **the PIG on the left is missing, and so is most of the machinery.**
-       The original stands the chosen army's own pig on a green turntable at
-       the left and has a great deal more moving metal than we draw. The
-       turntable is `standpc`; the pig is a MODEL, not frontend art. Where any
-       of it lands is not read — `sqarmy`, `pigpro` and `standpc` were named by
-       the loader arm and nothing has been traced past that. **This is the next
-       read**, and it is what makes the screen look like the original rather
-       than like a list.
+     - ~~the PIG on the left is missing~~ **there is no pig** — the PC build
+       stubs the lookup. Both frontend functions that work the pig-display
+       block dispatch on `screen − 3`, and screen 3 hands it a CONSTANT where
+       the SQUAD screens hand it a class; then `0x482510`, which turns that
+       into something to draw, is `xor eax,eax; ret 4`. Play said so first.
+       The four numbers 290/320/378/405 an earlier note put on this screen are
+       the squad screens' (records 12, 14, 19, 34) and belong with them.
+     - **the rest of the MACHINERY is still missing**, and that is a real gap:
+       the original carries a good deal more moving metal round the console
+       than we draw. Where it lands is not read.
    - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with
      `chardel`/`charspc`/`charent`, the caret stepping by its own little table
      (0x41DC69).

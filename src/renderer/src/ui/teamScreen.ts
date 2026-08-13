@@ -18,13 +18,16 @@
 // right. The `selcog` carriage at (553, 180) really does not move; the arm
 // blits it at a literal.
 //
-// Two things the arm does NOT draw, and neither is guessed at here:
+// **There is no PIG on this screen**, and that is the PC build's own answer
+// rather than a gap in ours. The frontend keeps a pig-display block and two
+// functions that work it (0x426610, 0x418C50), and both dispatch on
+// `screen − 3` through a byte map: screen 3's arms hand the block a CONSTANT 1
+// where the SQUAD screens hand it a pig's class. Then `0x482510` — the call
+// that turns that into something to draw — is a stub, `xor eax,eax; ret 4`,
+// with no callers but those two. Play said it before the disassembly did.
+// `frontend/notes.md`.
 //
-// - the SQUAD the original shows for the highlighted army. A changed row calls
-//   `0x4824A0`, which is `Team::SetNation` (`army/notes.md`), so the eight it
-//   lists are the team record's own and `lib/game/roster.ts` can supply them —
-//   but where `sqarmy`, `pigpro` and `standpc` land is not read, so the panel
-//   is left out rather than placed by eye.
+// One thing the arm does not draw and that IS a gap:
 // - MULTI-PLAYER's own furniture. Record 16 carries on from 0x41d099 into a
 //   long block of four team slots and a sine wobble; every other kind-2 screen
 //   returns before it. Ours still rides the machine (`ui/multiPlayer.ts`) and
