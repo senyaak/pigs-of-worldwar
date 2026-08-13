@@ -18,15 +18,14 @@
 // right. The `selcog` carriage at (553, 180) really does not move; the arm
 // blits it at a literal.
 //
-// Two things the arm does not draw, and both are gaps:
+// **The PIG on the turntable is BUILT** and it is a model, not a blit: the
+// display block the original keeps (0x513034..0x513068) carries clip 27, the
+// idle, and screen 3 draws on the pass's shared defaults. Its skins and its
+// HAT follow the lit army - Team::SetNation is what the original calls on a
+// changed row - and the hat hangs off bone 2, the head, the same decoded way
+// three/heldWeapon.ts hangs a weapon off bone 5.
 //
-// - **the PIG**, which the original stands on a turntable at the left of this
-//   screen. It is a MODEL, not a blit: the frontend's pig-display block
-//   (0x513034..0x513068) carries clip 27, the idle, and screen 3's draw arm
-//   overrides nothing — it falls into the tail on the shared defaults,
-//   `edi = ebp = 331`, `esi = 160`, `1000.0f` in `[0x513030]`. The uniform
-//   follows from `Team::SetNation`, which a changed row calls first. Needs the
-//   scene beside this canvas, so it lands the way `ui/battle.ts` does it.
+// One thing the arm does not draw and that IS still a gap:
 // - MULTI-PLAYER's own furniture. Record 16 carries on from 0x41d099 into a
 //   long block of four team slots and a sine wobble; every other kind-2 screen
 //   returns before it. Ours still rides the machine (`ui/multiPlayer.ts`) and
@@ -45,8 +44,16 @@ import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { NATIONS } from '../../../lib/game/teams'
-import { buildFrontendPig, CHAR_ARCHIVE, IDLE_CLIP, NATION_SKINS, PIG_ART } from '../three/frontendPig'
-import type { FrontendPig } from '../three/frontendPig'
+import {
+  buildFrontendPig,
+  CHAR_ARCHIVE,
+  HAT_ARCHIVE,
+  IDLE_CLIP,
+  NATION_HATS,
+  NATION_SKINS,
+  PIG_ART
+} from '../three/frontendPig'
+import type { FrontendPig, Outfit } from '../three/frontendPig'
 import type { Texture } from '../api'
 
 /** What the kind-2 loader arm (0x422270) decompresses, less the pieces this
@@ -224,7 +231,7 @@ export function initTeamScreen(handlers: {
    * fetched the first time it is lit and kept. Its own textures are the
    * British ones the model came with. */
   let pig: FrontendPig | null = null
-  const skins = new Map<number, Texture[]>()
+  const outfits = new Map<number, Outfit>()
 
   let selection = 0
   let visible = false
@@ -269,25 +276,34 @@ export function initTeamScreen(handlers: {
    */
   const dress = async (nation: number): Promise<void> => {
     if (!pig) return
-    const kept = skins.get(nation)
+    const kept = outfits.get(nation)
     if (kept) {
       pig.reskin(kept)
       return
     }
-    const path = NATION_SKINS[nation]
-    // Only a nation nobody has art for. TOMMY'S TROTTERS is not one of those:
-    // its skins came with the model and are put in `skins` at load, so coming
-    // back to row 0 puts them back on. Leaving that to this early return was
-    // the bug play saw — the first pig kept whichever nation it had just come
-    // from.
-    if (path === null || path === undefined) return
-    const loaded = await window.api.loadTims(path)
+    // TOMMY'S TROTTERS is never missing: its skins came with the model and are
+    // put in `outfits` at load, so row 0 is returned to like any other. That
+    // this used to be an early return was the bug play saw — the first pig
+    // kept whichever nation it had just come from.
+    const skin = NATION_SKINS[nation]
+    if (skin === null || skin === undefined) return
+    const [loaded, hat] = await Promise.all([
+      window.api.loadTims(skin),
+      window.api.loadModel(HAT_ARCHIVE, NATION_HATS[nation] ?? '')
+    ])
     if (!loaded.ok) {
-      console.warn(`${path}: ${loaded.error}`)
+      console.warn(`${skin}: ${loaded.error}`)
       return
     }
-    skins.set(nation, loaded.images)
-    if (selection === nation) pig.reskin(loaded.images)
+    // A hat that will not load leaves the pig bare-headed rather than in the
+    // wrong nation's skins.
+    const outfit: Outfit = {
+      textures: loaded.images,
+      hat: hat.ok ? { model: hat.model, textures: hat.textures } : null
+    }
+    if (!hat.ok) console.warn(`${NATION_HATS[nation]}: ${hat.error}`)
+    outfits.set(nation, outfit)
+    if (selection === nation) pig.reskin(outfit)
   }
 
   const navigate = (go: () => void): void => queueMicrotask(go)
@@ -496,8 +512,12 @@ export function initTeamScreen(handlers: {
         if (!built.ok) throw new Error(built.error)
         // The British skins come WITH the model, so they are the one nation
         // that needs no archive of its own — kept here so row 0 can be
-        // returned to like any other.
-        skins.set(0, built.textures)
+        // returned to like any other. Its HAT still comes out of FHATS.
+        const britishHat = await window.api.loadModel(HAT_ARCHIVE, NATION_HATS[0])
+        outfits.set(0, {
+          textures: built.textures,
+          hat: britishHat.ok ? { model: britishHat.model, textures: britishHat.textures } : null
+        })
         pig = buildFrontendPig(
           byId<HTMLDivElement>('team-pig'),
           { width: LAYOUT.pig.width, height: LAYOUT.pig.height },

@@ -123,11 +123,14 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        blitted into the frontend one (`three/frontendPig.ts`): `pcgru_me` out
        of `Chars/british.mad`, clip 27 idling, and the nation's skins swapped
        on a row change. Where it sits is `[CHECK — remake]` and nudgeable.
-     - **their HATS should differ, and do not yet.** Each nation has its own
-       hat MODEL in `Chars/FHATS.MAD` — `br_hat`, `frhelm`, `am_h`, `rus_h`,
-       `ja_ban`, `germh`, in the nation index's order, with `FHATS.MTD` for
-       the skins. What is not read is which BONE one hangs off and at what
-       offset; that is the next read and then a short build.
+     - ~~their HATS should differ~~ **DONE** — each nation has its own hat
+       MODEL in `Chars/FHATS.MAD` (`br_hat`, `frhelm`, `am_h`, `rus_h`,
+       `ja_ban`, `germh`, in the nation index's order) with `FHATS.MTD` for the
+       skins, and it hangs off **bone 2, the head** — which `three/heldWeapon.ts`
+       had already decoded from the engine's three attachment slots, weapon on
+       bone 5 and hat on bone 2, the bone's whole matrix and no offset. Probed
+       across the six: the silhouette's topmost row comes out 26/20/21/17/20/15,
+       six different hats.
      - **the rest of the MACHINERY is missing too** — the original carries a
        good deal more moving metal round the console than we draw. Not read.
    - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with

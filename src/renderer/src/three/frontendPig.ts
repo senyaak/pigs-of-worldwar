@@ -17,7 +17,11 @@
 //
 // This file knows nothing about which screen wants a pig or which row is lit.
 
+import * as THREE from 'three'
+
 import { ensureScene } from './scene'
+import { buildModelGeometry, buildTextureMaterials } from './modelMesh'
+import { HEAD, unresolve } from './heldWeapon'
 import { buildPig } from './pig'
 import type { Pig } from './pig'
 import { createPlayer } from './clipViewer'
@@ -49,6 +53,25 @@ export const NATION_SKINS: readonly (string | null)[] = [
  * agrees — so the frontend's is dressed as one. */
 export const PIG_ART = 'pcgru_me'
 
+/**
+ * And the six armies differ by HAT, which is a MODEL rather than a texture:
+ * `Chars/FHATS.MAD` is seven models of three parts with `FHATS.MTD` beside it,
+ * one per nation and a spare (`frontend/notes.md`). The exe loads that very
+ * archive by name at 0x4862ED.
+ *
+ * (`BRITHATS.MAD` is a different set and the battle's: seven BRITISH hats by
+ * class, on the family names `three/soldiers.ts` already maps.)
+ */
+export const HAT_ARCHIVE = 'Chars/FHATS.MAD'
+export const NATION_HATS: readonly string[] = [
+  'br_hat',
+  'frhelm',
+  'am_h',
+  'rus_h',
+  'ja_ban',
+  'germh'
+]
+
 /** `[0x513044] = 0x1B` (0x426911). */
 export const IDLE_CLIP = 27
 
@@ -56,10 +79,17 @@ export interface FrontendPig {
   /** The canvas to blit. Transparent where the pig is not, so it composites
    * over the frontend's own backdrop. */
   readonly canvas: HTMLCanvasElement
-  /** Dress it in another nation's skins — a whole rebuild, because a pig's
-   * materials are built from its texture set. */
-  reskin(textures: Texture[]): void
+  /** Dress it in another nation's skins and hat — a whole rebuild, because a
+   * pig's materials are built from its texture set, and the hat hangs off a
+   * bone of the mesh that goes with them. */
+  reskin(outfit: Outfit): void
   dispose(): void
+}
+
+/** What one army wears: its skins, and its hat if the archive had one. */
+export interface Outfit {
+  textures: Texture[]
+  hat: { model: Model; textures: Texture[] } | null
 }
 
 export interface PigParts {
@@ -90,18 +120,29 @@ export function buildFrontendPig(
   let pig: Pig | null = null
   let player: Player | null = null
 
-  const dress = (textures: Texture[]): void => {
+  const dress = (outfit: Outfit): void => {
     if (pig) {
       host3d.scene.remove(pig.group)
       pig.dispose()
     }
-    pig = buildPig(parts.model, textures, parts.skeleton)
+    pig = buildPig(parts.model, outfit.textures, parts.skeleton)
+    // The HAT, on bone 2 — the head — with the bone's whole matrix and no
+    // offset of its own, which is how `three/heldWeapon.ts` decoded the
+    // engine's three attachment slots. Same treatment as the weapon in the
+    // hand, one bone along.
+    if (outfit.hat) {
+      const geometry = buildModelGeometry(outfit.hat.model, outfit.hat.textures)
+      unresolve(outfit.hat.model, geometry, pig.bones)
+      const mesh = new THREE.Mesh(geometry, buildTextureMaterials(outfit.hat.model, outfit.hat.textures))
+      mesh.rotation.y = Math.PI
+      ;(pig.bones[HEAD] ?? pig.bones[0]).add(mesh)
+    }
     host3d.scene.add(pig.group)
     host3d.frameObject(pig.group)
     player = createPlayer(pig)
     player.play(parts.idle)
   }
-  dress(parts.textures)
+  dress({ textures: parts.textures, hat: null })
 
   const tick = (delta: number): void => player?.update(delta)
   host3d.onFrame.add(tick)

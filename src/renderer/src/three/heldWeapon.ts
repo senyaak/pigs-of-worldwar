@@ -41,6 +41,10 @@ const WEAPON_ARCHIVE = 'Chars/WEAPONS.MAD'
 /** The bone a held weapon hangs off: the hand (exe 0x440d55, dll 0x1000dbd1). */
 const HAND = 5
 
+/** …and the HEAD, which the same decode gives as bone 2 — where a HAT goes
+ * (three/frontendPig.ts uses it). */
+export const HEAD = 2
+
 /**
  * …and a half turn about the model's own vertical, which the weapons are
  * authored needing. Not a nudge — a measurement. `WE_RIF` hung on bone 5 with
@@ -98,7 +102,10 @@ function bindOffset(bones: THREE.Bone[], index: number, out: THREE.Vector3): THR
  * for is junk on these models, this simply undoes what was done rather than
  * reading anything into it.
  */
-function unresolve(model: Model, geometry: THREE.BufferGeometry, bones: THREE.Bone[]): void {
+/** Take the loader's accumulated bone offsets back OFF, so the vertices are
+ * bone-local and a bone's whole matrix can be handed over as the exe hands it.
+ * Exported because a HAT is attached exactly the same way. */
+export function unresolve(model: Model, geometry: THREE.BufferGeometry, bones: THREE.Bone[]): void {
   const position = geometry.getAttribute('position')
   const at = new THREE.Vector3()
   const offsets = new Map<number, THREE.Vector3>()
