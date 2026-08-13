@@ -156,12 +156,24 @@ const LAYOUT = {
    * `band.rows`) at the two offsets above it. */
   plate: { x: 168, drop: -48, band: { rows: 2, height: 30, at: [-74, -102] } },
   /**
-   * Where the letters sit ON the panel — `[CHECK — remake]`, the one thing on
-   * this screen the exe was not read for. Eight columns and six rows are spread
-   * across the panel less these insets; the top one is what keeps the first row
-   * clear of the name bar, which covers the panel down to y 64.
+   * Where the letters sit ON the panel: inside its own dark WINDOW, and these
+   * four are MEASURED off `alpha08`'s art rather than guessed. Scanning the
+   * plate for pixels darker than 115 in every channel, the window's solid core
+   * runs **x 29..260, y 100..332** of 304×352 — so the letters are laid across
+   * 232×232 with the gold frame left clear. Two checks that it is the right
+   * rectangle: the frame is handed, 29 on the left against 43 on the right, the
+   * way the art's light is; and the window lands at 197..428 on screen, which
+   * centres on 312 against the screen's own 320.
+   *
+   * Spreading the grid over the whole PLATE is what play saw as "the letters
+   * are bigger than the black screen" — the last column and the three keys sat
+   * on the frame and past it.
+   *
+   * The `[CHECK — remake]` here is only the SPREAD: the exe's own grid is a
+   * fixed 16-pixel step (`frontend/notes.md`), which does not fill the window
+   * and disagrees with play's screenshot twice over. See `COLUMNS`.
    */
-  inner: { left: 16, right: 16, top: 44, bottom: 16 }
+  inner: { left: 29, right: 43, top: 100, bottom: 19 }
 }
 
 /** The words. Both boxes are the exe's, out of the per-kind tables at

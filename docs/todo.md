@@ -169,8 +169,15 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        one the aspect argument picked: the plate is **widget 18's**, whose seven
        frames are `alpha02..08` and which the entrance walks 0 → 6, so the panel
        UNROLLS and comes to rest on **`alpha08`, 304×352 at (168, 32)** — dead
-       centre of the screen. Where the letters sit ON it is still the remake's
-       own (`INNER`), and the arm that would settle it is READ now without
+       centre of the screen. Where the letters sit ON it is bounded now by the
+       art rather than by the plate: play, "буквы больше чем границы этого
+       экрана" — the grid was spread over the WHOLE plate, so the last column
+       and the three keys sat on the gold frame and past it. `alpha08`'s dark
+       window, scanned for pixels under 115 in every channel, is **x 29..260,
+       y 100..332** of 304×352, which lands at 197..429 on screen and centres
+       on 312 against the screen's 320; the grid goes in there, with 3 pixels to
+       spare on the widest piece. The SPREAD across it is still the remake's own
+       (`INNER`), and the arm that would settle it is READ now without
        settling it: 0x43148C centres each glyph in a cell whose size is the box
        of one particular GLYPH — `` ` ``, 7×16 in CHARS2 — and steps
        `cell + 3·spacing` = 16 a column and twice a line's advance a row, with
