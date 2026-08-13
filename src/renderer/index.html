@@ -276,6 +276,11 @@
         pointer-events: none;
         image-rendering: pixelated;
       }
+      #team-pig {
+        position: absolute;
+        left: -9999px;
+        top: 0;
+      }
       .hidden {
         display: none !important;
       }
@@ -313,6 +318,11 @@
       <div id="team" class="hidden">
         <canvas id="team-screen"></canvas>
       </div>
+      <!-- The frontend pig renders here and is BLITTED into the team screen's
+           canvas (three/frontendPig.ts). It sits OUTSIDE that panel on purpose:
+           a hidden parent is display:none, the scene sizes its renderer from
+           the host's client box, and a 0x0 canvas cannot be drawn from. -->
+      <div id="team-pig"></div>
       <div id="multiplayer" class="hidden">
         <canvas id="mp-screen"></canvas>
       </div>

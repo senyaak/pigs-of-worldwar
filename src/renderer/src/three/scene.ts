@@ -30,7 +30,7 @@ export function ensureScene(container: HTMLElement): SceneHost {
   if (existing) return existing
 
   // preserveDrawingBuffer lets tests read pixels back (docs/testing.md).
-  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true })
   renderer.setSize(container.clientWidth, container.clientHeight)
   container.appendChild(renderer.domElement)
 

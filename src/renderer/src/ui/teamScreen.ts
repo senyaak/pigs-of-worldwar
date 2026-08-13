@@ -45,6 +45,9 @@ import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { NATIONS } from '../../../lib/game/teams'
+import { buildFrontendPig, CHAR_ARCHIVE, IDLE_CLIP, NATION_SKINS, PIG_ART } from '../three/frontendPig'
+import type { FrontendPig } from '../three/frontendPig'
+import type { Texture } from '../api'
 
 /** What the kind-2 loader arm (0x422270) decompresses, less the pieces this
  * screen's own arm never blits. `pigbkpc1` is the backdrop every screen sits
@@ -98,7 +101,16 @@ const LAYOUT = {
    * 0x41eb51), so the literal is where row 0 puts them and the frame carries
    * them down the list. */
   emblem: { x: 298, y: 170 },
-  lamp: { x: 537, y: 202 }
+  lamp: { x: 537, y: 202 },
+  /**
+   * Where the PIG is blitted, and it is **`[CHECK — remake]`**. The exe's own
+   * numbers for it are WORLD coordinates in front of a camera — the pass's
+   * defaults work out to (−20, −137, 1000) with 160 and 1280 beside them — so
+   * they say nothing about a rectangle in 640×480. This one is placed by eye
+   * against play's screenshot and is meant to be nudged:
+   * `pow.screen.layout.team.pig.x -= 4`, then `pow.screen.print()`.
+   */
+  pig: { x: 60, y: 150, width: 220, height: 250 }
 }
 
 /**
@@ -169,6 +181,7 @@ const cloneLayout = (): TeamLayout => ({
   track: { ...LAYOUT.track },
   emblem: { ...LAYOUT.emblem },
   lamp: { ...LAYOUT.lamp },
+  pig: { ...LAYOUT.pig },
   // The WORDS come along, because `rowX` is the one number here play has
   // already had to correct — `pow.screen.layout.team.text.rows[0].x -= 4`,
   // watch, `pow.screen.print()`.
@@ -202,6 +215,11 @@ export function initTeamScreen(handlers: {
   let lit: Font | null = null
   let plain: Font | null = null
   let names: string[] = []
+  /** The pig on the turntable, and the skins it can wear — a nation is
+   * fetched the first time it is lit and kept. Its own textures are the
+   * British ones the model came with. */
+  let pig: FrontendPig | null = null
+  const skins = new Map<number, Texture[]>()
 
   let selection = 0
   let visible = false
@@ -223,6 +241,43 @@ export function initTeamScreen(handlers: {
     selection = next
     reel.goTo(selection * FRAMES_PER_ROW)
     lamp.play(LAMP_BLINK)
+    void dress(selection)
+  }
+
+  /**
+   * Put the lit army's uniform on the pig. The British one came with the
+   * model; the other five are texture archives of their own, fetched the
+   * first time they are lit and kept ().
+   *
+   * A skin that will not load leaves the pig in what it is wearing — the
+   * screen is still usable, and the e2e suite treats console.error as a
+   * failed run.
+   */
+  /**
+   * Put the lit army's uniform on the pig. The British one came with the
+   * model; the other five are texture archives of their own, fetched the
+   * first time they are lit and kept (`three/frontendPig.ts`).
+   *
+   * A skin that will not load leaves the pig in what it is wearing — the
+   * screen is still usable, and the e2e suite treats `console.error` as a
+   * failed run, so this warns.
+   */
+  const dress = async (nation: number): Promise<void> => {
+    if (!pig) return
+    const kept = skins.get(nation)
+    if (kept) {
+      pig.reskin(kept)
+      return
+    }
+    const path = NATION_SKINS[nation]
+    if (path === null || path === undefined) return
+    const loaded = await window.api.loadTims(path)
+    if (!loaded.ok) {
+      console.warn(`${path}: ${loaded.error}`)
+      return
+    }
+    skins.set(nation, loaded.images)
+    if (selection === nation) pig.reskin(loaded.images)
   }
 
   const navigate = (go: () => void): void => queueMicrotask(go)
@@ -291,6 +346,18 @@ export function initTeamScreen(handlers: {
     }
 
     context.drawImage(art.get('pigbkpc1').image, 0, 0)
+
+    // The PIG, blitted out of its own scene. It goes on straight after the
+    // backdrop so every piece of the console can overlap it, which is the
+    // order the original draws in.
+    // A canvas with no width cannot be drawn from at all — it throws, and a
+    // throw in here stops the screen's own tick, which is how a hidden host
+    // once left the whole screen frozen mid-entrance. Its host sits outside
+    // this panel now (index.html); this is the belt as well as the braces.
+    if (pig && pig.canvas.width > 0 && pig.canvas.height > 0) {
+      const at = layout.pig
+      context.drawImage(pig.canvas, at.x, at.y + offset, at.width, at.height)
+    }
 
     // 1. the console's skirt — one four-row band, twenty-five times down.
     const console_ = art.get('counsele')
@@ -406,6 +473,30 @@ export function initTeamScreen(handlers: {
       names = Array.from({ length: NATIONS }, (_, i) => feText(ARMY_TEXT + i))
       loaded = true
       run(visible)
+
+      // The PIG comes second and separately: it is a model, it is slower than
+      // the art, and a screen without one is still the screen. Anything that
+      // goes wrong leaves it out rather than taking the list down with it.
+      try {
+        const [built, clips] = await Promise.all([
+          window.api.loadModel(CHAR_ARCHIVE, PIG_ART),
+          window.api.loadClips(CHAR_ARCHIVE)
+        ])
+        if (!built.ok) throw new Error(built.error)
+        pig = buildFrontendPig(
+          byId<HTMLDivElement>('team-pig'),
+          { width: LAYOUT.pig.width, height: LAYOUT.pig.height },
+          {
+            model: built.model,
+            textures: built.textures,
+            skeleton: built.skeleton,
+            idle: clips.ok ? (clips.clips[IDLE_CLIP] ?? null) : null
+          }
+        )
+        await dress(selection)
+      } catch (error) {
+        console.warn(`the team screen's pig: ${String(error)}`)
+      }
     },
     leave() {
       visible = false

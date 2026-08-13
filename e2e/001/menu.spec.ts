@@ -152,6 +152,28 @@ test('SELECT TEAM lists the six armies on the other layout', async ({ app }) => 
     })
   await expect.poll(distinctColors, { message: 'the painted team screen' }).toBeGreaterThan(50)
 
+  // And the PIG on the turntable, which is a MODEL blitted into that canvas
+  // (three/frontendPig.ts). Counted on its OWN canvas rather than in the
+  // frontend one: the backdrop behind it is a photograph and would answer for
+  // any number of colours on its own. Transparent everywhere the pig is not,
+  // which is what lets it composite over the backdrop at all.
+  const pigPixels = async (): Promise<number> =>
+    page.evaluate(() => {
+      const source = document.querySelector('#team-pig canvas') as HTMLCanvasElement | null
+      if (!source) return -1
+      const copy = document.createElement('canvas')
+      copy.width = source.width
+      copy.height = source.height
+      const context = copy.getContext('2d')
+      if (!context) return -1
+      context.drawImage(source, 0, 0)
+      const pixels = context.getImageData(0, 0, copy.width, copy.height).data
+      let opaque = 0
+      for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 8) opaque++
+      return opaque
+    })
+  await expect.poll(pigPixels, { message: 'the pig on the turntable' }).toBeGreaterThan(2000)
+
   // The lit row wraps over six, not four.
   await lightBar(page, "TOMMY'S TROTTERS", 'teamScreen')
   await nudge(page, 'menuUp', 'teamScreen')
