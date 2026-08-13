@@ -77,6 +77,11 @@ const ART = [
   'pcHweap', 'snipr', 'sappr', 'pcmedic', 'cmndo', 'pcmedal',
   'strp1', 'strp2',
   'bgdark', 'bglight',
+  // The FURNITURE. Play named these off the art sheet: `sqpic` is the panel the
+  // column of five stands on, `sqname01..06` is one widget carrying the TEAM's
+  // name across the top, `sqdial01..06` is the pig selector — the green piece
+  // beside the lit slot. The rest are the screen's own decoration.
+  'sqpic', 'sqpics00', 'sqname01', 'sqdial01', 'sqarmy', 'parrow1', 'pigpro',
   ...Array.from({ length: 9 }, (_, i) => `face${i + 1}a`)
 ]
 
@@ -119,7 +124,25 @@ const LAYOUT = {
   name: { drop: 60 },
   /** The two actions: record 12's own item boxes 59 and 60, raw (600, 658) and
    * (710, 658) 10 wide, which is (350, 385) and (418, 385) 56 across. */
-  actions: { x: [350, 418], y: 385, width: 56 }
+  actions: { x: [350, 418], y: 385, width: 56 },
+  /**
+   * THE FURNITURE, and **every number here is `[CHECK — remake]`** — the arm's
+   * blits for these pieces are not read, so they are placed where they have to
+   * be roughly right and left to be nudged from the console:
+   * `pow.screen.layout.player.panel.left.y -= 4`, then `pow.screen.print()`.
+   *
+   * What each piece IS, though, is play's, off the art sheet: `sqpic` 300×480
+   * is the panel the five stand on, `sqpics00` 256×448 its counterpart,
+   * `sqname01` 400×96 the TEAM's own plate, `sqdial01` 176×80 the selector
+   * beside the lit slot, and `pigpro`, `sqarmy` and `parrow1` the decoration.
+   */
+  panel: { left: { x: 0, y: 0 }, right: { x: 384, y: 16 } },
+  team: { x: 120, y: 4 },
+  /** The selector rides the lit pig's row, on that column's inboard side. */
+  selector: { x: [214, 250], drop: -12 },
+  army: { x: 264, y: 104 },
+  pig: { x: 220, y: 168 },
+  arrow: { x: [200, 392], y: 236 }
 }
 
 /** Record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12). */
@@ -142,6 +165,12 @@ const cloneLayout = (): PlayerLayout => ({
   stripes: { ...LAYOUT.stripes, x: [...LAYOUT.stripes.x] },
   name: { ...LAYOUT.name },
   actions: { ...LAYOUT.actions, x: [...LAYOUT.actions.x] },
+  panel: { left: { ...LAYOUT.panel.left }, right: { ...LAYOUT.panel.right } },
+  team: { ...LAYOUT.team },
+  selector: { ...LAYOUT.selector, x: [...LAYOUT.selector.x] },
+  army: { ...LAYOUT.army },
+  pig: { ...LAYOUT.pig },
+  arrow: { ...LAYOUT.arrow, x: [...LAYOUT.arrow.x] },
   text: { title: { ...TEXT.title } }
 })
 
@@ -251,6 +280,18 @@ export function initPlayerScreen(handlers: {
     offset = driveOn.offset()
     context.drawImage(sprites.get('pigbkpc1').image, 0, 0)
 
+    // The FURNITURE goes down first, everything else stands on it. Positions
+    // are `[CHECK — remake]` and meant to be nudged; what each piece is, is not.
+    const put = (name: string, x: number, y: number): void =>
+      context.drawImage(sprites.get(name).image, x, y + offset)
+    put('sqpic', layout.panel.left.x, layout.panel.left.y)
+    put('sqpics00', layout.panel.right.x, layout.panel.right.y)
+    put('sqname01', layout.team.x, layout.team.y)
+    put('pigpro', layout.pig.x, layout.pig.y)
+    put('sqarmy', layout.army.x, layout.army.y)
+    put('parrow1', layout.arrow.x[0], layout.arrow.y)
+    put('parrow1', layout.arrow.x[1], layout.arrow.y)
+
     for (let slot = 0; slot < SQUAD_SIZE; slot++) {
       const pig = squad[slot]
       if (!pig) continue
@@ -305,6 +346,12 @@ export function initPlayerScreen(handlers: {
         centred(font, pig.name, at.x, layout.grid.face),
         y + layout.name.drop
       )
+    }
+
+    // The SELECTOR, on the lit pig's row and on that column's inboard side.
+    if (selection < SQUAD_SIZE && squad[selection]) {
+      const lit = place(selection)
+      put('sqdial01', layout.selector.x[lit.column], lit.y + layout.selector.drop)
     }
 
     // The two actions, in record 12's own boxes.
