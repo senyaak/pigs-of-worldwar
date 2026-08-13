@@ -60,7 +60,8 @@ const ART = [
   'name0', 'name1', 'name2', 'name3', 'name4', 'name5',
   'selcog1', 'selcog2', 'selcog3', 'selcog4', 'selcog5', 'selcog6',
   'selec00', 'selec01', 'selec02', 'selec03', 'selec04', 'selec05',
-  'lit1', 'lit2', 'lit3'
+  'lit1', 'lit2', 'lit3',
+  'standpc'
 ]
 
 /** `Fesounds.srl` entry 4 at volume 60 — the reel stopping (0x41F34F). */
@@ -110,7 +111,10 @@ const LAYOUT = {
    * against play's screenshot and is meant to be nudged:
    * `pow.screen.layout.team.pig.x -= 4`, then `pow.screen.print()`.
    */
-  pig: { x: 60, y: 150, width: 220, height: 250 }
+  pig: { x: 60, y: 150, width: 220, height: 250 },
+  /** The turntable the pig stands on — `standpc`, 205×126, and placed by eye
+   * like the pig above it. **`[CHECK — remake]`**. */
+  stand: { x: 68, y: 318 }
 }
 
 /**
@@ -182,6 +186,7 @@ const cloneLayout = (): TeamLayout => ({
   emblem: { ...LAYOUT.emblem },
   lamp: { ...LAYOUT.lamp },
   pig: { ...LAYOUT.pig },
+  stand: { ...LAYOUT.stand },
   // The WORDS come along, because `rowX` is the one number here play has
   // already had to correct — `pow.screen.layout.team.text.rows[0].x -= 4`,
   // watch, `pow.screen.print()`.
@@ -270,6 +275,11 @@ export function initTeamScreen(handlers: {
       return
     }
     const path = NATION_SKINS[nation]
+    // Only a nation nobody has art for. TOMMY'S TROTTERS is not one of those:
+    // its skins came with the model and are put in `skins` at load, so coming
+    // back to row 0 puts them back on. Leaving that to this early return was
+    // the bug play saw — the first pig kept whichever nation it had just come
+    // from.
     if (path === null || path === undefined) return
     const loaded = await window.api.loadTims(path)
     if (!loaded.ok) {
@@ -354,6 +364,7 @@ export function initTeamScreen(handlers: {
     // throw in here stops the screen's own tick, which is how a hidden host
     // once left the whole screen frozen mid-entrance. Its host sits outside
     // this panel now (index.html); this is the belt as well as the braces.
+    context.drawImage(art.get('standpc').image, layout.stand.x, layout.stand.y + offset)
     if (pig && pig.canvas.width > 0 && pig.canvas.height > 0) {
       const at = layout.pig
       context.drawImage(pig.canvas, at.x, at.y + offset, at.width, at.height)
@@ -483,6 +494,10 @@ export function initTeamScreen(handlers: {
           window.api.loadClips(CHAR_ARCHIVE)
         ])
         if (!built.ok) throw new Error(built.error)
+        // The British skins come WITH the model, so they are the one nation
+        // that needs no archive of its own — kept here so row 0 can be
+        // returned to like any other.
+        skins.set(0, built.textures)
         pig = buildFrontendPig(
           byId<HTMLDivElement>('team-pig'),
           { width: LAYOUT.pig.width, height: LAYOUT.pig.height },

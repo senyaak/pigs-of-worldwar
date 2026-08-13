@@ -118,18 +118,16 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        it~~ **fixed** — the canvas still held the last frame drawn before
        `leave()`, so `enter()` paints the un-arrived state before the first
        tick now.
-     - **the PIG on the left is still missing, and it IS there in the original.**
-       Twice mis-read, now settled: both frontend functions that work the
-       pig-display block dispatch on `screen − 3`, and screen 3 overrides
-       NOTHING — it falls into the drawing tail on the shared defaults,
-       `edi = ebp = 331` and `esi = 160`, with clip 27 (idle) in the block and
-       `1000.0f` in `[0x513030]`. The class out of the team record and the
-       numbers 290/320/378/405 belong to the SQUAD screens (12, 14, 19, 34).
-       Only screen 45 turns the tail off. The three calls in the tail —
-       `0x419000`, `0x41B010`, `0x418BE0` — are the model and are the next read.
-       **This needs a MODEL beside the canvas**: the pig, that nation's uniform
-       and the turntable. `ui/` may not import `three/`, so it lands the way
-       `ui/battle.ts` does it — the screen composes, the scene draws.
+     - ~~the PIG on the left is missing~~ **DONE** — a MODEL on the ordinary
+       `ensureScene`/`buildPig` path, rendered to a canvas of its own and
+       blitted into the frontend one (`three/frontendPig.ts`): `pcgru_me` out
+       of `Chars/british.mad`, clip 27 idling, and the nation's skins swapped
+       on a row change. Where it sits is `[CHECK — remake]` and nudgeable.
+     - **their HATS should differ, and do not yet.** Each nation has its own
+       hat MODEL in `Chars/FHATS.MAD` — `br_hat`, `frhelm`, `am_h`, `rus_h`,
+       `ja_ban`, `germh`, in the nation index's order, with `FHATS.MTD` for
+       the skins. What is not read is which BONE one hangs off and at what
+       offset; that is the next read and then a short build.
      - **the rest of the MACHINERY is missing too** — the original carries a
        good deal more moving metal round the console than we draw. Not read.
    - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with
