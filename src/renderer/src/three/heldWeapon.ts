@@ -60,9 +60,17 @@ export const HEAD = 2
  *
  * — within three degrees of straight ahead, with the pitch following the
  * angle. (At the very ends the barrel is near vertical and its yaw stops
- * meaning anything, which is the only place the numbers wander.) Where the
- * original applies the turn is not traced: the objects it draws come out of a
- * table at 0x51bc04, built at load, and nothing has been read that fills it.
+ * meaning anything, which is the only place the numbers wander.)
+ *
+ * **And the original's own turn is now read.** The table at 0x51bc04 is filled
+ * by a loop at 0x486443: `chars\weapons.mad` walked a triple at a time
+ * (`afCreateObj2`, the entry pointer stepping 0x48 = three 24-byte records),
+ * `afScaleObj` at unity, and then **`afSetObjPos(obj, 0,0,0, 0, 0x800, 0)`** —
+ * and 0x1000 is a whole circle everywhere in this exe (`and eax,0FFFh` on the
+ * sine table), so 0x800 is HALF of one, about the vertical. The hat loop at
+ * 0x486340 does the same to `chars\fhats.mad`. The pig's BODY does not: its
+ * constructor scales (0x45e443) and never calls `afSetObjPos`. So the turn is
+ * the attachments', it is applied once at load, and a HAT gets it too.
  */
 const TURNED = Math.PI
 

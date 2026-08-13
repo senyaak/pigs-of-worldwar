@@ -131,18 +131,31 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        bone 5 and hat on bone 2, the bone's whole matrix and no offset. Probed
        across the six: the silhouette's topmost row comes out 26/20/21/17/20/15,
        six different hats.
-     - **TWO hats: the model carries its own.** Play, 2026-08-13. `pcgru_me`
-       has its hat in the MESH, so the nation hat lands on top of it. It is
-       21 groups of `{start, count, texture}` and its texture list holds
-       hat-looking entries — `SN_H000.TIM`, `BRGR_005.TIM`, `BRHV_005.TIM` —
-       so the job is finding WHICH group indexes one and dropping it, not
-       hiding a whole mesh. Nothing is read yet; a group-by-group render is
-       the cheapest way to see it.
-     - **the hat CENTRING is `[CHECK — remake]`.** Measured: with the bind
-       offset off, `br_hat`'s box is x −98.5..30.5 against a head bone at 3,
-       and x is the front-back axis — the hats are authored for a head this
-       model does not put in the same place. `three/frontendPig.ts` centres
-       the box on the bone in x and z; y already agreed and is untouched.
+     - ~~the hat CENTRING is `[CHECK — remake]`~~ **READ, and it was never a
+       centring.** The exe turns every attachment HALF a circle at load —
+       `afSetObjPos(obj, 0,0,0, 0, 0x800, 0)` at the end of both the hat loop
+       (0x486340, `chars\fhats.mad`) and the weapon loop (0x486443,
+       `chars\weapons.mad`), against a whole circle of 0x1000 — and the pig's
+       body constructor never calls it. So the half turn `three/heldWeapon.ts`
+       had measured its way to is the exe's own, and a hat gets the same one.
+       Untorned `br_hat` boxes x −197..61 against a head at x −25..221, i.e.
+       behind the skull, which is what play saw as "on the belly"; turned it
+       boxes x −49..209 and lands on it. `frontendPig.ts` turns and does not
+       centre. `frontend/notes.md` carries the whole chain, exe to dll.
+     - **TWO hats: the model carries its own, and the ORIGINAL wears both.**
+       Play, 2026-08-13; measured the same day. There is **no hatless model** —
+       `british.mad` is 27 triples, nine classes at three levels of detail, and
+       every one carries its headgear as ONE texture group. On `pcgru_me` that
+       is 48 faces and 31 vertices, all on bone 2, textured `GR_H000.TIM`,
+       which is **92% khaki rgb(88,80,8)** — the uniform's colour, against pig
+       skin at rgb(216,176,128) — so `_H` is a hat and not a head. Nothing in
+       the drawing path drops a group either: `afDrawAnimModel` draws the body
+       whole and hangs the attachments on it. So the original stacks them, and
+       the nation hat is the bigger: turned, `br_hat` encloses the mesh one in
+       x and z and falls 13 units short of its crown. **Look at it in play
+       before dropping anything** — if the mesh hat still shows through, the
+       group is one line to skip in `three/modelMesh.ts`, and that is a
+       divergence to write down rather than a fix.
      - **the rest of the MACHINERY is missing too** — the original carries a
        good deal more moving metal round the console than we draw. Not read.
    - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with
