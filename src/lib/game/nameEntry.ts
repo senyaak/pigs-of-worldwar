@@ -103,9 +103,10 @@ export function moveCursor(entry: NameEntry, dx: number, dy: number, alphabet: A
 
 export interface Pressed {
   entry: NameEntry
-  /** The finished name, once ENTER has taken it. */
+  /** The finished name, once ENTER has taken it — TRIMMED. */
   accepted?: string
-  /** ENTER on an empty name, which the original answers with sound 21. */
+  /** ENTER on a name with nothing in it, which the original answers with
+   * sound 21. */
   refused?: boolean
 }
 
@@ -114,8 +115,13 @@ export interface Pressed {
  *
  * A letter appends unless the name is already at `max`; SPACE appends a space
  * under the same limit (the exe writes byte 1, which is a space in the game's
- * `ASCII - 0x1F`); DELETE drops the last character; ENTER refuses an empty
- * name and otherwise hands it over.
+ * `ASCII - 0x1F`); DELETE drops the last character; ENTER refuses a name with
+ * nothing in it and otherwise hands it over.
+ *
+ * `[deliberate]` **ENTER judges the TRIMMED name, and hands over the trimmed
+ * one.** The exe tests the buffer's first byte alone (0x42AF50), so a name of
+ * one SPACE — byte 1, not 0 — passes it and a team ends up called nothing at
+ * all. Play asked for the trim; it is a remake rule, not a reading.
  */
 export function press(entry: NameEntry, alphabet: Alphabet, max: number): Pressed {
   const key = keyAt(entry, alphabet)
@@ -123,8 +129,9 @@ export function press(entry: NameEntry, alphabet: Alphabet, max: number): Presse
     return { entry: { ...entry, name: entry.name.slice(0, -1) } }
   }
   if (key === 'enter') {
-    if (entry.name.length === 0) return { entry, refused: true }
-    return { entry, accepted: entry.name }
+    const settled = entry.name.trim()
+    if (settled.length === 0) return { entry, refused: true }
+    return { entry, accepted: settled }
   }
   const character = key === 'space' ? ' ' : letterAt(entry, alphabet)
   if (character === null || entry.name.length >= max) return { entry }

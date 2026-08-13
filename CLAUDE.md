@@ -484,6 +484,10 @@ and the weakest of them were invented here:
   the plate and the lamp abutting: the clipper moves a blit's source rect by
   exactly what it moves the destination, so **x/y is the TOP LEFT corner**.
 
+- `[deliberate]` **A name is judged and kept TRIMMED.** The exe's ENTER tests
+  the buffer's first byte alone (0x42AF50), so a team called one SPACE passes;
+  `press` in `lib/game/nameEntry.ts` trims before it refuses and hands the
+  trimmed name over. Play's call.
 - `[deliberate]` **The mouse works the menu, and the original's does not.**
   Hovering lights a bar, clicking chooses it. The original is keyboard and pad
   only (it even ships `nomouse.com`); this is the remake's convenience, and so

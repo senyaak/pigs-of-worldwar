@@ -68,6 +68,16 @@ test('ENTER refuses an empty name and otherwise hands it over', { tag: '@nodata'
   expect(press({ name: 'TOMMY', cursor: 44 }, GRID, TEAM_NAME_MAX).accepted).toBe('TOMMY')
 })
 
+test('ENTER judges the name TRIMMED, and hands the trimmed one over', { tag: '@nodata' }, () => {
+  // `[deliberate]`: the exe tests the buffer's first byte, so a name of spaces
+  // passes it. Play asked for the trim.
+  expect(press({ name: ' ', cursor: 44 }, GRID, TEAM_NAME_MAX)).toMatchObject({ refused: true })
+  expect(press({ name: '   ', cursor: 44 }, GRID, TEAM_NAME_MAX)).toMatchObject({ refused: true })
+  expect(press({ name: ' TOMMY ', cursor: 44 }, GRID, TEAM_NAME_MAX).accepted).toBe('TOMMY')
+  // And the middle of a name is left alone.
+  expect(press({ name: ' A B ', cursor: 44 }, GRID, TEAM_NAME_MAX).accepted).toBe('A B')
+})
+
 test('the cursor wraps both ways over the grid', { tag: '@nodata' }, () => {
   // Row 0 is A..G; one left of A is the keys' column.
   expect(moveCursor(at(0), -1, 0, GRID).cursor).toBe(42)
