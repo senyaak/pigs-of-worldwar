@@ -32,6 +32,7 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   ['#viewer', { click: '#viewer-back' }],
   ['#archive-view', { click: '#archive-back' }],
   ['#browser', { click: '#browser-menu' }],
+  ['#oneplayer', { key: 'menuBack' }],
   ['#multiplayer', { key: 'menuBack' }]
 ]
 

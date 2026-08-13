@@ -14,7 +14,7 @@ import type { Page } from '@playwright/test'
 import { beginTurn, landed, tap } from './controller'
 
 /** Which screen's bars to read. The names are the `window.pow` keys. */
-export type Screen = 'menu' | 'multiPlayer'
+export type Screen = 'menu' | 'onePlayer' | 'multiPlayer'
 
 interface ScreenHooks {
   selected(): number
@@ -131,13 +131,26 @@ export async function choose(
 }
 
 /**
+ * The menu to the battle and no further — the walk a spec wants when the drop
+ * itself, or the beat at the top of the first turn, is the subject.
+ *
+ * It is two screens deep: the main menu's ONE PLAYER opens the screen of that
+ * name, and NEW GAME on it is what starts the battle (ui/onePlayer.ts).
+ */
+export async function toBattle(page: Page): Promise<void> {
+  await choose(page, 'ONE PLAYER')
+  await expect(page.locator('#oneplayer')).toBeVisible()
+  await choose(page, 'NEW GAME', 'onePlayer')
+  await expect(page.locator('#battle')).toBeVisible()
+}
+
+/**
  * The training ground — and then the level's opening drop, because CAMP's one
  * marker carries the parachute bit and nothing on the ground moves until its
  * pig is on it (`landed`).
  */
 export async function startGame(page: Page): Promise<void> {
-  await choose(page, 'ONE PLAYER')
-  await expect(page.locator('#battle')).toBeVisible()
+  await toBattle(page)
   await landed(page)
   // And past the beat at the top of the turn, which a player presses through
   // — see `beginTurn`. The spec that is about the beat opens the battle by

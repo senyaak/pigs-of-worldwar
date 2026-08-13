@@ -18,7 +18,7 @@ import path from 'node:path'
 import { GAME_DIR, PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
 import { debugState, hud, landed, peakNodeY, tap } from '../controller'
-import { choose } from '../menu'
+import { toBattle } from '../menu'
 import { parsePog, parachutesIn } from '../../src/lib/formats/pog'
 import { mapSpawns, spawnTeams } from '../../src/lib/game/spawns'
 import {
@@ -135,8 +135,7 @@ test('the battle opens with the pig in the air and does not begin until it lands
 }) => {
   const { page } = app
   // NOT `startGame`, which waits the drop out — this spec is about the drop.
-  await choose(page, 'ONE PLAYER')
-  await expect(page.locator('#battle')).toBeVisible()
+  await toBattle(page)
 
   const dropIn = (): Promise<{
     running: boolean
@@ -177,8 +176,7 @@ test('the battle opens with the pig in the air and does not begin until it lands
 
 test('the jump key cuts the canopy away and drops the pig the rest', async ({ app }) => {
   const { page } = app
-  await choose(page, 'ONE PLAYER')
-  await expect(page.locator('#battle')).toBeVisible()
+  await toBattle(page)
 
   const aloft = (): Promise<{ y: number; canopy: boolean } | undefined> =>
     page.evaluate(() => window.pow!.debug!.dropIn().pigs[0])

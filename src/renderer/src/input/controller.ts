@@ -314,6 +314,8 @@ declare global {
        * frontend draws on a canvas, so this is how a spec reads it
        * (docs/testing.md). */
       menu?: BarScreenView
+      /** ONE PLAYER — NEW GAME over LOAD GAME (ui/onePlayer.ts). */
+      onePlayer?: BarScreenView
       /** The MULTI-PLAYER screen, read the same way (ui/multiPlayer.ts). */
       multiPlayer?: BarScreenView
       /** Where the frontend's furniture sits, live: nudge a piece in the

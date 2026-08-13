@@ -96,9 +96,19 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
    **The autosave has nowhere to be called from yet**: nothing can start a
    campaign until NEW GAME lands, so `finishMission` is the call `ui/battle.ts`
    makes at the end of a mission once there is a campaign in play — item 4.
-4. **NEW GAME** — the chain is already mapped: record 14 ONE PLAYER wears
-   **kind 1**, the machine we have built, so it is a list of bars; then SELECT
-   TEAM (record 3, kind 2) and PLEASE NAME YOUR TEAM (record 15, kind 0).
+4. **NEW GAME** — the chain, screen by screen. **ONE PLAYER (record 14, kind 1)
+   is DONE 2026-08-13** — `ui/onePlayer.ts`, a list of two bars on the machine
+   we already had, NEW GAME live and LOAD GAME dark; it does not replay the
+   entrance, which is its family's own behaviour. What is left:
+   - **SELECT TEAM** (record 3, kind 2) — six armies at `fetext` 25..30. The
+     draw arm and the cursor are read (`frontend/notes.md`); what is new is the
+     kind-2 LAYOUT itself, and the live squad the screen shows for the
+     highlighted army, which `lib/game/roster.ts` can now supply.
+   - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with
+     `chardel`/`charspc`/`charent`, the caret stepping by its own little table
+     (0x41DC69).
+   - and then the autosave has a campaign to write: `newGame` on the way out of
+     the name entry, `finishMission` at the end of a mission.
 5. **LOAD GAME** — record 10, kind 8/9, the save-slot list whose items are
    named at RUNTIME (which is why their fetext ids overrun into the next
    screen's words). Its layout is not read at all yet.

@@ -165,3 +165,39 @@ KIND 2** — the same layout as SELECT TEAM, and that family is the one that
 loads `selcog` and `name0..5`, so the carriage this repo threw off the main
 menu belongs there. And the original's MULTI-PLAYER is **six** items — four
 teams, DONE, NETWORK — where ours is four slots and three actions.
+
+## ONE PLAYER, THE FIRST SCREEN OF THE CAMPAIGN CHAIN (2026-08-13)
+
+The cheapest screen in the game, and it cost nothing because it is the machine
+we already had: `frontend/menus.js` prints **screen 14 as kind 1** — the main
+menu's own layout — with the title at `fetext` 54 and two items at 55 and 56.
+NEW GAME goes to screen 3 SELECT TEAM and LOAD GAME to screen 10 LOAD. So
+`ui/onePlayer.ts` is a list and nothing else, the third module to sit on
+`initBarScreen` after the main menu and MULTI-PLAYER.
+
+**It does not drive on, and that is read.** The per-screen entrance table at
+0x4C0A18 gives screen 14 a y of +100 against the main menu's −650, but the
+loader arm that serves this family (0x421BC3, kinds 1 and 7) does not replay
+the entrance moving from one of its screens to another. So the machine stays
+put and only the plates turn over — which is also what it looks like, and the
+`entersFrom` the main menu passes is deliberately left out here.
+
+**LOAD GAME is dark**, and what it waits on is not the save — that is built
+(`lib/game/save.ts`, `src/main/saves.ts`) — but screen 10, which is **kind 8**
+and has not been read at all. Its items are named at RUNTIME, which is why
+their `fetext` ids overrun into the next screen's words.
+
+What it cost elsewhere: the battle is two screens deep from the menu now, so
+`e2e/menu.ts` grew `toBattle` — the walk without the drop — and `startGame`
+sits on it. Three specs that opened the battle by hand because the drop or the
+beat was their subject now go through it, and `toMenu`'s exit table learned
+`#oneplayer`.
+
+**Next is SELECT TEAM, record 3, kind 2** — six armies at `fetext` 25..30,
+action 6 with params 180..185. Its draw arm (0x41CBE1) and its cursor are read
+(`frontend/notes.md`): the `counsele` console, the `selcog` carriage at
+(553, 180), widget 0 walking FIVE frames per row with `selec00..05` rebuilt at
+`frame % 6` under it and a click on the step that lands, and — on this record
+alone — a live squad, because a changed row calls `0x4824A0` with it and the
+screen shows that army's actual eight. That last one is now cheap: the squad it
+would show is `lib/game/roster.ts`.

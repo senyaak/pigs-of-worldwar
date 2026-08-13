@@ -24,7 +24,7 @@ import {
   swapMap,
   warp
 } from '../controller'
-import { choose, startGame } from '../menu'
+import { choose, startGame, toBattle } from '../menu'
 import { TILE_STEP, TILE_WALL, TILE_WATER, parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
 import { readFileSync } from 'node:fs'
@@ -193,8 +193,7 @@ test('a turn waits a beat before it starts, and any input cuts it short', async 
   const { page } = app
   // NOT `startGame`, which lands the drop and then the beat is already
   // running вЂ” this wants to catch it.
-  await choose(page, 'ONE PLAYER')
-  await expect(page.locator('#battle')).toBeVisible()
+  await toBattle(page)
   await landed(page)
 
   // "START OF TURN": the clock is full and not moving.

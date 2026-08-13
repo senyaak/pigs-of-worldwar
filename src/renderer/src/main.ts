@@ -5,6 +5,7 @@ import { byId } from './ui/dom'
 import type { BarScreenView } from './input/controller'
 import { initWelcome } from './ui/welcome'
 import { initMenu } from './ui/menu'
+import { initOnePlayer } from './ui/onePlayer'
 import { initMultiPlayer } from './ui/multiPlayer'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
@@ -12,11 +13,20 @@ import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 
-type View = 'welcome' | 'menu' | 'multiplayer' | 'battle' | 'browser' | 'archive' | 'viewer'
+type View =
+  | 'welcome'
+  | 'menu'
+  | 'oneplayer'
+  | 'multiplayer'
+  | 'battle'
+  | 'browser'
+  | 'archive'
+  | 'viewer'
 
 const panels: Record<View, HTMLElement[]> = {
   welcome: [byId('welcome')],
   menu: [byId('menu')],
+  oneplayer: [byId('oneplayer')],
   multiplayer: [byId('multiplayer')],
   battle: [byId('battle')],
   browser: [byId('browser'), byId('file-list')],
@@ -72,7 +82,8 @@ const battle = initBattle(() => show('menu'))
 
 const menu = initMenu({
   onNewGame: () => {
-    void battle.open().then((ok) => ok && show('battle'))
+    show('oneplayer')
+    void onePlayer.load()
   },
   onMultiPlayer: () => {
     show('multiplayer')
@@ -84,6 +95,16 @@ const menu = initMenu({
   }
 })
 
+// NEW GAME opens the training ground for now — the original goes to SELECT
+// TEAM (screen 3), which is the next screen to build. Until then this bar does
+// what the main menu's ONE PLAYER did before the screen was inserted under it.
+const onePlayer = initOnePlayer({
+  onNewGame: () => {
+    void battle.open().then((ok) => ok && show('battle'))
+  },
+  onBack: () => show('menu')
+})
+
 const multiPlayer = initMultiPlayer({
   onStart: (map) => {
     void battle.open(map).then((ok) => ok && show('battle'))
@@ -93,7 +114,7 @@ const multiPlayer = initMultiPlayer({
 
 /** The frontend's screens, by the view that shows them. Only one of them may
  * be drawing and hearing the controller at a time. */
-const screens = { menu, multiplayer: multiPlayer }
+const screens = { menu, oneplayer: onePlayer, multiplayer: multiPlayer }
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
 
 // The frontend is drawn on a canvas, so what a screen says and which bar is
@@ -108,6 +129,7 @@ if (window.pow) {
     flipping: screen.flipping
   })
   window.pow.menu = view(menu)
+  window.pow.onePlayer = view(onePlayer)
   window.pow.multiPlayer = view(multiPlayer)
   // Each screen carries its OWN layout, so a nudge in the console moves the
   // screen being looked at rather than all of them.

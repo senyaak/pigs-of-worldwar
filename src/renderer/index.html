@@ -217,6 +217,7 @@
          and unsmoothed, so it reads as the original rather than as a blurred
          stretch of it. */
       #menu,
+      #oneplayer,
       #multiplayer {
         flex: 1;
         min-height: 0;
@@ -224,6 +225,7 @@
         overflow: hidden;
       }
       #menu-screen,
+      #op-screen,
       #mp-screen {
         display: block;
         width: 100%;
@@ -302,6 +304,9 @@
       </div>
       <div id="menu" class="hidden">
         <canvas id="menu-screen"></canvas>
+      </div>
+      <div id="oneplayer" class="hidden">
+        <canvas id="op-screen"></canvas>
       </div>
       <div id="multiplayer" class="hidden">
         <canvas id="mp-screen"></canvas>

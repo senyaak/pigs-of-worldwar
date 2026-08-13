@@ -8,7 +8,9 @@
 // asserts what the DATA says — ONE PLAYER, MULTI-PLAYER, OPTIONS, QUIT
 // APPLICATION — and that the screen is really painted.
 //
-// Only ONE PLAYER leads anywhere yet: it opens the training ground. The
+// Only ONE PLAYER leads anywhere yet, and it now opens the screen of that
+// name — NEW GAME over LOAD GAME, screen 14 of the exe's own table
+// (ui/onePlayer.ts) — from which NEW GAME opens the training ground. The
 // asset browsers are not a menu bar at all — the original has no such
 // screen, so they hang off the remake's own F1.
 
@@ -84,7 +86,31 @@ test('the lit bar moves on every press, and wraps', async ({ app }) => {
   expect(app.errors()).toEqual([])
 })
 
-test('ONE PLAYER opens the battle, and F1 the asset browsers', async ({ app }) => {
+test('ONE PLAYER is a screen of its own — NEW GAME over LOAD GAME', async ({ app }) => {
+  const { page } = app
+  await choose(page, 'ONE PLAYER')
+  await expect(page.locator('#oneplayer')).toBeVisible()
+  await expect(page.locator('#menu')).toBeHidden()
+
+  // fetext 55 and 56, screen 14's own two items.
+  await expect.poll(() => labels(page, 'onePlayer')).toEqual(['NEW GAME', 'LOAD GAME'])
+
+  // LOAD GAME is dark: there is a save but no screen 10 to list it from, so
+  // the bar refuses to be chosen and the lit bar stays where it was.
+  await lightBar(page, 'NEW GAME', 'onePlayer')
+  await nudge(page, 'menuDown', 'onePlayer')
+  expect(await selection(page, 'onePlayer')).toBe(1)
+  await tap(page, 'menuSelect')
+  await expect(page.locator('#oneplayer')).toBeVisible()
+
+  // And the back key is the way out, the way it is on MULTI-PLAYER.
+  await tap(page, 'menuBack')
+  await expect(page.locator('#menu')).toBeVisible()
+
+  expect(app.errors()).toEqual([])
+})
+
+test('NEW GAME opens the battle, and F1 the asset browsers', async ({ app }) => {
   const { page } = app
   await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
