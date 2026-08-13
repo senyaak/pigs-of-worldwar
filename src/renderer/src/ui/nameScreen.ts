@@ -25,7 +25,8 @@
 import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
 import type { Font } from './font'
-import { drive } from './drive'
+import { launch, spring, still } from './springs'
+import type { Motion } from './springs'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
 import { loadSprites } from './sprites'
@@ -55,8 +56,27 @@ const KEYPRESS = { name: 'CLICK1', gain: 0.4 }
 /** fetext: record 15's own title. */
 const TITLE_TEXT = 57
 
-/** Screen 15 comes down like the team screen it follows. */
-const ENTERS_FROM = -700
+/**
+ * THE MOTION, all of it read (0x41B9FD to seed, 0x424EB6 to arrive, 0x4260F0
+ * to leave; `frontend/notes.md` carries the pushes).
+ *
+ * The screen falls in on TWO axes at once, kicks itself when it lands, walks a
+ * widget six frames, and only then slides the name field in behind it. It
+ * leaves in the same order backwards. Nothing else on the screen moves.
+ */
+const START = { x: -800, y: -250, field: -700 }
+const REST = { x: 0, y: 70, field: 0 }
+/** Both of the screen's own axes, and the field's slower one. */
+const SCREEN_SPRING = { gain: 15, damping: 30, cap: 30 }
+const FIELD_SPRING = { gain: 10, damping: 17, cap: 50 }
+/** A screen does not spring OUT — it launches, under constant acceleration. */
+const LEAVING = { accel: 12, cap: 30 }
+/** The kick the arm gives itself the frame it arrives (0x424F32). */
+const BOUNCE = { y: 1, velocityY: -40, velocityX: -20 }
+/** Widget 18 walks 0 → 6 between the screen arriving and the field moving. */
+const GATE = 6
+/** Where the field goes when the screen leaves, before the screen follows. */
+const FIELD_EXIT = -400
 
 /**
  * The GRID: **seven letters across, six rows down**, and the three keys are an
@@ -95,7 +115,7 @@ const LAYOUT = {
   /** `propoint` tiled: the cap at `x`, middles from `repeat` stepping `step`
    * while they fit before `tail`, and the far cap at `tail` (0x41DDDB on).
    * The x's are the arm's; `y` and `height` are `[CHECK — remake]`. */
-  field: { x: 184, repeat: 204, step: 20, tail: 432, cell: 20, y: 112, height: 44 },
+  field: { x: 184, repeat: 204, step: 20, tail: 432, cell: 20, y: 96, height: 60 },
   /** The alphabet plate, `alpha03` — 352 wide, so centred it starts at 144.
    * The y is `[CHECK — remake]`, placed under the field the way play's
    * screenshot has it. */
@@ -106,8 +126,8 @@ const LAYOUT = {
  * 0x4C1548/0x4C15A8/0x4C1608 with the −25 origin folded in: raw (370, 97)
  * 190 wide. The name's line is centred over the field. */
 const TEXT = {
-  title: { x: 206, y: 56, width: 168 },
-  name: { x: 184, y: 126, width: 268 }
+  title: { x: 206, y: 40, width: 168 },
+  name: { x: 184, y: 118, width: 268 }
 }
 
 const TICK_MS = EXE_FRAME_SECONDS * 1000
@@ -162,8 +182,26 @@ export function initNameScreen(handlers: {
   let grid: Alphabet = ALPHABET_GRID
   let entry: NameEntry = newEntry()
 
-  const driveOn = drive(ENTERS_FROM)
+  /** The three numbers the screen is made of, and the widget between them. */
+  const at = { x: still(START.x), y: still(START.y), field: still(START.field) }
+  let gate = 0
+  let bounced = false
+  let phase: 'arriving' | 'here' | 'leaving' | 'gone' = 'arriving'
   let leaving: (() => void) | null = null
+
+  /** The frontend authors in 1024×820; a screen number comes back through
+   * these, which are the exe's own 0x41ADB0 and 0x41ADD0. */
+  const scaleX = (value: number): number => Math.trunc((value * SCREEN.width) / 1024)
+  const scaleY = (value: number): number => Math.trunc((value * SCREEN.height) / 820)
+
+  /** How far the whole screen is from where it settles, in pixels. The arm
+   * places its pieces at `2·scaleY(y) − k`, so the offset is doubled too. */
+  const screenOffset = (): { x: number; y: number } => ({
+    x: scaleX(at.x.value - REST.x),
+    y: 2 * scaleY(at.y.value - REST.y)
+  })
+  /** …and the field carries its own, undoubled. */
+  const fieldOffset = (): number => scaleY(at.field.value - REST.field)
 
   const move = (dx: number, dy: number): void => {
     const next = moveCursor(entry, dx, dy, grid)
@@ -173,14 +211,14 @@ export function initNameScreen(handlers: {
   }
 
   const choose = (): void => {
-    if (driveOn.phase() !== 'here') return
+    if (phase !== 'here') return
     const result = press(entry, grid, TEAM_NAME_MAX)
     entry = result.entry
     bank.play(KEYPRESS.name, { gain: KEYPRESS.gain })
     if (result.accepted === undefined) return
     const name = result.accepted
     leaving = () => handlers.onName(name)
-    driveOn.leave()
+    phase = 'leaving'
   }
 
   const navigate = (go: () => void): void => queueMicrotask(go)
@@ -213,36 +251,45 @@ export function initNameScreen(handlers: {
   const draw = (): void => {
     const context = canvas.getContext('2d')
     if (!context || !art || !lit || !plain) return
-    offset = driveOn.offset()
+    const screen = screenOffset()
+    // The screen's own two axes ride everything; the FIELD carries a third of
+    // its own, which does not move until the gate widget has walked.
+    offset = screen.y
+    const alongField = fieldOffset()
 
     context.drawImage(art.get('pigbkpc1').image, 0, 0)
 
     // The FIELD the typed name sits in: one cap, a run of middles, one cap —
     // `propoint` sliced 20 columns at a time, which is the arm's own step.
     const field = art.get('propoint')
-    const at = layout.field
+    const box = layout.field
     const slice = (from: number, x: number): void =>
       context.drawImage(
         field.image,
-        from, 0, at.cell, field.height,
-        x, at.y + offset, at.cell, at.height
+        from, 0, box.cell, field.height,
+        x + screen.x, box.y + alongField, box.cell, box.height
       )
-    slice(0, at.x)
-    for (let x = at.repeat; x < at.tail; x += at.step) slice(at.cell, x)
-    slice(field.width - at.cell, at.tail)
+    slice(0, box.x)
+    for (let x = box.repeat; x < box.tail; x += box.step) slice(box.cell, x)
+    slice(field.width - box.cell, box.tail)
 
-    // The name, padded out to its maximum with dots.
-    words(context, lit, padded(entry.name, TEAM_NAME_MAX), layout.text.name)
+    // The name, padded out to its maximum with dots. It rides the field.
+    words(context, lit, padded(entry.name, TEAM_NAME_MAX), {
+      ...layout.text.name,
+      x: layout.text.name.x + screen.x,
+      y: layout.text.name.y + alongField - offset
+    })
 
     // The alphabet's plate, and everything on it: eight columns by six rows,
     // the letters in the first seven and the three keys in the last.
     const plate = art.get('alpha03')
-    context.drawImage(plate.image, layout.plate.x, layout.plate.y + offset)
+    const plateX = layout.plate.x + screen.x
+    context.drawImage(plate.image, plateX, layout.plate.y + offset)
     const cellWidth = plate.width / GRID_COLUMNS
     const cellHeight = plate.height / grid.rows
     /** The middle of a cell, in canvas coordinates. */
     const cell = (column: number, row: number): { x: number; y: number } => ({
-      x: layout.plate.x + (column + 0.5) * cellWidth,
+      x: plateX + (column + 0.5) * cellWidth,
       y: layout.plate.y + offset + (row + 0.5) * cellHeight
     })
 
@@ -273,12 +320,43 @@ export function initNameScreen(handlers: {
       }
     })
 
-    words(context, lit, feText(TITLE_TEXT), layout.text.title)
+    words(context, lit, feText(TITLE_TEXT), {
+      ...layout.text.title,
+      x: layout.text.title.x + screen.x
+    })
   }
 
+  /**
+   * One frontend tick of the whole motion, in the exe's own order.
+   *
+   * Arriving: both axes spring together; the frame they land the screen kicks
+   * itself and the gate widget starts walking; the field only moves once that
+   * widget is at 6. Leaving: the field launches out first, the widget walks
+   * back, and the screen follows it.
+   */
   const advance = (): void => {
-    driveOn.tick()
-    if (driveOn.phase() === 'gone' && leaving) {
+    if (phase === 'leaving') {
+      launch(at.field, FIELD_EXIT, LEAVING)
+      if (gate > 0) gate--
+      else {
+        launch(at.x, START.x, LEAVING)
+        if (launch(at.y, START.y, LEAVING)) phase = 'gone'
+      }
+    } else if (phase !== 'gone') {
+      spring(at.x, REST.x, SCREEN_SPRING)
+      spring(at.y, REST.y, SCREEN_SPRING)
+      if (!bounced && at.x.value === REST.x && at.y.value === REST.y) {
+        bounced = true
+        at.y.value = BOUNCE.y
+        at.y.velocity = BOUNCE.velocityY
+        at.x.velocity = BOUNCE.velocityX
+      }
+      if (bounced && gate < GATE) gate++
+      if (gate === GATE) {
+        if (spring(at.field, REST.field, FIELD_SPRING) && phase === 'arriving') phase = 'here'
+      }
+    }
+    if (phase === 'gone' && leaving) {
       const go = leaving
       leaving = null
       navigate(go)
@@ -334,7 +412,12 @@ export function initNameScreen(handlers: {
     },
     enter() {
       visible = true
-      driveOn.restart()
+      at.x = still(START.x)
+      at.y = still(START.y)
+      at.field = still(START.field)
+      gate = 0
+      bounced = false
+      phase = 'arriving'
       entry = newEntry()
       leaving = null
       draw()
@@ -344,9 +427,9 @@ export function initNameScreen(handlers: {
     selected: () => entry.cursor,
     labels: () => [feText(TITLE_TEXT)],
     values: () => [entry.name],
-    flipping: () => driveOn.phase() !== 'here',
+    flipping: () => phase !== 'here',
     type(character) {
-      if (!visible || driveOn.phase() !== 'here') return
+      if (!visible || phase !== 'here') return
       const next = typeCharacter(entry, grid, TEAM_NAME_MAX, character)
       if (next === entry) return
       entry = next

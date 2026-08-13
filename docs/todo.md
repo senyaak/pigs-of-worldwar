@@ -169,10 +169,21 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        rows want sides as 8:6, and of the seven `alpha` plates only **`alpha03`,
        352×256** is (1.375, cell 44×42.7). The first pass had `alpha07` and 6×7
        and spread the letters half a screen apart.
-     - **every y is eyework.** The x's are the arm's (the field's caps at 184
-       and 432, twelve middles from 204 stepping 20; the keys 28 apart) but
-       every y the arm computes is `2·[0x512964] + k` off an entrance whose
-       resting value is not read.
+     - ~~every y is eyework~~ **the MOTION is read end to end** and built:
+       the screen springs in on TWO axes at once (x −800 → 0, y −250 → 70,
+       gain 15 damping 30 cap 30), KICKS itself the frame it lands (y = 1,
+       velocities −40 and −20), walks a gate widget 0 → 6, and only then
+       springs the name field in from −700 (gain 10, damping 17, cap 50). It
+       leaves in the same order backwards, on the accelerating launcher
+       (accel 12, cap 30): the field to −400 first, then the screen to −800
+       and −250. `frontend/notes.md` carries every push.
+     - **the three resting Y's are still eyework**, and the reason is now one
+       value: the arm places at `2·scaleY([0x512964]) − k`, and `[0x51F120]`
+       — the scale flag — is written both by the frontend's own entry and by
+       the TEXT object, which draws BEFORE the arm. Scaled it puts the plate
+       at 32, unscaled at 92, and only the second matches play's screenshot.
+       Read that flag's state at draw time and the last three numbers fall
+       out.
      - the caret plate the arm steps by its own table [51,35,35,19,3,3,3,3]
        is not drawn at all, and what `[0x5128CC]` names is not known.
      - the help line, `fetext` 770, carries `/Z(131,62)` and `/N`/`/S` markup
