@@ -165,10 +165,13 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        letters across, six rows down, and the three keys as an EIGHTH column on
        the same plate — a screenshot of the shipped game, which the disassembly
        could not give because 0x431380 computes the shape from two font metrics
-       filled at runtime. The art agrees and is the check: eight columns by six
-       rows want sides as 8:6, and of the seven `alpha` plates only **`alpha03`,
-       352×256** is (1.375, cell 44×42.7). The first pass had `alpha07` and 6×7
-       and spread the letters half a screen apart.
+       filled at runtime. Which PLATE they sit on is read now and it is not the
+       one the aspect argument picked: the plate is **widget 18's**, whose seven
+       frames are `alpha02..08` and which the entrance walks 0 → 6, so the panel
+       UNROLLS and comes to rest on **`alpha08`, 304×352 at (168, 32)** — dead
+       centre of the screen. Where the letters sit ON it is still the remake's
+       own (`INNER`): the exe lays them out through the text object off record
+       15's first item box, (280, 250) 270×30 raw, and that arm is unread.
      - ~~every y is eyework~~ **the MOTION is read end to end** and built:
        the screen springs in on TWO axes at once (x −800 → 0, y −250 → 70,
        gain 15 damping 30 cap 30), KICKS itself the frame it lands (y = 1,
@@ -177,27 +180,40 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        leaves in the same order backwards, on the accelerating launcher
        (accel 12, cap 30): the field to −400 first, then the screen to −800
        and −250. `frontend/notes.md` carries every push.
-     - **the three resting Y's are still eyework**, and the reason is now one
-       value: the arm places at `2·scaleY([0x512964]) − k`, and `[0x51F120]`
-       — the scale flag — is written both by the frontend's own entry and by
-       the TEXT object, which draws BEFORE the arm. Scaled it puts the plate
-       at 32, unscaled at 92, and only the second matches play's screenshot.
-       Read that flag's state at draw time and the last three numbers fall
-       out.
-     - the caret plate the arm steps by its own table [51,35,35,19,3,3,3,3]
-       is not drawn at all, and what `[0x5128CC]` names is not known.
+     - ~~the three resting Y's are still eyework~~ **DONE — the SCALE FLAG is
+       SET and every y is the arm's now.** `[0x51F120]` is written in exactly
+       four places and the TEXT object is not one of them: the three addresses
+       that had been called writes are the operand bytes of `mov eax,[51F120h]`.
+       The frontend sets it entering and clears it leaving, so an arm is SCALED,
+       and SELECT TEAM proves it — its lamp's `2·scaleY(20·row)` gives back the
+       0, 22, 46, 70, 92, 116 that already match its text rows, where unscaled
+       gives 40 a row. So the panel is at **32** with its bands at 6 and −22,
+       and the bar at **4**: a panel with the name bar inlaid across its top,
+       not three things stacked down the screen.
+     - ~~the caret plate the arm steps by its own table~~ **it was never a
+       caret**: `[0x5128CC]` is slot 19, which widget 18's builder (0x41F8A3)
+       fills from `alpha02..08`, and the table [51,35,35,19,3,3,3,3] is read
+       backward by **widget 20**, which this screen never walks. So the step is
+       a flat 3 and the plate is the panel itself.
      - the help line, `fetext` 770, carries `/Z(131,62)` and `/N`/`/S` markup
        nothing here parses yet.
    - **the PLAYER screen** (record 12, kind 5) — **BUILT**, `ui/playerScreen.ts`
-     on `lib/game/ranks.ts`. The eight pigs in the arm's own ragged five-then-
-     three, each with its career badge and the stripes of its step, the lit
-     portrait swelling on the exe's own rate, and START MISSION under them.
+     on `lib/game/ranks.ts`. The eight pigs in the arm's own grid, each with its
+     career badge and the stripes of its step, the lit portrait swelling on the
+     exe's own rate, and START MISSION beside them.
      Read and carried: the fifteen ranks are `fetext` 467 + class, the badge
      and stripes come out of 0x4D29C0, and the promotion tree at 0x4D2980 is
      four careers of three converging on COMMANDO and then HERO, twenty points
      either way. What is left on it:
-     - **every y is eyework**, as on the name entry, and the row pitch with it.
-       Only the column pitch, 74, is the arm's.
+     - ~~every y is eyework~~ **DONE, and the GRID was on its side.** `ebx` is
+       the COLUMN, not the row: it steps x by **462** and `ebp` steps y by
+       `2·37`, so it is five DOWN the left edge and three down the right, at
+       x **57** and **519** and rows **75, 149, 223, 296, 368**. The badges step
+       a pitch of their own, 417, and are HANDED (+82 left, −69 right) so both
+       columns face inward — 161 and 427, the row's y plus 44. The two actions
+       are record 12's own boxes 59 and 60, (350, 385) and (418, 385) 56 across,
+       and the title is (161, 45) 300. The swell is SIDEWAYS: `fcos` is pushed
+       as the width and the source height unscaled.
      - **which pair of stripes** the original uses is `[CHECK — remake]`:
        `pip1/2` and `strp1/2` are both pairs and the slot array is unnamed.
      - the screen's own furniture is not drawn at all — `sqpic`, `sqpics00..10`,

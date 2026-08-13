@@ -58,7 +58,7 @@ test('the squad arrives with eight named pigs, all GRUNTs', async ({ app }) => {
   expect(app.errors()).toEqual([])
 })
 
-test('it opens on START MISSION, and the grid is five then three', async ({ app }) => {
+test('it opens on START MISSION, and the grid is two columns of five and three', async ({ app }) => {
   const { page } = app
   await toPlayerScreen(page)
   await expect
@@ -76,14 +76,15 @@ test('it opens on START MISSION, and the grid is five then three', async ({ app 
   // nothing else presses once.
   expect(await selection(page, 'playerScreen')).toBe(8)
 
-  // Up from START lands on the grid's last row, which is the sixth pig — five
-  // on the first row and three on the second (the arm's own ragged shape).
+  // Up walks the list, which — the grid standing up as two columns — is up the
+  // right-hand three and on into the left-hand five.
   await tap(page, 'menuUp')
   expect(await selection(page, 'playerScreen')).toBe(7)
   await tap(page, 'menuUp')
-  expect(await selection(page, 'playerScreen')).toBe(2)
+  expect(await selection(page, 'playerScreen')).toBe(6)
 
-  // Sideways walks one place at a time, and wraps over all ten.
+  // Sideways CROSSES the columns at the same row: slot 6 is the right column's
+  // second, so it lands on the left column's second.
   await tap(page, 'menuLeft')
   expect(await selection(page, 'playerScreen')).toBe(1)
 

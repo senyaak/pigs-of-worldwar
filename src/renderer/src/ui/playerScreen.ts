@@ -1,23 +1,40 @@
 // The PLAYER screen — record 12, kind 5: your eight pigs, and what to do next.
 //
-// The exe draws the squad TWICE over the same ragged grid (0x41D285): a first
-// pass of portraits and a second of badges and stripes, both gated on the
-// screen having arrived. The grid is **five across and then three** — the arm
-// runs `ebp` 0..4 and `ebx` 0..1 and skips `ebx == 1 && ebp > 2` — over slots
-// read at `team + 64*slot + 0x70`, with the class in the byte after it.
+// The exe draws the squad TWICE over the same grid (0x41D285): a first pass of
+// portraits and a second of badges and stripes, both gated on the screen having
+// arrived. Slots are read at `team + 64*slot + 0x70`, with the class in the
+// byte after it.
+//
+// **The grid is TWO COLUMNS of five and three, and it stands UP.** The arm runs
+// `ebx` 0..1 and `ebp` 0..4 with the slot `ebx*5 + ebp` and skips
+// `ebx == 1 && ebp > 2` — and which counter drives which axis was read wrong
+// the first time round, so this screen was built five across. It is the outer
+// one that steps x, by **462** a column (0x41D3F3 on, `77·ebx` trebled and
+// doubled), and the inner one that steps y by `2·37` a row. Five DOWN the left
+// edge, three down the right, and everything else on the screen lives between
+// them.
+//
+// Every number below is the arm's own now, through the frontend's scalers
+// (`nameScreen.ts` carries how that was settled): the entrance rests at 0, so
+// `scaleX(0) - 10` is the x every piece is measured from and the two little
+// per-row nudges the arm carries are folded into `ROW_Y`. The BADGES step a
+// different column pitch from the portraits — 417 — and are handed, +82 on the
+// left column and −69 on the right, so the two columns face inward.
 //
 // **The lit portrait is the only thing that moves.** Every other pig is
-// blitted at 0x1000, unity; the chosen one's width and height come out of
-// `fcos` on `[0x512E54]`, an angle that advances 100 of 4096 a frame. So it
-// swells and shrinks in place.
+// blitted at 0x1000, unity; the chosen one's WIDTH comes out of `fcos` on
+// `[0x512E54]`, an angle that advances 100 of 4096 a frame, and the blit's x
+// re-centres it on its own source — the height is pushed unscaled. So it
+// breathes sideways.
 //
 // What a pig WEARS is one byte. `lib/game/ranks.ts` carries the tables: the
 // class picks the career's badge (six of them, 52×24) and the step in that
 // career picks the stripes, with step 0 wearing none.
 //
-// **The column pitch, 74, is the arm's** (`2·(37·column)`, 0x41D5B0). Every y
-// here is eyework — the arm's are computed off an entrance whose resting value
-// is not read, exactly as on the name entry.
+// What is still NOT drawn is the screen's own furniture — `sqpic`,
+// `sqpics00..10`, `sqdial01..06`, `sqname01..06`, `pigpro`, `parrow1..3`,
+// `sqarmy`, `sqoptsf`, the medals and the flags, and the frame `backgr~1`
+// pieces each portrait sits in — nor the arm's THIRD loop (0x41D70E on).
 
 import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
@@ -70,26 +87,39 @@ const SAVE_TEXT = 51
 
 const ENTERS_FROM = -700
 
-/** The grid: five, then three. */
-const ROWS = [5, 3]
+/** How many pigs each column carries: five down the left, three down the
+ * right. The arm's own guard is `ebx == 1 && ebp > 2`. */
+const COLUMN = [5, 3]
 
 /**
- * Where each piece lands. **The pitch is the arm's; every y is eyework** —
- * nudge from the console (`pow.screen.layout.player.grid.y += 4`, then
- * `pow.screen.print()`).
+ * Where the five rows sit, read off the arm rather than stepped: the y is
+ * `flag + 2·(37·row + nudge) + 72` and the two flags are per-row, which is why
+ * the pitch is 74, 74, 73, 72 rather than a flat number (0x41D2FF, 0x41D349).
+ */
+const ROW_Y = [75, 149, 223, 296, 368]
+
+/**
+ * Where each piece lands. Every number is the arm's, at the entrance's rest.
  */
 const LAYOUT = {
-  /** A face is 70×60, a badge 52×24. `pitch` is 0x41D5B0's own `2·37·column`. */
-  grid: { x: 96, y: 120, pitch: 74, rowPitch: 150, face: 70, high: 60 },
-  /** Under the face: the badge, the stripes, and the name. */
-  badge: { drop: 64 },
-  stripes: { drop: 64, across: 54 },
-  name: { drop: 92 },
-  /** The two actions, at the foot. */
-  actions: { x: 220, y: 400, pitch: 24, width: 200 }
+  /** The portraits: `scaleX(0) − 10 + 462·column + 67`. A face is 70×60. */
+  grid: { x: [57, 519], face: 70 },
+  /** The badge and the pips step **417** a column and are handed (+82 / −69),
+   * so both columns' badges face the middle of the screen. Their y is the
+   * row's plus 44 (0x74 against the portrait's 0x48). */
+  badge: { x: [161, 427], drop: 44 },
+  stripes: { x: [181, 447], drop: 44 },
+  /** The name under its own portrait — `[CHECK — remake]`. The exe hangs the
+   * eight names off `sqname01..06` and its unread third loop, not off an item
+   * box: record 12 has only the two below. */
+  name: { drop: 60 },
+  /** The two actions: record 12's own item boxes 59 and 60, raw (600, 658) and
+   * (710, 658) 10 wide, which is (350, 385) and (418, 385) 56 across. */
+  actions: { x: [350, 418], y: 385, width: 56 }
 }
 
-const TEXT = { title: { x: 206, y: 30, width: 228 } }
+/** Record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12). */
+const TEXT = { title: { x: 161, y: 45, width: 300 } }
 
 /** The lit portrait's swell: `fcos` on an angle that steps 100 of 4096 a frame
  * (0x41D365). The two constants beside it are not decoded, so the DEPTH of the
@@ -103,11 +133,11 @@ const MOST_TICKS = 4
 export type PlayerLayout = typeof LAYOUT & { text: typeof TEXT }
 
 const cloneLayout = (): PlayerLayout => ({
-  grid: { ...LAYOUT.grid },
-  badge: { ...LAYOUT.badge },
-  stripes: { ...LAYOUT.stripes },
+  grid: { ...LAYOUT.grid, x: [...LAYOUT.grid.x] },
+  badge: { ...LAYOUT.badge, x: [...LAYOUT.badge.x] },
+  stripes: { ...LAYOUT.stripes, x: [...LAYOUT.stripes.x] },
   name: { ...LAYOUT.name },
-  actions: { ...LAYOUT.actions },
+  actions: { ...LAYOUT.actions, x: [...LAYOUT.actions.x] },
   text: { title: { ...TEXT.title } }
 })
 
@@ -162,16 +192,20 @@ export function initPlayerScreen(handlers: {
     bank.play(CLICK.name, { gain: CLICK.gain })
   }
 
-  /** Left and right walk the row; up and down step a whole row, and the two
-   * actions are the row under the grid. */
-  const sideways = (by: number): void => step(by)
-  const vertical = (by: number): void => {
+  /** Up and down walk the list in order — which, the grid standing up, is down
+   * one column and on into the other. Left and right cross between the two
+   * columns at the same row, and between the two actions. */
+  const vertical = (by: number): void => step(by)
+  const sideways = (by: number): void => {
     if (selection >= SQUAD_SIZE) {
-      // Out of the actions and back onto the grid's last row, or round.
-      step(by > 0 ? PLACES - selection : -1 - (selection - SQUAD_SIZE))
+      step(by)
       return
     }
-    step(by > 0 ? ROWS[0] : -ROWS[0])
+    const column = selection < COLUMN[0] ? 0 : 1
+    const row = column === 0 ? selection : selection - COLUMN[0]
+    const other = column === 0 ? 1 : 0
+    const landing = Math.min(row, COLUMN[other] - 1)
+    step((other === 0 ? landing : COLUMN[0] + landing) - selection)
   }
 
   const choose = (): void => {
@@ -194,14 +228,11 @@ export function initPlayerScreen(handlers: {
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
 
-  /** Where slot `n` sits, in the ragged five-then-three. */
-  const place = (slot: number): { x: number; y: number } => {
-    const row = slot < ROWS[0] ? 0 : 1
-    const column = slot - (row === 0 ? 0 : ROWS[0])
-    return {
-      x: layout.grid.x + column * layout.grid.pitch,
-      y: layout.grid.y + row * layout.grid.rowPitch
-    }
+  /** Which column and row slot `n` stands in — five down, then three. */
+  const place = (slot: number): { column: number; x: number; y: number } => {
+    const column = slot < COLUMN[0] ? 0 : 1
+    const row = column === 0 ? slot : slot - COLUMN[0]
+    return { column, x: layout.grid.x[column], y: ROW_Y[row] }
   }
 
   const centred = (font: Font, text: string, x: number, width: number): number =>
@@ -222,50 +253,49 @@ export function initPlayerScreen(handlers: {
       const at = place(slot)
       const y = at.y + offset
 
-      // The PORTRAIT. The lit one swells; every other is drawn at its own size.
+      // The PORTRAIT. The lit one breathes sideways — the arm scales the WIDTH
+      // and re-centres the blit on the source, and pushes the height as it is.
       const face = sprites.get(`face${(pig.identity % 9) + 1}a`)
       const swell = slot === selection ? 1 + PULSE_DEPTH * Math.cos(pulse) : 1
       const width = face.width * swell
-      const high = face.height * swell
       context.drawImage(
         face.image,
         Math.round(at.x + (face.width - width) / 2),
-        Math.round(y + (face.height - high) / 2),
+        Math.round(y),
         Math.round(width),
-        Math.round(high)
+        face.height
       )
 
-      // The CAREER's badge, and the stripes of its step — 0 wears none.
+      // The CAREER's badge, and the stripes of its step — 0 wears none. Both
+      // sit inboard of the portrait, on the column's own hand.
       const badge = sprites.get(BADGE[careerOf(pig.rank)] ?? 'pcHweap')
-      context.drawImage(badge.image, at.x, y + layout.badge.drop)
+      context.drawImage(badge.image, layout.badge.x[at.column], y + layout.badge.drop)
       const step_ = stepOf(pig.rank)
       if (step_ > 0) {
         const stripes = sprites.get(STRIPES[step_ - 1] ?? STRIPES[0])
-        context.drawImage(stripes.image, at.x + layout.stripes.across, y + layout.stripes.drop)
+        context.drawImage(stripes.image, layout.stripes.x[at.column], y + layout.stripes.drop)
       }
 
-      // Its NAME, and its RANK under that — both out of fetext for the rank,
-      // and the player's own words for the name.
+      // Its NAME, under its own portrait. The RANK is the badge and the pips
+      // beside it — the arm writes no words for a pig at all.
       const font = slot === selection ? light : dark
-      font.draw(context, pig.name, centred(font, pig.name, at.x, layout.grid.face), y + layout.name.drop)
-      const rank = feText(rankText(pig.rank))
-      dark.draw(
+      font.draw(
         context,
-        rank,
-        centred(dark, rank, at.x, layout.grid.face),
-        y + layout.name.drop + dark.height
+        pig.name,
+        centred(font, pig.name, at.x, layout.grid.face),
+        y + layout.name.drop
       )
     }
 
-    // The two actions under the grid.
+    // The two actions, in record 12's own boxes.
     const actions = [feText(START_TEXT), feText(SAVE_TEXT)]
     actions.forEach((label, i) => {
       const font = selection === START + i ? light : dark
       font.draw(
         context,
         label,
-        centred(font, label, layout.actions.x, layout.actions.width),
-        layout.actions.y + offset + i * layout.actions.pitch
+        centred(font, label, layout.actions.x[i], layout.actions.width),
+        layout.actions.y + offset
       )
     })
 

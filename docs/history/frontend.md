@@ -462,3 +462,58 @@ same table.
 What the screen does NOT have is most of its furniture — `sqpic`, the dials,
 the name plates, the arrows, the medals — and every y on it is eyework, the
 same way the name entry's is and for the same reason.
+
+## The two screens straightened out, 2026-08-13
+
+Play: the name entry is crooked and the squad screen very crooked. Both were
+placed by eye for the same reason — the arms compute their coordinates off an
+entrance whose resting value goes through the frontend's resolution scalers, and
+whether those scalers were ON was the one value nobody had read. It is read now,
+and both screens came out of it.
+
+**The scale flag is SET, and the earlier note had misread three reads as
+writes.** `[0x51F120]` is written in four places in the whole exe's frontend:
+set entering (0x426A3F, 0x426B6D), cleared at the teardown and on a mode change
+out. The three addresses that had been written down as the TEXT object writing
+it are the operand bytes of `mov eax,[51F120h]`. So an arm is scaled — 640/1024
+across, 480/820 down, truncated — and SELECT TEAM proves it rather than either
+of these screens: its lamp steps `2·scaleY(20·row)` = 0, 22, 46, 70, 92, 116,
+which is the 0, 22, 45, 70, 92, 115 its text rows already sit at, and unscaled
+the same expression steps a flat 40.
+
+**The name entry is a PANEL with the name bar inlaid across its top.** The plate
+is widget 18's — the very widget the entrance walks 0 → 6 — and its seven frames
+are `alpha02..08`, so what had been a static plate and an invisible gate counter
+is one thing: the panel unrolls downward from y 32, 368 wide and 192 tall at
+frame 0, and rests 304×352 at x 168, centred. Two 30-row bands of its own top
+edge go above it at 6 and −22 and carry it off the top of the screen. The bar is
+`propoint` tiled at y 4 — caps at 184 and 432, twelve middles between them, each
+20×60 — with a single source row stretched 100 tall above both caps, which is
+the rail it falls in on. It does not ride the screen's x at all; it has a fall of
+its own and nothing else. The title's box is the exe's (206, 55) 300 wide, 15
+pixels down from where it had been guessed.
+
+**The squad screen's grid stands UP, and that was the "very".** The arm's two
+counters had been read the wrong way round: `ebx` is the COLUMN and steps x by
+462, `ebp` is the ROW and steps y by `2·37`. So it is five pigs DOWN the left
+edge and three down the right — x 57 and 519, rows 75, 149, 223, 296, 368 — with
+everything else on the screen between them, not five across the top. The badges
+step a pitch of their own, 417, and are handed +82 on the left and −69 on the
+right, so both columns' badges face the middle: 161 and 427, the row's y plus
+44. START MISSION and SAVE TEAM are the record's own item boxes 59 and 60, side
+by side at (350, 385) and (418, 385) under the short column. And the swell is
+SIDEWAYS — `fcos` is pushed as the blit's width, the source height is pushed
+unscaled, and the x re-centres — so the lit portrait breathes about its own
+axis instead of growing in place.
+
+`frontend/blits.js` in the disasm repo learned the two scalers and a `--set
+512964=70` for the entrance, which is what turned an arm full of `?` into
+pixels; the `lea reg,[reg+reg-imm]` its interpreter could not read was why every
+plate's y came out unknown.
+
+What is still not drawn is the squad screen's furniture — `sqpic`, the dials,
+the name plates, the arrows, the medals, the `backgr~1` frame each portrait sits
+in — and the arm's third loop (0x41D70E) that would place some of it. Where the
+letters sit on the name entry's panel is still the remake's own: the exe lays
+them out through the text object off record 15's first item box, (280, 250)
+270×30 raw, and that arm is unread.

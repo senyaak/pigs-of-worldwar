@@ -9,18 +9,41 @@
 // `lib/game/nameEntry.ts`, which is where the rules live and where they are
 // tested; this file is the picture.
 //
-// **The art is read, the placement is not.** The three key plates are 24×28
-// (0x41DD32/0x41DD5A/0x41DD70), the field is `propoint` tiled — a cap at x 184,
-// twelve middles from 204 stepping 20, and a cap at 432 (0x41DDDB..0x41DEDE) —
-// and `alpha02..08` are seven PLATES, one per frame of the widget the builder
-// walks (0x41F5E9), decoded here as solid blocks with nothing drawn on them:
-// the letters go on top as text. What the arm does NOT give is a single y,
-// because every one it computes is `2·[0x512964] + k` off an entrance whose
-// resting value is not read. So the verticals below are eyework and say so.
+// **The placement is READ now, every blit of it** (2026-08-13), and the one
+// thing that was open — whether the arm's coordinates go through the frontend's
+// resolution scalers — is settled: `[0x51F120]` is SET for the whole frontend
+// (0x426A3F, and the three sites an older note called writers are all `mov
+// eax,[51F120h]` READS), so `scaleX` is `v·640/1024` and `scaleY` is
+// `v·480/820`, both truncated. SELECT TEAM is the proof rather than this
+// screen: its lamp steps `2·scaleY(20·row)` = 0, 22, 46, 70, 92, 116, which is
+// the text rows' own 0, 22, 45, 70, 92, 115 — unscaled it would be 40 a row and
+// nothing would line up.
+//
+// So the screen is a PANEL with a bar inlaid at the top of it:
+//
+// - the panel is `alpha02..08`, the seven frames of **widget 18** — the very
+//   widget the entrance walks 0 → 6 — drawn whole at `(168, 2·scaleY(y) − 48)`
+//   with two 30-row bands of its own top edge above it at −74 and −102, which
+//   is how it reaches off the top of the screen. Its frames are 368×192,
+//   352×256, 320×288, 304×320, 304×336 and twice 304×352, so the panel UNROLLS
+//   downward as the widget walks and comes to rest at 168..472 — dead centre of
+//   a 640-wide screen — by 384.
+// - the bar is `propoint` tiled at y 4: a cap at x 184, twelve middles from 204
+//   stepping 20, a cap at 432, each 20×60, and a single source row stretched
+//   100 tall above both caps — the rail it drops in on, since the bar falls
+//   from −700 and the panel does not move under it.
+//
+// The x's are `scaleX([0x512CE4]) + 130 + step + 35`, where `step` is the arm's
+// own stack table [51, 35, 35, 19, 3, 3, 3, 3] read BACKWARD by **widget 20**'s
+// frame — a widget this screen never walks, so the step is 3 and the panel's x
+// is 168.
 //
 // The GRID itself is play's, off a screenshot of the shipped game — seven
-// letters across and six down with the three keys as an eighth column, on
-// `alpha03`. See `COLUMNS`.
+// letters across and six down with the three keys as an eighth column. Where it
+// sits ON the panel is the remake's own: the exe lays it out through the text
+// object, off record 15's first item box (raw (280, 250) 270×30, i.e. 150, 146)
+// and two font metrics filled at runtime, and that arm is not read. See
+// `COLUMNS` and `INNER`.
 
 import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
@@ -47,8 +70,13 @@ import {
 } from '../../../lib/game/nameEntry'
 import type { Alphabet, NameEntry } from '../../../lib/game/nameEntry'
 
+/** The panel's seven frames, in the order widget 18's builder walks them
+ * (0x41F8A3, `[0x511A48 + 4·frame]`). The entrance asks for frame 6, so
+ * `alpha08` is what the screen comes to rest wearing. */
+const PLATES = ['alpha02', 'alpha03', 'alpha04', 'alpha05', 'alpha06', 'alpha07', 'alpha08']
+
 /** What kind 0's loader arm (0x4228F9) brings that this screen blits. */
-const ART = ['pigbkpc1', 'propoint', 'alpha03', 'chardel', 'charspc', 'charent']
+const ART = ['pigbkpc1', 'propoint', ...PLATES, 'chardel', 'charspc', 'charent']
 
 /** `Fesounds.srl` entry 4 at volume 40 — every keypress (0x42AF71). */
 const KEYPRESS = { name: 'CLICK1', gain: 0.4 }
@@ -77,6 +105,10 @@ const BOUNCE = { y: 1, velocityY: -40, velocityX: -20 }
 const GATE = 6
 /** Where the field goes when the screen leaves, before the screen follows. */
 const FIELD_EXIT = -400
+
+/** Widget 18 IS the panel, and the gate the entrance walks is the panel
+ * unrolling: frame 0 is `alpha02` and frame 6 `alpha08`. */
+const PLATE_FRAMES = PLATES.length - 1
 
 /**
  * The GRID: **seven letters across, six rows down**, and the three keys are an
@@ -107,27 +139,39 @@ const ALPHABET_GRID: Alphabet = {
 }
 
 /**
- * Where each piece lands. Only the x's carry an address; every y is eyework,
- * for the reason in the file's own header — nudge them from the console
- * (`pow.screen.layout.name.field.y -= 4`, then `pow.screen.print()`).
+ * Where each piece lands, and every number here is the arm's own — see the
+ * file's header for how each was read. Only `INNER` is eyework; nudge it from
+ * the console (`pow.screen.layout.name.inner.top -= 4`, then
+ * `pow.screen.print()`).
  */
 const LAYOUT = {
   /** `propoint` tiled: the cap at `x`, middles from `repeat` stepping `step`
-   * while they fit before `tail`, and the far cap at `tail` (0x41DDDB on).
-   * The x's are the arm's; `y` and `height` are `[CHECK — remake]`. */
-  field: { x: 184, repeat: 204, step: 20, tail: 432, cell: 20, y: 96, height: 60 },
-  /** The alphabet plate, `alpha03` — 352 wide, so centred it starts at 144.
-   * The y is `[CHECK — remake]`, placed under the field the way play's
-   * screenshot has it. */
-  plate: { x: 144, y: 176 }
+   * while they fit before `tail`, and the far cap at `tail`, each 20 wide out
+   * of a 60×60 sprite and 60 tall (0x41DDDB..0x41DEDE). Above each cap the
+   * source's top row is stretched `rail` tall — the bar's own runners, which
+   * only show while it is falling. */
+  field: { x: 184, repeat: 204, step: 20, tail: 432, cell: 20, y: 4, height: 60, rail: 100 },
+  /** The panel: `alpha02..08` whole at (`x`, `drop` below the doubled
+   * entrance), with two `band.height`-row bands of its own top (from source row
+   * `band.rows`) at the two offsets above it. */
+  plate: { x: 168, drop: -48, band: { rows: 2, height: 30, at: [-74, -102] } },
+  /**
+   * Where the letters sit ON the panel — `[CHECK — remake]`, the one thing on
+   * this screen the exe was not read for. Eight columns and six rows are spread
+   * across the panel less these insets; the top one is what keeps the first row
+   * clear of the name bar, which covers the panel down to y 64.
+   */
+  inner: { left: 16, right: 16, top: 44, bottom: 16 }
 }
 
-/** The words. The title's box is the exe's, out of the per-kind tables at
- * 0x4C1548/0x4C15A8/0x4C1608 with the −25 origin folded in: raw (370, 97)
- * 190 wide. The name's line is centred over the field. */
+/** The words. Both boxes are the exe's, out of the per-kind tables at
+ * 0x4C1548/0x4C15A8/0x4C1608 for the title — record 15 is raw (370, 94) 400
+ * wide, which is (206, 55) 300 with the stretch's own +80/−25 folded in — and
+ * the NAME is centred in the bar it is typed into, which is the remake's own
+ * reading: the exe's item box for it is (150, 146), where the grid goes. */
 const TEXT = {
-  title: { x: 206, y: 40, width: 168 },
-  name: { x: 184, y: 118, width: 268 }
+  title: { x: 206, y: 55, width: 300 },
+  name: { x: 184, y: 26, width: 268 }
 }
 
 const TICK_MS = EXE_FRAME_SECONDS * 1000
@@ -137,7 +181,8 @@ export type NameLayout = typeof LAYOUT & { text: typeof TEXT }
 
 const cloneLayout = (): NameLayout => ({
   field: { ...LAYOUT.field },
-  plate: { ...LAYOUT.plate },
+  plate: { ...LAYOUT.plate, band: { ...LAYOUT.plate.band, at: [...LAYOUT.plate.band.at] } },
+  inner: { ...LAYOUT.inner },
   text: { title: { ...TEXT.title }, name: { ...TEXT.name } }
 })
 
@@ -194,11 +239,12 @@ export function initNameScreen(handlers: {
   const scaleX = (value: number): number => Math.trunc((value * SCREEN.width) / 1024)
   const scaleY = (value: number): number => Math.trunc((value * SCREEN.height) / 820)
 
-  /** How far the whole screen is from where it settles, in pixels. The arm
-   * places its pieces at `2·scaleY(y) − k`, so the offset is doubled too. */
+  /** The arm's own two scalars: every piece of the panel is placed at
+   * `2·scaleY(y) + k`, and the words ride the same thing measured from rest. */
+  const doubled = (): number => 2 * scaleY(at.y.value)
   const screenOffset = (): { x: number; y: number } => ({
     x: scaleX(at.x.value - REST.x),
-    y: 2 * scaleY(at.y.value - REST.y)
+    y: doubled() - 2 * scaleY(REST.y)
   })
   /** …and the field carries its own, undoubled. */
   const fieldOffset = (): number => scaleY(at.field.value - REST.field)
@@ -259,66 +305,97 @@ export function initNameScreen(handlers: {
 
     context.drawImage(art.get('pigbkpc1').image, 0, 0)
 
-    // The FIELD the typed name sits in: one cap, a run of middles, one cap —
-    // `propoint` sliced 20 columns at a time, which is the arm's own step.
+    // The PANEL — widget 18's own frame, so it unrolls downward as the gate
+    // walks. Two bands of its top edge go down first and the whole plate over
+    // them, which is the arm's order (0x41DD48, 0x41DD62, then 0x41DD77).
+    const frame = Math.min(gate, PLATE_FRAMES)
+    const plate = art.get(PLATES[frame])
+    const plateX = layout.plate.x + screen.x
+    const plateTop = doubled() + layout.plate.drop
+    const band = layout.plate.band
+    for (const above of band.at)
+      context.drawImage(
+        plate.image,
+        0, band.rows, plate.width, band.height,
+        plateX, doubled() + above, plate.width, band.height
+      )
+    context.drawImage(plate.image, plateX, plateTop)
+
+    // The BAR the typed name sits in: one cap, a run of middles, one cap —
+    // `propoint` sliced 20 columns at a time, which is the arm's own step —
+    // and above each cap the source's top row stretched into a rail. It does
+    // NOT ride the screen's x; it has a fall of its own and nothing else.
     const field = art.get('propoint')
     const box = layout.field
+    const fieldY = box.y + alongField
     const slice = (from: number, x: number): void =>
       context.drawImage(
         field.image,
         from, 0, box.cell, field.height,
-        x + screen.x, box.y + alongField, box.cell, box.height
+        x, fieldY, box.cell, box.height
+      )
+    const rail = (x: number): void =>
+      context.drawImage(
+        field.image,
+        0, 0, box.cell, 1,
+        x, fieldY - box.rail, box.cell, box.rail
       )
     slice(0, box.x)
+    rail(box.x)
     for (let x = box.repeat; x < box.tail; x += box.step) slice(box.cell, x)
     slice(field.width - box.cell, box.tail)
+    rail(box.tail)
 
-    // The name, padded out to its maximum with dots. It rides the field.
+    // The name, padded out to its maximum with dots. It rides the bar.
     words(context, lit, padded(entry.name, TEAM_NAME_MAX), {
       ...layout.text.name,
-      x: layout.text.name.x + screen.x,
       y: layout.text.name.y + alongField - offset
     })
 
-    // The alphabet's plate, and everything on it: eight columns by six rows,
-    // the letters in the first seven and the three keys in the last.
-    const plate = art.get('alpha03')
-    const plateX = layout.plate.x + screen.x
-    context.drawImage(plate.image, plateX, layout.plate.y + offset)
-    const cellWidth = plate.width / GRID_COLUMNS
-    const cellHeight = plate.height / grid.rows
-    /** The middle of a cell, in canvas coordinates. */
-    const cell = (column: number, row: number): { x: number; y: number } => ({
-      x: plateX + (column + 0.5) * cellWidth,
-      y: layout.plate.y + offset + (row + 0.5) * cellHeight
-    })
+    // Everything ON the panel: eight columns by six rows, the letters in the
+    // first seven and the three keys in the last. They wait for the panel to
+    // finish unrolling rather than swim about on it.
+    if (frame === PLATE_FRAMES) {
+      const inner = layout.inner
+      const gridX = plateX + inner.left
+      const gridY = plateTop + inner.top
+      const cellWidth = (plate.width - inner.left - inner.right) / GRID_COLUMNS
+      const cellHeight = (plate.height - inner.top - inner.bottom) / grid.rows
+      /** The middle of a cell, in canvas coordinates. */
+      const cell = (column: number, row: number): { x: number; y: number } => ({
+        x: gridX + (column + 0.5) * cellWidth,
+        y: gridY + (row + 0.5) * cellHeight
+      })
 
-    for (let i = 0; i < grid.letters.length; i++) {
-      const letter = grid.letters[i]
-      const middle = cell(i % grid.columns, Math.floor(i / grid.columns))
-      const font = i === entry.cursor ? lit : plain
-      font.draw(
-        context,
-        letter,
-        Math.round(middle.x - font.measure(letter) / 2),
-        Math.round(middle.y - font.height / 2)
-      )
-    }
-
-    // The three keys — 24×28 sprites, one per row of the eighth column, and
-    // the lit one boxed the way the letters are told apart by their shade.
-    const key = keyAt(entry, grid)
-    KEYS.forEach((name, i) => {
-      const sprite = art!.get(name === 'delete' ? 'chardel' : name === 'space' ? 'charspc' : 'charent')
-      const middle = cell(grid.columns, i)
-      const x = Math.round(middle.x - sprite.width / 2)
-      const y = Math.round(middle.y - sprite.height / 2)
-      context.drawImage(sprite.image, x, y)
-      if (key === name) {
-        context.strokeStyle = 'rgb(216, 216, 152)'
-        context.strokeRect(x - 0.5, y - 0.5, sprite.width + 1, sprite.height + 1)
+      for (let i = 0; i < grid.letters.length; i++) {
+        const letter = grid.letters[i]
+        const middle = cell(i % grid.columns, Math.floor(i / grid.columns))
+        const font = i === entry.cursor ? lit : plain
+        font.draw(
+          context,
+          letter,
+          Math.round(middle.x - font.measure(letter) / 2),
+          Math.round(middle.y - font.height / 2)
+        )
       }
-    })
+
+      // The three keys — 24×28 sprites, one per row of the eighth column, and
+      // the lit one boxed the way the letters are told apart by their shade.
+      const key = keyAt(entry, grid)
+      KEYS.forEach((name, i) => {
+        const sprite = art!.get(
+          name === 'delete' ? 'chardel' : name === 'space' ? 'charspc' : 'charent'
+        )
+        const middle = cell(grid.columns, i)
+        const x = Math.round(middle.x - sprite.width / 2)
+        const y = Math.round(middle.y - sprite.height / 2)
+        context.drawImage(sprite.image, x, y)
+        if (key === name) {
+          context.strokeStyle = 'rgb(216, 216, 152)'
+          context.strokeRect(x - 0.5, y - 0.5, sprite.width + 1, sprite.height + 1)
+        }
+      })
+    }
 
     words(context, lit, feText(TITLE_TEXT), {
       ...layout.text.title,
