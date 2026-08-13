@@ -14,7 +14,7 @@ import type { Page } from '@playwright/test'
 import { beginTurn, landed, tap } from './controller'
 
 /** Which screen's bars to read. The names are the `window.pow` keys. */
-export type Screen = 'menu' | 'onePlayer' | 'teamScreen' | 'multiPlayer'
+export type Screen = 'menu' | 'onePlayer' | 'teamScreen' | 'nameScreen' | 'multiPlayer'
 
 interface ScreenHooks {
   selected(): number
@@ -137,9 +137,9 @@ export const FIRST_ARMY = "TOMMY'S TROTTERS"
  * The menu to the battle and no further — the walk a spec wants when the drop
  * itself, or the beat at the top of the first turn, is the subject.
  *
- * It is three screens deep now: ONE PLAYER opens the screen of that name, NEW
- * GAME opens SELECT TEAM, and an army chosen there is what starts the battle
- * until PLEASE NAME YOUR TEAM lands under it (ui/teamScreen.ts).
+ * It is four screens deep now: ONE PLAYER opens the screen of that name, NEW
+ * GAME opens SELECT TEAM, an army chosen there opens PLEASE NAME YOUR TEAM,
+ * and a name accepted on that one starts the campaign.
  */
 export async function toBattle(page: Page): Promise<void> {
   await choose(page, 'ONE PLAYER')
@@ -147,7 +147,48 @@ export async function toBattle(page: Page): Promise<void> {
   await choose(page, 'NEW GAME', 'onePlayer')
   await expect(page.locator('#team')).toBeVisible()
   await choose(page, FIRST_ARMY, 'teamScreen')
+  await expect(page.locator('#name')).toBeVisible()
+  await nameTeam(page, TEST_TEAM)
   await expect(page.locator('#battle')).toBeVisible()
+}
+
+/** What the suite calls its army. Capitals and nothing the alphabet lacks —
+ * the original's grid has no lowercase and the fonts have no glyph for one. */
+export const TEST_TEAM = 'TEST'
+
+/**
+ * Type a name and accept it, the way the remake lets a player do it — the
+ * keyboard is `[deliberate]`, the original has only the grid, and the grid is
+ * what `nameEntry.spec.ts` covers.
+ */
+export async function nameTeam(page: Page, name: string): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const hooks = (window as unknown as PowScreens).pow?.nameScreen
+          return hooks ? hooks.flipping() : true
+        }),
+      { message: 'the name screen is still driving in' }
+    )
+    .toBe(false)
+  await page.evaluate((text) => {
+    const hooks = (window as unknown as { pow?: { nameScreen?: { type(c: string): void } } }).pow
+      ?.nameScreen
+    if (!hooks) throw new Error('the name screen is not up')
+    for (const character of text) hooks.type(character)
+  }, name)
+  // ENTER is the last of the three keys past the alphabet's end.
+  await page.evaluate(() => {
+    const pow = (window as unknown as {
+      pow?: { controller: { tap(a: string): void }; nameScreen?: { selected(): number } }
+    }).pow
+    if (!pow?.nameScreen) throw new Error('the name screen is not up')
+    // Walk into the keys' column and down to ENTER.
+    for (let i = 0; i < 8 && pow.nameScreen.selected() < 42; i++) pow.controller.tap('menuRight')
+    for (let i = 0; i < 3 && pow.nameScreen.selected() !== 44; i++) pow.controller.tap('menuDown')
+    pow.controller.tap('menuSelect')
+  })
 }
 
 /**

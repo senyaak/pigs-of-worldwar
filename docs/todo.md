@@ -156,11 +156,29 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        now. `frontend/notes.md` carries the chain link by link.
      - **the rest of the MACHINERY is missing too** — the original carries a
        good deal more moving metal round the console than we draw. Not read.
-   - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with
-     `chardel`/`charspc`/`charent`, the caret stepping by its own little table
-     (0x41DC69).
-   - and then the autosave has a campaign to write: `newGame` on the way out of
-     the name entry, `finishMission` at the end of a mission.
+   - ~~**PLEASE NAME YOUR TEAM**~~ **BUILT** — `ui/nameScreen.ts` on
+     `lib/game/nameEntry.ts`. The rules are all read: the alphabet is `fetext`
+     0 and the cursor is an index into it, the three past its end are DELETE,
+     SPACE and ENTER, a team name is eleven characters and a pig's seven, the
+     field pads with dots, and ENTER refuses an empty name. What is left on it:
+     - **the GRID's shape is `[CHECK — remake]`.** 6 across and 7 down, which
+       is what 42 letters make on `alpha07` (304×352) at a square cell. The
+       exe computes it — `columns = scaleX(w + stretch)/(advance + spacing) − 7`
+       — and the two font metrics that feeds on are not decoded, so this is
+       arithmetic on the art rather than a reading. Nudge it and the plate
+       together.
+     - **every y is eyework.** The x's are the arm's (the field's caps at 184
+       and 432, twelve middles from 204 stepping 20; the keys 28 apart) but
+       every y the arm computes is `2·[0x512964] + k` off an entrance whose
+       resting value is not read.
+     - the caret plate the arm steps by its own table [51,35,35,19,3,3,3,3]
+       is not drawn at all, and what `[0x5128CC]` names is not known.
+     - the help line, `fetext` 770, carries `/Z(131,62)` and `/N`/`/S` markup
+       nothing here parses yet.
+   - and the autosave now has its first half: `newGame` runs on the way out of
+     the name entry and writes `savearmy0` (`main.ts`). `finishMission` at the
+     end of a mission is still to come, and nothing READS a save back yet —
+     that waits on LOAD GAME below.
 5. **LOAD GAME** — record 10, kind 8/9, the save-slot list whose items are
    named at RUNTIME (which is why their fetext ids overrun into the next
    screen's words). Its layout is not read at all yet.

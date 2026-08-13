@@ -388,3 +388,45 @@ Two lessons. **A measurement can be right and still be the wrong answer** — th
 box really was behind the skull, and centring it really did move it there, and
 none of that was the bug. And **a shared buffer handed out as a view is a trap
 that only shows up on the second call**; the fix belongs where the mutation is.
+
+## PLEASE NAME YOUR TEAM (2026-08-13)
+
+The fourth screen, and the first one whose SHAPE was a surprise. It has no bars
+and no list: the alphabet is `fetext` 0 — one string of 42 characters — and the
+cursor is `[record+0x0C]`, the same field every other kind uses for "which item
+is lit". Three values past the end of that string are three keys of their own,
+and the walk at 0x42AE30 puts them in one more column beside the grid, wrapping
+those three among themselves. So the rules came out small and pure
+(`lib/game/nameEntry.ts`, ten tests) and the screen is only the picture.
+
+Everything about what a name IS was read: eleven characters for a team and
+seven for a pig (0x42CE6C and 0x42CEB7), the destination the screen is opened
+with, SPACE appending byte 1 because the game's letters are `ASCII − 0x1F`,
+ENTER refusing an empty name with sound 21, and the field showing the name
+padded out to its maximum with `fetext` 745, a full stop — so an empty team
+name reads as eleven dots.
+
+**The art answered questions the code did not.** `alpha02..08` looked like they
+might be letter grids; decoded, every one is a solid block, so they are seven
+PLATES the widget walks between and the letters go on top as text. And
+`chardel`/`charspc`/`charent` are 24×28 each, which is exactly the 28 the draw
+arm stacks its three blits by — so those three blits ARE the keys, one under
+another.
+
+**What is still not read is the grid's shape**, and it is worth saying why
+rather than pretending. 0x431380 computes it from the box and the font, and the
+two font metrics it reads are filled at runtime by the text object's
+constructor. Six across and seven down is what 42 letters make on `alpha07` at
+a square cell, and that is the argument for it — arithmetic on the art, not a
+reading. It is tagged `[CHECK — remake]` in the file and in `todo.md`, along
+with every y on the screen, which the arm computes off an entrance whose
+resting value is equally unread.
+
+Two additions came with it. `menuLeft`/`menuRight` — the frontend had never
+needed a sideways press before — and a `type()` on the screen, the remake's own
+keyboard, which is `[deliberate]` in the same way the mouse on the menu is: the
+original has only the grid, and the grid still works.
+
+And the far end: accepting a name runs `newGame` and writes `savearmy0`. That
+is the first save this project has ever written from play rather than from a
+test.

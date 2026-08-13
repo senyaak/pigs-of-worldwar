@@ -219,6 +219,7 @@
       #menu,
       #oneplayer,
       #team,
+      #name,
       #multiplayer {
         flex: 1;
         min-height: 0;
@@ -228,6 +229,7 @@
       #menu-screen,
       #op-screen,
       #team-screen,
+      #name-screen,
       #mp-screen {
         display: block;
         width: 100%;
@@ -323,6 +325,9 @@
            a hidden parent is display:none, the scene sizes its renderer from
            the host's client box, and a 0x0 canvas cannot be drawn from. -->
       <div id="team-pig"></div>
+      <div id="name" class="hidden">
+        <canvas id="name-screen"></canvas>
+      </div>
       <div id="multiplayer" class="hidden">
         <canvas id="mp-screen"></canvas>
       </div>

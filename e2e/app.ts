@@ -34,6 +34,7 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   ['#browser', { click: '#browser-menu' }],
   ['#oneplayer', { key: 'menuBack' }],
   ['#team', { key: 'menuBack' }],
+  ['#name', { key: 'menuBack' }],
   ['#multiplayer', { key: 'menuBack' }]
 ]
 

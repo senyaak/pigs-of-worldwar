@@ -318,6 +318,11 @@ declare global {
       onePlayer?: BarScreenView
       /** SELECT TEAM — the six armies (ui/teamScreen.ts). */
       teamScreen?: BarScreenView
+      /** PLEASE NAME YOUR TEAM (ui/nameScreen.ts). `selected` is the exe's own
+       * cursor — an index into the alphabet, or one of the three keys past its
+       * end — and `type` is the remake's keyboard, which the original has no
+       * way to offer. */
+      nameScreen?: BarScreenView & { typed(): string; type(character: string): void }
       /** The MULTI-PLAYER screen, read the same way (ui/multiPlayer.ts). */
       multiPlayer?: BarScreenView
       /** Where the frontend's furniture sits, live: nudge a piece in the
