@@ -316,6 +316,8 @@ declare global {
       menu?: BarScreenView
       /** ONE PLAYER — NEW GAME over LOAD GAME (ui/onePlayer.ts). */
       onePlayer?: BarScreenView
+      /** SELECT TEAM — the six armies (ui/teamScreen.ts). */
+      teamScreen?: BarScreenView
       /** The MULTI-PLAYER screen, read the same way (ui/multiPlayer.ts). */
       multiPlayer?: BarScreenView
       /** Where the frontend's furniture sits, live: nudge a piece in the

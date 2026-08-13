@@ -218,6 +218,7 @@
          stretch of it. */
       #menu,
       #oneplayer,
+      #team,
       #multiplayer {
         flex: 1;
         min-height: 0;
@@ -226,6 +227,7 @@
       }
       #menu-screen,
       #op-screen,
+      #team-screen,
       #mp-screen {
         display: block;
         width: 100%;
@@ -307,6 +309,9 @@
       </div>
       <div id="oneplayer" class="hidden">
         <canvas id="op-screen"></canvas>
+      </div>
+      <div id="team" class="hidden">
+        <canvas id="team-screen"></canvas>
       </div>
       <div id="multiplayer" class="hidden">
         <canvas id="mp-screen"></canvas>

@@ -14,7 +14,7 @@ import type { Page } from '@playwright/test'
 import { beginTurn, landed, tap } from './controller'
 
 /** Which screen's bars to read. The names are the `window.pow` keys. */
-export type Screen = 'menu' | 'onePlayer' | 'multiPlayer'
+export type Screen = 'menu' | 'onePlayer' | 'teamScreen' | 'multiPlayer'
 
 interface ScreenHooks {
   selected(): number
@@ -130,17 +130,23 @@ export async function choose(
   await tap(page, 'menuSelect')
 }
 
+/** The first of the six armies — `fetext` 25, and the one SELECT TEAM opens on. */
+export const FIRST_ARMY = "TOMMY'S TROTTERS"
+
 /**
  * The menu to the battle and no further — the walk a spec wants when the drop
  * itself, or the beat at the top of the first turn, is the subject.
  *
- * It is two screens deep: the main menu's ONE PLAYER opens the screen of that
- * name, and NEW GAME on it is what starts the battle (ui/onePlayer.ts).
+ * It is three screens deep now: ONE PLAYER opens the screen of that name, NEW
+ * GAME opens SELECT TEAM, and an army chosen there is what starts the battle
+ * until PLEASE NAME YOUR TEAM lands under it (ui/teamScreen.ts).
  */
 export async function toBattle(page: Page): Promise<void> {
   await choose(page, 'ONE PLAYER')
   await expect(page.locator('#oneplayer')).toBeVisible()
   await choose(page, 'NEW GAME', 'onePlayer')
+  await expect(page.locator('#team')).toBeVisible()
+  await choose(page, FIRST_ARMY, 'teamScreen')
   await expect(page.locator('#battle')).toBeVisible()
 }
 

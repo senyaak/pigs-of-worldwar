@@ -321,7 +321,13 @@ let shared: Promise<{
   off: Font
 }> | null = null
 
-function loadShared(): NonNullable<typeof shared> {
+/**
+ * The bank, the three font shades and the strings — shared by every frontend
+ * screen, machine or not. `ui/teamScreen.ts` is not built on this file's
+ * layout at all and still wears the same letters and hears the same clicks,
+ * so this is exported rather than kept to the machine.
+ */
+export function loadFrontend(): NonNullable<typeof shared> {
   shared ??= (async () => {
     const [bank, sprites, text, litFont, plainFont, offFont] = await Promise.all([
       loadBank(FRONTEND_SOUNDS),
@@ -808,7 +814,7 @@ export function initBarScreen(config: {
     async load() {
       if (loaded) return
       try {
-        const pieces = await loadShared()
+        const pieces = await loadFrontend()
         bank = pieces.bank
         art = pieces.art
         lit = pieces.lit

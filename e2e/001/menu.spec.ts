@@ -110,6 +110,54 @@ test('ONE PLAYER is a screen of its own — NEW GAME over LOAD GAME', async ({ a
   expect(app.errors()).toEqual([])
 })
 
+test('SELECT TEAM lists the six armies on the other layout', async ({ app }) => {
+  const { page } = app
+  await choose(page, 'ONE PLAYER')
+  await choose(page, 'NEW GAME', 'onePlayer')
+  await expect(page.locator('#team')).toBeVisible()
+
+  // fetext 25..30 — record 3's own six, and the order the nation index counts
+  // them in (lib/game/teams.ts).
+  await expect
+    .poll(() => labels(page, 'teamScreen'))
+    .toEqual([
+      "TOMMY'S TROTTERS",
+      'GARLIC GRUNTS',
+      'UNCLE HAMS HOGS',
+      'PIGGYSTROIKA',
+      'SUSHI-SWINE',
+      'SOW-A-KRAUTS'
+    ])
+
+  // It is a different layout, not the machine — but it is really painted, the
+  // same way the menu's canvas is checked. POLLED, because the labels arrive
+  // with `load()` and the first DRAW is a frontend tick later: reading the
+  // canvas straight after them catches it blank.
+  const distinctColors = async (): Promise<number> =>
+    page.evaluate(() => {
+      const canvas = document.getElementById('team-screen') as HTMLCanvasElement
+      const context = canvas.getContext('2d')
+      if (!context) return -1
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+      const seen = new Set<number>()
+      for (let i = 0; i < pixels.length; i += 4) {
+        seen.add((pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2])
+      }
+      return seen.size
+    })
+  await expect.poll(distinctColors, { message: 'the painted team screen' }).toBeGreaterThan(50)
+
+  // The lit row wraps over six, not four.
+  await lightBar(page, "TOMMY'S TROTTERS", 'teamScreen')
+  await nudge(page, 'menuUp', 'teamScreen')
+  expect(await selection(page, 'teamScreen'), 'up from the top wraps to the sixth').toBe(5)
+
+  await tap(page, 'menuBack')
+  await expect(page.locator('#oneplayer')).toBeVisible()
+
+  expect(app.errors()).toEqual([])
+})
+
 test('NEW GAME opens the battle, and F1 the asset browsers', async ({ app }) => {
   const { page } = app
   await startGame(page)

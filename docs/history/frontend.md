@@ -201,3 +201,57 @@ action 6 with params 180..185. Its draw arm (0x41CBE1) and its cursor are read
 alone — a live squad, because a changed row calls `0x4824A0` with it and the
 screen shows that army's actual eight. That last one is now cheap: the squad it
 would show is `lib/game/roster.ts`.
+
+## SELECT TEAM — THE SECOND LAYOUT, AND WHY THE READ CAME FIRST (2026-08-13)
+
+The first screen in this project that is **not the machine**. Play asked for it
+straight after ONE PLAYER; what it took was reading kind 2's draw arm rather
+than building from the summary this file already carried — because that summary
+turned out to be wrong in three places, and each one would have put art in the
+wrong pixel.
+
+**The corrections, before anything else.** The console's skirt is
+twenty-five blits stepping +4 down, not one. The repeated two-pixel column runs
+463..511, not "from 591" — a number that is neither end of anything and would
+have left a seam. And the name band sits at `namarm + 24`, dropping to +16 on
+one frame of six, where the old note had +16 as the base.
+
+**Then two that changed the shape of the job.** The arm draws ONE track, the
+mirrored one, where the main menu draws two. And it RETURNS after it for every
+kind-2 screen except record 16 — so the `com_man` block before it and the
+sine-wobble block after it are MULTI-PLAYER's, not this screen's.
+
+**"The arm is short" was then challenged, and proving it was worth the hour.**
+All 23 kinds are drawn by ONE function, `0x41BEF0` — the only `sub esp,668h`
+in `.text`, matching the `add esp,668h; ret 4` at 0x41E720 — and every arm is a
+label inside it, reached from a dispatch at 0x41BF54 over a byte map at
+0x41E768 and a pointer table at **0x41E72C**. Entry [2] is 0x41CBE1, so nothing
+before it is this arm's; entry [14] IS 0x41E71C, the function's own tail, which
+is the arm for the kinds that draw nothing — so the `jne` out of the middle of
+the kind-2 arm really is a return. The whole table is in `frontend/notes.md`
+now, which names every draw arm by kind.
+
+**What the screen actually is.** A console with ONE window in it. Six armies,
+and yet one `selec` emblem at (298, 170) and one `lit` lamp at (537, 202): what
+changes with the row is the FRAME. Widget 0 walks five frames per row and
+rebuilds the emblem at `frame % 6` on every step, clicking (`Fesounds` entry 4
+at 60) on the one that lands — the emblems reel past in a single window while
+the six names sit in the console's own eight text boxes below. The `selcog`
+carriage at (553, 180) does not move at all; the arm blits it at a literal.
+`ui/teamScreen.ts` is all of that, with the address on every number.
+
+**One piece is deliberately absent.** The original shows the highlighted army's
+own squad — a changed row calls `0x4824A0`, which `army/notes.md` identifies as
+`Team::SetNation`, so the eight it lists are the team record's and
+`lib/game/roster.ts` could supply them. Where `sqarmy`, `pigpro` and `standpc`
+land is not read, so the panel is left out rather than placed by eye.
+
+**And one spec bug worth remembering.** The screen's first version looked blank
+to the suite: the labels arrive with `load()` and the first DRAW is a frontend
+tick later, so reading the canvas straight after the labels catches it empty.
+The menu's own spec had polled for exactly this reason. Poll the canvas.
+
+Next is PLEASE NAME YOUR TEAM (record 15, kind 0) — the `alpha` alphabet with
+`chardel`/`charspc`/`charent` and a caret that steps by its own little table
+(0x41DC69). After it, `newGame` in `lib/game/save.ts` has everything it needs
+and the autosave finally has a campaign to write.

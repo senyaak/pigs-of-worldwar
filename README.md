@@ -34,9 +34,10 @@ launches. Add `--windowed` to play in a desktop window instead of fullscreen.
 
 It opens on the game's own main menu. `↑`/`↓` move the lit bar and `Enter`
 chooses it, `Esc` goes back — or use the mouse, which the original has no time
-for. ONE PLAYER opens the screen of that name, and NEW GAME on it opens the
-training ground; LOAD GAME waits on a screen to list saves from. `F1` opens the
-asset browsers, which are the remake's own debug screens.
+for. ONE PLAYER opens the screen of that name, NEW GAME on it opens SELECT
+TEAM, and an army chosen there opens the training ground; LOAD GAME waits on a
+screen to list saves from. `F1` opens the asset browsers, which are the
+remake's own debug screens.
 
 Controls in the battle (tank-style, as in the original):
 

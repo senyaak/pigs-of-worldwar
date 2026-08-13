@@ -6,6 +6,7 @@ import type { BarScreenView } from './input/controller'
 import { initWelcome } from './ui/welcome'
 import { initMenu } from './ui/menu'
 import { initOnePlayer } from './ui/onePlayer'
+import { initTeamScreen } from './ui/teamScreen'
 import { initMultiPlayer } from './ui/multiPlayer'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
@@ -17,6 +18,7 @@ type View =
   | 'welcome'
   | 'menu'
   | 'oneplayer'
+  | 'team'
   | 'multiplayer'
   | 'battle'
   | 'browser'
@@ -27,6 +29,7 @@ const panels: Record<View, HTMLElement[]> = {
   welcome: [byId('welcome')],
   menu: [byId('menu')],
   oneplayer: [byId('oneplayer')],
+  team: [byId('team')],
   multiplayer: [byId('multiplayer')],
   battle: [byId('battle')],
   browser: [byId('browser'), byId('file-list')],
@@ -95,14 +98,23 @@ const menu = initMenu({
   }
 })
 
-// NEW GAME opens the training ground for now — the original goes to SELECT
-// TEAM (screen 3), which is the next screen to build. Until then this bar does
-// what the main menu's ONE PLAYER did before the screen was inserted under it.
 const onePlayer = initOnePlayer({
   onNewGame: () => {
-    void battle.open().then((ok) => ok && show('battle'))
+    show('team')
+    void teamScreen.load()
   },
   onBack: () => show('menu')
+})
+
+// The army chosen goes nowhere yet: PLEASE NAME YOUR TEAM (record 15) is the
+// next screen, and after it `newGame` in lib/game/save.ts has everything it
+// needs. Until then picking one opens the training ground, which is what the
+// bar above it did before this screen was inserted under it.
+const teamScreen = initTeamScreen({
+  onPick: () => {
+    void battle.open().then((ok) => ok && show('battle'))
+  },
+  onBack: () => show('oneplayer')
 })
 
 const multiPlayer = initMultiPlayer({
@@ -114,7 +126,7 @@ const multiPlayer = initMultiPlayer({
 
 /** The frontend's screens, by the view that shows them. Only one of them may
  * be drawing and hearing the controller at a time. */
-const screens = { menu, oneplayer: onePlayer, multiplayer: multiPlayer }
+const screens = { menu, oneplayer: onePlayer, team: teamScreen, multiplayer: multiPlayer }
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
 
 // The frontend is drawn on a canvas, so what a screen says and which bar is
@@ -130,6 +142,7 @@ if (window.pow) {
   })
   window.pow.menu = view(menu)
   window.pow.onePlayer = view(onePlayer)
+  window.pow.teamScreen = view(teamScreen)
   window.pow.multiPlayer = view(multiPlayer)
   // Each screen carries its OWN layout, so a nudge in the console moves the
   // screen being looked at rather than all of them.

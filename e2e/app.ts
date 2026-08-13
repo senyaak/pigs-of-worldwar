@@ -33,6 +33,7 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   ['#archive-view', { click: '#archive-back' }],
   ['#browser', { click: '#browser-menu' }],
   ['#oneplayer', { key: 'menuBack' }],
+  ['#team', { key: 'menuBack' }],
   ['#multiplayer', { key: 'menuBack' }]
 ]
 
