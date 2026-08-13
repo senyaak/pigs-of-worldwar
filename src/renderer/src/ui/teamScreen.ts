@@ -18,16 +18,15 @@
 // right. The `selcog` carriage at (553, 180) really does not move; the arm
 // blits it at a literal.
 //
-// **There is no PIG on this screen**, and that is the PC build's own answer
-// rather than a gap in ours. The frontend keeps a pig-display block and two
-// functions that work it (0x426610, 0x418C50), and both dispatch on
-// `screen − 3` through a byte map: screen 3's arms hand the block a CONSTANT 1
-// where the SQUAD screens hand it a pig's class. Then `0x482510` — the call
-// that turns that into something to draw — is a stub, `xor eax,eax; ret 4`,
-// with no callers but those two. Play said it before the disassembly did.
-// `frontend/notes.md`.
+// Two things the arm does not draw, and both are gaps:
 //
-// One thing the arm does not draw and that IS a gap:
+// - **the PIG**, which the original stands on a turntable at the left of this
+//   screen. It is a MODEL, not a blit: the frontend's pig-display block
+//   (0x513034..0x513068) carries clip 27, the idle, and screen 3's draw arm
+//   overrides nothing — it falls into the tail on the shared defaults,
+//   `edi = ebp = 331`, `esi = 160`, `1000.0f` in `[0x513030]`. The uniform
+//   follows from `Team::SetNation`, which a changed row calls first. Needs the
+//   scene beside this canvas, so it lands the way `ui/battle.ts` does it.
 // - MULTI-PLAYER's own furniture. Record 16 carries on from 0x41d099 into a
 //   long block of four team slots and a sine wobble; every other kind-2 screen
 //   returns before it. Ours still rides the machine (`ui/multiPlayer.ts`) and

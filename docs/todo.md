@@ -118,16 +118,20 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        it~~ **fixed** — the canvas still held the last frame drawn before
        `leave()`, so `enter()` paints the un-arrived state before the first
        tick now.
-     - ~~the PIG on the left is missing~~ **there is no pig** — the PC build
-       stubs the lookup. Both frontend functions that work the pig-display
-       block dispatch on `screen − 3`, and screen 3 hands it a CONSTANT where
-       the SQUAD screens hand it a class; then `0x482510`, which turns that
-       into something to draw, is `xor eax,eax; ret 4`. Play said so first.
-       The four numbers 290/320/378/405 an earlier note put on this screen are
-       the squad screens' (records 12, 14, 19, 34) and belong with them.
-     - **the rest of the MACHINERY is still missing**, and that is a real gap:
-       the original carries a good deal more moving metal round the console
-       than we draw. Where it lands is not read.
+     - **the PIG on the left is still missing, and it IS there in the original.**
+       Twice mis-read, now settled: both frontend functions that work the
+       pig-display block dispatch on `screen − 3`, and screen 3 overrides
+       NOTHING — it falls into the drawing tail on the shared defaults,
+       `edi = ebp = 331` and `esi = 160`, with clip 27 (idle) in the block and
+       `1000.0f` in `[0x513030]`. The class out of the team record and the
+       numbers 290/320/378/405 belong to the SQUAD screens (12, 14, 19, 34).
+       Only screen 45 turns the tail off. The three calls in the tail —
+       `0x419000`, `0x41B010`, `0x418BE0` — are the model and are the next read.
+       **This needs a MODEL beside the canvas**: the pig, that nation's uniform
+       and the turntable. `ui/` may not import `three/`, so it lands the way
+       `ui/battle.ts` does it — the screen composes, the scene draws.
+     - **the rest of the MACHINERY is missing too** — the original carries a
+       good deal more moving metal round the console than we draw. Not read.
    - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with
      `chardel`/`charspc`/`charent`, the caret stepping by its own little table
      (0x41DC69).

@@ -316,27 +316,33 @@ let a press fly while the screen BEFORE it was still leaving, and both dropped
 it. The test only passed because the one above it happened to leave ONE PLAYER
 mid-walk. Wait for the panel to be visible before driving a screen.
 
-### "иди сравнивай" — and the pig turned out not to exist (2026-08-13)
+### "иди сравнивай" — the comparison paid, and then I over-read a stub (2026-08-13)
 
-The comparison was worth ordering, and it caught the same mistake twice over.
+Play ordered the comparison and it was worth it: both frontend functions that
+work the pig-display block — `0x426610` which fills it and `0x418C50` which
+draws it — dispatch on `screen − 3` through a byte map into a pointer table,
+and the first read had taken **the arm next to the right one** in each. Screen
+3's arms are `0x42667D` and `0x418D38`. The class read out of
+`[team + 0x71 + 64*slot]`, and the numbers **290, 320, 378, 405**, are the
+SQUAD screens' — records 12, 14, 19, 34 — and were never SELECT TEAM's. Screen
+3 overrides nothing and falls into the drawing tail on the shared defaults,
+`edi = ebp = 331` and `esi = 160`. Both byte maps are in `frontend/notes.md`.
 
-Both frontend functions that work the pig-display block — `0x426610` which
-sets it up and `0x418C50` which draws it — dispatch on `screen − 3` through a
-byte map into a pointer table. The first read had taken **the arm next to the
-right one** in each: screen 3's arms are `0x42667D` and `0x418D38`, which hand
-the block a CONSTANT 1 and the shared defaults. The class read out of
-`[team + 0x71 + 64*slot]`, and the numbers **290, 320, 378, 405**, belong to
-the SQUAD screens — records 12, 14, 19 and 34 — and were never SELECT TEAM's.
-Both byte maps are written out in `frontend/notes.md` now, because an arm
-reached by a table is easy to attribute to whoever you happened to be reading.
+**And then a worse mistake, which is the one worth keeping.** `0x482510` is
+`xor eax, eax; ret 4`, and that got written up as "the model lookup answers
+nothing, so the PC build draws no pig" — into this file, into `todo.md` and
+into the disasm notes. It is wrong twice over. **Its return value is discarded
+at both call sites** (`call` then `jmp`, 0x418D36 and 0x418D45), so it is a
+stubbed side-effect that says nothing about what is drawn. And it was written
+against a screenshot of the shipped game, supplied in the same conversation,
+showing the pig plainly. A remark from play — "свиньи кстати нет там" — was
+read as evidence for it, when it was a bug report about OUR screen after the
+fix that was meant to bring the pig in.
 
-And then the thing that settles it, which play had already said plainly —
-**`0x482510` is a stub.** `xor eax, eax; ret 4`, and its only two callers are
-those arms. The PC build looks a pig up and gets nothing, on every screen that
-asks. So there is no pig on SELECT TEAM to build, and the previous entry here
-promising "the first frontend screen that needs the scene" was promising work
-that does not exist. Whatever stands on a turntable in a PSX capture does not
-stand there in this build.
+The rule this earns: **a stub whose result nobody reads is not evidence of
+absence**, and no reading of the binary outranks a picture of the game running.
+`[play]` is above `[exe]` in this project for exactly this reason.
 
-What IS still missing from the screen is the rest of the machinery round the
-console, and that is a real gap with a real read behind it.
+So the pig is real work and it is still to do: the model, that nation's
+uniform, clip 27 idling, and a turntable — the first frontend screen here that
+needs the scene beside its canvas.
