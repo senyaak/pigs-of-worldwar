@@ -280,3 +280,38 @@ green turntable at the left, and carries a great deal more moving metal than
 we draw. That is the piece this file already flagged as unread — `standpc` is
 the turntable, the pig is a MODEL rather than frontend art — and it is what
 makes the screen read as the original instead of as a list. Next read.
+
+### The list moved left, and the pig turned out to be a MODEL (2026-08-13)
+
+Two more passes after play looked at it.
+
+**The text.** The exe's own item table really does say x 404 — records 5..12
+at 0x4C1728, raw 687 through the same `x·640/1024 − 25` the main menu's boxes
+go through, and every other box on this screen comes out of those tables and
+lands right. But `counsele` is **179 × 306**, so the console spans 335..564
+with the global 50 in it, and a 163-wide box at 404 runs to 567: the longest
+name goes past the console's own right edge, which is what play saw. It is
+368 now, centred on the console, `[play]` against the exe — and the exe's
+number is written down beside it because the disagreement is real and
+unexplained. The text boxes joined the screen's clonable layout at the same
+time, so the next correction is a console nudge rather than an edit.
+
+**The pig.** The left half of the original — a pig on a green turntable — is
+missing from our screen because it is missing from the draw arm: it is not
+frontend art. A changed row calls `Team::SetNation` with the row and then
+`0x426610(-1)`, which reads the pig's CLASS out of the team record at
+`[team + 0x71 + 64*slot]` and parks it in the frontend's own model-display
+state at 0x513034..0x513050. So the screen shows one pig of the chosen army,
+by class, wearing that nation's uniform because SetNation has just written it.
+
+**That is the piece left, and it is not a blit.** It wants the pig's model,
+the nation's uniform and a turntable beside a 2D canvas — the first frontend
+screen in this remake that needs the scene. Everything the engine needs is
+already there (the battle loads both), but `ui/` may not import `three/`, so
+it lands the way `ui/battle.ts` does it: the screen composes, the scene draws.
+
+**And one spec lesson.** A screen that has never been entered reports itself
+SETTLED — its drive is at rest and its plates are not walking — so `lightBar`
+let a press fly while the screen BEFORE it was still leaving, and both dropped
+it. The test only passed because the one above it happened to leave ONE PLAYER
+mid-walk. Wait for the panel to be visible before driving a screen.
