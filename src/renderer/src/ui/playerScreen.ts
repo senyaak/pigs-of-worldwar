@@ -47,7 +47,7 @@ import type { SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
-import { SQUAD_SIZE } from '../../../lib/game/roster'
+import { FIELDED, SQUAD_SIZE } from '../../../lib/game/roster'
 import type { Pig } from '../../../lib/game/roster'
 import { careerOf, rankText, stepOf } from '../../../lib/game/ranks'
 
@@ -266,9 +266,18 @@ export function initPlayerScreen(handlers: {
         face.height
       )
 
+      // The TRAPEZOID under the name plate, which is what the class badge
+      // stands in — and which of the two it is says which HALF of the squad the
+      // pig is in: `bgdark` for the five that take the field, `bglight` for the
+      // three that do not (`[play]`, against the shipped screen; the five is
+      // the manual's own `FIELDED`).
+      const leg = sprites.get(slot < FIELDED ? 'bgdark' : 'bglight')
+      const badge = sprites.get(BADGE[careerOf(pig.rank)] ?? 'pcHweap')
+      const legX = layout.badge.x[at.column] - Math.round((leg.width - badge.width) / 2)
+      context.drawImage(leg.image, legX, y + layout.badge.drop)
+
       // The CAREER's badge, and the stripes of its step — 0 wears none. Both
       // sit inboard of the portrait, on the column's own hand.
-      const badge = sprites.get(BADGE[careerOf(pig.rank)] ?? 'pcHweap')
       context.drawImage(badge.image, layout.badge.x[at.column], y + layout.badge.drop)
       const step_ = stepOf(pig.rank)
       if (step_ > 0) {
