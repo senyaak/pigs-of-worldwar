@@ -9,6 +9,68 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 
 ---
 
+## 0. THE CAMPAIGN'S SPINE — a save, then NEW GAME and LOAD GAME
+
+Play's order, 2026-08-13, and it is the next thing to build. The frontend is
+the expensive half of this project because every screen has to be
+disassembled first; the SAVE is not — it is ours, and only what a player sees
+has to match the original.
+
+**What the save holds** (play's list): which missions are done, the chosen
+army, the team's name, every pig's name and rank, and the PP tokens. There is
+no SAVE TEAM screen in our version — it **autosaves**. It lives in Electron's
+`userData`, never in the game folder.
+
+**What the original keeps, for the shape to grow toward.** A team is a
+**680-byte record**: six of them sit at 0x51F128 with a stride of 0x2A8, and
+`savearmy0` in the install is exactly one of those dumped — 680 bytes, whose
+pig names decode with the frontend's own `+0x1F` shift (JONES, DEN, BASIL…),
+laid out as a 160-byte header and eight 64-byte pig records. We do not have to
+read or write that file, but our own shape should be able to hold everything
+it holds.
+
+**The mission list is read.** 59 map names live behind a pointer table at
+0x4D1990, in this order: ROAD, TRENCH, RUMBLE, DEVI, TWIN, ZULUS, SNIPER,
+GUNS, OASIS, MASHED, CAMP, LIBERATE, MEDIX, FJORDS, EYRIE, BRIDGE, BAY,
+DESVAL, SNAKE, EMPLACE, KEEP, SUPLINE, TESTER, FOOT, FINAL, ESTU, DEMO, BOOM,
+BHILL, LECPROD, DVAL, ICE, BUTE, MAZE, SEPIA1, DBOWL, MLAKE, CMASS, ARTGUN,
+DVAL2, HELL3, HELL2, LUNAR1, CREEPY2, PLAY1, PLAY2, ICEFLOW, RIDGE, ARCHI,
+DEMO2, ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps. The first 53
+have a 60-byte record each at 0x4D5210 and the campaign indexes both tables
+by the same id (`lib/game/sky.ts` already carries field 0 of every record).
+**Every mission opens CAMP for now** — the list is real, the levels are not.
+
+### The order to do it in
+
+1. **One READ first, and it is play's own question**: when a pig dies, does a
+   new one take its place between missions? The place to look is whatever
+   writes the 680-byte team record at the end of a mission — the same record
+   `savearmy0` is a dump of — and `manual.pdf` in the install is a second
+   source. It decides whether the save's pig list is fixed-length with
+   headstones or a live roster.
+2. **`lib/game/missions.ts`** — the 53 records transcribed: id, map name, and
+   whatever of the 60 bytes turns out to be the briefing and the PP award.
+   Which records are the CAMPAIGN and which are arenas is one more look at
+   the table (FINAL is 24; the GEN\* run past its end).
+3. **The save itself** — a plain module in `lib/game/`, pure, no Electron, with
+   the main process owning the file. Autosave after a mission ends.
+4. **NEW GAME** — the chain is already mapped: record 14 ONE PLAYER wears
+   **kind 1**, the machine we have built, so it is a list of bars; then SELECT
+   TEAM (record 3, kind 2) and PLEASE NAME YOUR TEAM (record 15, kind 0).
+5. **LOAD GAME** — record 10, kind 8/9, the save-slot list whose items are
+   named at RUNTIME (which is why their fetext ids overrun into the next
+   screen's words). Its layout is not read at all yet.
+
+### What gates what
+
+- The save and the mission list need **no more disassembly**.
+- NEW GAME's first screen needs none either — kind 1 is built.
+- SELECT TEAM and the name entry need **one more pass each** on their draw
+  arms (0x41CBE1 and 0x41DC69): their art is named and their text boxes are
+  read, but the piece positions came from a linear walk that mixes the
+  branches, and the gates are widget frames (`frontend/notes.md`).
+- LOAD GAME needs its layout read from scratch.
+
 ## A. THE TUTORIAL — finish the training ground
 
 The script MOVES now: a crate collected speaks, a crate PLACED speaks, and the
