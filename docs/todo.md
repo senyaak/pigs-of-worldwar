@@ -170,8 +170,17 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        frames are `alpha02..08` and which the entrance walks 0 → 6, so the panel
        UNROLLS and comes to rest on **`alpha08`, 304×352 at (168, 32)** — dead
        centre of the screen. Where the letters sit ON it is still the remake's
-       own (`INNER`): the exe lays them out through the text object off record
-       15's first item box, (280, 250) 270×30 raw, and that arm is unread.
+       own (`INNER`), and the arm that would settle it is READ now without
+       settling it: 0x43148C centres each glyph in a cell whose size is the box
+       of one particular GLYPH — `` ` ``, 7×16 in CHARS2 — and steps
+       `cell + 3·spacing` = 16 a column and twice a line's advance a row, with
+       the keys' column at `(columns+1)·step − 4·spacing`. **It disagrees with
+       play twice**: the shape formula gives 8 columns off record 15's own
+       270-wide box where play counted seven, and 7 columns at 16 pixels is 112
+       pixels of letters on a panel 304 wide. So either the box the text object
+       is handed is not the item box as stored, or its pen offsets are not
+       pixels — one of those is the next thing to read, and until then play's
+       seven and the remake's own spread stand.
      - ~~every y is eyework~~ **the MOTION is read end to end** and built:
        the screen springs in on TWO axes at once (x −800 → 0, y −250 → 70,
        gain 15 damping 30 cap 30), KICKS itself the frame it lands (y = 1,
