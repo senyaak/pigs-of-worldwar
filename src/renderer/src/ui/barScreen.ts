@@ -38,7 +38,7 @@
 // `pow.screen.layout` nudges the lot live and `pow.screen.print()` writes it
 // back out, the same way `pow.hud` does.
 
-import { loadFont } from './font'
+import { FRONTEND_METRICS, loadFont } from './font'
 import type { Font } from './font'
 import { loadSprites } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
@@ -331,9 +331,9 @@ function loadShared(): NonNullable<typeof shared> {
       // text object out of the three and writes every screen with it, title
       // included (0x426AA6). The light one is the chosen bar, the plain one
       // the rest and the title, the dark one a bar with nothing behind it.
-      loadFont('chars2L'),
-      loadFont('CHARS2'),
-      loadFont('chars2D')
+      loadFont('chars2L', { metrics: FRONTEND_METRICS }),
+      loadFont('CHARS2', { metrics: FRONTEND_METRICS }),
+      loadFont('chars2D', { metrics: FRONTEND_METRICS })
     ])
     if (!text.ok) throw new Error(text.error)
     strings = text.strings

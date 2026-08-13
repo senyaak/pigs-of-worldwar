@@ -357,7 +357,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     heart = await tinted(white.heart, LAYOUT.plate.heart.colour)
     // The heal's letters take the same colour its heart does, so nudging one in
     // the console moves both.
-    healFont = await loadFont(PLATE_FONT, LAYOUT.plate.heart.colour)
+    healFont = await loadFont(PLATE_FONT, { colour: LAYOUT.plate.heart.colour })
   }
 
   const resize = (): boolean => {

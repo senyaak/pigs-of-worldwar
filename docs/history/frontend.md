@@ -152,6 +152,14 @@ repo transcribes the fix-ups rather than the pattern, which is why its output
 can be trusted where it looks odd: the save-slot screens really do stride past
 their own words, because their items are named at runtime.
 
+One more number came out of the same read and it moves every centred label:
+**the letters are spaced 3 apart and a SPACE is 8.** Neither is in the `.tab`
+— the exe's text constructor puts them on the object, and it builds every text
+object in the game the same way. Applied to the frontend's three shades only
+(`FRONTEND_METRICS` in `ui/font.ts`); the battle's text is left as play
+approved it, and is 3 per glyph narrower than the original until someone rules
+on it.
+
 Two things this hands the next piece of work. **MULTI-PLAYER is record 16 of
 KIND 2** — the same layout as SELECT TEAM, and that family is the one that
 loads `selcog` and `name0..5`, so the carriage this repo threw off the main
