@@ -134,7 +134,25 @@ export function buildFrontendPig(
       const geometry = buildModelGeometry(outfit.hat.model, outfit.hat.textures)
       unresolve(outfit.hat.model, geometry, pig.bones)
       const mesh = new THREE.Mesh(geometry, buildTextureMaterials(outfit.hat.model, outfit.hat.textures))
-      mesh.rotation.y = Math.PI
+      // NO half turn. A WEAPON needs one — it is authored facing the other way
+      // — but a hat is authored in the PIG's own space: every one of its
+      // vertices is assigned to bone 2 and its y is already at head height
+      // (−374..−276 against the head bone's −198). Turning it swung it off the
+      // skull sideways.
+      //
+      // **The centring is `[CHECK — remake]`.** Measured on `br_hat` against
+      // `pcgru_me`: with the bind offset taken off, the hat's box came out at
+      // x −98.5..30.5 where the head bone stands at x 3 — and x is the pig's
+      // FRONT-BACK axis (the model faces +X), so it sat behind the skull, which
+      // is what play saw as "on the belly". The hats are authored for a head
+      // this model does not put in the same place, so the box is centred on the
+      // bone in x and z and left alone in y, which is the axis that already
+      // agreed.
+      const box = new THREE.Box3().setFromBufferAttribute(
+        geometry.getAttribute('position') as THREE.BufferAttribute
+      )
+      const middle = box.getCenter(new THREE.Vector3())
+      geometry.translate(-middle.x, 0, -middle.z)
       ;(pig.bones[HEAD] ?? pig.bones[0]).add(mesh)
     }
     host3d.scene.add(pig.group)
