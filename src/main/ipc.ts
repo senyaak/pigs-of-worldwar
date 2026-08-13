@@ -8,6 +8,7 @@ import { promises as fs } from 'node:fs'
 
 import { parseArchive } from '../lib/formats/mad'
 import { getGameDir, insideGameDir, setGameDir, walkDir } from './gameDir'
+import { deleteSave, listSaves, readSave, savesDir, writeSave } from './saves'
 import {
   loadArchiveBmps,
   loadClips,
@@ -170,6 +171,45 @@ export function registerIpc(): void {
       return { ok: true, clips: await loadClips(path.dirname(insideGameDir(relPath))) }
     } catch (error) {
       return fail(relPath, error)
+    }
+  })
+
+  // The saves. Text in, text out — the SHAPE is lib/game/save.ts and the main
+  // process deliberately knows nothing about it, so a change to the save's
+  // fields never reaches this file.
+  ipcMain.handle('save:dir', () => savesDir())
+
+  ipcMain.handle('save:list', async () => {
+    try {
+      return { ok: true, saves: await listSaves() }
+    } catch (error) {
+      return fail('saves', error)
+    }
+  })
+
+  ipcMain.handle('save:read', async (_event, name: string) => {
+    try {
+      return { ok: true, text: await readSave(name) }
+    } catch (error) {
+      return fail(name, error)
+    }
+  })
+
+  ipcMain.handle('save:write', async (_event, name: string, text: string) => {
+    try {
+      await writeSave(name, text)
+      return { ok: true }
+    } catch (error) {
+      return fail(name, error)
+    }
+  })
+
+  ipcMain.handle('save:delete', async (_event, name: string) => {
+    try {
+      await deleteSave(name)
+      return { ok: true }
+    } catch (error) {
+      return fail(name, error)
     }
   })
 }

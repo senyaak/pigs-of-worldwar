@@ -30,5 +30,13 @@ contextBridge.exposeInMainWorld('api', {
   loadArchiveBmps: (relPath: string): Promise<unknown> =>
     ipcRenderer.invoke('bmps:load', relPath),
   loadGameText: (which: string): Promise<unknown> => ipcRenderer.invoke('text:load', which),
+  // The saves travel as TEXT: the shape lives in lib/game/save.ts and neither
+  // this bridge nor the main process parses it.
+  savesDir: (): Promise<string> => ipcRenderer.invoke('save:dir'),
+  listSaves: (): Promise<unknown> => ipcRenderer.invoke('save:list'),
+  readSave: (name: string): Promise<unknown> => ipcRenderer.invoke('save:read', name),
+  writeSave: (name: string, text: string): Promise<unknown> =>
+    ipcRenderer.invoke('save:write', name, text),
+  deleteSave: (name: string): Promise<unknown> => ipcRenderer.invoke('save:delete', name),
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit')
 })

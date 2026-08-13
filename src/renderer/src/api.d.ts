@@ -154,6 +154,21 @@ export type LoadSoundBankResult =
 
 export type LoadSoundResult = { ok: true; data: Uint8Array } | { ok: false; error: string }
 
+/** A save as it crosses the bridge: a name and its TEXT. Neither the main
+ *  process nor the preload parses one — `lib/game/save.ts` does. */
+export interface SaveFile {
+  name: string
+  text: string
+}
+
+export type ListSavesResult =
+  | { ok: true; saves: SaveFile[] }
+  | { ok: false; error: string }
+
+export type ReadSaveResult = { ok: true; text: string | null } | { ok: false; error: string }
+
+export type WriteSaveResult = { ok: true } | { ok: false; error: string }
+
 export interface Api {
   getGameDir(): Promise<string | null>
   selectGameDir(): Promise<string | null>
@@ -174,6 +189,12 @@ export interface Api {
   loadArchiveBmps(relPath: string): Promise<LoadTimsResult>
   loadGameText(which: string): Promise<LoadTextResult>
   loadTims(relPath: string): Promise<LoadTimsResult>
+  /** Where the saves are kept — shown by the menu, and what a test asserts on. */
+  savesDir(): Promise<string>
+  listSaves(): Promise<ListSavesResult>
+  readSave(name: string): Promise<ReadSaveResult>
+  writeSave(name: string, text: string): Promise<WriteSaveResult>
+  deleteSave(name: string): Promise<WriteSaveResult>
   quit(): Promise<void>
 }
 

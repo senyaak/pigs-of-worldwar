@@ -153,6 +153,11 @@ same commit as the dialog.
 - `POW_ENV_FILE=<path>` redirects where the app reads/writes its `.env`.
   Every spec points it at a file of its own under `_tmp/`, so tests never read
   or clobber the developer's real `.env`.
+- `POW_SAVE_DIR=<path>` redirects where the app keeps its campaign saves.
+  `e2e/launch.ts` points every launch at `_tmp/saves` (`SAVE_DIR`), because
+  the app's own default is `saves/` at the root of the checkout — a developer's
+  real campaign, which a run would autosave over at the end of every mission
+  it plays.
 - The real game installation is resolved by `e2e/launch.ts` as
   `POW_GAME_DIR`, falling back to the repo's parent folder (this repo lives
   inside the game directory). Specs treat it as **read-only**.

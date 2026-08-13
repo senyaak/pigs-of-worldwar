@@ -639,6 +639,78 @@ done yet.
    count), and the ending is the exe's own mode 2 with its tour, its three-second
    hold and its twenty-second bail.
 
+## THE CAMPAIGN'S SPINE — the roster, the order, and a save (2026-08-13)
+
+Three steps, in play's own order: one read, one read, and then a build that
+needed no disassembly at all. The addresses and the derivations are in
+`army/notes.md` in the disasm repo; what follows is what it cost and what the
+code took from it.
+
+**1. Does a new pig take a dead one's place?** Yes, and the roster is a live
+list of eight rather than a fixed list with headstones — which was the whole
+point of asking, because it decides the save's shape. Three things had to be
+found and the first was the file itself: `savearmy0` in the install is a
+680-byte record memcpy'd straight out of the live team (`sprintf("%s%d",
+"savearmy", slot)` then `0x450490(name, [0x51C560], 0x2A8)`), so it can be read
+field for field, and it was — a 112-byte header, eight 64-byte pig slots from
+`+0x70`, the team's name at `+0x270`. Then the two arms that touch the roster
+between missions: `0x450970` puts the last couple of the fallen back on their
+feet with everything they had, and `0x482810` drafts a Grunt into every slot
+still empty, names it `DRAFT<n>` off `fetext` 0x113 and a per-team counter, and
+swaps it to the BACK so the survivors close up in front in the order they
+already had. `lib/game/roster.ts` is both arms and nothing else.
+
+**The text shift came free and it is now PROVED rather than matched.** The
+draft-name builder adds `0xE1` to every byte of an ASCII number before it
+stores it, and `0xE1` is `-0x1F` — the same shift `text/notes.md` had found by
+inspection in `fetext.bin`. So the two encodings are one encoding.
+
+**`manual.pdf` is no use as a second source.** It was opened as one and it is a
+scan: images, no text layer, nothing to read. Worth knowing before anybody
+reaches for it again.
+
+**The one thing not read is the field the whole roster hangs off.** Both arms
+above keep a fallen pig on the test `pig+0x2C != -1 && pig+0x2C >= holes - 2`,
+and NOTHING FOUND WRITES `pig+0x2C` — `Pig::Init`'s `-1` is the only store to
+it a scan of `.text` turns up. Read as the order a pig fell in, the two
+readers agree and the arithmetic is exactly "the last two come back", which is
+what `RETURNING = 2` is. It is an inference off two readers and it is flagged
+in the code as play's to correct. "I could not find it" is never "it is not
+there" — the writer is somewhere.
+
+**2. Where the campaign's order lives.** `0x41A2B0` answers "which map next"
+with `campaignOrder[team + 0x53]` out of a dword table at **0x4D17F0**, and
+that is the id that reaches 0x41A552. The progression is therefore ONE BYTE in
+the save, stepped by `[team+0x53]++` at 0x450A19, and the campaign is over when
+it reaches 26. The table is 26 entries, every map id 0..24 exactly once plus
+ESTU (25) at position 1 — so the old guess that "names 0..24 end at FINAL, the
+right shape for a campaign of 25" was one mission short, and the missing one is
+the first real mission of all.
+
+**And the display names fell out of it.** `gtext 11 + mapId` over the
+campaign's own maps is a bijection, and the proof cost nothing:
+`ui/titleCard.ts` had already hard-coded BOOT CAMP at `gtext 11 + 10` from the
+training ground alone, and CAMP's map id **is** 10. Every campaign map has its
+card now, on the exe's other format (`gtext 158`, "MISSION >2N : >S") for
+everything that is not the training ground. It is still the one line on the
+page taken from the data rather than from code — what the exe's own level
+screen draws is the raw map name (0x429280).
+
+**3. The save.** Ours, and JSON on purpose: the shape only has to hold what the
+original's record holds, not to be it. `lib/game/save.ts` is the shape and the
+rules (`newGame`, `finishMission` — regroup the roster, then step the position,
+which is the order 0x450970 does them in — `serialise`/`parse`, where parse
+validates everything downstream relies on so a hand-edited file is "no save"
+rather than a crash). `src/main/saves.ts` owns the folder and does four things
+to it, in TEXT: the main process never parses a save, so a change to the
+save's fields cannot reach it. It writes through a temporary file and renames,
+because an autosave lands at the end of a mission — exactly when a player is
+most likely to close the window on it.
+
+**What is left of it is one call site.** Nothing can start a campaign until NEW
+GAME lands, so there is nothing for the end of a mission to autosave yet. That
+is item 4, and `finishMission` is the call it makes.
+
 ## What is still not read
 
 **Swept 2026-08-11 — docs/todo.md section D is the live list now**, and most of

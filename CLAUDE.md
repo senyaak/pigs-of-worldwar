@@ -211,7 +211,10 @@ every breach the repo has had compiled cleanly.
   nobody: `overlay.ts` what the scene projects for the dashboard, `sound.ts`
   the two polls the scene owes sound.
 - `src/main/` — `index.ts` lifecycle only, `gameDir.ts` locating the install,
-  `assets.ts` loading through the readers, `ipc.ts` the IPC surface.
+  `assets.ts` loading through the readers, `saves.ts` the campaign saves,
+  `ipc.ts` the IPC surface. **A save crosses as TEXT**: the shape is
+  `lib/game/save.ts` and neither the main process nor the preload parses one,
+  so a new field never reaches either.
 
 **The engine steps in FIXED quanta, and rolls from ONE stream.**
 `engine.update(delta)` accumulates real time and runs whole `STEP_SECONDS`
@@ -340,6 +343,12 @@ and the weakest of them were invented here:
 
 - `[play]` **`HEIGHT_SCALE` is 1** though the exe doubles. Answered in play
   twice; the doubling is above.
+- `[CHECK — remake]` **Two of the fallen get up again after a mission**
+  (`RETURNING` in `lib/game/roster.ts`). The rest of the roster rule is read —
+  the squad is a live list of EIGHT, refilled with `DRAFT<n>` Grunts at the
+  back — but the field both readers test, `pig+0x2C`, has no writer anybody has
+  found. Two is what the arithmetic gives if it is the order a pig fell in.
+  Correct it in play.
 - `[play]` **The pig slides, and that stays.** The walking clips carry a body
   about 855 units a second at 25 fps; the exe walks 1560, so the feet skate
   about 2×. Driving playback off the walking speed to close that (a `gait.ts`

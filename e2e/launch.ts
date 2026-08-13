@@ -29,6 +29,14 @@ export const TMP = path.join(REPO_ROOT, '_tmp')
  */
 export const PHASE_ENV = path.join(TMP, 'phase', '.env')
 
+/**
+ * Where a launched app keeps its saves. The app's own default is `saves/` at
+ * the root of the checkout, which is a real player's real campaign — a run
+ * autosaves at the end of every mission it plays, so the suite points
+ * `POW_SAVE_DIR` here instead (src/main/saves.ts).
+ */
+export const SAVE_DIR = path.join(TMP, 'saves')
+
 export interface Launched {
   app: ElectronApplication
   page: Page
@@ -41,6 +49,8 @@ export interface Launched {
 export interface LaunchOptions {
   /** Value for POW_ENV_FILE — where the app reads/writes its .env. */
   envFile: string
+  /** Value for POW_SAVE_DIR; `SAVE_DIR` unless a spec wants one of its own. */
+  saveDir?: string
   /** Extra CLI arguments, e.g. --game-dir=… */
   args?: string[]
   /**
@@ -71,6 +81,8 @@ export async function launchApp(options: LaunchOptions): Promise<Launched> {
     env: {
       ...process.env,
       POW_ENV_FILE: options.envFile,
+      // Never the developer's own campaign — see SAVE_DIR above.
+      POW_SAVE_DIR: options.saveDir ?? SAVE_DIR,
       // Show the window without pulling the foreground off the developer —
       // a run launches the app several times (src/main/index.ts).
       POW_NO_FOCUS: '1',

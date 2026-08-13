@@ -9,15 +9,14 @@
 // the briefing bar's queue, which is a different thing entirely
 // (`tutorial/notes.md`).
 
+import { missionNameIndex } from '../../../lib/game/missions'
 import { isTrainingGround } from '../../../lib/game/tutorial'
 import type { Font } from './font'
 
-/** Where the campaign's 25 mission names start in `gtext`. */
-const MISSION_NAMES = 11
 /** `gtext 159`, "TRAINING MISSION: >S". */
 const TRAINING_TITLE = 159
-/** The 11th campaign name, BOOT CAMP — the training ground's own. */
-const BOOT_CAMP = MISSION_NAMES + 10
+/** `gtext 158`, "MISSION >2N : >S" — everything that is not the training ground. */
+const MISSION_TITLE = 158
 
 /** The card's baseline in the 640×480 units the screen is laid out in. */
 export const CARD_Y = 160
@@ -25,17 +24,23 @@ export const CARD_Y = 160
 /**
  * What the card says on `map`, or null for a map with nothing to say.
  *
- * Only the training ground is answered. Which display name goes with which
- * MAP FILE is not stored anywhere in the game — the exe pairs them through a
- * level index nothing here has (`text/notes.md`) — so
- * every other map gets no card rather than a guessed one.
+ * Which display name goes with which MAP FILE is `lib/game/missions.ts` —
+ * `gtext 11 + mapId` over the campaign's own 26 maps, which is where the
+ * training ground's own BOOT CAMP had already been hard-coded from. A
+ * skirmish arena is not in the campaign and gets no card rather than a guessed
+ * one.
+ *
+ * `>2N` is the mission NUMBER, two digits — the position in the campaign, and
+ * the training ground is not one, which is the other half of why the exe has
+ * two formats.
  */
-export function missionTitle(strings: string[], map: string): string | null {
-  if (!isTrainingGround(map)) return null
-  const format = strings[TRAINING_TITLE]
-  const name = strings[BOOT_CAMP]
+export function missionTitle(strings: string[], map: string, position = 0): string | null {
+  const at = missionNameIndex(map)
+  if (at < 0) return null
+  const name = strings[at]
+  const format = strings[isTrainingGround(map) ? TRAINING_TITLE : MISSION_TITLE]
   if (!format || !name) return null
-  return format.replace('>S', name)
+  return format.replace('>S', name).replace('>2N', String(position).padStart(2, '0'))
 }
 
 /** Draw it centred across a view `viewWidth` units wide. */

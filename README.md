@@ -19,6 +19,14 @@ A folder is considered valid if it contains `warhogs_.exe`.
 `POW_ENV_FILE=<path>` redirects where the `.env` is read/written (used by
 tests — see [docs/testing.md](docs/testing.md)).
 
+## Saves
+
+A campaign in progress is written to `saves/` at the project root — beside the
+executable in a packaged build — one JSON file per game, and it **autosaves**:
+there is no SAVE screen, the file is written when a mission ends. The folder is
+gitignored, so a save belongs to the checkout it was played in.
+`POW_SAVE_DIR=<path>` moves it.
+
 ## Playing
 
 Double-click `play.bat` — it installs dependencies if needed, builds, and

@@ -51,38 +51,48 @@ LECPROD, DVAL, ICE, BUTE, MAZE, SEPIA1, DBOWL, MLAKE, CMASS, ARTGUN, DVAL2,
 HELL3, HELL2, LUNAR1, CREEPY2, PLAY1, PLAY2, ICEFLOW, RIDGE, ARCHI, DEMO2,
 ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
 
-**That is every map, not the campaign** — play puts the campaign at 24 or 25
-missions, and the list above is 59. Two things are now known about it and the
-third is the task:
+**That is every map, not the campaign — and the campaign is 26.** Read
+2026-08-13 (`army/notes.md`), now `lib/game/missions.ts`:
 
 - the 60-byte records at 0x4D5210 are the **weather block** and nothing else:
   sky index, fog and its colours, copied whole into 0x520708 when a map is
   entered (0x41A552). No briefing, no PP award, no campaign order in them.
 - **map id 10 is CAMP and the loader special-cases it on the spot**
   (`cmp eax,0Ah` right after the copy) — the training ground.
-- names 0..24 do end at **FINAL**, which is the right shape for a campaign of
-  25, but that is a coincidence worth checking rather than a reading. **Where
-  the campaign's own order lives is unread**: the id handed to 0x41A552 comes
-  from the progression, and finding its table is step 2 below.
+- **the order is 26 dwords at 0x4D17F0**, indexed by ONE BYTE in the save
+  (`team+0x53`) which the end-of-mission arm steps and the campaign ends at 26.
+  Every id 0..24 appears once — so "names 0..24 end at FINAL, the right shape
+  for a campaign of 25" was one short: ESTU (25) is position 1.
+- **a mission's display name is `gtext 11 + mapId`**, the one thing here taken
+  from the data rather than from code, and the training ground proves it —
+  `ui/titleCard.ts` had BOOT CAMP hard-coded at 11 + 10 already, and CAMP's id
+  is 10. The card names every campaign map now.
 
 **Every mission opens CAMP for now** — the list is real, the levels are not.
 
 ### The order to do it in
 
-1. **One READ first, and it is play's own question**: when a pig dies, does a
-   new one take its place between missions? The place to look is whatever
-   writes the 680-byte team record at the end of a mission — the same record
-   `savearmy0` is a dump of — and `manual.pdf` in the install is a second
-   source. It decides whether the save's pig list is fixed-length with
-   headstones or a live roster.
-2. **Find the CAMPAIGN's own list**, then `lib/game/missions.ts`. The map
-   table is not it: what is wanted is the order the campaign walks and what
-   each mission is worth. Start at the id handed to 0x41A552 — whoever
-   computes it is the progression — and at the single-player level screen
-   beside record 28's MULTI-PLAYER SELECT LEVEL. The 59 map names and their
-   ids are already read and go straight into the module.
-3. **The save itself** — a plain module in `lib/game/`, pure, no Electron, with
-   the main process owning the file. Autosave after a mission ends.
+1. ~~**One READ first**: when a pig dies, does a new one take its place?~~
+   **DONE 2026-08-13 — YES, and the roster is a LIVE LIST OF EIGHT.** A killed
+   pig's slot empties; the last two to fall get up again with their name and
+   stats (0x450970); every slot still empty is drafted into by 0x482810, which
+   names the newcomer `DRAFT<n>` (`fetext` 0x113 and a per-team counter) and
+   puts it at the BACK, survivors closing up in front. So no headstones — a
+   name that leaves never comes back. `lib/game/roster.ts`. Two caveats worth
+   keeping: `manual.pdf` is **no use as a second source**, it is a scan with no
+   text layer at all; and the field the "get up again" test reads (`pig+0x2C`)
+   has no writer anybody has found, so `RETURNING = 2` is an inference off two
+   readers and is **play's to correct**.
+2. ~~**Find the CAMPAIGN's own list**~~ **DONE 2026-08-13** — above, and
+   `lib/game/missions.ts`. What each mission is WORTH is still not read; the
+   save carries `tokens` for it.
+3. ~~**The save itself**~~ **DONE 2026-08-13** — `lib/game/save.ts` (pure: the
+   shape, `newGame`, `finishMission`, `serialise`/`parse`), `src/main/saves.ts`
+   (the folder and four operations, text in and text out — the main process
+   never parses a save), the IPC and the bridge, `unit/save.spec.ts`.
+   **The autosave has nowhere to be called from yet**: nothing can start a
+   campaign until NEW GAME lands, so `finishMission` is the call `ui/battle.ts`
+   makes at the end of a mission once there is a campaign in play — item 4.
 4. **NEW GAME** — the chain is already mapped: record 14 ONE PLAYER wears
    **kind 1**, the machine we have built, so it is a list of bars; then SELECT
    TEAM (record 3, kind 2) and PLEASE NAME YOUR TEAM (record 15, kind 0).
@@ -92,9 +102,9 @@ third is the task:
 
 ### What gates what
 
-- The SAVE needs **no more disassembly**. The mission LIST needs one read —
-  the campaign's order — and the map names it will hold are already read.
-- NEW GAME's first screen needs none either — kind 1 is built.
+- The SAVE and the mission LIST are **done and need nothing further** — what is
+  left of item 3 is one call site, and it waits on NEW GAME.
+- NEW GAME's first screen needs no disassembly either — kind 1 is built.
 - SELECT TEAM and the name entry need **one more pass each** on their draw
   arms (0x41CBE1 and 0x41DC69): their art is named and their text boxes are
   read, but the piece positions came from a linear walk that mixes the
