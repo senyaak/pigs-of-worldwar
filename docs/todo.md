@@ -100,10 +100,23 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
    is DONE 2026-08-13** — `ui/onePlayer.ts`, a list of two bars on the machine
    we already had, NEW GAME live and LOAD GAME dark; it does not replay the
    entrance, which is its family's own behaviour. What is left:
-   - **SELECT TEAM** (record 3, kind 2) — six armies at `fetext` 25..30. The
-     draw arm and the cursor are read (`frontend/notes.md`); what is new is the
-     kind-2 LAYOUT itself, and the live squad the screen shows for the
-     highlighted army, which `lib/game/roster.ts` can now supply.
+   - **SELECT TEAM** (record 3, kind 2) — six armies at `fetext` 25..30, title
+     24. **Read blit by blit 2026-08-13 and nothing is left to read** — the
+     numbers are in `frontend/notes.md`, and the re-read corrected three the
+     old summary had. The screen is: the `counsele` console stretched the
+     machine's way at (335, 160) with a 25-blit skirt from (335, 450); a
+     STATIC `selcog` carriage at (553, 180); `namarm1`/`namarm2` at 55 and 460
+     with the `name` band between 98 and 348 at `y + 24`, dropping 8 on one
+     frame of six; ONE track, the mirrored one; **one** `selec00..05` army
+     plate at (298, 170) and **one** `lit1..3` lamp at (537, 202), both
+     changing FRAME rather than position — widget 0 walks five frames per row
+     and clicks on the one that lands; and the six names in the console's own
+     boxes (x 404, 162 wide, y 216, 238, 261, 286, 308, 331, 355, 378), the
+     title at (100, 38) 425 wide in the LIGHT shade this family wears.
+     What is NOT read is the squad panel the screen shows for the highlighted
+     army — `0x4824A0` is `Team::SetNation`, so the eight it lists are the
+     team record's own and `lib/game/roster.ts` can supply them, but where
+     `sqarmy`/`pigpro`/`standpc` land is not read. Build the screen without it.
    - **PLEASE NAME YOUR TEAM** (record 15, kind 0) — the `alpha` alphabet with
      `chardel`/`charspc`/`charent`, the caret stepping by its own little table
      (0x41DC69).
