@@ -18,8 +18,15 @@ has to match the original.
 
 **What the save holds** (play's list): which missions are done, the chosen
 army, the team's name, every pig's name and rank, and the PP tokens. There is
-no SAVE TEAM screen in our version — it **autosaves**. It lives in Electron's
-`userData`, never in the game folder.
+no SAVE TEAM screen in our version — it **autosaves**.
+
+**Where it lives is play's call, not a rule.** The default written here is
+Electron's `userData`, for two reasons that are about us rather than about the
+original: every spec in this repo runs against the real installation
+**read-only**, and `--game-dir` can point at any copy of the game, so a save
+beside the game would follow whichever copy was opened. Against that, the
+original keeps `savearmy0` in its own folder, so putting ours there is
+defensible and is a one-line change.
 
 **What the original keeps, for the shape to grow toward.** A team is a
 **680-byte record**: six of them sit at 0x51F128 with a stride of 0x2A8, and
@@ -29,15 +36,28 @@ laid out as a 160-byte header and eight 64-byte pig records. We do not have to
 read or write that file, but our own shape should be able to hold everything
 it holds.
 
-**The mission list is read.** 59 map names live behind a pointer table at
-0x4D1990, in this order: ROAD, TRENCH, RUMBLE, DEVI, TWIN, ZULUS, SNIPER,
-GUNS, OASIS, MASHED, CAMP, LIBERATE, MEDIX, FJORDS, EYRIE, BRIDGE, BAY,
-DESVAL, SNAKE, EMPLACE, KEEP, SUPLINE, TESTER, FOOT, FINAL, ESTU, DEMO, BOOM,
-BHILL, LECPROD, DVAL, ICE, BUTE, MAZE, SEPIA1, DBOWL, MLAKE, CMASS, ARTGUN,
-DVAL2, HELL3, HELL2, LUNAR1, CREEPY2, PLAY1, PLAY2, ICEFLOW, RIDGE, ARCHI,
-DEMO2, ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps. The first 53
-have a 60-byte record each at 0x4D5210 and the campaign indexes both tables
-by the same id (`lib/game/sky.ts` already carries field 0 of every record).
+**Every MAP is read; the CAMPAIGN is not.** 59 map names live behind a pointer
+table at 0x4D1990: ROAD, TRENCH, RUMBLE, DEVI, TWIN, ZULUS, SNIPER, GUNS,
+OASIS, MASHED, CAMP, LIBERATE, MEDIX, FJORDS, EYRIE, BRIDGE, BAY, DESVAL,
+SNAKE, EMPLACE, KEEP, SUPLINE, TESTER, FOOT, FINAL, ESTU, DEMO, BOOM, BHILL,
+LECPROD, DVAL, ICE, BUTE, MAZE, SEPIA1, DBOWL, MLAKE, CMASS, ARTGUN, DVAL2,
+HELL3, HELL2, LUNAR1, CREEPY2, PLAY1, PLAY2, ICEFLOW, RIDGE, ARCHI, DEMO2,
+ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
+
+**That is every map, not the campaign** — play puts the campaign at 24 or 25
+missions, and the list above is 59. Two things are now known about it and the
+third is the task:
+
+- the 60-byte records at 0x4D5210 are the **weather block** and nothing else:
+  sky index, fog and its colours, copied whole into 0x520708 when a map is
+  entered (0x41A552). No briefing, no PP award, no campaign order in them.
+- **map id 10 is CAMP and the loader special-cases it on the spot**
+  (`cmp eax,0Ah` right after the copy) — the training ground.
+- names 0..24 do end at **FINAL**, which is the right shape for a campaign of
+  25, but that is a coincidence worth checking rather than a reading. **Where
+  the campaign's own order lives is unread**: the id handed to 0x41A552 comes
+  from the progression, and finding its table is step 2 below.
+
 **Every mission opens CAMP for now** — the list is real, the levels are not.
 
 ### The order to do it in
@@ -48,10 +68,12 @@ by the same id (`lib/game/sky.ts` already carries field 0 of every record).
    `savearmy0` is a dump of — and `manual.pdf` in the install is a second
    source. It decides whether the save's pig list is fixed-length with
    headstones or a live roster.
-2. **`lib/game/missions.ts`** — the 53 records transcribed: id, map name, and
-   whatever of the 60 bytes turns out to be the briefing and the PP award.
-   Which records are the CAMPAIGN and which are arenas is one more look at
-   the table (FINAL is 24; the GEN\* run past its end).
+2. **Find the CAMPAIGN's own list**, then `lib/game/missions.ts`. The map
+   table is not it: what is wanted is the order the campaign walks and what
+   each mission is worth. Start at the id handed to 0x41A552 — whoever
+   computes it is the progression — and at the single-player level screen
+   beside record 28's MULTI-PLAYER SELECT LEVEL. The 59 map names and their
+   ids are already read and go straight into the module.
 3. **The save itself** — a plain module in `lib/game/`, pure, no Electron, with
    the main process owning the file. Autosave after a mission ends.
 4. **NEW GAME** — the chain is already mapped: record 14 ONE PLAYER wears
@@ -63,7 +85,8 @@ by the same id (`lib/game/sky.ts` already carries field 0 of every record).
 
 ### What gates what
 
-- The save and the mission list need **no more disassembly**.
+- The SAVE needs **no more disassembly**. The mission LIST needs one read —
+  the campaign's order — and the map names it will hold are already read.
 - NEW GAME's first screen needs none either — kind 1 is built.
 - SELECT TEAM and the name entry need **one more pass each** on their draw
   arms (0x41CBE1 and 0x41DC69): their art is named and their text boxes are
