@@ -81,7 +81,7 @@ const ART = [
   // column of five stands on, `sqname01..06` is one widget carrying the TEAM's
   // name across the top, `sqdial01..06` is the pig selector — the green piece
   // beside the lit slot. The rest are the screen's own decoration.
-  'sqpic', 'sqpics00', 'sqname01', 'sqdial01', 'sqarmy', 'parrow1', 'pigpro',
+  'sqpic', 'sqname01', 'sqdial01', 'pigpro', 'backgr~1',
   ...Array.from({ length: 9 }, (_, i) => `face${i + 1}a`)
 ]
 
@@ -136,13 +136,20 @@ const LAYOUT = {
    * `sqname01` 400×96 the TEAM's own plate, `sqdial01` 176×80 the selector
    * beside the lit slot, and `pigpro`, `sqarmy` and `parrow1` the decoration.
    */
-  panel: { left: { x: 0, y: 0 }, right: { x: 384, y: 16 } },
+  /** **Each column has a panel of its own** (`[play]`) — and `sqpics00` is not
+   * the right one, play having never seen it on the screen at all, so the right
+   * panel is `sqpic` MIRRORED until something better is named. `width` is what
+   * mirrors it, the way the menu's right-hand track is drawn. */
+  panel: { left: { x: 0, y: 0 }, right: { x: 640, y: 0 } },
   team: { x: 120, y: 4 },
-  /** The selector rides the lit pig's row, on that column's inboard side. */
+  /** …and a SELECTOR of its own with it, on that column's inboard side. */
   selector: { x: [214, 250], drop: -12 },
-  army: { x: 264, y: 104 },
+  /** `pigpro` sits BEHIND the portraits (`[play]`), so it goes down with the
+   * panels rather than with the pigs. */
   pig: { x: 220, y: 168 },
-  arrow: { x: [200, 392], y: 236 }
+  /** The three `backgr~1` entries are the portrait's own backing (`[play]`).
+   * `inset` is how far it reaches past the face on every side. */
+  portrait: { inset: 4 }
 }
 
 /** Record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12). */
@@ -168,9 +175,8 @@ const cloneLayout = (): PlayerLayout => ({
   panel: { left: { ...LAYOUT.panel.left }, right: { ...LAYOUT.panel.right } },
   team: { ...LAYOUT.team },
   selector: { ...LAYOUT.selector, x: [...LAYOUT.selector.x] },
-  army: { ...LAYOUT.army },
   pig: { ...LAYOUT.pig },
-  arrow: { ...LAYOUT.arrow, x: [...LAYOUT.arrow.x] },
+  portrait: { ...LAYOUT.portrait },
   text: { title: { ...TEXT.title } }
 })
 
@@ -285,12 +291,19 @@ export function initPlayerScreen(handlers: {
     const put = (name: string, x: number, y: number): void =>
       context.drawImage(sprites.get(name).image, x, y + offset)
     put('sqpic', layout.panel.left.x, layout.panel.left.y)
-    put('sqpics00', layout.panel.right.x, layout.panel.right.y)
+    // The right panel is the same art MIRRORED — a negative width is what the
+    // frontend's own right-hand track does, so it is drawn from its right edge.
+    const panel = sprites.get('sqpic')
+    context.save()
+    context.scale(-1, 1)
+    context.drawImage(
+      panel.image,
+      -layout.panel.right.x,
+      layout.panel.right.y + offset
+    )
+    context.restore()
     put('sqname01', layout.team.x, layout.team.y)
     put('pigpro', layout.pig.x, layout.pig.y)
-    put('sqarmy', layout.army.x, layout.army.y)
-    put('parrow1', layout.arrow.x[0], layout.arrow.y)
-    put('parrow1', layout.arrow.x[1], layout.arrow.y)
 
     for (let slot = 0; slot < SQUAD_SIZE; slot++) {
       const pig = squad[slot]
@@ -298,9 +311,19 @@ export function initPlayerScreen(handlers: {
       const at = place(slot)
       const y = at.y + offset
 
-      // The PORTRAIT. The lit one breathes sideways — the arm scales the WIDTH
-      // and re-centres the blit on the source, and pushes the height as it is.
+      // The PORTRAIT, on its own backing — `backgr~1`, which is what the enter
+      // arm builds into the two slots the arm blits beside every face.
       const face = sprites.get(`face${(pig.identity % 9) + 1}a`)
+      const backing = sprites.get('backgr~1')
+      const inset = layout.portrait.inset
+      context.drawImage(
+        backing.image,
+        at.x - inset, y - inset,
+        face.width + inset * 2, face.height + inset * 2
+      )
+
+      // The lit one breathes sideways — the arm scales the WIDTH and re-centres
+      // the blit on the source, and pushes the height as it is.
       const swell = slot === selection ? 1 + PULSE_DEPTH * Math.cos(pulse) : 1
       const width = face.width * swell
       context.drawImage(
