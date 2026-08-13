@@ -335,6 +335,10 @@ and the weakest of them were invented here:
   data. The divergence is a deliberate simplification of something known.
 - `[play]` — the user ruled it, against the original as they remember it. It
   overrides the disassembly by design; do not "correct" it back.
+- `[manual]` — the game's own field manual says it in words. `manual.pdf` in
+  the install is a SCAN with no text layer; **`manual.txt` beside it is the
+  text**, and it is worth opening before calling a rule an inference — it
+  settled the roster's in one sentence.
 - `[gap]` — the original's behaviour is known and simply not built yet.
 - `[deliberate]` — a remake convenience the original never had. Not a bug.
 - **`[CHECK — remake]`** — invented here. Nothing was read and nobody ruled it;
@@ -343,12 +347,6 @@ and the weakest of them were invented here:
 
 - `[play]` **`HEIGHT_SCALE` is 1** though the exe doubles. Answered in play
   twice; the doubling is above.
-- `[CHECK — remake]` **Two of the fallen get up again after a mission**
-  (`RETURNING` in `lib/game/roster.ts`). The rest of the roster rule is read —
-  the squad is a live list of EIGHT, refilled with `DRAFT<n>` Grunts at the
-  back — but the field both readers test, `pig+0x2C`, has no writer anybody has
-  found. Two is what the arithmetic gives if it is the order a pig fell in.
-  Correct it in play.
 - `[play]` **The pig slides, and that stays.** The walking clips carry a body
   about 855 units a second at 25 fps; the exe walks 1560, so the feet skate
   about 2×. Driving playback off the walking speed to close that (a `gait.ts`

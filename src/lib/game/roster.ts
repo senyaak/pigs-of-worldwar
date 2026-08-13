@@ -24,17 +24,32 @@
 export const SQUAD_SIZE = 8
 
 /**
- * How many of the fallen get up again.
+ * How many of the fallen get up again — `[exe]`, and the MANUAL says it in
+ * words.
  *
- * `[exe]`, with one link inferred. Both readers — the roster arm at 0x4509F1
- * and the end-of-mission screen at 0x4848B5 — keep a pig whose `pig+0x2C` is
- * not -1 and is `>= holes - 2`, where `holes` is how many went down. Nothing
- * found WRITES that field: a scan of `.text` for stores to it turns up only
- * `Pig::Init`'s -1. Read as the order a pig fell in, the two sites agree and
- * the arithmetic is exactly "the last two to fall come back", which is what
- * this constant is. **Correct it in play** — the writer is still to be found.
+ * Both readers — the roster arm at 0x4509F1 and the end-of-mission screen at
+ * 0x4848B5 — keep a pig whose `pig+0x2C` is not -1 and is `>= holes - 2`,
+ * where `holes` is how many went down. Nothing found writes that field, so
+ * what it MEANS was an inference; `manual.txt` in the install settles it:
+ *
+ * > Lose three swine on one level and the first to die is gone for good. Lose
+ * > four of them and the first two shall never return from hog heaven. Lose
+ * > all five and you have to do the level all over again.
+ *
+ * Which is this arithmetic exactly, for `holes` of 1..4, and `pig+0x2C` is
+ * therefore the ORDER a pig fell in. Losing all five is not a case here at
+ * all — see `FIELDED`.
  */
 export const RETURNING = 2
+
+/**
+ * How many of the eight go on a mission — "a squad of eight little piggies
+ * (five plus three in reserve)", and the end-of-mission screen walks exactly
+ * five slots (0x4848AE). So at most five can fall, and losing all five is
+ * losing the MISSION: the manual's "you have to do the level all over again",
+ * which is a replay rather than a roster to regroup.
+ */
+export const FIELDED = 5
 
 export interface Pig {
   /** Encoded `ASCII − 0x1F` in the original; plain text here. */

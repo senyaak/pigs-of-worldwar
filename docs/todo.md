@@ -78,11 +78,14 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
    stats (0x450970); every slot still empty is drafted into by 0x482810, which
    names the newcomer `DRAFT<n>` (`fetext` 0x113 and a per-team counter) and
    puts it at the BACK, survivors closing up in front. So no headstones — a
-   name that leaves never comes back. `lib/game/roster.ts`. Two caveats worth
-   keeping: `manual.pdf` is **no use as a second source**, it is a scan with no
-   text layer at all; and the field the "get up again" test reads (`pig+0x2C`)
-   has no writer anybody has found, so `RETURNING = 2` is an inference off two
-   readers and is **play's to correct**.
+   name that leaves never comes back. `lib/game/roster.ts`.
+   **And the MANUAL confirmed it the same day** — `manual.pdf` is a scan with
+   no text layer, but `manual.txt` beside it in the install is the text: "Lose
+   three swine on one level and the first to die is gone for good. Lose four of
+   them and the first two shall never return." That is `v >= holes - 2`
+   exactly, so `pig+0x2C` is the order a pig fell in and `RETURNING = 2` is
+   read, not inferred. It also gives **five of the eight go on a mission**
+   (`FIELDED`), and losing all five is the mission LOST and replayed.
 2. ~~**Find the CAMPAIGN's own list**~~ **DONE 2026-08-13** — above, and
    `lib/game/missions.ts`. What each mission is WORTH is still not read; the
    save carries `tokens` for it.

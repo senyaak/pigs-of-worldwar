@@ -665,18 +665,30 @@ draft-name builder adds `0xE1` to every byte of an ASCII number before it
 stores it, and `0xE1` is `-0x1F` — the same shift `text/notes.md` had found by
 inspection in `fetext.bin`. So the two encodings are one encoding.
 
-**`manual.pdf` is no use as a second source.** It was opened as one and it is a
-scan: images, no text layer, nothing to read. Worth knowing before anybody
-reaches for it again.
+**The one thing not read was the field the whole roster hangs off**, and the
+MANUAL settled it within the hour. Both arms above keep a fallen pig on the
+test `pig+0x2C != -1 && pig+0x2C >= holes - 2`, and nothing found WRITES
+`pig+0x2C` — `Pig::Init`'s `-1` is the only store to it a scan of `.text`
+turns up — so what the field meant was an inference. Then play produced the
+text: **`manual.pdf` is a scan with no text layer, but `manual.txt` beside it
+in the install is the manual in words**, and it says
 
-**The one thing not read is the field the whole roster hangs off.** Both arms
-above keep a fallen pig on the test `pig+0x2C != -1 && pig+0x2C >= holes - 2`,
-and NOTHING FOUND WRITES `pig+0x2C` — `Pig::Init`'s `-1` is the only store to
-it a scan of `.text` turns up. Read as the order a pig fell in, the two
-readers agree and the arithmetic is exactly "the last two come back", which is
-what `RETURNING = 2` is. It is an inference off two readers and it is flagged
-in the code as play's to correct. "I could not find it" is never "it is not
-there" — the writer is somewhere.
+> Lose three swine on one level and the first to die is gone for good. Lose
+> four of them and the first two shall never return from hog heaven. Lose all
+> five and you have to do the level all over again.
+
+which is `v >= holes - 2` for holes of 1..4, exactly. So `pig+0x2C` is the
+order a pig fell in, `RETURNING = 2` is read rather than guessed, and the
+`[CHECK — remake]` it had been filed under is gone from CLAUDE.md. **Open the
+manual before calling something an inference** — it is now a source tag of its
+own, `[manual]`.
+
+It gave two more things for free: **five of the eight go on a mission** (five
+plus three in reserve — which is why the end-of-mission screen walks five
+slots and not eight, `FIELDED` in `lib/game/roster.ts`), and losing all five
+is not a roster case but the mission LOST and replayed. And the PP award, for
+whenever the squad screen lands: one point for finishing, one more for
+bringing all five through, up to five bonus points hidden per level.
 
 **2. Where the campaign's order lives.** `0x41A2B0` answers "which map next"
 with `campaignOrder[team + 0x53]` out of a dword table at **0x4D17F0**, and
