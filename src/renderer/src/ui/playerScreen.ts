@@ -31,13 +31,19 @@
 // class picks the career's badge (six of them, 52×24) and the step in that
 // career picks the stripes, with step 0 wearing none.
 //
-// The FURNITURE is down — a panel and a selector a column, the team's plate,
-// `pigpro` and the backing each portrait sits in — but only WHAT each piece is
-// comes from the game; WHERE it goes is placed by eye and nudged from the
-// console, the arm's THIRD loop (0x41D70E on) being unread. Still not drawn at
-// all: `sqoptsf`, the medals, the flags, and the blue name plate a pig's slot
-// wears. `sqpics00..10`, `sqarmy` and `parrow1..3` are deliberately NOT drawn —
-// play does not recognise them on this screen.
+// **The FURNITURE is the arm's own too, now that its TAIL is read** (0x41D830
+// to the `ret` at 0x41DB9C): a panel a column, a dial a column, the team's
+// plate and `pigpro`, every one of them at a number out of the exe rather than
+// off the eye. The tail also settles what the art IS. `sqpics00..10` are not
+// panels at all — they are widget 0's frames 0..5, `sqpic`'s own ARRIVAL, which
+// is why nobody recognised them at rest. `parrow1..3` is dead: nothing outside
+// the loader and the unload arm ever reads it. `sqarmy` is seeded and never
+// blitted. `backgr~1` is blitted by no draw arm — it stays here on play's word
+// alone, as the portrait's backing.
+//
+// Still NOT built: `pcflag`, which marks a pig the team can afford to promote
+// (0x41D814, and it wants the team's promotion points); the `sqoptsf` option
+// rows at x 428 with their `lit1/2/3` lamps; and the medals.
 
 import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
@@ -80,10 +86,10 @@ const ART = [
   'pcHweap', 'snipr', 'sappr', 'pcmedic', 'cmndo', 'pcmedal',
   'strp1', 'strp2',
   'bgdark', 'bglight',
-  // The FURNITURE. Play named these off the art sheet: `sqpic` is the panel the
-  // column of five stands on, `sqname01..06` is one widget carrying the TEAM's
-  // name across the top, `sqdial01..06` is the pig selector — the green piece
-  // beside the lit slot. The rest are the screen's own decoration.
+  // The FURNITURE, every piece of it placed by the arm's tail: `sqpic` is the
+  // panel a column stands on, cut short for the right one; `sqname01..06` one
+  // widget carrying the TEAM's name across the top; `sqdial01..06` the pig
+  // selector, one a column; `pigpro` the picture in front at the bottom.
   'sqpic', 'sqname01', 'sqdial01', 'pigpro', 'backgr~1',
   ...Array.from({ length: 9 }, (_, i) => `face${i + 1}a`)
 ]
@@ -112,13 +118,9 @@ const COLUMN = [5, 3]
  * `…rows[2] += 3` moves the third row of both — and an x is set on the column
  * it belongs to: `…columns[1].panel.x -= 4`. Then `pow.screen.print()`.
  *
- * Which numbers are READ and which are guessed is not uniform here, and it
- * matters when one disagrees with another: `rows`, the faces' x, the badges'
- * and the pips' are the arm's own, folded through the frontend's scalers.
- * Everything else — every `panel`, `selector`, `team`, `pigpro` and the name's
- * drop — is `[CHECK — remake]`, placed by eye because the arm's blits for the
- * furniture are not read. **When a face does not sit in its recess, it is the
- * PANEL that is in the wrong place, not the face.**
+ * **Only the name's drop is guessed now.** Everything else here is read —
+ * the pigs off the two loops, the furniture off the tail at 0x41D830, which
+ * had never been disassembled and is where every piece below came from.
  */
 const LAYOUT = {
   /**
@@ -129,6 +131,13 @@ const LAYOUT = {
    */
   rows: [75, 149, 223, 296, 368],
   /**
+   * The SELECTOR's own five rows, which are NOT the portraits' plus a
+   * constant: its counter steps `37n/5 + 18` in fifths of a row and rests at
+   * `74n + 64` (0x41ED4D), a flat pitch against the portraits' 74, 74, 73, 72.
+   * So the dial sits 11 px above the first row and 8 above the last.
+   */
+  selectorRows: [64, 138, 212, 286, 360],
+  /**
    * One entry a column, carrying every x that column decides.
    *
    * `face` is the portrait: `scaleX(0) − 10 + 462·column + 67`, and a face is
@@ -136,31 +145,53 @@ const LAYOUT = {
    * (+82 / −69), so both columns' badges face the middle of the screen — which
    * is why the two are not mirror images of each other.
    *
-   * `panel` and `selector` are play's, off the art sheet: `sqpic` 300×480 is
-   * the panel a column stands on and `sqdial01` 176×80 the selector beside its
-   * lit slot. **Each column has one of each of its own** (`[play]`) —
-   * `sqpics00` is not the right-hand panel, play having never seen it on the
-   * screen at all, so the right panel is `sqpic` drawn `mirror`ed, the way the
-   * frontend's right-hand track is.
+   * `panel` and `selector` are `mirror`ed on the right column — a negated
+   * width, the frontend's own way of drawing a right-hand copy — so their `x`
+   * is that copy's RIGHT edge. Both are the tail's own numbers: the panels at
+   * 0x41D8BB and 0x41D930, the dials at 0x41ED3D and 0x41EDB4, and the two
+   * panels come out exactly symmetric about x 320.
    */
   columns: [
-    { face: 57, badge: 161, stripes: 181, selector: -18, panel: { x: -20, y: 0, mirror: false } },
-    { face: 519, badge: 427, stripes: 447, selector: 250, panel: { x: 660, y: 0, mirror: true } }
+    {
+      face: 57,
+      badge: 161,
+      stripes: 181,
+      selector: { x: -32, mirror: false },
+      panel: { x: -32, y: -12, width: 298, height: 480, mirror: false }
+    },
+    {
+      face: 519,
+      badge: 427,
+      stripes: 447,
+      selector: { x: 672, mirror: true },
+      panel: { x: 672, y: -12, width: 298, height: 301, mirror: true }
+    }
   ],
+  /**
+   * **The right panel is the left one CUT SHORT and CAPPED**, which is how the
+   * original gets three slots out of a panel built for five. The blit's source
+   * rect loses 179 rows (`480 − C[6]`, 0x41D8D8) — exactly the two rows the
+   * right column does not have — and then the panel's own top-left corner is
+   * pasted on as the bottom end, flipped in BOTH axes (0x41D9EC, both `neg`).
+   * `x`/`y` are that flipped copy's right and bottom edges.
+   */
+  cap: { x: 672, y: 369, width: 120, height: 100 },
   /** How far below its row each piece hangs. The badge's 44 is the arm's
-   * (0x74 against the portrait's 0x48); the name's is `[CHECK — remake]`, the
-   * exe hanging the eight names off `sqname01..06` and its unread third loop
-   * rather than off an item box — record 12 has only the two actions. */
-  drop: { badge: 44, stripes: 44, name: 44, selector: 0 },
+   * (0x74 against the portrait's 0x48); the name's is the one number on this
+   * screen still `[CHECK — remake]` — the exe writes no words for a pig at
+   * all, record 12 having only the two actions. */
+  drop: { badge: 44, stripes: 44, name: 44 },
   /** The portrait: `width` is what its name is centred across, `inset` how far
    * its backing — the three `backgr~1` entries (`[play]`) — reaches past the
    * face on every side. */
   portrait: { width: 70, inset: 0 },
-  /** The TEAM's own plate, `sqname01` 400×96, across the top. */
-  team: { x: 120, y: 4 },
-  /** `pigpro` sits BEHIND the portraits (`[play]`), so it goes down with the
-   * panels rather than with the pigs. */
-  pigpro: { x: 240, y: 308 },
+  /** The TEAM's own plate, `sqname01` 400×96, hung off the top edge:
+   * `2·(scaleY(0) − 7)` (0x41DA12). */
+  team: { x: 120, y: -14 },
+  /** `pigpro` 200×191 at the bottom centre, and it is the arm's LAST blit
+   * (0x41DB85) — so it stands IN FRONT of everything, not behind the
+   * portraits as this file used to have it. */
+  pigpro: { x: 232, y: 304 },
   /** The WORDS, in their own `.data` boxes the way every other screen's are.
    * `title` is record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12)
    * — and SUSPECT, the +80/−25 folding that placed it having been found wrong
@@ -185,7 +216,13 @@ export type PlayerLayout = typeof LAYOUT
 
 const cloneLayout = (): PlayerLayout => ({
   rows: [...LAYOUT.rows],
-  columns: LAYOUT.columns.map((column) => ({ ...column, panel: { ...column.panel } })),
+  selectorRows: [...LAYOUT.selectorRows],
+  columns: LAYOUT.columns.map((column) => ({
+    ...column,
+    selector: { ...column.selector },
+    panel: { ...column.panel }
+  })),
+  cap: { ...LAYOUT.cap },
   drop: { ...LAYOUT.drop },
   portrait: { ...LAYOUT.portrait },
   team: { ...LAYOUT.team },
@@ -314,21 +351,36 @@ export function initPlayerScreen(handlers: {
     // are `[CHECK — remake]` and meant to be nudged; what each piece is, is not.
     const put = (name: string, x: number, y: number): void =>
       context.drawImage(sprites.get(name).image, x, y + offset)
-    // One panel a column. The right one is the same art MIRRORED — drawn from
-    // its right edge through a negated axis, which is what the frontend's own
-    // right-hand track does.
-    for (const column of layout.columns) {
-      if (!column.panel.mirror) {
-        put('sqpic', column.panel.x, column.panel.y)
-        continue
-      }
+    /** A piece of `sqpic`, flipped in either axis — which is how the original
+     * draws every right-hand copy on this screen, by negating the blit's own
+     * width (and, for the cap, its height too). `x`/`y` are the drawn copy's
+     * right and bottom edges wherever an axis is flipped. */
+    const cut = (
+      x: number, y: number, width: number, height: number,
+      flipX: boolean, flipY: boolean
+    ): void => {
+      const image = sprites.get('sqpic').image
       context.save()
-      context.scale(-1, 1)
-      context.drawImage(sprites.get('sqpic').image, -column.panel.x, column.panel.y + offset)
+      context.scale(flipX ? -1 : 1, flipY ? -1 : 1)
+      context.drawImage(
+        image,
+        0, 0, width, height,
+        flipX ? -x : x,
+        (flipY ? -(y + offset) : y + offset),
+        width, height
+      )
       context.restore()
     }
+
+    // One panel a column — and the RIGHT one is the left one cut short and
+    // capped, which is how three slots come out of a panel built for five.
+    for (const column of layout.columns) {
+      const panel = column.panel
+      cut(panel.x, panel.y, panel.width, panel.height, panel.mirror, false)
+      if (!panel.mirror) continue
+      cut(layout.cap.x, layout.cap.y, layout.cap.width, layout.cap.height, true, true)
+    }
     put('sqname01', layout.team.x, layout.team.y)
-    put('pigpro', layout.pigpro.x, layout.pigpro.y)
 
     for (let slot = 0; slot < SQUAD_SIZE; slot++) {
       const pig = squad[slot]
@@ -398,10 +450,20 @@ export function initPlayerScreen(handlers: {
     }
 
     // A SELECTOR a column, each on its column's own last-lit row: it rides up
-    // and down its own column and never crosses to the other.
+    // and down its own column and never crosses to the other. Both are always
+    // drawn, and the right one is mirrored to face its own column.
     layout.columns.forEach((column, index) => {
       const row = Math.min(columnRow[index], COLUMN[index] - 1)
-      put('sqdial01', column.selector, layout.rows[row] + layout.drop.selector)
+      const dial = sprites.get('sqdial01')
+      const y = layout.selectorRows[row] + offset
+      if (!column.selector.mirror) {
+        context.drawImage(dial.image, column.selector.x, y)
+        return
+      }
+      context.save()
+      context.scale(-1, 1)
+      context.drawImage(dial.image, -column.selector.x, y)
+      context.restore()
     })
 
     // The two actions, in record 12's own boxes.
@@ -425,6 +487,9 @@ export function initPlayerScreen(handlers: {
         layout.text.title.y + offset
       )
     }
+
+    // `pigpro` LAST, which is where the arm puts it — in front of everything.
+    put('pigpro', layout.pigpro.x, layout.pigpro.y)
   }
 
   const advance = (): void => {
