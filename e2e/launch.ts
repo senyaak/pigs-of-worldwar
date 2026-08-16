@@ -37,6 +37,17 @@ export const PHASE_ENV = path.join(TMP, 'phase', '.env')
  */
 export const SAVE_DIR = path.join(TMP, 'saves')
 
+/**
+ * ...and where it keeps its PROFILE, for the same reason. Electron's default
+ * user-data directory is keyed by the app's name, so a launched test app and
+ * the app a developer is playing share one — and with it one `localStorage`,
+ * which is where the console's layout nudges are stashed between runs
+ * (`main.ts`). An evening of moving furniture would be quietly overwritten by
+ * the next `npx playwright test`, whose own layout is written back when its
+ * window closes. So a run gets a profile of its own.
+ */
+export const PROFILE_DIR = path.join(TMP, 'profile')
+
 export interface Launched {
   app: ElectronApplication
   page: Page
@@ -76,7 +87,13 @@ export async function openAssets(page: Page): Promise<void> {
 
 export async function launchApp(options: LaunchOptions): Promise<Launched> {
   const app = await electron.launch({
-    args: ['.', ...(options.windowed === false ? [] : ['--windowed']), ...(options.args ?? [])],
+    args: [
+      '.',
+      // Never the developer's own profile — see PROFILE_DIR above.
+      `--user-data-dir=${PROFILE_DIR}`,
+      ...(options.windowed === false ? [] : ['--windowed']),
+      ...(options.args ?? [])
+    ],
     cwd: REPO_ROOT,
     env: {
       ...process.env,
