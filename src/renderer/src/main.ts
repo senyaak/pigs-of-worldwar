@@ -239,7 +239,16 @@ if (window.pow) {
     for (const [key, value] of Object.entries(from)) {
       const there = into[key]
       if (Array.isArray(there) && Array.isArray(value)) {
-        value.forEach((item, i) => (there[i] = item))
+        // An array of GROUPS — the player screen's columns — soaks element by
+        // element, so a renamed knob inside one is dropped like any other.
+        value.forEach((item, i) => {
+          const slot = there[i]
+          if (slot && typeof slot === 'object' && item && typeof item === 'object') {
+            soak(slot as Record<string, unknown>, item as Record<string, unknown>)
+          } else if (typeof slot === typeof item) {
+            there[i] = item
+          }
+        })
       } else if (there && typeof there === 'object' && value && typeof value === 'object') {
         soak(there as Record<string, unknown>, value as Record<string, unknown>)
       } else if (typeof there === typeof value) {

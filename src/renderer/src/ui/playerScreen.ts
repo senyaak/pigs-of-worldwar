@@ -31,10 +31,13 @@
 // class picks the career's badge (six of them, 52×24) and the step in that
 // career picks the stripes, with step 0 wearing none.
 //
-// What is still NOT drawn is the screen's own furniture — `sqpic`,
-// `sqpics00..10`, `sqdial01..06`, `sqname01..06`, `pigpro`, `parrow1..3`,
-// `sqarmy`, `sqoptsf`, the medals and the flags, and the frame `backgr~1`
-// pieces each portrait sits in — nor the arm's THIRD loop (0x41D70E on).
+// The FURNITURE is down — a panel and a selector a column, the team's plate,
+// `pigpro` and the backing each portrait sits in — but only WHAT each piece is
+// comes from the game; WHERE it goes is placed by eye and nudged from the
+// console, the arm's THIRD loop (0x41D70E on) being unread. Still not drawn at
+// all: `sqoptsf`, the medals, the flags, and the blue name plate a pig's slot
+// wears. `sqpics00..10`, `sqarmy` and `parrow1..3` are deliberately NOT drawn —
+// play does not recognise them on this screen.
 
 import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
@@ -101,59 +104,73 @@ const ENTERS_FROM = -700
 const COLUMN = [5, 3]
 
 /**
- * Where the five rows sit, read off the arm rather than stepped: the y is
- * `flag + 2·(37·row + nudge) + 72` and the two flags are per-row, which is why
- * the pitch is 74, 74, 73, 72 rather than a flat number (0x41D2FF, 0x41D349).
- */
-const ROW_Y = [75, 149, 223, 296, 368]
-
-/**
- * Where each piece lands. Every number is the arm's, at the entrance's rest.
+ * Where each piece lands, in FOUR groups, because that is how the screen is
+ * actually moved: `rows` is the y every slot shares, `columns` is the x each
+ * column decides, `drop` is how far below its row a piece hangs, and the rest
+ * belongs to the screen rather than to any column. So a y is set once —
+ * `pow.screen.layout.player.drop.badge = 40` moves both columns' badges,
+ * `…rows[2] += 3` moves the third row of both — and an x is set on the column
+ * it belongs to: `…columns[1].panel.x -= 4`. Then `pow.screen.print()`.
+ *
+ * Which numbers are READ and which are guessed is not uniform here, and it
+ * matters when one disagrees with another: `rows`, the faces' x, the badges'
+ * and the pips' are the arm's own, folded through the frontend's scalers.
+ * Everything else — every `panel`, `selector`, `team`, `pigpro` and the name's
+ * drop — is `[CHECK — remake]`, placed by eye because the arm's blits for the
+ * furniture are not read. **When a face does not sit in its recess, it is the
+ * PANEL that is in the wrong place, not the face.**
  */
 const LAYOUT = {
-  /** The portraits: `scaleX(0) − 10 + 462·column + 67`. A face is 70×60. */
-  grid: { x: [57, 519], face: 70 },
-  /** The badge and the pips step **417** a column and are handed (+82 / −69),
-   * so both columns' badges face the middle of the screen. Their y is the
-   * row's plus 44 (0x74 against the portrait's 0x48). */
-  badge: { x: [161, 427], drop: 44 },
-  stripes: { x: [181, 447], drop: 44 },
-  /** The name under its own portrait — `[CHECK — remake]`. The exe hangs the
-   * eight names off `sqname01..06` and its unread third loop, not off an item
-   * box: record 12 has only the two below. */
-  name: { drop: 60 },
-  /** The two actions: record 12's own item boxes 59 and 60, raw (600, 658) and
-   * (710, 658) 10 wide, which is (350, 385) and (418, 385) 56 across. */
-  actions: { x: [350, 418], y: 385, width: 56 },
   /**
-   * THE FURNITURE, and **every number here is `[CHECK — remake]`** — the arm's
-   * blits for these pieces are not read, so they are placed where they have to
-   * be roughly right and left to be nudged from the console:
-   * `pow.screen.layout.player.panel.left.y -= 4`, then `pow.screen.print()`.
-   *
-   * What each piece IS, though, is play's, off the art sheet: `sqpic` 300×480
-   * is the panel the five stand on, `sqpics00` 256×448 its counterpart,
-   * `sqname01` 400×96 the TEAM's own plate, `sqdial01` 176×80 the selector
-   * beside the lit slot, and `pigpro`, `sqarmy` and `parrow1` the decoration.
+   * The five rows, read off the arm rather than stepped: the y is
+   * `flag + 2·(37·row + nudge) + 72` and the two flags are per-row, which is
+   * why the pitch is 74, 74, 73, 72 rather than a flat number (0x41D2FF,
+   * 0x41D349). Both columns step the same five; the right one stops at three.
    */
-  /** **Each column has a panel of its own** (`[play]`) — and `sqpics00` is not
-   * the right one, play having never seen it on the screen at all, so the right
-   * panel is `sqpic` MIRRORED until something better is named. `width` is what
-   * mirrors it, the way the menu's right-hand track is drawn. */
-  panel: { left: { x: 0, y: 0 }, right: { x: 640, y: 0 } },
+  rows: [75, 149, 223, 296, 368],
+  /**
+   * One entry a column, carrying every x that column decides.
+   *
+   * `face` is the portrait: `scaleX(0) − 10 + 462·column + 67`, and a face is
+   * 70×60. The badge and the pips step **417** a column and are handed
+   * (+82 / −69), so both columns' badges face the middle of the screen — which
+   * is why the two are not mirror images of each other.
+   *
+   * `panel` and `selector` are play's, off the art sheet: `sqpic` 300×480 is
+   * the panel a column stands on and `sqdial01` 176×80 the selector beside its
+   * lit slot. **Each column has one of each of its own** (`[play]`) —
+   * `sqpics00` is not the right-hand panel, play having never seen it on the
+   * screen at all, so the right panel is `sqpic` drawn `mirror`ed, the way the
+   * frontend's right-hand track is.
+   */
+  columns: [
+    { face: 57, badge: 161, stripes: 181, selector: -18, panel: { x: -20, y: 0, mirror: false } },
+    { face: 519, badge: 427, stripes: 447, selector: 250, panel: { x: 660, y: 0, mirror: true } }
+  ],
+  /** How far below its row each piece hangs. The badge's 44 is the arm's
+   * (0x74 against the portrait's 0x48); the name's is `[CHECK — remake]`, the
+   * exe hanging the eight names off `sqname01..06` and its unread third loop
+   * rather than off an item box — record 12 has only the two actions. */
+  drop: { badge: 44, stripes: 44, name: 44, selector: 0 },
+  /** The portrait: `width` is what its name is centred across, `inset` how far
+   * its backing — the three `backgr~1` entries (`[play]`) — reaches past the
+   * face on every side. */
+  portrait: { width: 70, inset: 0 },
+  /** The TEAM's own plate, `sqname01` 400×96, across the top. */
   team: { x: 120, y: 4 },
-  /** …and a SELECTOR of its own with it, on that column's inboard side. */
-  selector: { x: [214, 250], drop: -12 },
   /** `pigpro` sits BEHIND the portraits (`[play]`), so it goes down with the
    * panels rather than with the pigs. */
-  pig: { x: 220, y: 168 },
-  /** The three `backgr~1` entries are the portrait's own backing (`[play]`).
-   * `inset` is how far it reaches past the face on every side. */
-  portrait: { inset: 4 }
+  pigpro: { x: 240, y: 308 },
+  /** The WORDS, in their own `.data` boxes the way every other screen's are.
+   * `title` is record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12)
+   * — and SUSPECT, the +80/−25 folding that placed it having been found wrong
+   * on the name screen (`docs/todo.md`). The two actions are its item boxes 59
+   * and 60, raw (600, 658) and (710, 658) 10 wide. */
+  text: {
+    title: { x: 161, y: 45, width: 300 },
+    actions: { x: [350, 418], y: 385, width: 56 }
+  }
 }
-
-/** Record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12). */
-const TEXT = { title: { x: 161, y: 45, width: 300 } }
 
 /** The lit portrait's swell: `fcos` on an angle that steps 100 of 4096 a frame
  * (0x41D365). The two constants beside it are not decoded, so the DEPTH of the
@@ -164,20 +181,19 @@ const PULSE_DEPTH = 0.12
 const TICK_MS = EXE_FRAME_SECONDS * 1000
 const MOST_TICKS = 4
 
-export type PlayerLayout = typeof LAYOUT & { text: typeof TEXT }
+export type PlayerLayout = typeof LAYOUT
 
 const cloneLayout = (): PlayerLayout => ({
-  grid: { ...LAYOUT.grid, x: [...LAYOUT.grid.x] },
-  badge: { ...LAYOUT.badge, x: [...LAYOUT.badge.x] },
-  stripes: { ...LAYOUT.stripes, x: [...LAYOUT.stripes.x] },
-  name: { ...LAYOUT.name },
-  actions: { ...LAYOUT.actions, x: [...LAYOUT.actions.x] },
-  panel: { left: { ...LAYOUT.panel.left }, right: { ...LAYOUT.panel.right } },
-  team: { ...LAYOUT.team },
-  selector: { ...LAYOUT.selector, x: [...LAYOUT.selector.x] },
-  pig: { ...LAYOUT.pig },
+  rows: [...LAYOUT.rows],
+  columns: LAYOUT.columns.map((column) => ({ ...column, panel: { ...column.panel } })),
+  drop: { ...LAYOUT.drop },
   portrait: { ...LAYOUT.portrait },
-  text: { title: { ...TEXT.title } }
+  team: { ...LAYOUT.team },
+  pigpro: { ...LAYOUT.pigpro },
+  text: {
+    title: { ...LAYOUT.text.title },
+    actions: { ...LAYOUT.text.actions, x: [...LAYOUT.text.actions.x] }
+  }
 })
 
 export interface PlayerScreen {
@@ -220,6 +236,10 @@ export function initPlayerScreen(handlers: {
   let teamName = ''
   let selection = 0
   let pulse = 0
+  /** **Each column's selector is its own and only travels UP and DOWN**
+   * (`[play]`), so a column remembers which of its rows was last lit and keeps
+   * its dial there while the other column, or an action, is chosen. */
+  const columnRow = [0, 0]
 
   const driveOn = drive(ENTERS_FROM)
   let leaving: (() => void) | null = null
@@ -228,6 +248,10 @@ export function initPlayerScreen(handlers: {
     const next = (selection + by + PLACES) % PLACES
     if (next === selection) return
     selection = next
+    if (selection < SQUAD_SIZE) {
+      const column = selection < COLUMN[0] ? 0 : 1
+      columnRow[column] = column === 0 ? selection : selection - COLUMN[0]
+    }
     bank.play(CLICK.name, { gain: CLICK.gain })
   }
 
@@ -271,7 +295,7 @@ export function initPlayerScreen(handlers: {
   const place = (slot: number): { column: number; x: number; y: number } => {
     const column = slot < COLUMN[0] ? 0 : 1
     const row = column === 0 ? slot : slot - COLUMN[0]
-    return { column, x: layout.grid.x[column], y: ROW_Y[row] }
+    return { column, x: layout.columns[column].face, y: layout.rows[row] }
   }
 
   const centred = (font: Font, text: string, x: number, width: number): number =>
@@ -290,20 +314,21 @@ export function initPlayerScreen(handlers: {
     // are `[CHECK — remake]` and meant to be nudged; what each piece is, is not.
     const put = (name: string, x: number, y: number): void =>
       context.drawImage(sprites.get(name).image, x, y + offset)
-    put('sqpic', layout.panel.left.x, layout.panel.left.y)
-    // The right panel is the same art MIRRORED — a negative width is what the
-    // frontend's own right-hand track does, so it is drawn from its right edge.
-    const panel = sprites.get('sqpic')
-    context.save()
-    context.scale(-1, 1)
-    context.drawImage(
-      panel.image,
-      -layout.panel.right.x,
-      layout.panel.right.y + offset
-    )
-    context.restore()
+    // One panel a column. The right one is the same art MIRRORED — drawn from
+    // its right edge through a negated axis, which is what the frontend's own
+    // right-hand track does.
+    for (const column of layout.columns) {
+      if (!column.panel.mirror) {
+        put('sqpic', column.panel.x, column.panel.y)
+        continue
+      }
+      context.save()
+      context.scale(-1, 1)
+      context.drawImage(sprites.get('sqpic').image, -column.panel.x, column.panel.y + offset)
+      context.restore()
+    }
     put('sqname01', layout.team.x, layout.team.y)
-    put('pigpro', layout.pig.x, layout.pig.y)
+    put('pigpro', layout.pigpro.x, layout.pigpro.y)
 
     for (let slot = 0; slot < SQUAD_SIZE; slot++) {
       const pig = squad[slot]
@@ -339,10 +364,11 @@ export function initPlayerScreen(handlers: {
       // pig is in: `bgdark` for the five that take the field, `bglight` for the
       // three that do not (`[play]`, against the shipped screen; the five is
       // the manual's own `FIELDED`).
+      const column = layout.columns[at.column]
       const leg = sprites.get(slot < FIELDED ? 'bgdark' : 'bglight')
       const badge = sprites.get(BADGE[careerOf(pig.rank)] ?? 'pcHweap')
-      const legX = layout.badge.x[at.column] - Math.round((leg.width - badge.width) / 2)
-      context.drawImage(leg.image, legX, y + layout.badge.drop)
+      const legX = column.badge - Math.round((leg.width - badge.width) / 2)
+      context.drawImage(leg.image, legX, y + layout.drop.badge)
 
       // The CAREER's badge, and the stripes of its step — 0 wears none. Both
       // sit inboard of the portrait, on the column's own hand.
@@ -352,12 +378,12 @@ export function initPlayerScreen(handlers: {
       // and the original shows a pig with no class at all until it is promoted.
       // The trapezoid stays — it is the plate's own leg, not the badge's.
       if (pig.rank !== GRUNT) {
-        context.drawImage(badge.image, layout.badge.x[at.column], y + layout.badge.drop)
+        context.drawImage(badge.image, column.badge, y + layout.drop.badge)
       }
       const step_ = stepOf(pig.rank)
       if (step_ > 0) {
         const stripes = sprites.get(STRIPES[step_ - 1] ?? STRIPES[0])
-        context.drawImage(stripes.image, layout.stripes.x[at.column], y + layout.stripes.drop)
+        context.drawImage(stripes.image, column.stripes, y + layout.drop.stripes)
       }
 
       // Its NAME, under its own portrait. The RANK is the badge and the pips
@@ -366,16 +392,17 @@ export function initPlayerScreen(handlers: {
       font.draw(
         context,
         pig.name,
-        centred(font, pig.name, at.x, layout.grid.face),
-        y + layout.name.drop
+        centred(font, pig.name, at.x, layout.portrait.width),
+        y + layout.drop.name
       )
     }
 
-    // The SELECTOR, on the lit pig's row and on that column's inboard side.
-    if (selection < SQUAD_SIZE && squad[selection]) {
-      const lit = place(selection)
-      put('sqdial01', layout.selector.x[lit.column], lit.y + layout.selector.drop)
-    }
+    // A SELECTOR a column, each on its column's own last-lit row: it rides up
+    // and down its own column and never crosses to the other.
+    layout.columns.forEach((column, index) => {
+      const row = Math.min(columnRow[index], COLUMN[index] - 1)
+      put('sqdial01', column.selector, layout.rows[row] + layout.drop.selector)
+    })
 
     // The two actions, in record 12's own boxes.
     const actions = [feText(START_TEXT), feText(SAVE_TEXT)]
@@ -384,8 +411,8 @@ export function initPlayerScreen(handlers: {
       font.draw(
         context,
         label,
-        centred(font, label, layout.actions.x[i], layout.actions.width),
-        layout.actions.y + offset
+        centred(font, label, layout.text.actions.x[i], layout.text.actions.width),
+        layout.text.actions.y + offset
       )
     })
 
@@ -456,6 +483,8 @@ export function initPlayerScreen(handlers: {
       visible = true
       driveOn.restart()
       selection = START
+      columnRow[0] = 0
+      columnRow[1] = 0
       pulse = 0
       leaving = null
       draw()
