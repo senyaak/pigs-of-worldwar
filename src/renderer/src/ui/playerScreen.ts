@@ -56,9 +56,23 @@ import type { SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
-import { FIELDED, SQUAD_SIZE } from '../../../lib/game/roster'
+import { SQUAD_SIZE } from '../../../lib/game/roster'
 import type { Pig } from '../../../lib/game/roster'
-import { careerOf, rankText, stepOf } from '../../../lib/game/ranks'
+import {
+  PROMOTE_TEXT,
+  careerOf,
+  promotionsFrom,
+  rankText,
+  stepOf
+} from '../../../lib/game/ranks'
+
+/** A piece of one of the board's lines: words, or one of the markup icons.
+ * `after` overrides the gap the board leaves before whatever comes next. */
+interface BoardPiece {
+  text?: string
+  icon?: string
+  after?: number
+}
 
 /** The six career badges, in the order the exe's own table counts them —
  * `careerOf` returns that order (0x4D29C0's first byte). */
@@ -85,7 +99,14 @@ const ART = [
   'pigbkpc1',
   'pcHweap', 'snipr', 'sappr', 'pcmedic', 'cmndo', 'pcmedal',
   'strp1', 'strp2',
-  'bgdark', 'bglight',
+  'bgdark',
+  // The three markup ICONS the board writes with, 22 tall like every icon in
+  // that set: `vp` is the TOKEN, `battle` how many battles a pig has fought,
+  // `kills` how many it has killed (`frontend/notes.md` — the archive's name
+  // is honest, whatever an earlier note said).
+  'vp', 'battle', 'kills',
+  // The option plate behind START MISSION and the lamp that flanks it.
+  'sqoptsf', 'lit1',
   // The FURNITURE, every piece of it placed by the arm's tail: `sqpic` is the
   // panel a column stands on, cut short for the right one; `sqname01..06` one
   // widget carrying the TEAM's name across the top; `sqdial01..06` the pig
@@ -176,11 +197,17 @@ const LAYOUT = {
    * `x`/`y` are that flipped copy's right and bottom edges.
    */
   cap: { x: 672, y: 369, width: 120, height: 100 },
-  /** How far below its row each piece hangs. The badge's 44 is the arm's
-   * (0x74 against the portrait's 0x48); the name's is the one number on this
-   * screen still `[CHECK — remake]` — the exe writes no words for a pig at
-   * all, record 12 having only the two actions. */
-  drop: { badge: 44, stripes: 44, name: 44 },
+  /**
+   * How far below its row each piece hangs.
+   *
+   * The badge's is the arm's 44 (0x74 against the portrait's 0x48) less the
+   * four play took off it to close the gap over the plate — `[play]`, and the
+   * trapezoid follows it because it is that plate's own leg. The NAME sits
+   * ABOVE the badge and inside the widget rather than under the portrait
+   * (`[play]`), which is `[CHECK — remake]` in the number only: the exe writes
+   * no words for a pig at all, record 12 having just the two actions.
+   */
+  drop: { badge: 40, stripes: 40, name: 16 },
   /** The portrait: `width` is what its name is centred across, `inset` how far
    * its backing — the three `backgr~1` entries (`[play]`) — reaches past the
    * face on every side. */
@@ -188,19 +215,49 @@ const LAYOUT = {
   /** The TEAM's own plate, `sqname01` 400×96, hung off the top edge:
    * `2·(scaleY(0) − 7)` (0x41DA12). */
   team: { x: 120, y: -14 },
-  /** `pigpro` 200×191 at the bottom centre, and it is the arm's LAST blit
-   * (0x41DB85) — so it stands IN FRONT of everything, not behind the
-   * portraits as this file used to have it. */
+  /**
+   * `pigpro` 200×191 at the bottom centre, the arm's LAST blit (0x41DB85) so
+   * it stands in front of everything — and it is **the BOARD**: a black face
+   * the screen writes the team's and the lit pig's numbers across (`[play]`).
+   * Five lines, centred on the board: the team's tokens, the pig's name, its
+   * class, what its next promotion costs, and its two counts side by side.
+   *
+   * The board's own x/y are the exe's; **every line's y is
+   * `[CHECK — remake]`** — nothing writes this text in any arm that has been
+   * read, so they are spaced by eye and meant to be nudged.
+   */
   pigpro: { x: 232, y: 304 },
-  /** The WORDS, in their own `.data` boxes the way every other screen's are.
-   * `title` is record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12)
-   * — and SUSPECT, the +80/−25 folding that placed it having been found wrong
-   * on the name screen (`docs/todo.md`). The two actions are its item boxes 59
-   * and 60, raw (600, 658) and (710, 658) 10 wide. */
-  text: {
-    title: { x: 161, y: 45, width: 300 },
-    actions: { x: [350, 418], y: 385, width: 56 }
-  }
+  board: {
+    centre: 332,
+    lines: { tokens: 322, name: 348, rank: 372, promote: 400, counts: 428 },
+    /** Between a piece of a line and the next, and how far the 22-tall icons
+     * ride above the letters' own top. */
+    gap: 6,
+    lift: 2,
+    /** …and between the two counts on the last line. */
+    spread: 24
+  },
+  /**
+   * The two actions are the tail's OPTION ROWS, not the item boxes this file
+   * used to place them by: the boxes fold to (350, 385) and (418, 385) side by
+   * side, and both the tail and the original's own screen stack them at a
+   * fixed x 428 — the same suspect fold the name screen's +80/−25 turned out
+   * to be. `rows` is each plate's top, `2·(H[n] − 6 + 33) − 91` at rest
+   * (0x41DA4D), and the lamps sit 16 lower (0x41DABB).
+   *
+   * **Only START wears a plate** (`[play]`) — SAVE TEAM is words alone.
+   */
+  options: {
+    x: 428,
+    width: 200,
+    rows: [337, 393],
+    /** How far into its plate a row's words sit — `[CHECK — remake]`. */
+    text: 38,
+    lamp: { x: [429, 601], drop: 16 }
+  },
+  /** Record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12) — and
+   * SUSPECT for the same folding reason as the actions were. */
+  text: { title: { x: 161, y: 45, width: 300 } }
 }
 
 /** The lit portrait's swell: `fcos` on an angle that steps 100 of 4096 a frame
@@ -227,18 +284,22 @@ const cloneLayout = (): PlayerLayout => ({
   portrait: { ...LAYOUT.portrait },
   team: { ...LAYOUT.team },
   pigpro: { ...LAYOUT.pigpro },
-  text: {
-    title: { ...LAYOUT.text.title },
-    actions: { ...LAYOUT.text.actions, x: [...LAYOUT.text.actions.x] }
-  }
+  board: { ...LAYOUT.board, lines: { ...LAYOUT.board.lines } },
+  options: {
+    ...LAYOUT.options,
+    rows: [...LAYOUT.options.rows],
+    lamp: { ...LAYOUT.options.lamp, x: [...LAYOUT.options.lamp.x] }
+  },
+  text: { title: { ...LAYOUT.text.title } }
 })
 
 export interface PlayerScreen {
   load(): Promise<void>
   leave(): void
   enter(): void
-  /** The squad to show. Called before the screen is entered. */
-  show(squad: Pig[], teamName: string): void
+  /** The squad to show, the team's name and its unspent tokens — the board
+   * writes the last of those. Called before the screen is entered. */
+  show(squad: Pig[], teamName: string, tokens: number): void
   /** Which of the ten places is lit: 0..7 a pig, 8 START MISSION, 9 SAVE. */
   selected(): number
   labels(): string[]
@@ -271,7 +332,11 @@ export function initPlayerScreen(handlers: {
   let offset = 0
   let squad: Pig[] = []
   let teamName = ''
+  let tokens = 0
   let selection = 0
+  /** Which pig the BOARD is about. The board never goes blank, so choosing an
+   * action leaves it on the pig that was last lit. */
+  let boardPig = 0
   let pulse = 0
   /** **Each column's selector is its own and only travels UP and DOWN**
    * (`[play]`), so a column remembers which of its rows was last lit and keeps
@@ -288,6 +353,7 @@ export function initPlayerScreen(handlers: {
     if (selection < SQUAD_SIZE) {
       const column = selection < COLUMN[0] ? 0 : 1
       columnRow[column] = column === 0 ? selection : selection - COLUMN[0]
+      boardPig = selection
     }
     bank.play(CLICK.name, { gain: CLICK.gain })
   }
@@ -412,12 +478,13 @@ export function initPlayerScreen(handlers: {
       )
 
       // The TRAPEZOID under the name plate, which is what the class badge
-      // stands in — and which of the two it is says which HALF of the squad the
-      // pig is in: `bgdark` for the five that take the field, `bglight` for the
-      // three that do not (`[play]`, against the shipped screen; the five is
-      // the manual's own `FIELDED`).
+      // stands in. **It is `bgdark` for every slot** (`[play]`, against the
+      // shipped screen — the right-hand three wear the dark one too), and the
+      // arm agrees: the blit at 0x41D6BC has one sprite, `[0x5119E8]`, and
+      // that slot holds `bgdark`. The fielded-five/reserve-three reading this
+      // file used to draw `bglight` on was wrong.
       const column = layout.columns[at.column]
-      const leg = sprites.get(slot < FIELDED ? 'bgdark' : 'bglight')
+      const leg = sprites.get('bgdark')
       const badge = sprites.get(BADGE[careerOf(pig.rank)] ?? 'pcHweap')
       const legX = column.badge - Math.round((leg.width - badge.width) / 2)
       context.drawImage(leg.image, legX, y + layout.drop.badge)
@@ -438,13 +505,15 @@ export function initPlayerScreen(handlers: {
         context.drawImage(stripes.image, column.stripes, y + layout.drop.stripes)
       }
 
-      // Its NAME, under its own portrait. The RANK is the badge and the pips
-      // beside it — the arm writes no words for a pig at all.
+      // Its NAME, ABOVE the badge and centred on the plate's own leg rather
+      // than on the portrait (`[play]`) — it belongs inside the widget, not
+      // under the face. The RANK is the badge and the pips beside it; the arm
+      // writes no words for a pig at all.
       const font = slot === selection ? light : dark
       font.draw(
         context,
         pig.name,
-        centred(font, pig.name, at.x, layout.portrait.width),
+        centred(font, pig.name, legX, leg.width),
         y + layout.drop.name
       )
     }
@@ -466,15 +535,19 @@ export function initPlayerScreen(handlers: {
       context.restore()
     })
 
-    // The two actions, in record 12's own boxes.
+    // The two actions, STACKED on the tail's own option rows — and START
+    // wears a plate, SAVE TEAM does not (`[play]`).
+    const options = layout.options
+    put('sqoptsf', options.x, options.rows[0])
+    options.lamp.x.forEach((x) => put('lit1', x, options.rows[0] + options.lamp.drop))
     const actions = [feText(START_TEXT), feText(SAVE_TEXT)]
     actions.forEach((label, i) => {
       const font = selection === START + i ? light : dark
       font.draw(
         context,
         label,
-        centred(font, label, layout.text.actions.x[i], layout.text.actions.width),
-        layout.text.actions.y + offset
+        centred(font, label, options.x, options.width),
+        options.rows[i] + options.text + offset
       )
     })
 
@@ -488,8 +561,67 @@ export function initPlayerScreen(handlers: {
       )
     }
 
-    // `pigpro` LAST, which is where the arm puts it — in front of everything.
+    // `pigpro` LAST, which is where the arm puts it — in front of everything —
+    // and it is the BOARD: five lines about the team and the lit pig, written
+    // across its black face (`[play]`).
     put('pigpro', layout.pigpro.x, layout.pigpro.y)
+    writeBoard(context, sprites, light)
+  }
+
+  /** One line of the board: pieces laid out left to right and centred as a
+   * group, a piece being either words or one of the markup icons. */
+  const boardLine = (
+    context: CanvasRenderingContext2D,
+    sprites: SpriteSet,
+    font: Font,
+    y: number,
+    pieces: BoardPiece[]
+  ): void => {
+    const board = layout.board
+    const widthOf = (piece: BoardPiece): number =>
+      piece.text !== undefined ? font.measure(piece.text) : sprites.get(piece.icon ?? '').width
+    const after = (piece: BoardPiece): number => piece.after ?? board.gap
+    const total = pieces.reduce(
+      (width, piece, i) => width + widthOf(piece) + (i < pieces.length - 1 ? after(piece) : 0),
+      0
+    )
+    let x = Math.round(board.centre - total / 2)
+    for (const piece of pieces) {
+      if (piece.text !== undefined) font.draw(context, piece.text, x, y + offset)
+      else context.drawImage(sprites.get(piece.icon ?? '').image, x, y - board.lift + offset)
+      x += widthOf(piece) + after(piece)
+    }
+  }
+
+  const writeBoard = (
+    context: CanvasRenderingContext2D,
+    sprites: SpriteSet,
+    font: Font
+  ): void => {
+    const pig = squad[boardPig]
+    if (!pig) return
+    const lines = layout.board.lines
+    const gap = layout.board.gap
+    // What the cheapest way out of this class costs. A HERO has none, and its
+    // line is left off rather than written with a dash.
+    const ways = promotionsFrom(pig.rank)
+    boardLine(context, sprites, font, lines.tokens, [{ icon: 'vp' }, { text: String(tokens) }])
+    boardLine(context, sprites, font, lines.name, [{ text: pig.name }])
+    boardLine(context, sprites, font, lines.rank, [{ text: feText(rankText(pig.rank)) }])
+    if (ways.length > 0) {
+      boardLine(context, sprites, font, lines.promote, [
+        { text: feText(PROMOTE_TEXT) },
+        { icon: 'vp' },
+        { text: String(Math.min(...ways.map((way) => way.cost))) }
+      ])
+    }
+    // The two counts, with the board's own wider gap between the pair.
+    boardLine(context, sprites, font, lines.counts, [
+      { icon: 'battle' },
+      { text: String(pig.missions), after: gap + layout.board.spread },
+      { icon: 'kills' },
+      { text: String(pig.score) }
+    ])
   }
 
   const advance = (): void => {
@@ -550,14 +682,16 @@ export function initPlayerScreen(handlers: {
       selection = START
       columnRow[0] = 0
       columnRow[1] = 0
+      boardPig = 0
       pulse = 0
       leaving = null
       draw()
       run(true)
     },
-    show(pigs, name) {
+    show(pigs, name, unspent) {
       squad = pigs
       teamName = name
+      tokens = unspent
     },
     selected: () => selection,
     labels: () => squad.map((pig) => pig.name).concat([feText(START_TEXT), feText(SAVE_TEXT)]),

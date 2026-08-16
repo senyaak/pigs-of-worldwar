@@ -167,7 +167,7 @@ async function startCampaign(name: string, nation: number): Promise<void> {
   const save = newGame(name, nation, squad, new Date().toISOString())
   const written = await window.api.writeSave(SLOT, serialise(save))
   if (!written.ok) console.warn(`the campaign was not saved: ${written.error}`)
-  playerScreen.show(save.squad, save.name)
+  playerScreen.show(save.squad, save.name, save.tokens)
   show('player')
   void playerScreen.load()
 }
