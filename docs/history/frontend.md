@@ -590,3 +590,16 @@ The exe's spinning `propoint.mad` is stood in by the `vp` coin, the two
 gtext fonts by BIG and GameChars, both `[CHECK — remake]`; the CONTINUE /
 RETRY fork stays ours — the original pays with SPACE and replays a loss
 without asking.
+
+**The campaign got its MISSION MAP** (2026-08-18), a screen the original never
+had outside a cheat. `ui/missionList.ts` is record 44's mechanics — the
+seven-row window scrolling under the parked lamp and bracket, the cursor
+seeded from the campaign's position, the silent moves, the console rising
+from 546 below — on the SELECT TEAM console's read furniture, wearing the
+mission TITLES out of gtext where the cheat printed raw map names. Played
+positions wear the plain shade, the current one the light, the future the
+dark, and only the current one can be chosen — the cheat moved the campaign
+anywhere, which is what a cheat is for and a map is not. The flow runs START
+→ (the training question at position 0; NO now lands HERE, on the first real
+mission) → the map → the battle, and `e2e/001/missions.spec.ts` drives the
+whole path. The suite's `toMenu` learned to wait an animated leave out.

@@ -8,6 +8,7 @@ import { initMenu } from './ui/menu'
 import { initOnePlayer } from './ui/onePlayer'
 import { initLoadScreen } from './ui/loadScreen'
 import { initAskTraining } from './ui/askTraining'
+import { initMissionList } from './ui/missionList'
 import { initDebrief } from './ui/debrief'
 import { initTeamScreen } from './ui/teamScreen'
 import { initNameScreen } from './ui/nameScreen'
@@ -28,6 +29,7 @@ type View =
   | 'oneplayer'
   | 'load'
   | 'ask'
+  | 'missions'
   | 'debrief'
   | 'team'
   | 'name'
@@ -44,6 +46,7 @@ const panels: Record<View, HTMLElement[]> = {
   oneplayer: [byId('oneplayer')],
   load: [byId('load')],
   ask: [byId('ask')],
+  missions: [byId('missions')],
   debrief: [byId('debrief')],
   team: [byId('team')],
   name: [byId('name')],
@@ -129,6 +132,26 @@ function startMission(): void {
   void battle.open(MISSION_STAND_IN).then((ok) => ok && show('battle'))
 }
 
+/** The MISSION MAP, standing on the campaign's own position. */
+function toMissions(): void {
+  const save = campaign.current()
+  if (!save) {
+    show('menu')
+    return
+  }
+  missionList.show(save.position, save.name)
+  show('missions')
+  void missionList.load()
+}
+
+// The campaign's 26 on the cheat screen's own mechanics: the current mission
+// in the light, the played ones plain, the future dark — and only the current
+// one can be chosen.
+const missionList = initMissionList({
+  onPick: () => startMission(),
+  onBack: () => toSquad()
+})
+
 // How a battle comes back decides where it lands: a walked-out mission goes
 // straight to the squad, a decided one goes through the debrief — where a WIN
 // is settled (`campaign.missionWon`) and waits to be accepted or replayed.
@@ -170,12 +193,12 @@ const debrief = initDebrief({
 })
 
 // PLAY TRAINING MISSION? — the original's record 39, asked once the campaign
-// stands at position 0. YES is the training ground; NO steps past it, and the
-// first REAL mission opens instead.
+// stands at position 0. YES is the training ground, launched straight; NO
+// steps past it and the MISSION MAP opens on the first real mission.
 const ask = initAskTraining({
   onYes: () => startMission(),
   onNo: () => {
-    void campaign.skipTutorial().then(() => startMission())
+    void campaign.skipTutorial().then(() => toMissions())
   },
   onBack: () => toSquad()
 })
@@ -240,8 +263,8 @@ const nameScreen = initNameScreen({
 })
 
 // …and the squad it raised is the PLAYER screen, record 12: eight pigs, their
-// ranks, and START MISSION — which asks about the training ground first while
-// the campaign still stands at position 0.
+// ranks, and START MISSION — which asks about the training ground while the
+// campaign stands at position 0, and goes through the MISSION MAP after.
 const playerScreen = initPlayerScreen({
   onStart: () => {
     const save = campaign.current()
@@ -251,7 +274,7 @@ const playerScreen = initPlayerScreen({
       void ask.load()
       return
     }
-    startMission()
+    toMissions()
   },
   onBack: () => show('name')
 })
@@ -286,6 +309,7 @@ const screens = {
   oneplayer: onePlayer,
   load: loadScreen,
   ask,
+  missions: missionList,
   debrief,
   team: teamScreen,
   name: nameScreen,
@@ -312,6 +336,7 @@ if (window.pow) {
   window.pow.onePlayer = view(onePlayer)
   window.pow.loadScreen = view(loadScreen)
   window.pow.askTraining = view(ask)
+  window.pow.missionList = view(missionList)
   window.pow.debrief = view(debrief)
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }

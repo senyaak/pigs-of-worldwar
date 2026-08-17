@@ -36,6 +36,7 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   // lands on the squad, which the chain below already walks.
   ['#debrief', { key: 'menuSelect' }],
   ['#ask', { key: 'menuBack' }],
+  ['#missions', { key: 'menuBack' }],
   ['#load', { key: 'menuBack' }],
   ['#oneplayer', { key: 'menuBack' }],
   ['#team', { key: 'menuBack' }],
@@ -56,6 +57,9 @@ export async function toMenu(page: Page): Promise<void> {
       if (await page.locator(view).isVisible()) {
         if ('click' in exit) await page.locator(exit.click).click()
         else await tap(page, exit.key)
+        // Several screens LEAVE the way they arrived — springs and launchers,
+        // half a second of travel — so wait the exit out before walking on.
+        await expect(page.locator(view)).toBeHidden()
         break
       }
     }

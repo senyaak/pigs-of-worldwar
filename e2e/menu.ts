@@ -19,6 +19,7 @@ export type Screen =
   | 'onePlayer'
   | 'loadScreen'
   | 'askTraining'
+  | 'missionList'
   | 'debrief'
   | 'teamScreen'
   | 'nameScreen'

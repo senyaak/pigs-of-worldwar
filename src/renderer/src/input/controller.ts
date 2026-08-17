@@ -320,6 +320,8 @@ declare global {
       loadScreen?: BarScreenView
       /** PLAY TRAINING MISSION? — YES over NO (ui/askTraining.ts). */
       askTraining?: BarScreenView
+      /** The MISSION MAP — `selected` is the browsed position (ui/missionList.ts). */
+      missionList?: BarScreenView
       /** The DEBRIEF — CONTINUE over RETRY (ui/debrief.ts). */
       debrief?: BarScreenView
       /** SELECT TEAM — the six armies (ui/teamScreen.ts). */
