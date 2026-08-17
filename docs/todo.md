@@ -312,11 +312,13 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
     (`mainbar1`'s repeat seam) and one kept divergence (up/down toggle too).
     Records 0/24/43 — the QUIT confirms — can reuse the module whenever the
     escape menu lands.
-  - **The end-of-mission DEBRIEF** — not a frontend record at all: the
-    battle's own 640×480 page, `debrief/notes.md`, faces/wounded/RIP,
-    uniforms, the award formula (now in `missionReward`), the rollback
-    snapshot, no retry menu in the original. Our bar-machine debrief can
-    become the real page when its art is wired.
+  - ~~**The end-of-mission DEBRIEF**~~ **BUILT 2026-08-18** — `ui/debrief.ts`
+    is the original's page: the loose BMPs of `Language/Tims/debrief/`
+    through their own loader, faces/wounded/`r_i_p` with the team's uniform
+    over the living, the pitch-74/73 rows, `Pigbkpc2` behind a loss, the
+    greyed SPECIAL BONUS row. Stand-ins, tagged: the `vp` coin for the
+    spinning `propoint.mad`, BIG/GameChars for the exe's unread gtext font
+    pair, and our CONTINUE/RETRY fork where the exe pays with SPACE.
 - ~~the CAMPAIGN MAP~~ **READ 2026-08-17, and THERE IS NO SUCH SCREEN**
   (`frontend/notes.md`). The "screen 22" of 0x41A2B0 is RECORD 22, GAME
   ENGINE — a launch state with no draw arm — and the campaign goes squad →
