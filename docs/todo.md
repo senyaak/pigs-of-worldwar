@@ -301,9 +301,14 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
     showing the picked slot's classes and MISSION N. No sound in the whole
     family; no delete exists in the exe; SAVE overwrites unguarded. Our
     `ui/loadScreen.ts` stand-in can be replaced with the real thing.
-  - **The confirm box (kind 12)** — behaviour decoded to the last sound;
-    `ui/askTraining.ts` can become the real widget box. NO on record 39
-    launches position 1 (already `[exe]` in ours).
+  - ~~**The confirm box (kind 12)**~~ **BUILT 2026-08-18** —
+    `ui/askTraining.ts` is the real widget box now: the two springs in from
+    the upper right, the `yesno` turn-over landing on `yes` with `Indu008`,
+    the six-tick `yesdial` slide with its stand-still window, the words
+    behind the hide-flag fade, the leave in reverse. One guessed number
+    (`mainbar1`'s repeat seam) and one kept divergence (up/down toggle too).
+    Records 0/24/43 — the QUIT confirms — can reuse the module whenever the
+    escape menu lands.
   - **The end-of-mission DEBRIEF** — not a frontend record at all: the
     battle's own 640×480 page, `debrief/notes.md`, faces/wounded/RIP,
     uniforms, the award formula (now in `missionReward`), the rollback

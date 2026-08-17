@@ -551,3 +551,15 @@ save grew a `tutorial` flag a win on position 0 raises and a skip does not.
 Every mission still opens CAMP — the twenty-five real levels wait on an AI.
 The read-debts this leaves are in todo.md §0's "what gates what", the campaign
 map screen ("screen 22", 0x41E365, nothing read) first among them.
+
+**The confirm box is the real widget now** (2026-08-18). `ui/askTraining.ts`
+stopped being a bar-machine stand-in the day after its behaviour pass: the
+kind-12 box slides in from the upper right on its two own springs, turns
+itself over onto the `yes` picture with `Indu008`, walks its band's short
+plate out, slides the dial six ticks with the window standing still, hides
+the words behind the exe's own countdown flag, and leaves in reverse — every
+number and sound the disassembly's (`frontend/notes.md`, the 2026-08-17
+pass). Guessed: only `mainbar1`'s repeat seam. Kept on purpose: up/down
+toggle the answer alongside left/right, where the exe's up/down arms are
+empty. The QUIT confirms (records 0, 24, 43) wear the same layout and wait
+on an escape menu to need them.
