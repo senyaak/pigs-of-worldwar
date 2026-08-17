@@ -129,7 +129,9 @@ export const discardMission = (): void => {
 /**
  * The player declined the training ground: the campaign steps past position 0
  * with no reward and no roster change, and the tutorial flag stays down —
- * skipped is not finished. Written at once: a decline is a decision.
+ * skipped is not finished. **The step is the exe's own** (0x42C37E writes
+ * `team[0x53] = 1` on record 39's NO and launches); written at once because a
+ * decline is a decision, which the original cannot do — it has no autosave.
  */
 export async function skipTutorial(): Promise<SaveGame | null> {
   if (!save || save.position !== 0) return save
