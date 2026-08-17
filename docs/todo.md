@@ -294,13 +294,16 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
   other twenty-five levels wait on an AI to field their far side.
 - ~~The read-from-scratch debts~~ **ALL THREE READ 2026-08-17**, each a build
   now waiting on nothing:
-  - **LOAD/SAVE (kinds 8/9)** — `frontend/notes.md`: one screen for both,
-    eight `pclit` plates at x 385 blinking script 1006 for the selection, the
-    `pcsav` frame, the `pcsvinf0..4` panel unrolling as the screen rises from
-    below, labels = team names read off the files, `---` for empty, the panel
-    showing the picked slot's classes and MISSION N. No sound in the whole
-    family; no delete exists in the exe; SAVE overwrites unguarded. Our
-    `ui/loadScreen.ts` stand-in can be replaced with the real thing.
+  - ~~**LOAD/SAVE (kinds 8/9)**~~ **LOAD BUILT 2026-08-18** —
+    `ui/loadScreen.ts` wears the original's furniture on our slots: the eight
+    `pclit` plates blinking script 1006, the `pcsav` frame, the `pcsvinf`
+    panel unrolling as the screen rises from a screen below, `---` for an
+    empty slot, the cursor refusing to rest on one, the panel drawing the
+    picked squad's badges and MISSION N, and not one sound — the family has
+    none. **SAVE ARMY (record 21, kind 9) is deliberately NEVER built**
+    (`[play]`): the campaign autosaves and there is nothing to save by hand.
+    The player screen's SAVE TEAM label goes with it whenever that screen is
+    next touched.
   - ~~**The confirm box (kind 12)**~~ **BUILT 2026-08-18** —
     `ui/askTraining.ts` is the real widget box now: the two springs in from
     the upper right, the `yesno` turn-over landing on `yes` with `Indu008`,

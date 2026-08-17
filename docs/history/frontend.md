@@ -563,3 +563,16 @@ pass). Guessed: only `mainbar1`'s repeat seam. Kept on purpose: up/down
 toggle the answer alongside left/right, where the exe's up/down arms are
 empty. The QUIT confirms (records 0, 24, 43) wear the same layout and wait
 on an escape menu to need them.
+
+**LOAD GAME wears the original's furniture, and SAVE ARMY will never exist**
+(2026-08-18). `ui/loadScreen.ts` came off the bar machine the day after its
+read: the eight `pclit` plates with the lit one blinking script 1006, the
+`pcsav` frame, the `pcsvinf` panel unrolling one frame a tick as the screen
+climbs from a full screen below, the words riding in from 32 px left on their
+own spring, `---` in an empty slot and a cursor that refuses to rest on one —
+and no sound anywhere, because the family has none. The MEANING is ours: the
+slots are the campaign's eight JSON autosaves, and the panel draws the picked
+squad's badges and MISSION N off the parsed save rather than a 680-byte
+struct. SAVE ARMY — the same screen with one action changed — is deliberately
+never built: the campaign autosaves, and play ruled there is nothing to save
+by hand.
