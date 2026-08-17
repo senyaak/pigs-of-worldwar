@@ -35,7 +35,9 @@ export interface SaveGame {
    * exactly this in one byte and ends the campaign when it reaches 26.
    */
   position: number
-  /** The nation faced at each position already played, indexed by position. */
+  /** The nation faced at each position, indexed by position — rolled ONCE at
+   * creation, the original's own way (`lib/game/enemies.ts`), and re-stamped
+   * with the nation actually fought as each mission ends (0x484F2E). */
   enemies: number[]
   /** Eight slots, always. */
   squad: Pig[]
@@ -58,13 +60,19 @@ export const isComplete = (save: SaveGame): boolean => save.position >= CAMPAIGN
 /** The map the next mission opens, or null for a finished campaign. */
 export const nextMap = (save: SaveGame): string | null => mapAt(save.position)
 
-export function newGame(name: string, nation: number, squad: Pig[], now: string): SaveGame {
+export function newGame(
+  name: string,
+  nation: number,
+  squad: Pig[],
+  now: string,
+  enemies: number[] = []
+): SaveGame {
   return {
     version: SAVE_VERSION,
     name,
     nation,
     position: 0,
-    enemies: [],
+    enemies,
     squad,
     drafts: 0,
     tokens: 0,

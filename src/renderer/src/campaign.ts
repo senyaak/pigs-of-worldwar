@@ -25,6 +25,7 @@ import {
   serialise,
   type SaveGame
 } from '../../lib/game/save'
+import { drawEnemies } from '../../lib/game/enemies'
 import { standingCount, SQUAD_SIZE, type Pig } from '../../lib/game/roster'
 
 /** The eight slot names, the original's own. */
@@ -68,7 +69,9 @@ export async function begin(name: string, nation: number, squad: Pig[]): Promise
   const listed = await window.api.listSaves()
   const taken = listed.ok ? listed.saves.map((file) => file.name) : []
   slot = SLOTS.find((name_) => !taken.includes(name_)) ?? taken[taken.length - 1] ?? SLOTS[0]
-  save = newGame(name, nation, squad, new Date().toISOString())
+  // The whole campaign's enemies are decided HERE, the original's own way —
+  // rolled at the team's birth, balanced, FINAL always Team Lard.
+  save = newGame(name, nation, squad, new Date().toISOString(), drawEnemies(nation, Math.random))
   pending = null
   await write()
   return save
@@ -85,9 +88,9 @@ export function adopt(from: { slot: string; save: SaveGame }): SaveGame {
 /**
  * The mission was WON: settle the roster, step the campaign and hold the
  * result for the debrief. The tokens earned are the manual's own rule; the
- * enemy nation is `(own + 1) % 6`, which is the exe's answer for the training
- * ground (0x41A409) standing in for every position until the table at
- * `team+0x54` has a writer (`[CHECK — remake]`).
+ * enemy nation comes off the table the campaign was born with (`enemies.ts`),
+ * with the training ground's `(own + 1) % 6` covering a loaded save from
+ * before the table existed.
  *
  * The squad handed in is the roster as the battle left it — today that is the
  * roster untouched, because a battle does not yet field the SAVE's pigs
@@ -99,7 +102,7 @@ export function missionWon(): SaveGame | null {
   const won = finishMission(
     save,
     save.squad,
-    (save.nation + 1) % 6,
+    save.enemies[save.position] ?? (save.nation + 1) % 6,
     save.tokens + missionReward(losses),
     new Date().toISOString()
   )

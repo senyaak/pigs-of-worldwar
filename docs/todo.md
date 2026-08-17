@@ -293,12 +293,27 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
   opens CAMP** (`MISSION_STAND_IN`, `main.ts`) — the list of 26 is real, the
   other twenty-five levels wait on an AI to field their far side.
 - The read-from-scratch debts: LOAD GAME's arm (0x41DF4A), the confirm box's
-  widget walk (kind 12), the end-of-mission screen, and the CAMPAIGN MAP —
-  "screen 22", draw arm 0x41E365, of which NOTHING is read: no record id
-  pinned, no art (its loader arm is one of the six unread in 0x421B40), only
-  `0x41A2B0` saying the picked row is written back into `team+0x53` and
-  0x429280 printing the raw map name. That screen is where the enemy-nation
-  table at `team+0x54` gets its writer (0x4829D0).
+  widget walk (kind 12), and the end-of-mission screen.
+- ~~the CAMPAIGN MAP~~ **READ 2026-08-17, and THERE IS NO SUCH SCREEN**
+  (`frontend/notes.md`). The "screen 22" of 0x41A2B0 is RECORD 22, GAME
+  ENGINE — a launch state with no draw arm — and the campaign goes squad →
+  (record 39's question at position 0) → launch, with no between-mission
+  screen at all. So our flow already matches the original's shape. What the
+  read yielded instead:
+  - **the mission list on screen is the CHEAT** — record 44, CHEAT LEVEL
+    SELECT, kind 2, opened by naming the team NAUGHTY PIGS (fetext 0x2EB;
+    also sets the tokens to 99): 26 raw map names in a seven-row scroll
+    window, and choosing a row MOVES `team+0x53`. Buildable any time on the
+    machinery we have; a `[gap]` until then.
+  - **the enemy table is rolled at the team's birth** (0x482940) — balanced
+    five of each other nation over positions 1..24, FINAL always Team Lard —
+    **and the remake now does the same**: `lib/game/enemies.ts`, rolled in
+    `campaign.begin`, read back by `missionWon`. `[exe]`.
+  - the full-screen map art (`lselpc*`) is MULTIPLAYER's SELECT LEVEL
+    (record 28, kind 20, arm 0x41E579) — a screen for the `net` worktree's
+    future, not the campaign's.
+  - mission TITLES (`gtext 11+mapId`) are drawn only by the battle's opening
+    card, which `ui/titleCard.ts` already does.
 - NEW GAME's first two screens are built. **SELECT TEAM's own pass is done**
   (0x41CBE1 and the widget pass at 0x41E790), and it found three wrong numbers
   in the old summary — which is the argument for doing the NAME ENTRY's pass

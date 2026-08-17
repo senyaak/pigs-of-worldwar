@@ -18,6 +18,7 @@ import {
   parse,
   serialise
 } from '../src/lib/game/save'
+import { LARD, drawEnemies } from '../src/lib/game/enemies'
 
 const NAMES = ['JONES', 'DEN', 'BASIL', 'GINGER', 'MONTY', 'SMITH', 'PONSONBY', 'PERCY']
 const squadOf = (): ReturnType<typeof newSquad> => newSquad(NAMES, [8, 2, 4, 1, 3, 7, 5, 6])
@@ -150,4 +151,35 @@ test('a mission pays one point, two for bringing all five through', { tag: '@nod
   expect(missionReward(0)).toBe(2)
   expect(missionReward(1)).toBe(1)
   expect(missionReward(5)).toBe(1)
+})
+
+test('the enemies are drawn at birth: balanced, never you, LARD last', { tag: '@nodata' }, () => {
+  // A seeded LCG, so the roll is the same every run — lib/game takes chance
+  // as a port and never reaches for Math.random itself.
+  let seed = 1
+  const rand = (): number => {
+    seed = (seed * 48271) % 2147483647
+    return seed / 2147483647
+  }
+  for (let own = 0; own < 6; own++) {
+    const enemies = drawEnemies(own, rand)
+    expect(enemies).toHaveLength(26)
+    // The training ground carries the launcher's own fallback.
+    expect(enemies[0]).toBe((own + 1) % 6)
+    // FINAL is always Team Lard.
+    expect(enemies[25]).toBe(LARD)
+    // Positions 1..24: never the player's own nation, never LARD, and the
+    // balance holds — the roll gives five of each of the five others over
+    // 1..25 and FINAL's overwrite takes one back, so four or five each.
+    const middle = enemies.slice(1, 25)
+    expect(middle).toHaveLength(24)
+    expect(middle).not.toContain(own)
+    expect(middle).not.toContain(LARD)
+    for (let nation = 0; nation < 6; nation++) {
+      if (nation === own) continue
+      const count = middle.filter((enemy) => enemy === nation).length
+      expect(count).toBeGreaterThanOrEqual(4)
+      expect(count).toBeLessThanOrEqual(5)
+    }
+  }
 })
