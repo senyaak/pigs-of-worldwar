@@ -32,6 +32,11 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   ['#viewer', { click: '#viewer-back' }],
   ['#archive-view', { click: '#archive-back' }],
   ['#browser', { click: '#browser-menu' }],
+  // The DEBRIEF has no back key on purpose — CONTINUE is its way out, and it
+  // lands on the squad, which the chain below already walks.
+  ['#debrief', { key: 'menuSelect' }],
+  ['#ask', { key: 'menuBack' }],
+  ['#load', { key: 'menuBack' }],
   ['#oneplayer', { key: 'menuBack' }],
   ['#team', { key: 'menuBack' }],
   ['#name', { key: 'menuBack' }],

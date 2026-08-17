@@ -9,7 +9,15 @@ import { test, expect } from '@playwright/test'
 
 import { CAMPAIGN, CAMPAIGN_LENGTH, MAP_NAMES, mapAt, mapId, missionNameIndex } from '../src/lib/game/missions'
 import { RETURNING, SQUAD_SIZE, fall, newSquad, regroup, standing, standingCount } from '../src/lib/game/roster'
-import { finishMission, isComplete, newGame, nextMap, parse, serialise } from '../src/lib/game/save'
+import {
+  finishMission,
+  isComplete,
+  missionReward,
+  newGame,
+  nextMap,
+  parse,
+  serialise
+} from '../src/lib/game/save'
 
 const NAMES = ['JONES', 'DEN', 'BASIL', 'GINGER', 'MONTY', 'SMITH', 'PONSONBY', 'PERCY']
 const squadOf = (): ReturnType<typeof newSquad> => newSquad(NAMES, [8, 2, 4, 1, 3, 7, 5, 6])
@@ -129,4 +137,17 @@ test('a save goes out and comes back, and rubbish comes back as nothing', { tag:
   expect(parse(serialise({ ...save, nation: 6 }))).toBeNull()
   expect(parse(serialise({ ...save, position: CAMPAIGN_LENGTH + 1 }))).toBeNull()
   expect(parse(serialise({ ...save, squad: save.squad.slice(1) }))).toBeNull()
+})
+
+test('a save from before the tutorial question answers "not played"', { tag: '@nodata' }, () => {
+  const save = newGame('OLD GUARD', 0, squadOf(), '2026-08-13T00:00:00.000Z')
+  const aged = JSON.parse(serialise(save)) as Record<string, unknown>
+  delete aged.tutorial
+  expect(parse(JSON.stringify(aged))).toEqual({ ...save, tutorial: false })
+})
+
+test('a mission pays one point, two for bringing all five through', { tag: '@nodata' }, () => {
+  expect(missionReward(0)).toBe(2)
+  expect(missionReward(1)).toBe(1)
+  expect(missionReward(5)).toBe(1)
 })

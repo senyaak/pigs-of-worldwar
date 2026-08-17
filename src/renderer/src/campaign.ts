@@ -1,0 +1,136 @@
+// THE CAMPAIGN IN PLAY — the one save the renderer is living in, and every
+// change it goes through between the menu and a mission.
+//
+// The rules are `lib/game/save.ts` and `lib/game/roster.ts`; this module is
+// the STATE — which slot the campaign writes, what the save says right now,
+// and the one mission result that is waiting to be accepted or thrown away.
+// `main.ts` stays the composition root: it decides which screen to show, this
+// decides what is true when it asks.
+//
+// **The original keeps EIGHT slots**, `savearmy0..7` — `sprintf("%s%d")` at
+// 0x42C3E7, and the no-save arm at 0x42C52D walks exactly that range
+// (`army/notes.md`). Ours are the same eight names holding JSON instead of the
+// exe's 680-byte struct, which is the shape `lib/game/save.ts` owns.
+//
+// **A won mission is not written until it is ACCEPTED** (`[play]`): the
+// debrief offers REPLAY to a player unhappy with the result, and a replay must
+// find the squad as the mission found it — so `finishMission` runs into
+// `pending` and only `acceptMission` writes it over the live save.
+
+import {
+  finishMission,
+  missionReward,
+  newGame,
+  parse,
+  serialise,
+  type SaveGame
+} from '../../lib/game/save'
+import { standingCount, SQUAD_SIZE, type Pig } from '../../lib/game/roster'
+
+/** The eight slot names, the original's own. */
+export const SLOTS = Array.from({ length: 8 }, (_, i) => `savearmy${i}`)
+
+let slot: string | null = null
+let save: SaveGame | null = null
+let pending: SaveGame | null = null
+
+/** The save as it stands, or null outside a campaign. */
+export const current = (): SaveGame | null => save
+
+/** The result waiting on the debrief, or null when nothing is. */
+export const afterMission = (): SaveGame | null => pending
+
+const write = async (): Promise<void> => {
+  if (!slot || !save) return
+  const wrote = await window.api.writeSave(slot, serialise(save))
+  // A save that will not write does NOT stop the game — the player asked to
+  // play, not to write files. It is worth a line in the console and no more.
+  if (!wrote.ok) console.warn(`campaign: the save would not write (${wrote.error})`)
+}
+
+/** Every slot that holds a readable save, newest first — LOAD GAME's list. */
+export async function listCampaigns(): Promise<{ slot: string; save: SaveGame }[]> {
+  const listed = await window.api.listSaves()
+  if (!listed.ok) return []
+  return listed.saves
+    .filter((file) => SLOTS.includes(file.name))
+    .map((file) => ({ slot: file.name, save: parse(file.text) }))
+    .filter((entry): entry is { slot: string; save: SaveGame } => entry.save !== null)
+}
+
+/**
+ * Start a fresh campaign in the first FREE slot — or, all eight taken, over
+ * the oldest, which is the listing's last (`src/main/saves.ts` sorts newest
+ * first). The original makes the player pick a slot on a SAVE ARMY screen;
+ * ours autosaves, so the slot is picked here and kept for the campaign's life.
+ */
+export async function begin(name: string, nation: number, squad: Pig[]): Promise<SaveGame> {
+  const listed = await window.api.listSaves()
+  const taken = listed.ok ? listed.saves.map((file) => file.name) : []
+  slot = SLOTS.find((name_) => !taken.includes(name_)) ?? taken[taken.length - 1] ?? SLOTS[0]
+  save = newGame(name, nation, squad, new Date().toISOString())
+  pending = null
+  await write()
+  return save
+}
+
+/** Take up a loaded save: LOAD GAME chose it, this is now the campaign. */
+export function adopt(from: { slot: string; save: SaveGame }): SaveGame {
+  slot = from.slot
+  save = from.save
+  pending = null
+  return save
+}
+
+/**
+ * The mission was WON: settle the roster, step the campaign and hold the
+ * result for the debrief. The tokens earned are the manual's own rule; the
+ * enemy nation is `(own + 1) % 6`, which is the exe's answer for the training
+ * ground (0x41A409) standing in for every position until the table at
+ * `team+0x54` has a writer (`[CHECK — remake]`).
+ *
+ * The squad handed in is the roster as the battle left it — today that is the
+ * roster untouched, because a battle does not yet field the SAVE's pigs
+ * (`docs/todo.md`); the fallen arrive with that link.
+ */
+export function missionWon(): SaveGame | null {
+  if (!save) return null
+  const losses = SQUAD_SIZE - standingCount(save.squad)
+  const won = finishMission(
+    save,
+    save.squad,
+    (save.nation + 1) % 6,
+    save.tokens + missionReward(losses),
+    new Date().toISOString()
+  )
+  // Winning the training ground is what sets the tutorial flag.
+  pending = save.position === 0 ? { ...won, tutorial: true } : won
+  return pending
+}
+
+/** The debrief took the result: it becomes the save and goes to disk. */
+export async function acceptMission(): Promise<SaveGame | null> {
+  if (!pending) return save
+  save = pending
+  pending = null
+  await write()
+  return save
+}
+
+/** The debrief chose REPLAY (or the mission was lost): the result is thrown
+ * away and the save stands as the mission found it. */
+export const discardMission = (): void => {
+  pending = null
+}
+
+/**
+ * The player declined the training ground: the campaign steps past position 0
+ * with no reward and no roster change, and the tutorial flag stays down —
+ * skipped is not finished. Written at once: a decline is a decision.
+ */
+export async function skipTutorial(): Promise<SaveGame | null> {
+  if (!save || save.position !== 0) return save
+  save = { ...save, position: 1, savedAt: new Date().toISOString() }
+  await write()
+  return save
+}

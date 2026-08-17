@@ -17,7 +17,7 @@
 import { existsSync } from 'node:fs'
 
 import { PHASE_ENV, launchApp, openAssets } from '../launch'
-import { expect, test } from '../app'
+import { expect, test, toMenu } from '../app'
 import { tap } from '../controller'
 import { choose, labels, lightBar, nudge, selection, startGame } from '../menu'
 
@@ -95,12 +95,14 @@ test('ONE PLAYER is a screen of its own — NEW GAME over LOAD GAME', async ({ a
   // fetext 55 and 56, screen 14's own two items.
   await expect.poll(() => labels(page, 'onePlayer')).toEqual(['NEW GAME', 'LOAD GAME'])
 
-  // LOAD GAME is dark: there is a save but no screen 10 to list it from, so
-  // the bar refuses to be chosen and the lit bar stays where it was.
+  // LOAD GAME opens screen 10 — the slot list (ui/loadScreen.ts) — and its
+  // back key returns here.
   await lightBar(page, 'NEW GAME', 'onePlayer')
   await nudge(page, 'menuDown', 'onePlayer')
   expect(await selection(page, 'onePlayer')).toBe(1)
   await tap(page, 'menuSelect')
+  await expect(page.locator('#load')).toBeVisible()
+  await tap(page, 'menuBack')
   await expect(page.locator('#oneplayer')).toBeVisible()
 
   // And the back key is the way out, the way it is on MULTI-PLAYER.
@@ -190,7 +192,11 @@ test('NEW GAME opens the battle, and F1 the asset browsers', async ({ app }) => 
   await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
   await expect(page.locator('#menu')).toBeHidden()
+  // Walking out of a campaign battle is an ABORT: it lands on the squad, not
+  // the menu — nothing is settled and nothing is written (main.ts).
   await page.locator('#battle-leave').click()
+  await expect(page.locator('#player')).toBeVisible()
+  await toMenu(page)
   await expect(page.locator('#menu')).toBeVisible()
 
   await openAssets(page)

@@ -517,3 +517,37 @@ in — and the arm's third loop (0x41D70E) that would place some of it. Where th
 letters sit on the name entry's panel is still the remake's own: the exe lays
 them out through the text object off record 15's first item box, (280, 250)
 270×30 raw, and that arm is unread.
+
+**The furniture went down three days later, and there was never a third loop**
+(2026-08-16). 0x41D70E is loop 2's fourth blit block — the promotion flag,
+`pcflag` on any pig whose next step the team can afford — and the furniture is
+the arm's TAIL, 0x41D830 to its `ret`, read end to end this session
+(`frontend/notes.md`). The answer to the screen's oldest riddle fell out of it:
+the right column's panel is the LEFT one, its source cut 179 rows short —
+exactly the two rows that column does not have — and capped with its own
+top-left corner flipped in both axes. `sqpics00..10` is the panel's arrival
+animation, `parrow1..3` and `sqarmy` are dead, `pigpro` is the arm's LAST blit
+and stands in front, and play read the shipped screen off it: it is the BOARD,
+five lines about the team and the lit pig written with the markup icons
+`vp`/`battle`/`kills`. Each column got a dial of its own that only rides up and
+down (`[play]`, then the tail agreed — two dials on counters of their own), the
+names moved onto the plate above the badge, and every trapezoid came out
+`bgdark`. The layout itself was regrouped into rows/columns/drop so the console
+work is one knob a move, and the nudge stash survives the window closing — an
+e2e run got a profile of its own the same evening, having been found writing
+its layouts into the developer's stash through the shared Electron profile.
+
+**The campaign got its spine** (2026-08-17). The save is LIVE now:
+`src/renderer/src/campaign.ts` holds the game in play, `begin` writes the first
+free of the original's eight `savearmy0..7` slots, and the three ways a battle
+ends go three ways — WON through the debrief, where CONTINUE takes the settled
+result (the manual's award: one point, two with all five through) and RETRY
+throws it away; LOST is the manual's replay; walked-out is an abort straight
+back to the squad, nothing written. LOAD GAME (`ui/loadScreen.ts`), the debrief
+(`ui/debrief.ts`, gtext's own 163/164/181/193) and PLAY TRAINING MISSION?
+(`ui/askTraining.ts`, fetext 141..143 — the original's record 39, whose kind-12
+box is decoded and not yet built) all ride the bar machine as stand-ins; the
+save grew a `tutorial` flag a win on position 0 raises and a skip does not.
+Every mission still opens CAMP — the twenty-five real levels wait on an AI.
+The read-debts this leaves are in todo.md §0's "what gates what", the campaign
+map screen ("screen 22", 0x41E365, nothing read) first among them.

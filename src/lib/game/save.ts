@@ -43,6 +43,11 @@ export interface SaveGame {
   drafts: number
   /** Unspent PP. */
   tokens: number
+  /** Whether the training ground has been PLAYED to its end. Position 0 is
+   * CAMP and the player is asked whether to play it at all (the original's
+   * record 39, PLAY TRAINING MISSION?); declining steps past it, so this flag
+   * is what says the tutorial was finished rather than skipped. */
+  tutorial: boolean
   /** ISO 8601, for the LOAD GAME list to sort and label by. */
   savedAt: string
 }
@@ -63,9 +68,22 @@ export function newGame(name: string, nation: number, squad: Pig[], now: string)
     squad,
     drafts: 0,
     tokens: 0,
+    tutorial: false,
     savedAt: now
   }
 }
+
+/**
+ * What winning a mission is worth in promotion points — `[manual]`:
+ *
+ * > You receive one promotion point for finishing the level and one more if
+ * > you bring all five of your swine through it.
+ *
+ * The exe's own award is not read (`army/notes.md` lists it as unsolved), and
+ * the manual's "up to five bonus points hidden on some levels" is a `[gap]` —
+ * nothing here knows where they hide.
+ */
+export const missionReward = (losses: number): number => (losses === 0 ? 2 : 1)
 
 /**
  * A mission is over: the fallen are settled, the campaign steps on, and the
@@ -127,6 +145,9 @@ export function parse(text: string): SaveGame | null {
   if (!Array.isArray(save.enemies) || !save.enemies.every(isCount)) return null
   if (!Array.isArray(save.squad) || save.squad.length !== SQUAD_SIZE) return null
   if (!save.squad.every(isPig)) return null
+  // `tutorial` arrived after the shape shipped; a file without it is from
+  // before the question existed, and the honest answer for it is "not played".
+  if (typeof save.tutorial !== 'boolean') save.tutorial = false
   return save as SaveGame
 }
 

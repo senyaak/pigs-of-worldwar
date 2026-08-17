@@ -124,6 +124,10 @@ const MISSES_TURN = 167
 const MISSION_ACCOMPLISHED = 163
 const MISSION_FAILED = 164
 
+/** How a battle came to be over: the engine's verdict, or the LEAVE button
+ * before it gave one — which is the player walking out on the mission. */
+export type BattleExit = 'won' | 'lost' | 'aborted'
+
 export interface BattleView {
   /** Open a battle. With no name it reopens whatever map the view is on,
    * which is the training ground until something asks for another — the
@@ -132,7 +136,7 @@ export interface BattleView {
   close(): void
 }
 
-export function initBattle(onLeave: () => void): BattleView {
+export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
   const canvasHost = byId<HTMLDivElement>('battle-canvas')
   const hudCanvas = byId<HTMLCanvasElement>('battle-hud')
   const hud = createHud(hudCanvas)
@@ -432,6 +436,10 @@ export function initBattle(onLeave: () => void): BattleView {
     if (action === 'trainingNext') void goToStep(standingStep() + 1)
   })
 
+  /** The engine's verdict, once it has given one. The LEAVE button before
+   * that is an ABORT — the player walking out, not an outcome. */
+  let verdict: Extract<BattleExit, 'won' | 'lost'> | null = null
+
   /** Put the battle away: the LEAVE button, and the end of a mission. */
   const leave = (): void => {
     controller.releaseAll()
@@ -443,7 +451,7 @@ export function initBattle(onLeave: () => void): BattleView {
     painted = 0
     speech.stop()
     hud.clear()
-    onLeave()
+    onLeave(verdict ?? 'aborted')
   }
 
   byId<HTMLButtonElement>('battle-leave').addEventListener('click', leave)
@@ -479,6 +487,7 @@ export function initBattle(onLeave: () => void): BattleView {
     speech.stop()
     cued = new Set()
     step = 0
+    verdict = null
     // A fresh level is the tutorial's first rung again, whoever asked for it —
     // the menu, `pow.swapMap`, or a step BACK, which sets its own want on the
     // far side of this.
@@ -613,6 +622,7 @@ export function initBattle(onLeave: () => void): BattleView {
         // by how many turns it took (lib/game/tutorial.ts) — over the beat the
         // engine holds the battle in.
         missionOver: ({ won, turns }) => {
+          verdict = won ? 'won' : 'lost'
           if (won) sergeant(clipForClosing(turns))
         },
         // …and that beat has run out: the battle goes away, exactly as the LEAVE

@@ -17,6 +17,9 @@ import { beginTurn, landed, tap } from './controller'
 export type Screen =
   | 'menu'
   | 'onePlayer'
+  | 'loadScreen'
+  | 'askTraining'
+  | 'debrief'
   | 'teamScreen'
   | 'nameScreen'
   | 'playerScreen'
@@ -214,7 +217,9 @@ export async function startGame(page: Page): Promise<void> {
   await beginTurn(page)
 }
 
-/** START MISSION on the player screen, which opens on it already lit. */
+/** START MISSION on the player screen, which opens on it already lit — and
+ * through PLAY TRAINING MISSION?, which a fresh campaign asks first. The
+ * suite always answers YES: its battles are the training ground. */
 export async function startMission(page: Page): Promise<void> {
   await expect
     .poll(
@@ -227,4 +232,6 @@ export async function startMission(page: Page): Promise<void> {
     )
     .toBe(false)
   await tap(page, 'menuSelect')
+  await expect(page.locator('#ask')).toBeVisible()
+  await choose(page, 'YES', 'askTraining')
 }

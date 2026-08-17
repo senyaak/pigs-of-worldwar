@@ -29,6 +29,10 @@ export function initOnePlayer(handlers: {
   /** NEW GAME. The original goes to SELECT TEAM; until that screen is built
    * this is what the main menu's own bar used to do. */
   onNewGame: () => void
+  /** LOAD GAME — screen 10, `ui/loadScreen.ts`. The bar is lit whether or not
+   * a save exists; an empty list is that screen's own state to show, the way
+   * the original walks its eight slots and draws what it finds (0x42C52D). */
+  onLoadGame: () => void
   /** Back to the main menu. */
   onBack: () => void
 }): OnePlayerScreen {
@@ -43,12 +47,9 @@ export function initOnePlayer(handlers: {
         choose: handlers.onNewGame
       },
       {
-        // Dark until there is a LOAD screen to open. The save itself exists
-        // (lib/game/save.ts) and the slot list is `src/main/saves.ts` away;
-        // what is missing is screen 10's layout, which is kind 8 and has not
-        // been read at all.
         label: () => feText(LOAD_GAME_TEXT),
-        enabled: () => false
+        enabled: () => true,
+        choose: handlers.onLoadGame
       }
     ]
   })

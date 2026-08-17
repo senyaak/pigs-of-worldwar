@@ -316,6 +316,12 @@ declare global {
       menu?: BarScreenView
       /** ONE PLAYER — NEW GAME over LOAD GAME (ui/onePlayer.ts). */
       onePlayer?: BarScreenView
+      /** LOAD GAME — the eight slots (ui/loadScreen.ts). */
+      loadScreen?: BarScreenView
+      /** PLAY TRAINING MISSION? — YES over NO (ui/askTraining.ts). */
+      askTraining?: BarScreenView
+      /** The DEBRIEF — CONTINUE over RETRY (ui/debrief.ts). */
+      debrief?: BarScreenView
       /** SELECT TEAM — the six armies (ui/teamScreen.ts). */
       teamScreen?: BarScreenView
       /** PLEASE NAME YOUR TEAM (ui/nameScreen.ts). `selected` is the exe's own

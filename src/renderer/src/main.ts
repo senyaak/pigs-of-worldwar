@@ -6,6 +6,9 @@ import type { BarScreenView } from './input/controller'
 import { initWelcome } from './ui/welcome'
 import { initMenu } from './ui/menu'
 import { initOnePlayer } from './ui/onePlayer'
+import { initLoadScreen } from './ui/loadScreen'
+import { initAskTraining } from './ui/askTraining'
+import { initDebrief } from './ui/debrief'
 import { initTeamScreen } from './ui/teamScreen'
 import { initNameScreen } from './ui/nameScreen'
 import { initPlayerScreen } from './ui/playerScreen'
@@ -17,12 +20,15 @@ import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 import { feText } from './ui/barScreen'
 import { newSquad, SQUAD_SIZE } from '../../lib/game/roster'
-import { newGame, serialise } from '../../lib/game/save'
+import * as campaign from './campaign'
 
 type View =
   | 'welcome'
   | 'menu'
   | 'oneplayer'
+  | 'load'
+  | 'ask'
+  | 'debrief'
   | 'team'
   | 'name'
   | 'player'
@@ -36,6 +42,9 @@ const panels: Record<View, HTMLElement[]> = {
   welcome: [byId('welcome')],
   menu: [byId('menu')],
   oneplayer: [byId('oneplayer')],
+  load: [byId('load')],
+  ask: [byId('ask')],
+  debrief: [byId('debrief')],
   team: [byId('team')],
   name: [byId('name')],
   player: [byId('player')],
@@ -90,7 +99,78 @@ const archive = initArchiveView(
 const viewer = initModelViewer(() => show(viewerOrigin))
 const terrain = initTerrainViewer()
 
-const battle = initBattle(() => show('menu'))
+/**
+ * Every campaign mission opens the TRAINING GROUND for now — the list of 26
+ * is real (`lib/game/missions.ts`), the twenty-five levels above it are not
+ * playable yet, there being no AI to field their other side (`docs/todo.md`).
+ * `[gap]`: swap this for `nextMap(save)` when the levels land.
+ */
+const MISSION_STAND_IN = 'CAMP'
+
+/** Whether the battle on screen belongs to the campaign — a MULTI-PLAYER
+ * skirmish leaves the way it always has, back to the main menu. */
+let campaignBattle = false
+
+/** The squad screen, standing on whatever the campaign now says. */
+function toSquad(): void {
+  const save = campaign.current()
+  if (!save) {
+    show('menu')
+    return
+  }
+  playerScreen.show(save.squad, save.name, save.tokens)
+  show('player')
+  void playerScreen.load()
+}
+
+/** Open the campaign's next mission. */
+function startMission(): void {
+  campaignBattle = true
+  void battle.open(MISSION_STAND_IN).then((ok) => ok && show('battle'))
+}
+
+// How a battle comes back decides where it lands: a walked-out mission goes
+// straight to the squad, a decided one goes through the debrief — where a WIN
+// is settled (`campaign.missionWon`) and waits to be accepted or replayed.
+const battle = initBattle((exit) => {
+  if (!campaignBattle || !campaign.current()) {
+    show('menu')
+    return
+  }
+  if (exit === 'aborted') {
+    toSquad()
+    return
+  }
+  if (exit === 'won') campaign.missionWon()
+  debrief.show(exit === 'won')
+  show('debrief')
+  void debrief.load()
+})
+
+// After a WIN: CONTINUE takes the settled result — roster, position, tokens —
+// writes it, and stands on the squad; RETRY throws it away and takes the field
+// again. After a LOSS there is nothing to take (the manual's "do the level all
+// over again"), so the same two rows read as RETRY and walk-away.
+const debrief = initDebrief({
+  onContinue: () => {
+    void campaign.acceptMission().then(() => toSquad())
+  },
+  onRetry: () => {
+    campaign.discardMission()
+    startMission()
+  }
+})
+
+// PLAY TRAINING MISSION? — the original's record 39, asked once the campaign
+// stands at position 0. YES is the training ground; NO steps past it, and the
+// first REAL mission opens instead.
+const ask = initAskTraining({
+  onYes: () => startMission(),
+  onNo: () => {
+    void campaign.skipTutorial().then(() => startMission())
+  },
+  onBack: () => toSquad()
+})
 
 const menu = initMenu({
   onNewGame: () => {
@@ -112,7 +192,21 @@ const onePlayer = initOnePlayer({
     show('team')
     void teamScreen.load()
   },
+  onLoadGame: () => {
+    show('load')
+    void loadScreen.load()
+  },
   onBack: () => show('menu')
+})
+
+// LOAD GAME: a chosen slot becomes the campaign, and the squad stands up on
+// it exactly as it does off a fresh NEW GAME.
+const loadScreen = initLoadScreen({
+  onLoaded: (entry) => {
+    campaign.adopt(entry)
+    toSquad()
+  },
+  onBack: () => show('oneplayer')
 })
 
 // The army chosen carries on to PLEASE NAME YOUR TEAM — record 15, the
@@ -138,10 +232,18 @@ const nameScreen = initNameScreen({
 })
 
 // …and the squad it raised is the PLAYER screen, record 12: eight pigs, their
-// ranks, and START MISSION.
+// ranks, and START MISSION — which asks about the training ground first while
+// the campaign still stands at position 0.
 const playerScreen = initPlayerScreen({
   onStart: () => {
-    void battle.open().then((ok) => ok && show('battle'))
+    const save = campaign.current()
+    if (!save) return
+    if (save.position === 0) {
+      show('ask')
+      void ask.load()
+      return
+    }
+    startMission()
   },
   onBack: () => show('name')
 })
@@ -152,28 +254,18 @@ const playerScreen = initPlayerScreen({
  *
  * The squad's names are the nation's own, out of `fetext` — six blocks of ten
  * from 166, the side then its nine pigs (`lib/game/teams.ts`) — and eight is
- * what a squad holds (`lib/game/roster.ts`). The slot is the original's own
- * `savearmy0`; ours is JSON beside it in the checkout's `saves/`, never in the
- * game folder (`src/main/saves.ts`).
- *
- * A save that will not write does NOT stop the battle: the player asked to
- * play, and losing the file is worth a warning rather than a dead button.
+ * what a squad holds (`lib/game/roster.ts`). The state, the slot and the
+ * autosave are `campaign.ts`'s.
  */
-const SLOT = 'savearmy0'
-
 async function startCampaign(name: string, nation: number): Promise<void> {
   const pigNames = Array.from({ length: SQUAD_SIZE }, (_, i) => feText(166 + nation * 10 + 1 + i))
-  const squad = newSquad(pigNames, [])
-  const save = newGame(name, nation, squad, new Date().toISOString())
-  const written = await window.api.writeSave(SLOT, serialise(save))
-  if (!written.ok) console.warn(`the campaign was not saved: ${written.error}`)
-  playerScreen.show(save.squad, save.name, save.tokens)
-  show('player')
-  void playerScreen.load()
+  await campaign.begin(name, nation, newSquad(pigNames, []))
+  toSquad()
 }
 
 const multiPlayer = initMultiPlayer({
   onStart: (map) => {
+    campaignBattle = false
     void battle.open(map).then((ok) => ok && show('battle'))
   },
   onBack: () => show('menu')
@@ -184,6 +276,9 @@ const multiPlayer = initMultiPlayer({
 const screens = {
   menu,
   oneplayer: onePlayer,
+  load: loadScreen,
+  ask,
+  debrief,
   team: teamScreen,
   name: nameScreen,
   player: playerScreen,
@@ -207,6 +302,9 @@ if (window.pow) {
   })
   window.pow.menu = view(menu)
   window.pow.onePlayer = view(onePlayer)
+  window.pow.loadScreen = view(loadScreen)
+  window.pow.askTraining = view(ask)
+  window.pow.debrief = view(debrief)
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }
   window.pow.playerScreen = view(playerScreen)

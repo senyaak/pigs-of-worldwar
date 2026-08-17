@@ -93,9 +93,9 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
    shape, `newGame`, `finishMission`, `serialise`/`parse`), `src/main/saves.ts`
    (the folder and four operations, text in and text out — the main process
    never parses a save), the IPC and the bridge, `unit/save.spec.ts`.
-   **The autosave has nowhere to be called from yet**: nothing can start a
-   campaign until NEW GAME lands, so `finishMission` is the call `ui/battle.ts`
-   makes at the end of a mission once there is a campaign in play — item 4.
+   ~~The autosave has nowhere to be called from yet~~ **it has now — item 4's
+   last bullet.** The shape grew `tutorial` (2026-08-17), backfilled false by
+   `parse` so older files still read.
 4. **NEW GAME** — the chain, screen by screen. **ONE PLAYER (record 14, kind 1)
    is DONE 2026-08-13** — `ui/onePlayer.ts`, a list of two bars on the machine
    we already had, NEW GAME live and LOAD GAME dark; it does not replay the
@@ -239,30 +239,70 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        as the width and the source height unscaled.
      - **which pair of stripes** the original uses is `[CHECK — remake]`:
        `pip1/2` and `strp1/2` are both pairs and the slot array is unnamed.
-     - the screen's own furniture is not drawn at all — `sqpic`, `sqpics00..10`,
-       `sqdial01..06`, `sqname01..06`, `pigpro`, `parrow1..3`, `sqarmy`,
-       `sqoptsf`, the medals and the flags. Nor is the arm's THIRD loop
-       (0x41D70E on), which none of this has read.
+     - ~~the screen's own furniture is not drawn at all~~ **DONE 2026-08-16,
+       and there was never a third loop** — 0x41D70E is loop 2's fourth blit
+       block (the PROMOTION FLAG, `pcflag` on a pig the team can afford to
+       promote), and the furniture is in the arm's TAIL, 0x41D830..0x41DB9C,
+       read end to end (`frontend/notes.md`). A panel a column — the right one
+       `sqpic` CUT 179 rows SHORT and capped with its own corner, which is how
+       three slots come out of art built for five — a dial a column resting on
+       74n+64, the team's plate at (120, −14), `pigpro` at (232, 304) drawn
+       LAST and in front. `sqpics00..10` is `sqpic`'s own arrival animation;
+       `parrow1..3` and `sqarmy` are dead on this screen; `backgr~1` is no draw
+       arm's — it stays on play's word as the portrait's backing. The BOARD is
+       `pigpro`'s face (`[play]`): tokens, name, class, PROMOTE cost, battles
+       and kills, written with markup icons `vp`/`battle`/`kills` — every
+       line's y is `[CHECK — remake]`, nothing writes that text in any read
+       arm. Still unread: `0x4267A0` (the option list's scroll) and which of
+       2/4 `[0x4C0D44]` carries for record 12.
      - **SAVE TEAM does nothing** and PROMOTE is not there at all: the pig menu
        (record 19) and CAREER PATH (record 25) are their own screens, and the
        tree they drive is already in `ranks.ts` waiting for them.
-   - and the autosave now has its first half: `newGame` runs on the way out of
-     the name entry and writes `savearmy0` (`main.ts`). `finishMission` at the
-     end of a mission is still to come, and nothing READS a save back yet —
-     that waits on LOAD GAME below.
-5. **LOAD GAME** — record 10, kind 8/9, the save-slot list whose items are
-   named at RUNTIME (which is why their fetext ids overrun into the next
-   screen's words). Its layout is not read at all yet.
+   - ~~the autosave now has its first half~~ **DONE 2026-08-17, BOTH halves,
+     and the campaign is a live thing** — `src/renderer/src/campaign.ts` holds
+     the SaveGame in play; `begin` writes the first free of the original's own
+     EIGHT slots `savearmy0..7` (0x42C3E7, `army/notes.md`) and `finishMission`
+     runs at the end of a won mission. **A win is not written until the DEBRIEF
+     takes it** (`[play]`): CONTINUE accepts — roster settled, position
+     stepped, tokens up by the manual's award (`missionReward`: one for the
+     level, one more for all five through, the hidden bonuses a `[gap]`) — and
+     RETRY throws it away and takes the field again. A LOST mission is the
+     manual's replay; a walked-out one (`BattleExit` 'aborted') goes straight
+     back to the squad with nothing written. The debrief rides the bar machine
+     with gtext's own words (163/164, 181 CONTINUE, 193 RETRY) — the original's
+     end-of-mission screen (0x4848A2 walks the five fielded) is unread.
+5. ~~**LOAD GAME**~~ **DONE 2026-08-17 as a STAND-IN** — `ui/loadScreen.ts` on
+   the bar machine: the eight slots listed newest first, the team's name on the
+   bar and its progress on the right, a chosen slot adopted as the campaign
+   (`e2e/001/load.spec.ts` drives the round trip). The original's record 10 is
+   kinds 8/9 — save slots named at runtime — and its draw arm (0x41DF4A) is
+   still unread; the look is `[CHECK — remake]` until it is.
+6. **PLAY TRAINING MISSION?** — **the fork is DONE 2026-08-17, the BOX is
+   not**: the original asks with record 39, a kind-12 confirm whose blits are
+   fully decoded (`yesno01..06`, the `yesdial1..7` cursor sliding between the
+   answers — `frontend/notes.md`), and ours asks with fetext 141/142/143 on
+   the bar machine (`ui/askTraining.ts`) until that widget screen is built.
+   YES plays CAMP and a win sets the save's `tutorial` flag; NO steps the
+   campaign past position 0 unrewarded, the flag staying down — skipped is not
+   finished. What YES/NO do in the ORIGINAL is unread; this fork is `[play]`.
 
 ### What gates what
 
-- The SAVE and the mission LIST are **done and need nothing further** — what is
-  left of item 3 is one call site, and it waits on NEW GAME.
+- The campaign SPINE is closed: save, slots, autosave, LOAD GAME, the
+  tutorial question and the three mission exits all run. **Every mission still
+  opens CAMP** (`MISSION_STAND_IN`, `main.ts`) — the list of 26 is real, the
+  other twenty-five levels wait on an AI to field their far side.
+- The read-from-scratch debts: LOAD GAME's arm (0x41DF4A), the confirm box's
+  widget walk (kind 12), the end-of-mission screen, and the CAMPAIGN MAP —
+  "screen 22", draw arm 0x41E365, of which NOTHING is read: no record id
+  pinned, no art (its loader arm is one of the six unread in 0x421B40), only
+  `0x41A2B0` saying the picked row is written back into `team+0x53` and
+  0x429280 printing the raw map name. That screen is where the enemy-nation
+  table at `team+0x54` gets its writer (0x4829D0).
 - NEW GAME's first two screens are built. **SELECT TEAM's own pass is done**
   (0x41CBE1 and the widget pass at 0x41E790), and it found three wrong numbers
   in the old summary — which is the argument for doing the NAME ENTRY's pass
   (0x41DC69) before building it too, rather than from the paraphrase.
-- LOAD GAME needs its layout read from scratch.
 
 ## A. THE TUTORIAL — finish the training ground
 
