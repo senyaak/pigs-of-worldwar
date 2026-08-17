@@ -103,7 +103,7 @@ export function missionWon(): SaveGame | null {
     save,
     save.squad,
     save.enemies[save.position] ?? (save.nation + 1) % 6,
-    save.tokens + missionReward(losses),
+    save.tokens + missionReward(save.position, losses),
     new Date().toISOString()
   )
   // Winning the training ground is what sets the tutorial flag.

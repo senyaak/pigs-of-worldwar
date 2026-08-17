@@ -147,10 +147,20 @@ test('a save from before the tutorial question answers "not played"', { tag: '@n
   expect(parse(JSON.stringify(aged))).toEqual({ ...save, tutorial: false })
 })
 
-test('a mission pays one point, two for bringing all five through', { tag: '@nodata' }, () => {
-  expect(missionReward(0)).toBe(2)
-  expect(missionReward(1)).toBe(1)
-  expect(missionReward(5)).toBe(1)
+test('the award is the debrief adder: finish, five through, fifths — CAMP pays zero', { tag: '@nodata' }, () => {
+  // The training ground never sees the debrief (0x47E606).
+  expect(missionReward(0, 0)).toBe(0)
+  // An ordinary win: one for the level, one more with all five through.
+  expect(missionReward(2, 0)).toBe(2)
+  expect(missionReward(2, 1)).toBe(1)
+  // Every fifth position pays five on top — 5, 10, 15, 20, 25.
+  expect(missionReward(5, 0)).toBe(7)
+  expect(missionReward(10, 3)).toBe(6)
+  // FINAL (position 25) forgives two down, and is itself a fifth.
+  expect(missionReward(25, 2)).toBe(7)
+  expect(missionReward(25, 3)).toBe(6)
+  // The hidden bonuses are the PROPOINTs actually picked up.
+  expect(missionReward(2, 0, 3)).toBe(5)
 })
 
 test('the enemies are drawn at birth: balanced, never you, LARD last', { tag: '@nodata' }, () => {

@@ -82,16 +82,24 @@ export function newGame(
 }
 
 /**
- * What winning a mission is worth in promotion points — `[manual]`:
+ * What winning a mission is worth in promotion points — `[exe]` now, the
+ * debrief's one adder (0x484EFF, `debrief/notes.md`):
  *
- * > You receive one promotion point for finishing the level and one more if
- * > you bring all five of your swine through it.
+ *   1 for finishing, +1 for bringing all five through — and FINAL forgives
+ *   two down (0x4848F1) — plus every PROPOINT the five picked up on the
+ *   field, plus 5 on every fifth position. The training ground never sees
+ *   the debrief and pays ZERO.
  *
- * The exe's own award is not read (`army/notes.md` lists it as unsolved), and
- * the manual's "up to five bonus points hidden on some levels" is a `[gap]` —
- * nothing here knows where they hide.
+ * `pickups` waits on the PROPOINT crate being built (`[gap]`); the manual's
+ * "hidden bonus points" are exactly those pickups, and the per-position
+ * count of them (0x4D3560) is only ever shown, never awarded.
  */
-export const missionReward = (losses: number): number => (losses === 0 ? 2 : 1)
+export function missionReward(position: number, losses: number, pickups = 0): number {
+  if (position === 0) return 0
+  const allThrough = position === CAMPAIGN_LENGTH - 1 ? losses < 3 : losses === 0
+  const fifth = position > 1 && position % 5 === 0 ? 5 : 0
+  return 1 + (allThrough ? 1 : 0) + pickups + fifth
+}
 
 /**
  * A mission is over: the fallen are settled, the campaign steps on, and the
