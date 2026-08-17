@@ -286,6 +286,22 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
    campaign past position 0 unrewarded, the flag staying down — skipped is not
    finished. What YES/NO do in the ORIGINAL is unread; this fork is `[play]`.
 
+### The PROPOINT tokens — deferred until one comes up in play
+
+Play's ruling, 2026-08-18: **one point for finishing, one for coming through
+without a death, and UP TO THREE tokens on a map — and not all of them stand
+on it: some spawn only through EVENTS.** That reading explains the deficit
+the measurement found — the POG places tokens on only nine maps (DESVAL and
+EMPLACE two each; MASHED, GUNS, LIBERATE, FJORDS, EYRIE, BAY, TESTER one
+each; 52 maps none) while the debrief's display table (0x4D3560) promises up
+to five — the missing ones are event-spawned (crates? the map script?), and
+where the table says four or five, play remembers three. `[play]` overrides
+the table's top end; the spawner is unread.
+
+**Deferred**: nothing here is built until a token map is reached in play —
+the order is the menus, then the FIRST MISSION, and the tokens when one is
+actually seen.
+
 ### What gates what
 
 - The campaign SPINE is closed: save, slots, autosave, LOAD GAME, the
