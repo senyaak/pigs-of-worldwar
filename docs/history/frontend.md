@@ -576,3 +576,17 @@ squad's badges and MISSION N off the parsed save rather than a 680-byte
 struct. SAVE ARMY — the same screen with one action changed — is deliberately
 never built: the campaign autosaves, and play ruled there is nothing to save
 by hand.
+
+**The debrief is the original's page** (2026-08-18). `ui/debrief.ts` came off
+the bar machine last of the three: the battle's own 640×480 screen, its art
+the loose BMPs in `Language/Tims/debrief/` through a loader of their own
+(`loadDebriefImages` — the one art folder the frontend does not archive).
+Five fielded rows on the exe's numbers — the pitch-74 portraits against the
+pitch-73 names, a face or its wounded twin or `r_i_p`, the team's uniform
+laid over the living, the badge-and-pip pair straddling x 215 — the team
+name at (320, 5), the verdict column centred on 456, `Pigbkpc2` behind a
+loss, and the SPECIAL BONUS row drawing the level's own token count greyed.
+The exe's spinning `propoint.mad` is stood in by the `vp` coin, the two
+gtext fonts by BIG and GameChars, both `[CHECK — remake]`; the CONTINUE /
+RETRY fork stays ours — the original pays with SPACE and replays a loss
+without asking.

@@ -100,3 +100,11 @@ export async function loadArchiveBmps(relPath: string): Promise<SpriteSet> {
   if (!result.ok) throw new Error(result.error)
   return spriteSet(result.images)
 }
+
+/** Load the DEBRIEF's loose BMPs — the one art folder that is not an
+ * archive (Language/Tims/debrief, main/assets.ts). */
+export async function loadDebriefSprites(names: string[]): Promise<SpriteSet> {
+  const result = await window.api.loadDebriefImages(names)
+  if (!result.ok) throw new Error(result.error)
+  return spriteSet(result.images)
+}

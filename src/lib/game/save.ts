@@ -96,10 +96,14 @@ export function newGame(
  */
 export function missionReward(position: number, losses: number, pickups = 0): number {
   if (position === 0) return 0
-  const allThrough = position === CAMPAIGN_LENGTH - 1 ? losses < 3 : losses === 0
   const fifth = position > 1 && position % 5 === 0 ? 5 : 0
-  return 1 + (allThrough ? 1 : 0) + pickups + fifth
+  return 1 + (survivalBonus(position, losses) ? 1 : 0) + pickups + fifth
 }
+
+/** The "all five through" half of the award, which the debrief also shows as
+ * its SURVIVAL BONUS token — FINAL forgives two down (0x4848F1). */
+export const survivalBonus = (position: number, losses: number): boolean =>
+  position === CAMPAIGN_LENGTH - 1 ? losses < 3 : losses === 0
 
 /**
  * A mission is over: the fallen are settled, the campaign steps on, and the

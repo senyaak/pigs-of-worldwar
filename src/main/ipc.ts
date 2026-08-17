@@ -13,6 +13,7 @@ import {
   loadArchiveBmps,
   loadClips,
   loadFont,
+  loadDebriefImages,
   loadFrontendImages,
   loadGameText,
   loadMapObjects,
@@ -93,6 +94,16 @@ export function registerIpc(): void {
       return { ok: true, images: await loadFrontendImages(gameDir, entryNames) }
     } catch (error) {
       return fail(entryNames.join(', '), error)
+    }
+  })
+
+  ipcMain.handle('debrief:images', async (_event, names: string[]) => {
+    const gameDir = getGameDir()
+    if (!gameDir) return { ok: false, error: 'Game folder is not set' }
+    try {
+      return { ok: true, images: await loadDebriefImages(gameDir, names) }
+    } catch (error) {
+      return fail(names.join(', '), error)
     }
   })
 

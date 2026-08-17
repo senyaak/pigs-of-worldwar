@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('api', {
   loadSound: (relPath: string): Promise<unknown> => ipcRenderer.invoke('sound:load', relPath),
   loadFrontendImages: (entryNames: string[]): Promise<unknown> =>
     ipcRenderer.invoke('frontend:images', entryNames),
+  loadDebriefImages: (names: string[]): Promise<unknown> =>
+    ipcRenderer.invoke('debrief:images', names),
   loadFont: (name: string): Promise<unknown> => ipcRenderer.invoke('frontend:font', name),
   loadTims: (relPath: string): Promise<unknown> => ipcRenderer.invoke('tims:load', relPath),
   loadArchiveBmps: (relPath: string): Promise<unknown> =>

@@ -141,8 +141,16 @@ const battle = initBattle((exit) => {
     toSquad()
     return
   }
+  const save = campaign.current()
+  if (!save) {
+    show('menu')
+    return
+  }
   if (exit === 'won') campaign.missionWon()
-  debrief.show(exit === 'won')
+  // The debrief reads the save AS THE MISSION FOUND IT — the position still
+  // naming the played mission, the squad carrying its fell marks; the settled
+  // result waits in `campaign.afterMission()` for CONTINUE to take it.
+  debrief.show(exit === 'won', save)
   show('debrief')
   void debrief.load()
 })

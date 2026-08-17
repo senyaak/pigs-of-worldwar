@@ -86,3 +86,26 @@ export function missionNameIndex(name: string): number {
     ? -1
     : MISSION_NAMES + id
 }
+
+/**
+ * How many of the eight take the field at a position — `0x450AB0`, `[exe]`:
+ * ONE pig on the training ground, THREE on the first real mission, five from
+ * then on (`debrief/notes.md` in the disasm repo).
+ */
+export function fieldedAt(position: number): number {
+  return position === 0 ? 1 : position === 1 ? 3 : 5
+}
+
+/**
+ * How many bonus points a position's level HAS — the 26-entry table at
+ * `0x4D3560`, `[exe]`. Display only: the debrief draws this many tokens with
+ * the unearned ones greyed, and the AWARD counts what was actually picked up
+ * on the field, never this.
+ */
+export function bonusPoints(position: number): number {
+  if (position <= 8 || position >= 25) return 0
+  if (position <= 15) return 1
+  if (position <= 20) return 2
+  if (position <= 22) return 3
+  return position === 23 ? 4 : 5
+}

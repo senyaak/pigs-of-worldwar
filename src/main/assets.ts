@@ -202,6 +202,33 @@ export async function loadFrontendImages(
   })
 }
 
+/**
+ * The DEBRIEF's images — loose BMPs in `Language/Tims/debrief/`, the one art
+ * folder the frontend does not archive: the nine faces and their wounded
+ * twins, `r_i_p`, the class badges, the uniforms and the two backdrops
+ * (`debrief/notes.md` in the disasm repo). Magenta is the key here as it is
+ * in FEBMP — the uniforms lie over the faces.
+ *
+ * The folder and the files are matched case-insensitively: the install
+ * spells `Facepc1.bmp` beside `facepcw1.bmp` and `pcHeavy.bmp`.
+ */
+export async function loadDebriefImages(
+  gameDir: string,
+  names: string[]
+): Promise<FrontendImage[]> {
+  const dir = path.join(gameDir, 'Language', 'Tims', 'debrief')
+  const siblings = await fs.readdir(dir)
+  const byName = new Map(siblings.map((file) => [file.toLowerCase(), file]))
+  return Promise.all(
+    names.map(async (wanted) => {
+      const file = byName.get(`${wanted.toLowerCase()}.bmp`)
+      if (!file) throw new Error(`no ${wanted}.bmp in Language/Tims/debrief`)
+      const bmp = parseBmp(await fs.readFile(path.join(dir, file)))
+      return { name: wanted.toLowerCase(), width: bmp.width, height: bmp.height, rgba: punchMagenta(bmp) }
+    })
+  )
+}
+
 export interface LoadedFont {
   name: string
   atlas: { width: number; height: number; rgba: Uint8Array }

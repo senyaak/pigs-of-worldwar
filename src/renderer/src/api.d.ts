@@ -184,6 +184,8 @@ export interface Api {
   loadSoundBank(relPath: string): Promise<LoadSoundBankResult>
   loadSound(relPath: string): Promise<LoadSoundResult>
   loadFrontendImages(entryNames: string[]): Promise<FrontendImagesResult>
+  /** The debrief's loose BMPs out of Language/Tims/debrief, magenta punched. */
+  loadDebriefImages(names: string[]): Promise<FrontendImagesResult>
   loadFont(name: string): Promise<LoadFontResult>
   /** Every BMP in a MAD — the skill menu's frame and icons. */
   loadArchiveBmps(relPath: string): Promise<LoadTimsResult>
