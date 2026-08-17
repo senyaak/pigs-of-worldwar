@@ -292,8 +292,23 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
   tutorial question and the three mission exits all run. **Every mission still
   opens CAMP** (`MISSION_STAND_IN`, `main.ts`) — the list of 26 is real, the
   other twenty-five levels wait on an AI to field their far side.
-- The read-from-scratch debts: LOAD GAME's arm (0x41DF4A), the confirm box's
-  widget walk (kind 12), and the end-of-mission screen.
+- ~~The read-from-scratch debts~~ **ALL THREE READ 2026-08-17**, each a build
+  now waiting on nothing:
+  - **LOAD/SAVE (kinds 8/9)** — `frontend/notes.md`: one screen for both,
+    eight `pclit` plates at x 385 blinking script 1006 for the selection, the
+    `pcsav` frame, the `pcsvinf0..4` panel unrolling as the screen rises from
+    below, labels = team names read off the files, `---` for empty, the panel
+    showing the picked slot's classes and MISSION N. No sound in the whole
+    family; no delete exists in the exe; SAVE overwrites unguarded. Our
+    `ui/loadScreen.ts` stand-in can be replaced with the real thing.
+  - **The confirm box (kind 12)** — behaviour decoded to the last sound;
+    `ui/askTraining.ts` can become the real widget box. NO on record 39
+    launches position 1 (already `[exe]` in ours).
+  - **The end-of-mission DEBRIEF** — not a frontend record at all: the
+    battle's own 640×480 page, `debrief/notes.md`, faces/wounded/RIP,
+    uniforms, the award formula (now in `missionReward`), the rollback
+    snapshot, no retry menu in the original. Our bar-machine debrief can
+    become the real page when its art is wired.
 - ~~the CAMPAIGN MAP~~ **READ 2026-08-17, and THERE IS NO SUCH SCREEN**
   (`frontend/notes.md`). The "screen 22" of 0x41A2B0 is RECORD 22, GAME
   ENGINE — a launch state with no draw arm — and the campaign goes squad →
