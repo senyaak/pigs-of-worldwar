@@ -171,3 +171,10 @@ npm run test:unit  # unit/ only — no game, no window, a couple of seconds
 npm run test:e2e   # boundaries + build + e2e/, against your own installation
 npm run test:all   # both suites, unit first
 ```
+
+**`npx playwright test` on its own does NOT build**, and `e2e/launch.ts`
+starts `out/main/index.js` — the bundle, not your sources. So a run after an
+edit tests the app as it was at the last build, silently. It cost a whole
+wrong conclusion once: a fix was backed out to check the spec would fail, the
+spec passed, and the reason was that the binary under it still had the fix in.
+Run `npm run build` first, or use `npm run test:e2e`, which does.
