@@ -24,6 +24,21 @@ const briefingReady = (page: Page): Promise<boolean> =>
     return pow?.briefing ? pow.briefing.ready() : false
   })
 
+/** How many distinct colours a canvas is carrying — the same reading the
+ * other frontend specs use to tell a drawn screen from a black one. */
+const painted = (page: Page, canvasId: string): Promise<number> =>
+  page.evaluate((id) => {
+    const canvas = document.getElementById(id) as HTMLCanvasElement | null
+    const context = canvas?.getContext('2d')
+    if (!canvas || !context) return -1
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+    const seen = new Set<number>()
+    for (let i = 0; i < pixels.length; i += 4) {
+      seen.add((pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2])
+    }
+    return seen.size
+  }, canvasId)
+
 test('declining the tutorial launches through the map: world, zoom, region, briefing', async ({
   app
 }) => {
@@ -57,6 +72,12 @@ test('declining the tutorial launches through the map: world, zoom, region, brie
   // The world map first, then a key a phase — the exe's own skip.
   await expect(page.locator('#pigmap')).toBeVisible()
   await expect.poll(() => mapPhase(page)).toBe('world')
+  // …and it is PAINTED. The art loads through the main process and a miss is
+  // only a console warning, so a spec that watched the phases alone would
+  // pass over a black screen.
+  await expect
+    .poll(() => painted(page, 'pigmap-screen'), { message: 'the world map is blank' })
+    .toBeGreaterThan(50)
   await tap(page, 'menuSelect')
   await expect.poll(() => mapPhase(page)).toBe('zoom')
   await tap(page, 'menuSelect')
@@ -69,12 +90,55 @@ test('declining the tutorial launches through the map: world, zoom, region, brie
   await expect
     .poll(() => briefingReady(page), { message: 'the briefing is still loading the level' })
     .toBe(true)
+  // The page itself is the level's own briefing art, with the enemy's
+  // portrait composited into position one's.
+  await expect
+    .poll(() => painted(page, 'briefing-screen'), { message: 'the briefing page is blank' })
+    .toBeGreaterThan(50)
   await tap(page, 'menuSelect')
   await expect(page.locator('#battle')).toBeVisible()
 
   // Walking out is an abort: back to the squad, nothing settled.
   await page.locator('#battle-leave').click()
   await expect(page.locator('#player')).toBeVisible()
+
+  expect(app.errors()).toEqual([])
+})
+
+test("the newspaper's three pieces load at the sizes the read gives", async ({ app }) => {
+  const { page } = app
+
+  // The paper only prints on a campaign WIN, which no menu spec can reach —
+  // so this asks the loader for the three pieces directly. The sizes are the
+  // exe's own (`pigmap/notes.md`): a full-screen front page, the story block
+  // and the photo, the last two colour-keyed.
+  const sizes = await page.evaluate(async () => {
+    const api = (
+      window as unknown as {
+        api: {
+          loadLanguageImages(
+            folder: string,
+            names: string[],
+            keyed: string[]
+          ): Promise<
+            | { ok: true; images: { name: string; width: number; height: number }[] }
+            | { ok: false; error: string }
+          >
+        }
+      }
+    ).api
+    const result = await api.loadLanguageImages(
+      'Papers',
+      ['british', 'text17', 'pic05'],
+      ['text17', 'pic05']
+    )
+    if (!result.ok) return { error: result.error }
+    return {
+      sizes: result.images.map((image) => `${image.name} ${image.width}x${image.height}`)
+    }
+  })
+  expect(sizes.error).toBeUndefined()
+  expect(sizes.sizes).toEqual(['british 640x480', 'text17 314x204', 'pic05 300x299'])
 
   expect(app.errors()).toEqual([])
 })
