@@ -12,7 +12,10 @@
 //   0x800, 0x1000, 0x2000. Six of them. Every shipped map partitions cleanly
 //   along it — the skirmish arenas into four sides of five, the campaign maps
 //   into two, FINAL into all six, and the training ground into one lonely
-//   marker. **It is a SLOT and not a nation**, which this file used to say it
+//   marker. It is the same byte the disassembly calls the marker's `+0x3B`
+//   team bitmask (`army/skins.md`) — field 13 is the u16 at record offset 0x3A,
+//   so its high byte IS 0x3B, and the two readings are one.
+//   **It is a SLOT and not a nation**, which this file used to say it
 //   was: DEVI carries sides 2 and 4 and OASIS 1 and 5, with no side 0 on
 //   either, and both are campaign maps a British player plays. Who wears what
 //   is decided by the save, not by the map (lib/game/nations.ts).
