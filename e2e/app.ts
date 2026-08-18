@@ -40,6 +40,7 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   // loaded briefing starts the battle, which the '#battle' row then leaves.
   ['#pigmap', { key: 'menuBack' }],
   ['#briefing', { key: 'menuSelect' }],
+  ['#paper', { key: 'menuSelect' }],
   ['#load', { key: 'menuBack' }],
   ['#oneplayer', { key: 'menuBack' }],
   ['#team', { key: 'menuBack' }],

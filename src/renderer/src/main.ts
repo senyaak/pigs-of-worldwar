@@ -10,6 +10,7 @@ import { initLoadScreen } from './ui/loadScreen'
 import { initAskTraining } from './ui/askTraining'
 import { initPigMap } from './ui/pigMap'
 import { initBriefing } from './ui/briefing'
+import { initNewspaper } from './ui/newspaper'
 import { initDebrief } from './ui/debrief'
 import { initTeamScreen } from './ui/teamScreen'
 import { initNameScreen } from './ui/nameScreen'
@@ -21,7 +22,8 @@ import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 import { feText } from './ui/barScreen'
-import { newSquad, SQUAD_SIZE } from '../../lib/game/roster'
+import { FIELDED, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
+import { mapAt, mapId } from '../../lib/game/missions'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
 import * as campaign from './campaign'
@@ -34,6 +36,7 @@ type View =
   | 'ask'
   | 'pigmap'
   | 'briefing'
+  | 'paper'
   | 'debrief'
   | 'team'
   | 'name'
@@ -52,6 +55,7 @@ const panels: Record<View, HTMLElement[]> = {
   ask: [byId('ask')],
   pigmap: [byId('pigmap')],
   briefing: [byId('briefing')],
+  paper: [byId('paper')],
   debrief: [byId('debrief')],
   team: [byId('team')],
   name: [byId('name')],
@@ -203,18 +207,37 @@ const battle = initBattle((exit) => {
 })
 
 // After a WIN: CONTINUE takes the settled result — roster, position, tokens —
-// writes it, and stands on the squad; RETRY throws it away and takes the field
-// again. After a LOSS there is nothing to take (the manual's "do the level all
-// over again"), so the same two rows read as RETRY and walk-away.
+// writes it, prints the NEWSPAPER (a campaign win only — never the training
+// ground, a loss or a retry, the exe's own gates) and stands on the squad;
+// RETRY throws it away and takes the field again. After a LOSS there is
+// nothing to take (the manual's "do the level all over again"), so the same
+// two rows read as RETRY and walk-away.
 const debrief = initDebrief({
   onContinue: () => {
-    void campaign.acceptMission().then(() => toSquad())
+    const before = campaign.current()
+    void campaign.acceptMission().then((after) => {
+      if (before && after && before.position > 0 && after.position > before.position) {
+        const survivors = FIELDED - (SQUAD_SIZE - standingCount(before.squad))
+        newspaper.show(
+          after.nation,
+          survivors,
+          after.tokens - before.tokens,
+          after.position,
+          mapId(mapAt(before.position) ?? '')
+        )
+        show('paper')
+        return
+      }
+      toSquad()
+    })
   },
   onRetry: () => {
     campaign.discardMission()
     startMission()
   }
 })
+
+const newspaper = initNewspaper({ onDone: () => toSquad() })
 
 // PLAY TRAINING MISSION? — the original's record 39, asked once the campaign
 // stands at position 0. YES is the training ground, launched straight; NO
@@ -399,8 +422,8 @@ const screens = {
   player: playerScreen,
   multiplayer: multiPlayer
 }
-/** …and the mission chain's two, which have no bars to read. */
-const passages = { pigmap: pigMap, briefing }
+/** …and the mission chain's three, which have no bars to read. */
+const passages = { pigmap: pigMap, briefing, paper: newspaper }
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
 
 // The frontend is drawn on a canvas, so what a screen says and which bar is

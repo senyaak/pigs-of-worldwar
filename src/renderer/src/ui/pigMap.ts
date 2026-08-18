@@ -51,8 +51,12 @@ const ZOOM_STEP_MS = 50
 const REGION_MS = 10000
 const REVEAL_MS = 150
 const BOB_MS = 100
-/** The veil's ceiling — alpha `f·64` of 255 at full zoom. */
+/** The zoom's VEIL: alpha `easing·64` of 255, drawn over a rect of its own
+ * whose travel caps at 0.75 — the second pass settled that the cap belongs
+ * to the veil ALONE, the page flying the whole way (0x483010, twice-built
+ * rect). Phase 3 draws no veil at all. */
 const VEIL = 64 / 255
+const VEIL_TRAVEL = 0.75
 
 /** The flag flies 40×32 and its pole 8×62, both hung (−8, −62) off the
  * stand's own point (0x4833B0). */
@@ -131,14 +135,22 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
     if (!page || !patch) return
     const f = (ZOOM_EASING[Math.min(step, ZOOM_EASING.length - 1)] ?? 100) / 100
     const target = REGION_PAGES[region]
-    const x = site.x + (target.x - site.x) * f
-    const y = site.y + (target.y - site.y) * f
-    const width = patch.width + (target.width - patch.width) * f
-    const height = patch.height + (target.height - patch.height) * f
+    const between = (from: number, to: number, by: number): number => from + (to - from) * by
+    const x = between(site.x, target.x, f)
+    const y = between(site.y, target.y, f)
+    const width = between(patch.width, target.width, f)
+    const height = between(patch.height, target.height, f)
 
     worldScene(context, false)
+    // The veil rides its OWN rect, three quarters of the travel behind.
+    const v = f * VEIL_TRAVEL
     context.fillStyle = `rgba(0, 0, 0, ${(VEIL * f).toFixed(3)})`
-    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.fillRect(
+      between(site.x, target.x, v),
+      between(site.y, target.y, v),
+      between(patch.width, target.width, v),
+      between(patch.height, target.height, v)
+    )
     context.globalAlpha = 1 - f
     context.drawImage(patch.image, x, y, width, height)
     context.globalAlpha = f
@@ -152,9 +164,9 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
     const page = pageOf(region)
     const at = REGION_PAGES[region]
     if (!page) return
+    // The snapshot the exe restores is the WORLD scene — phase 3 wears no
+    // veil (0x4833B0; the second pass settled it).
     worldScene(context, false)
-    context.fillStyle = `rgba(0, 0, 0, ${VEIL.toFixed(3)})`
-    context.fillRect(0, 0, canvas.width, canvas.height)
     context.drawImage(page.image, at.x, at.y, at.width, at.height)
 
     // The poles and flags come up one by one; the flag flies only where the

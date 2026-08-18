@@ -710,3 +710,31 @@ tables; the whole phase-001 suite is 21/21.
 **Not built from the read**: the newspaper page (mode 3, its variant math
 unread), the region-complete victory FMVs (03..07 and the endings 08/09),
 the load-screen gamma fade, the level runner's random non-campaign screens.
+
+## THE SECOND PASS: THE NEWSPAPER LANDS, THE ZOOM LOSES ITS VEIL — 2026-08-18
+
+Two more agent passes closed most of the chain's unread list and the OPTIONS
+family (`pigmap/notes.md` second half, `frontend/notes.md` 2026-08-18
+sections). Built from it the same day:
+
+- **The NEWSPAPER** (`ui/newspaper.ts` on `lib/game/newspaper.ts`): a
+  campaign win prints the nation's front page — headlines baked into the
+  localized art — with the story block keyed at (23, 144) and the photo at
+  (309, 111); the variant follows the five fielded survivors (a wipeout
+  splits on whether the win still paid two points), the story rotates on
+  the new position, and six maps carry special pages unless the win was
+  flawless. Shown after the debrief's CONTINUE, never for the training
+  ground, a loss or a retry; any key or ten seconds out. Wired as a third
+  PASSAGE beside the map and the briefing.
+- **The zoom corrected**: the second pass proved the 0.75 travel cap
+  belongs to the VEIL alone — drawn over its own lerped rect, not the
+  screen — while the page flies the whole way and stands still for the
+  last six steps, so phase 3's first frame equals phase 2's last. The
+  region phase wears no veil at all. `ui/pigMap.ts` follows.
+- Read but not built, and marked in todo: the victory FMVs, the gamma
+  fade with its tumbling `fhats.mad` hat (the "random load screens" that
+  turned out not to exist — NVIEW*.BMP is referenced by nothing), and the
+  whole OPTIONS family (volume overlay, controller setup with working
+  remaps, credits' wall-clock scroll) plus the in-mission pause and the
+  ESC/quit chain — each now specified to the pixel for whenever it is
+  picked up.

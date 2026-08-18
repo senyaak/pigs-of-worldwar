@@ -371,9 +371,18 @@ actually seen.
   (`[deliberate]`). The MISSION LIST stand-in (`ui/missionList.ts`, the
   cheat's mechanics) is DELETED with its spec — the real thing landed.
   `lib/game/pigmap.ts` (the tables), `ui/pigMap.ts`, `ui/briefing.ts`,
-  `unit/pigmap.spec.ts`, `e2e/001/mapchain.spec.ts`. Not built from the
-  read: the newspaper page (mode 3, tail unread), the region-complete FMVs,
-  the load-screen gamma fade. What the earlier read yielded still stands:
+  `unit/pigmap.spec.ts`, `e2e/001/mapchain.spec.ts`. **The NEWSPAPER is
+  read and built too** (second pass, 2026-08-18): a campaign win prints the
+  nation's front page with the story keyed at (23,144) and the photo at
+  (309,111), variant off the five fielded survivors (the wipeout split on
+  points ≥ 2), story rotated by the new position, six special pages for six
+  maps — after the debrief's CONTINUE, any key or 10 s out
+  (`lib/game/newspaper.ts`, `ui/newspaper.ts`, `unit/newspaper.spec.ts`).
+  Still not built from the read: the region-complete victory FMVs
+  (03..07, endings 08/09 — Bink), the load-screen gamma fade and its
+  tumbling-hat overlay (`fhats.mad` across a frozen frame — the "random
+  load screens" that never were; NVIEW*.BMP is dead art nothing reads).
+  What the earlier read yielded still stands:
   - **the mission list on screen is the CHEAT** — record 44, CHEAT LEVEL
     SELECT, kind 2, opened by naming the team NAUGHTY PIGS (fetext 0x2EB;
     also sets the tokens to 99): 26 raw map names in a seven-row scroll
@@ -392,6 +401,32 @@ actually seen.
   (0x41CBE1 and the widget pass at 0x41E790), and it found three wrong numbers
   in the old summary — which is the argument for doing the NAME ENTRY's pass
   (0x41DC69) before building it too, rather than from the paraphrase.
+- **The OPTIONS family and the ESCAPE chain are READ 2026-08-18 and wait to
+  be built** (`frontend/notes.md`, the 2026-08-18 sections):
+  - **VOLUME CONTROL** (record 20, kind 7) — an OVERLAY on the dimmed
+    OPTIONS machine: the `vol00` panel rising from below at (100,240), two
+    `vollit` knobs at 230+⌊25v/2⌋ (MASTER y+320, SFX y+351), MODE and
+    VOICES printing their value (MONO/STEREO/SURROUND, OFF/ON) with the lit
+    value flashing; LEFT/RIGHT step, Crunch at the stops, SFX previews
+    COINDROP/COINFLIP/SPARKS02/STEAM001 in turn; the exe's VOICES slider is
+    built and never drawn. Values live in team bytes +8/+9/+0xA/+0xC and
+    persist only through the save.
+  - **CONTROLLER SETUP** (record 41, kind 15) — the `pckey` poster
+    unrolling 0→6 with `Indu013`, twelve actions in a six-row window, and
+    remapping that WORKS (capture with swap-dedupe). Ours would bind the
+    remake's controller instead.
+  - **CREDITS** (record 45, kind 16) — a wall-clock scroll (~58.5 px/s) of
+    fetext 503+ name/role pairs over the backdrop, a pig voice looping. The
+    PC build draws only 18 of the ~150 shipped rows — dead PSX data; ours
+    should run the whole list.
+  - **The ESCAPE chain**: frontend ESC → REALLY QUIT? (24) from the squad,
+    REALLY QUIT APP? (43) from the main menu (kind 19 IS the app-quit
+    code); **in a MISSION esc is the PAUSE binding** — the game's own pause
+    (sim frozen, sound suspended, "-GAME PAUSED-" gtext 173 with
+    CONTINUE / MASTER / SFX / PIG VOICES / ABORT rows; the in-mission
+    volume tweaks touch only the engine and do not persist; ABORT asks ARE
+    YOU SURE and ends the mission). The remake's escape menu can reuse the
+    kind-12 confirm module for the quits.
 
 ## A. THE TUTORIAL — finish the training ground
 
