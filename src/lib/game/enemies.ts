@@ -40,3 +40,21 @@ export function drawEnemies(own: number, rand: () => number): number[] {
   enemies[25] = LARD
   return enemies
 }
+
+/**
+ * Fill a campaign's enemy table back in where it is SHORT.
+ *
+ * A save written between "the campaign gets its spine" and "the enemies are
+ * drawn at birth" carries `enemies: []` — and an empty array passes the
+ * parser's own test, so the save loads and every position on the pig map
+ * reads nation 7, the brown "none". Play saw the whole map in one colour.
+ *
+ * The repair keeps whatever the table already says — those entries are the
+ * nations already fought — and draws the rest, so a campaign in progress
+ * keeps its history and gains a future.
+ */
+export function fillEnemies(own: number, enemies: number[], rand: () => number): number[] {
+  if (enemies.length > 25) return enemies
+  const drawn = drawEnemies(own, rand)
+  return drawn.map((nation, position) => enemies[position] ?? nation)
+}

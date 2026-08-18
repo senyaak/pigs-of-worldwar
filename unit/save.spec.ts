@@ -19,7 +19,7 @@ import {
   parse,
   serialise
 } from '../src/lib/game/save'
-import { LARD, drawEnemies } from '../src/lib/game/enemies'
+import { LARD, drawEnemies, fillEnemies } from '../src/lib/game/enemies'
 
 const NAMES = ['JONES', 'DEN', 'BASIL', 'GINGER', 'MONTY', 'SMITH', 'PONSONBY', 'PERCY']
 const squadOf = (): ReturnType<typeof newSquad> => newSquad(NAMES, [8, 2, 4, 1, 3, 7, 5, 6])
@@ -207,3 +207,30 @@ test('the enemies are drawn at birth: balanced, never you, LARD last', { tag: '@
     }
   }
 })
+
+test('a campaign saved before the enemies were drawn gets its table filled', { tag: '@nodata' }, () => {
+  // An EMPTY table is what a save written between "the campaign gets its
+  // spine" and "the enemies are drawn at birth" carries, and it PARSES — an
+  // empty array passes every test in `parse` — so the pig map painted all 25
+  // territories nation 7, the brown "none". Play saw the map in one colour.
+  // A CYCLING source, never a constant one: `drawEnemies` rejects a nation
+  // until the counts allow it, so a rand that always answers the same number
+  // spins for ever (this spec hung the run once, learning that).
+  let tick = 0
+  const rand = (): number => ((tick = (tick * 7 + 3) % 97), tick / 97)
+
+  const filled = fillEnemies(0, [], rand)
+  expect(filled).toHaveLength(26)
+  expect(filled.slice(1, 25).every((nation) => nation !== 0)).toBe(true)
+
+  // What the table already says is HISTORY — the nations already fought —
+  // and the repair keeps every one of them.
+  const partial = [3, 3, 4, 5]
+  expect(fillEnemies(0, partial, rand).slice(0, 4)).toEqual(partial)
+
+  // A whole table is handed straight back, the same array, so nothing is
+  // redrawn and nothing is written.
+  const whole = drawEnemies(2, rand)
+  expect(fillEnemies(2, whole, rand)).toBe(whole)
+})
+

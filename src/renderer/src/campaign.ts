@@ -25,7 +25,7 @@ import {
   serialise,
   type SaveGame
 } from '../../lib/game/save'
-import { drawEnemies } from '../../lib/game/enemies'
+import { drawEnemies, fillEnemies } from '../../lib/game/enemies'
 import { standingCount, SQUAD_SIZE, type Pig } from '../../lib/game/roster'
 
 /** The eight slot names, the original's own. */
@@ -77,11 +77,21 @@ export async function begin(name: string, nation: number, squad: Pig[]): Promise
   return save
 }
 
-/** Take up a loaded save: LOAD GAME chose it, this is now the campaign. */
+/**
+ * Take up a loaded save: LOAD GAME chose it, this is now the campaign.
+ *
+ * The enemy table is topped up on the way in — a campaign begun before the
+ * enemies were drawn at birth saved an EMPTY one, which parses happily and
+ * then paints every territory on the pig map the brown "none".
+ */
 export function adopt(from: { slot: string; save: SaveGame }): SaveGame {
   slot = from.slot
-  save = from.save
+  const enemies = fillEnemies(from.save.nation, from.save.enemies, Math.random)
+  save = { ...from.save, enemies }
   pending = null
+  // A repaired table is written straight back, so the draw is made once and
+  // the campaign keeps the same enemies next time it is opened.
+  if (enemies !== from.save.enemies) void write()
   return save
 }
 

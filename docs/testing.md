@@ -178,3 +178,9 @@ edit tests the app as it was at the last build, silently. It cost a whole
 wrong conclusion once: a fix was backed out to check the spec would fail, the
 spec passed, and the reason was that the binary under it still had the fix in.
 Run `npm run build` first, or use `npm run test:e2e`, which does.
+
+**And `_tmp/saves` OUTLIVES a run.** The campaign specs write real saves into
+it, so running one spec on its own leaves state the next full phase reads:
+`load.spec.ts` sorts first in `e2e/001` and asserts a campaign at `0/26`, and
+a mapchain spec run alone earlier steps that same team to position 1. Clear
+the folder when a spec fails on something nobody touched.

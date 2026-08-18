@@ -842,3 +842,37 @@ position; past the current one, the nation defending it is us.
 `pow.pigMap.patches()` was added for the spec, because a map with no tints at
 all still paints — BigMap under them is a perfectly good-looking map, which
 is exactly why nobody noticed.
+
+### …and the one colour was an EMPTY ENEMY TABLE
+
+Play came back once more: "все 1го цвета — + всё ещё нет флажки тоже не
+появились — там есть вот флагштоки — а цветных флагов нет. скорее все 1
+проблема." Right on the last count, and it was neither the tint nor the
+blend.
+
+The measurement that found it planted a save mid-campaign, at position 4, and
+read the map back: positions 1..3 in our own green, and every other territory
+`6d3820` — which is not a mistake at all, it is row 7 of the exe's own colour
+table, the brown "NONE". `holder` returns 7 when `enemies[pos]` is undefined,
+and the table was EMPTY.
+
+`campaign.ts` was created calling `newGame(...)` with four arguments
+(`7247312`); `drawEnemies` was wired in a commit later (`21b0690`). Every
+campaign begun in that window saved `enemies: []` — and an empty array passes
+`parse`'s test, `every` over nothing being true — so the save loads fine and
+paints all 25 territories the same brown. The flags followed from the same
+place, plus a rule that is correct: nothing is conquered at position 1, so
+there is nothing to fly. Poles yes, flags no.
+
+`fillEnemies` tops a short table up on the way in, keeping whatever it already
+says (those entries are the nations already fought) and drawing the rest, and
+`adopt` writes the repaired save straight back so the draw is made once.
+
+Two things learned the hard way, both now written into the specs that hit
+them. A `rand` that answers a CONSTANT hangs `drawEnemies` — it rejects a
+nation until the counts allow it, so the unit spec needs a cycling source;
+that one wedged a run for ten minutes. And the e2e save folder OUTLIVES a
+run: `load.spec.ts` sorts first and asserts `0/26`, so a mapchain spec run on
+its own earlier leaves a campaign at position 1 and the next full phase fails
+on a spec nobody touched.
+
