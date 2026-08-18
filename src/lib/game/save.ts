@@ -100,6 +100,16 @@ export function missionReward(position: number, losses: number, pickups = 0): nu
   return 1 + (survivalBonus(position, losses) ? 1 : 0) + pickups + fifth
 }
 
+/**
+ * Whether a position pays points at all. The training ground does not: in the
+ * exe it never even reaches the debrief (0x47E606 sends CAMP straight to
+ * `EndOfMission`), and the one adder that exists lives inside that screen. The
+ * remake DOES show the screen after boot camp — `[play]`, the roll call is
+ * wanted — so the screen has to ask this before it draws a token, or it
+ * promises what `missionReward` refuses to pay.
+ */
+export const paysPoints = (position: number): boolean => position > 0
+
 /** The "all five through" half of the award, which the debrief also shows as
  * its SURVIVAL BONUS token — FINAL forgives two down (0x4848F1). */
 export const survivalBonus = (position: number, losses: number): boolean =>

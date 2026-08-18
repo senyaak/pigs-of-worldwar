@@ -206,12 +206,14 @@ const battle = initBattle((exit) => {
   void debrief.load()
 })
 
-// After a WIN: CONTINUE takes the settled result — roster, position, tokens —
-// writes it, prints the NEWSPAPER (a campaign win only — never the training
-// ground, a loss or a retry, the exe's own gates) and stands on the squad;
-// RETRY throws it away and takes the field again. After a LOSS there is
-// nothing to take (the manual's "do the level all over again"), so the same
-// two rows read as RETRY and walk-away.
+// The keys are the backdrop's own, and each of the four words it paints ends
+// up here. A WIN: SPACE is CONTINUE, which takes the settled result — roster,
+// position, tokens — writes it, prints the NEWSPAPER (a campaign win only —
+// never the training ground, a loss or a retry, the exe's own gates) and
+// stands on the squad; ESCAPE is RETRY, which throws the result away and
+// takes the field again. A LOSS: SPACE is RETRY (there is nothing to take —
+// the manual's "do the level all over again"), ESCAPE is EDIT SQUAD, which
+// walks away to the squad with the mission still waiting.
 const debrief = initDebrief({
   onContinue: () => {
     const before = campaign.current()
@@ -234,6 +236,10 @@ const debrief = initDebrief({
   onRetry: () => {
     campaign.discardMission()
     startMission()
+  },
+  onEditSquad: () => {
+    campaign.discardMission()
+    toSquad()
   }
 })
 
@@ -416,14 +422,18 @@ const screens = {
   oneplayer: onePlayer,
   load: loadScreen,
   ask,
-  debrief,
   team: teamScreen,
   name: nameScreen,
   player: playerScreen,
   multiplayer: multiPlayer
 }
-/** …and the mission chain's three, which have no bars to read. */
-const passages = { pigmap: pigMap, briefing, paper: newspaper }
+/**
+ * …and the mission chain's four, which have no bars to read. The DEBRIEF
+ * belongs here too now: it started life as a bar machine and became the
+ * original's own page, whose two keys are painted into the backdrop, so there
+ * is no cursor to report and no rows to name.
+ */
+const passages = { pigmap: pigMap, briefing, paper: newspaper, debrief }
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
 
 // The frontend is drawn on a canvas, so what a screen says and which bar is
@@ -448,7 +458,6 @@ if (window.pow) {
   // map stands in and whether the briefing would take a key.
   window.pow.pigMap = { phase: pigMap.phase }
   window.pow.briefing = { ready: briefing.ready }
-  window.pow.debrief = view(debrief)
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }
   window.pow.playerScreen = view(playerScreen)

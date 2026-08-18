@@ -738,3 +738,69 @@ sections). Built from it the same day:
   remaps, credits' wall-clock scroll) plus the in-mission pause and the
   ESC/quit chain — each now specified to the pixel for whenever it is
   picked up.
+
+## FIRST PLAY OF THE CHAIN: FOUR THINGS, AND TWO OF THEM WERE ONE — 2026-08-18
+
+The map chain went to play and came back with four reports. Two turned out
+to be the same defect wearing different clothes, and one of those was the
+kind the suite is structurally blind to.
+
+**"сломался парашют - начал миссию с падения"**, and the guess that came
+with it — "скорее всего перехватил нажатие клавиши на экране загрузки" —
+was right on the first try. ONE keydown was producing TWO actions. Every
+view binds its own map on the same `window`, gated on being the view that
+is up, and that gate holds right up to the moment a view hands over
+SYNCHRONOUSLY: the briefing's `menuSelect` shows the battle before the
+event has finished dispatching, so the listener registered after it read
+the same Space through the BATTLE's map, where it is `jump` — and a jump
+during the drop-in cuts every canopy. Measured, not argued: a throwaway
+probe listening on the controller recorded `["menuSelect","jump"]` off one
+press, with `canopy: false` on the pig by the next frame.
+
+`input/controller.ts` now calls `stopImmediatePropagation` on any event it
+turns into an action, and `MENU_ACTIONS` in `input/actions.ts` catches the
+other half — the frontend's own verbs reaching the battle's queue inside
+the same `fired()` pass, which no event listener could have stopped. The
+exe cannot have either bug: its canopy cut (0x490c20) tests the pad for a
+FRESH press, down this frame and not the last.
+
+**And the battle was RUNNING under the briefing.** Found while chasing the
+first: the scene is built the moment `battle.open()` resolves, which is
+exactly when the loading bar fills and the page says PRESS ANY KEY — and
+nothing gated the frame. The drop is five seconds; a player who reads the
+briefing lands before looking at it. `three/battle.ts` takes a `running`
+predicate now and the mission's clock does not start until the mission is
+on screen.
+
+**THE SUITE COULD NOT HAVE CAUGHT THE FIRST ONE**, and that is worth
+keeping. Specs drive `controller.tap` on purpose (CLAUDE.md), so no spec
+had ever produced a real keydown and the whole two-listener path was
+invisible. `e2e/001/mapchain.spec.ts` now presses a real `Space` — the one
+place in the suite that may, because here the keyboard IS the subject —
+and reads `pow.debug.dropIn()` for canopies. It was checked the only way a
+regression spec is worth anything: built with the fix backed out, watched
+to fail, put back.
+
+**"тренировка не должна давать награды."** `missionReward` had paid CAMP
+zero since it was written; the DEBRIEF was drawing two tokens anyway.
+`paysPoints` sits beside the award in `lib/game/save.ts` now and the page
+asks it before it draws, so the screen cannot promise what the save
+refuses.
+
+**"должен 1 свин быть показан а не 5."** The exe draws five rows always —
+0x484B77's bound is a literal — and calls the fielded count per row
+(0x4849C0) only to swap a benched pig's portrait for the plain one; the
+name and badge still print. But the exe never shows this page after boot
+camp at all (0x47E61F), so the screen a player meets there is the remake's
+own and play's ruling governs: rows follow `fieldedAt` — 1, then 3, then 5.
+
+**"там уже стоит нажми esc чтобы повторить."** The prompt was never ours:
+it is PAINTED INTO `Pigbkpc1/2` at y 438..466, and adopting the original's
+backdrop had brought it in under our own CONTINUE/RETRY rows, the selected
+one landing on top of the art's ESCAPE box. The rows are gone and the two
+keys do what the picture says: on a win SPACE continues and ESCAPE
+replays, on a loss SPACE replays and ESCAPE walks away to the squad. All
+four are the exe's own (0x484EB5 returns `won ? 0 : 2`, and a 0 rolls the
+mission back), and they answer where gtext 193 RETRY and 194 EDIT SQUAD
+belong — a question the disasm notes had open. The debrief left the bar
+screens for the PASSAGES on the way: it has no cursor to report any more.

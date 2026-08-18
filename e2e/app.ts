@@ -32,8 +32,11 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   ['#viewer', { click: '#viewer-back' }],
   ['#archive-view', { click: '#archive-back' }],
   ['#browser', { click: '#browser-menu' }],
-  // The DEBRIEF has no back key on purpose — CONTINUE is its way out, and it
-  // lands on the squad, which the chain below already walks.
+  // The DEBRIEF's keys are painted into its backdrop: SPACE is CONTINUE on a
+  // win — which lands on the squad or the paper, both of which the chain
+  // below walks. On a LOSS the same key is RETRY and would take the field
+  // again; nothing in the suite loses a mission yet, and the chain would
+  // unwind that too.
   ['#debrief', { key: 'menuSelect' }],
   ['#ask', { key: 'menuBack' }],
   // BACK on the pig map skips the whole chain to the briefing; a key on the

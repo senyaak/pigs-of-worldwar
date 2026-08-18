@@ -250,7 +250,28 @@ Keep modules small and single-purpose; that split was an explicit request.
 (`walkForward`, `turnLeft`, `jump`, `endTurn`). Keys, on-screen buttons and
 the e2e suite all call the same `press`/`release`/`tap`. **Never synthesise
 key events in a spec** — that tests a parallel path, and a broken keybinding
-would still pass. Use `e2e/controller.ts`.
+would still pass. Use `e2e/controller.ts`. The one exception is a spec whose
+SUBJECT is the keyboard, and there is exactly one
+(`e2e/001/mapchain.spec.ts`); it says so in its own words.
+
+**ONE keydown is ONE action, and one action reaches ONE view.** Every view
+binds its own map on the same `window` gated on being the view that is up, and
+that gate holds right until a view hands over SYNCHRONOUSLY — which the
+briefing does, showing the battle from inside the dispatch. So the same Space
+arrived twice: once as the briefing's `menuSelect`, once as the battle's
+`jump`, which cut the squad's parachutes on the drop-in's first frame. Two
+guards, because the leak has two halves: `bindKeyboard` calls
+`stopImmediatePropagation` on any event it consumes, and `MENU_ACTIONS` keeps
+the frontend's verbs out of the battle's queue, which no event listener could
+have reached. `[play]`, and the exe agrees — its own canopy cut tests the pad
+for a FRESH press (0x490c20).
+
+**A battle does not step until it is SHOWN.** The scene is built when
+`battle.open()` resolves, which is exactly when the briefing's loading bar
+fills — so `three/battle.ts` takes a `running` predicate and the frame is a
+no-op until the battle is the view. Without it the five-second drop-in runs
+under the loading screen and a player who reads the briefing lands before
+looking at it.
 
 ## Tests
 
@@ -484,6 +505,18 @@ and the weakest of them were invented here:
   the plate and the lamp abutting: the clipper moves a blit's source rect by
   exactly what it moves the destination, so **x/y is the TOP LEFT corner**.
 
+- `[play]` **The DEBRIEF lists only the pigs that FOUGHT** — one after boot
+  camp, three after the first mission, five from then on (`fieldedAt`). The
+  exe draws five rows always and uses that count only to swap a benched pig's
+  portrait for a plain one, its name and badge still printing. What makes this
+  play's call rather than a mistake: the exe never shows this page after boot
+  camp at all (0x47E61F), so the screen a player meets there is the remake's.
+- `[deliberate]` **The debrief SHOWS after the training ground and pays
+  nothing for it.** The exe sends CAMP straight to `EndOfMission`; here the
+  roll call is wanted, so `paysPoints` gates every token the page draws
+  against what `missionReward` actually hands out. The two must never be
+  allowed to disagree again — play caught the screen promising two points for
+  a mission worth none.
 - `[deliberate]` **A name is judged and kept TRIMMED.** The exe's ENTER tests
   the buffer's first byte alone (0x42AF50), so a team called one SPACE passes;
   `press` in `lib/game/nameEntry.ts` trims before it refuses and hands the

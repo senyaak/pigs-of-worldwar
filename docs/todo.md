@@ -351,8 +351,13 @@ actually seen.
     through their own loader, faces/wounded/`r_i_p` with the team's uniform
     over the living, the pitch-74/73 rows, `Pigbkpc2` behind a loss, the
     greyed SPECIAL BONUS row. Stand-ins, tagged: the `vp` coin for the
-    spinning `propoint.mad`, BIG/GameChars for the exe's unread gtext font
-    pair, and our CONTINUE/RETRY fork where the exe pays with SPACE.
+    spinning `propoint.mad` and BIG/GameChars for the exe's unread gtext
+    font pair. **The CONTINUE/RETRY fork is GONE (play, 2026-08-18)** — the
+    backdrop paints its own key bar, so the page now just honours it: on a
+    win SPACE continues and ESCAPE replays, on a loss SPACE replays and
+    ESCAPE walks away to the squad, which is the exe's `won ? 0 : 2` and the
+    home of gtext 193/194. Rows follow the FIELDED count (1/3/5) and the
+    training ground's tokens are gated on `paysPoints`.
 - ~~the CAMPAIGN MAP~~ ~~READ 2026-08-17, and THERE IS NO SUCH SCREEN~~
   **WRONG — play caught it, and it is READ AND BUILT 2026-08-18.** The map
   lives in the MISSION HOST, not in a frontend record — which is why every

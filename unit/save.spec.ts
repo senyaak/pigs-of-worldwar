@@ -13,6 +13,7 @@ import {
   finishMission,
   isComplete,
   missionReward,
+  paysPoints,
   newGame,
   nextMap,
   parse,
@@ -148,7 +149,8 @@ test('a save from before the tutorial question answers "not played"', { tag: '@n
 })
 
 test('the award is the debrief adder: finish, five through, fifths — CAMP pays zero', { tag: '@nodata' }, () => {
-  // The training ground never sees the debrief (0x47E606).
+  // The training ground never sees the debrief (0x47E61F sends map 10 to
+  // EndOfMission direct), and pays nothing.
   expect(missionReward(0, 0)).toBe(0)
   // An ordinary win: one for the level, one more with all five through.
   expect(missionReward(2, 0)).toBe(2)
@@ -161,6 +163,18 @@ test('the award is the debrief adder: finish, five through, fifths — CAMP pays
   expect(missionReward(25, 3)).toBe(6)
   // The hidden bonuses are the PROPOINTs actually picked up.
   expect(missionReward(2, 0, 3)).toBe(5)
+})
+
+test('the screen asks the same question the award answers', { tag: '@nodata' }, () => {
+  // The remake DOES show boot camp a debrief where the exe does not, so the
+  // page has to be told there is nothing to hand out — play found it printing
+  // two tokens for a mission that pays none.
+  expect(paysPoints(0)).toBe(false)
+  expect(missionReward(0, 0)).toBe(0)
+  for (let position = 1; position < 26; position++) {
+    expect(paysPoints(position)).toBe(true)
+    expect(missionReward(position, 0)).toBeGreaterThan(0)
+  }
 })
 
 test('the enemies are drawn at birth: balanced, never you, LARD last', { tag: '@nodata' }, () => {

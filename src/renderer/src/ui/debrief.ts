@@ -33,7 +33,7 @@ import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { RETURNING, SQUAD_SIZE, standingCount } from '../../../lib/game/roster'
 import type { Pig } from '../../../lib/game/roster'
 import type { SaveGame } from '../../../lib/game/save'
-import { survivalBonus } from '../../../lib/game/save'
+import { paysPoints, survivalBonus } from '../../../lib/game/save'
 import { bonusPoints, fieldedAt } from '../../../lib/game/missions'
 import { careerOf, stepOf } from '../../../lib/game/ranks'
 
@@ -44,8 +44,6 @@ const COMPLETE_TEXT = 190
 const SURVIVAL_TEXT = 191
 const SPECIAL_TEXT = 192
 const NONE_TEXT = 96
-const CONTINUE_TEXT = 181
-const RETRY_TEXT = 193
 
 /** The faces: `Facepc1..9` by identity, `facepcw1..9` wounded, `r_i_p` gone. */
 const FACES = Array.from({ length: 9 }, (_, i) => `Facepc${i + 1}`)
@@ -80,9 +78,11 @@ const TOKEN = 'vp'
 /**
  * Where everything lands — the exe's own numbers (0x4849A7..0x484D1A): five
  * rows with the portrait pitch 74 and the name pitch 73, which really do
- * differ by one; the right column centred on x 456. Only `token` and the two
- * ACTION rows are ours (`[CHECK — remake]`): the exe draws its tokens as a
- * 3D model in world coordinates and offers no actions at all.
+ * differ by one; the right column centred on x 456. Only `token` is ours
+ * (`[CHECK — remake]`) — the exe draws its tokens as a 3D model in world
+ * coordinates. There is nothing here for the two KEYS: the backdrop paints
+ * their bar itself, which is why the remake's own CONTINUE/RETRY rows are
+ * gone.
  */
 const LAYOUT = {
   team: { x: 320, y: 5 },
@@ -103,8 +103,7 @@ const LAYOUT = {
     special: 305,
     specialRow: { y: 330, step: 26 }
   },
-  token: { beside: 60, lift: 2 },
-  actions: { x: 456, continueY: 395, retryY: 430 }
+  token: { beside: 60, lift: 2 }
 }
 
 const TICK_MS = EXE_FRAME_SECONDS * 1000
@@ -122,8 +121,7 @@ const cloneLayout = (): DebriefLayout => ({
     badge: { ...LAYOUT.rows.badge }
   },
   column: { ...LAYOUT.column, specialRow: { ...LAYOUT.column.specialRow } },
-  token: { ...LAYOUT.token },
-  actions: { ...LAYOUT.actions }
+  token: { ...LAYOUT.token }
 })
 
 /** A fielded slot's fate — the exe's three states (0x48486F/0x4848CF). */
@@ -134,9 +132,9 @@ type Fate = 'stood' | 'returns' | 'gone'
  * unless more than RETURNING fell and it fell early (`fell < fallen − 2`, the
  * complement of 0x4509F1); on a LOSS every occupied slot is simply down.
  */
-function fates(squad: Pig[], won: boolean): Fate[] {
+function fates(squad: Pig[], won: boolean, fielded: number): Fate[] {
   const fallen = SQUAD_SIZE - standingCount(squad)
-  return squad.slice(0, 5).map((pig) => {
+  return squad.slice(0, fielded).map((pig) => {
     if (!won) return 'returns'
     if (pig.fell < 0) return 'stood'
     if (fallen > RETURNING && pig.fell < fallen - RETURNING) return 'gone'
@@ -148,19 +146,20 @@ export interface DebriefScreen {
   load(): Promise<void>
   leave(): void
   enter(): void
-  selected(): number
-  labels(): string[]
-  values(): (string | null)[]
-  flipping(): boolean
   /** The mission's outcome and the save AS THE MISSION FOUND IT — position
    * still on the played mission, the squad carrying its `fell` marks. */
   show(won: boolean, save: SaveGame): void
   layout: DebriefLayout
 }
 
+/**
+ * The three ways off the page, and the backdrop names all of them: a win is
+ * left with CONTINUE or RETRY, a loss with RETRY or EDIT SQUAD.
+ */
 export function initDebrief(handlers: {
   onContinue: () => void
   onRetry: () => void
+  onEditSquad: () => void
 }): DebriefScreen {
   const canvas = byId<HTMLCanvasElement>('debrief-screen')
   const layout = cloneLayout()
@@ -181,19 +180,23 @@ export function initDebrief(handlers: {
 
   const gameText = (index: number): string => strings[index] ?? ''
 
-  const toggle = (): void => {
-    selection = selection === 0 ? 1 : 0
-  }
-  const choose = (): void => {
-    if (selection === 0) handlers.onContinue()
-    else handlers.onRetry()
-  }
-
+  /**
+   * TWO KEYS, AND THE PAGE ALREADY NAMES THEM. Both are the exe's own: SPACE
+   * closes the screen the ordinary way (0x47ED88 stores 0x20), ESCAPE closes
+   * it too but makes 0x484EB5 return `won ? 0 : 2` — and a debrief that
+   * returns 0 rolls the whole mission back (0x482B95), which is what turns
+   * ESCAPE into a REPLAY on a win and SPACE into one on a loss. The four
+   * outcomes are exactly the four words painted into the two backdrops.
+   */
   controller.onAction((action) => {
     if (!visible) return
-    if (action === 'menuUp' || action === 'menuDown') toggle()
-    else if (action === 'menuSelect') choose()
-    // No back key: the mission is over and the question will not be dodged.
+    if (action === 'menuSelect') {
+      if (won) handlers.onContinue()
+      else handlers.onRetry()
+    } else if (action === 'menuBack') {
+      if (won) handlers.onRetry()
+      else handlers.onEditSquad()
+    }
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
 
@@ -220,20 +223,26 @@ export function initDebrief(handlers: {
     const context = canvas.getContext('2d')
     if (!context || !art || !big || !small || !save) return
     const sprites = art
-    const bigFont = big
     const smallFont = small
 
     // The backdrop says the verdict before a word does (0x484819).
     context.drawImage(sprites.get(won ? 'Pigbkpc1' : 'Pigbkpc2').image, 0, 0)
     write(context, big, save.name, layout.team.x, layout.team.y)
 
-    // The five fielded slots. Slots past the position's own count wear the
-    // plain portrait, the exe's own cap (0x4849C5).
+    // ONE ROW PER PIG THAT FOUGHT — `[play]`, and a divergence worth its
+    // words. The exe draws five rows always (the loop's bound at 0x484B77 is
+    // a literal 5) and calls the fielded count per row (0x4849C0) only to
+    // swap the benched pigs' portrait for a plain one — their name and badge
+    // still print. But the exe never shows this screen after boot camp at all
+    // (0x47E61F sends map 10 straight to EndOfMission), so the screen a
+    // player meets after the training ground is the remake's own, and play
+    // ruled on it: "должен 1 свин быть показан а не 5". Rows follow the
+    // count — 1 on the training ground, 3 on the first mission, 5 after.
     const fielded = fieldedAt(save.position)
-    const states = fates(save.squad, won)
+    const states = fates(save.squad, won, fielded)
     const uniform = sprites.get(UNIFORMS[UNIFORM_OF[save.nation] ?? 0])
-    save.squad.slice(0, 5).forEach((pig, i) => {
-      const state = i < fielded ? states[i] : 'stood'
+    save.squad.slice(0, fielded).forEach((pig, i) => {
+      const state = states[i]
       const faceTop = layout.rows.face.top + layout.rows.face.pitch * i
       const nameTop = layout.rows.name.top + layout.rows.name.pitch * i
       const face = pig.identity % 9
@@ -286,10 +295,20 @@ export function initDebrief(handlers: {
       write(context, big, gameText(FAILED_TEXT), centre, layout.column.failed)
     } else {
       const losses = SQUAD_SIZE - standingCount(save.squad)
+      // A token is drawn only where one is PAID: boot camp is worth zero
+      // (`paysPoints`), so it completes its level and earns nothing for it.
+      const pays = paysPoints(save.position)
       write(context, small, gameText(COMPLETE_TEXT), centre, layout.column.complete)
-      token(context, centre + layout.token.beside, layout.column.complete - layout.token.lift, false)
+      if (pays) {
+        token(
+          context,
+          centre + layout.token.beside,
+          layout.column.complete - layout.token.lift,
+          false
+        )
+      }
       write(context, small, gameText(SURVIVAL_TEXT), centre, layout.column.survival)
-      if (survivalBonus(save.position, losses)) {
+      if (pays && survivalBonus(save.position, losses)) {
         token(context, centre + layout.token.beside, layout.column.survival - layout.token.lift, false)
       } else {
         write(context, small, gameText(NONE_TEXT), centre, layout.column.none)
@@ -311,14 +330,11 @@ export function initDebrief(handlers: {
       }
     }
 
-    // OUR fork: CONTINUE over RETRY, the selected one in the big letters.
-    const rows: [string, number][] = [
-      [gameText(CONTINUE_TEXT), layout.actions.continueY],
-      [gameText(RETRY_TEXT), layout.actions.retryY]
-    ]
-    rows.forEach(([label, rowY], i) => {
-      write(context, selection === i ? bigFont : smallFont, label, layout.actions.x, rowY)
-    })
+    // NOTHING IS DRAWN FOR THE KEYS. The backdrop already paints the bar —
+    // `[SPACE] CONTINUE [ESCAPE] RETRY` on the win page, `[SPACE] RETRY
+    // [ESCAPE] EDIT SQUAD` on the loss — so a menu of our own put CONTINUE
+    // and RETRY on the screen a second time, the selected row landing over
+    // the art's own ESCAPE box. Play saw both at once.
   }
 
   let frame = 0
@@ -371,7 +387,6 @@ export function initDebrief(handlers: {
     },
     enter() {
       visible = true
-      selection = 0
       draw()
       run(true)
     },
@@ -379,10 +394,6 @@ export function initDebrief(handlers: {
       won = outcome
       save = state
     },
-    selected: () => selection,
-    labels: () => [gameText(CONTINUE_TEXT), gameText(RETRY_TEXT)],
-    values: () => [null, null],
-    flipping: () => false,
     layout
   }
 }
