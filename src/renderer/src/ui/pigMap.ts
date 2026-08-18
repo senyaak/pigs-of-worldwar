@@ -73,6 +73,8 @@ export interface PigMap {
    * each position (`save.enemies`), and the player's own. */
   show(position: number, enemies: number[], ownNation: number): Promise<void>
   phase(): Phase
+  /** How many of the 25 territories were tinted and laid down last frame. */
+  patches(): number
   layout: Record<string, never>
 }
 
@@ -98,30 +100,67 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
   let phase: Phase = 'off'
   let phaseBegan = 0
   let done = false
+  /** Territory patches drawn in the last world frame — the debug read. */
+  let patches = 0
 
-  const holder = (pos: number): number => enemies[pos] ?? 7
+  /**
+   * WHOSE COLOUR a position flies. A site's patch is tinted by the nation
+   * DEFENDING it (0x483A4C) — and once the campaign has moved past a
+   * position, the nation defending it is US. That is the whole point of the
+   * screen, in play's words: "наш цвет захватывает карту". Anything with no
+   * nation at all is index 7, the brown "none".
+   */
+  const holder = (pos: number): number => (pos < position ? own : (enemies[pos] ?? 7))
 
-  const tintOf = async (sprite: Sprite, nation: number): Promise<Sprite> => {
-    const key = `${sprite.name}:${nation}`
-    const had = tints.get(key)
-    if (had) return had
-    const painted = await tinted(sprite, [...nationColour(nation)])
-    tints.set(key, painted)
-    return painted
+  /**
+   * A tint, cached — keyed by the name the TABLES use, so the writing side
+   * and the reading side cannot drift apart on the archive's own spelling.
+   * (`spriteSet.get` is case-insensitive; this key is not, so it makes its
+   * own case.)
+   */
+  const tintOf = async (set: SpriteSet, name: string, nation: number): Promise<void> => {
+    const key = `${name.toLowerCase()}:${nation}`
+    if (tints.has(key)) return
+    tints.set(key, await tinted(set.get(name), [...nationColour(nation)]))
   }
+
+  /** The same key, for the drawing side. */
+  const tintFor = (name: string, nation: number): Sprite | undefined =>
+    tints.get(`${name.toLowerCase()}:${nation}`)
 
   const pageOf = (region: number): Sprite | null => pages.get(REGION_PAGES[region].art) ?? null
 
-  /** The composed world scene (0x483980): BigMap, the tinted patches, the
-   * banners. The current patch can be left out — the blink. */
-  const worldScene = (context: CanvasRenderingContext2D, hideCurrent: boolean): void => {
+  /** The composed world scene (0x483980): BigMap, the tinted patches ADDED
+   * over it, the banners. `flashCurrent` is phase 1's blink. */
+  const worldScene = (context: CanvasRenderingContext2D, flashCurrent: boolean): void => {
     if (!world || !tims || !banners) return
     context.drawImage(world.get('bigmap').image, 0, 0)
+    let laid = 0
+    // THE PATCHES ARE ADDED, NOT LAID OVER. The composer draws them with the
+    // library's flag 0x41, whose bit 0x40 sets SRCBLEND and DESTBLEND both to
+    // ONE (`_d3d.dll` 0x1000ECC8) — so a territory's colour is ADDED to the
+    // map under it and BigMap's own relief keeps showing through. The art is
+    // a greyscale silhouette and the nation colour is the diffuse it is
+    // modulated by, 0xFF neutral; drawn the ordinary way it is a flat slab of
+    // paint over the map instead of a wash across it.
+    context.globalCompositeOperation = 'lighter'
     SITES.forEach((site, i) => {
-      if (hideCurrent && i === position - 1) return
-      const painted = tints.get(`${site.art}:${holder(i + 1)}`)
-      if (painted) context.drawImage(painted.image, site.x, site.y)
+      // The BLINK does not hide the current territory: the exe redraws it
+      // with the colour forced to white (0x482D99, `ebx = 0xFFFFFFFF`), which
+      // over an additive blend is the mask at full brightness — a FLASH.
+      const painted =
+        flashCurrent && i === position - 1
+          ? tims!.get(site.art)
+          : tintFor(site.art, holder(i + 1))
+      if (!painted) return
+      context.drawImage(painted.image, site.x, site.y)
+      laid++
     })
+    context.globalCompositeOperation = 'source-over'
+    // How many territories actually took a colour. A miss here is SILENT —
+    // the bare BigMap underneath is a perfectly good-looking map — so a spec
+    // counts them (`pow.pigMap.patches`).
+    patches = laid
     for (const banner of BANNERS) {
       context.drawImage(banners.get(banner.art).image, banner.x, banner.y)
     }
@@ -131,7 +170,7 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
     const region = regionOf(position)
     const page = pageOf(region)
     const site = SITES[position - 1]
-    const patch = tints.get(`${site.art}:${holder(position)}`)
+    const patch = tintFor(site.art, holder(position))
     if (!page || !patch) return
     const f = (ZOOM_EASING[Math.min(step, ZOOM_EASING.length - 1)] ?? 100) / 100
     const target = REGION_PAGES[region]
@@ -182,7 +221,7 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
       const y = at.y + stand[1] + FLAG.dy
       context.drawImage(pole.image, x, y, POLE.width, POLE.height)
       if (pos < position) {
-        const flag = tints.get(`flag:${holder(pos)}`)
+        const flag = tintFor('flag', holder(pos))
         if (flag) context.drawImage(flag.image, x, y, FLAG.width, FLAG.height)
       }
     }
@@ -197,7 +236,7 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
     const wave =
       MARKER_WAVE[beat < MARKER_WAVE.length ? beat : MARKER_WAVE.length * 2 - 2 - beat] ?? 0
     const part = (name: string, x: number, y: number): void => {
-      const art = tints.get(`${name}:${own}`)
+      const art = tintFor(name, own)
       if (art) context.drawImage(art.image, x, y)
     }
     part('ar2', bx + wave - 64, by - 45)
@@ -315,19 +354,20 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
       }
       // Every tint the three phases will ask for, painted up front.
       const jobs: Promise<unknown>[] = []
-      SITES.forEach((site, i) => jobs.push(tintOf(tims!.get(site.art), holder(i + 1))))
+      SITES.forEach((site, i) => jobs.push(tintOf(tims!, site.art, holder(i + 1))))
       const [from, to] = regionSpan(regionOf(position))
       for (let pos_ = from; pos_ < to; pos_++) {
-        if (pos_ < position) jobs.push(tintOf(tims.get('flag'), holder(pos_)))
+        if (pos_ < position) jobs.push(tintOf(tims, 'flag', holder(pos_)))
       }
       for (const part of ['ar1', 'ar2', 'ar3', 'ar4']) {
-        jobs.push(tintOf(tims.get(part), own))
+        jobs.push(tintOf(tims, part, own))
       }
       await Promise.all(jobs)
       phase = 'world'
       phaseBegan = performance.now()
     },
     phase: () => phase,
+    patches: () => patches,
     layout: {}
   }
 }

@@ -804,3 +804,41 @@ four are the exe's own (0x484EB5 returns `won ? 0 : 2`, and a 0 rolls the
 mission back), and they answer where gtext 193 RETRY and 194 EDIT SQUAD
 belong — a question the disasm notes had open. The debrief left the bar
 screens for the PASSAGES on the way: it has no cursor to report any more.
+
+## THE MAP'S COLOURS, AND ONE ACTION SPENT TWICE — 2026-08-18
+
+Play took the chain out again: "карта почти классная - нет только цветов",
+our own colour should spread as the campaign is won, and the briefing was
+skipping itself.
+
+**The briefing skip was the parachute bug one floor up.** The map hands over
+to the briefing SYNCHRONOUSLY, so the key that ended the region phase was
+still being handed down the listener list when the briefing became the view,
+and the briefing takes ANY key. Rather than patch a third screen, the rule
+went into the controller: `stopDispatch()` ends an action's delivery, and
+`show()` — the one place a view changes — calls it. Both mapchain specs now
+assert the briefing is still up once the level has loaded, and both fail
+without it.
+
+**The colours needed measuring, and the first guess was wrong.** The tint
+cache looked like it was keyed one way and read another; a probe showed all
+25 patches drawn with the right nation colours (`cdbb62`, `828282`,
+`d67b85`, `6e7dc3`) and the region's marker in the player's own green. So
+the cache was never the fault — the tidy-up stayed, the claim did not.
+
+What the exe actually does came out of a fresh read (`pigmap/notes.md`, HOW A
+TERRITORY IS COLOURED): the patches are GREYSCALE MASKS, the nation colour is
+a diffuse at 255-neutral, and the composer draws them with **SRCBLEND =
+DESTBLEND = ONE**. The map is `bigmap + mask × colour/255` — a wash the
+relief shows through, where ours was a flat slab of paint laid over it. The
+same read killed a second error: the blink does not HIDE the current
+territory, it redraws it white, which over an additive blend is a flash.
+`ui/pigMap.ts` does both now.
+
+And the part that was simply missing: **a territory the campaign has already
+taken flies OUR colour.** `holder` returned the defending enemy for every
+position; past the current one, the nation defending it is us.
+
+`pow.pigMap.patches()` was added for the spec, because a map with no tints at
+all still paints — BigMap under them is a perfectly good-looking map, which
+is exactly why nobody noticed.

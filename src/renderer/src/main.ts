@@ -2,6 +2,7 @@
 // visible. No rendering or IPC details live here.
 
 import { byId } from './ui/dom'
+import { controller } from './input/controller'
 import type { BarScreenView } from './input/controller'
 import { initWelcome } from './ui/welcome'
 import { initMenu } from './ui/menu'
@@ -68,6 +69,12 @@ const panels: Record<View, HTMLElement[]> = {
 }
 
 function show(view: View): void {
+  // THE ACTION THAT BROUGHT US HERE IS SPENT. A view change is nearly always
+  // something a key did, and every view listens through the one controller
+  // gated on being the view that is up — so without this the screen arriving
+  // is already "up" while the same action is still being handed down the
+  // listener list, and answers it a second time (input/controller.ts).
+  controller.stopDispatch()
   for (const [name, elements] of Object.entries(panels)) {
     for (const element of elements) element.classList.toggle('hidden', name !== view)
   }
@@ -456,7 +463,7 @@ if (window.pow) {
   window.pow.askTraining = view(ask)
   // The map chain is not a bar screen: what a spec needs is which phase the
   // map stands in and whether the briefing would take a key.
-  window.pow.pigMap = { phase: pigMap.phase }
+  window.pow.pigMap = { phase: pigMap.phase, patches: pigMap.patches }
   window.pow.briefing = { ready: briefing.ready }
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }

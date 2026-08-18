@@ -32,6 +32,22 @@ export interface Controller {
   releaseAll(): void
   /** Called for one-shot actions (jump, endTurn). */
   onAction(listener: (action: Action) => void): () => void
+  /**
+   * THE ACTION IS SPENT: stop delivering it to anyone else.
+   *
+   * A listener that changes the VIEW calls this, and `show()` in the renderer
+   * is the one place that happens. Without it an action outlives the screen
+   * that answered it: every view listens through the same controller gated on
+   * being the view that is up, and a handover is synchronous, so the screen
+   * arriving is already "up" while the same action is still being handed
+   * down the list. Play met it twice — the briefing's key cutting the squad's
+   * parachutes, and then the map's key skipping the briefing outright, which
+   * is a loading screen and must be waited on.
+   *
+   * It is the software half of the exe's own rule: the pad is read once a
+   * frame and a press has to be FRESH, so an action can never be spent twice.
+   */
+  stopDispatch(): void
   /** Route real keyboard events into the controller while `enabled()` is
    * true; returns an unbind function. Each view binds the map it reads by —
    * the same arrow keys walk a pig and move a menu bar. */
@@ -46,8 +62,18 @@ export function createController(): Controller {
   const latched = new Set<Action>()
   const actionListeners = new Set<(action: Action) => void>()
 
+  /**
+   * Set by `stopDispatch` when a listener changes the view under an action:
+   * the rest of that action's delivery is cancelled.
+   */
+  let handed = false
+
   const fired = (action: Action): void => {
-    for (const listener of actionListeners) listener(action)
+    handed = false
+    for (const listener of actionListeners) {
+      if (handed) return
+      listener(action)
+    }
   }
 
   const controller: Controller = {
@@ -76,6 +102,9 @@ export function createController(): Controller {
     onAction(listener) {
       actionListeners.add(listener)
       return () => actionListeners.delete(listener)
+    },
+    stopDispatch() {
+      handed = true
     },
     bindKeyboard(enabled, bindings = DEFAULT_BINDINGS) {
       const down = (event: KeyboardEvent): void => {
@@ -339,7 +368,7 @@ declare global {
       askTraining?: BarScreenView
       /** The PIG MAP — which of the chain's phases is up (ui/pigMap.ts):
        * 'off', 'world', 'zoom' or 'region'. */
-      pigMap?: { phase(): string }
+      pigMap?: { phase(): string; patches(): number }
       /** The BRIEFING — whether the load is in and a key would start the
        * mission (ui/briefing.ts). */
       briefing?: { ready(): boolean }

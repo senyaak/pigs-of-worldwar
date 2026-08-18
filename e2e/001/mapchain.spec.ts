@@ -18,6 +18,13 @@ const mapPhase = (page: Page): Promise<string> =>
     return pow.pigMap.phase()
   })
 
+/** How many of the 25 territories the world map actually laid a tint over. */
+const mapPatches = (page: Page): Promise<number> =>
+  page.evaluate(() => {
+    const pow = (window as unknown as { pow?: { pigMap?: { patches(): number } } }).pow
+    return pow?.pigMap ? pow.pigMap.patches() : -1
+  })
+
 const briefingReady = (page: Page): Promise<boolean> =>
   page.evaluate(() => {
     const pow = (window as unknown as { pow?: { briefing?: { ready(): boolean } } }).pow
@@ -78,6 +85,14 @@ test('declining the tutorial launches through the map: world, zoom, region, brie
   await expect
     .poll(() => painted(page, 'pigmap-screen'), { message: 'the world map is blank' })
     .toBeGreaterThan(50)
+  // …and every territory wears a NATION's colour. This is not the picture
+  // test: a map with no tints at all still paints, because BigMap under them
+  // is a map. Play saw exactly that — "нет только цветов ... какойто
+  // дефолтный коричневый" — when the tint cache was keyed one way and read
+  // another.
+  await expect
+    .poll(() => mapPatches(page), { message: 'the territories took no colour' })
+    .toBe(25)
   await tap(page, 'menuSelect')
   await expect.poll(() => mapPhase(page)).toBe('zoom')
   await tap(page, 'menuSelect')
@@ -90,6 +105,11 @@ test('declining the tutorial launches through the map: world, zoom, region, brie
   await expect
     .poll(() => briefingReady(page), { message: 'the briefing is still loading the level' })
     .toBe(true)
+  // AND IT WAITS. The key that left the map must not also answer the page it
+  // opened — the briefing IS the loading screen, and play found it skipping
+  // itself the moment the region handed over.
+  await expect(page.locator('#briefing'), "the briefing answered the map's key").toBeVisible()
+  await expect(page.locator('#battle')).toBeHidden()
   // The page itself is the level's own briefing art, with the enemy's
   // portrait composited into position one's.
   await expect
@@ -228,6 +248,7 @@ test('back on the map skips the whole chain to the briefing', async ({ app }) =>
   await expect
     .poll(() => briefingReady(page), { message: 'the briefing is still loading the level' })
     .toBe(true)
+  await expect(page.locator('#briefing'), "the briefing answered the map's key").toBeVisible()
   await tap(page, 'menuSelect')
   await expect(page.locator('#battle')).toBeVisible()
   await page.locator('#battle-leave').click()

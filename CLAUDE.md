@@ -266,6 +266,14 @@ the frontend's verbs out of the battle's queue, which no event listener could
 have reached. `[play]`, and the exe agrees — its own canopy cut tests the pad
 for a FRESH press (0x490c20).
 
+**An action is SPENT the moment it changes the view.** `show()` calls
+`controller.stopDispatch()`, which ends that action's delivery to the rest of
+the listeners. The two-listener leak above is the keyboard half of this; the
+half no event can reach is a view handing over inside one `fired()` pass, and
+it bit twice — the battle queueing the briefing's key, then the briefing
+taking the map's. Anything new that changes the view goes through `show()`,
+which is where the rule lives.
+
 **A battle does not step until it is SHOWN.** The scene is built when
 `battle.open()` resolves, which is exactly when the briefing's loading bar
 fills — so `three/battle.ts` takes a `running` predicate and the frame is a
@@ -505,6 +513,15 @@ and the weakest of them were invented here:
   the plate and the lamp abutting: the clipper moves a blit's source rect by
   exactly what it moves the destination, so **x/y is the TOP LEFT corner**.
 
+- `[exe]` **A territory is a GREY MASK ADDED to the map, not a patch of paint
+  laid over it.** The 25 site patches, the region `flag` and the four marker
+  parts `ar1..ar4` are greyscale silhouettes; the nation colour is a DIFFUSE
+  at 255-neutral (`D3DTSS_COLOROP` is never set, so the stage stays at
+  MODULATE), and the world composer blends with SRCBLEND = DESTBLEND = ONE.
+  So `screen = bigmap + mask × colour/255`, `ui/pigMap.ts` draws the patches
+  with `globalCompositeOperation = 'lighter'`, and the blink is a WHITE FLASH
+  rather than a hole. `fpole` and the six region pages are real colour art and
+  take no tint. The whole model is in `pigmap/notes.md`.
 - `[play]` **The DEBRIEF lists only the pigs that FOUGHT** — one after boot
   camp, three after the first mission, five from then on (`fieldedAt`). The
   exe draws five rows always and uses that count only to swap a benched pig's
