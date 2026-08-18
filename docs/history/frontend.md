@@ -864,9 +864,20 @@ paints all 25 territories the same brown. The flags followed from the same
 place, plus a rule that is correct: nothing is conquered at position 1, so
 there is nothing to fly. Poles yes, flags no.
 
-`fillEnemies` tops a short table up on the way in, keeping whatever it already
-says (those entries are the nations already fought) and drawing the rest, and
-`adopt` writes the repaired save straight back so the draw is made once.
+The first repair went into `adopt`, and play asked the better question: "так
+это баг — как может сейв ломать карту?" Right. A file should not be able to
+break a screen, and the reason it could was not that the map lacked a guard —
+it was that the PARSER let through a save describing a campaign that cannot
+exist, after which every screen downstream was working correctly on nonsense.
+
+So the repair lives at the door instead. `parse` fills a short table the same
+way it already answers `tutorial` for a file written before that field
+existed, and `newGame` fills one too, so no caller can build a half table
+either. The draw is SEEDED off the save's own name and army rather than
+`Math.random`, which makes it pure — and means a file reads the same enemies
+however many times it is opened, instead of re-rolling the world on every
+load. Whatever the table already says is kept: those entries are the nations
+already fought.
 
 Two things learned the hard way, both now written into the specs that hit
 them. A `rand` that answers a CONSTANT hangs `drawEnemies` — it rejects a

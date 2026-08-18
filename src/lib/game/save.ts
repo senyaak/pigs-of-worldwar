@@ -17,7 +17,9 @@
 // **There is no SAVE screen.** It autosaves — one slot per game, written when
 // a mission ends.
 
+import { fillEnemies } from './enemies'
 import { CAMPAIGN_LENGTH, mapAt } from './missions'
+import { seeded } from './random'
 import { regroup, SQUAD_SIZE, type Pig } from './roster'
 
 /** Bumped when the shape changes in a way an older file cannot be read as. */
@@ -67,12 +69,15 @@ export function newGame(
   now: string,
   enemies: number[] = []
 ): SaveGame {
+  // An unseeded table is the caller's convenience — every campaign still gets
+  // a whole one, because half a table is a map nobody can draw.
+  const drawn = fillEnemies(nation, enemies, seeded(seedOf(name, nation)))
   return {
     version: SAVE_VERSION,
     name,
     nation,
     position: 0,
-    enemies,
+    enemies: drawn,
     squad,
     drafts: 0,
     tokens: 0,
@@ -178,7 +183,30 @@ export function parse(text: string): SaveGame | null {
   // `tutorial` arrived after the shape shipped; a file without it is from
   // before the question existed, and the honest answer for it is "not played".
   if (typeof save.tutorial !== 'boolean') save.tutorial = false
+  /**
+   * A SHORT ENEMY TABLE IS FILLED IN HERE, at the door, because nothing
+   * downstream can cope with one and everything downstream believes it.
+   *
+   * Campaigns begun before the enemies were drawn at birth saved `enemies:
+   * []`, and the checks above pass it — `every` over nothing is true. The pig
+   * map then read nation 7 for all 25 territories, which is the exe's brown
+   * "nobody", and play saw the whole map in one colour. The lesson is not
+   * that the map needed a guard: it is that a file was allowed past the
+   * parser describing a campaign that cannot exist, and every screen after
+   * that was working correctly on nonsense.
+   *
+   * The draw is SEEDED from the save itself, so it is pure, and so a file
+   * that is loaded twice gets the same enemies both times.
+   */
+  save.enemies = fillEnemies(save.nation, save.enemies, seeded(seedOf(save.name, save.nation)))
   return save as SaveGame
+}
+
+/** A stable seed for a save: its team name and army, nothing that moves. */
+function seedOf(name: string, nation: number): number {
+  let hash = 0x50_49_47_53 ^ nation
+  for (let i = 0; i < name.length; i++) hash = Math.imul(hash ^ name.charCodeAt(i), 0x01000193)
+  return hash >>> 0
 }
 
 const isCount = (value: unknown): value is number =>

@@ -513,6 +513,15 @@ and the weakest of them were invented here:
   the plate and the lamp abutting: the clipper moves a blit's source rect by
   exactly what it moves the destination, so **x/y is the TOP LEFT corner**.
 
+- `[deliberate]` **A save is REPAIRED at the parser, never downstream.**
+  `parse` fills a short enemy table and defaults a missing `tutorial`, so
+  nothing after it has to wonder. The rule was bought: a campaign begun before
+  the enemies were drawn at birth saved `enemies: []`, which passed every
+  check — `every` over nothing is true — and the pig map then painted all 25
+  territories the brown "nobody". Play asked how a save could break a screen,
+  and the answer is that it should not be able to: a file describing a
+  campaign that cannot exist must not get past `parse`. Repairs there are
+  SEEDED off the save itself, so they are pure and a file reads the same twice.
 - `[exe]` **A territory is a GREY MASK ADDED to the map, not a patch of paint
   laid over it.** The 25 site patches, the region `flag` and the four marker
   parts `ar1..ar4` are greyscale silhouettes; the nation colour is a DIFFUSE

@@ -208,7 +208,34 @@ test('the enemies are drawn at birth: balanced, never you, LARD last', { tag: '@
   }
 })
 
-test('a campaign saved before the enemies were drawn gets its table filled', { tag: '@nodata' }, () => {
+test('a save with a SHORT enemy table is repaired at the door', { tag: '@nodata' }, () => {
+  // This is where it has to happen. A campaign begun before the enemies were
+  // drawn at birth saved `enemies: []`, the checks let it through — `every`
+  // over nothing is true — and the pig map then read nation 7 for all 25
+  // territories, the exe's brown "nobody". Play saw the map in one colour and
+  // asked the right question: how can a SAVE break a screen? It could because
+  // a file was allowed past the parser describing a campaign that cannot
+  // exist, so no guard downstream is the answer — this is.
+  const save = newGame('OLD GUARD', 0, squadOf(), '2026-08-13T00:00:00.000Z')
+  const aged = JSON.parse(serialise(save)) as Record<string, unknown>
+  aged.enemies = []
+  const read = parse(JSON.stringify(aged))
+  expect(read).not.toBeNull()
+  expect(read!.enemies).toHaveLength(26)
+  expect(read!.enemies.slice(1, 25).every((nation) => nation !== 0)).toBe(true)
+
+  // Seeded from the save itself, so the SAME file reads the same enemies
+  // every time it is opened — a repair a player cannot re-roll by reloading.
+  expect(parse(JSON.stringify(aged))!.enemies).toEqual(read!.enemies)
+
+  // A table already whole is left exactly as it was: those entries are the
+  // nations already fought.
+  const played = { ...save, enemies: save.enemies.slice() }
+  played.enemies[0] = 4
+  expect(parse(serialise(played))!.enemies).toEqual(played.enemies)
+})
+
+test('the table is filled where it is short, and kept where it is not', { tag: '@nodata' }, () => {
   // An EMPTY table is what a save written between "the campaign gets its
   // spine" and "the enemies are drawn at birth" carries, and it PARSES — an
   // empty array passes every test in `parse` — so the pig map painted all 25
