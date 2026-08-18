@@ -383,6 +383,14 @@ actually seen.
   points ≥ 2), story rotated by the new position, six special pages for six
   maps — after the debrief's CONTINUE, any key or 10 s out
   (`lib/game/newspaper.ts`, `ui/newspaper.ts`, `unit/newspaper.spec.ts`).
+  **The COLOURS were corrected after play, 2026-08-18**: a territory patch is
+  a greyscale MASK and the nation colour a 255-neutral diffuse, and the
+  composer ADDS it (SRCBLEND = DESTBLEND = ONE), so the map is `bigmap + mask
+  × colour/255` and the blink is a white FLASH rather than a hole. A position
+  the campaign has already taken flies the PLAYER's colour. Flags appear only
+  on the conquered, so the first mission shows poles and none — the exe's own
+  rule, and what play read as a bug. `pow.pigMap.patches()` exists because a
+  map with no tints still paints.
   Still not built from the read: the region-complete victory FMVs
   (03..07, endings 08/09 — Bink), the load-screen gamma fade and its
   tumbling-hat overlay (`fhats.mad` across a frozen frame — the "random

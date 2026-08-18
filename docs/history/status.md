@@ -723,6 +723,65 @@ most likely to close the window on it.
 GAME lands, so there is nothing for the end of a mission to autosave yet. That
 is item 4, and `finishMission` is the call it makes.
 
+## PLAY'S LIST OF 2026-08-18 — the first play of the mission chain, eight things
+
+The map chain went to play twice in one day. Every item was answered; two
+pairs turned out to be one defect each, and one answer overturned how the
+whole screen is coloured. The working is in `docs/history/frontend.md`.
+
+**The first pass, four.**
+
+1. *"Сломался парашют - начал миссию с падения"*, with the guess that the
+   loading screen's keypress was to blame. It was. One keydown produced TWO
+   actions: the briefing's `menuSelect` showed the battle from inside the
+   dispatch, and the listener after it read the same Space through the
+   BATTLE's map, where it is `jump` — which during the drop-in cuts every
+   canopy. Measured with a probe on the controller: `["menuSelect","jump"]`
+   off one press, canopy gone by the next frame.
+2. *"Тренировка не должна давать награды."* The save had paid boot camp zero
+   since it was written; the DEBRIEF drew two tokens anyway. `paysPoints` now
+   sits beside the award and the page asks it before it draws.
+3. *"На экране победы после тренировки должен 1 свин быть показан а не 5."*
+   The exe draws five rows always and uses the fielded count only to swap a
+   benched pig's portrait — but it never shows this page after boot camp at
+   all (0x47E61F), so the screen there is the remake's and play's ruling
+   governs. Rows follow `fieldedAt`: 1, then 3, then 5.
+4. *"Там уже стоит нажми esc чтобы повторить."* The prompt was never ours —
+   it is PAINTED INTO `Pigbkpc1/2`, adopted with the backdrop, and our
+   CONTINUE/RETRY rows sat on top of it. The rows are gone and the keys do
+   what the picture says. It also answered where gtext 193/194 belong, which
+   the disasm notes had listed as open.
+
+**The second pass, four more.**
+
+5. *The briefing skipped itself.* Item 1 one floor up: the map hands over
+   synchronously, so the key that ended the region phase was still being
+   delivered when the briefing — which takes any key — became the view. The
+   rule went into the controller rather than a third screen: `stopDispatch()`
+   ends an action's delivery and `show()` calls it.
+6. *Found while chasing it: the battle ran UNDER the briefing.* The scene is
+   built when `battle.open()` resolves, which is when the loading bar fills,
+   and nothing gated the frame — so the five-second drop happened while the
+   player read the page.
+7. *"Карта почти классная - нет только цветов."* Measured before touched, and
+   the first guess was wrong: all 25 patches were already drawn in the right
+   nation colours. What the exe does differently came out of a fresh read —
+   the patches are greyscale MASKS, the colour a 255-neutral diffuse, and the
+   composer blends SRCBLEND = DESTBLEND = ONE. And the piece simply missing:
+   a position already taken flies OUR colour.
+8. *"Все 1го цвета... скорее все 1 проблема."* Right, and it was neither the
+   tint nor the blend. A campaign begun between `7247312` and `21b0690` saved
+   `enemies: []`, which PASSES `parse` — `every` over nothing is true — so
+   every territory read nation 7, the brown "nobody". Play's follow-up was
+   the better question: "как может сейв ломать карту?" It cannot be allowed
+   to, so the fill happens at the parser now, seeded off the save itself, and
+   the stopgap in `adopt` is gone.
+
+**What play has NOT seen yet**, and what to ask about next time: the map with
+its colours corrected, the flags on conquered positions (nothing is conquered
+before the second mission, so the first shows poles and none — the exe's own
+rule, and what read as a bug), and any region past the first.
+
 ## What is still not read
 
 **Swept 2026-08-11 — docs/todo.md section D is the live list now**, and most of
