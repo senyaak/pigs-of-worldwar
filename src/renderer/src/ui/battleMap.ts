@@ -18,7 +18,8 @@
 //
 // Canvas 2D can only do affine transforms, so the board is subdivided and each
 // cell drawn affinely — which is what the library does too, for the same
-// reason, only at 2×2 where this uses more.
+// reason, only at 2×2 where this uses more. Laying one cell down, and keeping
+// two neighbours from leaving a hairline between them, is `ui/affine.ts`.
 
 import {
   BLIP_COLOURS,
@@ -35,6 +36,7 @@ import {
 } from '../../../lib/game/scanner'
 import type { Blip, BlipIcon, Eye } from '../../../lib/game/scanner'
 import type { MapRaster } from '../../../lib/game/mapRaster'
+import { grow, texturedTriangle } from './affine'
 import { loadTims, tinted } from './sprites'
 import type { Sprite } from './sprites'
 
@@ -49,11 +51,6 @@ const FRAMES_PER_SECOND = 60
  * and keeps the recession smooth across a quad this wide.
  */
 const CELLS = 8
-/**
- * How far each cell is pushed out from its own middle, in pixels, so the
- * fractional edges of two neighbours meet instead of leaving a hairline.
- */
-const OVERLAP = 0.5
 /** The markers are 10×11 and the library draws them at exactly that. */
 const BLIP_WIDTH = 10
 const BLIP_HEIGHT = 11
@@ -82,57 +79,6 @@ export interface BattleMap {
 }
 
 const key = (icon: BlipIcon, colour: readonly number[]): string => `${icon}|${colour.join(',')}`
-
-/**
- * One triangle of the picture, mapped affinely onto one triangle of the
- * screen: clip to the destination, then compose the transform that carries the
- * three source corners onto the three destination ones.
- *
- * `transform` rather than `setTransform`, because the dashboard has already
- * scaled the context to the window.
- */
-function texturedTriangle(
-  context: CanvasRenderingContext2D,
-  image: ImageBitmap,
-  source: readonly [number, number][],
-  dest: readonly [number, number][]
-): void {
-  const [[sx0, sy0], [sx1, sy1], [sx2, sy2]] = source
-  const [[dx0, dy0], [dx1, dy1], [dx2, dy2]] = dest
-  const denom = sx0 * (sy2 - sy1) - sx1 * sy2 + sx2 * sy1 + (sx1 - sx2) * sy0
-  if (denom === 0) return
-  const a = -(sy0 * (dx2 - dx1) - sy1 * dx2 + sy2 * dx1 + (sy1 - sy2) * dx0) / denom
-  const b = (sy1 * dy2 + sy0 * (dy1 - dy2) - sy2 * dy1 + (sy2 - sy1) * dy0) / denom
-  const c = (sx0 * (dx2 - dx1) - sx1 * dx2 + sx2 * dx1 + (sx1 - sx2) * dx0) / denom
-  const d = -(sx1 * dy2 + sx0 * (dy1 - dy2) - sx2 * dy1 + (sx2 - sx1) * dy0) / denom
-  const e =
-    (sx0 * (sy2 * dx1 - sy1 * dx2) + sy0 * (sx1 * dx2 - sx2 * dx1) + (sx2 * sy1 - sx1 * sy2) * dx0) / denom
-  const f =
-    (sx0 * (sy2 * dy1 - sy1 * dy2) + sy0 * (sx1 * dy2 - sx2 * dy1) + (sx2 * sy1 - sx1 * sy2) * dy0) / denom
-
-  context.save()
-  context.beginPath()
-  context.moveTo(dx0, dy0)
-  context.lineTo(dx1, dy1)
-  context.lineTo(dx2, dy2)
-  context.closePath()
-  context.clip()
-  context.transform(a, b, c, d, e, f)
-  context.drawImage(image, 0, 0)
-  context.restore()
-}
-
-/** Push a triangle's corners out from its own middle, to close the seams. */
-function spread(dest: [number, number][]): [number, number][] {
-  const mx = (dest[0][0] + dest[1][0] + dest[2][0]) / 3
-  const my = (dest[0][1] + dest[1][1] + dest[2][1]) / 3
-  return dest.map(([x, y]) => {
-    const dx = x - mx
-    const dy = y - my
-    const length = Math.hypot(dx, dy) || 1
-    return [x + (dx / length) * OVERLAP, y + (dy / length) * OVERLAP] as [number, number]
-  })
-}
 
 export function createBattleMap(): BattleMap {
   /** Every marker in every colour it is ever drawn in, painted once. */
@@ -251,7 +197,7 @@ export function createBattleMap(): BattleMap {
                 context,
                 ground,
                 [source[i], source[j], source[k]],
-                spread([screen[i], screen[j], screen[k]])
+                grow([screen[i], screen[j], screen[k]])
               )
             }
           }
