@@ -121,8 +121,20 @@ Pixel block: u32 block length, u16 VRAM x, u16 VRAM y, u16 width in 16-bit
 units (×4 pixels in 4-bit mode, ×2 in 8-bit), u16 height, then indices packed
 low-nibble-first (4-bit). Rows run top to bottom.
 
-Nation skins: `AMERICAN.MTD`, `FRENCH.MTD`, … in `Chars/` mirror the entry
-layout of the per-nation archives, so the same model dresses per team.
+Nation skins: `british.mtd`, `AMERICAN.MTD`, `FRENCH.MTD`, `GERMAN.MTD`,
+`RUSSIAN.MTD`, `JAPANESE.MTD` and `TEAMLARD.MTD` in `Chars/` hold **120 entries
+each, name for name and size for size**, so one geometry load dresses any of
+them. Measured across the install: of the ~110 entries that differ from the
+British ones, **105 to 108 differ only in their CLUT** — a nation is a REPAINT,
+not a redraw, and only a handful of pieces are actually drawn again (the ace's
+tunic everywhere, and some German headgear). All 840 entries decode. Which
+archive a nation takes goes through the SKIN remap, not the nation index —
+`lib/game/nations.ts`, `army/skins.md`.
+
+`FHATS.MAD` holds the seven nation hats — `br_hat, am_h, frhelm, germh, rus_h,
+ja_ban, pur_hat`, in SKIN order — with `FHATS.MTD` for their textures.
+`BRITHATS.MAD` beside them is seven British hats by class family and is unused
+by the game.
 
 ## Skeleton & animation
 

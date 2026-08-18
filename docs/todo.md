@@ -125,9 +125,12 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        swapped on a row change. Where it sits is `[CHECK — remake]` and
        nudgeable; WHICH model is not — see the hats below.
      - ~~their HATS should differ~~ **DONE** — each nation has its own hat
-       MODEL in `Chars/FHATS.MAD` (`br_hat`, `frhelm`, `am_h`, `rus_h`,
-       `ja_ban`, `germh`, in the nation index's order) with `FHATS.MTD` for the
-       skins, and it hangs off **bone 2, the head** — which `three/heldWeapon.ts`
+       MODEL in `Chars/FHATS.MAD` with `FHATS.MTD` for the skins. **The
+       archive's own order is `br_hat, am_h, frhelm, germh, rus_h, ja_ban,
+       pur_hat` — SKIN order, not the nation's**, which this entry had wrong;
+       the exe indexes its cache by the skin straight (`army/skins.md`), and
+       `lib/game/nations.ts` holds the one list both screens use. It hangs off
+       **bone 2, the head** — which `three/heldWeapon.ts`
        had already decoded from the engine's three attachment slots, weapon on
        bone 5 and hat on bone 2, the bone's whole matrix and no offset. Probed
        across the six: the silhouette's topmost row comes out 26/20/21/17/20/15,
@@ -1271,7 +1274,15 @@ not pulled, written here so nobody has to remember an address.
 
 ## E. BIGGER THINGS NOT BUILT
 
-- **The MAP**, bottom left of the dashboard.
+- ~~**The MAP**, bottom left of the dashboard.~~ **DONE 2026-08-18/19** —
+  `ui/battleMap.ts` on `lib/game/scanner.ts` and `lib/game/mapRaster.ts`. It is
+  the library's SCANNER, not a screen: a tilted square of the whole level that
+  never opens, never closes and is never clipped. `scanner/notes.md` has the
+  read; `docs/history/status.md` has what it corrected.
+- ~~**The pigs wear their own nations.**~~ **DONE 2026-08-19** —
+  `lib/game/nations.ts`, `army/skins.md`, `docs/history/pig.md`. The player's
+  squad wears SELECT TEAM's choice and the enemy the campaign's schedule;
+  hats included.
 - **The rest of the battle screen** in the order play asks for it.
 - **The two unbuilt menu screens** — MULTI-PLAYER leads somewhere, OPTIONS does
   not.

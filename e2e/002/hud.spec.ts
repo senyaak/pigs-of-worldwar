@@ -92,8 +92,8 @@ test('the squads are the game\'s own six nations, out of fetext', () => {
     'NOBBY', 'GINGER', 'DEN', 'MONTY', 'BASIL', 'PONSONBY', 'PERCY', 'SMITH', 'JONES'
   ])
 
-  // A marker's side bit indexes this list, so the six of them line up with
-  // the six nations — which is what makes LIBERATE's enemy French.
+  // Six blocks for six nations. A marker's side bit does NOT index this list —
+  // it is a slot, and who wears what comes off the save (lib/game/nations.ts).
   expect(teams).toHaveLength(MAX_TEAMS)
 })
 
