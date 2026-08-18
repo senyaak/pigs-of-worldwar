@@ -60,10 +60,12 @@ export type { SoldierArt } from './squad'
 export interface BattleAssets {
   blocks: TerrainBlock[]
   terrainTextures: TerrainTexture[]
-  /** Every model the squads need — one per class group on the map. The
-   * first is the fallback for a class nothing loaded art for. */
+  /** Every model the squads need — one per class group on the map, per NATION
+   * fielded. The first is the fallback for a class nothing loaded art for. */
   soldiers: SoldierArt[]
   skeleton: Bone[]
+  /** Which nation each side wears, by side index (lib/game/nations.ts). */
+  nations: readonly number[]
   clips: Clip[]
   /** The map's .POG records and the geometry they name. Empty is fine — a
    * map whose objects failed to load still plays. */
@@ -257,7 +259,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     ...pigBlips(game.players, game.players.indexOf(game.currentPlayer), performance.now() / 1000),
     ...objectBlips(assets.objects, (id) => !props.drawn(id))
   ]
-  const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
+  const squad = fieldSquad(assets, game.players.map((player) => player.pigs), query, root)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
   const dropInArt = createDropInArt(squad, assets.canopy)

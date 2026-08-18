@@ -19,6 +19,7 @@ import type { Obstruction } from '../../../lib/game/obstacles'
 import type { DropIn } from '../../../lib/game/dropIn'
 import type { MapProps } from './props'
 import type { Blip, Eye } from '../../../lib/game/scanner'
+import { skinOf } from '../../../lib/game/nations'
 import type { Squad } from './squad'
 import { skillName } from '../../../lib/game/skills'
 
@@ -309,6 +310,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
       squads: () =>
         game.players.map((player) => ({
           name: player.name,
+          nation: player.nation,
+          skin: skinOf(player.nation),
           pigs: player.pigs.map((pig) => ({
             name: pig.name,
             pigClass: pig.pigClass,

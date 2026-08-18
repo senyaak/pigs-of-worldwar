@@ -88,13 +88,29 @@ export interface Pig {
 
 export interface Player {
   name: string
+  /**
+   * Which nation this side wears, 0..6 — what dresses its pigs and colours
+   * its markers (lib/game/nations.ts).
+   *
+   * It is NOT the side's slot on the map: the player's is chosen at SELECT
+   * TEAM and the enemy's comes off the campaign's own schedule, so two sides
+   * can hold slots 2 and 4 (DEVI does) and still be British and whoever the
+   * save says.
+   */
+  nation: number
   pigs: Pig[]
   /** Which pig acts the next time this player's turn comes up. */
   activePig: number
 }
 
 export interface GameConfig {
-  players: { name: string; pigNames: string[] }[]
+  /**
+   * The sides. `nation` dresses them (lib/game/nations.ts) and defaults to the
+   * side's own position — which is what a battle assembled without a campaign
+   * behind it gets, and what every spec that does not care about uniforms
+   * wants.
+   */
+  players: { name: string; nation?: number; pigNames: string[] }[]
   /** One spawn per pig, in player order then squad order. */
   spawns: PigSpawn[]
   /** Seconds a player has per turn (the original's turn clock). */
@@ -150,10 +166,11 @@ export class Game {
     }
     let spawn = 0
     let id = 0
-    this.players = config.players.map((player) => {
+    this.players = config.players.map((player, side) => {
       if (player.pigNames.length === 0) throw new Error(`${player.name} has no pigs`)
       return {
         name: player.name,
+        nation: player.nation ?? side,
         activePig: 0,
         pigs: player.pigNames.map((name, index) => {
           const at = config.spawns[spawn++]

@@ -67,9 +67,12 @@ export function registerIpc(): void {
     }
   })
 
-  ipcMain.handle('model:load', async (_event, relPath: string, base: string) => {
+  ipcMain.handle('model:load', async (_event, relPath: string, base: string, skins?: string) => {
     try {
-      return { ok: true, ...(await loadModel(insideGameDir(relPath), base)) }
+      return {
+        ok: true,
+        ...(await loadModel(insideGameDir(relPath), base, skins ? insideGameDir(skins) : undefined))
+      }
     } catch (error) {
       return fail(relPath, error)
     }

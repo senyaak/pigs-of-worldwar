@@ -26,6 +26,7 @@ import {
   type SaveGame
 } from '../../lib/game/save'
 import { drawEnemies } from '../../lib/game/enemies'
+import { bootCampEnemy } from '../../lib/game/nations'
 import { standingCount, SQUAD_SIZE, type Pig } from '../../lib/game/roster'
 
 /** The eight slot names, the original's own. */
@@ -102,7 +103,7 @@ export function missionWon(): SaveGame | null {
   const won = finishMission(
     save,
     save.squad,
-    save.enemies[save.position] ?? (save.nation + 1) % 6,
+    save.enemies[save.position] ?? bootCampEnemy(save.nation),
     save.tokens + missionReward(save.position, losses),
     new Date().toISOString()
   )

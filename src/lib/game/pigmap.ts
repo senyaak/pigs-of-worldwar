@@ -10,6 +10,8 @@
 // not on the map, and the exe gates the whole sequence off it. Site row i is
 // position i+1 throughout.
 
+import { LARD, skinOf } from './nations'
+
 /** One thing on the world map: its art entry (PMAPTIMS/LANGTIMS) and where
  * it sits on the 640×480 BigMap. */
 export interface MapPiece {
@@ -110,10 +112,11 @@ export const ZOOM_EASING: readonly number[] = [
 export const MARKER_WAVE: readonly number[] = [0, 1, 2, 4, 7, 12]
 
 /**
- * The nation colours, in the exe's ART order (0x4D34E0): england, usa,
+ * The nation colours, in the exe's SKIN order (0x4D34E0): england, usa,
  * france, germany, russia, japan, Team Lard, and the brown "nobody". The
- * frontend's nation index goes through `ART_OF` first — the same
- * {0,2,1,4,5,3,6} map 0x4508E0 applies everywhere art is picked by nation.
+ * frontend's nation index goes through `skinOf` first — the same
+ * {0,2,1,4,5,3,6} map 0x4508E0 applies everywhere art is picked by nation
+ * (lib/game/nations.ts).
  */
 export const NATION_COLOURS: readonly (readonly [number, number, number])[] = [
   [0x27, 0xaa, 0x69],
@@ -126,13 +129,13 @@ export const NATION_COLOURS: readonly (readonly [number, number, number])[] = [
   [0x6d, 0x38, 0x20]
 ]
 
-const ART_OF = [0, 2, 1, 4, 5, 3, 6] as const
-
 /** A nation's map colour — the frontend index in, the tint out. Anything
- * out of range is the brown "nobody". */
+ * out of range is the brown "nobody", which is one past Lard's own violet. */
 export const nationColour = (nation: number): readonly [number, number, number] =>
-  NATION_COLOURS[ART_OF[nation] ?? 7] ?? NATION_COLOURS[7]
+  (nation >= 0 && nation <= LARD ? NATION_COLOURS[skinOf(nation)] : NATION_COLOURS[7]) ??
+  NATION_COLOURS[7]
 
 /** A nation's ART index — what picks `level1n%d.bmp` and every other
- * nation-numbered art (0x4508E0's own map). */
-export const nationArt = (nation: number): number => ART_OF[nation] ?? 6
+ * nation-numbered art. It is `Team::SkinOf` (0x4508E0) and nothing else, so it
+ * lives in lib/game/nations.ts now and this is the old name for it. */
+export const nationArt = skinOf

@@ -29,6 +29,7 @@ import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
 import { loadDebriefSprites, loadSprites } from './sprites'
 import type { SpriteSet } from './sprites'
+import { skinOf } from '../../../lib/game/nations'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { RETURNING, SQUAD_SIZE, standingCount } from '../../../lib/game/roster'
 import type { Pig } from '../../../lib/game/roster'
@@ -61,9 +62,9 @@ const BADGE: Record<string, string> = {
 }
 const PIPS = ['pcPip1', 'pcPip2']
 
-/** The uniforms in FILE order, and the exe's nation → file map (0x4508F6). */
+/** The uniforms in FILE order — which is SKIN order, so `skinOf` picks one
+ * (lib/game/nations.ts). */
 const UNIFORMS = ['unifeng', 'unifusa', 'uniffren', 'unifgerm', 'unifruss', 'unifjap', 'uniflard']
-const UNIFORM_OF = [0, 2, 1, 4, 5, 3, 6]
 
 const DEBRIEF_ART = [
   'Pigbkpc1', 'Pigbkpc2',
@@ -240,7 +241,7 @@ export function initDebrief(handlers: {
     // count — 1 on the training ground, 3 on the first mission, 5 after.
     const fielded = fieldedAt(save.position)
     const states = fates(save.squad, won, fielded)
-    const uniform = sprites.get(UNIFORMS[UNIFORM_OF[save.nation] ?? 0])
+    const uniform = sprites.get(UNIFORMS[skinOf(save.nation)] ?? UNIFORMS[0])
     save.squad.slice(0, fielded).forEach((pig, i) => {
       const state = states[i]
       const faceTop = layout.rows.face.top + layout.rows.face.pitch * i

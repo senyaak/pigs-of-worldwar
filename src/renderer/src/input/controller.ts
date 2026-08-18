@@ -316,6 +316,10 @@ export interface DebugHooks {
    * it, and the art it wears. */
   squads(): {
     name: string
+    /** Which nation this side wears, and the SKIN that picks its art — a
+     * side's slot on the map says neither (lib/game/nations.ts). */
+    nation: number
+    skin: number
     pigs: { name: string; pigClass: number; art: string; x: number; z: number; heading: number }[]
   }[]
   /** What the map's .POG put on the ground: how many records were drawn out

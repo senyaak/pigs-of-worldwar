@@ -176,6 +176,29 @@ reasoning, the false starts and the sessions behind them are in
   `lib/game/mines.ts` still carries an invented 1024 and a set of three; see
   `todo.md` B10. `[exe]`
 
+- **A NATION and a SKIN are two different numbers, and the art goes by the
+  skin.** SELECT TEAM writes a nation (0 British, 1 French, 2 American,
+  3 Russian, 4 Japanese, 5 German, 6 Lard); every archive, hat, colour and
+  paper is indexed by the skin (0 British, 1 American, 2 French, 3 German,
+  4 Russian, 5 Japanese, 6 Lard). `Team::SkinOf` (0x4508E0) is the one
+  converter, `{0,2,1,4,5,3,6}` with anything out of range clamped to Lard.
+  `lib/game/nations.ts`. `[exe]`
+- **A map's spawn side bit is a SLOT, not a nation.** DEVI carries slots 2 and
+  4 and OASIS 1 and 5, with no slot 0 on either, and both are campaign maps.
+  Which side is the PLAYER'S is record `+0x58` bit 0, which `Map::Load` tests
+  before it looks at the side bits (0x4A5D2A); exactly one side per shipped map
+  carries it. `lib/game/spawns.ts`. `[exe]` for the branch, `[measured]` for the
+  survey.
+- **The enemy's nation comes from the SAVE, not the map.** The whole campaign's
+  opponents are rolled once when the army is born — five rounds of five,
+  balanced, never the player's own, and position 25 forced to Lard — and the
+  boot camp takes `(own + 1) % 6` instead (0x41A409). `lib/game/enemies.ts`,
+  `army/skins.md`. `[exe]`
+- **A nation is a REPAINT.** All seven `Chars/*.MTD` hold the same 120 entries
+  under the same names at the same sizes, and 105 of the ~110 that differ from
+  the British ones differ only in their palette. So one geometry load dresses
+  any nation, and `loadModel` takes the archive as an argument. `[measured]`
+
 **Animation**
 
 - **The animation library is `Data/_d3d.dll`**, not the exe — which resolves

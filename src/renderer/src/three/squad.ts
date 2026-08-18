@@ -21,10 +21,20 @@ import type { Quat } from '../../../lib/game/quaternion'
 import { classArt } from './soldiers'
 import type { PigPlate } from '../contracts/overlay'
 
-/** One dressed soldier model out of Chars/british.mad. */
+/**
+ * One dressed soldier model: the geometry out of `Chars/british.mad` and the
+ * skins out of whichever nation's `.MTD` (lib/game/nations.ts).
+ *
+ * All seven archives hold the same 120 entries under the same names at the
+ * same sizes, so one set of faces indexes any of them — a nation is a repaint.
+ * The pair `(base, nation)` is the KEY: two nations share the geometry, and
+ * looking one up by `base` alone silently dressed both sides the same.
+ */
 export interface SoldierArt {
   /** Archive base name, e.g. `pcgru_hi` (three/soldiers.ts). */
   base: string
+  /** Which nation these skins are, 0..6. */
+  nation: number
   model: Model
   textures: Texture[]
 }
@@ -77,10 +87,13 @@ export interface Squad {
 }
 
 export interface SquadAssets {
-  /** Every model the squads need — one per class group on the map. The first
-   * is the fallback for a class nothing loaded art for. */
+  /** Every model the squads need — one per class group on the map, per NATION
+   * fielded. The first is the fallback for a class nothing loaded art for. */
   soldiers: SoldierArt[]
   skeleton: Bone[]
+  /** Which nation each side wears, by side index — what picks between two
+   * `SoldierArt`s that share a base. */
+  nations: readonly number[]
 }
 
 /**
@@ -88,15 +101,29 @@ export interface SquadAssets {
  */
 export function fieldSquad(
   assets: SquadAssets,
-  pigs: Pig[],
+  /** Every pig, side by side — the outer array's index is the side, which is
+   * what says which nation's skins its pigs wear. */
+  squads: Pig[][],
   query: TerrainQuery,
   root: THREE.Object3D
 ): Squad {
-  const artFor = (pigClass: number): SoldierArt =>
-    assets.soldiers.find((art) => art.base === classArt(pigClass)) ?? assets.soldiers[0]
+  const artFor = (pigClass: number, nation: number): SoldierArt => {
+    const base = classArt(pigClass)
+    return (
+      assets.soldiers.find((art) => art.base === base && art.nation === nation) ??
+      assets.soldiers.find((art) => art.base === base) ??
+      assets.soldiers[0]
+    )
+  }
+
+  const pigs = squads.flat()
+  const nationOf = new Map<number, number>()
+  squads.forEach((side, index) => {
+    for (const pig of side) nationOf.set(pig.id, assets.nations[index] ?? index)
+  })
 
   const members = pigs.map((pig) => {
-    const art = artFor(pig.pigClass)
+    const art = artFor(pig.pigClass, nationOf.get(pig.id) ?? 0)
     const mesh = buildPig(art.model, art.textures, assets.skeleton)
     // buildPig wraps the mesh in its own converted group; the battle has one
     // already, so only the mesh moves across.

@@ -42,6 +42,7 @@ import { lobOf } from '../../../lib/game/grenade'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../../../lib/game/scenery'
 import { mapRaster } from '../../../lib/game/mapRaster'
+import { SKIN_ARCHIVES, skinOf } from '../../../lib/game/nations'
 import { give } from '../../../lib/game/inventory'
 import { skyArchiveFor, weatherFor } from '../../../lib/game/sky'
 import { byId } from './dom'
@@ -130,10 +131,18 @@ const MISSION_FAILED = 164
 export type BattleExit = 'won' | 'lost' | 'aborted'
 
 export interface BattleView {
-  /** Open a battle. With no name it reopens whatever map the view is on,
+  /**
+   * Open a battle. With no name it reopens whatever map the view is on,
    * which is the training ground until something asks for another — the
-   * MULTI-PLAYER screen asks for a two-sided one (ui/multiPlayer.ts). */
-  open(name?: string): Promise<boolean>
+   * MULTI-PLAYER screen asks for a two-sided one (ui/multiPlayer.ts).
+   *
+   * `wearing` is which NATION each side fields, campaign side first: the
+   * player's own choice and then whoever the save says this mission is against
+   * (lib/game/nations.ts). Left out, each side wears its slot — which is what a
+   * battle opened from the console gets, and what every spec that does not care
+   * about uniforms sees.
+   */
+  open(name?: string, wearing?: readonly number[]): Promise<boolean>
   close(): void
 }
 
@@ -463,7 +472,7 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
 
   /** (Re)start the battle on `name` — fresh spawns, fresh turn order. A load
    * failure leaves whatever battle was running untouched. */
-  const start = async (name: string): Promise<boolean> => {
+  const start = async (name: string, wearing: readonly number[] = []): Promise<boolean> => {
     // A battle that cannot load stays unopened and says so in the console —
     // the same place a refused swapMap answers. The view never appears, so
     // there is nowhere on screen to put it.
@@ -513,18 +522,28 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     // hands it to the engine — the water mask walks every texel of the ground
     // and there was a second copy of it here (lib/game/engine.ts).
     query = buildQuery(terrainResult.blocks, terrainResult.textures)
-    const squads = mapSquads(objects, teams)
+    const squads = mapSquads(objects, teams, wearing)
     if (squads.length === 0) return refuse(`${name} carries no spawn markers — nothing to field`)
 
     // Which models to load is only known once the squads are: a map fields
-    // the classes its own markers name.
+    // the classes its own markers name — and now one set PER NATION fielded,
+    // since two sides in different uniforms share the same geometry and must
+    // not share the same `SoldierArt` (three/squad.ts).
     const bases = artFor(squads.flatMap((squad) => squad.spawns.map((at) => at.pigClass ?? 0)))
-    const loaded = await Promise.all(bases.map((base) => window.api.loadModel(CHAR_ARCHIVE, base)))
+    const dressed = [...new Set(squads.map((squad) => squad.nation))]
+    const wanted = dressed.flatMap((nation) => bases.map((base) => ({ base, nation })))
+    const loaded = await Promise.all(
+      wanted.map(({ base, nation }) =>
+        // Skin 0 is British and its archive is the one paired with the model,
+        // so it is asked for by omission — the same call the frontend makes.
+        window.api.loadModel(CHAR_ARCHIVE, base, skinOf(nation) === 0 ? undefined : SKIN_ARCHIVES[skinOf(nation)])
+      )
+    )
     const missing = loaded.findIndex((result) => !result.ok)
     if (missing >= 0) return refuse((loaded[missing] as { ok: false; error: string }).error)
-    const soldiers = bases.map((base, index) => {
+    const soldiers = wanted.map(({ base, nation }, index) => {
       const result = loaded[index] as Extract<LoadModelResult, { ok: true }>
-      return { base, model: result.model, textures: result.textures }
+      return { base, nation, model: result.model, textures: result.textures }
     })
 
     // The canopy the level opens under. A squad that drops in without it
@@ -648,6 +667,7 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
         blocks: terrainResult.blocks,
         terrainTextures: terrainResult.textures,
         soldiers,
+        nations: squads.map((squad) => squad.nation),
         skeleton: (loaded[0] as Extract<LoadModelResult, { ok: true }>).skeleton,
         clips: clipsResult.ok ? clipsResult.clips : [],
         // A map without its props is still playable ground, so a failed POG
@@ -748,7 +768,7 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     // MULTI-PLAYER screen made a MENU action change it, and then ONE PLAYER
     // opened CAMP's squad on LIBERATE's terrain. It cost a spec three phases
     // away — the pig walked into water it should never have been near.
-    open: (name) => start(name ?? DEFAULT_MAP),
+    open: (name, wearing) => start(name ?? DEFAULT_MAP, wearing),
     close() {
       scene?.dispose()
       scene = null

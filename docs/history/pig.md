@@ -134,3 +134,49 @@ is wood, walking past it or under it is not, and a crate is not), and
 `e2e/002/audio.spec.ts` walks CAMP's first bridge and hears `FT_WOOD` over the
 exe's own sand layer. `pow.debug.surface()` now answers what a hoof landing
 NOW would play rather than the raw tile, which is what makes that assertable.
+
+## UNIFORMS — the squads wear their nations, 2026-08-19
+
+The battle used to load `Chars/british.mad` and take whatever `british.mtd`
+came paired with it, so both sides were British on every map. Now the player's
+squad wears the nation chosen at SELECT TEAM and the enemy wears whoever the
+campaign says this mission is against.
+
+Three numbers had been run together and the read separated them
+(`army/skins.md`): the NATION a player picks, the SKIN every piece of art is
+indexed by, and the SLOT a map's markers sit in. `Team::SkinOf` (0x4508E0)
+converts the first into the second — `{0,2,1,4,5,3,6}` — and that table was
+already in this tree TWICE, as `ART_OF` in `pigmap.ts` and `UNIFORM_OF` in
+`debrief.ts`. It lives in `lib/game/nations.ts` now and both use it.
+
+Three things this corrected, each of which had been written down as fact:
+
+- **`teams.ts`, `spawns.ts` and `muster.ts` all said a marker's side bit IS the
+  nation.** It is a slot. DEVI carries slots 2 and 4 and OASIS 1 and 5, neither
+  has a slot 0, and both are campaign maps a British player plays; seventeen of
+  the twenty-six maps are `0 + 1`, which under that reading would have made
+  seventeen missions in a row French. Which side is the player's is record
+  `+0x58` bit 0 — exactly one side per map carries it, and on DEVI it is 4.
+  `spawnTeams` orders the campaign's own side first now.
+- **The blip colours were eight and are six.** The last two were the first two
+  rows of the scanner board's GROUND palette, one table further on in the dll.
+  And they are indexed by the SKIN, not by a side's position in the list, so a
+  French squad is blue and an American one cyan rather than the other way round.
+- **`save.nation` and `save.enemies[position]` never crossed into the battle.**
+  `battle.open` takes them now; without them each side falls back on its own
+  slot, which is what the console's `pow.swapMap` and the headless spec get.
+
+What made it cheap: **a nation is a repaint.** All seven archives hold the same
+120 entries under the same names at the same sizes, and 105 of the ~110 that
+differ from the British ones differ only in their CLUT — so one geometry load
+dresses any of them. `loadModel(archive, base, skins?)` takes the alternative
+`.MTD` and decodes it through the SAME padding path the paired one uses, so a
+face's texture index cannot shift.
+
+`SoldierArt` is keyed by `(base, nation)` now. It was keyed by `base` alone,
+which would have dressed both sides in whichever nation loaded first — silently,
+since the geometry is identical.
+
+Not done: the nation HATS in battle. The exe hangs one off bone 2 for model
+type 2 only (classes 1, 2, 3), out of `FHATS.MAD` in skin order, and the
+frontend already does it for the SELECT TEAM pig — the battle does not.

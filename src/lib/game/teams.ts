@@ -8,14 +8,19 @@
 // shape. (fetext 25-30 name the same six for the team-select screen, and 226
 // starts TEAM LARD — the developers' own side, which is not a nation.)
 //
-// A map's spawn markers carry the side as one bit each, six of them
-// (lib/game/spawns.ts), so a marker's bit IS an index into this list: the
-// nation a map fields is the map's own choice.
+// **A marker's side bit is NOT an index into this list**, which is what this
+// file used to say. It is a slot: DEVI carries sides 2 and 4 and OASIS 1 and 5,
+// with no side 0 on either, and both are campaign maps. Who wears what is the
+// SAVE's business — the player's own choice and the campaign's enemy schedule
+// (lib/game/nations.ts, lib/game/enemies.ts) — and the map only says where the
+// pigs stand.
+
+import { NATIONS } from './nations'
 
 /** Where the six blocks start in fetext, and how long each one is. */
 const FIRST = 166
 const BLOCK = 10
-export const NATIONS = 6
+export { NATIONS }
 
 export interface Team {
   name: string

@@ -22,15 +22,19 @@ import type { BodyExtent } from './body'
 
 /**
  * How many sides a battle fields. The markers name up to six (FINAL uses all
- * of them), but there is no AI for the rest, so the first two the map carries
- * are the ones that play — and WHICH two is the map's own business: a marker's
- * side bit is the nation (lib/game/teams.ts).
+ * of them), but there is no AI for the rest, so two play: the CAMPAIGN'S OWN
+ * side and the first other one the map carries (lib/game/spawns.ts orders them
+ * that way).
  */
 export const SIDES_FIELDED = 2
 
 export interface Squad {
   name: string
   pigNames: string[]
+  /** Which nation this side wears — 0..6, the index `lib/game/nations.ts`
+   * turns into a skin. The MAP does not decide it: the player's is the one
+   * chosen at SELECT TEAM and the enemy's is the campaign's own schedule. */
+  nation: number
   spawns: PigSpawn[]
 }
 
@@ -55,14 +59,18 @@ export function fielded(objects: MapObject[]): MapObject[] {
  * training ground is one pig — there is no filling in, and a map that carries
  * no markers cannot be played, which is the empty list.
  */
-export function mapSquads(objects: MapObject[], teams: Team[]): Squad[] {
+export function mapSquads(objects: MapObject[], teams: Team[], nations: readonly number[]): Squad[] {
   return battleSides(objects, SIDES_FIELDED).map((side, index) => {
-    // The side bit the map set IS the nation; a map with a bit no nation
-    // answers to falls back on the order it was found in.
-    const team = teams[side[0]?.team] ?? teams[index]
+    // Which NATION fields this side is handed in, campaign side first — the
+    // map only says where the pigs stand. A nation past the six playable ones
+    // (Team Lard, the last mission) has no `fetext` block, so the names fall
+    // back on the side's own order.
+    const nation = nations[index] ?? index
+    const team = teams[nation] ?? teams[index] ?? teams[0]
     const pigs = side.slice(0, team.pigNames.length)
     return {
       name: team.name,
+      nation,
       pigNames: team.pigNames.slice(0, pigs.length),
       spawns: pigs.map((at) => ({
         x: at.x,
@@ -101,7 +109,11 @@ export interface MusterParts {
 export function musterGame(parts: MusterParts): Game {
   const { squads, map, ground, bodyOf } = parts
   return new Game({
-    players: squads.map((squad) => ({ name: squad.name, pigNames: squad.pigNames })),
+    players: squads.map((squad) => ({
+      name: squad.name,
+      nation: squad.nation,
+      pigNames: squad.pigNames
+    })),
     spawns: squads.flatMap((squad) =>
       squad.spawns.map((at) => ({
         ...at,

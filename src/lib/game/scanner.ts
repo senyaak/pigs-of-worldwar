@@ -16,14 +16,17 @@
 // packed pair to `DrawScanner` (0x10009810) at the end of the flush. So the
 // plate is a smuggler's envelope, and nothing of it is ever on screen.
 //
-// What the library then draws is a top-down grid of the terrain, CENTRED ON
-// THE CAMERA and TURNED WITH IT, with the icon quads stamped over it.
+// What the library then draws is a square of the whole level under a camera
+// tilted 28.125° above it, TURNED by the view's yaw — and not centred on the
+// camera, whose position cancels out of the arithmetic exactly — with the icon
+// quads stamped over it and nothing clipped.
 //
 // Pure: positions and rules in, blips out. Where they land on the screen is
 // the dashboard's (ui/battleMap.ts), and what the ground looks like is
 // lib/game/mapRaster.ts.
 
 import { fromExeFrames } from './ballistics'
+import { skinOf } from './nations'
 import type { MapObject } from '../formats/pog'
 import type { Player } from './game'
 
@@ -184,10 +187,19 @@ export interface Blip {
 }
 
 /**
- * The eight blip colours, `[0x1002BE70]`, three dwords each.
+ * The blip colours, `[0x1002BE70]`, three dwords each — **SIX of them, indexed
+ * by the SKIN** (lib/game/nations.ts), which is what the model's own `+0x04`
+ * field holds and what the library reads at dll 0x100049BC.
  *
- * Indexed by the model's own team field, so this is the map's answer to
- * "whose pig is that" and it is not the same table the flags use.
+ * There were eight here and the last two were a misread: 0x1002BEB8, which
+ * follows this table, is the ground palette the board is painted from
+ * (lib/game/mapRaster.ts), and its first two rows had been swept in. There is
+ * no seventh entry and so no Lard colour — the exe's own copy of this table
+ * (0x4C2E78, read by `Pig::Draw` at 0x440BD8) is six entries too, and a
+ * seventh index would pull the padding after it.
+ *
+ * The two copies agree hue for hue; the library's is brighter for British
+ * (255 against 128 green) and for German (200 against 128 grey).
  */
 export const BLIP_COLOURS: readonly [number, number, number][] = [
   [0, 255, 0],
@@ -195,9 +207,7 @@ export const BLIP_COLOURS: readonly [number, number, number][] = [
   [0, 0, 255],
   [200, 200, 200],
   [255, 0, 0],
-  [255, 255, 0],
-  [60, 50, 40],
-  [40, 70, 40]
+  [255, 255, 0]
 ]
 
 /** What the acting pig flashes to, half the time (`v & 2` at 0x10003C0E). */
@@ -300,7 +310,10 @@ export function pigBlips(players: readonly Player[], acting: number, clock: numb
         x: pig.position.x,
         z: pig.position.z,
         icon: 'iconpig',
-        colour: active && flash ? BLIP_WHITE : (BLIP_COLOURS[team % BLIP_COLOURS.length] ?? BLIP_WHITE)
+        // The side's NATION picks the colour, through the skin — not its
+        // position in the list. Team Lard has no colour of its own in either
+        // table, so it falls back to white rather than reading past the end.
+        colour: active && flash ? BLIP_WHITE : (BLIP_COLOURS[skinOf(players[team].nation)] ?? BLIP_WHITE)
       })
     }
   }

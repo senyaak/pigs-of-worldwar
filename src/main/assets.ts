@@ -50,16 +50,13 @@ async function siblingSkeleton(dir: string): Promise<Bone[]> {
   return parseHir(await fs.readFile(path.join(dir, hirName)))
 }
 
-/** The paired texture archive: same base name, .mtd extension. */
-async function pairedTextures(full: string): Promise<(Tim & { name: string })[]> {
-  const dir = path.dirname(full)
-  const stem = path.basename(full).replace(/\.mad$/i, '')
-  const siblings = await fs.readdir(dir)
-  const mtdName = siblings.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.mtd`)
-  if (!mtdName) return []
-  const mtdData = await fs.readFile(path.join(dir, mtdName))
-  // Undecodable entries become 1×1 placeholders so face texture indices keep
-  // lining up with entry order.
+/**
+ * Every TIM of one archive, IN ENTRY ORDER — an undecodable one becomes a 1×1
+ * placeholder rather than being dropped, because a face's texture index is a
+ * position in this list and a hole would shift everything after it.
+ */
+async function texturesOf(mtdPath: string): Promise<(Tim & { name: string })[]> {
+  const mtdData = await fs.readFile(mtdPath)
   return parseArchive(mtdData).entries.map((entry) => {
     try {
       return { name: entry.name, ...parseTim(mtdData.subarray(entry.offset, entry.offset + entry.size)) }
@@ -76,8 +73,25 @@ async function pairedTextures(full: string): Promise<(Tim & { name: string })[]>
   })
 }
 
-/** A model out of a .mad archive: geometry, paired textures, skeleton. */
-export async function loadModel(full: string, base: string): Promise<LoadedModel> {
+/** The paired texture archive: same base name, .mtd extension. */
+async function pairedTextures(full: string): Promise<(Tim & { name: string })[]> {
+  const dir = path.dirname(full)
+  const stem = path.basename(full).replace(/\.mad$/i, '')
+  const siblings = await fs.readdir(dir)
+  const mtdName = siblings.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.mtd`)
+  if (!mtdName) return []
+  return texturesOf(path.join(dir, mtdName))
+}
+
+/**
+ * A model out of a .mad archive: geometry, textures, skeleton.
+ *
+ * `skins` names a DIFFERENT texture archive to dress it in — one of the six
+ * nation `.MTD`s, which hold the same 120 entries under the same names as
+ * `british.mtd` (lib/game/nations.ts). It goes through the same padding decode
+ * as the paired one, so the face indices line up whichever archive is used.
+ */
+export async function loadModel(full: string, base: string, skins?: string): Promise<LoadedModel> {
   const data = await fs.readFile(full)
   const { entries } = parseArchive(data)
   const slice = (ext: string): Uint8Array => {
@@ -94,7 +108,7 @@ export async function loadModel(full: string, base: string): Promise<LoadedModel
 
   return {
     model: parseModel(slice('.VTX'), slice('.NO2'), slice('.FAC'), boneOffsets),
-    textures: await pairedTextures(full),
+    textures: await (skins ? texturesOf(skins) : pairedTextures(full)),
     skeleton
   }
 }

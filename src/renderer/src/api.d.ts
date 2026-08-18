@@ -175,7 +175,10 @@ export interface Api {
   setGameDir(dir: string): Promise<SetDirResult>
   listFiles(): Promise<FileEntry[]>
   listArchive(relPath: string): Promise<ListArchiveResult>
-  loadModel(relPath: string, base: string): Promise<LoadModelResult>
+  /** One model's geometry and skeleton, dressed from its paired `.mtd` — or
+   * from `skins`, another archive with the same entry layout, which is how a
+   * nation's uniform is put on (lib/game/nations.ts). */
+  loadModel(relPath: string, base: string, skins?: string): Promise<LoadModelResult>
   /** The sky dome and one mood's skins — by mood, not by path. */
   loadSky(archive: string): Promise<LoadSkyResult>
   loadClips(relPath: string): Promise<LoadClipsResult>

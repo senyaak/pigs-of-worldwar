@@ -13,17 +13,16 @@
 // takes `(own + 1) % 6` there instead (0x41A409). This module stores that
 // fallback IN the slot, so the table is dense and the save carries one array.
 
-/** How many nations can be an enemy: the six playable, and LARD past them. */
-const NATIONS = 6
-
-/** Team Lard, the nation the campaign ends on. */
-export const LARD = NATIONS
 
 /**
  * The campaign's enemy table, indexed by POSITION 0..25. `rand` is a source of
  * [0, 1) — the renderer hands `Math.random`, a test hands something seeded
  * (`lib/game` itself never reaches for chance, docs/testing.md).
  */
+import { LARD, NATIONS } from './nations'
+
+export { LARD }
+
 export function drawEnemies(own: number, rand: () => number): number[] {
   const enemies: number[] = [(own + 1) % NATIONS]
   const counts = Array.from({ length: NATIONS }, () => 0)

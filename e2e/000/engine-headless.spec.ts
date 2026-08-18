@@ -63,7 +63,9 @@ async function buildHeadless(seed?: number, without: string[] = []): Promise<Bui
     (one) => !without.includes(one.name.toUpperCase())
   )
   const query = buildQuery(terrain.blocks, terrain.textures)
-  const squads = mapSquads(objects, teams)
+  // No campaign behind this run, so each side wears its own slot — which is
+  // what `mapSquads` does with an empty list (lib/game/nations.ts).
+  const squads = mapSquads(objects, teams, [])
   expect(squads.length, `${MAP} carries spawn markers`).toBeGreaterThan(0)
 
   const game = musterGame({

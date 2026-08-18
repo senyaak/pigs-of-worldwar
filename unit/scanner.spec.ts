@@ -3,8 +3,8 @@
 //
 // The rules are the exe's and the library's (lib/game/scanner.ts): the
 // espionage classes are off the map on anybody else's turn, only four model
-// names get a marker at all, and the acting pig flashes on the millisecond
-// clock's own bit.
+// names get a marker at all, a side's colour comes from its NATION through the
+// skin remap, and the board is a tilted square of the whole level.
 
 import { test, expect } from '@playwright/test'
 
@@ -28,11 +28,12 @@ import { GROUND_PALETTE, MINE_TEXEL, RASTER_SIZE, RASTER_WORLD } from '../src/li
 import { BLOCKS_PER_SIDE, TILES_PER_SIDE } from '../src/lib/formats/pmg'
 import type { MapObject } from '../src/lib/formats/pog'
 import type { Pig, Player } from '../src/lib/game/game'
+import { LARD } from '../src/lib/game/nations'
 
 const pig = (name: string, pigClass: number, x = 0, z = 0, health = 50): Pig =>
   ({ id: name.length, name, index: 0, health, carrying: [], holding: null, position: { x, y: 0, z }, heading: 0, pigClass, parachutes: false }) as unknown as Pig
 
-const team = (name: string, pigs: Pig[], activePig = 0): Player => ({ name, pigs, activePig })
+const team = (name: string, pigs: Pig[], activePig = 0, nation = 0): Player => ({ name, nation, pigs, activePig })
 
 const object = (name: string, id: number, x = 0, z = 0): MapObject =>
   ({ name, id, type: 0, x, y: 0, z, yaw: 0, pitch: 0, roll: 0 }) as unknown as MapObject
@@ -70,10 +71,16 @@ test('the acting pig flashes white, slowly, and nobody else does', { tag: '@noda
   expect(lit[1].colour).toEqual(BLIP_COLOURS[0])
 })
 
-test('each side takes its own blip colour', { tag: '@nodata' }, () => {
-  const sides = [team('A', [pig('A1', 0)]), team('B', [pig('B1', 0)]), team('C', [pig('C1', 0)])]
+test("a blip takes its side's NATION colour, through the skin", { tag: '@nodata' }, () => {
+  // Nation 1 is French and skin 2 is blue; nation 2 is American and skin 1 is
+  // cyan — so the pair proves the remap rather than the ordering
+  // (lib/game/nations.ts, `Team::SkinOf` 0x4508E0).
+  const sides = [team('BR', [pig('A1', 0)], 0, 0), team('FR', [pig('B1', 0)], 0, 1), team('US', [pig('C1', 0)], 0, 2)]
   const blips = pigBlips(sides, 0, 0)
-  expect(blips.map((one) => one.colour)).toEqual([BLIP_COLOURS[0], BLIP_COLOURS[1], BLIP_COLOURS[2]])
+  expect(blips.map((one) => one.colour)).toEqual([BLIP_COLOURS[0], BLIP_COLOURS[2], BLIP_COLOURS[1]])
+  // Six colours and no seventh: Team Lard has none in either table.
+  expect(BLIP_COLOURS).toHaveLength(6)
+  expect(pigBlips([team('LARD', [pig('L', 0)], 0, LARD)], 0, 0)[0].colour).toEqual(BLIP_WHITE)
 })
 
 test('only crates and propoints get a marker — a drum does not', { tag: '@nodata' }, () => {

@@ -9,10 +9,18 @@
 //   SB_ME 10, SN_ME 8, SP_ME 9, CO_ME 4, SA_ME 5, LE_ME 14, AC_ME 16 —
 //   the class list `gtext` holds from index 63.
 // - `flags`' HIGH byte is the side, one bit each: 0x100, 0x200, 0x400,
-//   0x800, 0x1000, 0x2000. Six of them, for the game's six nations. Every
-//   shipped map partitions cleanly along it — the skirmish arenas into four
-//   sides of five, the campaign maps into two, FINAL into all six, and the
-//   training ground into one lonely marker.
+//   0x800, 0x1000, 0x2000. Six of them. Every shipped map partitions cleanly
+//   along it — the skirmish arenas into four sides of five, the campaign maps
+//   into two, FINAL into all six, and the training ground into one lonely
+//   marker. **It is a SLOT and not a nation**, which this file used to say it
+//   was: DEVI carries sides 2 and 4 and OASIS 1 and 5, with no side 0 on
+//   either, and both are campaign maps a British player plays. Who wears what
+//   is decided by the save, not by the map (lib/game/nations.ts).
+// - field 28's bit 0 says the marker belongs to the CAMPAIGN'S OWN side —
+//   the player's. `Map::Load` (0x4A5D2A) branches on it before anything else
+//   and hands those markers to team 0; everything else goes to the AI. Exactly
+//   one side per shipped map carries it, and on DEVI that side is 4 and on
+//   OASIS 5, which is what makes it the answer rather than "the lowest bit".
 // - `yaw` is a real facing: 62 markers of 772 sit at zero and the rest are
 //   spread right round.
 
@@ -24,8 +32,10 @@ export interface SpawnPoint {
   z: number
   /** Facing, radians in the game's own space. */
   heading: number
-  /** Side, 0..5, from the one flag bit that is set. */
+  /** Side, 0..5, from the one flag bit that is set. A SLOT, not a nation. */
   team: number
+  /** Whether this marker is the campaign's own side — the player's squad. */
+  player: boolean
   /** Class index — Grunt 0, Gunner 1, … (gtext 63 up). */
   pigClass: number
   /** The marker's own name, e.g. `GR_ME`: the class GROUP. */
@@ -44,6 +54,15 @@ export const isSpawnMarker = (object: MapObject): boolean => object.name.endsWit
 export const MAX_TEAMS = 6
 
 const TEAM_SHIFT = 8
+
+/** The field whose bit 0 marks the campaign's own side (record byte 0x58). */
+const SCRIPTED_FIELD = 28
+
+/**
+ * Whether a marker belongs to the side the campaign plays — the exe's
+ * `pog->w[0x58] & 1`, tested at 0x4A5D2A before the side bits are looked at.
+ */
+export const isPlayerSpawn = (object: MapObject): boolean => (object.fields[SCRIPTED_FIELD] & 1) !== 0
 
 /** Which side a marker belongs to, or -1 if it names none. */
 export function spawnTeam(object: MapObject): number {
@@ -83,6 +102,7 @@ export function mapSpawns(objects: MapObject[]): SpawnPoint[] {
       // marker's stored yaw simply does not mean what a prop's does.
       heading: object.yaw + Math.PI,
       team,
+      player: isPlayerSpawn(object),
       pigClass: object.type,
       marker: object.name,
       parachutes: parachutesIn(object)
@@ -109,10 +129,20 @@ export function battleSides(objects: MapObject[], most: number): SpawnPoint[][] 
   return spawnTeams(objects).slice(0, most)
 }
 
+/**
+ * The sides, **the campaign's own first** and the rest in bit order.
+ *
+ * The order matters now that it decides who wears what: the player's squad is
+ * whichever side carries the scripted bit, and on two shipped maps that is not
+ * the lowest one.
+ */
 export function spawnTeams(objects: MapObject[]): SpawnPoint[][] {
   const teams = new Map<number, SpawnPoint[]>()
   for (const spawn of mapSpawns(objects)) {
     teams.set(spawn.team, [...(teams.get(spawn.team) ?? []), spawn])
   }
-  return [...teams.entries()].sort((a, b) => a[0] - b[0]).map(([, list]) => list)
+  const owns = (list: SpawnPoint[]): number => (list.some((spawn) => spawn.player) ? 0 : 1)
+  return [...teams.entries()]
+    .sort((a, b) => owns(a[1]) - owns(b[1]) || a[0] - b[0])
+    .map(([, list]) => list)
 }

@@ -28,6 +28,7 @@ import { mapAt, mapId } from '../../lib/game/missions'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
 import * as campaign from './campaign'
+import { bootCampEnemy } from '../../lib/game/nations'
 
 type View =
   | 'welcome'
@@ -170,9 +171,13 @@ function startMission(): void {
 function toBriefing(): void {
   const save = campaign.current()
   const position = save?.position ?? 0
-  const enemy = save ? (save.enemies[save.position] ?? (save.nation + 1) % 6) : null
+  const enemy = save ? (save.enemies[save.position] ?? bootCampEnemy(save.nation)) : null
   show('briefing')
-  briefing.show(position, enemy, battle.open(MISSION_STAND_IN))
+  // …and the same pair dresses the two squads: the player's own nation and
+  // whoever this mission is against. The MAP says only where the pigs stand
+  // (lib/game/nations.ts, lib/game/spawns.ts).
+  const wearing = save && enemy !== null ? [save.nation, enemy] : undefined
+  briefing.show(position, enemy, battle.open(MISSION_STAND_IN, wearing))
 }
 
 // The world map → region → flags sequence, the exe's 0x482C30. Skippable —
