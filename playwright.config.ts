@@ -16,7 +16,16 @@ import { defineConfig } from '@playwright/test'
 // runs both, unit first. `npm run boundaries` is what keeps the split honest —
 // a unit spec may not import out of `e2e/`, and a spec that needs neither the
 // app nor the game's files does not belong in `e2e/`.
+//
+// A RUN CLEANS UP AFTER ITSELF, at both ends. `e2e/scratch.ts` removes the
+// save slots and the Electron profile a launched app writes — before, because
+// a killed run or a hand-driven single spec leaves state with no teardown to
+// collect it, and after, so the tree is left as it was found. It never touches
+// `_tmp/` itself: that folder is the project's scratch space and most of what
+// is in it was put there on purpose.
 export default defineConfig({
+  globalSetup: './e2e/scratch.ts',
+  globalTeardown: './e2e/scratch.ts',
   timeout: 30_000,
   expect: { timeout: 5_000 },
   workers: 1,

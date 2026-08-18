@@ -163,6 +163,14 @@ same commit as the dialog.
   inside the game directory). Specs treat it as **read-only**.
 - Fabricated game folders (for negative/CLI tests) and all other scratch state
   go under `_tmp/` or `os.tmpdir()`, and are wiped by the spec that made them.
+- **A run clears what a LAUNCH wrote, at both ends** — `e2e/scratch.ts`, hung
+  off `globalSetup` and `globalTeardown` in `playwright.config.ts`, removes
+  `_tmp/saves` and `_tmp/profile`. Before as well as after, because a killed
+  run and a hand-driven single spec both leave state with no teardown to
+  collect it. It does NOT touch `_tmp/` itself: that is the project's scratch
+  space and most of what is in it was put there on purpose. The phase chain's
+  `.env` is left alone too — it is the handover between phases, and keeping it
+  is what lets a later phase run warm on its own.
 
 ## Running
 
@@ -179,8 +187,13 @@ wrong conclusion once: a fix was backed out to check the spec would fail, the
 spec passed, and the reason was that the binary under it still had the fix in.
 Run `npm run build` first, or use `npm run test:e2e`, which does.
 
-**And `_tmp/saves` OUTLIVES a run.** The campaign specs write real saves into
-it, so running one spec on its own leaves state the next full phase reads:
-`load.spec.ts` sorts first in `e2e/001` and asserts a campaign at `0/26`, and
-a mapchain spec run alone earlier steps that same team to position 1. Clear
-the folder when a spec fails on something nobody touched.
+**`_tmp/saves` USED to outlive a run**, and it is worth knowing what that cost
+because the shape recurs. The campaign specs write real saves into it, so
+running one spec on its own left state the next full phase read: `load.spec.ts`
+sorts first in `e2e/001` and asserts a campaign at `0/26`, while a mapchain
+spec run alone earlier had walked that same team to position 1 — so a run
+failed on a spec nobody had touched, pointing at LOAD GAME rather than at the
+leftover. `e2e/scratch.ts` clears it now (Isolation, above). **State that
+outlives a run is a spec's own junk**: whatever a new spec writes outside its
+own process belongs in the same place, not in a comment telling the next
+person to delete it by hand.

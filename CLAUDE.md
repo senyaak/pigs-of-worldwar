@@ -377,6 +377,19 @@ it beyond `PHASE_ENV` existing, and the fixture says so if it does not.
 Specs run against the **real** installation, read-only, with counts asserted
 as floors where savegame churn could move them and exactly where it cannot.
 
+**A RUN CLEANS UP AFTER ITSELF.** Anything a spec writes outside its own
+process — saves, profiles, fabricated installs — is cleared by the suite, not
+left for somebody to delete by hand: `e2e/scratch.ts` runs as both
+`globalSetup` and `globalTeardown`, taking `_tmp/saves` and `_tmp/profile`
+with it at each end, and a spec that makes its own folder removes it in
+`afterAll` (`e2e/cli-game-dir.spec.ts`). BEFORE as well as after, because a
+killed run and a hand-driven single spec leave state with no teardown to
+collect it. It was not tidiness: leftover saves failed `load.spec.ts`, which
+asserts a fresh campaign at 0/26 and found one an earlier standalone run had
+walked to position 1 — a spec nobody had touched, pointing at the wrong
+place. What is NOT cleared is `_tmp/` itself, which is the project's scratch
+space, and the phase chain's `.env`, which is the handover between phases.
+
 ```bash
 npm run typecheck && npm run build && npx playwright test
 ```
