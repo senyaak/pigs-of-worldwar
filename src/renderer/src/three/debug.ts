@@ -316,6 +316,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
             name: pig.name,
             pigClass: pig.pigClass,
             art: squad.of(pig.id)?.art ?? '',
+            hat: squad.of(pig.id)?.hat ?? false,
             x: pig.position.x,
             z: pig.position.z,
             heading: pig.heading

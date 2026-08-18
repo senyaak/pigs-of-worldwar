@@ -9,7 +9,7 @@ import { fielded, mapSquads, musterGame } from '../../../lib/game/muster'
 import { nations } from '../../../lib/game/teams'
 import { artFor, classArt } from '../three/soldiers'
 import { bodyExtent } from '../../../lib/game/body'
-import type { LoadModelResult } from '../api'
+import type { LoadModelResult, Model, Texture } from '../api'
 import { ensureScene } from '../three/scene'
 import { createBattleInput } from '../input/battleInput'
 import { buildBattle } from '../three/battle'
@@ -42,7 +42,7 @@ import { lobOf } from '../../../lib/game/grenade'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../../../lib/game/scenery'
 import { mapRaster } from '../../../lib/game/mapRaster'
-import { SKIN_ARCHIVES, skinOf } from '../../../lib/game/nations'
+import { HAT_ARCHIVE, HAT_CLASSES, SKIN_ARCHIVES, SKIN_HATS, skinOf } from '../../../lib/game/nations'
 import { give } from '../../../lib/game/inventory'
 import { skyArchiveFor, weatherFor } from '../../../lib/game/sky'
 import { byId } from './dom'
@@ -546,6 +546,19 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
       return { base, nation, model: result.model, textures: result.textures }
     })
 
+    // The nation HATS, one per side that fields a class which wears one. Their
+    // textures are shared (`FHATS.MTD`), so the archive is asked plainly; a hat
+    // that will not load leaves that side bare-headed rather than refusing the
+    // battle, since the same load fails for every map.
+    const hats = new Map<number, { model: Model; textures: Texture[] }>()
+    if (squads.some((squad) => squad.spawns.some((at) => HAT_CLASSES.has(at.pigClass ?? 0)))) {
+      for (const nation of dressed) {
+        const wear = await window.api.loadModel(HAT_ARCHIVE, SKIN_HATS[skinOf(nation)] ?? '')
+        if (wear.ok) hats.set(nation, { model: wear.model, textures: wear.textures })
+        else console.warn(`${SKIN_HATS[skinOf(nation)]}: ${wear.error}`)
+      }
+    }
+
     // The canopy the level opens under. A squad that drops in without it
     // would be hanging from nothing, so a failed load stands them on their
     // markers instead of taking the battle down with it.
@@ -668,6 +681,7 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
         terrainTextures: terrainResult.textures,
         soldiers,
         nations: squads.map((squad) => squad.nation),
+        hats,
         skeleton: (loaded[0] as Extract<LoadModelResult, { ok: true }>).skeleton,
         clips: clipsResult.ok ? clipsResult.clips : [],
         // A map without its props is still playable ground, so a failed POG

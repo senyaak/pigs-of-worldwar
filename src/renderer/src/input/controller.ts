@@ -320,7 +320,7 @@ export interface DebugHooks {
      * side's slot on the map says neither (lib/game/nations.ts). */
     nation: number
     skin: number
-    pigs: { name: string; pigClass: number; art: string; x: number; z: number; heading: number }[]
+    pigs: { name: string; pigClass: number; art: string; hat: boolean; x: number; z: number; heading: number }[]
   }[]
   /** What the map's .POG put on the ground: how many records were drawn out
    * of how many, and where each one landed (game space, Y-down). */

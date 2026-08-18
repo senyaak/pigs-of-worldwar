@@ -66,6 +66,9 @@ export interface BattleAssets {
   skeleton: Bone[]
   /** Which nation each side wears, by side index (lib/game/nations.ts). */
   nations: readonly number[]
+  /** The nation hats out of `Chars/FHATS.MAD`, by nation — only the
+   * heavy-gunner family wears one (three/squad.ts). */
+  hats: ReadonlyMap<number, { model: Model; textures: Texture[] }>
   clips: Clip[]
   /** The map's .POG records and the geometry they name. Empty is fine — a
    * map whose objects failed to load still plays. */

@@ -19,6 +19,9 @@ import { buildPig } from './pig'
 import type { Pig as PigMesh } from './pig'
 import type { Quat } from '../../../lib/game/quaternion'
 import { classArt } from './soldiers'
+import { HEAD, unresolve } from './heldWeapon'
+import { buildModelGeometry, buildTextureMaterials } from './modelMesh'
+import { HAT_CLASSES } from '../../../lib/game/nations'
 import type { PigPlate } from '../contracts/overlay'
 
 /**
@@ -55,6 +58,10 @@ export interface Soldier {
   /** The archive base actually drawn, which is the fallback when the pig's
    * class had no art of its own. */
   readonly art: string
+  /** Which nation's skins it is wearing, and whether a nation HAT went on its
+   * head — only the heavy-gunner family gets one (lib/game/nations.ts). */
+  readonly nation: number
+  readonly hat: boolean
   /**
    * Wear this pose: one parent-relative turn per bone, in HIR order.
    *
@@ -94,6 +101,41 @@ export interface SquadAssets {
   /** Which nation each side wears, by side index — what picks between two
    * `SoldierArt`s that share a base. */
   nations: readonly number[]
+  /**
+   * The nation HATS, by nation — `Chars/FHATS.MAD`, one triple each.
+   *
+   * Only the heavy-gunner family wears one (`HAT_CLASSES`); everything else
+   * carries its headgear in its own mesh, and the exe zeroes the attachment
+   * slot for it. A nation with no entry simply goes bare-headed.
+   */
+  hats: ReadonlyMap<number, { model: Model; textures: Texture[] }>
+}
+
+/**
+ * Put a nation's hat on a pig's head — bone 2, the bone's whole matrix and no
+ * offset, exactly as the weapon hangs off bone 5 (three/heldWeapon.ts).
+ *
+ * And turned HALF a circle, which is the exe's own and not a fit: the hat loop
+ * at 0x486340 ends every triple with `afSetObjPos(hat, 0,0,0, 0, 0x800, 0)`
+ * against a whole circle of 0x1000, and the body's constructor never calls it.
+ * Untorned, `br_hat` boxes behind the skull.
+ *
+ * Only the heavy-gunner family gets one: the exe hangs a hat when the model
+ * type is 2 and zeroes the slot otherwise (0x440D71), and every other class
+ * carries its headgear as a texture group in its own mesh.
+ */
+function wearHat(
+  mesh: PigMesh,
+  hat: { model: Model; textures: Texture[] } | null,
+  pigClass: number
+): boolean {
+  if (!hat || !HAT_CLASSES.has(pigClass)) return false
+  const geometry = buildModelGeometry(hat.model, hat.textures)
+  unresolve(hat.model, geometry, mesh.bones)
+  const worn = new THREE.Mesh(geometry, buildTextureMaterials(hat.model, hat.textures))
+  worn.rotation.y = Math.PI
+  ;(mesh.bones[HEAD] ?? mesh.bones[0]).add(worn)
+  return true
 }
 
 /**
@@ -123,8 +165,10 @@ export function fieldSquad(
   })
 
   const members = pigs.map((pig) => {
-    const art = artFor(pig.pigClass, nationOf.get(pig.id) ?? 0)
+    const nation = nationOf.get(pig.id) ?? 0
+    const art = artFor(pig.pigClass, nation)
     const mesh = buildPig(art.model, art.textures, assets.skeleton)
+    const hat = wearHat(mesh, assets.hats.get(nation) ?? null, pig.pigClass)
     // buildPig wraps the mesh in its own converted group; the battle has one
     // already, so only the mesh moves across.
     const node = mesh.group.children[0]
@@ -139,6 +183,8 @@ export function fieldSquad(
       mesh,
       node,
       art: art.base,
+      nation,
+      hat,
       pose(turns, root) {
         const count = Math.min(turns.length, mesh.bones.length)
         for (let bone = 0; bone < count; bone++) {

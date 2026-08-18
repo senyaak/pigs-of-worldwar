@@ -8,6 +8,8 @@
 import { test, expect } from '@playwright/test'
 
 import {
+  HAT_ARCHIVE,
+  HAT_CLASSES,
   LARD,
   NATIONS,
   SKIN_ARCHIVES,
@@ -78,6 +80,20 @@ test('the art tables are all in SKIN order and all agree on their length', { tag
   // Russia is nation 3, skin 4, red; Japan is nation 4, skin 5, yellow.
   expect(SKIN_COLOURS[skinOf(3)]).toEqual([255, 0, 0])
   expect(SKIN_COLOURS[skinOf(4)]).toEqual([255, 255, 0])
+})
+
+test('only the heavy-gunner family wears a nation hat', { tag: '@nodata' }, () => {
+  // `ClassToModel` (0x4C2E50) gives model type 2 to classes 1, 2 and 3 alone,
+  // and the exe hangs a hat only on type 2 — every other class carries its
+  // headgear in its own mesh.
+  expect([...HAT_CLASSES].sort((a, b) => a - b)).toEqual([1, 2, 3])
+  expect(HAT_CLASSES.has(0)).toBe(false)
+  expect(HAT_CLASSES.has(14)).toBe(false)
+  // …and the hats are looked up by SKIN, in the archive's own mesh order.
+  expect(HAT_ARCHIVE).toContain('FHATS')
+  expect(SKIN_HATS[skinOf(0)]).toBe('br_hat')
+  expect(SKIN_HATS[skinOf(2)]).toBe('am_h')
+  expect(SKIN_HATS[skinOf(LARD)]).toBe('pur_hat')
 })
 
 test('the pig map paints a territory by the same remap', { tag: '@nodata' }, () => {

@@ -80,6 +80,22 @@ export const SKIN_COLOURS: readonly (readonly [number, number, number])[] = [
   [255, 255, 0]
 ]
 
+/** Where the seven nation hats live — one triple each, in SKIN order. */
+export const HAT_ARCHIVE = 'Chars/FHATS.MAD'
+
+/**
+ * Which classes wear a nation's hat, and it is a short list.
+ *
+ * The exe hangs one only when the pig's MODEL TYPE is 2 (0x440D71 in battle,
+ * 0x480A1A in the frontend), and `ClassToModel` at 0x4C2E50 —
+ * `{1,2,2,2,6,5,5,5,7,7,8,4,4,4,3,3}` — gives type 2 to classes **1, 2 and 3**
+ * alone: the heavy-gunner family. Everything else has its headgear drawn into
+ * its own mesh as a texture group, and the exe sets the attachment slot to
+ * zero for it. `Chars/BRITHATS.MAD` sits in the install unused — its name
+ * appears nowhere in the executable.
+ */
+export const HAT_CLASSES = new Set([1, 2, 3])
+
 /**
  * Who the training ground fields against you.
  *

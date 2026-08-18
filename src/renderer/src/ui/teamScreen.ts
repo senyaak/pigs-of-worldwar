@@ -43,13 +43,13 @@ import type { Sprite, SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
+import { SKIN_HATS, skinOf } from '../../../lib/game/nations'
 import { NATIONS } from '../../../lib/game/teams'
 import {
   buildFrontendPig,
   CHAR_ARCHIVE,
   HAT_ARCHIVE,
   IDLE_CLIP,
-  NATION_HATS,
   NATION_SKINS,
   PIG_ART
 } from '../three/frontendPig'
@@ -289,7 +289,7 @@ export function initTeamScreen(handlers: {
     if (skin === null || skin === undefined) return
     const [loaded, hat] = await Promise.all([
       window.api.loadTims(skin),
-      window.api.loadModel(HAT_ARCHIVE, NATION_HATS[nation] ?? '')
+      window.api.loadModel(HAT_ARCHIVE, SKIN_HATS[skinOf(nation)] ?? '')
     ])
     if (!loaded.ok) {
       console.warn(`${skin}: ${loaded.error}`)
@@ -301,7 +301,7 @@ export function initTeamScreen(handlers: {
       textures: loaded.images,
       hat: hat.ok ? { model: hat.model, textures: hat.textures } : null
     }
-    if (!hat.ok) console.warn(`${NATION_HATS[nation]}: ${hat.error}`)
+    if (!hat.ok) console.warn(`${SKIN_HATS[skinOf(nation)]}: ${hat.error}`)
     outfits.set(nation, outfit)
     if (selection === nation) pig.reskin(outfit)
   }
@@ -513,7 +513,7 @@ export function initTeamScreen(handlers: {
         // The British skins come WITH the model, so they are the one nation
         // that needs no archive of its own — kept here so row 0 can be
         // returned to like any other. Its HAT still comes out of FHATS.
-        const britishHat = await window.api.loadModel(HAT_ARCHIVE, NATION_HATS[0])
+        const britishHat = await window.api.loadModel(HAT_ARCHIVE, SKIN_HATS[0])
         outfits.set(0, {
           textures: built.textures,
           hat: britishHat.ok ? { model: britishHat.model, textures: britishHat.textures } : null

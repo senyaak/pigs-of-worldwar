@@ -194,6 +194,12 @@ reasoning, the false starts and the sessions behind them are in
   balanced, never the player's own, and position 25 forced to Lard — and the
   boot camp takes `(own + 1) % 6` instead (0x41A409). `lib/game/enemies.ts`,
   `army/skins.md`. `[exe]`
+- **Only the heavy-gunner family wears a nation HAT.** `ClassToModel`
+  (0x4C2E50) gives model type 2 to classes 1, 2 and 3 alone, and the exe hangs
+  a hat off bone 2 when the type is 2 and zeroes the slot otherwise (0x440D71);
+  every other class carries its headgear in its own mesh. The hat takes the
+  same half turn every attachment gets at load, and `Chars/BRITHATS.MAD` is
+  unused — its name is nowhere in the executable. `[exe]`
 - **A nation is a REPAINT.** All seven `Chars/*.MTD` hold the same 120 entries
   under the same names at the same sizes, and 105 of the ~110 that differ from
   the British ones differ only in their palette. So one geometry load dresses

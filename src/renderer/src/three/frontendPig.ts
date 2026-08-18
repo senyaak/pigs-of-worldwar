@@ -74,18 +74,15 @@ export const PIG_ART = 'pchvy_hi'
  * one per nation and a spare (`frontend/notes.md`). The exe loads that very
  * archive by name at 0x4862ED.
  *
- * (`BRITHATS.MAD` is a different set and the battle's: seven BRITISH hats by
- * class, on the family names `three/soldiers.ts` already maps.)
+ * (`BRITHATS.MAD` beside it holds seven BRITISH hats on the class family
+ * names — and is UNUSED: the string does not appear in the executable at all.)
+ *
+ * The archive's own mesh order is `br_hat, am_h, frhelm, germh, rus_h, ja_ban,
+ * pur_hat`, which is SKIN order, and the exe indexes its cache by the skin
+ * straight — so the list lives in `lib/game/nations.ts` with the rest of the
+ * art tables and this screen looks one up the same way the battle does.
  */
-export const HAT_ARCHIVE = 'Chars/FHATS.MAD'
-export const NATION_HATS: readonly string[] = [
-  'br_hat',
-  'frhelm',
-  'am_h',
-  'rus_h',
-  'ja_ban',
-  'germh'
-]
+export { HAT_ARCHIVE } from '../../../lib/game/nations'
 
 /** `[0x513044] = 0x1B` (0x426911). */
 export const IDLE_CLIP = 27

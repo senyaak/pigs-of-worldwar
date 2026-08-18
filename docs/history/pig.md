@@ -177,6 +177,29 @@ face's texture index cannot shift.
 which would have dressed both sides in whichever nation loaded first — silently,
 since the geometry is identical.
 
-Not done: the nation HATS in battle. The exe hangs one off bone 2 for model
-type 2 only (classes 1, 2, 3), out of `FHATS.MAD` in skin order, and the
-frontend already does it for the SELECT TEAM pig — the battle does not.
+### …and the hats, the same day
+
+The battle wears them now too. The exe hangs one off bone 2 — the head, the
+bone's whole matrix and no offset — and turns it half a circle, which is the
+same `afSetObjPos(obj, 0,0,0, 0, 0x800, 0)` every attachment gets at load
+(0x486340) and which `three/heldWeapon.ts` had already measured its way to for
+the weapon on bone 5. So `wearHat` is the weapon's own treatment, one bone
+along.
+
+**Only the heavy-gunner family gets one.** `ClassToModel` (0x4C2E50) gives
+model type 2 to classes 1, 2 and 3 alone, and the exe hangs a hat when the type
+is 2 and writes ZERO into the slot otherwise (0x440D71) — every other class
+carries its headgear in its own mesh as a texture group. That is also why the
+heavy is the one model with a bare head, which the SELECT TEAM work had already
+found from the other end.
+
+`FHATS.MAD`'s mesh order is `br_hat, am_h, frhelm, germh, rus_h, ja_ban,
+pur_hat` — SKIN order, and the exe indexes its cache by the skin straight. The
+frontend had its own list in nation order under its own name; there is one list
+now, in `nations.ts`, and both screens look a hat up the same way.
+
+`Chars/BRITHATS.MAD` — seven British hats on the class family names — is UNUSED:
+the string does not appear in the executable at all. A note here used to call it
+"the battle's".
+
+`pow.debug.squads()` reports `nation`, `skin` and, per pig, `hat`.
