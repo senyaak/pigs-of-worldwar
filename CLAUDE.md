@@ -135,6 +135,30 @@ reasoning, the false starts and the sessions behind them are in
   QUARTER (not the sign) by CAMP's iron gate. Every name that fails to resolve
   ends in `_ME`: those are the pig spawn markers, class in `type`.
   `objects/notes.md`. `[exe]`
+- **The battle MAP is the library's SCANNER, it is never opened and it is never
+  closed.** The exe draws none of it: it loads `chars\top.mad` only to have an
+  object to pack two screen coordinates into, and the dispatcher keeps that
+  object out of the world and hands the pair to `_d3d.dll`'s `DrawScanner`
+  (0x454913/0x4582F0, dll 0x1000485C/0x10009810). It slides in over twenty
+  frames when a battle starts and stays: its enable bit has exactly two writers
+  in `.text`, a zero in the constructor and a one in the HUD setup, so the
+  slide-out is dead code. The picture is the WHOLE level in about 126 pixels —
+  one 64×64 texel a tile — centred on the camera and turned with it, shrinking
+  only while a shot charges. `lib/game/scanner.ts`, `scanner/notes.md`. `[exe]`
+- **An espionage pig is off the map on anybody else's turn, and there is no
+  range.** Classes 8, 9 and 10 — SCOUT, SNIPER, SPY — get marker 0xFF whenever
+  their team is not the team whose turn it is (0x440C67), and the library drops
+  the blip; the same test hides the name over the pig's head. It cuts both ways:
+  your own scout is off your own map through the enemy's turn. Only four model
+  names get a marker at all — CRATE1, CRATE2, CRATE4, PROPOINT — and DRUM sits
+  one place past the window on purpose. `[exe]`
+- **Mines are not on the map, and never were.** `bomb` in `MAPICONS.MTD` has no
+  reference in the library, and all 68 instructions that touch the mine tile bit
+  are gameplay. What exists is the GROUND reveal: a 3×3 block of tiles round a
+  pig of class 4, 5, 6, 7 or 0x0E stamped back through `Map::SetTile`
+  (0x4767A0) — a texture swap, three tiles, five classes.
+  `lib/game/mines.ts` still carries an invented 1024 and a set of three; see
+  `todo.md` B10. `[exe]`
 
 **Animation**
 
@@ -428,6 +452,15 @@ and the weakest of them were invented here:
   ellipse matched to play), the PINK the heart is painted (its art is white),
   and the heart's ×2 (the map's marker is 10×11 and stands beside letters 32
   tall). Correct them against play.
+- `[CHECK — remake]` **Two things about the battle map are ours.** What COLOUR
+  a tile becomes on the 64×64 picture — `lib/game/mapRaster.ts` averages the
+  tile's own ground texture and dims it by the light the map already bakes,
+  because `DrawScanner`'s fill loop was not decoded and `map1.tim` as it ships
+  is not a picture of any level. And WHICH WAY the library counts its screen y,
+  which decides whether the widget sits below the middle of the screen or above
+  it: the two offsets are the exe's (`-110`, `75` off the centre) and the sign
+  is a reading, taken as the one that lands it bottom-left where play remembers
+  it. `LAYOUT.map.centre` is where to nudge it.
 - `[gap]` **The power gauge and the weapon icons wait for a weapon.**
   `newpow1..7` and `powg1` are the gauge — which the original shows only when
   the weapon in hand needs one — and `FACETIMS.MAD`, despite the name, holds

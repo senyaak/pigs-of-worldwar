@@ -54,6 +54,11 @@ export interface MapProps {
   /** Whether one record's art is on the map at all — false while the map
    * SCRIPT is still holding it back (lib/game/script.ts). */
   show(id: number, visible: boolean): void
+  /** Whether it is on the map right NOW: taken records are gone and held-back
+   * ones are hidden. What the dashboard's map asks before drawing a crate's
+   * blip, since the original's blip belongs to the OBJECT and dies with it
+   * (lib/game/scanner.ts). */
+  drawn(id: number): boolean
   /** Move one record's art up or down, game space. What a crate coming down
    * under a canopy needs, and nothing else uses. */
   raise(id: number, y: number): void
@@ -213,6 +218,7 @@ export function buildMapProps(
       const mesh = byId.get(id)
       if (mesh) mesh.visible = visible
     },
+    drawn: (id) => byId.get(id)?.visible === true,
     raise(id, y) {
       const mesh = byId.get(id)
       if (mesh) mesh.position.y = y

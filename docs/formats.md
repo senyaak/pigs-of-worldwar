@@ -445,8 +445,17 @@ A plain named archive of TIMs — the battle's in-game furniture:
 The assembly and every one of those meanings comes from PLAY, piece by
 piece; the archive's order says none of it.
 
-`MAPICONS.MTD` holds the overview map (`map1`) and its markers — `iconpig`,
-`iconhart`, `iconpkup`, `iconprop`, all 10×11. `TBOXTIMS.MAD` is the
+`MAPICONS.MTD` holds **eight** entries, not four: the battle map's own
+surface `map1` (64×64, 4-bit — one texel per terrain tile, and its shipped
+content is not a picture of any level), the four 10×11 markers `iconpig`,
+`iconhart`, `iconpkup` and `iconprop`, plus `bomb` 8×8 and `rain` 2×10 and
+`snow` 6×10. The last three are DEAD in the shipped PC build: `bomb` has no
+reference in `_d3d.dll` at all, and the weather draws out of its own
+`rain.mtd`/`snow.mtd` (`[0x520668]+0x41C`). `Chars\TOP.MAD` is the plate the
+map hangs on and `Chars\TOP.MTD` its own textures — `map1` again (byte for
+byte), `wt_s`, `ca-under`, `newbase` and `mapcl000`; the model's UVs fit that
+archive and not MAPICONS, which is what the exe actually binds it to.
+`TBOXTIMS.MAD` is the
 briefing bar that slides down from the top: `npro1..4`, two brass end caps
 and the black scroll between them. `FACETIMS.MAD`, despite the name, is the
 weapon panel — `wepn01..20` at 64×64, plus `croshair`, `point01/02`,

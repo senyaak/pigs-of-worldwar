@@ -41,6 +41,7 @@ import { SKILL, skillName } from '../../../lib/game/skills'
 import { lobOf } from '../../../lib/game/grenade'
 import { UNLIMITED } from '../../../lib/game/inventory'
 import type { Collected } from '../../../lib/game/scenery'
+import { mapRaster } from '../../../lib/game/mapRaster'
 import { give } from '../../../lib/game/inventory'
 import { skyArchiveFor, weatherFor } from '../../../lib/game/sky'
 import { byId } from './dom'
@@ -374,6 +375,10 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
       // DOES rather than how charged it is (ui/hud.ts, `DIAL.slot.lens`).
       lens: lensFor(game.currentPig.holding),
       scope: scene.scoped(),
+      // The map is centred on the camera and turned by it, and it shows what
+      // the side whose turn it is can see (lib/game/scanner.ts).
+      eye: scene.eye(),
+      blips: scene.blips(),
       // The card carries the mission's name for as long as anyone is still in the
       // air, "MISSION ACCOMPLISHED!" once it is over, and "GET READY >S..." for
       // the beat at the top of every turn — all three the same centred card the
@@ -663,6 +668,11 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
       sound,
       running: isBattleUp
     })
+    // The dashboard's map, built once off the same ground the mesh came from
+    // — one pixel a tile, the whole world (lib/game/mapRaster.ts). Not
+    // awaited: it is a picture appearing on a widget that is still sliding
+    // in, and a battle should not wait on it.
+    void hud.ground(mapRaster(terrainResult.blocks, terrainResult.textures))
     map = name
     updateHud()
     if (frame === 0) frame = requestAnimationFrame(paint)

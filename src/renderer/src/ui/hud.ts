@@ -5,7 +5,8 @@
 // - the CLOCK, bottom right;
 // - the ANGLE DIAL and the WEAPON SLOT as one widget, top right, always
 //   there — the slot empty until a weapon is chosen;
-// - the MAP, bottom left (not built yet);
+// - the MAP, bottom left — the level from above with a blip on everything
+//   worth one, turning under the camera (ui/battleMap.ts);
 // - over each pig, its NAME and its health beside a heart, which hide while
 //   the player is moving and come back after a couple of seconds' rest;
 // - the power gauge, only when the weapon in hand asks for one.
@@ -29,6 +30,10 @@ import { loadTims, tinted } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
 import { drawTitleCard } from './titleCard'
 import { createBriefingBar } from './briefingBar'
+import { createBattleMap } from './battleMap'
+import { SCANNER_CENTRE } from '../../../lib/game/scanner'
+import type { Blip, Eye } from '../../../lib/game/scanner'
+import type { MapRaster } from '../../../lib/game/mapRaster'
 import { createSkillMenu } from './skillMenu'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SkillMenu } from './skillMenu'
@@ -235,7 +240,17 @@ export const LAYOUT = {
      * anything when the model's scale moved. */
     lift: 120,
     heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
-  }
+  },
+  /**
+   * THE MAP. Its middle, against the middle of the screen.
+   *
+   * Both numbers are the exe's own (lib/game/scanner.ts, 0x454597/0x4545AC);
+   * the SIGN of y is the remake's reading of which way the library counts,
+   * and this is where to nudge it if play says the widget sits wrong. Its
+   * SIZE is not here because it is not free: the picture is the whole world
+   * at the scanner's own scale.
+   */
+  map: { centre: { x: SCANNER_CENTRE.x, y: SCANNER_CENTRE.y } }
 }
 
 /** What the specs wait for; the console tweaks `LAYOUT.plate.delay`. */
@@ -280,6 +295,12 @@ export interface HudState {
   /** The level's opening card — "TRAINING MISSION: BOOT CAMP" — while the
    * squad is still in the air, and null once it is down (ui/titleCard.ts). */
   title: string | null
+  /** Where the camera stands and which way it looks: the map is centred on
+   * it and turns with it. Null before there is a scene to ask. */
+  eye: Eye | null
+  /** Everything the map shows a marker for, already filtered by whose turn
+   * it is — an enemy scout is not on this list (lib/game/scanner.ts). */
+  blips: readonly Blip[]
 }
 
 export interface Hud {
@@ -289,6 +310,9 @@ export interface Hud {
   draw(state: HudState): void
   /** Send a line through the briefing bar (ui/briefingBar.ts). */
   say(text: string): void
+  /** Hand the map the level's picture, built once when the battle opens
+   * (lib/game/mapRaster.ts). Null blanks it. */
+  ground(raster: MapRaster | null): Promise<void>
   /** The skill menu, which the battle opens and drives (ui/skillMenu.ts). */
   readonly skills: SkillMenu
   /** Whether the bar still has anything to say. */
@@ -327,6 +351,10 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
   // The bar is its own piece with its own art and its own clock; the
   // dashboard only owns the canvas they share.
   const bar = createBriefingBar()
+  // The map keeps its own art, its own entrance and its own easing scale,
+  // the same way the bar keeps its clock — the dashboard only owns the
+  // canvas they share (ui/battleMap.ts).
+  const battleMap = createBattleMap()
   // What the pig is carrying, in the game's own frame. Its art is loaded
   // beside the dashboard's and it draws over everything else.
   const skills = createSkillMenu()
@@ -389,6 +417,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         }
         await repaint()
         await bar.load()
+        await battleMap.load()
         await skills.load()
         loaded = true
       } catch (error) {
@@ -399,12 +428,16 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     },
 
     say: (text) => bar.say(text),
+    ground: (raster) => battleMap.ground(raster),
     skills,
     speaking: () => bar.busy(),
 
     clear() {
       bar.clear()
       skills.close()
+      // The next battle plays the entrance again, as the original does — the
+      // slide belongs to the map going up, not to the app starting.
+      battleMap.reset()
       const context = canvas.getContext('2d')
       if (context) context.clearRect(0, 0, canvas.width, canvas.height)
     },
@@ -607,6 +640,22 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       context.translate(dialX + DIAL.hub.x, dialY + DIAL.hub.y)
       context.rotate(aimRadians(state.aim ?? 0))
       context.drawImage(needle.image, -needle.width, -needle.height / 2)
+      context.restore()
+
+      // THE MAP, after the gauge and before anything modal — which is the
+      // exe's own order round the HUD frame (0x4578D2 the gauge, 0x4578D9
+      // the map). It shrinks while a shot is charging, and `charge` is
+      // exactly the condition the original ties that to: the skill's record
+      // says it has a gauge, and the same branch turns both on (0x493CBD).
+      context.save()
+      context.scale(scale, scale)
+      battleMap.draw(context, viewWidth, AUTHORED_HEIGHT, {
+        delta: state.delta,
+        eye: state.eye,
+        blips: state.blips,
+        charging: state.charge !== null,
+        centre: LAYOUT.map.centre
+      })
       context.restore()
 
       // The skill menu goes over the brass, since it is a MODE rather than

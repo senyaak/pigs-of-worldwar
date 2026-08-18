@@ -30,6 +30,8 @@ import { createDropInArt } from './dropIn'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import type { Battle } from '../../../lib/game/battle'
+import { objectBlips, pigBlips } from '../../../lib/game/scanner'
+import type { Blip, Eye } from '../../../lib/game/scanner'
 import { createTween } from './tween'
 import { createWear } from './wear'
 import type { Point } from '../../../lib/game/pose'
@@ -105,6 +107,15 @@ export interface BattleScene {
   plates(width: number, height: number, lift: number): PigPlate[]
   /** Seconds the acting pig has stood still: the names come back with it. */
   still(): number
+  /** Where the camera stands and which way it looks, GAME space — what the
+   * dashboard's map is centred on and turned by (lib/game/scanner.ts). The
+   * camera lives here, so the dashboard asks rather than guesses, exactly as
+   * it does for the plates. */
+  eye(): Eye
+  /** Everything the map draws a marker for. Built here because it takes both
+   * halves — the squads out of the game and the crates out of the map's art,
+   * which is the only place that knows one has been taken. */
+  blips(): Blip[]
   /** The damage numbers floating over the battle, projected into a view this
    * big — the dashboard draws them in the game's own letters. */
   numbers(width: number, height: number): FloatingNumber[]
@@ -209,6 +220,40 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   /** Scratch for the camera's position in GAME space: the root is turned half a
    * turn about x, so the world's y and z are the game's negated. */
   const eyeInGame = new THREE.Vector3()
+  /** …and the map's own pair, so asking for the eye between frames cannot
+   * disturb what the see-through test is holding. */
+  const mapEye = new THREE.Vector3()
+  const mapLook = new THREE.Vector3()
+
+  /**
+   * Where the camera is and which way it looks, GAME space — what the
+   * dashboard's map is centred on and turned by.
+   *
+   * The root is turned half a turn about x, so a point taken back into its
+   * space IS in game space; that is the same trip the see-through test makes.
+   * The look is taken as a second POINT rather than as a direction, because a
+   * direction taken through `worldToLocal` would come back rotated and
+   * translated both.
+   */
+  const eye = (): Eye => {
+    root.worldToLocal(mapEye.copy(host.camera.position))
+    host.camera.getWorldDirection(mapLook)
+    root.worldToLocal(mapLook.add(host.camera.position))
+    return { x: mapEye.x, z: mapEye.z, heading: Math.atan2(mapLook.x - mapEye.x, mapLook.z - mapEye.z) }
+  }
+
+  /**
+   * Everything the map draws a marker for.
+   *
+   * Whose turn it is decides what is on it: an espionage pig is on its own
+   * team's map and on nobody else's (lib/game/scanner.ts). A crate's marker
+   * belongs to the OBJECT in the original and dies with it, so the art is
+   * asked whether the record is still standing.
+   */
+  const blips = (): Blip[] => [
+    ...pigBlips(game.players, game.players.indexOf(game.currentPlayer), performance.now()),
+    ...objectBlips(assets.objects, (id) => !props.drawn(id))
+  ]
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
@@ -764,6 +809,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     burning: () => grenadeArt.burning(),
     mines: () => mines.at().map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     mineMarkers: () => mineArt.shown(),
+    map: () => ({ eye: eye(), blips: blips() }),
     minesTripped: () => mineArt.tripped(),
     charging: () => battle.charging(),
     firing: () => battle.view().firing?.phase ?? null,
@@ -844,6 +890,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     plates: (width, height, lift) => squad.plates(host.camera, width, height, lift),
     numbers: (width, height) => projectDamage(now.numbers, host.camera, root, width, height),
     still: () => now.still,
+    eye,
+    blips,
     charging: battle.charging,
     scoped: () => now.scoped,
     aim: battle.aim,

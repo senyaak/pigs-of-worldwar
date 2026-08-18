@@ -993,11 +993,53 @@ control sets, polled once a frame" in [turns.md](turns.md).
   are read from `BIG.TAB`, so the bar loads `BIG` and kerns a pixel a pair as
   the exe does. One number in it is still unchecked — the 300 ms a line that
   FITS the window is held for, which reads faster than a line can be read.
-- **The rest of the battle screen, in the order play asks for it**: the MAP
-  bottom left (`MAPICONS.MTD`: `map1` plus the pig, heart, pickup and prop
-  markers), and the POWER gauge, which nothing has needed yet. The dial is
-  done — the needle turns with the aim angle and the slot beside it carries
-  the chosen skill's icon, out of the skill menu's own art.
+- ~~**The rest of the battle screen**: the MAP bottom left~~ **DONE
+  2026-08-18** — `ui/battleMap.ts` on `lib/game/scanner.ts` and
+  `lib/game/mapRaster.ts`, and the read behind it is below. The dial and the
+  POWER gauge were already done.
+
+### THE MAP — read 2026-08-18, and it is not a screen
+
+The exe does not draw it: `Data\_d3d.dll` does, and the whole of the exe's
+share is a smuggler's envelope. The HUD constructor (0x4544E0) loads
+`chars\top.mad`, binds it to MAPICONS (0x454913 `afCreateObj2`) and calls
+`afInitScanner` with the same archive (0x4549A0); the per-frame draw
+(0x4582F0, from 0x4578D9 in the HUD frame 0x457840) packs two screen
+coordinates into that object's `+0x4C` and pushes it at the sort list, and the
+library's dispatcher sees the high bits set, keeps the object OUT of the world
+(0x1000485C) and hands the packed pair to `DrawScanner` (0x10009810). So the
+plate is never on screen; what is, is a top-down grid of the terrain centred
+on the camera and turned with it, with the icon quads stamped over it.
+
+Four things that were assumed and are now read:
+
+- **It is never opened and never closed.** `HUD+0xC69`, the enable bit, has
+  exactly two writers in `.text` — the constructor zeroing it (0x4547F4) and
+  the HUD's setup raising it (0x457490). The slide-out branch is dead code.
+  It comes up over twenty frames off the table at 0x4D1958 and stays up.
+- **The only thing that resizes it is a CHARGING shot**:
+  `afSetScannerSizeSmall(1)` rides the same branch that turns the power gauge
+  on (0x493CBD/0x493CC9), and the scales are 0.151072 and 0.121060 — 126 and
+  101 pixels for the whole 64-tile world.
+- **The espionage classes are off the enemy's map**, and the rule is the TURN
+  and nothing else (0x440C67): classes 8, 9 and 10 — SCOUT, SNIPER, SPY — get
+  marker 0xFF and the library drops them. No range, no spotting, and it cuts
+  both ways: your own scout is off your map through the enemy's turn. The same
+  test hides the name-and-health marker over the pig's head (0x459BA7).
+- **MINES ARE NOT ON THE MAP AT ALL.** `bomb` in MAPICONS has zero references
+  in the library, the exe reads the MAPICONS handle at exactly two addresses
+  and both are in the constructor, and all 68 instructions that touch the mine
+  tile bit are gameplay — none is in a render function. What DOES exist is the
+  GROUND reveal (0x4767A0): a 3×3 block of tiles around a pig of class 4, 5,
+  6, 7 or 0x0E — COMMANDO, SAPPER, ENGINEER, SABOTEUR, HERO — saved and
+  stamped back through `Map::SetTile`, which is a texture swap on the ground.
+  See `todo.md` item B10: our `DETECTORS` set and `DETECT_RANGE` are both
+  wrong, and they are the mine-CARRYING set rather than the seeing one.
+
+What is the remake's own and tagged as such: what colour a tile becomes on a
+64×64 picture (`lib/game/mapRaster.ts` — the library's own fill loop was not
+decoded), and which way the library counts its screen y, which decides whether
+the widget sits below centre or above it (`LAYOUT.map.centre`).
 - **The menu DRIVES ON, and every number in that is read.** It comes down
   from 380 pixels above — the exe's per-screen start table at 0x4C0A18, in
   the frontend's own 1024×820 space — and settles on one shared damped

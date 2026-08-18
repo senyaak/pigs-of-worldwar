@@ -275,6 +275,17 @@ export interface DebugHooks {
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }
+  /**
+   * The dashboard's map, from the side it is drawn for: where it is centred
+   * and turned, and one entry per marker on it.
+   *
+   * `blips` is already filtered by whose turn it is, so an espionage pig
+   * missing from this list is the rule working (lib/game/scanner.ts).
+   */
+  map(): {
+    eye: { x: number; z: number; heading: number }
+    blips: { x: number; z: number; icon: string; colour: [number, number, number] }[]
+  }
   /** Where it is LOOKING, as a unit vector — the rig eases its position and
    * not its aim, so a shake in the view lives here (three/debug.ts). */
   facing(): { x: number; y: number; z: number }

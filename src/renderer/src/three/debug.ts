@@ -18,6 +18,7 @@ import { surfaceUnder } from '../../../lib/game/footsteps'
 import type { Obstruction } from '../../../lib/game/obstacles'
 import type { DropIn } from '../../../lib/game/dropIn'
 import type { MapProps } from './props'
+import type { Blip, Eye } from '../../../lib/game/scanner'
 import type { Squad } from './squad'
 import { skillName } from '../../../lib/game/skills'
 
@@ -79,6 +80,8 @@ export interface DebugParts {
   /** How many mine MARKERS are on the scene — what the side whose turn it is can
    * see of the field (three/mineArt.ts). */
   mineMarkers: () => number
+  /** The dashboard's map from the side it is drawn for (lib/game/scanner.ts). */
+  map: () => { eye: Eye; blips: Blip[] }
   /**
    * …and how many of those are TRODDEN ones, which wear a different model.
    *
@@ -261,6 +264,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** …and how many BURIED ones are being drawn for the side whose turn it is:
        * a mine is hidden unless a pig near it has the class to see one. */
       mineMarkers: () => parts.mineMarkers(),
+      map: () => parts.map(),
       minesTripped: () => parts.minesTripped(),
       charging: () => parts.charging(),
       /** Where the shot sequence is: 'fuse' while the ten frames run down,
