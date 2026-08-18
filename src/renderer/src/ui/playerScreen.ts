@@ -41,8 +41,8 @@
 // blitted. `backgr~1` is blitted by no draw arm — it stays here on play's word
 // alone, as the portrait's backing.
 //
-// Still NOT built: `pcflag`, which marks a pig the team can afford to promote
-// (0x41D814, and it wants the team's promotion points); and the medals.
+// Still NOT built: the medals, and `pcflag`'s 10-px shift on a pig wearing a
+// pip (`sub edi,0Ah` leaks out of the pip block — ours stands still).
 
 import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
@@ -105,6 +105,8 @@ const ART = [
   // The PIG MENU's plaque and its medallion's three shades (ui/pigMenu.ts) —
   // kind 6 loads nothing of its own, the family already carries it.
   'swap', 'swap01', 'swap02', 'swap03',
+  // The PROMOTION FLAG — on every pig the team can afford to promote.
+  'pcflag',
   // The three markup ICONS the board writes with, 22 tall like every icon in
   // that set: `vp` is the TOKEN, `battle` how many battles a pig has fought,
   // `kills` how many it has killed (`frontend/notes.md` — the archive's name
@@ -222,6 +224,14 @@ const LAYOUT = {
    * `2·(scaleY(0) − 7)` (0x41DA12). */
   team: { x: 120, y: -14 },
   /**
+   * The PROMOTION FLAG, `pcflag` 24×34, on every pig the team can afford to
+   * promote (0x41D70E): a rookie's rests at x 203 left and 406 right —
+   * `[0x512C70]` walks 0→23 so it flies 23 px toward the centre as it
+   * arrives — and its y is `drop` under the pig's row. The exe shifts a
+   * pip-wearer's 10 px inboard; ours stands still (`[CHECK — remake]`).
+   */
+  flag: { x: [203, 406], drop: 49, fly: 23 },
+  /**
    * `pigpro` 200×191 at the bottom centre, the arm's LAST blit (0x41DB85) so
    * it stands in front of everything — and it is **the BOARD**: a black face
    * the screen writes the team's and the lit pig's numbers across (`[play]`).
@@ -288,6 +298,7 @@ const cloneLayout = (): PlayerLayout => ({
   drop: { ...LAYOUT.drop },
   portrait: { ...LAYOUT.portrait },
   team: { ...LAYOUT.team },
+  flag: { ...LAYOUT.flag, x: [...LAYOUT.flag.x] },
   pigpro: { ...LAYOUT.pigpro },
   board: { ...LAYOUT.board, lines: { ...LAYOUT.board.lines } },
   options: {
@@ -388,6 +399,8 @@ export function initPlayerScreen(handlers: {
    * How long it stands is `[CHECK — remake]`. */
   let spent: { cost: number; ticks: number } | null = null
   const SPENT = { x: 323, y: 189, ticks: 24 }
+  /** The promotion flag's arrival — `[0x512C70]`, walked 0 → 23. */
+  let flagFly = 0
 
   const menu = initPigMenu({
     promote: (slot) => handlers.promote(slot),
@@ -606,6 +619,20 @@ export function initPlayerScreen(handlers: {
         context.drawImage(stripes.image, column.stripes, y + layout.drop.stripes)
       }
 
+      // The PROMOTION FLAG — this pig can be promoted RIGHT NOW (0x41D70E).
+      // The exe's four gates fold to two here: the screen has arrived, and a
+      // way out of the class is within the team's tokens. It flies its last
+      // 23 px toward the centre as it lands.
+      if (
+        driveOn.phase() === 'here' &&
+        promotionsFrom(pig.rank).some((way) => way.cost <= tokens)
+      ) {
+        const flag = sprites.get('pcflag')
+        const short = layout.flag.fly - flagFly
+        const x = at.column === 0 ? layout.flag.x[0] - short : layout.flag.x[1] + short
+        context.drawImage(flag.image, x, at.y + layout.flag.drop + offset)
+      }
+
       // Its NAME, ABOVE the badge and centred on the plate's own leg rather
       // than on the portrait (`[play]`) — it belongs inside the widget, not
       // under the face. The RANK is the badge and the pips beside it; the arm
@@ -740,6 +767,7 @@ export function initPlayerScreen(handlers: {
   const advance = (): void => {
     driveOn.tick()
     pulse += PULSE_STEP
+    if (driveOn.phase() === 'here' && flagFly < layout.flag.fly) flagFly++
     menu.tick()
     if (career.state() === 'open') career.tick()
     dim = Math.max(0, Math.min(DIM_TICKS, dim + (overlaid() ? 1 : -1)))
@@ -807,6 +835,7 @@ export function initPlayerScreen(handlers: {
       armed = -1
       dim = 0
       spent = null
+      flagFly = 0
       menu.reset()
       career.reset()
       draw()
