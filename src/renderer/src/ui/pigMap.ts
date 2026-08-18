@@ -13,10 +13,10 @@
 //  2. the ZOOM (0x483010) — the current patch's rectangle flies to the
 //     region page's over 32 steps of 50 ms on the easing table, the patch
 //     fading out, the region page fading in, a black veil rising to 64/255;
-//  3. the REGION (0x4833B0) — the page close up, a flag pole on every one of
-//     its missions revealing one by one, the conquered ones flying the
-//     nation's flag, and the CURRENT one wearing the player's own animated
-//     marker, bobbing on the wave table. 10 000 ms, or any key.
+//  3. the REGION (0x4833B0) — the page close up, every one of its missions
+//     revealing one by one as a flag in the colour of the nation HOLDING it
+//     with its pole over the top, and the CURRENT one wearing the player's
+//     own animated marker, bobbing on the wave table. 10 000 ms, or any key.
 //
 // Any key skips the phase it lands in — the exe's own (0x480870). BACK skips
 // the WHOLE map instead, which is the remake's own shortcut (`[deliberate]`).
@@ -39,7 +39,8 @@ import {
   ZOOM_EASING,
   nationColour,
   regionOf,
-  regionSpan
+  regionSpan,
+  standsShown
 } from '../../../lib/game/pigmap'
 
 /** The exe's own clocks: the blink's tick, the zoom's step, the region's
@@ -49,7 +50,6 @@ const WORLD_MS = 2000
 const BLINK_TICK_MS = 64
 const ZOOM_STEP_MS = 50
 const REGION_MS = 10000
-const REVEAL_MS = 150
 const BOB_MS = 100
 /** The zoom's VEIL: alpha `easing·64` of 255, drawn over a rect of its own
  * whose travel caps at 0.75 — the second pass settled that the cap belongs
@@ -59,7 +59,8 @@ const VEIL = 64 / 255
 const VEIL_TRAVEL = 0.75
 
 /** The flag flies 40×32 and its pole 8×62, both hung (−8, −62) off the
- * stand's own point (0x4833B0). */
+ * stand's own point and drawn in that order — the pole goes OVER the flag's
+ * own hoist edge (0x48356C then 0x4835F4, one x/y for the pair). */
 const FLAG = { width: 40, height: 32, dx: -8, dy: -62 }
 const POLE = { width: 8, height: 62 }
 
@@ -75,6 +76,8 @@ export interface PigMap {
   phase(): Phase
   /** How many of the 25 territories were tinted and laid down last frame. */
   patches(): number
+  /** How many flags flew in the last region frame. */
+  flags(): number
   layout: Record<string, never>
 }
 
@@ -102,13 +105,24 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
   let done = false
   /** Territory patches drawn in the last world frame — the debug read. */
   let patches = 0
+  /** Flags blitted in the last region frame, for the same reason: a page of
+   * bare poles is a perfectly good-looking page, so a miss here is silent. */
+  let flags = 0
 
   /**
-   * WHOSE COLOUR a position flies. A site's patch is tinted by the nation
-   * DEFENDING it (0x483A4C) — and once the campaign has moved past a
-   * position, the nation defending it is US. That is the whole point of the
-   * screen, in play's words: "наш цвет захватывает карту". Anything with no
-   * nation at all is index 7, the brown "none".
+   * WHOSE COLOUR a position flies — its patch on the world map, and its flag
+   * on the region page, both off this one answer (0x483A4C fills the array
+   * the two share).
+   *
+   * The exe keeps it as a 25-entry array of nations, rolled when the army is
+   * born and RE-STAMPED at the debrief (0x484F2E) — so a mission that has
+   * been won reads back as ours from then on. We do not re-stamp anything: a
+   * save's `enemies` is the roll, and a position already behind the campaign
+   * is ours by arithmetic. Same answer, one fewer thing to keep in step.
+   *
+   * That is the whole point of the screen, in play's words: "наш цвет
+   * захватывает карту". Anything with no nation at all is index 7, the brown
+   * "none".
    */
   const holder = (pos: number): number => (pos < position ? own : (enemies[pos] ?? 7))
 
@@ -198,6 +212,7 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
   }
 
   const drawRegion = (context: CanvasRenderingContext2D, elapsed: number): void => {
+    flags = 0
     if (!tims) return
     const region = regionOf(position)
     const page = pageOf(region)
@@ -208,23 +223,31 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
     worldScene(context, false)
     context.drawImage(page.image, at.x, at.y, at.width, at.height)
 
-    // The poles and flags come up one by one; the flag flies only where the
-    // campaign has already been through.
+    // EVERY stand of the region flies a flag, from the very first visit —
+    // there is no "only where the campaign has been". The loop at
+    // 0x483566..0x483631 carries no comparison at all: its one gate is the
+    // timed cursor, and the flag and its pole are the same two blits every
+    // time round. What a flag says is WHO HOLDS that mission, so a fresh
+    // campaign opens on a page full of other nations' colours and takes them
+    // over one by one.
     const [from, to] = regionSpan(region)
-    const shown = Math.min(to - from, Math.floor(elapsed / REVEAL_MS) + 1)
+    const shown = standsShown(elapsed, to - from)
     const pole = tims.get('fpole')
+    let flown = 0
     for (let i = 0; i < shown; i++) {
       const pos = from + i
       const stand = FLAG_STANDS[pos - 1]
       if (!stand) continue
       const x = at.x + stand[0] + FLAG.dx
       const y = at.y + stand[1] + FLAG.dy
-      context.drawImage(pole.image, x, y, POLE.width, POLE.height)
-      if (pos < position) {
-        const flag = tintFor('flag', holder(pos))
-        if (flag) context.drawImage(flag.image, x, y, FLAG.width, FLAG.height)
+      const flag = tintFor('flag', holder(pos))
+      if (flag) {
+        context.drawImage(flag.image, x, y, FLAG.width, FLAG.height)
+        flown++
       }
+      context.drawImage(pole.image, x, y, POLE.width, POLE.height)
     }
+    flags = flown
 
     // The player's own marker on the CURRENT mission, four parts bobbing on
     // the wave — the exe's own offsets (0x4833B0).
@@ -356,9 +379,7 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
       const jobs: Promise<unknown>[] = []
       SITES.forEach((site, i) => jobs.push(tintOf(tims!, site.art, holder(i + 1))))
       const [from, to] = regionSpan(regionOf(position))
-      for (let pos_ = from; pos_ < to; pos_++) {
-        if (pos_ < position) jobs.push(tintOf(tims, 'flag', holder(pos_)))
-      }
+      for (let pos_ = from; pos_ < to; pos_++) jobs.push(tintOf(tims, 'flag', holder(pos_)))
       for (const part of ['ar1', 'ar2', 'ar3', 'ar4']) {
         jobs.push(tintOf(tims, part, own))
       }
@@ -368,6 +389,7 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
     },
     phase: () => phase,
     patches: () => patches,
+    flags: () => flags,
     layout: {}
   }
 }

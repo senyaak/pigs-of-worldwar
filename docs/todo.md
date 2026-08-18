@@ -390,10 +390,14 @@ actually seen.
   a greyscale MASK and the nation colour a 255-neutral diffuse, and the
   composer ADDS it (SRCBLEND = DESTBLEND = ONE), so the map is `bigmap + mask
   × colour/255` and the blink is a white FLASH rather than a hole. A position
-  the campaign has already taken flies the PLAYER's colour. Flags appear only
-  on the conquered, so the first mission shows poles and none — the exe's own
-  rule, and what play read as a bug. `pow.pigMap.patches()` exists because a
-  map with no tints still paints.
+  the campaign has already taken flies the PLAYER's colour.
+  **The FLAGS were corrected after play, 2026-08-19**: EVERY stand of a region
+  flies one from the campaign's first day, in the colour of the nation holding
+  that mission — the per-position loop at 0x483566 carries no comparison at
+  all, and the campaign position is not read anywhere in the routine. "Only on
+  the conquered" was this repo's invention and it showed as a page of bare
+  poles. `pow.pigMap.patches()` and `pow.pigMap.flags()` exist because a map
+  with no tints, and a page with no flags, both still paint.
   Still not built from the read: the region-complete victory FMVs
   (03..07, endings 08/09 — Bink), the load-screen gamma fade and its
   tumbling-hat overlay (`fhats.mad` across a frozen frame — the "random

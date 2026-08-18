@@ -606,7 +606,11 @@ and the weakest of them were invented here:
   So `screen = bigmap + mask × colour/255`, `ui/pigMap.ts` draws the patches
   with `globalCompositeOperation = 'lighter'`, and the blink is a WHITE FLASH
   rather than a hole. `fpole` and the six region pages are real colour art and
-  take no tint. The whole model is in `pigmap/notes.md`.
+  take no tint. **EVERY stand of a region flies a flag, from the campaign's
+  first day** — the region loop (0x483566) carries no comparison at all and
+  never reads the campaign position, so there is no "only where we have been"
+  and no such thing as a bare pole; what a flag says is who HOLDS that
+  mission. The whole model is in `pigmap/notes.md`.
 - `[play]` **The DEBRIEF lists only the pigs that FOUGHT** — one after boot
   camp, three after the first mission, five from then on (`fieldedAt`). The
   exe draws five rows always and uses that count only to swap a benched pig's

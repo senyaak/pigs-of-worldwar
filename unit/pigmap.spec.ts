@@ -11,8 +11,11 @@ import {
   ZOOM_EASING,
   nationArt,
   nationColour,
+  REVEAL_FIRST_MS,
+  REVEAL_STEP_MS,
   regionOf,
-  regionSpan
+  regionSpan,
+  standsShown
 } from '../src/lib/game/pigmap'
 
 test('the map is 25 sites, six banners and six pages', { tag: '@nodata' }, () => {
@@ -52,4 +55,25 @@ test('a nation maps to its art and its colour', { tag: '@nodata' }, () => {
   expect(nationColour(0)).toEqual([0x27, 0xaa, 0x69])
   // Anything off the table is the brown "nobody".
   expect(nationColour(99)).toEqual([0x6d, 0x38, 0x20])
+})
+
+test('the region reveals a stand at 100 ms and one every 150 after', { tag: '@nodata' }, () => {
+  // `start + (ticks + 1) / 3` on a 50 ms tick (0x483877), integer division.
+  expect(REVEAL_FIRST_MS).toBe(100)
+  expect(REVEAL_STEP_MS).toBe(150)
+  expect(standsShown(0, 5)).toBe(0)
+  expect(standsShown(99, 5)).toBe(0)
+  expect(standsShown(100, 5)).toBe(1)
+  expect(standsShown(249, 5)).toBe(1)
+  expect(standsShown(250, 5)).toBe(2)
+  expect(standsShown(400, 5)).toBe(3)
+  expect(standsShown(550, 5)).toBe(4)
+  expect(standsShown(700, 5)).toBe(5)
+  // Frozen once the region is full (0x483869), and never negative on the way
+  // in — the phase's clock starts at zero, not at the first stand.
+  expect(standsShown(10000, 5)).toBe(5)
+  expect(standsShown(-1, 5)).toBe(0)
+  // Arstria has four stands and the isle one; both stop where they stop.
+  expect(standsShown(10000, regionSpan(4)[1] - regionSpan(4)[0])).toBe(4)
+  expect(standsShown(10000, regionSpan(5)[1] - regionSpan(5)[0])).toBe(1)
 })

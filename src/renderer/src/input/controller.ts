@@ -383,7 +383,7 @@ declare global {
       askTraining?: BarScreenView
       /** The PIG MAP — which of the chain's phases is up (ui/pigMap.ts):
        * 'off', 'world', 'zoom' or 'region'. */
-      pigMap?: { phase(): string; patches(): number }
+      pigMap?: { phase(): string; patches(): number; flags(): number }
       /** The BRIEFING — whether the load is in and a key would start the
        * mission (ui/briefing.ts). */
       briefing?: { ready(): boolean }

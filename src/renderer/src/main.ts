@@ -468,7 +468,7 @@ if (window.pow) {
   window.pow.askTraining = view(ask)
   // The map chain is not a bar screen: what a spec needs is which phase the
   // map stands in and whether the briefing would take a key.
-  window.pow.pigMap = { phase: pigMap.phase, patches: pigMap.patches }
+  window.pow.pigMap = { phase: pigMap.phase, patches: pigMap.patches, flags: pigMap.flags }
   window.pow.briefing = { ready: briefing.ready }
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }

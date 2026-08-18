@@ -887,3 +887,44 @@ run: `load.spec.ts` sorts first and asserts `0/26`, so a mapchain spec run on
 its own earlier leaves a campaign at position 1 and the next full phase fails
 on a spec nobody touched.
 
+
+## THE FLAGS WERE OURS, NOT THE EXE'S — 2026-08-19
+
+Play, on the same breath as the map's white hairlines: *"при зуме карты и
+показе карты региона — всё ещё нет флажков"*. The entry above this one had
+answered that once already, and answered it wrongly: "nothing is conquered at
+position 1, so there is nothing to fly. **Poles yes, flags no.**" That was an
+inference dressed as a reading, and the second report is what it took to go
+back to the binary rather than repeat it.
+
+**0x4833B0's per-position loop is 0x483566..0x483631 and it contains no `cmp`
+and no `test`.** The campaign position `[0x51F17B]` is not read anywhere in
+the routine at all. There is no conquest gate, there never was one, and an
+unflown pole is not a thing the original can draw: the flag and the pole are
+the same two blits every time round the loop, at one x/y, the pole second so
+that it covers the flag's hoist edge.
+
+What a flag says is **who HOLDS that mission** — `[0x520920 + 4i]`, which the
+composer fills from `team+0x55+i`, the 25-entry schedule rolled when the army
+is born. So a brand-new campaign opens on a region page of five foreign
+flags and takes them over one at a time, which is the screen doing its job:
+the debrief re-stamps the slot as each mission is won (0x484F2E). The player's
+own nation is read exactly once in the whole routine, at 0x48365A, and only
+for the four-part `ar1..ar4` marker on the current mission.
+
+We do not re-stamp anything — a save's `enemies` is the roll and a position
+behind the campaign is ours by arithmetic — so `holder` was already giving the
+right answer for all 25. Only the gate around it was invented. It is gone, and
+the pre-tint in `show()` now paints a flag for every stand of the region
+rather than for the conquered ones alone.
+
+Two smaller things came out of the same read. The reveal is **100 ms and then
+one every 150**, not one immediately and every 150 after: the cursor is
+`start + (ticks + 1) / 3` on a 50 ms tick (0x483877), so the stands land at
+100, 250, 400, 550, 700 — it lives in `lib/game/pigmap.ts` as `standsShown`
+now, with `unit/pigmap.spec.ts` on it. And phase 2 draws neither flag nor
+pole: the whole zoom makes three blits, the veil, the patch and the page.
+
+`pow.pigMap.flags()` joins `patches()`, for the reason `patches()` exists —
+a page of bare poles looks like a perfectly good page, and this is the second
+time a silent miss on this screen was found by a player rather than by a run.

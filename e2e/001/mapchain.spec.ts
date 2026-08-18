@@ -25,6 +25,13 @@ const mapPatches = (page: Page): Promise<number> =>
     return pow?.pigMap ? pow.pigMap.patches() : -1
   })
 
+/** How many flags the region page flew in its last frame. */
+const mapFlags = (page: Page): Promise<number> =>
+  page.evaluate(() => {
+    const pow = (window as unknown as { pow?: { pigMap?: { flags(): number } } }).pow
+    return pow?.pigMap ? pow.pigMap.flags() : -1
+  })
+
 const briefingReady = (page: Page): Promise<boolean> =>
   page.evaluate(() => {
     const pow = (window as unknown as { pow?: { briefing?: { ready(): boolean } } }).pow
@@ -97,6 +104,15 @@ test('declining the tutorial launches through the map: world, zoom, region, brie
   await expect.poll(() => mapPhase(page)).toBe('zoom')
   await tap(page, 'menuSelect')
   await expect.poll(() => mapPhase(page)).toBe('region')
+  // …and EVERY stand of the region flies one — five for Hogshead, from the
+  // campaign's first day, in the colours of the nations holding them. They
+  // come up one at a time over the phase's first 700 ms. The exe has no
+  // conquest gate on this loop (0x483566 carries no comparison at all) and
+  // this repo invented one, so the page showed bare poles and play reported
+  // it twice before it was read properly.
+  await expect
+    .poll(() => mapFlags(page), { message: 'the region page flew no flags' })
+    .toBe(5)
   await tap(page, 'menuSelect')
 
   // The chain always ends on the BRIEFING, which is the loading screen: the

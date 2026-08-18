@@ -108,6 +108,25 @@ export const ZOOM_EASING: readonly number[] = [
   100, 100, 100
 ]
 
+/**
+ * THE REVEAL — when the region's stands come up, one after another.
+ *
+ * The exe counts 50 ms ticks and puts the cursor at `start + (ticks + 1) / 3`
+ * (0x483877, integer division), so the first stand is up at 100 ms and one
+ * more follows every 150. It is frozen once the region is full (0x483869).
+ *
+ * A stand is a flag AND its pole, together: the loop body has no comparison in
+ * it at all (0x483566..0x483631), so there is no such thing as an unflown pole
+ * — whoever holds a mission flies a flag over it from the campaign's first
+ * day.
+ */
+export const REVEAL_FIRST_MS = 100
+export const REVEAL_STEP_MS = 150
+
+/** How many of a region's `stands` are up, `elapsed` ms into the phase. */
+export const standsShown = (elapsed: number, stands: number): number =>
+  Math.min(stands, Math.max(0, Math.floor((elapsed - REVEAL_FIRST_MS) / REVEAL_STEP_MS) + 1))
+
 /** The current-mission marker's bob, ping-ponged (0x4D4B88). */
 export const MARKER_WAVE: readonly number[] = [0, 1, 2, 4, 7, 12]
 
