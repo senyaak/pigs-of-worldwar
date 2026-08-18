@@ -672,7 +672,7 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     // — one pixel a tile, the whole world (lib/game/mapRaster.ts). Not
     // awaited: it is a picture appearing on a widget that is still sliding
     // in, and a battle should not wait on it.
-    void hud.ground(mapRaster(terrainResult.blocks, terrainResult.textures))
+    void hud.ground(mapRaster(terrainResult.blocks))
     map = name
     updateHud()
     if (frame === 0) frame = requestAnimationFrame(paint)

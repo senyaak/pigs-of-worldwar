@@ -446,8 +446,9 @@ The assembly and every one of those meanings comes from PLAY, piece by
 piece; the archive's order says none of it.
 
 `MAPICONS.MTD` holds **eight** entries, not four: the battle map's own
-surface `map1` (64×64, 4-bit — one texel per terrain tile, and its shipped
-content is not a picture of any level), the four 10×11 markers `iconpig`,
+surface `map1` (64×64, 4-bit — one texel per terrain tile; its shipped content
+is not a picture of any level because `afInitScanner` overwrites the whole
+thing at the start of every battle), the four 10×11 markers `iconpig`,
 `iconhart`, `iconpkup` and `iconprop`, plus `bomb` 8×8 and `rain` 2×10 and
 `snow` 6×10. The last three are DEAD in the shipped PC build: `bomb` has no
 reference in `_d3d.dll` at all, and the weather draws out of its own

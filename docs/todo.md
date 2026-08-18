@@ -1037,12 +1037,15 @@ the mechanic:
   ENGINEER, SABOTEUR, HERO, gated also on `[pig+0x2EC]` not being 1 or 8. Our
   `DETECTORS = new Set([5, 6, 7])` is the set that CARRIES skill 35 MINE, which
   is a different thing from the set that SEES one.
-- **It does not touch the map view, because nothing does.** `bomb` in
-  MAPICONS.MTD has no reference anywhere in `_d3d.dll`; the exe reads the
-  MAPICONS handle at exactly two addresses and both are in the HUD's
-  constructor. Mines are a tile bit and not an object, so there is nothing for
-  the scanner to hang a blip on. "The enemy is not shown them" is not
-  implemented either — nobody is.
+- **The map shows a minefield, but not through this and not as a marker.**
+  `bomb` in MAPICONS.MTD has no reference anywhere in `_d3d.dll` — mines are a
+  tile bit and not an object, so there is nothing to hang a blip on. What the
+  map does instead is bake the bit into its own picture: `afInitScanner`'s fill
+  loop writes a solid RED texel wherever `flags & 0x40` is set (dll
+  0x1000A3E6), once, when the battle opens. So a placed minefield is red ground
+  on everybody's map with no class gate and no range, and a mine LAID during
+  play never appears there at all — the texture is never rebuilt. "The enemy is
+  not shown them" is not implemented in either place.
 
 Still waiting on the classes to exist, so this is a correction to make when the
 work is picked up, not one to make now.

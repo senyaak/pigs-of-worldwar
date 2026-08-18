@@ -23,21 +23,9 @@
 // the dashboard's (ui/battleMap.ts), and what the ground looks like is
 // lib/game/mapRaster.ts.
 
+import { fromExeFrames } from './ballistics'
 import type { MapObject } from '../formats/pog'
 import type { Player } from './game'
-
-/**
- * How many screen pixels one world unit is worth, at a given scale.
- *
- * `DrawScanner` keeps `18884 / scale` in `[0x11B8A7C0]` (0x100201B0) and
- * divides every blip's world offset by it before multiplying by 480
- * (0x10020124), so the whole chain collapses to this.
- *
- * At the resting scale the world's 64 tiles of 512 come to 126 pixels, which
- * is the size of the thing: a small dial showing the WHOLE level, with blips
- * on it half as wide as a tile.
- */
-export const scannerPixels = (scale: number): number => (scale * 480) / 18884
 
 /** Resting size — `afSetScannerSizeSmall(0)`, `[0x1002C680]` (0x1000FFA0). */
 export const SCANNER_SCALE = 0.151072
@@ -75,29 +63,107 @@ export const SCANNER_SLIDE = [0, 0, 5, 10, 13, 15, 22, 30, 35, 40, 70, 90, 95, 1
 export const SCANNER_SLIDE_FROM = 200
 
 /**
- * Where the map's middle sits, as an offset from the middle of the SCREEN.
+ * Where the map's middle sits: **110 in from the LEFT edge and 75 up from the
+ * BOTTOM one** — the bottom-left corner, and now read rather than inferred.
  *
- * The constructor works both out at 0x454597 and 0x4545AC — the screen's own
- * half-width less 0x6E and its half-height less 0x4B — and 0x458463 adds the
- * slide to the second before packing the pair.
+ * The exe packs `x = screenW/2 - 0x6E` and `y = screenH/2 - 0x4B + slide`
+ * (0x454597 / 0x4545AC, packed at 0x458477); the library then does
  *
- * **The sign of y is the remake's reading and is worth knowing as such.** The
- * numbers themselves are read; which way the library counts its screen y is
- * not, because `DrawScanner`'s anchor arithmetic was not decoded. Taken as
- * y-UP, the pair lands the map left of centre and below it — the bottom left
- * that play remembers, with the entrance rising from off the bottom edge.
- * Taken the other way it would sit above centre and slide down onto the
- * battle, which is neither. Nudge it in the console like the rest of the
- * dashboard if play says otherwise.
+ *     centreX = halfW - x + shrink        (dll 0x10009B43)
+ *     centreY = halfH + y                 (dll 0x10009D25)
+ *
+ * so the halves cancel and what is left is 110 from the left and
+ * `screenH - 75` from the top. The library writes `D3DFVF_XYZRHW` vertices
+ * straight into `DrawPrimitive`, so its y grows DOWNWARD — which settles the
+ * sign the other way from the first guess here: **the slide is ADDED, the
+ * widget starts 200 below its place, off the bottom of the screen, and rises
+ * into it.**
  */
-export const SCANNER_CENTRE = { x: -110, y: 75 }
+export const SCANNER_CENTRE = { left: 110, fromBottom: 75 }
 
 /**
- * Where the camera stands and which way it looks, game space — what the map
- * is centred on and turned by.
+ * How far the widget slides LEFT as it shrinks — `(0.151072 - scale) * -500`
+ * (dll 0x10009A9E..0x10009B43), which is 15 pixels at the small scale.
  *
- * `heading` is `atan2(forward.x, forward.z)`, which is the map's own frame
- * and nothing else's: the picture puts that direction UP.
+ * It is compensation, not decoration: the board's own half-width changes by
+ * `480 * (0.151072 - 0.121060)` = 14.4, so the two nearly cancel and the
+ * board's LEFT edge stays put while it shrinks.
+ */
+export const scannerShrink = (scale: number): number => (SCANNER_SCALE - scale) * -500
+
+/**
+ * The board's TILT — and it is a real camera, not a flattened picture.
+ *
+ * The library builds an ordinary Euler basis with the angles `(0, 3776, yaw)`
+ * (dll 0x100099BF..0x10009B34) against a full turn of 4096, so 3776 is −320
+ * units = **−28.125°**: the scanner looks that far DOWN from the horizontal,
+ * not straight down. Its two trig values are the whole of the tilt.
+ */
+export const SCANNER_TILT_TURNS = 3776 / 4096
+export const TILT_COS = Math.cos(SCANNER_TILT_TURNS * Math.PI * 2)
+export const TILT_SIN = Math.sin(SCANNER_TILT_TURNS * Math.PI * 2)
+
+/** What the projection multiplies by — the library's own 480 (dll 0x10020124). */
+export const SCANNER_PROJECT = 480
+
+/**
+ * How far out the board's own edge sits, in world units.
+ *
+ * A blip's place on the board is `world * scale / 18884` (dll 0x10009F8B
+ * against `[0x11B8A7C0] = 18884 / scale`), and the board quad spans ±scale in
+ * that same space — so its rim is the world at ±18884.
+ *
+ * **The map it carries only reaches ±16384**, so the picture is drawn
+ * `37768 / 32256` = 1.171× too big for the blips standing on it. That is in
+ * the shipped library, not a misread: both paths were checked to share one
+ * matrix and one anchor. Kept, because it is what the original looks like.
+ */
+export const SCANNER_REACH = 18884
+
+/**
+ * Where a point of the board lands, relative to the widget's middle.
+ *
+ * `px`/`py` are the board's own square, ±scale across, and they are the world
+ * divided by `SCANNER_REACH`: `px` along world x, `py` along world z. `yaw` is
+ * the camera's, and the library's own convention — `(cos yaw, sin yaw)` is the
+ * direction that comes out pointing straight UP the widget.
+ *
+ * The vertical is `TILT_SIN` (negative) times the forward axis, so far is up
+ * the screen, and the `W` divide is a real ground-plane recession of about
+ * ±15% rather than an even squash.
+ */
+export function projectScanner(px: number, py: number, yaw: number): { x: number; y: number } {
+  const cy = Math.cos(yaw)
+  const sy = Math.sin(yaw)
+  const a = sy * px - cy * py
+  const b = cy * px + sy * py
+  const w = 1 / (1 + TILT_COS * b)
+  return { x: SCANNER_PROJECT * a * w, y: SCANNER_PROJECT * TILT_SIN * b * w }
+}
+
+/**
+ * **The board does NOT move with the camera.** The library subtracts the
+ * camera's position and adds it straight back (dll `[esp+68h]`), so it
+ * cancels exactly — the whole level is drawn, always centred on the widget,
+ * and only TURNED. Verified by re-running the arithmetic with the camera
+ * thrown far off the map: the same screen coordinates come out.
+ *
+ * That is self-consistent, since the world is itself centred on the origin,
+ * and it is why nothing is ever clipped: the board is a square that sweeps its
+ * corners round as the player turns, and it is meant to be seen doing it.
+ */
+export const SCANNER_FOLLOWS_CAMERA = false
+
+/**
+ * Which way the camera looks — the only thing the board takes from it, since
+ * it does not follow the camera's POSITION (`SCANNER_FOLLOWS_CAMERA`).
+ *
+ * `heading` is `atan2(forward.z, forward.x)`, which is the library's own yaw
+ * convention and nothing else's: `(cos yaw, sin yaw)` in world (x, z) is the
+ * direction the picture puts UP.
+ *
+ * `x`/`z` are carried anyway, because the blips are drawn relative to the same
+ * origin the board is and a debug hook wants to see where the eye was.
  */
 export interface Eye {
   x: number
@@ -138,11 +204,35 @@ export const BLIP_COLOURS: readonly [number, number, number][] = [
 export const BLIP_WHITE: [number, number, number] = [255, 255, 255]
 
 /**
- * How often the acting pig's blip changes colour: `Pig::Draw` picks its
- * marker value off bit 0x40 of the millisecond clock at `[0x520878]`
- * (0x440C54), which is one flip every 64 ms.
+ * How long the flashing blip holds each colour.
+ *
+ * **It is the pig the CAMERA is on that flashes**, not the pig whose turn it
+ * is: `Pig::Draw` asks at 0x440C24 whether this pig is `cam+0x54` (or
+ * `cam+0xB0` in camera mode 2) and only then reads the counter. The two are
+ * the same thing here, because the chase follows the acting pig — worth
+ * knowing the day something else takes the camera.
+ *
+ * The BIT is read: `Pig::Draw` picks the marker value off **bit 0x40** of the
+ * counter at `[0x520878]` (0x440C48), so the period is 64 of whatever that
+ * counter counts and the flip is exactly halfway.
+ *
+ * **What that counter counts is NOT established, and the first reading of it
+ * was wrong.** It was taken for a millisecond clock, which would make the
+ * blink 64 ms — about eight flashes a second — and play says plainly that it
+ * is much slower than that. Chasing the writer does not settle it either: the
+ * one clean store, 0x47FB1F, takes its value from 0x48CEF0, and that function
+ * returns an element of an array on the acting TEAM rather than a time. Its
+ * readers argue both ways — several difference it against 100, 150 and 300,
+ * which read as milliseconds, while 0x45A612 takes `(c >> 4) & 3` as a
+ * four-phase animation, which at 16 ms a phase would be a 60 Hz flicker and at
+ * 16 frames is half a second a phase.
+ *
+ * So: the exe's own bit, counted in the exe's own frames, and `[play]` for the
+ * unit. Nudge the period here if it still reads wrong.
  */
-export const BLINK_MS = 0x40
+export const BLINK_FRAMES = 0x40
+/** …in seconds, which is what a drawer has. */
+export const BLINK_SECONDS = fromExeFrames(BLINK_FRAMES)
 
 /**
  * **The espionage classes are not on the enemy's map.** `Pig::Draw` at
@@ -191,12 +281,13 @@ export const BLIP_OBJECTS: Readonly<Record<string, { icon: BlipIcon; colour: [nu
 /**
  * Every pig the map shows, for the team whose turn it is.
  *
- * `clock` is the battle's own millisecond clock — what the acting pig's
- * flashing is timed off.
+ * `clock` is seconds since the battle opened — what the acting pig's flashing
+ * is timed off.
  */
 export function pigBlips(players: readonly Player[], acting: number, clock: number): Blip[] {
   const blips: Blip[] = []
-  const flash = (clock & BLINK_MS) !== 0
+  // The exe's own halfway flip, on a clock this side counts in seconds.
+  const flash = Math.floor(clock / BLINK_SECONDS) % 2 === 1
   for (let team = 0; team < players.length; team++) {
     const own = team === acting
     for (const pig of players[team].pigs) {

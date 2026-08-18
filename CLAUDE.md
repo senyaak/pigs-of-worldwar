@@ -142,9 +142,22 @@ reasoning, the false starts and the sessions behind them are in
   (0x454913/0x4582F0, dll 0x1000485C/0x10009810). It slides in over twenty
   frames when a battle starts and stays: its enable bit has exactly two writers
   in `.text`, a zero in the constructor and a one in the HUD setup, so the
-  slide-out is dead code. The picture is the WHOLE level in about 126 pixels —
-  one 64×64 texel a tile — centred on the camera and turned with it, shrinking
-  only while a shot charges. `lib/game/scanner.ts`, `scanner/notes.md`. `[exe]`
+  slide-out is dead code. It sits **110 in from the left and 75 up from the
+  bottom** and shrinks only while a shot charges. `lib/game/scanner.ts`,
+  `scanner/notes.md`. `[exe]`
+- **The map is TILTED, it does NOT follow the camera, and nothing about it is
+  masked.** The board is a square of the WHOLE level seen through a camera
+  28.125° above the ground (the library's Euler angles are `(0, 3776, yaw)`
+  against a full turn of 4096), with a real ±15% ground-plane recession — 167
+  pixels wide at its near edge, 128 at its far one, 70 tall. The camera's
+  POSITION cancels out of the vertex arithmetic exactly, so the board only
+  TURNS; and there is no clipper, no scissor and no viewport change anywhere on
+  the path, so its corners sweep round in the open. `[exe]`
+- **The map's picture is one texel a tile, and its colours are the library's.**
+  `afInitScanner` locks a 64×64 surface once per battle and writes
+  `palette[type & 0x1F] * shade >> 9` into every texel, shade running 64..194
+  with the tile's own height across the map's range — then hands it over with
+  `afOverwriteTexture`. `lib/game/mapRaster.ts` carries the palette. `[exe]`
 - **An espionage pig is off the map on anybody else's turn, and there is no
   range.** Classes 8, 9 and 10 — SCOUT, SNIPER, SPY — get marker 0xFF whenever
   their team is not the team whose turn it is (0x440C67), and the library drops
@@ -152,11 +165,14 @@ reasoning, the false starts and the sessions behind them are in
   your own scout is off your own map through the enemy's turn. Only four model
   names get a marker at all — CRATE1, CRATE2, CRATE4, PROPOINT — and DRUM sits
   one place past the window on purpose. `[exe]`
-- **Mines are not on the map, and never were.** `bomb` in `MAPICONS.MTD` has no
-  reference in the library, and all 68 instructions that touch the mine tile bit
-  are gameplay. What exists is the GROUND reveal: a 3×3 block of tiles round a
-  pig of class 4, 5, 6, 7 or 0x0E stamped back through `Map::SetTile`
-  (0x4767A0) — a texture swap, three tiles, five classes.
+- **A minefield IS on the map — as red GROUND, not as a marker, and only the
+  mines that were there when the battle opened.** The same fill loop writes a
+  solid red texel wherever the tile's mine bit is set, unconditionally and for
+  everybody; the texture is never rebuilt, so a mine laid during play never
+  shows. `bomb` in `MAPICONS.MTD` really is dead art — it has no reference in
+  the library at all. Separately there is the GROUND reveal: a 3×3 block of
+  tiles round a pig of class 4, 5, 6, 7 or 0x0E stamped back through
+  `Map::SetTile` (0x4767A0) — a texture swap, three tiles, five classes.
   `lib/game/mines.ts` still carries an invented 1024 and a set of three; see
   `todo.md` B10. `[exe]`
 
@@ -452,15 +468,13 @@ and the weakest of them were invented here:
   ellipse matched to play), the PINK the heart is painted (its art is white),
   and the heart's ×2 (the map's marker is 10×11 and stands beside letters 32
   tall). Correct them against play.
-- `[CHECK — remake]` **Two things about the battle map are ours.** What COLOUR
-  a tile becomes on the 64×64 picture — `lib/game/mapRaster.ts` averages the
-  tile's own ground texture and dims it by the light the map already bakes,
-  because `DrawScanner`'s fill loop was not decoded and `map1.tim` as it ships
-  is not a picture of any level. And WHICH WAY the library counts its screen y,
-  which decides whether the widget sits below the middle of the screen or above
-  it: the two offsets are the exe's (`-110`, `75` off the centre) and the sign
-  is a reading, taken as the one that lands it bottom-left where play remembers
-  it. `LAYOUT.map.centre` is where to nudge it.
+- `[CHECK — remake]` **One thing about the battle map is ours: its FILTERING.**
+  The library's texture filter state on the board draw was not read, so whether
+  the 64×64 picture is smoothed or point-sampled across its 167 pixels is a
+  judgement — `ui/battleMap.ts` smooths it, on the grounds that a stretch that
+  large reads as the filtered texture Direct3D would give rather than as blocks.
+  Everything else about the widget — where it sits, how big it is, how far it
+  tilts, how it turns, what colour each tile becomes — is read.
 - `[gap]` **The power gauge and the weapon icons wait for a weapon.**
   `newpow1..7` and `powg1` are the gauge — which the original shows only when
   the weapon in hand needs one — and `FACETIMS.MAD`, despite the name, holds

@@ -239,7 +239,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     root.worldToLocal(mapEye.copy(host.camera.position))
     host.camera.getWorldDirection(mapLook)
     root.worldToLocal(mapLook.add(host.camera.position))
-    return { x: mapEye.x, z: mapEye.z, heading: Math.atan2(mapLook.x - mapEye.x, mapLook.z - mapEye.z) }
+    // `atan2(z, x)` and not the other way round: the library's yaw is the one
+    // whose `(cos, sin)` in world (x, z) points UP the widget
+    // (lib/game/scanner.ts).
+    return { x: mapEye.x, z: mapEye.z, heading: Math.atan2(mapLook.z - mapEye.z, mapLook.x - mapEye.x) }
   }
 
   /**
@@ -251,7 +254,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * asked whether the record is still standing.
    */
   const blips = (): Blip[] => [
-    ...pigBlips(game.players, game.players.indexOf(game.currentPlayer), performance.now()),
+    ...pigBlips(game.players, game.players.indexOf(game.currentPlayer), performance.now() / 1000),
     ...objectBlips(assets.objects, (id) => !props.drawn(id))
   ]
   const squad = fieldSquad(assets, game.players.flatMap((player) => player.pigs), query, root)

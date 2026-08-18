@@ -1,28 +1,39 @@
 // The map on the dashboard — the SCANNER, drawn.
 //
 // What it is and where every number comes from is lib/game/scanner.ts; this
-// only puts it on the canvas. Three things move: the whole widget slides up
-// into place over the battle's first twenty frames, the picture turns under
-// the camera, and it shrinks while a shot is charging so the power gauge has
-// room.
+// puts it on the canvas. Three things to keep in mind about its LOOK, all
+// read out of `_d3d.dll` rather than chosen here:
 //
-// The ground is a 64×64 image built once per battle (lib/game/mapRaster.ts)
-// and drawn turned; the blips are `MAPICONS.MTD`'s markers, which ship white
-// and are painted, so every colour they can take is tinted once at load.
+// - **it is not a view from straight above.** The board is a square of ground
+//   seen through a camera tilted 28.125° down, with a real ±15% perspective
+//   recession along the screen-vertical axis. On a 640×480 screen its near
+//   edge is 167 pixels wide and its far edge 128.
+// - **it does not follow the camera and it is not masked.** The whole level is
+//   drawn, always centred on the widget, and only TURNED — so the square's
+//   corners sweep round as the player turns and are meant to be seen doing it.
+//   There is no clipping of any kind in the original.
+// - **it sits in the bottom-left corner**, 110 in from the left and 75 up from
+//   the bottom, and slides UP into that place over the battle's first twenty
+//   frames.
+//
+// Canvas 2D can only do affine transforms, so the board is subdivided and each
+// cell drawn affinely — which is what the library does too, for the same
+// reason, only at 2×2 where this uses more.
 
 import {
   BLIP_COLOURS,
   BLIP_OBJECTS,
   BLIP_WHITE,
   SCANNER_EASE_PER_SECOND,
+  SCANNER_REACH,
   SCANNER_SCALE,
   SCANNER_SCALE_SMALL,
   SCANNER_SLIDE,
   SCANNER_SLIDE_FROM,
-  scannerPixels
+  projectScanner,
+  scannerShrink
 } from '../../../lib/game/scanner'
 import type { Blip, BlipIcon, Eye } from '../../../lib/game/scanner'
-import { RASTER_WORLD } from '../../../lib/game/mapRaster'
 import type { MapRaster } from '../../../lib/game/mapRaster'
 import { loadTims, tinted } from './sprites'
 import type { Sprite } from './sprites'
@@ -32,6 +43,23 @@ const MARKERS = 'Language/Tims/MAPICONS.MTD'
 const SLIDE_FRAMES = SCANNER_SLIDE.length
 /** The clock those frames are counted on — the engine's fixed step. */
 const FRAMES_PER_SECOND = 60
+/**
+ * How many cells the board is cut into, each way, before each is drawn with an
+ * affine transform. The library uses 2 for the same reason; more is cheap here
+ * and keeps the recession smooth across a quad this wide.
+ */
+const CELLS = 8
+/**
+ * How far each cell is pushed out from its own middle, in pixels, so the
+ * fractional edges of two neighbours meet instead of leaving a hairline.
+ */
+const OVERLAP = 0.5
+/** The markers are 10×11 and the library draws them at exactly that. */
+const BLIP_WIDTH = 10
+const BLIP_HEIGHT = 11
+
+/** Where the camera is and which way it looks. */
+export type { Eye }
 
 export interface BattleMapState {
   /** Seconds since the last frame. */
@@ -40,9 +68,6 @@ export interface BattleMapState {
   blips: readonly Blip[]
   /** Whether a shot is charging, which is what shrinks the map. */
   charging: boolean
-  /** Where its middle sits against the middle of the screen — the
-   * dashboard's, so the console can nudge it (ui/hud.ts, `LAYOUT.map`). */
-  centre: { x: number; y: number }
 }
 
 export interface BattleMap {
@@ -57,6 +82,57 @@ export interface BattleMap {
 }
 
 const key = (icon: BlipIcon, colour: readonly number[]): string => `${icon}|${colour.join(',')}`
+
+/**
+ * One triangle of the picture, mapped affinely onto one triangle of the
+ * screen: clip to the destination, then compose the transform that carries the
+ * three source corners onto the three destination ones.
+ *
+ * `transform` rather than `setTransform`, because the dashboard has already
+ * scaled the context to the window.
+ */
+function texturedTriangle(
+  context: CanvasRenderingContext2D,
+  image: ImageBitmap,
+  source: readonly [number, number][],
+  dest: readonly [number, number][]
+): void {
+  const [[sx0, sy0], [sx1, sy1], [sx2, sy2]] = source
+  const [[dx0, dy0], [dx1, dy1], [dx2, dy2]] = dest
+  const denom = sx0 * (sy2 - sy1) - sx1 * sy2 + sx2 * sy1 + (sx1 - sx2) * sy0
+  if (denom === 0) return
+  const a = -(sy0 * (dx2 - dx1) - sy1 * dx2 + sy2 * dx1 + (sy1 - sy2) * dx0) / denom
+  const b = (sy1 * dy2 + sy0 * (dy1 - dy2) - sy2 * dy1 + (sy2 - sy1) * dy0) / denom
+  const c = (sx0 * (dx2 - dx1) - sx1 * dx2 + sx2 * dx1 + (sx1 - sx2) * dx0) / denom
+  const d = -(sx1 * dy2 + sx0 * (dy1 - dy2) - sx2 * dy1 + (sx2 - sx1) * dy0) / denom
+  const e =
+    (sx0 * (sy2 * dx1 - sy1 * dx2) + sy0 * (sx1 * dx2 - sx2 * dx1) + (sx2 * sy1 - sx1 * sy2) * dx0) / denom
+  const f =
+    (sx0 * (sy2 * dy1 - sy1 * dy2) + sy0 * (sx1 * dy2 - sx2 * dy1) + (sx2 * sy1 - sx1 * sy2) * dy0) / denom
+
+  context.save()
+  context.beginPath()
+  context.moveTo(dx0, dy0)
+  context.lineTo(dx1, dy1)
+  context.lineTo(dx2, dy2)
+  context.closePath()
+  context.clip()
+  context.transform(a, b, c, d, e, f)
+  context.drawImage(image, 0, 0)
+  context.restore()
+}
+
+/** Push a triangle's corners out from its own middle, to close the seams. */
+function spread(dest: [number, number][]): [number, number][] {
+  const mx = (dest[0][0] + dest[1][0] + dest[2][0]) / 3
+  const my = (dest[0][1] + dest[1][1] + dest[2][1]) / 3
+  return dest.map(([x, y]) => {
+    const dx = x - mx
+    const dy = y - my
+    const length = Math.hypot(dx, dy) || 1
+    return [x + (dx / length) * OVERLAP, y + (dy / length) * OVERLAP] as [number, number]
+  })
+}
 
 export function createBattleMap(): BattleMap {
   /** Every marker in every colour it is ever drawn in, painted once. */
@@ -74,8 +150,8 @@ export function createBattleMap(): BattleMap {
       try {
         const markers = await loadTims(MARKERS)
         // A pig takes any of the eight team colours or white while it is the
-        // one acting; a crate and a propoint take one colour each. That is
-        // the whole set, so there is nothing to work out per frame.
+        // one the camera is on; a crate and a propoint take one colour each.
+        // That is the whole set, so there is nothing to work out per frame.
         const wanted: [BlipIcon, [number, number, number]][] = [
           ...BLIP_COLOURS.map((colour) => ['iconpig', colour] as [BlipIcon, [number, number, number]]),
           ['iconpig', BLIP_WHITE],
@@ -125,51 +201,81 @@ export function createBattleMap(): BattleMap {
       const step = SCANNER_EASE_PER_SECOND * state.delta
       scale = wanted > scale ? Math.min(wanted, scale + step) : Math.max(wanted, scale - step)
 
-      const pixels = scannerPixels(scale)
-      const span = RASTER_WORLD * pixels
-      // Anchored on the middle of the SCREEN, not of the authored 640 —
-      // everything on this dashboard that is not centred is placed against
-      // the view's own edges (ui/hud.ts).
-      const cx = viewWidth / 2 + state.centre.x
-      const cy = viewHeight / 2 + state.centre.y + slide
-      const angle = state.eye.heading
-
-      context.save()
-      context.beginPath()
-      context.rect(cx - span / 2, cy - span / 2, span, span)
-      context.clip()
+      // 110 in from the left and 75 up from the bottom, and the shrink pulls
+      // it further left so the board's left edge stays put.
+      const cx = 110 + scannerShrink(scale)
+      const cy = viewHeight - 75 + slide
+      const yaw = state.eye.heading
 
       if (ground) {
+        // The board is the square ±scale, cut into cells and laid down two
+        // triangles at a time. Its texture's COLUMN runs along world z and its
+        // ROW along world x (lib/game/mapRaster.ts), and the library insets
+        // the UVs to texel CENTRES — the quad's rim sits on texel 0.5 and 63.5
+        // rather than on the texture's own edge.
+        const texels = ground.width
+        const inset = 0.5
+        const usable = texels - 1
+        const at = (i: number): number => (i / CELLS) * 2 - 1
+        const uv = (t: number): number => inset + ((t + 1) / 2) * usable
         context.save()
-        context.translate(cx, cy)
-        context.rotate(-angle)
-        // The raster's first row is the world's most negative z and its first
-        // column the most negative x, so flipping y here puts +z up the
-        // screen and the image goes down in one piece.
-        context.scale(1, -1)
-        context.imageSmoothingEnabled = false
-        context.drawImage(
-          ground,
-          (-RASTER_WORLD / 2 - state.eye.x) * pixels,
-          (-RASTER_WORLD / 2 - state.eye.z) * pixels,
-          span,
-          span
-        )
+        // A 64-pixel picture over 167 is a stretch either way; smoothed reads
+        // as the filtered texture the original hands to Direct3D rather than
+        // as chunky blocks. `[CHECK — remake]`: the library's filter state on
+        // this draw was not read.
+        context.imageSmoothingEnabled = true
+        for (let row = 0; row < CELLS; row++) {
+          for (let column = 0; column < CELLS; column++) {
+            const px0 = at(row) * scale
+            const px1 = at(row + 1) * scale
+            const py0 = at(column) * scale
+            const py1 = at(column + 1) * scale
+            // px runs along world x, which is the texture's ROW; py along z,
+            // which is its COLUMN.
+            const corners: [number, number, number, number][] = [
+              [px0, py0, uv(at(column)), uv(at(row))],
+              [px0, py1, uv(at(column + 1)), uv(at(row))],
+              [px1, py1, uv(at(column + 1)), uv(at(row + 1))],
+              [px1, py0, uv(at(column)), uv(at(row + 1))]
+            ]
+            const screen = corners.map(([px, py]) => {
+              const point = projectScanner(px, py, yaw)
+              return [cx + point.x, cy + point.y] as [number, number]
+            })
+            const source = corners.map(([, , u, v]) => [u, v] as [number, number])
+            for (const [i, j, k] of [
+              [0, 1, 2],
+              [0, 2, 3]
+            ]) {
+              texturedTriangle(
+                context,
+                ground,
+                [source[i], source[j], source[k]],
+                spread([screen[i], screen[j], screen[k]])
+              )
+            }
+          }
+        }
         context.restore()
       }
 
-      // The blips are placed through the same turn and drawn UPRIGHT: a
-      // marker is a marker whichever way the camera looks.
-      const cos = Math.cos(angle)
-      const sin = Math.sin(angle)
+      // The blips go through the SAME projection and are drawn upright at
+      // their own 10×11 — the library never scales them, never turns them with
+      // the board and never clips them, so one outside the board is simply
+      // drawn outside it.
+      context.save()
+      context.imageSmoothingEnabled = false
       for (const blip of state.blips) {
         const marker = painted.get(key(blip.icon, blip.colour))
         if (!marker) continue
-        const u = (blip.x - state.eye.x) * pixels
-        const v = (blip.z - state.eye.z) * pixels
-        const x = cx + u * cos - v * sin
-        const y = cy - u * sin - v * cos
-        context.drawImage(marker.image, Math.round(x - marker.width / 2), Math.round(y - marker.height / 2))
+        const point = projectScanner((blip.x * scale) / SCANNER_REACH, (blip.z * scale) / SCANNER_REACH, yaw)
+        context.drawImage(
+          marker.image,
+          Math.round(cx + point.x - BLIP_WIDTH / 2),
+          Math.round(cy + point.y - BLIP_HEIGHT / 2),
+          BLIP_WIDTH,
+          BLIP_HEIGHT
+        )
       }
       context.restore()
     }

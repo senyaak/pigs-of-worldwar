@@ -31,7 +31,6 @@ import type { Sprite, SpriteSet } from './sprites'
 import { drawTitleCard } from './titleCard'
 import { createBriefingBar } from './briefingBar'
 import { createBattleMap } from './battleMap'
-import { SCANNER_CENTRE } from '../../../lib/game/scanner'
 import type { Blip, Eye } from '../../../lib/game/scanner'
 import type { MapRaster } from '../../../lib/game/mapRaster'
 import { createSkillMenu } from './skillMenu'
@@ -240,17 +239,11 @@ export const LAYOUT = {
      * anything when the model's scale moved. */
     lift: 120,
     heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
-  },
-  /**
-   * THE MAP. Its middle, against the middle of the screen.
-   *
-   * Both numbers are the exe's own (lib/game/scanner.ts, 0x454597/0x4545AC);
-   * the SIGN of y is the remake's reading of which way the library counts,
-   * and this is where to nudge it if play says the widget sits wrong. Its
-   * SIZE is not here because it is not free: the picture is the whole world
-   * at the scanner's own scale.
-   */
-  map: { centre: { x: SCANNER_CENTRE.x, y: SCANNER_CENTRE.y } }
+  }
+  // THE MAP has no entry here on purpose: nothing about its placement or its
+  // size is free. Where it sits, how big it is, how far it tilts and how it
+  // turns are all read out of the library, and they live with the reading in
+  // `lib/game/scanner.ts`.
 }
 
 /** What the specs wait for; the console tweaks `LAYOUT.plate.delay`. */
@@ -653,8 +646,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         delta: state.delta,
         eye: state.eye,
         blips: state.blips,
-        charging: state.charge !== null,
-        centre: LAYOUT.map.centre
+        charging: state.charge !== null
       })
       context.restore()
 

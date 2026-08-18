@@ -1,76 +1,102 @@
-// The picture on the map: one pixel per tile, 64×64 for the whole world.
+// The picture on the map — and it is READ, not invented.
 //
-// **The size is not a choice.** The plate the original hangs the map on
-// (`chars\top.mad`) puts ONE 64×64 texture on its top face — `map1.tim`,
-// MAPICONS' first entry — against a world that is 64×64 tiles, and the whole
-// of it comes to about 126 screen pixels at the scanner's resting scale
-// (lib/game/scanner.ts). So a tile is a texel and a texel is two pixels.
+// `map1.tim`, MAPICONS' first entry, is a 64×64 scratch surface that
+// `afInitScanner` FILLS once per battle (dll 0x1000A35D..0x1000A46C: it locks
+// a 64×64 texture surface, writes every texel, and hands it over with
+// `afOverwriteTexture`). Per texel, from the library's own 65×65 terrain grid:
 //
-// **What goes IN each texel is ours.** `map1.tim` as it ships is not a
-// picture of any level: its sixteen indices were matched against the tile
-// types of all fifty-nine shipped maps and the best a type-to-index reading
-// does is 0.41 of the grid, i.e. nothing. It is a scratch surface the
-// library fills, and `DrawScanner`'s own fill loop (dll 0x10009B40..0x10009E7F)
-// was not decoded — it reads the terrain out of `[0x11AFAA38]` and builds a
-// turned grid, and that is as far as the read got. So the colours here are
-// the remake's own: the tile's own ground texture averaged down to one pixel,
-// dimmed by the light the map already bakes into its corners.
+//     lo    = height - lowestHeight
+//     shade = lo * 130 / (highest - lowest) + 64            // 64..194
+//     rgb   = PALETTE[flags & 0x1F] * shade >> 9            // 5 bits a channel
+//     if (flags & 0x40) rgb = (31, 0, 0)                    // a MINE, solid red
 //
-// `[CHECK — remake]` — the LOOK, not the size or the placement.
+// Two things follow that are worth stating plainly.
 //
-// Pure: blocks and textures in, pixels out.
+// **Mines DO show on the map, as red tiles** — but only the ones already on
+// the map when the battle opens, because the texture is written once and never
+// rebuilt. A mine a pig lays during play never appears. That is the whole of
+// the mine's presence on the map: there is no icon, no class gate and no
+// range, and `scanner.ts`'s note about the `bomb` art stands — it is the BOARD
+// that carries them, not a marker.
+//
+// **The texture is laid out transposed** to the way this engine counts: the
+// library indexes its grid `i*65 + j` with `i` along world x and `j` along
+// world z, and fills texel (column, row) from record `column + 65*row` — so
+// the picture's COLUMN runs along world z and its ROW along world x. Kept that
+// way here so the drawer can hand the board its corners without a flip.
+//
+// Pure: blocks in, pixels out.
 
 import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP } from '../formats/pmg'
 import type { TerrainBlock } from '../formats/pmg'
-import type { Tim } from '../formats/tim'
 
 /** Tiles across the world, and so pixels across the map. */
 export const RASTER_SIZE = BLOCKS_PER_SIDE * TILES_PER_SIDE
 /** World units the whole picture spans. */
 export const RASTER_WORLD = RASTER_SIZE * TILE_STEP
 
+/**
+ * The library's own ground palette, `[0x1002BEB8]`, twelve entries of three
+ * dwords. The type is `flags & 0x1F`, which can reach 31; the table has only
+ * twelve sane rows and the library clamps nothing, so anything past the end
+ * reads adjacent memory there. Here it falls back to the first entry rather
+ * than to whatever happens to be next in the array.
+ */
+export const GROUND_PALETTE: readonly [number, number, number][] = [
+  [60, 50, 40],
+  [40, 70, 40],
+  [128, 128, 128],
+  [153, 94, 34],
+  [90, 90, 150],
+  [50, 50, 50],
+  [50, 50, 50],
+  [100, 80, 30],
+  [180, 240, 240],
+  [100, 100, 100],
+  [60, 50, 40],
+  [240, 100, 53]
+]
+
+/** What a mine's tile becomes, in the library's own 5-bit channels. */
+export const MINE_TEXEL: [number, number, number] = [31, 0, 0]
+
+/** Shade at the lowest ground, and how much is added by the highest. */
+export const SHADE_FLOOR = 64
+export const SHADE_RANGE = 130
+
 export interface MapRaster {
   /** Always `RASTER_SIZE`; carried so a drawer never has to import it. */
   size: number
-  /** RGBA, row 0 at the world's most NEGATIVE z, column 0 at its most negative x. */
+  /** RGBA. COLUMN runs along world z, ROW along world x — see the header. */
   rgba: Uint8Array
 }
 
-/**
- * One texture boiled down to one colour: the mean of every pixel that is not
- * the transparent index. `parseTim` has already put colour 0 at alpha 0, so
- * the alpha byte is the whole test.
- */
-function meanColour(tim: Tim): [number, number, number] {
-  let r = 0
-  let g = 0
-  let b = 0
-  let n = 0
-  for (let at = 0; at < tim.rgba.length; at += 4) {
-    if (tim.rgba[at + 3] === 0) continue
-    r += tim.rgba[at]
-    g += tim.rgba[at + 1]
-    b += tim.rgba[at + 2]
-    n++
-  }
-  if (n === 0) return [0, 0, 0]
-  return [r / n, g / n, b / n]
-}
+/** The library works in 5-bit channels; a canvas wants eight. */
+const FROM_FIVE = 255 / 31
 
 /**
  * Draw the whole world onto a `RASTER_SIZE` square.
  *
- * The shade is the mean of the tile's four corner brightnesses — the same
- * baked vertex light the ground mesh uses, which is what makes the hills read
- * on a picture with no relief of its own (lib/formats/pmg.ts).
+ * The height a texel is shaded by is the tile's own first CORNER, not an
+ * average: the library reads record `column + 65*row` for both the height and
+ * the flags, and that record is the vertex at the tile's origin.
  */
-export function mapRaster(blocks: readonly TerrainBlock[], textures: readonly Tim[]): MapRaster {
+export function mapRaster(blocks: readonly TerrainBlock[]): MapRaster {
   const rgba = new Uint8Array(RASTER_SIZE * RASTER_SIZE * 4)
-  // One average per texture rather than per tile: a map has some four
-  // thousand tiles and a couple of hundred textures.
-  const means = new Map<number, [number, number, number]>()
-  const half = (BLOCKS_PER_SIDE * TILES_PER_SIDE * TILE_STEP) / 2
+  const half = RASTER_WORLD / 2
   const verts = TILES_PER_SIDE + 1
+
+  // The shade needs the whole map's range before any texel can be written,
+  // and the library keeps exactly that pair as it loads the ground.
+  let lowest = Infinity
+  let highest = -Infinity
+  for (const block of blocks) {
+    for (const height of block.heights) {
+      if (height < lowest) lowest = height
+      if (height > highest) highest = height
+    }
+  }
+  const span = highest - lowest || 1
 
   for (const block of blocks) {
     // A block knows where it is in the world, so the raster is filled from
@@ -81,22 +107,16 @@ export function mapRaster(blocks: readonly TerrainBlock[], textures: readonly Ti
     for (let r = 0; r < TILES_PER_SIDE; r++) {
       for (let c = 0; c < TILES_PER_SIDE; c++) {
         const tile = block.tiles[r * TILES_PER_SIDE + c]
-        let mean = means.get(tile.texture)
-        if (!mean) {
-          const tim = textures[tile.texture]
-          mean = tim ? meanColour(tim) : [0, 0, 0]
-          means.set(tile.texture, mean)
+        const height = block.heights[r * verts + c]
+        const shade = Math.floor(((height - lowest) * SHADE_RANGE) / span) + SHADE_FLOOR
+        const mined = (tile.type & 0x40) !== 0
+        const ground = GROUND_PALETTE[tile.type & 0x1f] ?? GROUND_PALETTE[0]
+        // Column runs along world z, row along world x.
+        const at = ((blockX + c) * RASTER_SIZE + (blockZ + r)) * 4
+        for (let channel = 0; channel < 3; channel++) {
+          const five = mined ? MINE_TEXEL[channel] : Math.min(31, (ground[channel] * shade) >> 9)
+          rgba[at + channel] = Math.round(five * FROM_FIVE)
         }
-        const shade =
-          (block.shades[r * verts + c] +
-            block.shades[r * verts + c + 1] +
-            block.shades[(r + 1) * verts + c] +
-            block.shades[(r + 1) * verts + c + 1]) /
-          (4 * 255)
-        const at = ((blockZ + r) * RASTER_SIZE + (blockX + c)) * 4
-        rgba[at] = Math.min(255, Math.round(mean[0] * shade))
-        rgba[at + 1] = Math.min(255, Math.round(mean[1] * shade))
-        rgba[at + 2] = Math.min(255, Math.round(mean[2] * shade))
         rgba[at + 3] = 255
       }
     }
