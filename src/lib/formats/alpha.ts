@@ -26,10 +26,24 @@ function isKey(palette: Uint8Array, index: number): boolean {
   )
 }
 
-/** A frontend sprite: every magenta texel becomes transparent. */
+/** A frontend sprite: every magenta texel becomes transparent. A 24-bit
+ * page has no palette to test, so its texels are tested by colour — the
+ * briefing's pasted-in portrait is a keyed 24-bit BMP. */
 export function punchMagenta(bmp: Bmp): Uint8Array {
   const rgba = new Uint8Array(bmp.rgba)
   const colors = bmp.palette.byteLength / 4
+  if (colors === 0) {
+    for (let i = 0; i < rgba.length; i += 4) {
+      if (
+        rgba[i] >= KEY.r - SLACK &&
+        rgba[i + 1] <= KEY.g + SLACK &&
+        rgba[i + 2] >= KEY.b - SLACK
+      ) {
+        rgba[i + 3] = 0
+      }
+    }
+    return rgba
+  }
   const clear = new Uint8Array(colors)
   for (let i = 0; i < colors; i++) clear[i] = isKey(bmp.palette, i) ? 1 : 0
   for (let i = 0; i < bmp.indices.length; i++) {

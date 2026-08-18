@@ -658,3 +658,55 @@ its own cursor (`[deliberate]`) and gives the armed pig the exe's.
 points); `e2e/001/pigmenu.spec.ts` drives all three choices, the broke
 refusal, the seven-letter trim, the whole-pig swap and the disarm, and the
 career walk on a planted three-token save.
+
+## THE PIG MAP AND THE BRIEFING — 2026-08-18
+
+Play asked for the mission screen and named what the note said did not exist:
+"карта мира + карта региона + флажки миссий". The 2026-08-17 read had
+concluded THERE IS NO CAMPAIGN MAP because no frontend RECORD draws one — and
+that was the wrong place to conclude from: the chain lives in the MISSION
+HOST (0x47DE90), after the frontend tears down on record 22. Two agent passes
+pinned it end to end (`pigmap/notes.md` in the disasm repo) and the build
+followed the same day. "I could not find it" is never "it is not there" —
+now proved on a whole SCREEN.
+
+**What the chain is** (every number the exe's): the world map — `BigMap.bmp`
+under 25 territory patches (one array at 0x4D3658 places them) tinted by the
+nation holding each mission (0x4D34E0, through the {0,2,1,4,5,3,6} art map)
+with six localized region banners, the current mission's patch blinking on
+`tick & 0x10` for 2000 ms; the ZOOM — the patch's rectangle flying to the
+region page's over 32 steps of 50 ms on the easing table 0x4D4A40, patch
+fading out, page fading in, a veil to 64/255; the REGION — the `*phy` page
+(flat single-TIM archives, NOT 3D) with `fpole` on every one of its missions
+revealing one by one, `flag` 40×32 tinted on the conquered, and the player's
+own four-part `ar1..4` marker bobbing on 0x4D4B88 over the current one; then
+the BRIEFING — `level<position>.bmp`, which IS the loading screen: the
+17-step loadbar at (152, 451) 330×15, gtext 257 PRESS ANY KEY creeping up 2
+px a frame once the load is in, and position 1 compositing the enemy's
+`level1n<nation>.bmp` portrait at (342, 190). The training ground skips the
+whole map (the exe gates on map id 10) and briefs on `level0.bmp`. After a
+mission the game goes back through the map every time.
+
+**The build**: `lib/game/pigmap.ts` carries the tables pure — sites, banners,
+region pages with sizes, `regionOf`/`regionSpan` (Arstria keeps FOUR,
+position 25 stands alone on the Isle of Swine), flag stands, easing, wave,
+nation colours; `ui/pigMap.ts` runs the three phases on ms clocks with the
+art tinted through `sprites.tinted`; `ui/briefing.ts` holds the page while
+`battle.open` runs under it, the bar walking to its last step on its own
+clock (`[CHECK — remake]` for that speed) and a key pressed EARLY counting.
+The loaders grew one generic: `loadLanguageImages` (any Language/Tims
+folder, punching only the keyed names — a 24-bit page keeps its magenta),
+and `parseBmp` learned 24-bit. A key skips a phase, the exe's own; BACK
+skips the whole map, `[deliberate]`.
+
+**The MISSION LIST stand-in died the way stand-ins do** — `ui/missionList.ts`
+and `e2e/001/missions.spec.ts` deleted, the flow rewired: START MISSION (or
+NO to the training question) launches through the map; there is no list to
+browse, because the original has none — the campaign is linear and the map
+is its face. `e2e/001/mapchain.spec.ts` drives both paths (phase by phase,
+and BACK's skip) into the battle and out; `unit/pigmap.spec.ts` pins the
+tables; the whole phase-001 suite is 21/21.
+
+**Not built from the read**: the newspaper page (mode 3, its variant math
+unread), the region-complete victory FMVs (03..07 and the endings 08/09),
+the load-screen gamma fade, the level runner's random non-campaign screens.

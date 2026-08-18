@@ -321,9 +321,10 @@ actually seen.
 ### What gates what
 
 - The campaign SPINE is closed: save, slots, autosave, LOAD GAME, the
-  tutorial question and the three mission exits all run. **Every mission still
-  opens CAMP** (`MISSION_STAND_IN`, `main.ts`) — the list of 26 is real, the
-  other twenty-five levels wait on an AI to field their far side.
+  tutorial question, the map chain and the three mission exits all run.
+  **Every mission still opens CAMP** (`MISSION_STAND_IN`, `main.ts`) — the
+  campaign of 26 is real, the other twenty-five levels wait on an AI to
+  field their far side.
 - ~~The read-from-scratch debts~~ **ALL THREE READ 2026-08-17**, each a build
   now waiting on nothing:
   - ~~**LOAD/SAVE (kinds 8/9)**~~ **LOAD BUILT 2026-08-18** —
@@ -352,12 +353,27 @@ actually seen.
     greyed SPECIAL BONUS row. Stand-ins, tagged: the `vp` coin for the
     spinning `propoint.mad`, BIG/GameChars for the exe's unread gtext font
     pair, and our CONTINUE/RETRY fork where the exe pays with SPACE.
-- ~~the CAMPAIGN MAP~~ **READ 2026-08-17, and THERE IS NO SUCH SCREEN**
-  (`frontend/notes.md`). The "screen 22" of 0x41A2B0 is RECORD 22, GAME
-  ENGINE — a launch state with no draw arm — and the campaign goes squad →
-  (record 39's question at position 0) → launch, with no between-mission
-  screen at all. So our flow already matches the original's shape. What the
-  read yielded instead:
+- ~~the CAMPAIGN MAP~~ ~~READ 2026-08-17, and THERE IS NO SUCH SCREEN~~
+  **WRONG — play caught it, and it is READ AND BUILT 2026-08-18.** The map
+  lives in the MISSION HOST, not in a frontend record — which is why every
+  menu-side search missed it (`pigmap/notes.md` has the whole chain; the
+  "never never" lesson holds). Built as the original runs it: START MISSION
+  (position 1 on) → the WORLD MAP (`BigMap` under 25 territory patches
+  tinted by the defending nation, six banners, the current one blinking) →
+  the ZOOM (32 easing steps, patch crossfading into the region page) → the
+  REGION (`*phy` flat pages — not 3D — with a pole per mission, flags on the
+  conquered, the player's own four-part marker bobbing on the current) → the
+  BRIEFING, which IS the loading screen (`level<pos>.bmp` + the 17-step
+  loadbar at (152,451) + gtext 257 creeping up; position 1 pastes the
+  enemy's `level1n<nation>.bmp` portrait at (342,190)) → a key starts. The
+  training ground skips the map and briefs on `level0.bmp`, the exe's own
+  gate. A key skips a phase (the exe's); BACK skips the whole map
+  (`[deliberate]`). The MISSION LIST stand-in (`ui/missionList.ts`, the
+  cheat's mechanics) is DELETED with its spec — the real thing landed.
+  `lib/game/pigmap.ts` (the tables), `ui/pigMap.ts`, `ui/briefing.ts`,
+  `unit/pigmap.spec.ts`, `e2e/001/mapchain.spec.ts`. Not built from the
+  read: the newspaper page (mode 3, tail unread), the region-complete FMVs,
+  the load-screen gamma fade. What the earlier read yielded still stands:
   - **the mission list on screen is the CHEAT** — record 44, CHEAT LEVEL
     SELECT, kind 2, opened by naming the team NAUGHTY PIGS (fetext 0x2EB;
     also sets the tokens to 99): 26 raw map names in a seven-row scroll

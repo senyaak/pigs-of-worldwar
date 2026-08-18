@@ -1,5 +1,6 @@
-// Minimal palettized BMP reader — enough for the game's frontend images
-// (every decoded MGL is an 8-bit BMP) and its fonts (some are 4-bit). Pure,
+// Minimal BMP reader — enough for the game's frontend images (every decoded
+// MGL is an 8-bit BMP), its fonts (some are 4-bit) and the loose pages of
+// `Language/Tims` (the pig map and the briefings are plain 24-bit). Pure,
 // like the others.
 //
 // The palette and every texel's index come back untouched alongside the
@@ -12,9 +13,9 @@ export interface Bmp {
   height: number
   /** RGBA, rows top to bottom, fully opaque. */
   rgba: Uint8Array
-  /** The palette, RGBA, four bytes an entry. */
+  /** The palette, RGBA, four bytes an entry — EMPTY for a 24-bit page. */
   palette: Uint8Array
-  /** One palette index per pixel, rows top to bottom. */
+  /** One palette index per pixel, rows top to bottom — EMPTY for 24-bit. */
   indices: Uint8Array
 }
 
@@ -26,9 +27,28 @@ export function parseBmp(data: Uint8Array): Bmp {
   const width = view.getInt32(18, true)
   const rawHeight = view.getInt32(22, true)
   const bpp = view.getUint16(28, true)
-  if (bpp !== 8 && bpp !== 4) throw new Error(`unsupported BMP bpp ${bpp} (only 4 and 8)`)
+  if (bpp !== 8 && bpp !== 4 && bpp !== 24) {
+    throw new Error(`unsupported BMP bpp ${bpp} (only 4, 8 and 24)`)
+  }
   const height = Math.abs(rawHeight)
   const topDown = rawHeight < 0
+
+  if (bpp === 24) {
+    const rowSize = ((width * 3 + 3) & ~3) >>> 0
+    const rgba = new Uint8Array(width * height * 4)
+    for (let y = 0; y < height; y++) {
+      const row = pixelOffset + (topDown ? y : height - 1 - y) * rowSize
+      for (let x = 0; x < width; x++) {
+        const at = (y * width + x) * 4
+        const p = row + x * 3
+        rgba[at] = data[p + 2]
+        rgba[at + 1] = data[p + 1]
+        rgba[at + 2] = data[p]
+        rgba[at + 3] = 255
+      }
+    }
+    return { width, height, rgba, palette: new Uint8Array(0), indices: new Uint8Array(0) }
+  }
 
   const paletteOffset = 14 + headerSize
   const colors = Math.min(1 << bpp, Math.floor((pixelOffset - paletteOffset) / 4))

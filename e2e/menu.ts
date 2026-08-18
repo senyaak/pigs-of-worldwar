@@ -19,7 +19,6 @@ export type Screen =
   | 'onePlayer'
   | 'loadScreen'
   | 'askTraining'
-  | 'missionList'
   | 'debrief'
   | 'teamScreen'
   | 'nameScreen'
@@ -222,7 +221,9 @@ export async function startGame(page: Page): Promise<void> {
 
 /** START MISSION on the player screen, which opens on it already lit — and
  * through PLAY TRAINING MISSION?, which a fresh campaign asks first. The
- * suite always answers YES: its battles are the training ground. */
+ * suite always answers YES: its battles are the training ground — which
+ * skips the pig map (the exe's own gate) and briefs on `level0.bmp`, the
+ * page that is also the loading screen. A key on the loaded page starts. */
 export async function startMission(page: Page): Promise<void> {
   await expect
     .poll(
@@ -237,4 +238,16 @@ export async function startMission(page: Page): Promise<void> {
   await tap(page, 'menuSelect')
   await expect(page.locator('#ask')).toBeVisible()
   await choose(page, 'YES', 'askTraining')
+  await expect(page.locator('#briefing')).toBeVisible()
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const pow = (window as unknown as { pow?: { briefing?: { ready(): boolean } } }).pow
+          return pow?.briefing ? pow.briefing.ready() : false
+        }),
+      { message: 'the briefing is still loading the level' }
+    )
+    .toBe(true)
+  await tap(page, 'menuSelect')
 }

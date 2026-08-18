@@ -36,7 +36,10 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   // lands on the squad, which the chain below already walks.
   ['#debrief', { key: 'menuSelect' }],
   ['#ask', { key: 'menuBack' }],
-  ['#missions', { key: 'menuBack' }],
+  // BACK on the pig map skips the whole chain to the briefing; a key on the
+  // loaded briefing starts the battle, which the '#battle' row then leaves.
+  ['#pigmap', { key: 'menuBack' }],
+  ['#briefing', { key: 'menuSelect' }],
   ['#load', { key: 'menuBack' }],
   ['#oneplayer', { key: 'menuBack' }],
   ['#team', { key: 'menuBack' }],

@@ -203,28 +203,37 @@ export async function loadFrontendImages(
 }
 
 /**
- * The DEBRIEF's images — loose BMPs in `Language/Tims/debrief/`, the one art
- * folder the frontend does not archive: the nine faces and their wounded
- * twins, `r_i_p`, the class badges, the uniforms and the two backdrops
- * (`debrief/notes.md` in the disasm repo). Magenta is the key here as it is
- * in FEBMP — the uniforms lie over the faces.
+ * Loose BMPs out of one `Language/Tims/<folder>` — the art the game does not
+ * archive: `debrief` (the end-of-mission page), `PigMap` (the world map),
+ * `Briefing` (the mission pages and the loadbar). `keyed` names get the
+ * magenta key punched — the debrief's overlays and the briefing's pasted-in
+ * enemy portrait are colour-keyed blits in the exe; a full-page photograph
+ * is not, and punching it would eat any magenta in the picture.
  *
- * The folder and the files are matched case-insensitively: the install
- * spells `Facepc1.bmp` beside `facepcw1.bmp` and `pcHeavy.bmp`.
+ * Folder and files are matched case-insensitively: the install spells
+ * `Facepc1.bmp` beside `facepcw1.bmp`, and `PigMap` beside `debrief`.
  */
-export async function loadDebriefImages(
+export async function loadLanguageImages(
   gameDir: string,
-  names: string[]
+  folder: string,
+  names: string[],
+  keyed: string[] = []
 ): Promise<FrontendImage[]> {
-  const dir = path.join(gameDir, 'Language', 'Tims', 'debrief')
+  const tims = path.join(gameDir, 'Language', 'Tims')
+  const folders = await fs.readdir(tims)
+  const found = folders.find((one) => one.toLowerCase() === folder.toLowerCase())
+  if (!found) throw new Error(`no ${folder} in Language/Tims`)
+  const dir = path.join(tims, found)
   const siblings = await fs.readdir(dir)
   const byName = new Map(siblings.map((file) => [file.toLowerCase(), file]))
+  const punched = new Set(keyed.map((name) => name.toLowerCase()))
   return Promise.all(
     names.map(async (wanted) => {
       const file = byName.get(`${wanted.toLowerCase()}.bmp`)
-      if (!file) throw new Error(`no ${wanted}.bmp in Language/Tims/debrief`)
+      if (!file) throw new Error(`no ${wanted}.bmp in Language/Tims/${found}`)
       const bmp = parseBmp(await fs.readFile(path.join(dir, file)))
-      return { name: wanted.toLowerCase(), width: bmp.width, height: bmp.height, rgba: punchMagenta(bmp) }
+      const rgba = punched.has(wanted.toLowerCase()) ? punchMagenta(bmp) : bmp.rgba
+      return { name: wanted.toLowerCase(), width: bmp.width, height: bmp.height, rgba }
     })
   )
 }

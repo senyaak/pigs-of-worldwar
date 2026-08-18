@@ -8,7 +8,8 @@ import { initMenu } from './ui/menu'
 import { initOnePlayer } from './ui/onePlayer'
 import { initLoadScreen } from './ui/loadScreen'
 import { initAskTraining } from './ui/askTraining'
-import { initMissionList } from './ui/missionList'
+import { initPigMap } from './ui/pigMap'
+import { initBriefing } from './ui/briefing'
 import { initDebrief } from './ui/debrief'
 import { initTeamScreen } from './ui/teamScreen'
 import { initNameScreen } from './ui/nameScreen'
@@ -31,7 +32,8 @@ type View =
   | 'oneplayer'
   | 'load'
   | 'ask'
-  | 'missions'
+  | 'pigmap'
+  | 'briefing'
   | 'debrief'
   | 'team'
   | 'name'
@@ -48,7 +50,8 @@ const panels: Record<View, HTMLElement[]> = {
   oneplayer: [byId('oneplayer')],
   load: [byId('load')],
   ask: [byId('ask')],
-  missions: [byId('missions')],
+  pigmap: [byId('pigmap')],
+  briefing: [byId('briefing')],
   debrief: [byId('debrief')],
   team: [byId('team')],
   name: [byId('name')],
@@ -69,6 +72,12 @@ function show(view: View): void {
   for (const [name, screen] of Object.entries(screens)) {
     if (view === name) screen.enter()
     else screen.leave()
+  }
+  // The two PASSAGES between the squad and a battle are not bar screens, but
+  // they hold the controller the same way.
+  for (const [name, passage] of Object.entries(passages)) {
+    if (view === name) passage.enter()
+    else passage.leave()
   }
 }
 
@@ -128,30 +137,43 @@ function toSquad(): void {
   void playerScreen.load()
 }
 
-/** Open the campaign's next mission. */
+/**
+ * Open the campaign's next mission — through the ORIGINAL's own chain
+ * (`pigmap/notes.md`): the world map, the zoom and the region with its flags
+ * (position 1 on), then the briefing page, which is the loading screen, and
+ * the mission on a key. The training ground (position 0) skips the map and
+ * briefs on its own page, the exe's own gate on map id 10.
+ */
 function startMission(): void {
-  campaignBattle = true
-  void battle.open(MISSION_STAND_IN).then((ok) => ok && show('battle'))
-}
-
-/** The MISSION MAP, standing on the campaign's own position. */
-function toMissions(): void {
   const save = campaign.current()
-  if (!save) {
-    show('menu')
+  campaignBattle = true
+  if (!save || save.position === 0) {
+    toBriefing()
     return
   }
-  missionList.show(save.position, save.name)
-  show('missions')
-  void missionList.load()
+  show('pigmap')
+  void pigMap.show(save.position, save.enemies, save.nation)
 }
 
-// The campaign's 26 on the cheat screen's own mechanics: the current mission
-// in the light, the played ones plain, the future dark — and only the current
-// one can be chosen.
-const missionList = initMissionList({
-  onPick: () => startMission(),
-  onBack: () => toSquad()
+/** The briefing page up, and the battle loading UNDER it. */
+function toBriefing(): void {
+  const save = campaign.current()
+  const position = save?.position ?? 0
+  const enemy = save ? (save.enemies[save.position] ?? (save.nation + 1) % 6) : null
+  show('briefing')
+  briefing.show(position, enemy, battle.open(MISSION_STAND_IN))
+}
+
+// The world map → region → flags sequence, the exe's 0x482C30. Skippable —
+// it always ends on the briefing.
+const pigMap = initPigMap({
+  onDone: () => toBriefing()
+})
+
+const briefing = initBriefing({
+  onGo: () => show('battle'),
+  // A level that will not open is a walk back to the squad, not a hang.
+  onFailed: () => toSquad()
 })
 
 // How a battle comes back decides where it lands: a walked-out mission goes
@@ -196,11 +218,12 @@ const debrief = initDebrief({
 
 // PLAY TRAINING MISSION? — the original's record 39, asked once the campaign
 // stands at position 0. YES is the training ground, launched straight; NO
-// steps past it and the MISSION MAP opens on the first real mission.
+// steps past it (0x42C37E's own move) and launches position 1 through the
+// full map chain, exactly the exe's path.
 const ask = initAskTraining({
   onYes: () => startMission(),
   onNo: () => {
-    void campaign.skipTutorial().then(() => toMissions())
+    void campaign.skipTutorial().then(() => startMission())
   },
   onBack: () => toSquad()
 })
@@ -301,7 +324,7 @@ const playerScreen = initPlayerScreen({
       void ask.load()
       return
     }
-    toMissions()
+    startMission()
   },
   onBack: () => show('name'),
   promote: (slot) => {
@@ -370,13 +393,14 @@ const screens = {
   oneplayer: onePlayer,
   load: loadScreen,
   ask,
-  missions: missionList,
   debrief,
   team: teamScreen,
   name: nameScreen,
   player: playerScreen,
   multiplayer: multiPlayer
 }
+/** …and the mission chain's two, which have no bars to read. */
+const passages = { pigmap: pigMap, briefing }
 byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('menu'))
 
 // The frontend is drawn on a canvas, so what a screen says and which bar is
@@ -397,7 +421,10 @@ if (window.pow) {
   window.pow.onePlayer = view(onePlayer)
   window.pow.loadScreen = view(loadScreen)
   window.pow.askTraining = view(ask)
-  window.pow.missionList = view(missionList)
+  // The map chain is not a bar screen: what a spec needs is which phase the
+  // map stands in and whether the briefing would take a key.
+  window.pow.pigMap = { phase: pigMap.phase }
+  window.pow.briefing = { ready: briefing.ready }
   window.pow.debrief = view(debrief)
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }

@@ -320,8 +320,12 @@ declare global {
       loadScreen?: BarScreenView
       /** PLAY TRAINING MISSION? — YES over NO (ui/askTraining.ts). */
       askTraining?: BarScreenView
-      /** The MISSION MAP — `selected` is the browsed position (ui/missionList.ts). */
-      missionList?: BarScreenView
+      /** The PIG MAP — which of the chain's phases is up (ui/pigMap.ts):
+       * 'off', 'world', 'zoom' or 'region'. */
+      pigMap?: { phase(): string }
+      /** The BRIEFING — whether the load is in and a key would start the
+       * mission (ui/briefing.ts). */
+      briefing?: { ready(): boolean }
       /** The DEBRIEF — CONTINUE over RETRY (ui/debrief.ts). */
       debrief?: BarScreenView
       /** SELECT TEAM — the six armies (ui/teamScreen.ts). */

@@ -186,6 +186,13 @@ export interface Api {
   loadFrontendImages(entryNames: string[]): Promise<FrontendImagesResult>
   /** The debrief's loose BMPs out of Language/Tims/debrief, magenta punched. */
   loadDebriefImages(names: string[]): Promise<FrontendImagesResult>
+  /** Loose BMPs out of any Language/Tims folder — PigMap, Briefing — with
+   * only the `keyed` names magenta-punched (a full page is not). */
+  loadLanguageImages(
+    folder: string,
+    names: string[],
+    keyed: string[]
+  ): Promise<FrontendImagesResult>
   loadFont(name: string): Promise<LoadFontResult>
   /** Every BMP in a MAD — the skill menu's frame and icons. */
   loadArchiveBmps(relPath: string): Promise<LoadTimsResult>

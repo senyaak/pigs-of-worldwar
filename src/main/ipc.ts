@@ -13,7 +13,7 @@ import {
   loadArchiveBmps,
   loadClips,
   loadFont,
-  loadDebriefImages,
+  loadLanguageImages,
   loadFrontendImages,
   loadGameText,
   loadMapObjects,
@@ -101,11 +101,26 @@ export function registerIpc(): void {
     const gameDir = getGameDir()
     if (!gameDir) return { ok: false, error: 'Game folder is not set' }
     try {
-      return { ok: true, images: await loadDebriefImages(gameDir, names) }
+      // The debrief's overlays are all colour-keyed, so every name punches.
+      return { ok: true, images: await loadLanguageImages(gameDir, 'debrief', names, names) }
     } catch (error) {
       return fail(names.join(', '), error)
     }
   })
+
+  ipcMain.handle(
+    'language:images',
+    async (_event, folder: string, names: string[], keyed: string[]) => {
+      const gameDir = getGameDir()
+      if (!gameDir) return { ok: false, error: 'Game folder is not set' }
+      if (!/^[a-z0-9]+$/i.test(folder)) return { ok: false, error: `Not a Tims folder: ${folder}` }
+      try {
+        return { ok: true, images: await loadLanguageImages(gameDir, folder, names, keyed) }
+      } catch (error) {
+        return fail(`${folder}: ${names.join(', ')}`, error)
+      }
+    }
+  )
 
   ipcMain.handle('frontend:font', async (_event, name: string) => {
     const gameDir = getGameDir()

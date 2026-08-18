@@ -108,3 +108,15 @@ export async function loadDebriefSprites(names: string[]): Promise<SpriteSet> {
   if (!result.ok) throw new Error(result.error)
   return spriteSet(result.images)
 }
+
+/** Loose BMPs out of any other Language/Tims folder — the pig map's world
+ * picture, the briefing pages — punching only the `keyed` names. */
+export async function loadLanguageSprites(
+  folder: string,
+  names: string[],
+  keyed: string[] = []
+): Promise<SpriteSet> {
+  const result = await window.api.loadLanguageImages(folder, names, keyed)
+  if (!result.ok) throw new Error(result.error)
+  return spriteSet(result.images)
+}
