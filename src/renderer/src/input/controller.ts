@@ -331,9 +331,14 @@ declare global {
        * end — and `type` is the remake's keyboard, which the original has no
        * way to offer. */
       nameScreen?: BarScreenView & { typed(): string; type(character: string): void }
-      /** The PLAYER screen — the eight pigs and the two actions
-       * (ui/playerScreen.ts). `selected` is 0..7 a pig, then START and SAVE. */
+      /** The PLAYER screen — the eight pigs and START MISSION
+       * (ui/playerScreen.ts). `selected` is 0..7 a pig, then START. */
       playerScreen?: BarScreenView
+      /** The PIG MENU over the squad — PROMOTE / SWAP POSITION / RENAME
+       * (ui/pigMenu.ts); `open` says whether it is up at all. */
+      pigMenu?: BarScreenView & { open(): boolean }
+      /** CAREER PATH, a GRUNT's four ways out (ui/careerPath.ts). */
+      careerPath?: BarScreenView & { open(): boolean }
       /** The MULTI-PLAYER screen, read the same way (ui/multiPlayer.ts). */
       multiPlayer?: BarScreenView
       /** Where the frontend's furniture sits, live: nudge a piece in the

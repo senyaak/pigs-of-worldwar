@@ -127,6 +127,22 @@ export const discardMission = (): void => {
 }
 
 /**
+ * A squad edit off the pig menu — promote, rename, swap (`lib/game/promotion`)
+ * — applied to the live save and AUTOSAVED at once: the original waits for
+ * SAVE TEAM, which the remake deliberately does not have, and an edit is a
+ * decision the same way declining the tutorial is. A refused edit (null from
+ * the rule) writes nothing and returns null so the screen can say no.
+ */
+export async function amend(edit: (save: SaveGame) => SaveGame | null): Promise<SaveGame | null> {
+  if (!save) return null
+  const changed = edit(save)
+  if (!changed) return null
+  save = { ...changed, savedAt: new Date().toISOString() }
+  await write()
+  return save
+}
+
+/**
  * The player declined the training ground: the campaign steps past position 0
  * with no reward and no roster change, and the tutorial flag stays down —
  * skipped is not finished. **The step is the exe's own** (0x42C37E writes

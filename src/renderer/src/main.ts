@@ -21,6 +21,8 @@ import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 import { feText } from './ui/barScreen'
 import { newSquad, SQUAD_SIZE } from '../../lib/game/roster'
+import { costOf, promotionsFrom } from '../../lib/game/ranks'
+import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
 import * as campaign from './campaign'
 
 type View =
@@ -246,25 +248,50 @@ let chosenNation = 0
 const teamScreen = initTeamScreen({
   onPick: (nation) => {
     chosenNation = nation
+    nameScreen.use('team')
     show('name')
     void nameScreen.load()
   },
   onBack: () => show('oneplayer')
 })
 
-// And the name closes the last gap in front of `newGame`: a campaign has a
-// team, a nation and a squad of eight. Starting the battle is still the
-// training ground until there is a briefing to go through.
+/** Which pig RENAME is about, or null while the name entry is the team's. */
+let renaming: number | null = null
+
+// The one kind-0 machine names both: the TEAM on the way into a campaign, and
+// a PIG off the pig menu — record 13's own max of seven, committed to the
+// roster and straight back to the squad, the exe's own path (0x42B118).
 const nameScreen = initNameScreen({
   onName: (name) => {
+    if (renaming !== null) {
+      const slot = renaming
+      renaming = null
+      void campaign.amend((save) => renamePig(save, slot, name)).then(() => toSquad())
+      return
+    }
     void startCampaign(name, chosenNation)
   },
-  onBack: () => show('team')
+  onBack: () => {
+    if (renaming !== null) {
+      renaming = null
+      toSquad()
+      return
+    }
+    show('team')
+  }
 })
+
+/** An edit went through: the squad screen shows the moved save. */
+const refreshSquad = (save: ReturnType<typeof campaign.current>): void => {
+  if (save) playerScreen.show(save.squad, save.name, save.tokens)
+}
 
 // …and the squad it raised is the PLAYER screen, record 12: eight pigs, their
 // ranks, and START MISSION — which asks about the training ground while the
 // campaign stands at position 0, and goes through the MISSION MAP after.
+// Choosing a PIG opens the pig menu over it (ui/pigMenu.ts), whose three
+// choices land back here: the rules are `lib/game/promotion.ts`, the state is
+// the campaign's, and every write autosaves (`campaign.amend`).
 const playerScreen = initPlayerScreen({
   onStart: () => {
     const save = campaign.current()
@@ -276,7 +303,41 @@ const playerScreen = initPlayerScreen({
     }
     toMissions()
   },
-  onBack: () => show('name')
+  onBack: () => show('name'),
+  promote: (slot) => {
+    const save = campaign.current()
+    const pig = save?.squad[slot]
+    if (!save || !pig) return { kind: 'none' }
+    const ways = promotionsFrom(pig.rank)
+    if (ways.length === 0) return { kind: 'none' }
+    if (ways.length > 1) {
+      // A GRUNT: the affordability gate runs HERE, the exe's own order —
+      // CAREER PATH pays without a second test, all four ways costing one.
+      return ways[0].cost > save.tokens ? { kind: 'refused' } : { kind: 'career' }
+    }
+    const way = ways[0]
+    if (way.cost > save.tokens) return { kind: 'refused' }
+    void campaign.amend((it) => promotePig(it, slot, way.to)).then(refreshSquad)
+    return { kind: 'promoted', cost: way.cost }
+  },
+  swap: (a, b) => {
+    void campaign.amend((it) => swapPigs(it, a, b)).then(refreshSquad)
+  },
+  rename: (slot) => {
+    renaming = slot
+    nameScreen.use('pig')
+    show('name')
+    void nameScreen.load()
+  },
+  careerPick: (slot, to) => {
+    const save = campaign.current()
+    const pig = save?.squad[slot]
+    if (!save || !pig) return false
+    const cost = costOf(pig.rank, to)
+    if (cost === null || cost > save.tokens) return false
+    void campaign.amend((it) => promotePig(it, slot, to)).then(refreshSquad)
+    return true
+  }
 })
 
 /**
@@ -341,6 +402,10 @@ if (window.pow) {
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }
   window.pow.playerScreen = view(playerScreen)
+  // The squad's two overlays read through the same window, plus whether each
+  // is up at all.
+  window.pow.pigMenu = playerScreen.menu
+  window.pow.careerPath = playerScreen.career
   window.pow.multiPlayer = view(multiPlayer)
   // Each screen carries its OWN layout, so a nudge in the console moves the
   // screen being looked at rather than all of them.

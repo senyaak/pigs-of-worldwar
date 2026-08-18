@@ -24,6 +24,8 @@ export type Screen =
   | 'teamScreen'
   | 'nameScreen'
   | 'playerScreen'
+  | 'pigMenu'
+  | 'careerPath'
   | 'multiPlayer'
 
 interface ScreenHooks {

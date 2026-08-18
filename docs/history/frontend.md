@@ -603,3 +603,58 @@ anywhere, which is what a cheat is for and a map is not. The flow runs START
 → (the training question at position 0; NO now lands HERE, on the first real
 mission) → the map → the battle, and `e2e/001/missions.spec.ts` drives the
 whole path. The suite's `toMenu` learned to wait an animated leave out.
+
+## THE PIG MENU AND THE CAREER PATH — 2026-08-18
+
+The squad screen's pigs DO something now. The whole session was two reads and
+one build, and both reads went to the disasm repo first (`frontend/notes.md`,
+same date): the pig menu — record 19, kind 6 — and the promotion actions
+behind it, then CAREER PATH — record 25, kind 13.
+
+**SAVE TEAM went first.** The label had been promised away since SAVE ARMY
+was ruled out (the campaign autosaves); touching the screen was the trigger.
+START MISSION stands alone on its plate now, `PLACES` is nine, and
+`e2e/001/player.spec.ts` counts one action.
+
+**The menu is an OVERLAY, and that was the read's structural half.** The exe
+never leaves the squad screen: action 7 links record 19 OVER record 12,
+the parent keeps updating and drawing, and its brightness ramps 120 → 80 at
+4 a tick. Two corrections fell out of the same pass and are worth more than
+the menu itself: **the blit queue flushes BACKWARD** (first queued is drawn
+on top — every "last blit wins" reading was upside down), and **the breathing
+portrait is the SWAP-ARMED pig**, `[0x4C0C58]`, not the cursor — nobody
+breathes in the exe's normal state. The remake keeps the lit pig's swell as
+its own cursor (`[deliberate]`) and gives the armed pig the exe's.
+
+**What was built** (`ui/pigMenu.ts`, `ui/careerPath.ts`, composed by
+`ui/playerScreen.ts`; the rules in `lib/game/promotion.ts`, written through
+`campaign.amend`, which autosaves):
+
+- the `swap` plaque at (180, 260) riding `2·scaleY` of the box's own spring —
+  500 → 0 at gain 12 / damping 20 / cap 40, out on the launcher 14/70 — with
+  the `swap01..03` medallion at x 230 sliding 16 px a widget-frame down the
+  three rows and blinking script 1006 at rest; the words stand still on their
+  boxes (232, 357/389/422) while the plaque rises under them, all three in
+  the plain shade — the medallion IS the highlight;
+- PROMOTE carrying its price — the `vp` icon and the cost off the tree, `-`
+  for a HERO; one way pays at once (`Promo`@80, the spend number at
+  (323, 189), the menu closing), a GRUNT gates at the menu (`Crunch`@100
+  when short) and picks on CAREER PATH, a HERO does nothing at all;
+- CAREER PATH as the original's CAROUSEL — the title and ONE career name in
+  one box (184, 339/373, 218 wide), four icons at (260 + 30n, 408) with the
+  chosen one blinking on alternate ticks, `click4`@40 a move — paying
+  without a second test, which is safe while all four ways cost one;
+- SWAP POSITION arming the squad (`steam1`@100): the armed pig breathes, the
+  next pig click swaps the WHOLE pig, BACK only disarms;
+- RENAME through the one kind-0 machine — `nameScreen.use('pig')`: title 52,
+  max seven, the buffer empty the way 0x42CEB7 leaves it — committed to the
+  roster and straight back to the squad. The remake shows it as a full view
+  where the exe overlays the panel over the dimmed squad; tagged in todo.
+- sounds throughout are the read's: `Indu037`@100 a pig click, `steam1`@60
+  in / @100 out, `click1`@60 the medallion arriving, `hiss2`@100 for the
+  career path and the name entry.
+
+`unit/promotion.spec.ts` walks the tree pure (a GRUNT to HERO on twenty
+points); `e2e/001/pigmenu.spec.ts` drives all three choices, the broke
+refusal, the seven-letter trim, the whole-pig swap and the disarm, and the
+career walk on a planted three-token save.

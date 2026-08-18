@@ -255,9 +255,25 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
        line's y is `[CHECK — remake]`, nothing writes that text in any read
        arm. Still unread: `0x4267A0` (the option list's scroll) and which of
        2/4 `[0x4C0D44]` carries for record 12.
-     - **SAVE TEAM does nothing** and PROMOTE is not there at all: the pig menu
-       (record 19) and CAREER PATH (record 25) are their own screens, and the
-       tree they drive is already in `ranks.ts` waiting for them.
+     - ~~**SAVE TEAM does nothing** and PROMOTE is not there at all~~ **BOTH
+       SETTLED 2026-08-18.** SAVE TEAM is REMOVED — the autosave's screen-side
+       half, promised where SAVE ARMY was ruled out. And the PIG MENU (record
+       19, kind 6) is READ AND BUILT: an overlay over the DIMMED squad (120→80
+       at 4/tick), the `swap` plaque springing 500→0 (12/20/40), the
+       `swap01..03` medallion sliding 16 px a frame and blinking script 1006,
+       PROMOTE with the `vp`-icon price or `-` for a HERO. CAREER PATH (record
+       25, kind 13) too — the original's CAROUSEL: one career name in one box,
+       four icons at (260+30n, 408), the lit one blinking. PROMOTE pays and
+       writes the class (`lib/game/promotion.ts` + `campaign.amend` autosave),
+       GRUNT gates at the menu and picks on the path, SWAP arms the squad and
+       the next click swaps whole — **and the breathing portrait is the ARMED
+       pig, the exe's own; breathing the lit one too stays `[deliberate]`** —
+       RENAME reuses the kind-0 machine (title 52, max 7, empty buffer).
+       `ui/pigMenu.ts`, `ui/careerPath.ts`, `e2e/001/pigmenu.spec.ts`,
+       `unit/promotion.spec.ts`; the read is `frontend/notes.md` 2026-08-18.
+       Small `[CHECK — remake]`s: the spend popup's life at (323,189), the
+       menu rows' shade, career path's close sound, our full-screen name view
+       where the exe overlays it.
    - ~~the autosave now has its first half~~ **DONE 2026-08-17, BOTH halves,
      and the campaign is a live thing** — `src/renderer/src/campaign.ts` holds
      the SaveGame in play; `begin` writes the first free of the original's own
@@ -318,8 +334,9 @@ actually seen.
     picked squad's badges and MISSION N, and not one sound — the family has
     none. **SAVE ARMY (record 21, kind 9) is deliberately NEVER built**
     (`[play]`): the campaign autosaves and there is nothing to save by hand.
-    The player screen's SAVE TEAM label goes with it whenever that screen is
-    next touched.
+    ~~The player screen's SAVE TEAM label goes with it whenever that screen is
+    next touched~~ **gone 2026-08-18** — START MISSION stands alone on its
+    plate.
   - ~~**The confirm box (kind 12)**~~ **BUILT 2026-08-18** —
     `ui/askTraining.ts` is the real widget box now: the two springs in from
     the upper right, the `yesno` turn-over landing on `yes` with `Indu008`,

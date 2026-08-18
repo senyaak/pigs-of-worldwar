@@ -42,8 +42,7 @@
 // alone, as the portrait's backing.
 //
 // Still NOT built: `pcflag`, which marks a pig the team can afford to promote
-// (0x41D814, and it wants the team's promotion points); the `sqoptsf` option
-// rows at x 428 with their `lit1/2/3` lamps; and the medals.
+// (0x41D814, and it wants the team's promotion points); and the medals.
 
 import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
@@ -55,6 +54,9 @@ import { loadSprites } from './sprites'
 import type { SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
+import { initPigMenu } from './pigMenu'
+import type { PromoteResult } from './pigMenu'
+import { initCareerPath } from './careerPath'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { SQUAD_SIZE } from '../../../lib/game/roster'
 import type { Pig } from '../../../lib/game/roster'
@@ -100,6 +102,9 @@ const ART = [
   'pcHweap', 'snipr', 'sappr', 'pcmedic', 'cmndo', 'pcmedal',
   'strp1', 'strp2',
   'bgdark',
+  // The PIG MENU's plaque and its medallion's three shades (ui/pigMenu.ts) —
+  // kind 6 loads nothing of its own, the family already carries it.
+  'swap', 'swap01', 'swap02', 'swap03',
   // The three markup ICONS the board writes with, 22 tall like every icon in
   // that set: `vp` is the TOKEN, `battle` how many battles a pig has fought,
   // `kills` how many it has killed (`frontend/notes.md` — the archive's name
@@ -118,11 +123,12 @@ const ART = [
 /** `Fesounds.srl` entry 4 — the same click every other frontend screen makes. */
 const CLICK = { name: 'CLICK1', gain: 0.6 }
 
-/** Record 12's own two: START MISSION and SAVE TEAM. The six after them are
- * the pigs, named at runtime, which is why their fetext ids run into the next
- * screen's words (`frontend/notes.md`). */
+/** Record 12's first item, START MISSION — the one action this screen keeps.
+ * The original's second, SAVE TEAM (fetext 51), went with the SAVE ARMY screen:
+ * the campaign autosaves, so there is nothing to save by hand (`[play]`,
+ * docs/todo.md). The items after them are the pigs, named at runtime, which is
+ * why their fetext ids run into the next screen's words (`frontend/notes.md`). */
 const START_TEXT = 50
-const SAVE_TEXT = 51
 
 const ENTERS_FROM = -700
 
@@ -238,19 +244,18 @@ const LAYOUT = {
     spread: 24
   },
   /**
-   * The two actions are the tail's OPTION ROWS, not the item boxes this file
-   * used to place them by: the boxes fold to (350, 385) and (418, 385) side by
-   * side, and both the tail and the original's own screen stack them at a
+   * START MISSION is the tail's OPTION ROW, not the item box this file used
+   * to place it by: the boxes fold to (350, 385) side by side with SAVE
+   * TEAM's, and both the tail and the original's own screen stack plates at a
    * fixed x 428 — the same suspect fold the name screen's +80/−25 turned out
-   * to be. `rows` is each plate's top, `2·(H[n] − 6 + 33) − 91` at rest
-   * (0x41DA4D), and the lamps sit 16 lower (0x41DABB).
-   *
-   * **Only START wears a plate** (`[play]`) — SAVE TEAM is words alone.
+   * to be. `rows[0]` is the plate's top, `2·(H[n] − 6 + 33) − 91` at rest
+   * (0x41DA4D), and the lamps sit 16 lower (0x41DABB). SAVE TEAM itself is
+   * gone with the SAVE ARMY screen (`[play]`, autosave).
    */
   options: {
     x: 428,
     width: 200,
-    rows: [337, 393],
+    rows: [337],
     /** How far into its plate a row's words sit — `[CHECK — remake]`. */
     text: 38,
     lamp: { x: [429, 601], drop: 16 }
@@ -293,30 +298,53 @@ const cloneLayout = (): PlayerLayout => ({
   text: { title: { ...LAYOUT.text.title } }
 })
 
+/** An overlay's e2e window — the pig menu's or the career path's. */
+export interface OverlayView {
+  selected(): number
+  labels(): string[]
+  values(): (string | null)[]
+  flipping(): boolean
+  open(): boolean
+}
+
 export interface PlayerScreen {
   load(): Promise<void>
   leave(): void
   enter(): void
   /** The squad to show, the team's name and its unspent tokens — the board
-   * writes the last of those. Called before the screen is entered. */
+   * writes the last of those. Called before the screen is entered, and again
+   * whenever an edit moved the save under the screen. */
   show(squad: Pig[], teamName: string, tokens: number): void
-  /** Which of the ten places is lit: 0..7 a pig, 8 START MISSION, 9 SAVE. */
+  /** Which of the nine places is lit: 0..7 a pig, 8 START MISSION. */
   selected(): number
   labels(): string[]
   values(): (string | null)[]
   flipping(): boolean
+  /** The PIG MENU riding over the squad (ui/pigMenu.ts). */
+  menu: OverlayView
+  /** …and CAREER PATH, the same way (ui/careerPath.ts). */
+  career: OverlayView
   layout: PlayerLayout
 }
 
-/** The two actions live past the eight pigs, the way the name entry's keys
+/** The one action lives past the eight pigs, the way the name entry's keys
  * live past its letters. */
 export const START = SQUAD_SIZE
-export const SAVE = SQUAD_SIZE + 1
-const PLACES = SQUAD_SIZE + 2
+const PLACES = SQUAD_SIZE + 1
 
 export function initPlayerScreen(handlers: {
   onStart: () => void
   onBack: () => void
+  /** PROMOTE on the pig menu — the composition root holds the save and
+   * answers what happened; the menu picks the sound and whether to stay. */
+  promote: (slot: number) => PromoteResult
+  /** The armed swap's second pick — both slots, in the order they were
+   * chosen. The root writes and calls `show` again. */
+  swap: (a: number, b: number) => void
+  /** RENAME chose a pig: the name entry opens on it. */
+  rename: (slot: number) => void
+  /** A CAREER PATH row — true is written and paid. */
+  careerPick: (slot: number, to: number) => boolean
 }): PlayerScreen {
   const canvas = byId<HTMLCanvasElement>('player-screen')
   const layout = cloneLayout()
@@ -346,6 +374,43 @@ export function initPlayerScreen(handlers: {
   const driveOn = drive(ENTERS_FROM)
   let leaving: (() => void) | null = null
 
+  /** SWAP POSITION's armed pig, or −1 — the exe's `[0x4C0C58]`, and the one
+   * portrait that BREATHES in the original (the selection swell below is the
+   * remake's own, kept `[deliberate]`). */
+  let armed = -1
+  /** The squad DIMS behind an overlay — `[+0x20]` 120 → 80 at 4 a tick — so
+   * this counts 0..DIM_TICKS and the shade is drawn from it. */
+  let dim = 0
+  const DIM_TICKS = 10
+  /** …and 80/120 of lit is a third of the way to black. */
+  const DIM_SHADE = 1 / 3
+  /** The floating spend — the exe's 0x4196E0 popup, pinned at (323, 189).
+   * How long it stands is `[CHECK — remake]`. */
+  let spent: { cost: number; ticks: number } | null = null
+  const SPENT = { x: 323, y: 189, ticks: 24 }
+
+  const menu = initPigMenu({
+    promote: (slot) => handlers.promote(slot),
+    onSwap: (slot) => {
+      armed = slot
+    },
+    onRename: (slot) => handlers.rename(slot),
+    onSpent: (cost) => {
+      spent = { cost, ticks: SPENT.ticks }
+    },
+    onCareer: (slot) => career.open(slot)
+  })
+  const career = initCareerPath({
+    pick: (slot, to) => handlers.careerPick(slot, to),
+    onSpent: (cost) => {
+      spent = { cost, ticks: SPENT.ticks }
+    },
+    onClosed: () => {}
+  })
+  /** Whether either overlay holds the screen — input goes to it and the
+   * squad dims under it. */
+  const overlaid = (): boolean => menu.state() !== 'closed' || career.state() === 'open'
+
   const step = (by: number): void => {
     const next = (selection + by + PLACES) % PLACES
     if (next === selection) return
@@ -374,8 +439,25 @@ export function initPlayerScreen(handlers: {
     step((other === 0 ? landing : COLUMN[0] + landing) - selection)
   }
 
+  /** `Fesounds.srl` 12, `Indu037` at 100 — every pig click (0x42BC83), the
+   * one that opens the menu and the one that completes a swap alike. */
+  const PIG_CLICK = { name: 'INDU037', gain: 1.0 }
+
   const choose = (): void => {
     if (driveOn.phase() !== 'here') return
+    if (selection < SQUAD_SIZE) {
+      if (!squad[selection]) return
+      bank.play(PIG_CLICK.name, { gain: PIG_CLICK.gain })
+      if (armed >= 0) {
+        // The second pick of a SWAP: the whole pigs change places and the
+        // squad disarms — the root writes and shows the moved roster.
+        handlers.swap(armed, selection)
+        armed = -1
+        return
+      }
+      menu.open(selection, squad[selection].rank)
+      return
+    }
     if (selection !== START) return
     leaving = handlers.onStart
     driveOn.leave()
@@ -385,12 +467,28 @@ export function initPlayerScreen(handlers: {
 
   controller.onAction((action) => {
     if (!visible) return
+    // An overlay holds the screen while it is up.
+    if (menu.state() !== 'closed') {
+      menu.handle(action)
+      return
+    }
+    if (career.state() === 'open') {
+      career.handle(action)
+      return
+    }
     if (action === 'menuUp') vertical(-1)
     else if (action === 'menuDown') vertical(1)
     else if (action === 'menuLeft') sideways(-1)
     else if (action === 'menuRight') sideways(1)
     else if (action === 'menuSelect') choose()
-    else if (action === 'menuBack') navigate(handlers.onBack)
+    else if (action === 'menuBack') {
+      // BACK with a swap armed only disarms (0x42D7ED) — no leaving, no sound.
+      if (armed >= 0) {
+        armed = -1
+        return
+      }
+      navigate(handlers.onBack)
+    }
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
 
@@ -465,9 +563,12 @@ export function initPlayerScreen(handlers: {
         face.width + inset * 2, face.height + inset * 2
       )
 
-      // The lit one breathes sideways — the arm scales the WIDTH and re-centres
-      // the blit on the source, and pushes the height as it is.
-      const swell = slot === selection ? 1 + PULSE_DEPTH * Math.cos(pulse) : 1
+      // The breathing is the arm's — WIDTH scaled, the blit re-centred on its
+      // source, the height pushed as it is. In the exe the ONLY pig that
+      // breathes is the SWAP-ARMED one (`[0x4C0C58]`, frontend/notes.md);
+      // breathing the lit one too is the remake's own cursor, `[deliberate]`.
+      const swell =
+        slot === selection || slot === armed ? 1 + PULSE_DEPTH * Math.cos(pulse) : 1
       const width = face.width * swell
       context.drawImage(
         face.image,
@@ -535,21 +636,20 @@ export function initPlayerScreen(handlers: {
       context.restore()
     })
 
-    // The two actions, STACKED on the tail's own option rows — and START
-    // wears a plate, SAVE TEAM does not (`[play]`).
+    // START MISSION on the tail's own option row, on its plate with its two
+    // lamps. It is the screen's only action now — SAVE TEAM went with the
+    // autosave (`[play]`).
     const options = layout.options
     put('sqoptsf', options.x, options.rows[0])
     options.lamp.x.forEach((x) => put('lit1', x, options.rows[0] + options.lamp.drop))
-    const actions = [feText(START_TEXT), feText(SAVE_TEXT)]
-    actions.forEach((label, i) => {
-      const font = selection === START + i ? light : dark
-      font.draw(
-        context,
-        label,
-        centred(font, label, options.x, options.width),
-        options.rows[i] + options.text + offset
-      )
-    })
+    const startLabel = feText(START_TEXT)
+    const startFont = selection === START ? light : dark
+    startFont.draw(
+      context,
+      startLabel,
+      centred(startFont, startLabel, options.x, options.width),
+      options.rows[0] + options.text + offset
+    )
 
     // The team's own name across the top, which is what the player just typed.
     if (teamName) {
@@ -566,6 +666,19 @@ export function initPlayerScreen(handlers: {
     // across its black face (`[play]`).
     put('pigpro', layout.pigpro.x, layout.pigpro.y)
     writeBoard(context, sprites, light)
+
+    // An OVERLAY dims the squad to two thirds under it — the exe ramps the
+    // record's own brightness 120 → 80 — and stands on top, bright.
+    if (dim > 0) {
+      context.fillStyle = `rgba(0, 0, 0, ${((dim / DIM_TICKS) * DIM_SHADE).toFixed(3)})`
+      context.fillRect(0, 0, canvas.width, canvas.height)
+    }
+    menu.draw(context, sprites, dark)
+    career.draw(context, sprites, light)
+
+    // The floating spend — the number of points a promotion just took,
+    // pinned where the exe pins its popup.
+    if (spent) light.draw(context, String(spent.cost), SPENT.x, SPENT.y)
   }
 
   /** One line of the board: pieces laid out left to right and centred as a
@@ -627,6 +740,10 @@ export function initPlayerScreen(handlers: {
   const advance = (): void => {
     driveOn.tick()
     pulse += PULSE_STEP
+    menu.tick()
+    if (career.state() === 'open') career.tick()
+    dim = Math.max(0, Math.min(DIM_TICKS, dim + (overlaid() ? 1 : -1)))
+    if (spent && --spent.ticks <= 0) spent = null
     if (driveOn.phase() === 'gone' && leaving) {
       const go = leaving
       leaving = null
@@ -670,6 +787,8 @@ export function initPlayerScreen(handlers: {
         return
       }
       loaded = true
+      menu.use(bank)
+      career.use(bank)
       run(visible)
     },
     leave() {
@@ -685,6 +804,11 @@ export function initPlayerScreen(handlers: {
       boardPig = 0
       pulse = 0
       leaving = null
+      armed = -1
+      dim = 0
+      spent = null
+      menu.reset()
+      career.reset()
       draw()
       run(true)
     },
@@ -694,13 +818,26 @@ export function initPlayerScreen(handlers: {
       tokens = unspent
     },
     selected: () => selection,
-    labels: () => squad.map((pig) => pig.name).concat([feText(START_TEXT), feText(SAVE_TEXT)]),
+    labels: () => squad.map((pig) => pig.name).concat([feText(START_TEXT)]),
     values: (): (string | null)[] => [
       ...squad.map((pig) => feText(rankText(pig.rank))),
-      null,
       null
     ],
     flipping: () => driveOn.phase() !== 'here',
+    menu: {
+      selected: () => menu.selected(),
+      labels: () => menu.labels(),
+      values: () => menu.values(),
+      flipping: () => menu.flipping(),
+      open: () => menu.state() !== 'closed'
+    },
+    career: {
+      selected: () => career.selected(),
+      labels: () => career.labels(),
+      values: () => career.values(),
+      flipping: () => career.flipping(),
+      open: () => career.state() === 'open'
+    },
     layout
   }
 }

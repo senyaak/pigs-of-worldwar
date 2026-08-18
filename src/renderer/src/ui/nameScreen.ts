@@ -60,6 +60,7 @@ import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import {
   ALPHABET,
   KEYS,
+  PIG_NAME_MAX,
   TEAM_NAME_MAX,
   keyAt,
   moveCursor,
@@ -81,8 +82,13 @@ const ART = ['pigbkpc1', 'propoint', ...PLATES, 'chardel', 'charspc', 'charent']
 /** `Fesounds.srl` entry 4 at volume 40 — every keypress (0x42AF71). */
 const KEYPRESS = { name: 'CLICK1', gain: 0.4 }
 
-/** fetext: record 15's own title. */
-const TITLE_TEXT = 57
+/**
+ * fetext: record 15's title, and record 13's — the same kind-0 machine names
+ * a TEAM (eleven letters) or a PIG (seven, 0x42CEB7's own max). Which is
+ * `use`'s to say; the buffer starts empty either way, the exe's own.
+ */
+const TITLES = { team: 57, pig: 52 } as const
+export type Naming = keyof typeof TITLES
 
 /**
  * THE MOTION, all of it read (0x41B9FD to seed, 0x424EB6 to arrive, 0x4260F0
@@ -217,6 +223,9 @@ export interface NameScreen {
   load(): Promise<void>
   leave(): void
   enter(): void
+  /** Whose name the next entry is — the team's or a pig's. Set before
+   * `enter`; it stays until set again. */
+  use(which: Naming): void
   /** What has been typed so far. */
   typed(): string
   /** Where the cursor is, as the exe keeps it: an index into the alphabet, or
@@ -253,6 +262,8 @@ export function initNameScreen(handlers: {
    * constant is only the fallback for a stripped install. */
   let grid: Alphabet = ALPHABET_GRID
   let entry: NameEntry = newEntry()
+  let naming: Naming = 'team'
+  const nameMax = (): number => (naming === 'team' ? TEAM_NAME_MAX : PIG_NAME_MAX)
 
   /** The three numbers the screen is made of, and the widget between them. */
   const at = { x: still(START.x), y: still(START.y), field: still(START.field) }
@@ -285,7 +296,7 @@ export function initNameScreen(handlers: {
 
   const choose = (): void => {
     if (phase !== 'here') return
-    const result = press(entry, grid, TEAM_NAME_MAX)
+    const result = press(entry, grid, nameMax())
     entry = result.entry
     bank.play(KEYPRESS.name, { gain: KEYPRESS.gain })
     if (result.accepted === undefined) return
@@ -374,7 +385,7 @@ export function initNameScreen(handlers: {
     rail(box.tail)
 
     // The name, padded out to its maximum with dots. It rides the bar.
-    words(context, lit, padded(entry.name, TEAM_NAME_MAX), {
+    words(context, lit, padded(entry.name, nameMax()), {
       ...layout.text.name,
       y: layout.text.name.y + alongField - offset
     })
@@ -424,7 +435,7 @@ export function initNameScreen(handlers: {
       })
     }
 
-    words(context, lit, feText(TITLE_TEXT), {
+    words(context, lit, feText(TITLES[naming]), {
       ...layout.text.title,
       x: layout.text.title.x + screen.x
     })
@@ -527,14 +538,17 @@ export function initNameScreen(handlers: {
       draw()
       run(true)
     },
+    use(which) {
+      naming = which
+    },
     typed: () => entry.name,
     selected: () => entry.cursor,
-    labels: () => [feText(TITLE_TEXT)],
+    labels: () => [feText(TITLES[naming])],
     values: () => [entry.name],
     flipping: () => phase !== 'here',
     type(character) {
       if (!visible || phase !== 'here') return
-      const next = typeCharacter(entry, grid, TEAM_NAME_MAX, character)
+      const next = typeCharacter(entry, grid, nameMax(), character)
       if (next === entry) return
       entry = next
       bank.play(KEYPRESS.name, { gain: KEYPRESS.gain })
