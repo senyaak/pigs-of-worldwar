@@ -24,7 +24,7 @@
 // What a key MEANS is not decided here: `lib/game/controls.ts` is that table and
 // it is pure. This file is the plumbing — collect what is held, ask, act.
 
-import { DEBUG_ACTIONS, DRIVING_ACTIONS, HELD_ACTIONS } from './actions'
+import { DEBUG_ACTIONS, DRIVING_ACTIONS, HELD_ACTIONS, MENU_ACTIONS } from './actions'
 import type { Action } from './actions'
 import { controller } from './controller'
 import { modeOf, readControls, verbOf, wakes } from '../../../lib/game/controls'
@@ -70,7 +70,9 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
     // The remake's own keys are not input to the RULES and must not be queued as
     // one: `wakes` counts a queued verb, so F12 would end the beat at the top of
     // the turn it jumped into (input/actions.ts, `DEBUG_ACTIONS`).
-    if (host.up() && !DEBUG_ACTIONS.includes(action)) pending.push(action)
+    if (!host.up()) return
+    if (DEBUG_ACTIONS.includes(action) || MENU_ACTIONS.includes(action)) return
+    pending.push(action)
   })
 
   /** Held actions that went down since the last poll. Read once, at the top of

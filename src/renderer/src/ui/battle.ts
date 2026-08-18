@@ -660,7 +660,8 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
       map: name,
       onCollected: collected,
       bus,
-      sound
+      sound,
+      running: isBattleUp
     })
     map = name
     updateHud()

@@ -83,6 +83,23 @@ export function createController(): Controller {
         const action = bindings[event.code]
         if (!action) return
         event.preventDefault()
+        /**
+         * ONE keydown is ONE action, and this is what says so.
+         *
+         * Every view binds its own map on the same `window`, gated on being
+         * the view that is up — which holds right up to the moment a view
+         * hands over SYNCHRONOUSLY. The briefing's `menuSelect` shows the
+         * battle before the event has finished dispatching, so the listener
+         * registered after it then read the same Space through the BATTLE's
+         * map, where it is `jump` — and a jump during the drop-in cuts every
+         * canopy. Play landed the whole squad without parachutes.
+         *
+         * The exe cannot have this bug: its own canopy cut (0x490c20) tests
+         * the pad for a FRESH press — down this frame and not the last — so a
+         * key carried in from the screen before reads as already held and
+         * does nothing.
+         */
+        event.stopImmediatePropagation()
         // Auto-repeat must not re-fire one-shot actions.
         if (event.repeat && !HELD_ACTIONS.includes(action)) return
         controller.press(action)
@@ -326,8 +343,6 @@ declare global {
       /** The BRIEFING — whether the load is in and a key would start the
        * mission (ui/briefing.ts). */
       briefing?: { ready(): boolean }
-      /** The DEBRIEF — CONTINUE over RETRY (ui/debrief.ts). */
-      debrief?: BarScreenView
       /** SELECT TEAM — the six armies (ui/teamScreen.ts). */
       teamScreen?: BarScreenView
       /** PLEASE NAME YOUR TEAM (ui/nameScreen.ts). `selected` is the exe's own

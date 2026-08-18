@@ -40,6 +40,26 @@ export type Action = (typeof ACTIONS)[number]
 export const DEBUG_ACTIONS: readonly Action[] = ['assets', 'trainingBack', 'trainingNext']
 
 /**
+ * The FRONTEND's own verbs, which the battle must never queue.
+ *
+ * No key in `DEFAULT_BINDINGS` produces one, so the only way a battle hears
+ * these is a screen handing over SYNCHRONOUSLY inside a single dispatch: the
+ * briefing's `menuSelect` shows the battle, and the listeners after it in the
+ * same `fired()` pass then see a battle that is up and queue the very key
+ * that left the screen before. The keyboard half of that is stopped at the
+ * event (`input/controller.ts`); this is the half that never touched an
+ * event at all.
+ */
+export const MENU_ACTIONS: readonly Action[] = [
+  'menuUp',
+  'menuDown',
+  'menuLeft',
+  'menuRight',
+  'menuSelect',
+  'menuBack'
+]
+
+/**
  * The keys that DRIVE — the axes, as opposed to the verbs.
  *
  * They are dropped whenever the control set changes, so a new set always starts

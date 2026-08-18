@@ -154,10 +154,29 @@ export interface BattleSceneParts {
   /** The battle's own bus, already carrying whatever else listens. */
   bus: BattleBus
   sound: SceneSound
+  /**
+   * Whether the battle is the view yet. The scene is BUILT before it is
+   * shown — that is exactly what the briefing's loading bar waits on — so
+   * without this the world starts stepping under the loading screen and the
+   * drop-in, five seconds of descent, is over before the player presses a
+   * key. Play saw the mission open with the squad already down.
+   */
+  running: () => boolean
 }
 
 export function buildBattle(parts: BattleSceneParts): BattleScene {
-  const { host, assets, query, game, onGameChanged, map, onCollected, bus, sound: sounds } = parts
+  const {
+    host,
+    assets,
+    query,
+    game,
+    onGameChanged,
+    map,
+    onCollected,
+    bus,
+    sound: sounds,
+    running
+  } = parts
   const root = new THREE.Group()
   root.rotation.x = Math.PI
 
@@ -640,6 +659,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   let lastFrame = 0
 
   const onFrame = (delta: number): void => {
+    // The mission's clock does not start until the mission is on screen.
+    if (!running()) return
     time += delta
     lastFrame = delta
     // **THE LINE COMES BEFORE THE SHOT**, so the rules are told whether the pig

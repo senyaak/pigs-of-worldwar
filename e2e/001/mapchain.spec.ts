@@ -24,6 +24,14 @@ const briefingReady = (page: Page): Promise<boolean> =>
     return pow?.briefing ? pow.briefing.ready() : false
   })
 
+/** Whether the squad screen is still driving in — nothing takes a key while
+ * a screen travels, so every walk through it waits here first. */
+const flipping = (page: Page): Promise<boolean> =>
+  page.evaluate(() => {
+    const pow = (window as unknown as { pow?: { playerScreen?: { flipping(): boolean } } }).pow
+    return pow?.playerScreen ? pow.playerScreen.flipping() : true
+  })
+
 /** How many distinct colours a canvas is carrying — the same reading the
  * other frontend specs use to tell a drawn screen from a black one. */
 const painted = (page: Page, canvasId: string): Promise<number> =>
@@ -55,15 +63,7 @@ test('declining the tutorial launches through the map: world, zoom, region, brie
   // START at position 0 asks the original's question; NO steps past the
   // training ground and launches position 1 — through the MAP.
   await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          const pow = (window as unknown as { pow?: { playerScreen?: { flipping(): boolean } } })
-            .pow
-          return pow?.playerScreen ? pow.playerScreen.flipping() : true
-        }),
-      { message: 'the player screen is still driving in' }
-    )
+    .poll(() => flipping(page), { message: 'the player screen is still driving in' })
     .toBe(false)
   await tap(page, 'menuSelect')
   await expect(page.locator('#ask')).toBeVisible()
@@ -99,6 +99,66 @@ test('declining the tutorial launches through the map: world, zoom, region, brie
   await expect(page.locator('#battle')).toBeVisible()
 
   // Walking out is an abort: back to the squad, nothing settled.
+  await page.locator('#battle-leave').click()
+  await expect(page.locator('#player')).toBeVisible()
+
+  expect(app.errors()).toEqual([])
+})
+
+test('the key that leaves the briefing does not cut the squad loose', async ({ app }) => {
+  const { page } = app
+
+  // THIS SPEC PRESSES A REAL KEY, and it is the one place in the suite that
+  // may. The rule is `controller.tap` (docs/testing.md) because a spec must
+  // not test a parallel path — but here the keyboard IS the subject. Play
+  // found it: "сломался парашют - начал миссию с падения". One Space was
+  // reaching two views. The briefing's `menuSelect` showed the battle inside
+  // the same dispatch, and the battle then read the SAME event through its
+  // own map, where Space is `jump` — which during the drop-in cuts every
+  // canopy at once.
+  await choose(page, 'ONE PLAYER')
+  await expect(page.locator('#oneplayer')).toBeVisible()
+  await choose(page, 'NEW GAME', 'onePlayer')
+  await expect(page.locator('#team')).toBeVisible()
+  await choose(page, FIRST_ARMY, 'teamScreen')
+  await expect(page.locator('#name')).toBeVisible()
+  await nameTeam(page, TEST_TEAM)
+  await expect(page.locator('#player')).toBeVisible()
+  await expect
+    .poll(() => flipping(page), { message: 'the player screen is still driving in' })
+    .toBe(false)
+  await tap(page, 'menuSelect')
+  await expect(page.locator('#ask')).toBeVisible()
+
+  // YES — the training ground, which skips the map and briefs straight away,
+  // and whose one pig comes down under a canopy of its own (CAMP flags its
+  // single marker, `parachute/notes.md`).
+  await choose(page, 'YES', 'askTraining')
+  await expect(page.locator('#briefing')).toBeVisible()
+  await expect.poll(() => briefingReady(page), { message: 'the level is still loading' }).toBe(true)
+
+  await page.keyboard.press('Space')
+  await expect(page.locator('#battle')).toBeVisible()
+
+  // …and the squad is still under silk. The drop is five seconds, so it is
+  // running when the mission opens and every pig in it still has a canopy.
+  const drop = await page.evaluate(() => {
+    const pow = (
+      window as unknown as {
+        pow?: {
+          debug?: {
+            dropIn(): { running: boolean; pigs: { canopy: boolean; landed: boolean }[] }
+          }
+        }
+      }
+    ).pow
+    if (!pow?.debug) throw new Error('pow.debug is missing')
+    return pow.debug.dropIn()
+  })
+  expect(drop.running, 'the drop was over before the mission was even shown').toBe(true)
+  expect(drop.pigs.length).toBeGreaterThan(0)
+  expect(drop.pigs.filter((pig) => !pig.canopy && !pig.landed)).toEqual([])
+
   await page.locator('#battle-leave').click()
   await expect(page.locator('#player')).toBeVisible()
 
@@ -154,15 +214,7 @@ test('back on the map skips the whole chain to the briefing', async ({ app }) =>
   await nameTeam(page, TEST_TEAM)
   await expect(page.locator('#player')).toBeVisible()
   await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          const pow = (window as unknown as { pow?: { playerScreen?: { flipping(): boolean } } })
-            .pow
-          return pow?.playerScreen ? pow.playerScreen.flipping() : true
-        }),
-      { message: 'the player screen is still driving in' }
-    )
+    .poll(() => flipping(page), { message: 'the player screen is still driving in' })
     .toBe(false)
   await tap(page, 'menuSelect')
   await expect(page.locator('#ask')).toBeVisible()
