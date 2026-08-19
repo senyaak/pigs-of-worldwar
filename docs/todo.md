@@ -513,8 +513,10 @@ What is actually missing, in the order it is worth doing:
    the order they fell, which `main.ts` stamps on with `fall` before the
    debrief reads anything. `discardMission` stands the squad back up, so
    RETRY and EDIT SQUAD find it as the mission did; CONTINUE settles it as
-   before. What is deliberately NOT carried yet: `missions`/`score` stay at
-   zero (docs/history/status.md, "THE SAVE'S SQUAD TAKES THE FIELD").
+   before. And since later the same day the board's two counts COUNT:
+   `killed` carries the attacker, the battle tallies side 0's kills, and a
+   win puts missions+1 and the kills on every fielded pig's record
+   (`credit`, docs/history/status.md "THE BOARD'S TWO COUNTS COUNT").
 
 4. ~~**A turn is 45 seconds on every map but CAMP.**~~ **DONE 2026-08-19.**
    The exe's turn table is indexed by the CAMPAIGN POSITION — `[0x51f17b]`

@@ -1201,3 +1201,41 @@ the marks at all.
 Still open on this link: a pig's `missions` and `score` counters stay at
 zero — nothing increments them yet — and the enemy side still fields
 `fetext` names, which is the original's own behaviour.
+
+## THE BOARD'S TWO COUNTS COUNT — 2026-08-19
+
+The squad screen's board had printed a pig's battles and kills since the day
+it was read off the shipped screen — icons `battle` and `kills`, then
+`pig.missions` and `pig.score` — and both numbers were zeros forever. The
+disasm settled what they are before anything was built: `pig+0x0A`, the
+field the save calls `score`, is a running SUM OF KILLS — the battle counts
+them per pig (`+0x1D0`, written by the kill handler's other-side branch,
+0x467E11), the writeback puts the mission's count in `pig+0x18`, and
+`Team::EndOfMission` adds it in (0x450996) beside `pig+0x08`++ (0x450993).
+No points for kills — the mission award stays the only legit adder to
+`team+0x50` — and NO DEATHS COUNTER anywhere: a death is the roster's own
+`fell` and the slot leaving, which the campaign link already carries.
+
+So the remake does the same, in three short steps:
+
+- **The kill knows its attacker.** `killed` on the bus carries `by` — the
+  weapon's owner. A `Shot` and a `Lobbed` carry `owner` now, set beside
+  their `id` by `fire`/`throwOne`/`plant`; `burst` takes the owner as a
+  parameter and threads it onto every kill it causes; the blade's swing had
+  its attacker in scope all along. Water, the nowhere-to-swim drown and a
+  MINE pass nothing — the mine is the map's weapon, nobody's.
+- **The battle view tallies side 0** off the same `killed` events it was
+  already reading for the fall marks: an enemy brought down goes on the
+  killer's roster slot, a same-side kill deliberately does not (the exe
+  splits exactly there, and its friendly tally has no reader). The tally
+  leaves with the verdict.
+- **A win puts it on the record.** `credit` in `lib/game/roster.ts` is
+  `EndOfMission`'s two adders — every FIELDED slot gets missions+1 and its
+  kills onto `score`, copying, before `regroup` — and `missionWonResult`
+  runs it on the way into `finishMission`, so nothing lands until CONTINUE
+  and a replay counts nothing twice. `unit/kills.spec.ts` pins the
+  attribution at the burst and the bookkeeping at the record.
+
+The one divergence worth naming: kills the ENEMY takes are counted nowhere,
+because the enemy has no roster — same as the original, whose writeback only
+runs over the player's team.

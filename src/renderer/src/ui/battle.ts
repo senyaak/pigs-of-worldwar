@@ -161,8 +161,12 @@ export interface BattleView {
  * `fallen` on the way out is the roster SLOTS of side 0's dead, in the order
  * they went down — what `fall` marks the save's squad with (lib/game/roster.ts).
  * Empty on an abort, on a skirmish, and on a mission nobody died in.
+ * `kills` is side 0's kill tally by roster slot — what `credit` adds to the
+ * lifetime scores when a win is taken.
  */
-export function initBattle(onLeave: (exit: BattleExit, fallen: number[]) => void): BattleView {
+export function initBattle(
+  onLeave: (exit: BattleExit, fallen: number[], kills: number[]) => void
+): BattleView {
   const canvasHost = byId<HTMLDivElement>('battle-canvas')
   const hudCanvas = byId<HTMLCanvasElement>('battle-hud')
   const hud = createHud(hudCanvas)
@@ -580,6 +584,12 @@ export function initBattle(onLeave: (exit: BattleExit, fallen: number[]) => void
    * campaign's fall marks are exactly this list (lib/game/roster.ts). */
   let fallen: number[] = []
 
+  /** Side 0's KILLS, by roster slot — every enemy a pig's weapon brought down,
+   * off the same `killed` events' `by`. Same-side kills are deliberately not
+   * counted, the exe's own split (its friendly tally has no reader), and a
+   * death with no attacker — water, a mine — is nobody's. */
+  let kills: number[] = []
+
   /** Put the battle away: the LEAVE button, and the end of a mission. */
   const leave = (): void => {
     controller.releaseAll()
@@ -591,7 +601,7 @@ export function initBattle(onLeave: (exit: BattleExit, fallen: number[]) => void
     painted = 0
     speech.stop()
     hud.clear()
-    onLeave(verdict ?? 'aborted', fallen)
+    onLeave(verdict ?? 'aborted', fallen, kills)
   }
 
   byId<HTMLButtonElement>('battle-leave').addEventListener('click', leave)
@@ -633,6 +643,7 @@ export function initBattle(onLeave: (exit: BattleExit, fallen: number[]) => void
     step = 0
     verdict = null
     fallen = []
+    kills = []
     // A fresh level is the tutorial's first rung again, whoever asked for it —
     // the menu, `pow.swapMap`, or a step BACK, which sets its own want on the
     // far side of this.
@@ -752,10 +763,15 @@ export function initBattle(onLeave: (exit: BattleExit, fallen: number[]) => void
         // **A pig of OURS went down.** Its squad index is its slot in the
         // save's roster — side 0 fields `squad.slice(0, fieldedAt(position))`
         // in roster order — and the ORDER of this list is what `fell` encodes
-        // (lib/game/roster.ts).
-        killed: ({ pig }) => {
+        // (lib/game/roster.ts). **And a pig of ours may have done it**: `by`
+        // is the weapon's owner, and an enemy it brought down goes on that
+        // slot's kill tally — the count the squad screen's board prints.
+        killed: ({ pig, by }) => {
           const one = game?.players[0]?.pigs.find((p) => p.id === pig)
           if (one && !fallen.includes(one.index)) fallen.push(one.index)
+          if (by === undefined || one) return
+          const killer = game?.players[0]?.pigs.find((p) => p.id === by)
+          if (killer) kills[killer.index] = (kills[killer.index] ?? 0) + 1
         },
         placed: ({ skill, amount }) => {
           step = 0

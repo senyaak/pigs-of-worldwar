@@ -27,7 +27,8 @@ import {
 } from '../../lib/game/save'
 import { drawEnemies } from '../../lib/game/enemies'
 import { bootCampEnemy } from '../../lib/game/nations'
-import { standingCount, SQUAD_SIZE, type Pig } from '../../lib/game/roster'
+import { credit, standingCount, SQUAD_SIZE, type Pig } from '../../lib/game/roster'
+import { fieldedAt } from '../../lib/game/missions'
 
 /** The eight slot names, the original's own. */
 export const SLOTS = Array.from({ length: 8 }, (_, i) => `savearmy${i}`)
@@ -104,14 +105,17 @@ export function adopt(from: { slot: string; save: SaveGame }): SaveGame {
  *
  * The squad handed in is the roster as the battle left it: `main.ts` has
  * already stamped the battle's dead onto it with `fall`, in the order they
- * went down, so the losses counted here are the mission's own.
+ * went down, so the losses counted here are the mission's own. `kills` is the
+ * battle's tally by slot, and `credit` puts it on the record — the mission
+ * played and the kills taken, for every pig that was fielded — before the
+ * roster regroups, the original's own order (`Team::EndOfMission`).
  */
-export function missionWonResult(): SaveGame | null {
+export function missionWonResult(kills: readonly number[] = []): SaveGame | null {
   if (!save) return null
   const losses = SQUAD_SIZE - standingCount(save.squad)
   const won = finishMission(
     save,
-    save.squad,
+    credit(save.squad, fieldedAt(save.position), kills),
     save.enemies[save.position] ?? bootCampEnemy(save.nation),
     save.tokens + missionReward(save.position, losses),
     new Date().toISOString()

@@ -59,9 +59,11 @@ export interface Pig {
   identity: number
   /** The class, an index into `gtext` 63 (Grunt) onward. A draft is a Grunt. */
   rank: number
-  /** Missions this pig has played (`pig+0x08`). */
+  /** Missions this pig has played (`pig+0x08`, `++` at 0x450993). */
   missions: number
-  /** What it has been worth across them (`pig+0x0A`). */
+  /** Its KILLS across them — `pig+0x0A` is a running sum of each mission's
+   * kill count (`Team::EndOfMission` adds the battle's tally, 0x450996), and
+   * the squad screen's board prints it beside the `kills` icon. */
   score: number
   /** How many had already fallen when this one did, or -1 while it stands —
    *  the original's `pig+0x2C`. */
@@ -100,6 +102,26 @@ export function newSquad(names: string[], identities: number[]): Pig[] {
     score: 0,
     fell: -1
   }))
+}
+
+/**
+ * A mission PLAYED, on the record: every fielded pig gets the mission counted
+ * and its kills added to the lifetime score — the original's
+ * `Team::EndOfMission`, which walks exactly the fielded slots (0x4509B2),
+ * `pig+0x08`++ (0x450993) and `pig+0x0A += pig+0x18` (0x450996). Copying,
+ * like `regroup`: the squad handed in is not written to.
+ *
+ * `kills` is the battle's tally by SLOT — what the bus's `killed` events say
+ * a pig brought down (lib/game/events.ts) — and a slot it names nothing for
+ * scored nothing. Runs before `regroup`, the original's own order, so a pig
+ * that fell and comes back keeps the kills it took with it.
+ */
+export function credit(squad: Pig[], fielded: number, kills: readonly number[]): Pig[] {
+  return squad.map((pig, slot) =>
+    slot < fielded
+      ? { ...pig, missions: pig.missions + 1, score: pig.score + (kills[slot] ?? 0) }
+      : pig
+  )
 }
 
 /** The lowest identity nobody in the squad is using. */
