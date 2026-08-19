@@ -30,11 +30,20 @@ import {
   barCells
 } from '../../../lib/game/pauseMenu'
 import type { PauseState } from '../../../lib/game/pauseMenu'
-import { loadFont } from './font'
+import { FRONTEND_METRICS, loadFont } from './font'
 import type { Font } from './font'
 import type { SpriteSet } from './sprites'
 
-/** The battle's small letters — the object the exe prints this menu with. */
+/**
+ * The battle's small letters — `FETEXT\small`, the object the exe prints this
+ * menu with (built at 0x480D10 into `[0x51BA54]`, which `get_gtext` indexes).
+ *
+ * **With the game's own TRACKING**, which is not optional and is not the
+ * frontend's: the exe's text object adds 3 after every glyph and 8 for a
+ * space, its constructor sets that on every one it builds (0x430C28), and
+ * without it the letters here came out jammed edge to edge. Play's word for
+ * the result was "шрифт гавно", and they were right.
+ */
 const MENU_FONT = 'SMALL'
 /** The frame's eight tiles, in the order the art itself puts them in. */
 const FRAME = ['pause1', 'pause2', 'pause3', 'pause4', 'pause5', 'pause6', 'pause7', 'pause8']
@@ -133,7 +142,10 @@ export function createPauseMenu(): PauseMenu {
         const painted = await Promise.all(
           (Object.keys(INK) as Ink[]).map(async (ink) => [
             ink,
-            await loadFont(MENU_FONT, { colour: [...INK[ink]] as [number, number, number] })
+            await loadFont(MENU_FONT, {
+              colour: [...INK[ink]] as [number, number, number],
+              metrics: FRONTEND_METRICS
+            })
           ])
         )
         for (const [ink, font] of painted as [Ink, Font][]) fonts.set(ink, font)

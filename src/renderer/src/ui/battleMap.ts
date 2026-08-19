@@ -25,14 +25,11 @@ import {
   BLIP_COLOURS,
   BLIP_OBJECTS,
   BLIP_WHITE,
-  SCANNER_EASE_PER_SECOND,
   SCANNER_REACH,
   SCANNER_SCALE,
-  SCANNER_SCALE_SMALL,
   SCANNER_SLIDE,
   SCANNER_SLIDE_FROM,
-  projectScanner,
-  scannerShrink
+  projectScanner
 } from '../../../lib/game/scanner'
 import type { Blip, BlipIcon, Eye } from '../../../lib/game/scanner'
 import type { MapRaster } from '../../../lib/game/mapRaster'
@@ -63,15 +60,6 @@ export interface BattleMapState {
   delta: number
   eye: Eye | null
   blips: readonly Blip[]
-  /**
-   * Whether the board is drawn SMALL.
-   *
-   * Two things ask for it and both are the library's own
-   * `afSetScannerSizeSmall(1)`: a shot charging, and the MAP VIEW camera —
-   * which the PAUSE enters (0x49FBF0 on the way in, 0x49F867 on the way out,
-   * `lib/game/mapView.ts`). One size, two callers.
-   */
-  small: boolean
 }
 
 export interface BattleMap {
@@ -94,8 +82,8 @@ export function createBattleMap(): BattleMap {
   let loaded = false
   /** How far into the entrance, 0..SLIDE_FRAMES — the exe's own counter. */
   let entered = 0
-  /** The live scale, easing toward the wanted one as the library's does. */
-  let scale = SCANNER_SCALE
+  /** The board's half-size on screen. One value: it never changes (play). */
+  const scale = SCANNER_SCALE
 
   return {
     async load() {
@@ -139,7 +127,6 @@ export function createBattleMap(): BattleMap {
 
     reset() {
       entered = 0
-      scale = SCANNER_SCALE
     },
 
     draw(context, viewWidth, viewHeight, state) {
@@ -150,13 +137,10 @@ export function createBattleMap(): BattleMap {
       const progress = SCANNER_SLIDE[Math.min(SLIDE_FRAMES - 1, Math.floor(entered))] / 100
       const slide = SCANNER_SLIDE_FROM * (1 - progress)
 
-      const wanted = state.small ? SCANNER_SCALE_SMALL : SCANNER_SCALE
-      const step = SCANNER_EASE_PER_SECOND * state.delta
-      scale = wanted > scale ? Math.min(wanted, scale + step) : Math.max(wanted, scale - step)
-
-      // 110 in from the left and 75 up from the bottom, and the shrink pulls
-      // it further left so the board's left edge stays put.
-      const cx = 110 + scannerShrink(scale)
+      // **ONE SIZE, ALWAYS.** The library shrinks it for a charging shot and
+      // for the map view, and play ruled that out on sight — "у неё всегда 1
+      // размер" (lib/game/scanner.ts carries both numbers and the ruling).
+      const cx = 110
       const cy = viewHeight - 75 + slide
       const yaw = state.eye.heading
 

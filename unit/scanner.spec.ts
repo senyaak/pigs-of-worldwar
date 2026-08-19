@@ -148,11 +148,14 @@ test('the board is TILTED, not flat, and the camera faces UP it', { tag: '@nodat
   expect(far.y).toBeLessThan(near.y)
 })
 
-test('it sits bottom left, and shrinking pulls it left rather than resizing in place', { tag: '@nodata' }, () => {
+test('it sits bottom left, and it is ONE size', { tag: '@nodata' }, () => {
   expect(SCANNER_CENTRE.left).toBe(110)
   expect(SCANNER_CENTRE.fromBottom).toBe(75)
-  // Nothing moves at the resting scale; the small one pulls it 15 left, which
-  // is what keeps the board's LEFT edge where it was.
+  // The library has a small size and two callers for it — a charging shot and
+  // the map view — and play ruled it out on sight: "у неё всегда 1 размер".
+  // The numbers stay READ, and stay unapplied; what pins that is the drawer
+  // holding `scale` as a `const` (ui/battleMap.ts), so this asserts only that
+  // the library's own compensation is what it was measured to be.
   expect(scannerShrink(SCANNER_SCALE)).toBeCloseTo(0, 6)
   expect(scannerShrink(SCANNER_SCALE_SMALL)).toBeCloseTo(-15, 1)
 })

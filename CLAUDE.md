@@ -143,10 +143,12 @@ reasoning, the false starts and the sessions behind them are in
   frames when a battle starts and stays: its enable bit has exactly two writers
   in `.text`, a zero in the constructor and a one in the HUD setup, so the
   slide-out is dead code. It sits **110 in from the left and 75 up from the
-  bottom** and shrinks while a shot charges — and while the MAP VIEW camera is
-  up, which the PAUSE enters. One small size, two callers of the library's own
-  `afSetScannerSizeSmall`. `lib/game/scanner.ts`, `lib/game/mapView.ts`,
-  `scanner/notes.md`. `[exe]`
+  bottom**. The library RESIZES it — smaller while a shot charges and while
+  the MAP VIEW camera is up, two callers of `afSetScannerSizeSmall` — and
+  **`[play]` overrides that: it is always one size.** "Миникарта не должна
+  отдаляться вообще." Both numbers stay read and unapplied in
+  `lib/game/scanner.ts`. `lib/game/mapView.ts`, `scanner/notes.md`. `[exe]`
+  for the widget, `[play]` for the size.
 - **The map is TILTED, it does NOT follow the camera, and nothing about it is
   masked.** The board is a square of the WHOLE level seen through a camera
   28.125° above the ground (the library's Euler angles are `(0, 3776, yaw)`

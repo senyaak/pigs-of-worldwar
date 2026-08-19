@@ -124,7 +124,7 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
     .toBeGreaterThan(20)
 
   // The corners the original uses: the clock bottom right, the dial and its
-  // weapon slot top right, and nothing bottom left, where the map will go.
+  // weapon slot top right, and the MAP bottom left.
   const corners = await page.evaluate(() => {
     const canvas = document.getElementById('battle-hud') as HTMLCanvasElement
     const context = canvas.getContext('2d')!
@@ -144,9 +144,13 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
   })
   expect(corners.bottomRight, 'the clock').toBeGreaterThan(1000)
   expect(corners.topRight, 'the angle dial and the weapon slot').toBeGreaterThan(1000)
-  expect(corners.bottomLeft, 'the map is not built yet').toBe(0)
+  // This used to read `toBe(0)` with "the map is not built yet" on it, and it
+  // outlived the map by a session — the widget landed and nothing ran this
+  // file. A count rather than a picture: the board is a solid quad, so a
+  // thousand opaque pixels is a floor no blank corner reaches.
+  expect(corners.bottomLeft, 'the map').toBeGreaterThan(1000)
   // An overlay, not a curtain: the battle keeps almost all of the view.
-  expect(corners.bottomRight + corners.topRight).toBeLessThan(corners.area / 4)
+  expect(corners.bottomRight + corners.topRight + corners.bottomLeft).toBeLessThan(corners.area / 3)
 
   // What it says is what the game says, and the clock runs down.
   const before = await hud(page)

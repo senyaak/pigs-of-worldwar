@@ -33,16 +33,25 @@ import type { Player } from './game'
 /** Resting size — `afSetScannerSizeSmall(0)`, `[0x1002C680]` (0x1000FFA0). */
 export const SCANNER_SCALE = 0.151072
 /**
- * …and while a shot is CHARGING, which is the one thing that resizes it: the
- * skill's own record `+0x14` turns on the power gauge and calls
- * `afSetScannerSizeSmall(1)` in the same breath (0x493CBD/0x493CC9), so the
- * map shrinks to leave the gauge room and grows back on release (0x493D74).
+ * …and the SMALL size, which is **read and deliberately NOT APPLIED**.
+ *
+ * Two things in the exe ask for `afSetScannerSizeSmall(1)`: a shot charging
+ * (the skill's record `+0x14` turns on the power gauge and shrinks the map in
+ * the same breath, 0x493CBD/0x493CC9, grown back at 0x493D74) and the MAP VIEW
+ * camera, which the pause enters (`lib/game/mapView.ts`).
+ *
+ * `[play]`, 2026-08-19, on seeing it move: **"миникарта не должна отдаляться
+ * вообще — у неё всегда 1 размер."** That overrides the reading, which is the
+ * standing rule for how this remake settles a look. The number stays here
+ * because it IS the library's and because a note that says only "we do not do
+ * this" invites somebody to put it back without knowing it was a decision.
  */
 export const SCANNER_SCALE_SMALL = 0.12106
 /**
- * How fast it gets there: the library eases its live scale toward the wanted
- * one by this much A FRAME (0x10020110/0x10020118), against the engine's own
- * 60 Hz step — so the resize takes about half a second.
+ * How fast it WOULD get there: the library eases its live scale toward the
+ * wanted one by this much a frame (0x10020110/0x10020118) against the engine's
+ * 60 Hz step, so the resize takes about half a second. Unused while the size
+ * is fixed — see `SCANNER_SCALE_SMALL`.
  */
 export const SCANNER_EASE_PER_SECOND = 0.0015 * 60
 
@@ -85,6 +94,9 @@ export const SCANNER_SLIDE_FROM = 200
 export const SCANNER_CENTRE = { left: 110, fromBottom: 75 }
 
 /**
+ * How far the widget WOULD slide left as it shrinks — unused with the size
+ * fixed, and zero at the resting scale in any case.
+ *
  * How far the widget slides LEFT as it shrinks — `(0.151072 - scale) * -500`
  * (dll 0x10009A9E..0x10009B43), which is 15 pixels at the small scale.
  *

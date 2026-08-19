@@ -79,6 +79,18 @@ const PAUSED_KEYS: readonly [Action, PauseVerb][] = [
   ['fire', 'select']
 ]
 
+/**
+ * …and SPACE chooses as well, which is the remake's own.
+ *
+ * The exe's SELECT is one button — bit 0x20, the one that fires — and this
+ * remake split firing off onto F because SPACE already jumps (input/actions.ts).
+ * That is fine in a battle and wrong in a menu: a player looking at CONTINUE
+ * presses the key every other screen in the game chooses with, and nothing
+ * happened. Play found it in one sitting. Jumping means nothing while the
+ * world is stopped, so the key is free.
+ */
+const PAUSED_ALSO_SELECTS: readonly Action[] = ['jump']
+
 export function createBattleInput(host: BattleInputHost): BattleInput {
   /**
    * One-shot presses waiting for the next poll, IN ORDER.
@@ -316,12 +328,16 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
       //
       // Everything is read on the EDGE. `tookPress` consumes the latch a held
       // key sets, so holding W walks the cursor one row and no more.
-      for (const action of pending.splice(0, pending.length)) {
+      const held = pending.splice(0, pending.length)
+      for (const action of held) {
         if (action === 'pause') host.pauseVerb('back')
       }
       for (const [action, verb] of PAUSED_KEYS) {
         if (controller.tookPress(action)) host.pauseVerb(verb)
       }
+      // SPACE arrives as a queued one-shot rather than a latch, so it is read
+      // out of the same list the pause key came from.
+      if (held.some((action) => PAUSED_ALSO_SELECTS.includes(action))) host.pauseVerb('select')
       pressed = new Set()
       stepped = { x: 0, y: 0 }
       return
