@@ -1,12 +1,14 @@
 // PHASE 002 (app) — the level's opening drop.
 //
 // A map's spawn markers say which pigs arrive by parachute (flags bit 6,
-// lib/formats/pog.ts): on a campaign map it is the player's side of five and
-// the enemy is already standing there, and on the training ground it is the
-// one trainee. Those pigs start 3072–3583 exe units above their own marker
-// and come down under a canopy while everything else — the turn clock, the
-// controls — waits, which is what the original does (0x46ed23 advances the
-// clip and returns).
+// lib/formats/pog.ts): on a campaign map it is the player's side of five —
+// the exe stands the enemy on the ground — and on the training ground it is
+// the one trainee. The REMAKE then drops everyone together the moment any
+// fielded marker carries the bit (`[play]`, lib/game/muster.ts); the first
+// test below pins the DATA, which stays read as the exe reads it. Arriving
+// pigs start 3072–3583 exe units above their own marker and come down under
+// a canopy while everything else — the turn clock, the controls — waits,
+// which is what the original does (0x46ed23 advances the clip and returns).
 //
 // The physics is pinned in the pure part below; the app part is the wiring:
 // the pig really is in the air, it really is wearing a canopy, and the

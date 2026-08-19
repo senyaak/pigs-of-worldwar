@@ -77,6 +77,13 @@ export interface Soldier {
    * `y` is the FEET. Moves the mesh and nothing else.
    */
   place(x: number, y: number, z: number, heading: number): void
+  /**
+   * Repaint the FACE: the eyes and the mouth are texture groups of the pig's
+   * own archive (`eyes000`, `gobs000` — the resting face every class's head
+   * bakes in), so an expression is a texture handed in over them. Null on
+   * either puts the pig's own back (three/faces.ts).
+   */
+  wearFace(eyes: THREE.Texture | null, gob: THREE.Texture | null): void
 }
 
 export interface Squad {
@@ -177,6 +184,17 @@ export function fieldSquad(
      * offset is added to this rather than replacing it (pig.HIR gives the pig's
      * own root (0,0,0), but nothing here should depend on that). */
     const bind0 = mesh.bones[0]?.position.clone() ?? new THREE.Vector3()
+    /** The materials painting this pig's eyes and mouth, each with the map it
+     * was built with — what `wearFace` swaps and puts back. Found by the
+     * texture the draw group references, because the materials come out of
+     * `buildTextureMaterials` one per group in group order. */
+    const faceSlots = art.model.groups.flatMap((group, index) => {
+      const name = (art.textures[group.texture]?.name ?? '').toLowerCase()
+      const part = name.startsWith('eyes') ? 'eyes' : name.startsWith('gobs') ? 'gob' : null
+      const material = Array.isArray(mesh.mesh.material) ? mesh.mesh.material[index] : null
+      if (!part || !(material instanceof THREE.MeshStandardMaterial)) return []
+      return [{ part, material, own: material.map }]
+    })
 
     const soldier: Soldier = {
       pig,
@@ -206,6 +224,14 @@ export function fieldSquad(
         // battle about it.
         node.position.set(x, y - mesh.footOffset, z)
         node.rotation.y = heading + PIG_HEADING_OFFSET
+      },
+      wearFace(eyes, gob) {
+        for (const slot of faceSlots) {
+          const wanted = (slot.part === 'eyes' ? eyes : gob) ?? slot.own
+          if (slot.material.map === wanted) continue
+          slot.material.map = wanted
+          slot.material.needsUpdate = true
+        }
       }
     }
     soldier.place(pig.position.x, restingY(query, pig.position.x, pig.position.z), pig.position.z, pig.heading)

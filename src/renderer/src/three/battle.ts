@@ -9,7 +9,7 @@
 // `lib/game`; this scene feeds them intents and draws what they say.
 
 import * as THREE from 'three'
-import type { Bone, Clip, MapObject, MapProp, Model, Sky, TerrainBlock, TerrainTexture, Texture } from '../api'
+import type { Bone, Clip, MapObject, MapProp, Model, Sky, TerrainBlock, TerrainTexture, Texture, TimImage } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
 import { createEngine } from '../../../lib/game/engine'
 import type { TerrainQuery } from '../../../lib/game/terrain'
@@ -27,6 +27,7 @@ import type { Soldier, SoldierArt } from './squad'
 import { SCOPE_BONE, SCOPE_MAGNIFY, SCOPE_MOUNT, createChase } from './chase'
 import type { View } from './chase'
 import { createDropInArt } from './dropIn'
+import { createFaces } from './faces'
 import { buildMarker } from './marker'
 import { createHeldWeapons } from './heldWeapon'
 import type { Battle } from '../../../lib/game/battle'
@@ -93,6 +94,9 @@ export interface BattleAssets {
    * under. Null is fine: a map whose squad parachutes simply stands instead
    * of dropping under nothing (three/dropIn.ts). */
   canopy: { model: Model; textures: Texture[] } | null
+  /** `Chars/FACES.MTD` — the alternate eyes and mouths a pig's face swaps to
+   * (three/faces.ts). Empty is fine: every pig keeps its resting face. */
+  faces: TimImage[]
   /** The dome the map stands under, already skinned with its own mood
    * (lib/game/sky.ts). Null is fine: the battle falls back on the flat clear
    * colour it had before there was a sky at all. */
@@ -287,6 +291,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
   const dropInArt = createDropInArt(squad, assets.canopy)
+  /** …and the face a pig wears on the way down (three/faces.ts). */
+  const faces = createFaces(squad, assets.faces)
   /** The canopy art a descent wears, and the record it lifts (three/airDrop). */
   const airDropArt = createAirDropArt(props, assets.canopy)
   const marker = buildMarker(root)
@@ -315,8 +321,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     handling({
       shown: ({ id, visible }) => props.show(id, visible),
       taken: ({ id }) => props.take(id),
-      dropOpened: ({ pig }) => dropInArt.open(pig),
+      dropOpened: ({ pig }) => {
+        dropInArt.open(pig)
+        faces.scare(pig)
+      },
+      // The canopy goes on a CUT and on the ground alike; the face only calms
+      // on landing — a pig falling free has even more to be scared of.
       dropCut: ({ pig }) => dropInArt.cut(pig),
+      dropLanded: ({ pig }) => faces.calm(pig),
       crateSent: ({ id }) => airDropArt.open(id),
       crateLanded: ({ id }) => airDropArt.land(id),
       canopiesCut: () => airDropArt.cutAll(),
@@ -1020,6 +1032,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       terrain.dispose()
       props.dispose()
       dropInArt.dispose()
+      faces.dispose()
       marker.dispose()
       effectArt.dispose()
       bulletArt.dispose()

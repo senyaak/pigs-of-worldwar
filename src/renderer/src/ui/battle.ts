@@ -710,6 +710,12 @@ export function initBattle(
       ? { model: canopyResult.model, textures: canopyResult.textures }
       : null
 
+    // …and the faces a pig's head swaps to on the way down (three/faces.ts).
+    // Failing it costs only the expression: everyone keeps the resting face.
+    const facesResult = await window.api.loadTims('Chars/FACES.MTD')
+    if (!facesResult.ok) console.log(`${name} without face art: ${facesResult.error}`)
+    const faces = facesResult.ok ? facesResult.images : []
+
     // …and the sky the map stands under, which the exe picks by MAP out of its
     // mission records (lib/game/sky.ts). Failing it costs the dome and nothing
     // else, so it is reported and stepped over like the props.
@@ -846,6 +852,7 @@ export function initBattle(
         propTextures: objectsResult.ok ? objectsResult.textures : [],
         strings: battleText,
         canopy,
+        faces,
         sky: skyResult.ok ? skyResult.sky : null,
         weather
       },

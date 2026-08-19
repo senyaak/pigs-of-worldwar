@@ -203,3 +203,35 @@ the string does not appear in the executable at all. A note here used to call it
 "the battle's".
 
 `pow.debug.squads()` reports `nation`, `skin` and, per pig, `hat`.
+
+## Everyone drops in, nobody T-poses, and the drop face (2026-08-20)
+
+Play on mission one: "все свины падают на парашютах — у нас враг в т-позе
+стоит". Two separate faults under one report, and a face on top.
+
+**The T-pose.** A pig whose worn clip is `null` is drawn in the HIR bind
+pose, and nothing ever dressed the enemy: `clip` events are the only way into
+`anim`, campaign maps flag only the player's side for the drop, and both the
+drop-in phase and the start-of-turn beat return before the idle pass can
+reach the standing squad. The engine now sets IDLE on every pig at
+construction — the drop-in re-dresses its arrivals a moment later — so a pig
+with nothing to do stands about instead of spreading its arms.
+
+**Who drops.** The marker bit is real and stays read as the exe reads it
+(one side of a campaign map — the exe stands the enemy on the ground), but
+play rules everyone arrives out of the sky, so `mapSquads` now puts the whole
+battle under canopies the moment any fielded marker carries the bit. A map
+that flags nobody still stands everyone. `[play]`, noted in the muster and in
+`e2e/002/parachute.spec.ts`, whose data test still pins the bit itself.
+
+**The face.** The camera looks an arriving pig in the face the whole way
+down, and what it saw was the resting face the head bakes in — `eyes000`
+relaxed, `gobs000` with its tongue out. "Помойму не то выражение лица."
+`Chars/FACES.MTD` holds seven alternate eyes and seven mouths at the same
+sizes (the exe loads it unconditionally at 0x486030; the swap mechanism is
+not decoded), and the textures themselves sort into expressions on sight:
+002 closed lids, 004 a wide-eyed stare, 005 anger, and on the mouths 001 a
+grin, 004 an open scream. `three/faces.ts` uploads the 004 pair and
+`Soldier.wearFace` repaints the two face-group materials — scared from
+`dropOpened` (a cut canopy keeps it), the pig's own back on `dropLanded`.
+`[CHECK — remake]` on the choice of pair; correcting it is one name.

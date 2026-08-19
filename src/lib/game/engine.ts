@@ -236,6 +236,12 @@ export function createEngine(parts: EngineParts): Engine {
   /** What each pig is playing, how far into it, and whether a committed clip
    * has run out. */
   const anim = createAnim(world.clips)
+  // NOBODY stands in the bind pose. A pig with no clip at all is drawn as the
+  // HIR's T-pose, and until something happened to it nothing ever gave it one
+  // — the enemy squad stood like that through the whole opening drop. Everyone
+  // starts standing about; the drop-in re-dresses its arrivals the moment it
+  // lifts them (lib/game/dropIn.ts).
+  for (const one of pigs()) anim.setClip(one, ANIM.IDLE)
   /** …and where that puts its bones. The blade, the muzzle and the scope's eye
    * are the same question, asked of the engine now (lib/game/bonePose.ts). */
   const bones = createBonePose({ skeleton: world.skeleton, clips: world.clips, anim })

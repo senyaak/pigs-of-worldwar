@@ -101,7 +101,16 @@ export function mapSquads(
   nations: readonly number[],
   own?: OwnSquad
 ): Squad[] {
-  return battleSides(objects, SIDES_FIELDED).map((side, index) => {
+  const sides = battleSides(objects, SIDES_FIELDED)
+  // EVERYONE drops in together. The marker bit picks out one side of a
+  // campaign map — the player's, with the enemy already standing there
+  // (lib/formats/pog.ts) — and play rules otherwise: "все свины падают на
+  // парашютах". So one flagged marker among the fielded sides puts the whole
+  // battle under canopies, and a map that flags nobody (some arenas) still
+  // stands everyone on its markers. `[play]`, overriding the map data on
+  // purpose; the bit itself stays read as the exe reads it.
+  const parachutes = sides.some((side) => side.some((at) => at.parachutes))
+  return sides.map((side, index) => {
     // Which NATION fields this side is handed in, campaign side first — the
     // map only says where the pigs stand. A nation past the six playable ones
     // (Team Lard, the last mission) has no `fetext` block, so the names fall
@@ -123,7 +132,7 @@ export function mapSquads(
           // The CLASS is the pig's own rank, not the marker's: the marker
           // said where to stand, the roster says what is standing there.
           pigClass: own.pigs[slot].pigClass,
-          parachutes: at.parachutes
+          parachutes
         }))
       }
     }
@@ -138,7 +147,7 @@ export function mapSquads(
         z: at.z,
         heading: at.heading,
         pigClass: at.pigClass,
-        parachutes: at.parachutes
+        parachutes
       }))
     }
   })
