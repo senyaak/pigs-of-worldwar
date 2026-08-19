@@ -51,13 +51,15 @@ back out to paste in. Placing this art is eyework — it took four rounds of
 "almost, seven pixels up" to seat the weapon slot — so do that in the
 console and commit the result, rather than rebuilding per pixel.
 
-**A turn's LENGTH is the level's, and the first three are 99 seconds.** The
-exe reads it from a 27-entry table at 0x4d1860 and multiplies by 100 into
-the clock (0x4309f1) — 99, 60, 45, 30, 15 as the campaign tightens, which is
-also why the dashboard's clock has exactly two digit windows. WHICH level is
-which map is NOT decoded (the name comes from its own array on a different
-index), so `lib/game/turns.ts` keys only CAMP, the training ground and so
-level 0, and says so.
+**A turn's LENGTH is the campaign position's, and the first three are 99
+seconds.** The exe reads it from a 27-entry table at 0x4d1860 and multiplies
+by 100 into the clock (0x4309f1) — 99, 60, 45, 30, 15 as the campaign
+tightens, which is also why the dashboard's clock has exactly two digit
+windows. The index was decoded 2026-08-19: `[0x51f17b]` is `team+0x53`, the
+campaign position (`pigmap/notes.md`), and the order table at 0x4D17F0 says
+which map a position opens — so `lib/game/turns.ts` composes the two and
+keys every campaign map by name now, `unit/turns.spec.ts` pinning the
+corners.
 
 **A turn does not begin when it is handed over.** There is a beat first —
 its own mode in the original, with the debug line "START OF TURN - Press any
@@ -1165,3 +1167,37 @@ FILTER state on the board draw was not read, so `ui/battleMap.ts` smooths the
   crate's contents and a spawn's team would live. Of the flags word (13),
   the side, the player counts, "placed at all" and now bit 6 (the
   parachute) are decoded; the rest of the low byte is not.
+
+## THE SAVE'S SQUAD TAKES THE FIELD — 2026-08-19
+
+The link both ends of the campaign were waiting on (`todo.md` 0A.3), in both
+directions.
+
+**Out:** `mapSquads` takes an `OwnSquad` now — the team's name off the save
+and the first `fieldedAt(position)` pigs of the roster, each under its own
+name and CLASS, because a pig's `rank` IS its class byte
+(`lib/game/ranks.ts`). Side 0 is the one it replaces, which is safe because
+`battleSides` orders the side carrying the map's player bit first.
+`toBriefing` in `main.ts` builds it off the live save, so ESTU fields the
+player's own three — names, promotions and all — instead of NOBBY, GINGER
+and DEN off `fetext`, and the GET READY card greets the team by the name the
+player typed. The roster is packed standing-first by `regroup`, so
+"the first N slots" and "the front line" are the same pigs. A skirmish and
+the console pass no `OwnSquad` and dress from `fetext` as before.
+
+**Back:** the battle view collects `killed` off the bus for side 0 — the
+pig's squad index is its roster slot, and the ORDER of the list is what
+`fell` encodes — and hands the list out with the verdict. `main.ts` stamps
+it onto the live save with `fall` before `missionWonResult` runs, so the
+debrief's fates, the losses, the survival bonus and the newspaper's
+survivors (now counted against `fieldedAt`, not a flat five) all read the
+mission that was actually played. Nothing reaches the disk there: CONTINUE
+settles it through `acceptMission` exactly as before, and `discardMission`
+now stands the squad back up (`fell = -1` across the eight) — a replay
+fields the whole front line again, and a lost mission writes nothing, the
+manual's own "do the level all over again". The walk-out ABORT never applies
+the marks at all.
+
+Still open on this link: a pig's `missions` and `score` counters stay at
+zero — nothing increments them yet — and the enemy side still fields
+`fetext` names, which is the original's own behaviour.

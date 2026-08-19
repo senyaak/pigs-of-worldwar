@@ -611,3 +611,32 @@ picture's first column never keeps what it computed — it is a copy of the
 second, all the way down. The picture's column runs along world z, so it is
 the first z of every row. `mapRaster` does that now, with a test that would
 fail on the old fill.
+
+## THE CLOCK BY MAP, AND A VERDICT THAT KNOWS OUR SIDE — 2026-08-19
+
+**The turn table's index turned out to be the campaign position, and the gap
+in `turns.ts` closed for free.** `turns/notes.md` had left "which level is
+which map" undecoded; the pigmap round decoded it from the other end —
+`[0x51f17b]` is `team+0x53`, the campaign position (`pigmap/notes.md`), and
+the order table at 0x4D17F0 maps positions to map ids (`army/notes.md`).
+`lib/game/missions.ts` already carried that order as `CAMPAIGN`, so `BY_MAP`
+in `lib/game/turns.ts` is now `Object.fromEntries` over the two tables
+instead of a single hand-written CAMP row: 99 seconds on CAMP, ESTU and
+ROAD, 60 to ZULUS, 45 to BRIDGE, 30 to TESTER, 15 on FOOT — the campaign's
+tightest turn, Hamburger Hill — and 30 again on FINAL. The arenas are in
+neither table and keep the 45 default; the original's multiplayer takes its
+turn time off the FIELD CONDITIONS screen, which is not built.
+`unit/turns.spec.ts` pins the corners, and the stale "Not decoded" section
+of `turns/notes.md` now points at the two files that read it.
+
+**And the verdict knows whose side is whose now.** `outcomeOf` used to answer
+`'won'` on `sidesStanding === 1` — losing the whole squad to the last enemy
+read as a victory, and the debrief would have paid for it. The exe's two
+counters were never anonymous: `[+0x348]` is the player's side and
+`[+0x34C]` the rest, our side empty is 2 (lost) in every arm including
+both-empty, and the win asks OUR counter still standing with the others'
+empty. The remake's side 0 IS the player's — `spawnTeams` orders the side
+carrying the map's player bit first — so `outcomeOf(training, ownStanding,
+othersStanding, targetsLeft)` says exactly that, `handOver` in
+`lib/game/battle.ts` feeds it per-side, and `e2e/002/endOfGame.spec.ts`
+pins the case that used to lie: our side down, one enemy up, `'lost'`.

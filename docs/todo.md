@@ -497,32 +497,34 @@ What is actually missing, in the order it is worth doing:
    multiplayer set). `lib/game/muster.ts` carries `PLAYERS = 1` beside
    `SIDES_FIELDED = 2` now, and `e2e/002/spawns.spec.ts` pins ROAD.
 
-2. **The verdict does not know whose side is the player's, and on a real
-   mission that is wrong.** `outcomeOf` answers `'won'` on
-   `sidesStanding === 1` and `'lost'` only when NOBODY is standing
-   (`lib/game/endOfGame.ts`) — so losing your whole squad reads as a win and
-   the debrief pays for it. The training ground never noticed because it has
-   its own branch on targets. The battle needs to know which side is ours, and
-   the answer is already in the spawn data: exactly one side per shipped map
-   carries the player bit (`lib/game/spawns.ts`, and CLAUDE.md's fact about
-   record `+0x58`).
+2. ~~**The verdict does not know whose side is the player's**~~ **DONE
+   2026-08-19.** `outcomeOf(training, ownStanding, othersStanding,
+   targetsLeft)` now: our side down is `'lost'` whoever else is standing —
+   the exe's own both-empty case is 2, not 3 — and the win asks OUR side up
+   with the others' empty. Side 0 is ours because `spawnTeams` orders the
+   side carrying the map's player bit first; `handOver` feeds it per-side and
+   `e2e/002/endOfGame.spec.ts` pins the case that used to lie
+   (docs/history/turns.md).
 
-3. **The SAVE's squad does not reach the field.** A battle musters from the
-   map's markers and the nation's `fetext` names — which is why our pigs on
-   ESTU are NOBBY, GINGER and DEN rather than whoever the save holds — and
-   `roster.ts`/`fieldedAt` are read only by the debrief, the squad screen and
-   the newspaper. Nothing carries losses back either, so `missionWonResult`
-   counts casualties off an untouched roster. This is the link both ends of
-   the campaign are waiting on: who goes out, who comes back, and the
-   RETRY/EDIT SQUAD asymmetry that cannot bite until it exists.
+3. ~~**The SAVE's squad does not reach the field.**~~ **DONE 2026-08-19,
+   both directions.** `mapSquads` takes an `OwnSquad` — the save's name and
+   the first `fieldedAt(position)` pigs, each under its own name and
+   rank-class — and the battle hands side 0's dead back as roster slots in
+   the order they fell, which `main.ts` stamps on with `fall` before the
+   debrief reads anything. `discardMission` stands the squad back up, so
+   RETRY and EDIT SQUAD find it as the mission did; CONTINUE settles it as
+   before. What is deliberately NOT carried yet: `missions`/`score` stay at
+   zero (docs/history/status.md, "THE SAVE'S SQUAD TAKES THE FIELD").
 
-4. **A turn is 45 seconds on every map but CAMP.** `BY_MAP` in
-   `lib/game/turns.ts` has one key, because the exe's turn clock is indexed by
-   a LEVEL NUMBER and the map→level link is not decoded. Known gap, written
-   there.
+4. ~~**A turn is 45 seconds on every map but CAMP.**~~ **DONE 2026-08-19.**
+   The exe's turn table is indexed by the CAMPAIGN POSITION — `[0x51f17b]`
+   is `team+0x53`, decoded in `pigmap/notes.md` — so `BY_MAP` in
+   `lib/game/turns.ts` is now the composition of `CAMPAIGN` and the table:
+   every campaign map by name, arenas on the 45 default,
+   `unit/turns.spec.ts` pinning the corners.
 
-5. **There is no AI, and that is the whole of what is left after the four
-   above.** Six greps' worth of comments say so and not one line does anything
+5. **There is no AI, and that is the whole of what is left of this list.**
+   Six greps' worth of comments say so and not one line does anything
    about it (`muster.ts`, `spawns.ts`, `main.ts`, `multiPlayer.ts`). Until it
    exists a mission is a hotseat: the enemy stands where it spawned and its
    turn is ended by hand.
