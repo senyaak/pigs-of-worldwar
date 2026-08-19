@@ -724,51 +724,61 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         context.restore()
       }
 
-      // A pig's name, and its health beside a heart under it — once it has
-      // stood still long enough. Drawn in the widget's own units, with the
-      // scene's screen positions brought back into them.
-      //
-      // …or the moment anybody's number goes DOWN, standing still or not: the
-      // water hurts silently and invisibly, and without this nothing on screen
-      // says so (`PLATE.hurt`).
-      hurtFor = Math.max(0, hurtFor - delta)
-      for (const plate of state.pigs) {
-        const before = wasHealth.get(plate.name)
-        if (before !== undefined && plate.health < before) hurtFor = PLATE.hurt
-        wasHealth.set(plate.name, plate.health)
+      // THE PLATES ARE A FUNCTION because they can REFUSE to draw, and what
+      // follows them must not be refused with them. This used to be a bare
+      // `return` in the middle of `draw`, and the pause menu was added after
+      // it: ESCAPE froze the game, the menu answered its keys and made its
+      // noises, and nothing was ever painted, because a pig that had not been
+      // standing still long enough took the whole rest of the frame with it.
+      // Play saw exactly that.
+      const drawPlates = (font: Font, heart: Sprite): void => {
+        // A pig's name, and its health beside a heart under it — once it has
+        // stood still long enough. Drawn in the widget's own units, with the
+        // scene's screen positions brought back into them.
+        //
+        // …or the moment anybody's number goes DOWN, standing still or not: the
+        // water hurts silently and invisibly, and without this nothing on screen
+        // says so (`PLATE.hurt`).
+        hurtFor = Math.max(0, hurtFor - delta)
+        for (const plate of state.pigs) {
+          const before = wasHealth.get(plate.name)
+          if (before !== undefined && plate.health < before) hurtFor = PLATE.hurt
+          wasHealth.set(plate.name, plate.health)
+        }
+        if (state.still < PLATE.delay && hurtFor <= 0) return
+        const line = font.height
+        const gap = font.measure(' ')
+        context.save()
+        context.scale(scale, scale)
+        const heartSize = {
+          width: heart.width * PLATE.heart.scale,
+          height: heart.height * PLATE.heart.scale
+        }
+        for (const plate of state.pigs) {
+          const at = { x: plate.x / scale, y: plate.y / scale }
+          const health = String(plate.health)
+          const healthWidth = heartSize.width + gap + font.measure(health)
+          // Two lines are drawn UPWARD from the anchor, so a pig near the top
+          // of the view puts them off it. Slide the block down to the edge
+          // rather than dropping it: a name that vanishes reads as a bug, and
+          // did.
+          const top = Math.max(0, at.y - line * 2 - PLATE.gap)
+          if (at.y > canvas.height / scale) continue
+          font.draw(context, plate.name, Math.round(at.x - font.measure(plate.name) / 2), Math.round(top))
+          const healthLeft = Math.round(at.x - healthWidth / 2)
+          const healthTop = Math.round(top + line + PLATE.gap)
+          context.drawImage(
+            heart.image,
+            healthLeft,
+            healthTop + Math.round((line - heartSize.height) / 2),
+            heartSize.width,
+            heartSize.height
+          )
+          font.draw(context, health, healthLeft + heartSize.width + gap, healthTop)
+        }
+        context.restore()
       }
-      if (state.still < PLATE.delay && hurtFor <= 0) return
-      const line = font.height
-      const gap = font.measure(' ')
-      context.save()
-      context.scale(scale, scale)
-      const heartSize = {
-        width: heart.width * PLATE.heart.scale,
-        height: heart.height * PLATE.heart.scale
-      }
-      for (const plate of state.pigs) {
-        const at = { x: plate.x / scale, y: plate.y / scale }
-        const health = String(plate.health)
-        const healthWidth = heartSize.width + gap + font.measure(health)
-        // Two lines are drawn UPWARD from the anchor, so a pig near the top
-        // of the view puts them off it. Slide the block down to the edge
-        // rather than dropping it: a name that vanishes reads as a bug, and
-        // did.
-        const top = Math.max(0, at.y - line * 2 - PLATE.gap)
-        if (at.y > canvas.height / scale) continue
-        font.draw(context, plate.name, Math.round(at.x - font.measure(plate.name) / 2), Math.round(top))
-        const healthLeft = Math.round(at.x - healthWidth / 2)
-        const healthTop = Math.round(top + line + PLATE.gap)
-        context.drawImage(
-          heart.image,
-          healthLeft,
-          healthTop + Math.round((line - heartSize.height) / 2),
-          heartSize.width,
-          heartSize.height
-        )
-        font.draw(context, health, healthLeft + heartSize.width + gap, healthTop)
-      }
-      context.restore()
+      drawPlates(font, heart)
 
       // …AND THE PAUSE OVER ALL OF IT. Last, because it is the only modal
       // thing the dashboard carries: the exe draws it over the live frame too

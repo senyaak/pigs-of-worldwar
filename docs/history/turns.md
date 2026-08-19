@@ -393,3 +393,33 @@ So this becomes a real question on exactly one day: when a battle starts
 fielding the SAVE's pigs — the `[gap]` `missionWonResult()` already names, "the
 fallen arrive with that link". That is when RETRY has to undo the writeback
 and EDIT SQUAD has to keep it.
+
+### The menu was never on the screen — 2026-08-19, the play after
+
+Play, on the first session with it: *"при нажатии esc ставится пауза - но меню
+не показывается - хотя звуки слышны."* Which is exactly right, and the state
+was right too: the world froze, the sound went, the cursor moved and clicked.
+
+`hud.draw` had a bare `return` in the middle of it — the name plates hide
+until the acting pig has stood still long enough, and that refusal was written
+as an early return rather than a guard. The pause block had been appended
+AFTER it. So on any frame where the pig had not been still for `PLATE.delay`,
+which is every frame just after a key, the whole rest of the dashboard was
+skipped and the menu with it. The plates are `drawPlates()` now, a function
+that can refuse without taking anything else down.
+
+**The suite passed it, and that is the part worth keeping.** Every assertion
+in `e2e/002/pause.spec.ts` read `pow.battle.menu()` — the state — and none
+read a pixel. It is the second time in one session: the pig map's flags were
+computed and never drawn and the specs read `phase()` and `patches()`. So
+`greenPixels` now counts the title's green on the HUD canvas, before and
+after, and CLAUDE.md carries the rule: a debug read is not a paint check.
+
+**And a second thing play reported the same day did NOT reproduce.** "камера
+летает по кругу над картой" — measured three ways with `pow.debug.camera()`:
+untouched for twenty seconds of a turn, after a turn key is released, and
+across a pause with a key held down. The camera is static to the unit in all
+three, `view()` stays `chase` throughout, and `eye()` — the only thing that
+could have drifted, since it is what turns the dashboard's map — accumulates
+nothing: it copies the camera into a scratch vector every call. Left open for
+the moment it happens rather than guessed at.

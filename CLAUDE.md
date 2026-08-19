@@ -401,6 +401,18 @@ it beyond `PHASE_ENV` existing, and the fixture says so if it does not.
 Specs run against the **real** installation, read-only, with counts asserted
 as floors where savegame churn could move them and exactly where it cannot.
 
+**A DEBUG READ IS NOT A PAINT CHECK, and this has now cost two play sessions.**
+`pow.*` says what a view THINKS; it says nothing about whether a pixel was
+laid down. The pig map's flags were computed and never drawn, and the pause
+menu answered its keys and made its noises with nothing on the screen — both
+passed a suite that only read state. Anything drawn on a canvas needs an
+assertion that reads the CANVAS: count the distinct colours (`painted` in
+`e2e/001/mapchain.spec.ts`), count a signature colour's pixels (`greenPixels`
+in `e2e/002/pause.spec.ts`), or count the blits (`pow.pigMap.flags()`). And
+the trap that produced the second one is worth naming: a bare `return` in the
+middle of a long `draw` takes everything after it with it. Put the refusable
+part in a function of its own.
+
 **A RUN CLEANS UP AFTER ITSELF.** Anything a spec writes outside its own
 process — saves, profiles, fabricated installs — is cleared by the suite, not
 left for somebody to delete by hand: `e2e/scratch.ts` runs as both

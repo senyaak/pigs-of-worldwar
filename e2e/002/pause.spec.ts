@@ -23,6 +23,28 @@ const menu = (
     return (pow?.battle?.menu() ?? null) as { row: number; confirming: boolean; yes: boolean } | null
   })
 
+/**
+ * How many pixels of the TITLE's green the dashboard is carrying.
+ *
+ * This is the assertion the first pass did not have, and it cost a play
+ * session: the state was right, the menu answered its keys and made its
+ * noises, and nothing was painted — the plates' early `return` sat between
+ * `draw` and the pause block and swallowed the whole rest of the frame. A
+ * spec that reads only the state cannot tell a drawn menu from a silent one.
+ */
+const greenPixels = (page: Page): Promise<number> =>
+  page.evaluate(() => {
+    const canvas = document.getElementById('battle-hud') as HTMLCanvasElement | null
+    const context = canvas?.getContext('2d')
+    if (!canvas || !context) return -1
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+    let green = 0
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i] < 40 && pixels[i + 1] > 200 && pixels[i + 2] < 40 && pixels[i + 3] > 200) green++
+    }
+    return green
+  })
+
 const paused = (page: Page): Promise<boolean> =>
   page.evaluate(() => {
     const pow = (window as unknown as { pow?: { battle?: { paused(): boolean } } }).pow
@@ -39,6 +61,12 @@ test('escape freezes the mission, and nothing in it moves', async ({ app }) => {
   expect(await paused(page)).toBe(true)
   // The menu opens on its first row with nothing armed.
   expect(await menu(page)).toMatchObject({ row: 0, confirming: false, yes: false })
+  // …AND IT IS ON THE SCREEN. `-GAME PAUSED-` is the one green thing the
+  // dashboard ever draws, so counting its pixels tells a painted menu from a
+  // menu that merely exists.
+  await expect
+    .poll(() => greenPixels(page), { message: 'the pause menu is not painted' })
+    .toBeGreaterThan(20)
 
   // WALK. The key is read — the poll runs in the scene's input pass, which is
   // ahead of the frame the pause stops — and the pig does not take a step,
@@ -59,6 +87,10 @@ test('escape freezes the mission, and nothing in it moves', async ({ app }) => {
   await tap(page, 'pause')
   expect(await paused(page)).toBe(false)
   expect(await menu(page)).toBeNull()
+  // …and it is gone from the screen with it.
+  await expect
+    .poll(() => greenPixels(page), { message: 'the pause menu is still painted' })
+    .toBe(0)
   await press(page, 'walkForward')
   await page.waitForTimeout(200)
   await release(page, 'walkForward')
