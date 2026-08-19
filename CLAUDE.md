@@ -380,7 +380,9 @@ and it is driven by the battle's own keys because the exe reads one pad. Two
 things follow. **Escape is the battle's own action, never `menuBack`** — that
 one is in `MENU_ACTIONS`, which the battle deliberately drops. And **the pause
 is SINGLE-PLAYER only**: play's rule, "в мп вообще никаких остановок", and a
-lockstep battle cannot have one side stop the clock.
+lockstep battle cannot have one side stop the clock. What it is PRINTED in is
+`[play]` and the divergence list carries it: CHARS2, not the `FETEXT\small`
+the exe prints every line of this menu with.
 
 **ABORT is a LOSS, and there is no MISSION ABORTED screen.** gtext 189 carries
 those words and nothing in the executable reads it; the exe writes −2 into the
@@ -517,6 +519,16 @@ and the weakest of them were invented here:
 
 - `[play]` **`HEIGHT_SCALE` is 1** though the exe doubles. Answered in play
   twice; the doubling is above.
+- `[play]` **The PAUSE menu is printed in CHARS2**, and the exe prints it in
+  `FETEXT\small` — read twice, and not in doubt: every line of 0x45A9B0 goes
+  through the object at `[0x51BA54]`, thirty-nine times, and the big one at
+  `[0x51BA58]` is not touched once. SMALL is twelve pixels tall with a
+  four-pixel `I`, and play called it unreadable twice running — "шрифт гавно",
+  then "надо другой взять". CHARS2 is sixteen tall and is what every other
+  menu in the game is written in. **The volume BAR keeps SMALL**, because its
+  width is arithmetic rather than taste: the track is twenty `I ` pairs, `I`
+  is 4 wide and a space advances 8, so a cell is 12 and the track is exactly
+  240 across a panel of 260. `ui/pauseMenu.ts`.
 - `[play]` **The pig slides, and that stays.** The walking clips carry a body
   about 855 units a second at 25 fps; the exe walks 1560, so the feet skate
   about 2×. Driving playback off the walking speed to close that (a `gait.ts`

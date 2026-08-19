@@ -30,16 +30,20 @@ const GLYPH_SHIFT = 0x1f
  * How far a line SPREADS, which is not in the `.tab` at all.
  *
  * The exe's text object advances its pen by `[+0x14] + the glyph's width`
- * (0x4318dd) and its constructor sets that field to **3** whenever the
- * frontend's squeeze is on, which the shipped build always has (0x430c28).
- * A SPACE is the other half of the same reading: its box is 0×0 in every
- * `.tab`, and the number the exe adds is **8** (0x4316b2, the arm taken when
- * the same object says its glyphs are proportional).
+ * (0x4318dd), and its constructor writes **3** into that field when
+ * `[0x51F120]` is set and **0** when it is not (0x430c28). A SPACE is the
+ * other half of the same reading: its box is 0×0 in every `.tab`, and the
+ * number the exe adds is **8** (0x4316b2, the arm taken when the same object
+ * says its glyphs are proportional) — and that one has no flag on it.
  *
- * It is a property of the text OBJECT, and the exe builds every one of them
- * the same way — so this is the game's spacing everywhere, not the
- * frontend's. It is applied where it has been checked against the original's
- * own boxes and nowhere else; the battle's text is left as play approved it.
+ * **The name is right and an earlier note here was not.** This file used to
+ * say the shipped build always has that flag, so the 3 was the game's spacing
+ * everywhere. It is the FRONTEND's: the same `[0x51F120]` is what turns on the
+ * 1024→640 squeeze of every coordinate (0x41ADB0), and the pause menu — which
+ * is drawn during a mission — writes its panel in plain 640-space pixels
+ * (±0x82 by ±0x96 of the screen centre, 0x454876). Both cannot be true at
+ * once, so the flag is CLEAR in a mission: the battle's letters carry no
+ * tracking, and `loadFont` with no metrics at all is exactly what they are.
  */
 export interface Metrics {
   /** Added after every glyph. */

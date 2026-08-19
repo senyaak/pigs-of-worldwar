@@ -3,9 +3,10 @@
 // The rules and every string id are `lib/game/pauseMenu.ts`; this is where it
 // goes on the screen. It is the MISSION's own menu and not the frontend's:
 // the menu machine is torn down when a mission loads, and this is printed
-// with the battle's small letters straight over the 3D view (exe 0x45A9B0).
-// So it belongs on the dashboard's canvas beside the skill menu, which is the
-// same kind of thing — an in-battle mode with art of its own.
+// straight over the 3D view (exe 0x45A9B0). So it belongs on the dashboard's
+// canvas beside the skill menu, which is the same kind of thing — an in-battle
+// mode with art of its own. Which LETTERS it is printed in is the one thing
+// here that is not the exe's; `MENU_FONT` says why.
 //
 // Every number here is read. The panel is the screen's centre ±130 by ±150
 // (0x454876), the rows are five offsets off the panel's top written out one
@@ -35,16 +36,38 @@ import type { Font } from './font'
 import type { SpriteSet } from './sprites'
 
 /**
- * The battle's small letters — `FETEXT\small`, the object the exe prints this
- * menu with (built at 0x480D10 into `[0x51BA54]`, which `get_gtext` indexes).
+ * The letters the menu is PRINTED in — and this one is `[play]`, over a
+ * reading that is not in doubt.
  *
- * **With the game's own TRACKING**, which is not optional and is not the
- * frontend's: the exe's text object adds 3 after every glyph and 8 for a
- * space, its constructor sets that on every one it builds (0x430C28), and
- * without it the letters here came out jammed edge to edge. Play's word for
- * the result was "шрифт гавно", and they were right.
+ * The exe prints every line of this menu with `FETEXT\small`: the whole draw
+ * takes the object at `[0x51BA54]`, which `0x480D10` builds from that font,
+ * and `[0x51BA58]` — the big one — is not touched once between 0x45A9B0 and
+ * 0x45B560. That was read twice. But SMALL is twelve pixels tall with a
+ * four-pixel `I`, and on a 260×300 panel play called it unreadable twice
+ * running: "шрифт гавно", then "шрифт в esc меню ужасный - надо другой
+ * взять". So the menu wears the frontend's CHARS2 — sixteen tall, the same
+ * letters every other menu in the game is written in, tracked the way
+ * `ui/barScreen.ts` tracks them.
  */
-const MENU_FONT = 'SMALL'
+const MENU_FONT = 'CHARS2'
+/**
+ * …but the volume BAR keeps SMALL, because the bar is not writing.
+ *
+ * The exe's track is a string — twenty `I ` pairs (`0x4CFA1C`) with the fill
+ * `I ` repeated `value/5` over it (0x45AE0F, 0x45AE61) — and its width is not
+ * a matter of taste: `I` is 4 wide and a space advances 8, so a cell is 12 and
+ * the track is exactly 240 in a panel 260 across. Any other font moves that.
+ *
+ * **And the spacing here is ZERO, which corrects what this file used to say.**
+ * The 3 the text object adds after a glyph is written only when `[0x51F120]`
+ * is set (0x430C28), and that same flag is what turns on the 1024→640 squeeze
+ * of every coordinate (0x41ADB0). The pause writes its panel at ±0x82 by ±0x96
+ * of the screen centre — 640-space pixels, unsqueezed — so the flag is CLEAR
+ * in a mission and the battle's letters carry no tracking at all. `loadFont`
+ * with no metrics is exactly that: tracking 0, and a space out of the `.tab`,
+ * which for SMALL is the 8 the exe adds.
+ */
+const BAR_FONT = 'SMALL'
 /** The frame's eight tiles, in the order the art itself puts them in. */
 const FRAME = ['pause1', 'pause2', 'pause3', 'pause4', 'pause5', 'pause6', 'pause7', 'pause8']
 const TILE = 16
@@ -96,6 +119,11 @@ const INK = {
 
 type Ink = keyof typeof INK
 
+/** Which inks each family is painted in — the words never go red, the ticks
+ * never go green. */
+const TEXT_INKS: readonly Ink[] = ['title', 'lit', 'dim']
+const BAR_INKS: readonly Ink[] = ['lit', 'dim', 'fillLit', 'fillDim']
+
 /**
  * How dark the panel's inside goes.
  *
@@ -123,7 +151,9 @@ export interface PauseMenu {
 }
 
 export function createPauseMenu(): PauseMenu {
-  const fonts = new Map<Ink, Font>()
+  /** The words, and the ticks — two fonts, for the reason `BAR_FONT` gives. */
+  const letters = new Map<Ink, Font>()
+  const ticks = new Map<Ink, Font>()
   let tiles: SpriteSet | null = null
 
   /** `gtext`, or nothing at all — a stripped install draws an empty row rather
@@ -133,38 +163,48 @@ export function createPauseMenu(): PauseMenu {
   return {
     async load(art) {
       tiles = art
-      if (fonts.size > 0) return
+      if (letters.size > 0) return
       // ITS OWN FAILURE IS ITS OWN. The dashboard loads this last, inside the
       // try that decides whether the dashboard loaded at all — so a missing
       // font here must not take the gauge, the clock and the map down with
       // it. `draw` checks and does nothing.
-      try {
+      const paint = async (
+        into: Map<Ink, Font>,
+        name: string,
+        inks: readonly Ink[],
+        metrics?: typeof FRONTEND_METRICS
+      ): Promise<void> => {
         const painted = await Promise.all(
-          (Object.keys(INK) as Ink[]).map(async (ink) => [
+          inks.map(async (ink) => [
             ink,
-            await loadFont(MENU_FONT, {
-              colour: [...INK[ink]] as [number, number, number],
-              metrics: FRONTEND_METRICS
-            })
+            await loadFont(name, { colour: [...INK[ink]] as [number, number, number], metrics })
           ])
         )
-        for (const [ink, font] of painted as [Ink, Font][]) fonts.set(ink, font)
+        for (const [ink, font] of painted as [Ink, Font][]) into.set(ink, font)
+      }
+      try {
+        await paint(letters, MENU_FONT, TEXT_INKS, FRONTEND_METRICS)
+        await paint(ticks, BAR_FONT, BAR_INKS)
       } catch (error) {
         console.warn(`no pause menu: ${String(error)}`)
       }
     },
 
     draw(context, viewWidth, state, strings) {
-      if (!fonts.has('title') || !tiles) return
+      if (!letters.has('title') || !tiles) return
       const cx = viewWidth / 2
       const cy = LAYOUT.centreY
       const write = (ink: Ink, text: string, x: number, y: number): void => {
-        fonts.get(ink)?.draw(context, text, Math.round(x), Math.round(y))
+        letters.get(ink)?.draw(context, text, Math.round(x), Math.round(y))
       }
       const centred = (ink: Ink, text: string, y: number): void => {
-        const font = fonts.get(ink)
+        const font = letters.get(ink)
         if (!font) return
         write(ink, text, cx - font.measure(text) / 2, y)
+      }
+      /** One pass of the bar, in the font whose cell is 12 wide. */
+      const tickRow = (ink: Ink, text: string, x: number, y: number): void => {
+        ticks.get(ink)?.draw(context, text, Math.round(x), Math.round(y))
       }
 
       /** The panel: one darkened quad, then the frame round it. */
@@ -237,8 +277,12 @@ export function createPauseMenu(): PauseMenu {
         const level = row.kind === 'master' ? state.master : state.sfx
         const barX = cx + LAYOUT.bar.left
         const barY = y + LAYOUT.bar.below
-        write(ink, TRACK, barX, barY)
-        write(ink === 'lit' ? 'fillLit' : 'fillDim', 'I '.repeat(barCells(level)), barX, barY)
+        // The track first and the fill OVER it, which is the one place this
+        // does not follow the exe: it draws the fill and then lays the full
+        // white track on top (0x45AE57 then 0x45B0BF), and the level would be
+        // invisible if we did.
+        tickRow(ink, TRACK, barX, barY)
+        tickRow(ink === 'lit' ? 'fillLit' : 'fillDim', 'I '.repeat(barCells(level)), barX, barY)
       })
     }
   }
