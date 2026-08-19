@@ -371,8 +371,23 @@ musters off the MAP rather than off the save's roster, so `losses` in
 `missionWon()` is always zero today and `save.squad` is never touched by a
 battle at all. Nor is anything staged on a loss: `missionWon()` runs only on a
 win, builds a NEW object into `pending` and leaves `save` alone, so the
-`discardMission()` both keys call is a no-op there. The disk is written by
-`acceptMission()` and by a squad edit, and by nothing else.
+`discardMission()` both keys call is a no-op there.
+
+**And `missionWon()` does not write to disk** — that is the half the whole
+answer rests on. It stages; `acceptMission()` is what promotes `pending` to
+`save` and writes. There are exactly FOUR writers in `campaign.ts`, and it is
+worth having them listed because "the debrief saves" is the easy assumption:
+
+| writer | what reaches it |
+| ------ | --------------- |
+| `begin()` | NEW GAME, the army being born |
+| `acceptMission()` | CONTINUE on a won debrief |
+| `amend()` | EVERY squad edit — rename, upgrade, move (`main.ts`) |
+| `skipTutorial()` | answering NO to PLAY TRAINING MISSION |
+
+So a squad edit autosaves on the spot (the original waits for SAVE TEAM,
+which the remake deliberately does not have), and `adopt()` — loading somebody
+else's slot — writes nothing, because what it takes is already on disk.
 
 So this becomes a real question on exactly one day: when a battle starts
 fielding the SAVE's pigs — the `[gap]` `missionWon()` already names, "the
