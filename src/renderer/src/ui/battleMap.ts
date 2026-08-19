@@ -16,6 +16,10 @@
 //   the bottom, and slides UP into that place over the battle's first twenty
 //   frames.
 //
+// One more thing, since play asked twice about the white on it: the WHITE is
+// the original's own arithmetic and the picture is right. `lib/game/mapRaster.ts`
+// carries the proof.
+//
 // Canvas 2D can only do affine transforms, so the board is subdivided and each
 // cell drawn affinely — which is what the library does too, for the same
 // reason, only at 2×2 where this uses more. Laying one cell down, and keeping
@@ -156,10 +160,12 @@ export function createBattleMap(): BattleMap {
         const at = (i: number): number => (i / CELLS) * 2 - 1
         const uv = (t: number): number => inset + ((t + 1) / 2) * usable
         context.save()
-        // A 64-pixel picture over 167 is a stretch either way; smoothed reads
-        // as the filtered texture the original hands to Direct3D rather than
-        // as chunky blocks. `[CHECK — remake]`: the library's filter state on
-        // this draw was not read.
+        // SMOOTHED, and that is READ now rather than judged: the library sets
+        // `D3DTSS_MAGFILTER` and `MINFILTER` to LINEAR once at start-up
+        // (dll 0x10006518 and 0x1000652C, the only two filter writes in the
+        // whole of `.text`), and `DrawScanner` never touches the state. So a
+        // 64-pixel picture over 167 is stretched bilinearly by the original
+        // too, and the blocky reading would have been the wrong one.
         context.imageSmoothingEnabled = true
         for (let row = 0; row < CELLS; row++) {
           for (let column = 0; column < CELLS; column++) {

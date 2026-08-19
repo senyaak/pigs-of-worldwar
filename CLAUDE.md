@@ -162,6 +162,21 @@ reasoning, the false starts and the sessions behind them are in
   `palette[type & 0x1F] * shade >> 9` into every texel, shade running 64..194
   with the tile's own height across the map's range — then hands it over with
   `afOverwriteTexture`. `lib/game/mapRaster.ts` carries the palette. `[exe]`
+- **The shade lights the PEAKS, the channel is five bits, and the WHITE on the
+  board is the original's.** `height` is an elevation, positive up — proved
+  four ways, of which the plainest is that water sits at the map's MINIMUM
+  (`scanner/notes.md`) — so shade 64 is the lowest vertex, where the
+  arithmetic is the exact 8→5 bit conversion, and 194 the highest. Each
+  channel is then CLAMPED at 31 by the library itself (`cmp ecx,1Fh / jle /
+  mov ecx,1Fh`, dll 0x1000A3F4), so any palette row over 82 blows out on high
+  ground: row 9 is `100,100,100`, and CAMP's boundary plateau turns the whole
+  rim pure white. Play reported that as four white stripes; it is what the exe
+  draws, and `unit/scanner.spec.ts` pins both ends of the scale. `[exe]`
+- **The board is stretched BILINEARLY**, which was the last open question about
+  the widget. The library writes `D3DTSS_MAGFILTER` and `MINFILTER` = LINEAR
+  once at start-up (dll 0x10006518/0x1000652C — the only two filter writes in
+  its whole `.text`) and `DrawScanner` never touches the state, so the 64×64
+  picture is smoothed across its 167 pixels, not point-sampled. `[exe]`
 - **An espionage pig is off the map on anybody else's turn, and there is no
   range.** Classes 8, 9 and 10 — SCOUT, SNIPER, SPY — get marker 0xFF whenever
   their team is not the team whose turn it is (0x440C67), and the library drops
@@ -581,13 +596,6 @@ and the weakest of them were invented here:
   ellipse matched to play), the PINK the heart is painted (its art is white),
   and the heart's ×2 (the map's marker is 10×11 and stands beside letters 32
   tall). Correct them against play.
-- `[CHECK — remake]` **One thing about the battle map is ours: its FILTERING.**
-  The library's texture filter state on the board draw was not read, so whether
-  the 64×64 picture is smoothed or point-sampled across its 167 pixels is a
-  judgement — `ui/battleMap.ts` smooths it, on the grounds that a stretch that
-  large reads as the filtered texture Direct3D would give rather than as blocks.
-  Everything else about the widget — where it sits, how big it is, how far it
-  tilts, how it turns, what colour each tile becomes — is read.
 - `[gap]` **The power gauge and the weapon icons wait for a weapon.**
   `newpow1..7` and `powg1` are the gauge — which the original shows only when
   the weapon in hand needs one — and `FACETIMS.MAD`, despite the name, holds

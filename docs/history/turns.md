@@ -565,3 +565,41 @@ dashboard afterwards: 310..541 against a panel of 297..557.
 One thing there is still deliberately not the exe's: the exe draws the red
 fill FIRST and lays the full white track over it (0x45AE57, then 0x45B0BF),
 which hides the level. We draw the track and then the fill.
+
+### The four white stripes on the board — 2026-08-19
+
+Play, same round: "на карте мира 4 белые полоски (или больше) и мне кажется те
+откуда миникарта выезжает". Three screens could have meant that, so it was
+measured rather than guessed, and the first two answers were both NO: the world
+map's bright frame is painted into `BigMap.BMP` itself (rows 24..35 and 408..419,
+columns 48..57 and 542..548, checked against the file's own pixels), and the
+scanner's board has no transparent seams at all — the affine grow closed those
+last round, and a hole scan of the whole widget finds none at either yaw.
+
+The board itself is where they are. Its four RIM bands are near-white, they
+TURN with the board, and the picture behind them is a fifth of the way to
+saturated: the map raster's own texels reach 255. So the question became
+arithmetic, and it needed the library.
+
+**It is the original's.** The channel is five bits — the mine writes 31, not
+255 — and the library clamps each one itself (`cmp ecx,1Fh / jle / mov ecx,1Fh`,
+dll 0x1000A3F4). Palette row 9 is `100,100,100` and `100*194 >> 9` is 37, so any
+high grey ground goes pure white. CAMP's boundary plateau averages 3087 against
+1489 in the middle, all of it row 9 — a white frame round the whole board.
+
+**And the direction was read, not assumed**, because getting it backwards would
+have inverted the picture: `height` is an elevation, positive UP. `afSetMap`
+stores `2 * (int16)` with no negation; the min/max sentinels start at +262144
+and 0; water floods everything `<=` a level and RAISES what is below it, and on
+every shipped map the water sits at the bottom of the range; gravity points
+`(0,-1,0)`. Flipping it puts 941 white texels on CAMP where there are 208.
+
+The last thing that could still have been ours was the FILTER — the board is
+64 texels stretched over 167 pixels, and this repo had smoothed it on a
+judgement. Read now: the library sets MAG and MIN to LINEAR once at start-up
+and `DrawScanner` never touches the state, so bilinear is right and the
+`[CHECK — remake]` is retired.
+
+Nothing was changed on the board. What came out of it is a `unit/scanner.spec.ts`
+test pinning both ends of the scale — 99 at the lowest ground, 255 at the
+highest — so the next reader does not "fix" the white back out.
