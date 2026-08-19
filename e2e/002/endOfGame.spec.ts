@@ -40,16 +40,19 @@ test('the mission is measured by the DUMMIES, and by nothing else on the map', (
   expect(targetsOf(CAMP).length, 'plenty else breaks').toBeGreaterThan(ids.size)
 })
 
-test('a training mission can be won and cannot be lost; a battle goes by sides', () => {
-  expect(outcomeOf(true, 1, 3)).toBe('playing')
-  expect(outcomeOf(true, 1, 0)).toBe('won')
+test('a training mission can be won and cannot be lost; a battle knows whose side is ours', () => {
+  expect(outcomeOf(true, true, 1, 3)).toBe('playing')
+  expect(outcomeOf(true, true, 1, 0)).toBe('won')
   // The training ground floors a pig at one point (lib/game/health.ts), so the
   // exe's own branch has no losing answer in it at all.
-  expect(outcomeOf(true, 0, 2)).toBe('playing')
+  expect(outcomeOf(true, false, 0, 2)).toBe('playing')
 
-  expect(outcomeOf(false, 2, 0)).toBe('playing')
-  expect(outcomeOf(false, 1, 0)).toBe('won')
-  expect(outcomeOf(false, 0, 0)).toBe('lost')
+  expect(outcomeOf(false, true, 1, 0)).toBe('playing')
+  expect(outcomeOf(false, true, 0, 0)).toBe('won')
+  // Our whole squad down is a LOSS whoever else is standing — the exe's
+  // both-empty case is 2, not 3, and its side-empty case never asks further.
+  expect(outcomeOf(false, false, 1, 0)).toBe('lost')
+  expect(outcomeOf(false, false, 0, 0)).toBe('lost')
 })
 
 test('the ending holds for three seconds, tours the survivors, and bails at twenty', () => {

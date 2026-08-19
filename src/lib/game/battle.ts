@@ -491,13 +491,15 @@ export function createBattle(parts: BattleParts): Battle {
    * notice there is nothing left to knock down.
    */
   const handOver = (): void => {
-    const standing = game.players.filter((player) =>
-      player.pigs.some((pig) => !isDead(pig))
-    ).length
+    // Side 0 is OURS — the campaign's own, which `spawnTeams` orders first off
+    // the map's player bit — and the verdict tells it apart from the rest the
+    // way the exe's two counters do (lib/game/endOfGame.ts).
+    const sidesUp = game.players.map((player) => player.pigs.some((pig) => !isDead(pig)))
+    const othersUp = sidesUp.filter((up, side) => up && side > 0).length
     // The turn's weapon count starts over — from 1 or less, because 2 is what
     // the wasted-turn line writes and it must survive the handover (0x48F50C).
     if (parts.training && weaponUses <= 1) weaponUses = 0
-    const outcome = outcomeOf(parts.training, standing, parts.targetsLeft())
+    const outcome = outcomeOf(parts.training, sidesUp[0] === true, othersUp, parts.targetsLeft())
     if (outcome !== 'playing') {
       // The turn that has just been played is the count the closer is picked by —
       // the exe's `[gameMode+0x40C]`, which its own `NextPlayer` has just

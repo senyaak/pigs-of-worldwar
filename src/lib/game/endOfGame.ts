@@ -69,19 +69,24 @@ export type Outcome = 'playing' | 'won' | 'lost'
 /**
  * The state of the game, asked at the handover.
  *
- * `sidesStanding` is how many players still have somebody — the remake's reading
- * of the exe's two counters, since nothing here splits a squad into "the player's"
- * and "the computer's". Nobody at all is `lost` the way the exe's own both-empty
- * case is 2 rather than 3.
+ * The exe's two counters ARE "the player's" and "the computer's" — `[+0x348]`
+ * still 1 with `[+0x34C]` empty is the win, and every arm with our side empty
+ * is 2, the both-empty case included. So losing the whole squad is a LOSS even
+ * when it took the enemy down with it, and `ownStanding` is the campaign's own
+ * side — index 0 of the battle's players, which `spawnTeams` orders first off
+ * the map's player bit (lib/game/spawns.ts, record `+0x58`).
+ *
+ * `othersStanding` is how many of the OTHER sides still have somebody.
  */
 export function outcomeOf(
   training: boolean,
-  sidesStanding: number,
+  ownStanding: boolean,
+  othersStanding: number,
   targetsLeft: number
 ): Outcome {
   if (training) return targetsLeft > 0 ? 'playing' : 'won'
-  if (sidesStanding === 0) return 'lost'
-  return sidesStanding === 1 ? 'won' : 'playing'
+  if (!ownStanding) return 'lost'
+  return othersStanding === 0 ? 'won' : 'playing'
 }
 
 /**
