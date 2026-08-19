@@ -1305,13 +1305,18 @@ not pulled, written here so nobody has to remember an address.
   `e2e/002/pause.spec.ts` pin both halves. Play's own constraint stands and is
   written into the code: a real pause is SINGLE-PLAYER only and multiplayer
   must never stop (docs/history/status.md, "Threads left mid-pull").
-  **And the pause's own CAMERA is in, 2026-08-19** — mode 7, the MAP VIEW:
-  pulled back to 11000 and touring the field a pig every 0x7D frames, with the
-  corner scanner shrunk while it is up (`lib/game/mapView.ts`). Play reported
-  it as "камера летает по кругу над картой" and it was a feature nobody had
-  built rather than a bug. **Skill 63 MAP VIEW is the other way into the same
-  mode and is still not built** — it wants the inventory entry and the input
-  lockout, and the camera half now exists for it.
+  **And the pause's own CAMERA is in, 2026-08-19** — mode 7, the MAP VIEW: the
+  camera FLIES, `x = 11000·cos θ`, `z = 11000·sin 2θ` with the bearing
+  advancing six of 4096 every frame, which is a FIGURE-EIGHT about the world
+  origin at the height of the map's own peak; it looks at a pig, eased in at a
+  thirteenth a frame, changing every 126 frames (`lib/game/mapView.ts`). Play
+  reported it as "камера летает по кругу над картой" and it was a feature
+  nobody had built rather than a bug — then caught the first build of it,
+  which walked pig to pig with a still camera and was the VICTORY camera by
+  another name. The exe also SHRINKS the corner scanner while it is up and we
+  do not: play ruled the map one size. **Skill 63 MAP VIEW is the other way
+  into the same mode and is still not built** — it wants the inventory entry
+  and the input lockout, and the camera half now exists for it.
 
   **And the abort is FINISHED too, 2026-08-19** — by finding out there was
   nothing to finish. There is no MISSION ABORTED screen: gtext 189 carries

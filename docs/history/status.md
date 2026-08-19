@@ -1056,9 +1056,18 @@ Four things that were assumed and are now read:
   wrong, and they are the mine-CARRYING set rather than the seeing one.
 
 **And skill 63 MAP VIEW turned out to be a different thing entirely** — not
-this widget at all, but a camera mode: `SetMode(7)`, the camera pulled back to
-11000, normal input locked out, and an AUTO-TOUR that shows every visible pig
-in turn for 0x7D frames each. Not built; `scanner/notes.md` carries it whole.
+this widget at all, but a camera mode: `SetMode(7)`, normal input locked out,
+and a camera that FLIES. Read again on 2026-08-19 (`docs/history/turns.md`,
+"the flight was built from half a reading"): the description above — "an
+AUTO-TOUR that shows every visible pig in turn for 0x7D frames each" — is the
+smaller half of it and reads as a still camera cutting between pigs, which is
+the VICTORY camera. Mode 7 advances a bearing six of 4096 EVERY frame and
+travels `x = 11000·cos θ`, `z = 11000·sin 2θ` — a figure-eight about the world
+origin — while looking at a pig it changes every 126 frames.
+
+**The camera half is BUILT**, because the PAUSE enters the same mode
+(`lib/game/mapView.ts`). The skill is not: it wants the inventory entry and
+the input lockout.
 
 What is left as the remake's own, and it is one thing: the library's texture
 FILTER state on the board draw was not read, so `ui/battleMap.ts` smooths the

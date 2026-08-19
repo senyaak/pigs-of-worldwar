@@ -496,3 +496,39 @@ with asking for one twice, which is the only property that matters.
 The e2e now asserts the camera is somewhere ELSE seven hundred milliseconds
 into a pause while the turn clock has not moved — a parked flight passes every
 "is it in map view" check and fails that one.
+
+### Three more from the same play round — 2026-08-19
+
+Reported in one line — *"меню не работает и шрифт там гавно"*, plus
+*"миникарта не должна отдаляться вообще"* — and only one of the three was a
+matter of taste.
+
+**The font was measurable.** The menu loaded `FETEXT\small` with no metrics, so
+tracking was 0 and the letters were drawn edge to edge. The exe's text object
+adds 3 after every glyph and 8 for a space, and its constructor sets that on
+every one it builds (0x430C28) — `FRONTEND_METRICS` is that pair, already in
+the repo, and this menu prints through the very object the frontend does. It
+was not the font being wrong; it was the font being drawn without the game's
+own spacing.
+
+**The menu did not answer because SELECT is one button in the original.** Bit
+0x20, the one that fires. This remake split firing onto F, because SPACE
+already jumps — right in a battle and wrong in a menu: a player looking at
+CONTINUE presses the key every other screen in the game chooses with, and
+nothing happened. SPACE selects too now; jumping means nothing while the world
+is stopped, so the key was free. `[deliberate]`, and it is the same shape as
+the mouse working the frontend.
+
+**And the map holds ONE SIZE.** The library shrinks it in two places — a
+charging shot and the map view — both read, and play overrode both on sight.
+Both numbers stay in `lib/game/scanner.ts` with the ruling written beside them,
+and the drawer holds its scale as a `const` so nothing can re-apply them by
+accident. That also retired the one reason the dashboard had been keeping a
+real delta through a pause.
+
+**A stale spec fell out of it.** `e2e/002/hud.spec.ts` asserted the bottom-left
+corner of the dashboard was EMPTY — "the map is not built yet" — and it
+outlived the map by a whole session, because nothing had run that file. It
+counts the board's pixels now. Two lessons in one round, and they are the same
+lesson: a suite only tells you about the files you run, and only about the
+things it actually looks at.

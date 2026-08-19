@@ -211,9 +211,10 @@ test('the pause hands the camera to the MAP VIEW, and it FLIES', async ({ app })
   expect(chase.view).toBe('chase')
 
   // A PAUSED MISSION IS NOT A STILL PICTURE. The exe puts the camera in mode 7
-  // — the same MAP VIEW skill 63 enters — which pulls back to 11000 against
-  // the chase's 3072 and walks the field a pig every 0x7D frames
-  // (lib/game/mapView.ts). Play named it: "камера летает по кругу над картой".
+  // — the same MAP VIEW skill 63 enters — and mode 7 FLIES: a figure-eight
+  // about the world origin, 11000 out along its long axis, the bearing
+  // advancing every frame (lib/game/mapView.ts). Play named it: "камера летает
+  // по кругу над картой".
   await tap(page, 'pause')
   await expect.poll(async () => (await eye()).view, { message: 'the camera did not survey' }).toBe('map')
   const reach = (a: number[], b: number[]): number => Math.hypot(a[0] - b[0], a[2] - b[2])
