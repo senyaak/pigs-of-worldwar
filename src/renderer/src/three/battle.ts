@@ -43,7 +43,7 @@ import { handling } from '../../../lib/game/events'
 import type { BattleBus } from '../../../lib/game/events'
 import type { SceneSound } from '../contracts/sound'
 import type { Collected } from '../../../lib/game/scenery'
-import { FRAME_SECONDS } from '../../../lib/game/ballistics'
+import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBulletArt } from './shots'
 import { crossedTowards, sightBlockers, silhouetteOf } from '../../../lib/game/seeThrough'
 import { createGrenadeArt } from './grenades'
@@ -52,7 +52,17 @@ import { PIG_HEIGHT, PIG_HOLD, PIG_RADIUS } from '../../../lib/game/obstacles'
 import { weaponLayer } from '../../../lib/game/controls'
 import { advanceTraining, nextBreak } from '../../../lib/game/training'
 import { exposeBattleDebug } from './debug'
-import { touredIndex } from '../../../lib/game/mapView'
+import {
+  DWELL_FRAMES,
+  FLOOR_CLEARANCE,
+  LOOK_EASE,
+  MOVE_EASE_XZ,
+  MOVE_EASE_Y,
+  NEAR_ENOUGH,
+  advanceBearing,
+  easeOver,
+  orbitPoint
+} from '../../../lib/game/mapView'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SceneHost } from './scene'
 
@@ -722,35 +732,85 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * displacement with the time that produced it (three/debug.ts, `frame`). */
   let lastFrame = 0
 
-  /** How long this pause has been touring, and whether one is under way. */
-  let touring = 0
-  let surveying = false
-
   /**
    * THE PAUSE'S OWN CAMERA — the exe's mode 7, entered at 0x49205F and put
    * back on the way out.
    *
    * A paused mission is not a still picture in the original: the world stops
-   * and the camera pulls back to 11000 and goes round the field, one pig every
-   * 0x7D frames. It tours the pigs the DRAW loop is drawing — the `+0x30` byte
-   * the tour tests is the one a shelter clears — so a pig indoors is skipped,
-   * and so is a dead one.
+   * and the camera goes FLYING. The path is a figure-eight — `x = R·cos(θ)`,
+   * `z = R·sin(2θ)`, the sine's index doubled at 0x4A4E67 — about the world
+   * origin at the height of the map's own highest ground, with the bearing
+   * advancing six of 4096 EVERY frame whether or not anything else changes
+   * (lib/game/mapView.ts carries every number and where it was read).
    *
-   * It runs on the frame's own delta and not the engine's, because it is a
-   * camera: the world is not stepping and must not be made to.
+   * What it LOOKS at is a pig, and that half is a lagged copy: the look-at
+   * point eases toward the subject at a thirteenth a frame, which is what
+   * makes a change of subject a sweep rather than a cut.
+   *
+   * Play caught the first attempt at this: switching subject pig by pig with
+   * a still camera is the VICTORY camera (lib/game/endOfGame.ts), not this.
    */
+  let bearing = 0
+  let watching = -1
+  let dwell = 0
+  let flying = false
+  /** The flight and its aim, both in GAME space; the camera is world space. */
+  const flightAt = new THREE.Vector3()
+  const lookingAt = new THREE.Vector3()
+  const worldPoint = new THREE.Vector3()
+
   const survey = (delta: number): void => {
-    const first = !surveying
-    surveying = true
-    touring = first ? 0 : touring + delta
     const shown = now.pigs.filter((pig) => pig.health > 0 && !pig.sheltered)
-    const index = touredIndex(touring, shown.length)
-    const soldier = index < 0 ? null : squad.of(shown[index].id)
-    if (!soldier) return
-    // `null` on the first frame of a pause SNAPS rather than glides, the same
-    // way a new acting pig does — the camera has 11000 units to travel and
-    // sliding all of it would read as a swoop the original does not have.
-    chase.follow(drawnStance(soldier), soldier.node.position.y, 0, first ? null : delta, 'map')
+    if (shown.length === 0) return
+    const frames = delta / EXE_FRAME_SECONDS
+    const first = !flying
+    if (first) {
+      flying = true
+      bearing = 0
+      dwell = 0
+      watching = shown[0].id
+    }
+    bearing = advanceBearing(bearing, frames)
+    dwell += frames
+    const point = orbitPoint(bearing)
+    const away = (pig: { x: number; z: number }): number =>
+      Math.hypot(pig.x - point.x, pig.z - point.z)
+
+    // The subject changes when the look has run out OR when the flight comes
+    // too near the pig it is on — the routine's one early-out. The next one is
+    // the next pig far enough away, and a full lap keeps whoever it is on.
+    const standing = shown.find((pig) => pig.id === watching) ?? shown[0]
+    if (dwell >= DWELL_FRAMES || away(standing) < NEAR_ENOUGH) {
+      const at = shown.findIndex((pig) => pig.id === standing.id)
+      for (let step = 1; step <= shown.length; step++) {
+        const candidate = shown[(at + step) % shown.length]
+        if (away(candidate) >= NEAR_ENOUGH || step === shown.length) {
+          watching = candidate.id
+          break
+        }
+      }
+      dwell = 0
+    }
+
+    // WHERE IT FLIES. The nominal height is the map's own peak, and the mover
+    // holds it clear of the ground under it by 0x300 — which on a map with any
+    // relief never fires.
+    const subject = shown.find((pig) => pig.id === watching) ?? standing
+    const wantY = Math.min(query.peak, query.height(point.x, point.z) - FLOOR_CLEARANCE)
+    if (first) {
+      flightAt.set(point.x, wantY, point.z)
+      lookingAt.set(subject.x, subject.y, subject.z)
+    } else {
+      flightAt.x += (point.x - flightAt.x) * easeOver(MOVE_EASE_XZ, frames)
+      flightAt.z += (point.z - flightAt.z) * easeOver(MOVE_EASE_XZ, frames)
+      flightAt.y += (wantY - flightAt.y) * easeOver(MOVE_EASE_Y, frames)
+      const look = easeOver(LOOK_EASE, frames)
+      lookingAt.x += (subject.x - lookingAt.x) * look
+      lookingAt.y += (subject.y - lookingAt.y) * look
+      lookingAt.z += (subject.z - lookingAt.z) * look
+    }
+    host.camera.position.copy(root.localToWorld(worldPoint.copy(flightAt)))
+    host.camera.lookAt(root.localToWorld(worldPoint.copy(lookingAt)))
     lastView = 'map'
   }
 
@@ -761,7 +821,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       if (paused()) survey(delta)
       return
     }
-    surveying = false
+    flying = false
     time += delta
     lastFrame = delta
     // **THE LINE COMES BEFORE THE SHOT**, so the rules are told whether the pig

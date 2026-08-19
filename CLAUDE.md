@@ -357,14 +357,21 @@ it. The dashboard keeps drawing on a delta of ZERO, so the bar stops scrolling
 and the plates stop fading — with the MAP the one exception, because its size
 belongs to the camera rather than the world.
 
-**And a paused mission is NOT a still picture.** The exe hands the camera its
-mode 7 — the same MAP VIEW skill 63 enters — which pulls back to 11000 against
-the chase's 3072 and walks the field, one pig every 0x7D frames, skipping the
-pigs the draw loop is not drawing. `lib/game/mapView.ts`, and the corner
-scanner shrinks while it is up. Play named it before it was built: "камера
-летает по кругу над картой". So `three/battle.ts` takes a `paused` predicate
-BESIDE `running`: the first says the world has stopped, the second says what
-to do instead of nothing.
+**And a paused mission is NOT a still picture — the camera FLIES.** The exe
+hands it mode 7, the same MAP VIEW skill 63 enters, whose per-frame handler
+advances a bearing six of 4096 EVERY frame and puts the camera at
+`x = 11000·cos θ`, `z = 11000·sin 2θ` — the sine's index doubled, so the path
+is a FIGURE-EIGHT about the world origin — at the height of the map's own
+highest ground. What it looks at is a pig, eased in at a thirteenth a frame,
+changing every 126 frames or when the flight comes within 4408 units of it.
+`lib/game/mapView.ts` carries every number. So `three/battle.ts` takes a
+`paused` predicate BESIDE `running`: the first says the world has stopped, the
+second says what to do instead of nothing.
+
+**Switching subject with a still camera is the VICTORY camera, not this one**
+(`lib/game/endOfGame.ts`, one survivor every two seconds). That mistake was
+built once, off a note that had read only the subject half of mode 7 — and on
+a one-pig map it produced a camera that never moved at all.
 
 The menu itself is
 `lib/game/pauseMenu.ts` (five rows and no more: the exe's lit row dispatches

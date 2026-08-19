@@ -23,11 +23,14 @@ import {
   pausePress
 } from '../src/lib/game/pauseMenu'
 import {
-  MAP_CLOSE,
-  MAP_DISTANCE,
-  TOUR_FRAMES,
-  TOUR_SECONDS,
-  touredIndex
+  DWELL_FRAMES,
+  NEAR_ENOUGH,
+  ORBIT_FRAMES,
+  ORBIT_RADIUS,
+  ORBIT_STEP,
+  advanceBearing,
+  easeOver,
+  orbitPoint
 } from '../src/lib/game/mapView'
 import type { PauseState, PauseVerb } from '../src/lib/game/pauseMenu'
 
@@ -165,24 +168,59 @@ test('a pause opens on the settings it is handed, and on row zero', { tag: '@nod
   expect(state).toMatchObject({ row: 0, confirming: false, yes: false, master: 40, sfx: 15, speech: false })
 })
 
-test('the map view tours a pig every 0x7D frames, wrapping', { tag: '@nodata' }, () => {
-  // The exe's own count (0x4A4D40), on its own clock — a bit over four
-  // seconds a pig at 30 frames a second.
-  expect(TOUR_FRAMES).toBe(0x7d)
-  expect(TOUR_SECONDS).toBeCloseTo(125 / 30, 6)
-  expect(touredIndex(0, 3)).toBe(0)
-  expect(touredIndex(TOUR_SECONDS - 0.001, 3)).toBe(0)
-  expect(touredIndex(TOUR_SECONDS, 3)).toBe(1)
-  expect(touredIndex(TOUR_SECONDS * 2, 3)).toBe(2)
-  // …and it WRAPS rather than stopping at the end of the list.
-  expect(touredIndex(TOUR_SECONDS * 3, 3)).toBe(0)
-  expect(touredIndex(TOUR_SECONDS * 7, 3)).toBe(1)
-  // One pig is a tour of one; no pigs at all is nothing to look at, which is
-  // a real case — every pig on the field can be indoors at once.
-  expect(touredIndex(TOUR_SECONDS * 5, 1)).toBe(0)
-  expect(touredIndex(1, 0)).toBe(-1)
-  // The camera pulls back to 11000 against the chase's 3072 — row 7 of
-  // 0x4D9528 against the chase's own.
-  expect(MAP_DISTANCE).toBe(11000)
-  expect(MAP_CLOSE).toBeCloseTo(11000 / 3072, 9)
+test('the map view FLIES, and the path is a figure-eight', { tag: '@nodata' }, () => {
+  // `add eax,6` every frame (0x4A4E5E), wrapped to 4096 — so a lap of the long
+  // axis is 4096/6 frames, a bit under twenty-three seconds.
+  expect(ORBIT_STEP).toBe(6)
+  expect(ORBIT_RADIUS).toBe(11000)
+  expect(ORBIT_FRAMES).toBeCloseTo(4096 / 6, 6)
+
+  // THE SINE'S INDEX IS DOUBLED (0x4A4E67), which is what makes it a
+  // figure-eight rather than a circle: z closes two cycles while x closes one.
+  // A circle holds `x² + z²` constant and this is nowhere near it.
+  const at = (bearing: number): { x: number; z: number } => orbitPoint(bearing)
+  const reach = (bearing: number): number => Math.hypot(at(bearing).x, at(bearing).z)
+
+  // The two ENDS of the eight, half a turn apart, both R out along x.
+  expect(at(0)).toMatchObject({ x: expect.closeTo(ORBIT_RADIUS, 6), z: expect.closeTo(0, 6) })
+  expect(at(2048)).toMatchObject({ x: expect.closeTo(-ORBIT_RADIUS, 6), z: expect.closeTo(0, 6) })
+  // The CROSSING, at a quarter and three quarters of the turn: the path comes
+  // back through the middle of the map, which is the one thing a circle can
+  // never do.
+  expect(reach(1024)).toBeCloseTo(0, 6)
+  expect(reach(3072)).toBeCloseTo(0, 6)
+  // …and between end and crossing it BULGES past the radius, to R·√1.5 — the
+  // widest the flight ever gets.
+  expect(reach(512)).toBeCloseTo(ORBIT_RADIUS * Math.SQRT2 * Math.sqrt(0.75), 4)
+  expect(reach(512)).toBeGreaterThan(ORBIT_RADIUS)
+
+  // The bearing wraps rather than growing without end.
+  expect(advanceBearing(0, 1)).toBe(6)
+  expect(advanceBearing(4092, 1)).toBe(2)
+  expect(advanceBearing(0, ORBIT_FRAMES)).toBeCloseTo(0, 6)
+  // …and it advances on FRACTIONS of a frame, because our frames are not the
+  // exe's.
+  expect(advanceBearing(0, 0.5)).toBeCloseTo(3, 9)
+})
+
+test('the look runs out at 126 frames, or when the flight comes near', { tag: '@nodata' }, () => {
+  // `cmp ecx,7Dh` is tested BEFORE the increment, so the dwell is 126.
+  expect(DWELL_FRAMES).toBe(126)
+  // `cmp eax,1286BB5h` is a SQUARED distance in XZ.
+  expect(NEAR_ENOUGH).toBeCloseTo(Math.sqrt(0x1286bb5), 9)
+  expect(Math.round(NEAR_ENOUGH)).toBe(4408)
+})
+
+test('an easing is the same curve however the frames are cut', { tag: '@nodata' }, () => {
+  // One frame of a sixth is a sixth.
+  expect(easeOver(1 / 6, 1)).toBeCloseTo(1 / 6, 9)
+  // Two frames of a sixth leave (5/6)² of the gap, and asking for two at once
+  // has to agree with asking for one twice — which is the whole point.
+  const once = easeOver(1 / 6, 2)
+  const twice = 1 - (1 - easeOver(1 / 6, 1)) * (1 - easeOver(1 / 6, 1))
+  expect(once).toBeCloseTo(twice, 12)
+  // Nothing at all for no time, and never past the whole gap.
+  expect(easeOver(1 / 6, 0)).toBe(0)
+  expect(easeOver(1 / 6, 1000)).toBeLessThanOrEqual(1)
+  expect(easeOver(1 / 6, -1)).toBe(0)
 })

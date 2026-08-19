@@ -188,7 +188,7 @@ test('confirming the abort ends the mission on the LOSS debrief', async ({ app }
   expect(app.errors()).toEqual([])
 })
 
-test('the pause hands the camera to the MAP VIEW, and it tours', async ({ app }) => {
+test('the pause hands the camera to the MAP VIEW, and it FLIES', async ({ app }) => {
   const { page } = app
   test.setTimeout(90_000)
   await startGame(page)
@@ -216,15 +216,23 @@ test('the pause hands the camera to the MAP VIEW, and it tours', async ({ app })
   // (lib/game/mapView.ts). Play named it: "камера летает по кругу над картой".
   await tap(page, 'pause')
   await expect.poll(async () => (await eye()).view, { message: 'the camera did not survey' }).toBe('map')
-  const survey = await eye()
-  // …and it stands FURTHER OUT than the chase did, which is the one number of
-  // the mode's own row whose reader is traced.
   const reach = (a: number[], b: number[]): number => Math.hypot(a[0] - b[0], a[2] - b[2])
+  const survey = await eye()
+  // …and it leaves the shoulder it was standing over.
   expect(reach(survey.cam, chase.cam)).toBeGreaterThan(1000)
 
-  // The world is still frozen under it — this is a camera, not a resumption.
+  // **AND IT KEEPS FLYING**, which is the whole of what play asked for: the
+  // bearing advances six of 4096 every frame whether or not anything else
+  // changes, so the camera is somewhere else half a second later. The first
+  // build of this switched SUBJECT between pigs and left the camera parked —
+  // that is the VICTORY camera, and on a one-pig map it did not move at all.
   const clock = (await hud(page)).seconds
-  await page.waitForTimeout(600)
+  await page.waitForTimeout(700)
+  const later = await eye()
+  expect(later.view).toBe('map')
+  expect(reach(later.cam, survey.cam), 'the flight is parked').toBeGreaterThan(100)
+
+  // The world is still frozen under it — this is a camera, not a resumption.
   expect((await hud(page)).seconds).toBe(clock)
 
   // Letting go puts the ordinary chase back.

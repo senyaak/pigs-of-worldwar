@@ -7,7 +7,6 @@ import type { Pig } from '../../../lib/game/game'
 import { SWIM_SINK } from '../../../lib/game/locomotion'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
-import { MAP_CLOSE } from '../../../lib/game/mapView'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { clearHeading } from '../../../lib/game/sightline'
 import type { Blocked } from '../../../lib/game/sightline'
@@ -559,11 +558,11 @@ const RIG: Record<
     floor: false
   },
   scope: { close: 0, lift: 0, floor: true },
-  // The SURVEY: the same shoulder rig, standing 11000 out instead of 3072 —
-  // row 7 of 0x4D9528, and the only column of it whose reader is traced. The
-  // pig ends up small and the field ends up in shot, which is the whole point
-  // of the mode.
-  map: { close: MAP_CLOSE, lift: LIFT, floor: true }
+  // The MAP VIEW is here for completeness and is never read, the way `scope`
+  // is: mode 7 does not sit on this rig at all. It flies its own figure-eight
+  // about the world origin at a fixed height and only LOOKS at a pig
+  // (lib/game/mapView.ts, three/battle.ts).
+  map: { close: 0, lift: 0, floor: false }
 }
 
 export interface Chase {

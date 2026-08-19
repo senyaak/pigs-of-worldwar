@@ -452,3 +452,47 @@ parked with the whole field in shot.
 negative readings said "not a bug in what you built", which is exactly what
 they should say about a feature that does not exist — and the way to tell
 those two apart was not more measuring. It was play pointing at the note.
+
+### …and the flight was built from half a reading — 2026-08-19, the pass after
+
+Play, on the build: *"камера всё ещё не летает"*, and then the diagnosis I had
+not made: *"переключает субъект между свиньями — это камера победы; камера
+паузы прям летает над полем по кругу."* Exactly right, and the duplication was
+literal — `endOfGame.ts` already walks survivors on a `TOUR_SECONDS`, and the
+new module had reached for the same name.
+
+The note it was built from — `scanner/notes.md`, mine, written for skill 63 —
+described the subject-stepping half of camera mode 7 and **nothing else**. The
+handler was re-read to its last instruction and the flight is the larger half
+of it:
+
+- `add eax,6` at **0x4A4E5E**, unconditional, every frame — so the camera moves
+  whether or not the subject does. My "it would park with one pig" was a
+  conclusion from a reading that had never looked at this instruction, and CAMP
+  fields exactly one pig, which is why play saw nothing at all.
+- `add ecx,ecx` at **0x4A4E67** doubles the SINE's index, so the path is
+  `x = R·cos θ`, `z = R·sin 2θ` — a 1:2 Lissajous about the world origin. **A
+  figure-eight, not a circle**, crossing through the middle of the map twice a
+  lap and bulging to R·√1.5 at the corners.
+- the radius is the float `[0x4BD6E8] = 11000`, and **not** row 7 of the
+  per-mode table, which happens to read 11000 in its first column and has no
+  reader anywhere. The `MAP_CLOSE` the first build derived as a fraction of the
+  chase rig was doubly wrong: wrong number, and the mode is not on that rig.
+- the height is fixed at twice the map's highest vertex — which through
+  `fromExeY`'s halving is exactly `TerrainQuery.peak`, so the query grew one
+  field rather than the module growing a constant.
+- 126 frames a subject (`cmp ecx,7Dh` is tested BEFORE the increment), and ONE
+  early-out, the flight passing within 4408 units. The "or leaves the screen"
+  in the old note was a misread of the `+0x30` draw flag, which is the search
+  loop's eligibility filter.
+- three easings, and the look-at's 1/13 a frame is mode 7's alone — every other
+  mode gets a third. That is what makes a change of subject a sweep.
+
+`easeOver` is the one thing here that is ours rather than read: the exe eases
+per fixed frame and our frames are not fixed, so a factor is applied as
+`1 − (1−f)^n`. The unit spec pins that asking for two frames at once agrees
+with asking for one twice, which is the only property that matters.
+
+The e2e now asserts the camera is somewhere ELSE seven hundred milliseconds
+into a pause while the turn clock has not moved — a parked flight passes every
+"is it in map view" check and fails that one.

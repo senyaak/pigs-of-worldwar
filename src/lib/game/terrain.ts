@@ -291,6 +291,16 @@ export class TerrainQuery {
   private readonly grid: TerrainBlock[][]
   /** The fitted water level in elevation units, null on a dry map. */
   readonly waterElevation: number | null
+  /**
+   * The map's HIGHEST ground, in game space — so the most negative `height`
+   * anywhere on it, y being down.
+   *
+   * The exe keeps the same thing at `[landscape+0x30]`, filled at heightmap
+   * load with `max(h*2)` over every vertex (0x4A5789) in its own doubled
+   * units — which `fromExeY` halves back to exactly this. The MAP VIEW camera
+   * flies at it (lib/game/mapView.ts).
+   */
+  readonly peak: number
   /** Per-cell region water levels (elevation units), null where dry. */
   private readonly waterLevels: (number | null)[][]
   /** Every mine tile, worked out on the first ask (`mineTiles`). */
@@ -305,6 +315,11 @@ export class TerrainQuery {
     this.minX = Math.min(...blocks.map((b) => b.x))
     this.minZ = Math.min(...blocks.map((b) => b.z))
     this.waterElevation = fitWaterElevation(blocks)
+    let highest = 0
+    for (const block of blocks) {
+      for (const height of block.heights) if (height > highest) highest = height
+    }
+    this.peak = -highest * HEIGHT_SCALE
     this.waterLevels = waterLevelGrid(blocks)
     this.grid = []
     for (const block of blocks) {
