@@ -118,7 +118,12 @@ reasoning, the false starts and the sessions behind them are in
   the constants, `[play]` for walls not being ladders.
 - **A map does not place the same things in every game.** The low byte of a
   record's flags is which player count it exists in, and the loader drops it
-  otherwise (0x4a58cb). `[exe]`
+  otherwise (0x4a58cb). **The count to ask with is the number of PLAYERS, and
+  the campaign is ONE** — not the number of sides fielded, which is two.
+  Confusing them cost ROAD its whole squad: its five scripted markers carry
+  low byte 0x71, the first player bit only, so at two players the player's
+  side vanished and the enemy's four-player pair was promoted to ours.
+  `PLAYERS` in `lib/game/muster.ts`, pinned in `e2e/002/spawns.spec.ts`. `[exe]`
 - **The SKY is a MODEL, and the `Skys/` folder is not it.** `Chars/SKYDOME.MAD`
   carries two hemispheres — `skydome` over the horizon, `skydomeu` under it,
   544 triangles each in four quadrants — and one of eleven `Chars/<mood>.MAD`

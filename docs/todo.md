@@ -68,7 +68,9 @@ ISLAND, LAKE, ONEWAY, then the six GEN\* skirmish maps.
   `ui/titleCard.ts` had BOOT CAMP hard-coded at 11 + 10 already, and CAMP's id
   is 10. The card names every campaign map now.
 
-**Every mission opens CAMP for now** — the list is real, the levels are not.
+~~**Every mission opens CAMP for now**~~ **NOT ANY MORE, 2026-08-19** — the
+campaign opens its own level now, and every one of them was measured open.
+Section 0A has the sweep and the one bug it turned up.
 
 ### The order to do it in
 
@@ -325,9 +327,10 @@ actually seen.
 
 - The campaign SPINE is closed: save, slots, autosave, LOAD GAME, the
   tutorial question, the map chain and the three mission exits all run.
-  **Every mission still opens CAMP** (`MISSION_STAND_IN`, `main.ts`) — the
-  campaign of 26 is real, the other twenty-five levels wait on an AI to
-  field their far side.
+  ~~**Every mission still opens CAMP**~~ **the campaign opens its own level,
+  2026-08-19** — `nextMap(save)` in `main.ts`. All 53 real maps open; what is
+  still missing is an AI and a verdict that knows whose side is whose, which
+  is section 0A.
 - ~~The read-from-scratch debts~~ **ALL THREE READ 2026-08-17**, each a build
   now waiting on nothing:
   - ~~**LOAD/SAVE (kinds 8/9)**~~ **LOAD BUILT 2026-08-18** —
@@ -451,6 +454,83 @@ actually seen.
     the latter and 240 has no reader in `.text` at all. What is still the
     FRONTEND's half — REALLY QUIT? and REALLY QUIT APP? — can reuse the
     kind-12 confirm module.
+
+## 0A. PLAYING THE REAL CAMPAIGN — what stands between us and mission 1
+
+Play asked on 2026-08-19: what is left before the first map can be loaded. The
+answer turned out to be shorter than this list looks, because most of it is
+already built — so this section says what was MEASURED that day, not what was
+assumed.
+
+**The map opens today.** `pow.swapMap('ESTU')` — position 1's own level —
+loads with no errors and stands TWO squads on it: ours of three (which is what
+`fieldedAt` gives position 1) and the French `GARLIC GRUNTS`, three, in skin 2.
+So "the levels are not playable" was never about the levels.
+
+**And so does the rest of the turn machinery.** `Game.endTurn` moves the acting
+pig, then walks to the next side that still has anybody standing, turns the
+turn number over and resets the clock (`lib/game/game.ts`). Both sides take
+their turns from the same keyboard, which `e2e/002/battle.spec.ts` already
+drives on LIBERATE. The verdict "one side left standing" exists
+(`lib/game/endOfGame.ts`).
+
+What is actually missing, in the order it is worth doing:
+
+1. ~~**Every campaign map has to OPEN**~~ **DONE 2026-08-19, and the sweep
+   found a real bug on the way.** All 59 names were opened one after another
+   through `swapMap` in one run: **53 open, with not one console error
+   between them**, and the six that refuse are the `GEN*` texture sets, which
+   carry no spawn markers and are not maps. `main.ts` opens `nextMap(save)`
+   now.
+
+   **The bug was ROAD — mission 2 — and it was a confusion of two numbers.**
+   The battle filtered a map's records by `SIDES_FIELDED`, which is 2 because
+   two squads play, where the exe's own test asks how many PLAYERS the game
+   has. The campaign is ONE. Measured over ROAD's POG: its five scripted
+   markers, the player's own side, carry low byte 0x71 — only the first
+   player bit — so asking for two dropped the whole squad, and the enemy's
+   two four-player markers were promoted to ours because no surviving side
+   carried the scripted bit. ROAD opened as a lone pair of pigs with nobody
+   to fight, and `outcomeOf` would have called it won on the first handover.
+   At one player it fields 5 against 3. Over all 59 maps exactly two read
+   differently either way, ROAD and BOOM (the arena, whose four sides are the
+   multiplayer set). `lib/game/muster.ts` carries `PLAYERS = 1` beside
+   `SIDES_FIELDED = 2` now, and `e2e/002/spawns.spec.ts` pins ROAD.
+
+2. **The verdict does not know whose side is the player's, and on a real
+   mission that is wrong.** `outcomeOf` answers `'won'` on
+   `sidesStanding === 1` and `'lost'` only when NOBODY is standing
+   (`lib/game/endOfGame.ts`) — so losing your whole squad reads as a win and
+   the debrief pays for it. The training ground never noticed because it has
+   its own branch on targets. The battle needs to know which side is ours, and
+   the answer is already in the spawn data: exactly one side per shipped map
+   carries the player bit (`lib/game/spawns.ts`, and CLAUDE.md's fact about
+   record `+0x58`).
+
+3. **The SAVE's squad does not reach the field.** A battle musters from the
+   map's markers and the nation's `fetext` names — which is why our pigs on
+   ESTU are NOBBY, GINGER and DEN rather than whoever the save holds — and
+   `roster.ts`/`fieldedAt` are read only by the debrief, the squad screen and
+   the newspaper. Nothing carries losses back either, so `missionWonResult`
+   counts casualties off an untouched roster. This is the link both ends of
+   the campaign are waiting on: who goes out, who comes back, and the
+   RETRY/EDIT SQUAD asymmetry that cannot bite until it exists.
+
+4. **A turn is 45 seconds on every map but CAMP.** `BY_MAP` in
+   `lib/game/turns.ts` has one key, because the exe's turn clock is indexed by
+   a LEVEL NUMBER and the map→level link is not decoded. Known gap, written
+   there.
+
+5. **There is no AI, and that is the whole of what is left after the four
+   above.** Six greps' worth of comments say so and not one line does anything
+   about it (`muster.ts`, `spawns.ts`, `main.ts`, `multiPlayer.ts`). Until it
+   exists a mission is a hotseat: the enemy stands where it spawned and its
+   turn is ended by hand.
+
+Not blockers for mission 1, though the lists carry them: the pillbox's two
+weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens
+(`bonusPoints(1)` is 0 — the first mission pays none), the empty power-gauge
+slot, and the three arch bridges that are fallen through (ESTU is not one).
 
 ## A. THE TUTORIAL — finish the training ground
 

@@ -18,6 +18,8 @@ import { GAME_DIR } from '../launch'
 import { startGame } from '../menu'
 import { existsForPlayers, parsePog } from '../../src/lib/formats/pog'
 import { MAX_TEAMS, battleSides, mapSpawns, spawnTeams } from '../../src/lib/game/spawns'
+import { PLAYERS, fielded } from '../../src/lib/game/muster'
+import { CAMPAIGN, MAP_NAMES } from '../../src/lib/game/missions'
 import type { SpawnPoint } from '../../src/lib/game/spawns'
 import { classArt } from '../../src/renderer/src/three/soldiers'
 
@@ -60,6 +62,55 @@ test('a map does not field the same squad in every game', () => {
   const spots = (side: SpawnPoint[]): string[] =>
     side.map((at) => `${at.x},${at.z}`).sort()
   expect(spots(forPlayers(1)[1])).toEqual(spots(forPlayers(2)[1]))
+})
+
+test('the campaign is ONE player, and ROAD is the map that proves it', () => {
+  // The count the battle filters by is the number of PLAYERS, not the number
+  // of sides it fields — and ROAD is where getting that wrong shows. Its five
+  // scripted markers, the player's own squad, carry low byte 0x71: the only
+  // player bit set is the first. Ask for two and every one of them goes, and
+  // what is left is the enemy's two four-player markers — which, since no
+  // surviving side carries the scripted bit, are promoted to OURS. Mission 2
+  // opened as a lone pair of pigs with nobody to fight.
+  const sides = (players: number): SpawnPoint[][] =>
+    spawnTeams(pog('ROAD').filter((object) => existsForPlayers(object, players)))
+  expect(sides(2).map((side) => side.length)).toEqual([2])
+  expect(sides(1).map((side) => side.length)).toEqual([5, 3])
+
+  // So the campaign fields at ONE, and that is what `fielded` hands the
+  // battle. Five against three, ours first, and ours is the scripted side.
+  expect(PLAYERS).toBe(1)
+  const asPlayed = spawnTeams(fielded(pog('ROAD')))
+  expect(asPlayed.map((side) => side.length)).toEqual([5, 3])
+  expect(asPlayed[0].every((at) => at.player)).toBe(true)
+  expect(asPlayed[1].some((at) => at.player)).toBe(false)
+})
+
+test('every campaign map fields two sides, and only the GEN sets field none', () => {
+  // The survey ROAD's bug slipped through. It is the whole shipped list, read
+  // from the files rather than from a battle, so it costs nothing to run and
+  // it fails the moment a map stops fielding an opponent.
+  const sides = (name: string): number[] =>
+    spawnTeams(fielded(pog(name))).map((side) => side.length)
+
+  for (const [position, id] of CAMPAIGN.entries()) {
+    const name = MAP_NAMES[id]
+    const fields = sides(name)
+    if (name === 'CAMP') {
+      // The training ground is one pig and no opponent, on purpose.
+      expect(fields, name).toEqual([1])
+      continue
+    }
+    expect(fields.length, `${name} (position ${position}) fields one side only`).toBeGreaterThan(1)
+    expect(fields[0], `${name} fields nobody of ours`).toBeGreaterThan(0)
+    expect(fields[1], `${name} fields nobody against us`).toBeGreaterThan(0)
+  }
+
+  // …and the six GEN sets are not maps at all: no markers, so nothing to
+  // field, which is exactly why the battle refuses them.
+  for (const name of MAP_NAMES.filter((one) => one.startsWith('GEN'))) {
+    expect(sides(name), name).toEqual([])
+  }
 })
 
 test('a marker carries the class, and the class picks the art', () => {

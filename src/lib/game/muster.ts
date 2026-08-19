@@ -39,15 +39,34 @@ export interface Squad {
 }
 
 /**
+ * How many PLAYERS the game has — **which is not how many sides it fields**,
+ * and confusing the two dropped a whole campaign map's own squad.
+ *
+ * The campaign is one player against the computer, so it is 1. The number
+ * beside it, `SIDES_FIELDED`, is 2 because two squads stand on the map; the
+ * exe's own record filter asks the first question and never the second.
+ */
+export const PLAYERS = 1
+
+/**
  * The records this many players actually get.
  *
  * A map does not place the same things in every game: the low byte of a
  * record's flags says which player counts it exists in. BOOM is the map that
  * shows it — one-player snipers and multiplayer grunts on the very same spots
  * (lib/formats/pog.ts).
+ *
+ * **ROAD is the map that proves the count has to be 1.** Measured over its
+ * POG: its five scripted markers — the player's own side — carry low byte
+ * 0x71, whose only player bit is the first, so asking for two players drops
+ * every one of them. What was left was the enemy's two four-player markers,
+ * and since no surviving side carried the scripted bit they were promoted to
+ * OUR squad: mission 2 opened as a lone pair of pigs with nobody to fight. At
+ * one player the same map fields 5 against 3, which is a mission. ROAD and
+ * BOOM are the only two of the 59 that read differently either way.
  */
-export function fielded(objects: MapObject[]): MapObject[] {
-  return objects.filter((object) => existsForPlayers(object, SIDES_FIELDED))
+export function fielded(objects: MapObject[], players: number = PLAYERS): MapObject[] {
+  return objects.filter((object) => existsForPlayers(object, players))
 }
 
 /**

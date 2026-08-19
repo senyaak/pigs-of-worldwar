@@ -25,6 +25,7 @@ import { initBattle } from './ui/battle'
 import { feText } from './ui/barScreen'
 import { FIELDED, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
 import { mapAt, mapId } from '../../lib/game/missions'
+import { nextMap } from '../../lib/game/save'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
 import * as campaign from './campaign'
@@ -126,12 +127,19 @@ const viewer = initModelViewer(() => show(viewerOrigin))
 const terrain = initTerrainViewer()
 
 /**
- * Every campaign mission opens the TRAINING GROUND for now — the list of 26
- * is real (`lib/game/missions.ts`), the twenty-five levels above it are not
- * playable yet, there being no AI to field their other side (`docs/todo.md`).
- * `[gap]`: swap this for `nextMap(save)` when the levels land.
+ * WHICH LEVEL a mission opens: the campaign's own, `CAMPAIGN[position]`.
+ *
+ * This used to be the training ground for every mission of the twenty-six, on
+ * the grounds that the levels were not playable. They are: all 53 real maps
+ * open, measured one by one, and the only six that refuse are the `GEN*`
+ * texture sets, which carry no spawn markers and are not maps. What is still
+ * missing is an AI — so a mission is a HOTSEAT, both sides driven from the
+ * same keyboard — and a verdict that knows whose side is whose
+ * (`docs/todo.md`, section 0A).
+ *
+ * A battle with no campaign behind it falls back on the training ground.
  */
-const MISSION_STAND_IN = 'CAMP'
+const NO_CAMPAIGN_MAP = 'CAMP'
 
 /** Whether the battle on screen belongs to the campaign — a MULTI-PLAYER
  * skirmish leaves the way it always has, back to the main menu. */
@@ -177,7 +185,8 @@ function toBriefing(): void {
   // whoever this mission is against. The MAP says only where the pigs stand
   // (lib/game/nations.ts, lib/game/spawns.ts).
   const wearing = save && enemy !== null ? [save.nation, enemy] : undefined
-  briefing.show(position, enemy, battle.open(MISSION_STAND_IN, wearing))
+  const level = (save && nextMap(save)) || NO_CAMPAIGN_MAP
+  briefing.show(position, enemy, battle.open(level, wearing))
 }
 
 // The world map → region → flags sequence, the exe's 0x482C30. Skippable —

@@ -782,6 +782,48 @@ its colours corrected, the flags on conquered positions (nothing is conquered
 before the second mission, so the first shows poles and none — the exe's own
 rule, and what read as a bug), and any region past the first.
 
+## THE CAMPAIGN OPENS ITS OWN LEVELS — 2026-08-19
+
+Play asked what was left before the first map could be loaded. Most of the
+answer was "nothing", and finding that out took a measurement rather than a
+reading of the lists.
+
+**What was already true.** `pow.swapMap('ESTU')` — position 1's own level —
+opened with no errors and stood two squads on it: ours of three and the French
+`GARLIC GRUNTS`, three, in their own skin. The turn machinery underneath was
+built too: `Game.endTurn` walks to the next side with anybody standing, turns
+the turn number over and resets the clock, and both sides take their turns from
+one keyboard, which `e2e/002/battle.spec.ts` had been driving on LIBERATE for a
+while. The verdict "one side left standing" existed. So the note that said the
+levels were not playable was a year older than the code under it.
+
+**The sweep.** All 59 map names, opened one after another in one run through
+`swapMap`: **53 open, not one console error between them**; the six refusals
+are the `GEN*` texture sets, which carry no spawn markers and were never maps.
+`main.ts` opens `nextMap(save)` now instead of the training ground.
+
+**And the sweep earned its keep on the third map.** ROAD — mission 2 — came up
+with a single squad of two pigs and nobody to fight. The cause was two numbers
+wearing one name: the battle filtered a map's records by `SIDES_FIELDED`, which
+is 2 because two squads play, where the exe's test asks how many PLAYERS the
+game has, and the campaign is one. ROAD's five scripted markers carry low byte
+0x71 — the first player bit only — so asking for two dropped the player's whole
+side, and the enemy's two four-player markers were promoted to ours, no
+surviving side carrying the scripted bit. `outcomeOf` would have called that
+won on the first handover. At one player ROAD fields 5 against 3. Over the
+whole shipped list exactly two maps read differently either way: ROAD and BOOM,
+the arena whose four sides are its multiplayer set — which `spawns.spec.ts` had
+already pinned as "one player gets two sides", a fact read and then not wired
+up.
+
+The survey that would have caught it is cheap and is in the suite now: every
+campaign map fields two sides from the files alone, CAMP fields its one pig,
+the GEN sets field none.
+
+What is still between here and a mission that can be WON properly is section 0A
+of `docs/todo.md`: no AI, a verdict that does not know whose side is ours, the
+save's squad not reaching the field, and a turn clock that knows only CAMP.
+
 ## What is still not read
 
 **Swept 2026-08-11 — docs/todo.md section D is the live list now**, and most of
