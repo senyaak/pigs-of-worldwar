@@ -24,6 +24,7 @@ import { weaponOf } from './weapons'
 import type { Firing } from './shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
+import { createStubBrain } from './ai'
 import { beginWalkAway } from './walkAway'
 import type { WalkAway } from './walkAway'
 import { advanceEndOfGame, beginEndOfGame, outcomeOf } from './endOfGame'
@@ -96,6 +97,12 @@ export interface BattleParts {
   bus: BattleBus
   /** Every roll this battle makes — the tremor's among them (lib/game/random.ts). */
   random: Random
+  /**
+   * Which sides the MACHINE plays (lib/game/ai.ts). Input never drives their
+   * pigs and the battle answers their turns itself. Absent means nobody's —
+   * a battle assembled without it is the hotseat every pure spec drives.
+   */
+  computer?: (side: number) => boolean
 }
 
 /** What the renderer reads once the frame has run. */
@@ -190,6 +197,9 @@ export interface Battle {
     charging: boolean
     armed: boolean
     sights: boolean
+    /** The machine is playing this turn: input must drive nothing
+     * (lib/game/ai.ts). */
+    computerTurn: boolean
   }
   /** End the beat at the top of a turn: any input does. */
   beginTurn(): void
@@ -235,6 +245,12 @@ export function createBattle(parts: BattleParts): Battle {
   const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, effects, numbers } = parts
   const { tumbles, airDrops, dropIn, drowning, onChanged } = parts
   const emit = parts.bus.emit
+
+  /** Which sides the machine plays, and the brain that plays them — the stub
+   * that thinks and passes, today (lib/game/ai.ts). */
+  const computer = parts.computer ?? (() => false)
+  const brain = createStubBrain()
+  const computerTurn = (): boolean => computer(game.players.indexOf(game.currentPlayer))
 
   /** Every pig on the map, as bodies to walk into. */
   const everyone = (): Pig[] => game.players.flatMap((player) => player.pigs)
@@ -580,6 +596,8 @@ export function createBattle(parts: BattleParts): Battle {
     struck = false
     sights.setHeld(false)
     swings.reset()
+    // A turn is a fresh start for the machine too (lib/game/ai.ts).
+    brain.reset()
     emit({ kind: 'cameraReset' })
   }
 
@@ -742,6 +760,37 @@ export function createBattle(parts: BattleParts): Battle {
     }
 
     const acting = game.currentPig
+
+    // **THE COMPUTER'S TURN.** The machine plays this side, so nothing the
+    // player holds is read past here — input is muted at the source too
+    // (input/battleInput.ts) — and the brain's orders are carried out instead:
+    // it waits out the GET READY card, begins the beat, stands THINKING with
+    // SKIP TURN in hand, and passes. The pass goes through the same
+    // `endTurnBeat` every other way of ending a turn takes, so the WALK AWAY
+    // beat and the one place a mission can end stay one road. If the brain
+    // ever stalls, the clock above still runs the turn out.
+    if (computerTurn()) {
+      switch (brain.update(delta, game.starting)) {
+        case 'begin':
+          game.beginTurn()
+          break
+        case 'think':
+          // In hand for the dashboard's slot; the pose is put on HERE because
+          // the player's own SKIP-TURN block further down is never reached.
+          acting.holding = SKILL.SKIP_TURN
+          anim.setClip(acting, ANIM.THINKING)
+          anim.overlay(acting, -1, 0)
+          break
+        case 'pass':
+          acting.holding = null
+          // The same announcement the player's skip makes (the menu's noise).
+          emit({ kind: 'skillUsed' })
+          endTurnBeat()
+          break
+      }
+      onChanged()
+      return
+    }
 
     // "START OF TURN - press any key to continue": the pig stands, and nothing
     // here ends the beat. ENDING it belongs to the input layer, and to one
@@ -1262,7 +1311,11 @@ export function createBattle(parts: BattleParts): Battle {
         climbing !== null ||
         leaving !== null ||
         carry !== null,
-      sights: layerSights(weaponLayer(game.currentPig.holding)) && !dropIn.running()
+      sights: layerSights(weaponLayer(game.currentPig.holding)) && !dropIn.running(),
+      // The machine is playing: the input layer reads this and drives nothing
+      // (input/battleInput.ts). ESCAPE still pauses — it never reaches the
+      // rules to begin with.
+      computerTurn: computerTurn()
     }),
     beginTurn: () => game.beginTurn(),
     cutTurnBeat() {

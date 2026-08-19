@@ -135,7 +135,8 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
     locked: false,
     charging: false,
     armed: false,
-    sights: false
+    sights: false,
+    computerTurn: false
   }
 
   /** The axes, by whichever test the caller wants: everything that is DOWN, or
@@ -353,6 +354,20 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
       host.togglePause()
       // …and the pause is spent alone. Anything queued alongside it belongs to
       // the frame the player has just stopped.
+      return
+    }
+
+    // THE MACHINE'S TURN IS NOT THE PLAYER'S. Every verb and every axis is
+    // dropped rather than banked — the same rule the pause takes — so nothing
+    // here opens the enemy's menu, arms its weapon or cuts its GET READY
+    // short. ESCAPE was taken out above and still pauses; the battle answers
+    // the machine's turn itself (lib/game/ai.ts).
+    if (battle.situation().computerTurn) {
+      battle.setIntent(0, 0)
+      battle.setAim(0)
+      battle.setSighting(false)
+      battle.setFiring(false, false)
+      stepped = { x: 0, y: 0 }
       return
     }
 

@@ -129,6 +129,12 @@ export interface EngineParts {
    * that wants to answer it some other way, and for the pure specs.
    */
   pose?: Pose
+  /**
+   * Which sides the MACHINE plays (lib/game/ai.ts, lib/game/battle.ts). The
+   * app hands in "everyone but side 0"; left out, nobody's — a battle
+   * assembled without it is the hotseat the pure specs drive.
+   */
+  computer?: (side: number) => boolean
 }
 
 /**
@@ -421,7 +427,8 @@ export function createEngine(parts: EngineParts): Engine {
     targetsLeft,
     onChanged,
     bus,
-    random
+    random,
+    computer: parts.computer
   })
 
   /** One STEP of the rules: the frame's own order of events first — it reads

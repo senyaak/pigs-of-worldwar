@@ -525,11 +525,18 @@ What is actually missing, in the order it is worth doing:
    every campaign map by name, arenas on the 45 default,
    `unit/turns.spec.ts` pinning the corners.
 
-5. **There is no AI, and that is the whole of what is left of this list.**
-   Six greps' worth of comments say so and not one line does anything
-   about it (`muster.ts`, `spawns.ts`, `main.ts`, `multiPlayer.ts`). Until it
-   exists a mission is a hotseat: the enemy stands where it spawned and its
-   turn is ended by hand.
+5. **There is no AI — but its SEAT is built, 2026-08-20.** The battle knows
+   which sides the machine plays (`computer(side)` — the app hands in
+   "everyone but side 0"), input never drives a machine pig
+   (`input/battleInput.ts` mutes everything but ESCAPE on its turn), and the
+   machine's turn runs itself through the one road every turn takes:
+   `lib/game/ai.ts` is the brain, and today's brain waits out the GET READY
+   card, stands THINKING (clip 46), and passes. So a mission plays start to
+   finish with the enemy passing every turn; what is left is a brain that
+   DOES something — and it must stay a function of stepped time and the
+   battle's one random stream, because lockstep (the `net` branch) will feed
+   the same seam. The pure specs and `engine-headless` stay hotseat: nobody
+   is the computer unless the assembler says so.
 
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens

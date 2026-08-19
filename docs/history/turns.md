@@ -677,3 +677,36 @@ while `pause5`'s uniform dark rim and `fpole`'s solid columns — both of
 which broader drafts of the rule ate — stay whole. The current mission's
 white FLASH on the world map is untouched: that one is the exe's own
 (0x482D99, colour forced white over the additive blend).
+
+## The machine takes its own turn — the AI's seat, with a stub in it (2026-08-20)
+
+Until now a mission was a hotseat: the handover put the camera on the enemy
+pig and the same keyboard drove it. What landed is the SEAM, not a mind:
+
+- **Which sides the machine plays is the battle's `computer(side)`**
+  (`BattleParts`, threaded through `EngineParts`). The app hands in "everyone
+  but side 0" — side 0 is ours, the same load-bearing convention the verdict
+  uses — and nothing else does: a battle assembled without it (every pure
+  spec, `engine-headless`) is the hotseat it always was.
+- **Input never drives a machine pig.** `battleInput.poll` reads
+  `situation().computerTurn` and drops every verb and axis — the same rule
+  the pause takes, so nothing banks up — with ESCAPE untouched, because the
+  pause is taken out of the queue before the gate.
+- **The machine's turn is answered inside `battle.update`**, in a block that
+  runs where the player's control sets would: the brain (`lib/game/ai.ts`)
+  orders `begin` after 2 s of the GET READY card, `think` once — SKIP TURN in
+  hand, clip 46 on — and `pass` after 2 s more, through the same
+  `endTurnBeat` → WALK AWAY → `handOver` road every turn takes, so the
+  mission verdict keeps its one home. If the brain ever stalls, the turn
+  clock still runs the turn out: the clock block sits above and ticks
+  regardless.
+- **The brain is deterministic on purpose** — orders are a function of the
+  battle's stepped time, and a real brain must keep that and roll only from
+  the battle's seeded stream, because the `net` branch will drive this same
+  seam in lockstep. Both waits are `[deliberate]` remake numbers
+  (`AI_START_SECONDS`, `AI_THINK_SECONDS`), tuned for watchability.
+
+`unit/ai.spec.ts` pins the order sequence (including the beat expiring on its
+own 9.98 s before the brain was ever asked while it held);
+`e2e/002/battle.spec.ts`'s rotation now watches the French pass their own
+turn instead of clicking it away.

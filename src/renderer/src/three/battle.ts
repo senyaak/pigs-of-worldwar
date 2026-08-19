@@ -360,7 +360,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     },
     query,
     onChanged: onGameChanged,
-    bus
+    bus,
+    // The MACHINE plays everyone but side 0 — the campaign's own, which the
+    // spawn order puts first (lib/game/muster.ts). Today its brain only
+    // passes (lib/game/ai.ts); multiplayer will rewire this seam.
+    computer: (side) => side > 0
   })
   const { battle, scenery, obstacles, anim, swings, shots, grenades, mines, effects, numbers, airDrops, dropIn } =
     engine
