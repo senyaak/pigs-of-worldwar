@@ -10,7 +10,21 @@
 //     rgb   = PALETTE[flags & 0x1F] * shade >> 9            // 5 bits a channel
 //     if (flags & 0x40) rgb = (31, 0, 0)                    // a MINE, solid red
 //
-// Two things follow that are worth stating plainly.
+// Three things follow that are worth stating plainly.
+//
+// **The white on it is the ORIGINAL's**, and it was checked when play reported
+// it. The clamp is the library's own — `cmp ecx,1Fh / jle / mov ecx,1Fh` on
+// each channel in turn (dll 0x1000A3F4..0x1000A40D) — and the channel really
+// is five bits: the mine writes 31, not 255. So any palette row over 82 blows
+// out at high ground, and row 9 is `100,100,100`: on CAMP, whose boundary
+// plateau averages 3087 against 1489 in the middle, the whole rim clamps to
+// pure white and the board wears a white frame. Play saw exactly that — "на
+// карте мира 4 белые полоски" — and it is what the exe draws.
+//
+// The SIGN behind that was read rather than assumed (`scanner/notes.md`, four
+// independent proofs): `height` is an elevation, positive UP, so shade 64 is
+// the map's lowest vertex and 194 its highest — the picture lights the PEAKS.
+// Turning it the other way up puts 941 white texels on CAMP instead of 208.
 //
 // **Mines DO show on the map, as red tiles** — but only the ones already on
 // the map when the battle opens, because the texture is written once and never
@@ -24,6 +38,10 @@
 // world z, and fills texel (column, row) from record `column + 65*row` — so
 // the picture's COLUMN runs along world z and its ROW along world x. Kept that
 // way here so the drawer can hand the board its corners without a flip.
+//
+// One thing the library does that this does not: its column 0 is a COPY of
+// column 1 (`cmp edi,1 / jne` at 0x1000A431, which writes the texel twice).
+// `[gap]`, and a one-texel one.
 //
 // Pure: blocks in, pixels out.
 

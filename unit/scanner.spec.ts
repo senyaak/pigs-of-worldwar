@@ -24,8 +24,9 @@ import {
   projectScanner,
   scannerShrink
 } from '../src/lib/game/scanner'
-import { GROUND_PALETTE, MINE_TEXEL, RASTER_SIZE, RASTER_WORLD } from '../src/lib/game/mapRaster'
-import { BLOCKS_PER_SIDE, TILES_PER_SIDE } from '../src/lib/formats/pmg'
+import { GROUND_PALETTE, MINE_TEXEL, RASTER_SIZE, RASTER_WORLD, mapRaster } from '../src/lib/game/mapRaster'
+import type { TerrainBlock } from '../src/lib/formats/pmg'
+import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP } from '../src/lib/formats/pmg'
 import type { MapObject } from '../src/lib/formats/pog'
 import type { Pig, Player } from '../src/lib/game/game'
 import { LARD } from '../src/lib/game/nations'
@@ -175,4 +176,40 @@ test('the entrance is twenty frames and ends settled', { tag: '@nodata' }, () =>
   // It overshoots and comes back — the table's own bounce at 13..17.
   expect(Math.max(...SCANNER_SLIDE.slice(0, 15))).toBe(100)
   expect(SCANNER_SLIDE[14]).toBeLessThan(100)
+})
+
+/** One block of flat ground of one type, at grid position (bx, bz). */
+const flatBlock = (bx: number, bz: number, height: number, type: number): TerrainBlock => ({
+  x: bx * TILE_STEP - RASTER_WORLD / 2,
+  z: bz * TILE_STEP - RASTER_WORLD / 2,
+  heights: Int16Array.from(new Array((TILES_PER_SIDE + 1) ** 2).fill(height)),
+  shades: new Uint8Array((TILES_PER_SIDE + 1) ** 2),
+  tiles: new Array(TILES_PER_SIDE ** 2).fill(0).map(() => ({
+    texture: 0,
+    rotateFlip: 0,
+    type,
+    slip: 0
+  }))
+})
+
+test('the picture lights the PEAKS, and high ground CLAMPS to white', { tag: '@nodata' }, () => {
+  // Play reported four white stripes round the board and they are the
+  // ORIGINAL's: the library shades a texel `palette[type] * shade >> 9` with
+  // shade 64 at the map's lowest vertex and 194 at its highest, and clamps
+  // each channel at 31 — `cmp ecx,1Fh / jle / mov ecx,1Fh`, dll 0x1000A3F4.
+  // Row 9 is (100,100,100), and 100*194>>9 is 37, so any high grey ground
+  // comes out pure white. CAMP's boundary plateau is exactly that.
+  const raster = mapRaster([flatBlock(0, 0, 64, 9), flatBlock(4, 0, 4352, 9)])
+  const texel = (x: number, z: number): number[] => {
+    const at = (x * RASTER_SIZE + z) * 4
+    return [raster.rgba[at], raster.rgba[at + 1], raster.rgba[at + 2]]
+  }
+  // The LOWEST ground is shade 64, where the arithmetic is the exact 8→5 bit
+  // conversion — the palette entry as authored, `100 >> 3` back out as 99.
+  expect(texel(0, 0)).toEqual([99, 99, 99])
+  // The HIGHEST is 194, which saturates. This is the white play saw.
+  expect(texel(4, 0)).toEqual([255, 255, 255])
+  // …and that direction is READ, not assumed (`scanner/notes.md`): height is
+  // an elevation, positive UP. Turning it over would darken the peaks.
+  expect(texel(4, 0)[0]).toBeGreaterThan(texel(0, 0)[0])
 })
