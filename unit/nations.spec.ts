@@ -139,6 +139,32 @@ test('the squads wear what they are HANDED, not what the map slots them in', { t
   expect(squads.map((squad) => skinOf(squad.nation))).toEqual([0, 3])
 })
 
+test('the SAVE\'s squad takes the field: side 0 wears its names and RANKS', { tag: '@nodata' }, () => {
+  const road = [
+    marker(0, true, 1),
+    marker(0, true, 2),
+    marker(0, true, 3),
+    marker(5, false, 4),
+    marker(5, false, 5)
+  ]
+  const own = {
+    name: 'MY TEAM',
+    pigs: [
+      { name: 'ALPHA', pigClass: 9 },
+      { name: 'BRAVO', pigClass: 0 }
+    ]
+  }
+  const squads = mapSquads(road, teamList(), [0, 5], own)
+  // Two of the three markers are taken — the ROSTER's count, not the map's —
+  // and the class on each is the pig's own rank, not the marker's.
+  expect(squads[0].name).toBe('MY TEAM')
+  expect(squads[0].pigNames).toEqual(['ALPHA', 'BRAVO'])
+  expect(squads[0].spawns.map((at) => at.pigClass)).toEqual([9, 0])
+  // The enemy is still dressed from `fetext`, capped by its own markers.
+  expect(squads[1].name).toBe('GERMAN')
+  expect(squads[1].pigNames).toEqual(['ONE', 'TWO'])
+})
+
 test('handed nothing, a side falls back on its own position', { tag: '@nodata' }, () => {
   // What a battle opened from the console gets, and what the headless spec
   // runs on: no campaign behind it, so no chosen uniforms.

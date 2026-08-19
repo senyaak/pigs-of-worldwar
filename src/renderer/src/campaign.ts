@@ -102,9 +102,9 @@ export function adopt(from: { slot: string; save: SaveGame }): SaveGame {
  * with the training ground's `(own + 1) % 6` covering a loaded save from
  * before the table existed.
  *
- * The squad handed in is the roster as the battle left it — today that is the
- * roster untouched, because a battle does not yet field the SAVE's pigs
- * (`docs/todo.md`); the fallen arrive with that link.
+ * The squad handed in is the roster as the battle left it: `main.ts` has
+ * already stamped the battle's dead onto it with `fall`, in the order they
+ * went down, so the losses counted here are the mission's own.
  */
 export function missionWonResult(): SaveGame | null {
   if (!save) return null
@@ -131,9 +131,12 @@ export async function acceptMission(): Promise<SaveGame | null> {
 }
 
 /** The debrief chose REPLAY (or the mission was lost): the result is thrown
- * away and the save stands as the mission found it. */
+ * away and the save stands as the mission found it — the battle's fall marks
+ * included, because a replay fields the whole front line again and a lost
+ * mission writes nothing (the manual's "do the level all over again"). */
 export const discardMission = (): void => {
   pending = null
+  if (save) save = { ...save, squad: save.squad.map((pig) => ({ ...pig, fell: -1 })) }
 }
 
 /**

@@ -39,6 +39,18 @@ export interface Squad {
 }
 
 /**
+ * The campaign's own side, fielded from the SAVE rather than from `fetext`:
+ * the team's name as the player typed it, and the first `fieldedAt(position)`
+ * pigs of the roster — each under its own name and CLASS, because a pig's
+ * `rank` IS its class byte (lib/game/roster.ts, lib/game/ranks.ts). The
+ * marker still says where a pig stands; the roster says who it is.
+ */
+export interface OwnSquad {
+  name: string
+  pigs: { name: string; pigClass: number }[]
+}
+
+/**
  * How many PLAYERS the game has — **which is not how many sides it fields**,
  * and confusing the two dropped a whole campaign map's own squad.
  *
@@ -77,14 +89,44 @@ export function fielded(objects: MapObject[], players: number = PLAYERS): MapObj
  * the first two are taken. CAMP fields one side of one pig, because the
  * training ground is one pig — there is no filling in, and a map that carries
  * no markers cannot be played, which is the empty list.
+ *
+ * `own` is the campaign's squad off the SAVE, and it replaces side 0's names
+ * AND classes — side 0 is the player's, because `battleSides` orders the side
+ * carrying the map's player bit first. Without it every side is dressed from
+ * `fetext`, which is what a skirmish and the console get.
  */
-export function mapSquads(objects: MapObject[], teams: Team[], nations: readonly number[]): Squad[] {
+export function mapSquads(
+  objects: MapObject[],
+  teams: Team[],
+  nations: readonly number[],
+  own?: OwnSquad
+): Squad[] {
   return battleSides(objects, SIDES_FIELDED).map((side, index) => {
     // Which NATION fields this side is handed in, campaign side first — the
     // map only says where the pigs stand. A nation past the six playable ones
     // (Team Lard, the last mission) has no `fetext` block, so the names fall
     // back on the side's own order.
     const nation = nations[index] ?? index
+    if (index === 0 && own && own.pigs.length > 0) {
+      // How many go out is the roster's count against the map's markers,
+      // whichever is shorter — one on the training ground, three at ESTU,
+      // five from then on (lib/game/missions.ts, `fieldedAt`).
+      const pigs = side.slice(0, own.pigs.length)
+      return {
+        name: own.name,
+        nation,
+        pigNames: own.pigs.slice(0, pigs.length).map((pig) => pig.name),
+        spawns: pigs.map((at, slot) => ({
+          x: at.x,
+          z: at.z,
+          heading: at.heading,
+          // The CLASS is the pig's own rank, not the marker's: the marker
+          // said where to stand, the roster says what is standing there.
+          pigClass: own.pigs[slot].pigClass,
+          parachutes: at.parachutes
+        }))
+      }
+    }
     const team = teams[nation] ?? teams[index] ?? teams[0]
     const pigs = side.slice(0, team.pigNames.length)
     return {

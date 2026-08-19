@@ -6,6 +6,7 @@ import type { Game } from '../../../lib/game/game'
 import { buildQuery } from '../../../lib/game/engine'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { fielded, mapSquads, musterGame } from '../../../lib/game/muster'
+import type { OwnSquad } from '../../../lib/game/muster'
 import { nations } from '../../../lib/game/teams'
 import { artFor, classArt } from '../three/soldiers'
 import { bodyExtent } from '../../../lib/game/body'
@@ -146,12 +147,22 @@ export interface BattleView {
    * (lib/game/nations.ts). Left out, each side wears its slot — which is what a
    * battle opened from the console gets, and what every spec that does not care
    * about uniforms sees.
+   *
+   * `own` is the campaign's squad off the SAVE — the team's name and the pigs
+   * that take the field, each under its own name and rank-class
+   * (lib/game/muster.ts). Left out, side 0 is dressed from `fetext` like
+   * everybody else.
    */
-  open(name?: string, wearing?: readonly number[]): Promise<boolean>
+  open(name?: string, wearing?: readonly number[], own?: OwnSquad): Promise<boolean>
   close(): void
 }
 
-export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
+/**
+ * `fallen` on the way out is the roster SLOTS of side 0's dead, in the order
+ * they went down — what `fall` marks the save's squad with (lib/game/roster.ts).
+ * Empty on an abort, on a skirmish, and on a mission nobody died in.
+ */
+export function initBattle(onLeave: (exit: BattleExit, fallen: number[]) => void): BattleView {
   const canvasHost = byId<HTMLDivElement>('battle-canvas')
   const hudCanvas = byId<HTMLCanvasElement>('battle-hud')
   const hud = createHud(hudCanvas)
@@ -564,6 +575,11 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
    * that is an ABORT — the player walking out, not an outcome. */
   let verdict: Extract<BattleExit, 'won' | 'lost'> | null = null
 
+  /** Side 0's dead, as roster slots in the order they went down — collected
+   * off the bus's own `killed` and handed out with the verdict, because the
+   * campaign's fall marks are exactly this list (lib/game/roster.ts). */
+  let fallen: number[] = []
+
   /** Put the battle away: the LEAVE button, and the end of a mission. */
   const leave = (): void => {
     controller.releaseAll()
@@ -575,14 +591,18 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     painted = 0
     speech.stop()
     hud.clear()
-    onLeave(verdict ?? 'aborted')
+    onLeave(verdict ?? 'aborted', fallen)
   }
 
   byId<HTMLButtonElement>('battle-leave').addEventListener('click', leave)
 
   /** (Re)start the battle on `name` — fresh spawns, fresh turn order. A load
    * failure leaves whatever battle was running untouched. */
-  const start = async (name: string, wearing: readonly number[] = []): Promise<boolean> => {
+  const start = async (
+    name: string,
+    wearing: readonly number[] = [],
+    own?: OwnSquad
+  ): Promise<boolean> => {
     // A battle that cannot load stays unopened and says so in the console —
     // the same place a refused swapMap answers. The view never appears, so
     // there is nowhere on screen to put it.
@@ -612,6 +632,7 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     cued = new Set()
     step = 0
     verdict = null
+    fallen = []
     // A fresh level is the tutorial's first rung again, whoever asked for it —
     // the menu, `pow.swapMap`, or a step BACK, which sets its own want on the
     // far side of this.
@@ -632,7 +653,7 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     // hands it to the engine — the water mask walks every texel of the ground
     // and there was a second copy of it here (lib/game/engine.ts).
     query = buildQuery(terrainResult.blocks, terrainResult.textures)
-    const squads = mapSquads(objects, teams, wearing)
+    const squads = mapSquads(objects, teams, wearing, own)
     if (squads.length === 0) return refuse(`${name} carries no spawn markers — nothing to field`)
 
     // Which models to load is only known once the squads are: a map fields
@@ -728,6 +749,14 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     // briefing bar's wording with the pickup message.
     bus.on(
       handling({
+        // **A pig of OURS went down.** Its squad index is its slot in the
+        // save's roster — side 0 fields `squad.slice(0, fieldedAt(position))`
+        // in roster order — and the ORDER of this list is what `fell` encodes
+        // (lib/game/roster.ts).
+        killed: ({ pig }) => {
+          const one = game?.players[0]?.pigs.find((p) => p.id === pig)
+          if (one && !fallen.includes(one.index)) fallen.push(one.index)
+        },
         placed: ({ skill, amount }) => {
           step = 0
           sergeant(clipForPlacement(skill, amount))
@@ -905,7 +934,7 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     // MULTI-PLAYER screen made a MENU action change it, and then ONE PLAYER
     // opened CAMP's squad on LIBERATE's terrain. It cost a spec three phases
     // away — the pig walked into water it should never have been near.
-    open: (name, wearing) => start(name ?? DEFAULT_MAP, wearing),
+    open: (name, wearing, own) => start(name ?? DEFAULT_MAP, wearing, own),
     close() {
       scene?.dispose()
       scene = null

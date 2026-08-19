@@ -23,8 +23,8 @@ import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 import { feText } from './ui/barScreen'
-import { FIELDED, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
-import { mapAt, mapId } from '../../lib/game/missions'
+import { fall, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
+import { fieldedAt, mapAt, mapId } from '../../lib/game/missions'
 import { nextMap } from '../../lib/game/save'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
@@ -186,7 +186,19 @@ function toBriefing(): void {
   // (lib/game/nations.ts, lib/game/spawns.ts).
   const wearing = save && enemy !== null ? [save.nation, enemy] : undefined
   const level = (save && nextMap(save)) || NO_CAMPAIGN_MAP
-  briefing.show(position, enemy, battle.open(level, wearing))
+  // WHO takes the field is the SAVE's: the first `fieldedAt` of the roster,
+  // under the team's own name — one pig on the training ground, three at
+  // ESTU, five from then on. The roster is packed standing-first by
+  // `regroup`, so the front slots are the front line (lib/game/roster.ts).
+  const own = save
+    ? {
+        name: save.name,
+        pigs: save.squad
+          .slice(0, fieldedAt(position))
+          .map((pig) => ({ name: pig.name, pigClass: pig.rank }))
+      }
+    : undefined
+  briefing.show(position, enemy, battle.open(level, wearing, own))
 }
 
 // The world map → region → flags sequence, the exe's 0x482C30. Skippable —
@@ -213,7 +225,7 @@ const briefing = initBriefing({
 // carries those words and has no reader anywhere in the executable. What is
 // left calling itself `aborted` is the toolbar's walk-out, which is the
 // remake's own button and has no original to be faithful to.
-const battle = initBattle((exit) => {
+const battle = initBattle((exit, fallen) => {
   if (!campaignBattle || !campaign.current()) {
     show('menu')
     return
@@ -227,6 +239,12 @@ const battle = initBattle((exit) => {
     show('menu')
     return
   }
+  // The battle's dead land on the ROSTER first, in the order they went down —
+  // the original writes `pig+0x2C` on the live team the same way — so the
+  // debrief's fates and `missionWonResult`'s losses both read the truth.
+  // Never written to disk here: CONTINUE settles it through `acceptMission`,
+  // and every other way out stands the squad back up (`discardMission`).
+  for (const slot of fallen) fall(save.squad, slot)
   if (exit === 'won') campaign.missionWonResult()
   // The debrief reads the save AS THE MISSION FOUND IT — the position still
   // naming the played mission, the squad carrying its fell marks; the settled
@@ -249,7 +267,9 @@ const debrief = initDebrief({
     const before = campaign.current()
     void campaign.acceptMission().then((after) => {
       if (before && after && before.position > 0 && after.position > before.position) {
-        const survivors = FIELDED - (SQUAD_SIZE - standingCount(before.squad))
+        // Of the pigs that actually FOUGHT — one on the training ground,
+        // three at ESTU, five from then on — how many came back.
+        const survivors = fieldedAt(before.position) - (SQUAD_SIZE - standingCount(before.squad))
         newspaper.show(
           after.nation,
           survivors,
