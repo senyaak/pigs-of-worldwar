@@ -34,9 +34,11 @@ const EXITS: [string, { click: string } | { key: Action }][] = [
   ['#browser', { click: '#browser-menu' }],
   // The DEBRIEF's keys are painted into its backdrop: SPACE is CONTINUE on a
   // win — which lands on the squad or the paper, both of which the chain
-  // below walks. On a LOSS the same key is RETRY and would take the field
-  // again; nothing in the suite loses a mission yet, and the chain would
-  // unwind that too.
+  // below walks. On a LOSS the same key is RETRY and takes the field again,
+  // and the chain unwinds that too: the '#battle' row above walks out through
+  // the toolbar, which lands on the squad. The suite does reach a loss page
+  // now — `e2e/002/pause.spec.ts` aborts a mission — but that spec leaves it
+  // on its own key rather than relying on this.
   ['#debrief', { key: 'menuSelect' }],
   ['#ask', { key: 'menuBack' }],
   // BACK on the pig map skips the whole chain to the briefing; a key on the

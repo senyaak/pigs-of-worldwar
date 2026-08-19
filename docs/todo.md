@@ -1305,9 +1305,15 @@ not pulled, written here so nobody has to remember an address.
   `e2e/002/pause.spec.ts` pin both halves. Play's own constraint stands and is
   written into the code: a real pause is SINGLE-PLAYER only and multiplayer
   must never stop (docs/history/status.md, "Threads left mid-pull").
-  Still not built off this: the MISSION ABORTED screen (gtext 189) the exe
-  shows after an abort — the remake goes straight back to the squad, which is
-  what `aborted` already did.
+  **And the abort is FINISHED too, 2026-08-19** — by finding out there was
+  nothing to finish. There is no MISSION ABORTED screen: gtext 189 carries
+  those words and has no reader in the executable, and the 0x424298 an earlier
+  note blamed is `push 0BDh` as a Y coordinate. The exe writes −2 into the
+  outcome word and falls into the same debrief call the ordinary end takes,
+  and that page asks only `outcome == 0` — so an abort IS a loss, on
+  `pigbkpc2.bmp` with SPACE = RETRY and ESC = EDIT SQUAD. The pause's ABORT
+  leaves with the `lost` verdict now; `aborted` stays what it was, the
+  toolbar's walk-out, which is the remake's own button.
 - **The sky is DONE and shown — this entry is provenance, not work.** The dome,
   the mood's fog and the weather are in and answered by play (2026-08-12);
   nothing below is a defect and none of it is visible. It is here so the next

@@ -359,6 +359,14 @@ one is in `MENU_ACTIONS`, which the battle deliberately drops. And **the pause
 is SINGLE-PLAYER only**: play's rule, "в мп вообще никаких остановок", and a
 lockstep battle cannot have one side stop the clock.
 
+**ABORT is a LOSS, and there is no MISSION ABORTED screen.** gtext 189 carries
+those words and nothing in the executable reads it; the exe writes −2 into the
+outcome word and falls into the same debrief call the ordinary end takes, and
+that page only ever asks `outcome == 0`. So the pause's ABORT leaves with the
+`lost` verdict and lands on the loss debrief — SPACE RETRY, ESCAPE EDIT SQUAD
+— while `aborted` keeps meaning the TOOLBAR's walk-out, which is the remake's
+own button and has no original to be faithful to.
+
 **A battle does not step until it is SHOWN.** The scene is built when
 `battle.open()` resolves, which is exactly when the briefing's loading bar
 fills — so `three/battle.ts` takes a `running` predicate and the frame is a

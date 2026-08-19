@@ -316,7 +316,46 @@ through zero, which is an overflow rather than a behaviour. And Escape over an
 armed ARE YOU SURE? takes the question down rather than the whole pause: the
 toggle was read, the confirm flag's fate across one was not.
 
-Still not built: the MISSION ABORTED screen (gtext 189) the exe shows after an
-abort. ABORT here goes straight back to the squad, which is what `aborted`
-already did — and which matches the exe in skipping the debrief and the
-newspaper.
+### …and the MISSION ABORTED screen turned out not to exist — same day
+
+The one thing left open above was "the MISSION ABORTED screen (gtext 189) the
+exe shows after an abort". It shows no such thing, and the sentence was mine:
+an earlier note had said gtext 189 was "printed by the post-mission frontend
+screen (0x424298)", and I repeated it without checking. **0x424298 is
+`push 0BDh` as a Y COORDINATE** — `0x419FA0(600, 189, −5, 0)` — the same trap
+this repo had already documented once for 0xF0 = (320, 240). And gtext 189 has
+no reader anywhere: a byte scan of `.text` for every `BD 00 00 00` gives 24
+hits, 23 of them jump displacements or mid-instruction, and the full caller
+list of the gtext accessor covers 0xBB, 0xBC, 0xBE, 0xBF and 0xC0 and skips
+0xBD. It is a PSX leftover like 174 VOLUME, 178 INSTRUCTIONS and 240 PIG
+VOICES.
+
+**What actually happens is that an abort is a LOSS.** ABORT writes mode 17;
+the level runner's outcome switch takes `edi == 2` at 0x47E629, writes −2 into
+the outcome word and FALLS THROUGH into the same debrief call the ordinary end
+takes; and the page's own gate is `won = (outcome == 0)`, so −2 and the
+ordinary −1 are one page with one pair of keys. Nothing in the image tells
+them apart.
+
+So the build was one line, and it is a rename rather than a screen: the
+pause's ABORT leaves with the **`lost`** verdict, and lands on the loss
+debrief the remake already had — SPACE RETRY, ESCAPE EDIT SQUAD, which is
+exactly the pair the exe paints into `pigbkpc2.bmp`. `aborted` keeps what it
+always meant here: the TOOLBAR's walk-out, which is the remake's own button
+and has no original to be faithful to. Routing that through the debrief too
+was tried first and the e2e fixture caught it in one run — the loss page's
+SPACE is RETRY, so walking out of a battle went back into one, forever.
+
+**One thing the same pass got wrong, and it is worth knowing why it was
+caught.** It reported a fourth sound pitch for the pause, 0x50, from
+`4922A3 push 50h / 4922A5 push 61h`. Disassembling the whole arm gives
+`push ebp ×5 / push 64h / push ebp / push 50h / push 61h` — the call is
+`Play(index=0x61, volume=0x50, 0, pitch=0x64, …)`, so **0x50 is the volume**
+and it is identical in every one of these calls. An earlier pass had already
+shown the full sequence; two readings of one instruction disagreed and the
+cheap check settled it. The note now says so, so it is not re-added.
+
+Still open from the same read, and stated rather than built: the exe's RETRY
+rolls the whole team back from a snapshot (`memcpy(team, team+0xAA0, 0x2A8)`)
+while EDIT SQUAD does not, so casualties persist on one key and not the other.
+The remake discards the pending result on both.

@@ -129,3 +129,29 @@ test('the volumes step in fives and stop at both ends', async ({ app }) => {
   await tap(page, 'pause')
   expect(app.errors()).toEqual([])
 })
+
+test('confirming the abort ends the mission on the LOSS debrief', async ({ app }) => {
+  const { page } = app
+  await startGame(page)
+  await tap(page, 'pause')
+  for (let i = 0; i < 4; i++) await tap(page, 'walkBack')
+  await tap(page, 'fire')
+  expect(await menu(page)).toMatchObject({ confirming: true, yes: false })
+  // LEFT arms YES — the confirm reads the way it is drawn.
+  await tap(page, 'turnLeft')
+  await tap(page, 'fire')
+
+  // AND IT IS THE ORDINARY LOSS PAGE. There is no MISSION ABORTED screen:
+  // gtext 189 carries those words and nothing in the exe reads it. The abort
+  // writes −2 into the outcome word and falls into the same debrief call the
+  // normal end takes, and the page only ever asks `outcome == 0`.
+  await expect(page.locator('#debrief')).toBeVisible()
+  await expect(page.locator('#battle')).toBeHidden()
+  expect(await paused(page)).toBe(false)
+
+  // ESCAPE is EDIT SQUAD, which walks away with the mission still waiting —
+  // the exe's own second key on this page.
+  await tap(page, 'menuBack')
+  await expect(page.locator('#player')).toBeVisible()
+  expect(app.errors()).toEqual([])
+})

@@ -504,9 +504,18 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     if (outcome.cutSpeech) speech.stop()
     if (outcome.resume) setPaused(false)
     if (outcome.abort) {
-      // The exe's mode 17: the mission simply ends, and the debrief and the
-      // newspaper are both skipped — which is what `aborted` already does
-      // here (main.ts sends it straight back to the squad).
+      // **AN ABORT IS A LOSS**, and that is not an interpretation: the exe
+      // writes −2 into the outcome word and falls straight through into the
+      // same debrief call the ordinary end takes (0x47E643 into 0x47E652),
+      // and the page asks only `outcome == 0` (0x482B5E) — so −2 and the
+      // ordinary −1 are one page with one pair of keys. There is no MISSION
+      // ABORTED screen; gtext 189 carries those words and has no reader
+      // anywhere in the executable.
+      //
+      // So it leaves with a VERDICT rather than as `aborted`, which stays
+      // what it always meant here: the toolbar's walk-out, a remake
+      // convenience the original has no button for.
+      verdict = 'lost'
       setPaused(false)
       leave()
     }

@@ -195,6 +195,14 @@ const briefing = initBriefing({
 // How a battle comes back decides where it lands: a walked-out mission goes
 // straight to the squad, a decided one goes through the debrief — where a WIN
 // is settled (`campaign.missionWon`) and waits to be accepted or replayed.
+//
+// **The pause menu's ABORT is not `aborted` — it arrives as a LOSS**, because
+// that is what the exe makes it: it writes −2 into the outcome word and falls
+// straight into the same debrief call the ordinary end takes, and the page
+// asks only `outcome == 0`. There is no MISSION ABORTED screen; gtext 189
+// carries those words and has no reader anywhere in the executable. What is
+// left calling itself `aborted` is the toolbar's walk-out, which is the
+// remake's own button and has no original to be faithful to.
 const battle = initBattle((exit) => {
   if (!campaignBattle || !campaign.current()) {
     show('menu')
@@ -223,9 +231,9 @@ const battle = initBattle((exit) => {
 // position, tokens — writes it, prints the NEWSPAPER (a campaign win only —
 // never the training ground, a loss or a retry, the exe's own gates) and
 // stands on the squad; ESCAPE is RETRY, which throws the result away and
-// takes the field again. A LOSS: SPACE is RETRY (there is nothing to take —
-// the manual's "do the level all over again"), ESCAPE is EDIT SQUAD, which
-// walks away to the squad with the mission still waiting.
+// takes the field again. A LOSS, and an ABORT with it: SPACE is RETRY (there
+// is nothing to take — the manual's "do the level all over again"), ESCAPE is
+// EDIT SQUAD, which walks away to the squad with the mission still waiting.
 const debrief = initDebrief({
   onContinue: () => {
     const before = campaign.current()
