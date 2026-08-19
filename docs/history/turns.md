@@ -355,7 +355,26 @@ and it is identical in every one of these calls. An earlier pass had already
 shown the full sequence; two readings of one instruction disagreed and the
 cheap check settled it. The note now says so, so it is not re-added.
 
-Still open from the same read, and stated rather than built: the exe's RETRY
-rolls the whole team back from a snapshot (`memcpy(team, team+0xAA0, 0x2A8)`)
-while EDIT SQUAD does not, so casualties persist on one key and not the other.
-The remake discards the pending result on both.
+One difference from the same read was written down here as if it were live,
+and it is not — play asked what the losses were, and the answer is that there
+are none. The exe's RETRY rolls the whole team back from a snapshot
+(`memcpy(team, team+0xAA0, 0x2A8)`) while EDIT SQUAD does not, so ITS
+casualties persist on one key and not the other. What makes those casualties
+is the battle→roster writeback `0x497930`, which runs before the page and puts
+the dead, the kills, the friendly kills and the propoints into the live team
+struct.
+
+**The remake has no such writeback, so there is nothing for either key to keep
+or undo.** `fall()` in `lib/game/roster.ts` is the only thing that could mark a
+pig down and its single caller in the whole tree is a unit spec; a battle
+musters off the MAP rather than off the save's roster, so `losses` in
+`missionWon()` is always zero today and `save.squad` is never touched by a
+battle at all. Nor is anything staged on a loss: `missionWon()` runs only on a
+win, builds a NEW object into `pending` and leaves `save` alone, so the
+`discardMission()` both keys call is a no-op there. The disk is written by
+`acceptMission()` and by a squad edit, and by nothing else.
+
+So this becomes a real question on exactly one day: when a battle starts
+fielding the SAVE's pigs — the `[gap]` `missionWon()` already names, "the
+fallen arrive with that link". That is when RETRY has to undo the writeback
+and EDIT SQUAD has to keep it.
