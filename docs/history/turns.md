@@ -640,3 +640,40 @@ carrying the map's player bit first — so `outcomeOf(training, ownStanding,
 othersStanding, targetsLeft)` says exactly that, `handOver` in
 `lib/game/battle.ts` feeds it per-side, and `e2e/002/endOfGame.spec.ts`
 pins the case that used to lie: our side down, one enemy up, `'lost'`.
+
+## THE WHITE STRIPES WERE THE WORLD MAP'S AFTER ALL — 2026-08-19
+
+The "four white stripes" section above ended on the wrong screen. Play's
+report said "на карте мира" and play meant it; the round that answered it
+measured the world map's BigMap frame and the scanner's seams, found both
+clean, and settled on the scanner board's clamp-white rim — which is real,
+still the exe's own, and still deliberately kept. But the stripes play kept
+seeing are thin vertical hairlines ON THE WORLD MAP's territories, and a
+screenshot finally pinned them: `hog2`, `sau4`, `trot2`, `sau3` — and, by
+the same defect, every digit of the battle clock.
+
+**They are ALIGNMENT PADDING in the art, and the PC original draws them.**
+The whole chain was read this round (`library/notes.md` in the disasm repo):
+a TIM's width is stored in 16-bit units, so odd-width art carries a filler
+column; the exe's composer writes a −1 size sentinel into the 2D record
+(0x483B83) and the library substitutes the PADDED width and UVs off the
+page-fitted entry (dll 0x1000F1DA, 0x10012737); transparency is the CLUT
+word 0x0000 — the loader strips the STP bit and canonicalises the zero-word
+entry into index 0 (0x10012F90), so a grey-filled padding column is opaque
+and, under the composer's additive blend, a bright hairline. Two false
+leads died on the way: "the frame in BigMap.BMP" (real, but inset ~40px and
+present in the PC original's own blit — full-surface, 1:1, at 0,0, read at
+0x44D4D0), and "index 0 is transparent" (it is the RESULT of
+canonicalisation, never the test).
+
+So the fix is a `[play]` divergence — the memory is the PSX's, which never
+had this port artifact — and it lives in the FORMAT layer: `spritePadding`
+in `lib/formats/tim.ts` measures the filler (trailing columns within the
+rounding allowance, one opaque index the body uses only as stray noise) and
+`loadTims` in `main/assets.ts` trims it for SPRITES only. The rule is
+deliberately narrow and pinned on the shipped data
+(`e2e/000/timpadding.spec.ts`): exactly the four masks and the ten digits,
+while `pause5`'s uniform dark rim and `fpole`'s solid columns — both of
+which broader drafts of the rule ate — stay whole. The current mission's
+white FLASH on the world map is untouched: that one is the exe's own
+(0x482D99, colour forced white over the additive blend).

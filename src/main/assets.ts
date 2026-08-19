@@ -11,7 +11,7 @@ import { boneWorldOffsets, parseHir } from '../lib/formats/hir'
 import type { Bone } from '../lib/formats/hir'
 import { parseModel } from '../lib/formats/model'
 import type { Model } from '../lib/formats/model'
-import { parseTim } from '../lib/formats/tim'
+import { parseTim, spritePadding } from '../lib/formats/tim'
 import type { Tim } from '../lib/formats/tim'
 import { parseMcapClip } from '../lib/formats/mcap'
 import type { McapClip } from '../lib/formats/mcap'
@@ -308,11 +308,24 @@ export async function loadTims(full: string): Promise<TimImage[]> {
   for (const entry of parseArchive(data).entries) {
     try {
       const tim = parseTim(data.subarray(entry.offset, entry.offset + entry.size))
+      // The 16-bit-unit width rounding leaves garbage columns on some shipped
+      // sprites — a white hairline on four territory masks and every clock
+      // digit. The PC original draws them; the remake does not (`[play]`,
+      // lib/formats/tim.ts `spritePadding`). Sprites only: the model and
+      // terrain paths map UVs over the full surface and are not touched.
+      const width = tim.width - spritePadding(tim)
+      let rgba = tim.rgba
+      if (width !== tim.width) {
+        rgba = new Uint8Array(width * tim.height * 4)
+        for (let row = 0; row < tim.height; row++) {
+          rgba.set(tim.rgba.subarray(row * tim.width * 4, row * tim.width * 4 + width * 4), row * width * 4)
+        }
+      }
       images.push({
         name: entry.name.replace(/\.tim$/i, '').toLowerCase(),
-        width: tim.width,
+        width,
         height: tim.height,
-        rgba: tim.rgba
+        rgba
       })
     } catch (error) {
       console.warn(`${path.basename(full)}: ${entry.name} — ${String(error)}`)
