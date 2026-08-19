@@ -532,3 +532,36 @@ outlived the map by a whole session, because nothing had run that file. It
 counts the board's pixels now. Two lessons in one round, and they are the same
 lesson: a suite only tells you about the files you run, and only about the
 things it actually looks at.
+### The font, again — and this time it changes font — 2026-08-19
+
+Play's second look at the same menu: "шрифт в esc меню ужасный - надо другой
+взять". The first round had blamed the spacing and fixed the spacing; that was
+right as far as it went and it was not enough. Two things came out of reading
+0x45A9B0 to its last instruction rather than around it.
+
+**The exe really does print this menu in `FETEXT\small`.** Thirty-nine
+references to `[0x51BA54]` between 0x45A9B0 and 0x45B560, none at all to
+`[0x51BA58]`, the big one. There is no scaling anywhere on the path either —
+no `imul` touches a glyph box. So SMALL, twelve pixels tall with a four-pixel
+`I`, on a panel 260×300, is what the original looks like, and play has now
+called it unreadable twice. The menu wears **CHARS2** instead — sixteen tall,
+the letters every other menu in the game is written in — and the divergence is
+`[play]` in CLAUDE.md with the reading beside it.
+
+**And the spacing note this file left behind was wrong.** The 3 the pen adds
+after a glyph is written only when `[0x51F120]` is set (0x430c28); the same
+flag gates the 1024→640 squeeze of every coordinate (0x41ADB0). The pause
+writes its panel in plain 640-space pixels, so the flag is CLEAR in a mission:
+the battle's letters carry no tracking at all, and `FRONTEND_METRICS` is named
+correctly after all.
+
+**Which is why the volume BAR keeps SMALL.** Its width is arithmetic, not
+taste. The track is twenty `I ` pairs (0x4CFA1C) with the fill `I ` repeated
+`value/5` over it; `I` is 4 wide and a space advances 8, so a cell is 12 and
+the track is exactly 240 across a panel of 260 — it fits because the exe's own
+font makes it fit, and any other font moves it. Measured on the running
+dashboard afterwards: 310..541 against a panel of 297..557.
+
+One thing there is still deliberately not the exe's: the exe draws the red
+fill FIRST and lays the full white track over it (0x45AE57, then 0x45B0BF),
+which hides the level. We draw the track and then the fill.
