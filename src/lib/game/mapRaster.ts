@@ -39,9 +39,12 @@
 // the picture's COLUMN runs along world z and its ROW along world x. Kept that
 // way here so the drawer can hand the board its corners without a flip.
 //
-// One thing the library does that this does not: its column 0 is a COPY of
-// column 1 (`cmp edi,1 / jne` at 0x1000A431, which writes the texel twice).
-// `[gap]`, and a one-texel one.
+// **The picture's first column is a COPY of its second**, which is the
+// library's own last act on every row: the fill loop writes the texel twice
+// when it reaches the second column (`cmp edi,1 / jne / sub ebp,2 / mov
+// [ebp],cx`, dll 0x1000A431), so whatever column 0 computed for itself is
+// overwritten. The picture's column runs along world z, so it is the first z
+// of each row that takes its neighbour's colour.
 //
 // Pure: blocks in, pixels out.
 
@@ -138,6 +141,13 @@ export function mapRaster(blocks: readonly TerrainBlock[]): MapRaster {
         rgba[at + 3] = 255
       }
     }
+  }
+
+  // …and then the first column takes the second's, the way the library's own
+  // loop leaves it (0x1000A431). One texel wide, down the whole picture.
+  for (let row = 0; row < RASTER_SIZE; row++) {
+    const second = (row * RASTER_SIZE + 1) * 4
+    rgba.copyWithin(row * RASTER_SIZE * 4, second, second + 4)
   }
   return { size: RASTER_SIZE, rgba }
 }

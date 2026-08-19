@@ -204,12 +204,36 @@ test('the picture lights the PEAKS, and high ground CLAMPS to white', { tag: '@n
     const at = (x * RASTER_SIZE + z) * 4
     return [raster.rgba[at], raster.rgba[at + 1], raster.rgba[at + 2]]
   }
+  // Read at z = 2, clear of the first column, which is a copy of the second.
+  //
   // The LOWEST ground is shade 64, where the arithmetic is the exact 8→5 bit
   // conversion — the palette entry as authored, `100 >> 3` back out as 99.
-  expect(texel(0, 0)).toEqual([99, 99, 99])
+  expect(texel(0, 2)).toEqual([99, 99, 99])
   // The HIGHEST is 194, which saturates. This is the white play saw.
-  expect(texel(4, 0)).toEqual([255, 255, 255])
+  expect(texel(4, 2)).toEqual([255, 255, 255])
   // …and that direction is READ, not assumed (`scanner/notes.md`): height is
   // an elevation, positive UP. Turning it over would darken the peaks.
-  expect(texel(4, 0)[0]).toBeGreaterThan(texel(0, 0)[0])
+  expect(texel(4, 2)[0]).toBeGreaterThan(texel(0, 2)[0])
+})
+
+test('the first column of the picture is a copy of the second', { tag: '@nodata' }, () => {
+  // The library's fill loop writes the texel TWICE when it reaches column 1
+  // (`cmp edi,1 / jne / sub ebp,2 / mov [ebp],cx`, dll 0x1000A431), so column
+  // 0 never keeps what it computed. The picture's column runs along world z.
+  const block = flatBlock(0, 0, 64, 9)
+  // Give the first column — tile row r = 0, which is the z the copy lands on
+  // — a colour of its own, so a picture that kept it would say so.
+  for (let c = 0; c < TILES_PER_SIDE; c++) block.tiles[c].type = 11
+  const raster = mapRaster([block])
+  const texel = (x: number, z: number): number[] => {
+    const at = (x * RASTER_SIZE + z) * 4
+    return [raster.rgba[at], raster.rgba[at + 1], raster.rgba[at + 2]]
+  }
+  // Flat ground, so every shade is the floor 64: type 9 comes out 99 and type
+  // 11 — `240,100,53` — would come out 247 in the red.
+  expect(texel(0, 1)).toEqual([99, 99, 99])
+  expect(texel(0, 0)).toEqual([99, 99, 99])
+  // …and the row's own second column is untouched, which is what says the
+  // copy went one way and not both.
+  expect(texel(1, 2)).toEqual([99, 99, 99])
 })

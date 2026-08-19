@@ -600,6 +600,14 @@ judgement. Read now: the library sets MAG and MIN to LINEAR once at start-up
 and `DrawScanner` never touches the state, so bilinear is right and the
 `[CHECK — remake]` is retired.
 
-Nothing was changed on the board. What came out of it is a `unit/scanner.spec.ts`
-test pinning both ends of the scale — 99 at the lowest ground, 255 at the
-highest — so the next reader does not "fix" the white back out.
+Nothing was changed about the WHITE. What came out of the round is a
+`unit/scanner.spec.ts` test pinning both ends of the scale — 99 at the lowest
+ground, 255 at the highest — so the next reader does not "fix" it back out.
+
+The one real gap the reading turned up was a texel wide, and it is closed now:
+the library's fill loop writes the texel twice when it reaches the second
+column (`cmp edi,1 / jne / sub ebp,2 / mov [ebp],cx`, 0x1000A431), so the
+picture's first column never keeps what it computed — it is a copy of the
+second, all the way down. The picture's column runs along world z, so it is
+the first z of every row. `mapRaster` does that now, with a test that would
+fail on the old fill.
