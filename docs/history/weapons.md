@@ -1181,3 +1181,26 @@ until play weighs the new evidence.
 
 ~~Left open: the record's `+0x28`/`+0x2C`~~ — closed 2026-08-11: the attack
 animation steps' repeat count and signed playback rate (`weapons/fire.md`).
+## The class kits — a pig arrives armed (2026-08-20)
+
+Mission one needed pigs to carry their class's own weapons, and the table was
+already half-read: the class record at 0x4d02e0 — the same 128 bytes health
+and the walk grant come out of — continues with `(skill, amount)` pairs, −1
+unlimited, ended by `0,−1`. The disasm notes carried twelve rows; a
+PE-section dump of the exe re-read the record whole and found **twenty-four**,
+with the commando's row cut short in the notes (it goes on past the jetpack:
+a cluster grenade, three medicine darts, a poison gas, a TNT). Rows 12..14
+are the medic family and the hero, 15..16 continue that family — 16 is the
+ACE the `AC_ME` marker names — and 17..23 have no found reader.
+
+`lib/game/kits.ts` carries rows 0..16 and `outfit(pigClass)`, built through
+the inventory's own `give`, and the `Game` constructor hands it to every pig
+where `carrying: []` used to be. The old comment there — "a pig starts with
+nothing, every shipped map hands out its weapons in crates" — was simply
+wrong about the original. CAMP still behaves: the tutorial script clears the
+acting pig at every crate placement, so the trainee's kit goes the moment the
+first step places one, exactly as the exe's `Pig::ClearInventory` does.
+
+`unit/kits.spec.ts` pins the grunt's row, the commando's un-truncated one,
+the 17-row table with the grunt fallback past its end, and that a fresh
+battle deals every pig its own copy.

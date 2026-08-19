@@ -7,6 +7,7 @@
 // the next pig of that squad is the one that acts.
 
 import type { Slot } from './inventory'
+import { outfit } from './kits'
 import { isDead, maxHealthFor } from './health'
 import { NO_BODY } from './body'
 import type { BodyExtent } from './body'
@@ -56,8 +57,8 @@ export interface Pig {
    */
   health: number
   /** What it is carrying: up to fifteen skills, in the order they were
-   * picked up (lib/game/inventory.ts). A pig starts with nothing — every
-   * shipped map hands out its weapons in crates. */
+   * picked up (lib/game/inventory.ts). A pig steps in already holding its
+   * class's own kit (lib/game/kits.ts); the crates top it up. */
   carrying: Slot[]
   /** The skill chosen out of the menu, or null for empty hands. The pig
    * takes its model in hand and aims it (lib/game/weapons.ts, aim.ts);
@@ -180,7 +181,7 @@ export class Game {
             name,
             index,
             health: maxHealthFor(pigClass),
-            carrying: [],
+            carrying: outfit(pigClass),
             holding: null,
             position: { x: at.x, y: at.y ?? 0, z: at.z },
             body: at.body ?? NO_BODY,
