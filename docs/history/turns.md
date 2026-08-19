@@ -415,11 +415,40 @@ computed and never drawn and the specs read `phase()` and `patches()`. So
 `greenPixels` now counts the title's green on the HUD canvas, before and
 after, and CLAUDE.md carries the rule: a debug read is not a paint check.
 
-**And a second thing play reported the same day did NOT reproduce.** "камера
-летает по кругу над картой" — measured three ways with `pow.debug.camera()`:
-untouched for twenty seconds of a turn, after a turn key is released, and
-across a pause with a key held down. The camera is static to the unit in all
-three, `view()` stays `chase` throughout, and `eye()` — the only thing that
-could have drifted, since it is what turns the dashboard's map — accumulates
-nothing: it copies the camera into a scratch vector every call. Left open for
-the moment it happens rather than guessed at.
+**And a second thing play reported the same day was not a bug at all — it was
+a FEATURE nobody had built.** "камера летает по кругу над картой". I measured
+it four ways first and every one came back negative: the camera is static to
+the unit through twenty seconds of an untouched turn, it settles within a
+second of a turn key being released, it does not move across a pause with a
+key held, and the 3D picture is byte-identical to itself over three seconds of
+pause. `eye()` — the only thing that could have drifted, since it is what turns
+the dashboard's map — accumulates nothing either.
+
+Then play said where to look: *"во время паузы — ты вроде в дизасм записывал
+про неё."* They were right, and it was my own note. **The exe's pause enters
+CAMERA MODE 7** (0x49205F, restored on the way out), and mode 7 is the MAP
+VIEW `scanner/notes.md` had already read in full for skill 63: the camera
+pulls back to **11000** against the chase's 3072 — row 7 of 0x4D9528 — and its
+per-frame update 0x4A4D40 walks the pig list, looks at each for **0x7D
+frames**, then steps to the next and wraps. It also shrinks the corner scanner
+(`afSetScannerSizeSmall`), which is the very same small size a charging shot
+asks for, so the widget needed no new number.
+
+So a paused mission in the original is not a frozen frame: the world stops and
+the camera goes round the field. `lib/game/mapView.ts` is the rule,
+`three/chase.ts` gains a `map` row on the same rig it already had, and
+`three/battle.ts` takes a `paused` predicate beside `running` — the first says
+the world has stopped, the second says what to do instead of nothing. It tours
+the pigs the DRAW loop is drawing, which is what the `+0x30` byte the exe tests
+means: a pig indoors is skipped, and so is a dead one.
+
+Two things about it are ours and both say so: the first frame SNAPS rather
+than gliding 11000 units, and the exe's two ways of cutting a pig's turn short
+— the camera coming too close, the pig leaving the screen — are not modelled,
+because both are properties of a camera still travelling and this one is
+parked with the whole field in shot.
+
+**The measurement was not wasted, and it is why this is written down.** Four
+negative readings said "not a bug in what you built", which is exactly what
+they should say about a feature that does not exist — and the way to tell
+those two apart was not more measuring. It was play pointing at the note.

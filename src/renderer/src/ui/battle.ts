@@ -810,7 +810,8 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
       onCollected: collected,
       bus,
       sound,
-      running: isRunning
+      running: isRunning,
+      paused: () => paused
     })
     // The dashboard's map, built once off the same ground the mesh came from
     // — one pixel a tile, the whole world (lib/game/mapRaster.ts). Not

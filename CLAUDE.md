@@ -143,7 +143,9 @@ reasoning, the false starts and the sessions behind them are in
   frames when a battle starts and stays: its enable bit has exactly two writers
   in `.text`, a zero in the constructor and a one in the HUD setup, so the
   slide-out is dead code. It sits **110 in from the left and 75 up from the
-  bottom** and shrinks only while a shot charges. `lib/game/scanner.ts`,
+  bottom** and shrinks while a shot charges — and while the MAP VIEW camera is
+  up, which the PAUSE enters. One small size, two callers of the library's own
+  `afSetScannerSizeSmall`. `lib/game/scanner.ts`, `lib/game/mapView.ts`,
   `scanner/notes.md`. `[exe]`
 - **The map is TILTED, it does NOT follow the camera, and nothing about it is
   masked.** The board is a square of the WHOLE level seen through a camera
@@ -343,14 +345,26 @@ it bit twice — the battle queueing the briefing's key, then the briefing
 taking the map's. Anything new that changes the view goes through `show()`,
 which is where the rule lives.
 
-**ESCAPE is the PAUSE, and a pause is THREE things stopping at once.**
-`ui/battle.ts` owns one flag and each domain reads it in its own way: the
-WORLD stops because `running` gates the whole frame in `three/battle.ts`, so
-`engine.update` is never reached and the fixed-step accumulator never sees the
-time; the SOUND stops by suspending the one shared `AudioContext`, which holds
-a half-spoken line where it was instead of losing it; and the DASHBOARD keeps
-DRAWING — the frozen battle behind the menu is the point — but is handed a
-delta of zero so nothing on it moves. The menu itself is
+**ESCAPE is the PAUSE, and a pause stops the WORLD while the CAMERA goes
+touring.** `ui/battle.ts` owns one flag and each domain reads it in its own
+way. The world stops because `running` gates the whole frame in
+`three/battle.ts`, so `engine.update` is never reached and the fixed-step
+accumulator never sees the time. The sound stops by suspending the one shared
+`AudioContext`, which holds a half-spoken line where it was instead of losing
+it. The dashboard keeps drawing on a delta of ZERO, so the bar stops scrolling
+and the plates stop fading — with the MAP the one exception, because its size
+belongs to the camera rather than the world.
+
+**And a paused mission is NOT a still picture.** The exe hands the camera its
+mode 7 — the same MAP VIEW skill 63 enters — which pulls back to 11000 against
+the chase's 3072 and walks the field, one pig every 0x7D frames, skipping the
+pigs the draw loop is not drawing. `lib/game/mapView.ts`, and the corner
+scanner shrinks while it is up. Play named it before it was built: "камера
+летает по кругу над картой". So `three/battle.ts` takes a `paused` predicate
+BESIDE `running`: the first says the world has stopped, the second says what
+to do instead of nothing.
+
+The menu itself is
 `lib/game/pauseMenu.ts` (five rows and no more: the exe's lit row dispatches
 through a five-entry jump table) drawn by `ui/pauseMenu.ts` on the HUD canvas,
 and it is driven by the battle's own keys because the exe reads one pad. Two

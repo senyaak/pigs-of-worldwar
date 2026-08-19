@@ -7,6 +7,7 @@ import type { Pig } from '../../../lib/game/game'
 import { SWIM_SINK } from '../../../lib/game/locomotion'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
+import { MAP_CLOSE } from '../../../lib/game/mapView'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { clearHeading } from '../../../lib/game/sightline'
 import type { Blocked } from '../../../lib/game/sightline'
@@ -504,6 +505,9 @@ export type View =
   | 'throw'
   /** Down the barrel: first person, looking where the weapon points. */
   | 'scope'
+  /** Pulled right back over the field — the exe's mode 7, which the PAUSE and
+   * skill 63 MAP VIEW both enter (lib/game/mapView.ts). */
+  | 'map'
 
 /**
  * Where each view stands on the one rig: how much of the chase's distance it
@@ -554,7 +558,12 @@ const RIG: Record<
     raise: THROW_RISE,
     floor: false
   },
-  scope: { close: 0, lift: 0, floor: true }
+  scope: { close: 0, lift: 0, floor: true },
+  // The SURVEY: the same shoulder rig, standing 11000 out instead of 3072 —
+  // row 7 of 0x4D9528, and the only column of it whose reader is traced. The
+  // pig ends up small and the field ends up in shot, which is the whole point
+  // of the mode.
+  map: { close: MAP_CLOSE, lift: LIFT, floor: true }
 }
 
 export interface Chase {

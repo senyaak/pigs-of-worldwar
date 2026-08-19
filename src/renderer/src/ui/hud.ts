@@ -461,11 +461,17 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
 
       const scale = canvas.height / AUTHORED_HEIGHT
       const viewWidth = canvas.width / scale
-      // WHAT THE PAUSE STOPS. The dashboard is still drawn — the point of a
-      // pause is to look at the frozen battle — but everything on it that
-      // moves under its own clock is handed a delta of zero, so the bar stops
-      // scrolling, the map stops sliding in and the plates stop fading. The
-      // world behind them is not stepping; neither should they.
+      // WHAT THE PAUSE STOPS, and what it does NOT. The dashboard is still
+      // drawn — the point of a pause is to look at the battle — and everything
+      // on it that moves because the WORLD moves is handed a delta of zero: the
+      // bar stops scrolling, the plates stop fading.
+      //
+      // The MAP is the exception and it keeps the real delta, because its size
+      // belongs to the CAMERA rather than to the world: the map view's own
+      // `SetMode` shrinks it, the way a charging shot does, and a shrink that
+      // never animates is a shrink that never happens. The exe draws the same
+      // line — its pause stops the game tick `[0x520878]` and leaves the
+      // camera touring (lib/game/mapView.ts).
       const delta = state.paused ? 0 : state.delta
 
       // The bar runs on its own clock and its own art, so it neither waits
@@ -666,10 +672,12 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       context.save()
       context.scale(scale, scale)
       battleMap.draw(context, viewWidth, AUTHORED_HEIGHT, {
-        delta,
+        delta: state.delta,
         eye: state.eye,
         blips: state.blips,
-        charging: state.charge !== null
+        // …and it goes SMALL for a charging shot and for the pause, which are
+        // the library's two callers of the same thing (ui/battleMap.ts).
+        small: state.charge !== null || state.paused
       })
       context.restore()
 

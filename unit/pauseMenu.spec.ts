@@ -22,6 +22,13 @@ import {
   newPause,
   pausePress
 } from '../src/lib/game/pauseMenu'
+import {
+  MAP_CLOSE,
+  MAP_DISTANCE,
+  TOUR_FRAMES,
+  TOUR_SECONDS,
+  touredIndex
+} from '../src/lib/game/mapView'
 import type { PauseState, PauseVerb } from '../src/lib/game/pauseMenu'
 
 /** Walk a list of presses in, and hand back what the last one answered. */
@@ -156,4 +163,26 @@ test('every noise is one sample at one of three pitches', { tag: '@nodata' }, ()
 test('a pause opens on the settings it is handed, and on row zero', { tag: '@nodata' }, () => {
   const state = newPause({ master: 40, sfx: 15, speech: false })
   expect(state).toMatchObject({ row: 0, confirming: false, yes: false, master: 40, sfx: 15, speech: false })
+})
+
+test('the map view tours a pig every 0x7D frames, wrapping', { tag: '@nodata' }, () => {
+  // The exe's own count (0x4A4D40), on its own clock — a bit over four
+  // seconds a pig at 30 frames a second.
+  expect(TOUR_FRAMES).toBe(0x7d)
+  expect(TOUR_SECONDS).toBeCloseTo(125 / 30, 6)
+  expect(touredIndex(0, 3)).toBe(0)
+  expect(touredIndex(TOUR_SECONDS - 0.001, 3)).toBe(0)
+  expect(touredIndex(TOUR_SECONDS, 3)).toBe(1)
+  expect(touredIndex(TOUR_SECONDS * 2, 3)).toBe(2)
+  // …and it WRAPS rather than stopping at the end of the list.
+  expect(touredIndex(TOUR_SECONDS * 3, 3)).toBe(0)
+  expect(touredIndex(TOUR_SECONDS * 7, 3)).toBe(1)
+  // One pig is a tour of one; no pigs at all is nothing to look at, which is
+  // a real case — every pig on the field can be indoors at once.
+  expect(touredIndex(TOUR_SECONDS * 5, 1)).toBe(0)
+  expect(touredIndex(1, 0)).toBe(-1)
+  // The camera pulls back to 11000 against the chase's 3072 — row 7 of
+  // 0x4D9528 against the chase's own.
+  expect(MAP_DISTANCE).toBe(11000)
+  expect(MAP_CLOSE).toBeCloseTo(11000 / 3072, 9)
 })

@@ -63,8 +63,15 @@ export interface BattleMapState {
   delta: number
   eye: Eye | null
   blips: readonly Blip[]
-  /** Whether a shot is charging, which is what shrinks the map. */
-  charging: boolean
+  /**
+   * Whether the board is drawn SMALL.
+   *
+   * Two things ask for it and both are the library's own
+   * `afSetScannerSizeSmall(1)`: a shot charging, and the MAP VIEW camera —
+   * which the PAUSE enters (0x49FBF0 on the way in, 0x49F867 on the way out,
+   * `lib/game/mapView.ts`). One size, two callers.
+   */
+  small: boolean
 }
 
 export interface BattleMap {
@@ -143,7 +150,7 @@ export function createBattleMap(): BattleMap {
       const progress = SCANNER_SLIDE[Math.min(SLIDE_FRAMES - 1, Math.floor(entered))] / 100
       const slide = SCANNER_SLIDE_FROM * (1 - progress)
 
-      const wanted = state.charging ? SCANNER_SCALE_SMALL : SCANNER_SCALE
+      const wanted = state.small ? SCANNER_SCALE_SMALL : SCANNER_SCALE
       const step = SCANNER_EASE_PER_SECOND * state.delta
       scale = wanted > scale ? Math.min(wanted, scale + step) : Math.max(wanted, scale - step)
 

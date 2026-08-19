@@ -52,6 +52,7 @@ import { PIG_HEIGHT, PIG_HOLD, PIG_RADIUS } from '../../../lib/game/obstacles'
 import { weaponLayer } from '../../../lib/game/controls'
 import { advanceTraining, nextBreak } from '../../../lib/game/training'
 import { exposeBattleDebug } from './debug'
+import { touredIndex } from '../../../lib/game/mapView'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
 import type { SceneHost } from './scene'
 
@@ -178,6 +179,15 @@ export interface BattleSceneParts {
    * key. Play saw the mission open with the squad already down.
    */
   running: () => boolean
+  /**
+   * Whether the game is PAUSED, as opposed to merely not on screen.
+   *
+   * The two are not the same thing and the camera is the reason: a battle that
+   * has not been shown yet is not drawn at all, while a PAUSED one hands the
+   * camera to the exe's mode 7 and tours the field (lib/game/mapView.ts). So
+   * `running` stops the world and this one says what to do instead.
+   */
+  paused: () => boolean
 }
 
 export function buildBattle(parts: BattleSceneParts): BattleScene {
@@ -191,7 +201,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     onCollected,
     bus,
     sound: sounds,
-    running
+    running,
+    paused
   } = parts
   const root = new THREE.Group()
   root.rotation.x = Math.PI
@@ -711,9 +722,46 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * displacement with the time that produced it (three/debug.ts, `frame`). */
   let lastFrame = 0
 
+  /** How long this pause has been touring, and whether one is under way. */
+  let touring = 0
+  let surveying = false
+
+  /**
+   * THE PAUSE'S OWN CAMERA — the exe's mode 7, entered at 0x49205F and put
+   * back on the way out.
+   *
+   * A paused mission is not a still picture in the original: the world stops
+   * and the camera pulls back to 11000 and goes round the field, one pig every
+   * 0x7D frames. It tours the pigs the DRAW loop is drawing — the `+0x30` byte
+   * the tour tests is the one a shelter clears — so a pig indoors is skipped,
+   * and so is a dead one.
+   *
+   * It runs on the frame's own delta and not the engine's, because it is a
+   * camera: the world is not stepping and must not be made to.
+   */
+  const survey = (delta: number): void => {
+    const first = !surveying
+    surveying = true
+    touring = first ? 0 : touring + delta
+    const shown = now.pigs.filter((pig) => pig.health > 0 && !pig.sheltered)
+    const index = touredIndex(touring, shown.length)
+    const soldier = index < 0 ? null : squad.of(shown[index].id)
+    if (!soldier) return
+    // `null` on the first frame of a pause SNAPS rather than glides, the same
+    // way a new acting pig does — the camera has 11000 units to travel and
+    // sliding all of it would read as a swoop the original does not have.
+    chase.follow(drawnStance(soldier), soldier.node.position.y, 0, first ? null : delta, 'map')
+    lastView = 'map'
+  }
+
   const onFrame = (delta: number): void => {
-    // The mission's clock does not start until the mission is on screen.
-    if (!running()) return
+    // The mission's clock does not start until the mission is on screen — but
+    // a PAUSE is not that: the world stops and the camera goes touring.
+    if (!running()) {
+      if (paused()) survey(delta)
+      return
+    }
+    surveying = false
     time += delta
     lastFrame = delta
     // **THE LINE COMES BEFORE THE SHOT**, so the rules are told whether the pig

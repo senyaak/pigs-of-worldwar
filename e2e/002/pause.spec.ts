@@ -187,3 +187,48 @@ test('confirming the abort ends the mission on the LOSS debrief', async ({ app }
   await expect(page.locator('#player')).toBeVisible()
   expect(app.errors()).toEqual([])
 })
+
+test('the pause hands the camera to the MAP VIEW, and it tours', async ({ app }) => {
+  const { page } = app
+  test.setTimeout(90_000)
+  await startGame(page)
+
+  const eye = (): Promise<{ view: string; cam: number[] }> =>
+    page.evaluate(() => {
+      const pow = (
+        window as unknown as {
+          pow?: { debug?: { camera(): { x: number; y: number; z: number }; view(): string } }
+        }
+      ).pow
+      const c = pow?.debug?.camera()
+      return {
+        view: pow?.debug?.view() ?? '',
+        cam: c ? [Math.round(c.x), Math.round(c.y), Math.round(c.z)] : []
+      }
+    })
+
+  const chase = await eye()
+  expect(chase.view).toBe('chase')
+
+  // A PAUSED MISSION IS NOT A STILL PICTURE. The exe puts the camera in mode 7
+  // — the same MAP VIEW skill 63 enters — which pulls back to 11000 against
+  // the chase's 3072 and walks the field a pig every 0x7D frames
+  // (lib/game/mapView.ts). Play named it: "камера летает по кругу над картой".
+  await tap(page, 'pause')
+  await expect.poll(async () => (await eye()).view, { message: 'the camera did not survey' }).toBe('map')
+  const survey = await eye()
+  // …and it stands FURTHER OUT than the chase did, which is the one number of
+  // the mode's own row whose reader is traced.
+  const reach = (a: number[], b: number[]): number => Math.hypot(a[0] - b[0], a[2] - b[2])
+  expect(reach(survey.cam, chase.cam)).toBeGreaterThan(1000)
+
+  // The world is still frozen under it — this is a camera, not a resumption.
+  const clock = (await hud(page)).seconds
+  await page.waitForTimeout(600)
+  expect((await hud(page)).seconds).toBe(clock)
+
+  // Letting go puts the ordinary chase back.
+  await tap(page, 'pause')
+  await expect.poll(async () => (await eye()).view, { message: 'the chase did not come back' }).toBe('chase')
+  expect(app.errors()).toEqual([])
+})
