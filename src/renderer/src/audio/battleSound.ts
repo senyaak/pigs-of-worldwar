@@ -22,7 +22,7 @@ import type { BattleBus } from '../../../lib/game/events'
 import type { SceneSound } from '../contracts/sound'
 
 /** The battle's sound bank — 99 numbered effects (lib/formats/srl.ts). */
-const GAME_SOUNDS = 'Audio/sfxday.srl'
+export const GAME_SOUNDS = 'Audio/sfxday.srl'
 
 export interface BattleSound extends SceneSound {
   dispose(): void

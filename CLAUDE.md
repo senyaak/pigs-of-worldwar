@@ -343,6 +343,22 @@ it bit twice — the battle queueing the briefing's key, then the briefing
 taking the map's. Anything new that changes the view goes through `show()`,
 which is where the rule lives.
 
+**ESCAPE is the PAUSE, and a pause is THREE things stopping at once.**
+`ui/battle.ts` owns one flag and each domain reads it in its own way: the
+WORLD stops because `running` gates the whole frame in `three/battle.ts`, so
+`engine.update` is never reached and the fixed-step accumulator never sees the
+time; the SOUND stops by suspending the one shared `AudioContext`, which holds
+a half-spoken line where it was instead of losing it; and the DASHBOARD keeps
+DRAWING — the frozen battle behind the menu is the point — but is handed a
+delta of zero so nothing on it moves. The menu itself is
+`lib/game/pauseMenu.ts` (five rows and no more: the exe's lit row dispatches
+through a five-entry jump table) drawn by `ui/pauseMenu.ts` on the HUD canvas,
+and it is driven by the battle's own keys because the exe reads one pad. Two
+things follow. **Escape is the battle's own action, never `menuBack`** — that
+one is in `MENU_ACTIONS`, which the battle deliberately drops. And **the pause
+is SINGLE-PLAYER only**: play's rule, "в мп вообще никаких остановок", and a
+lockstep battle cannot have one side stop the clock.
+
 **A battle does not step until it is SHOWN.** The scene is built when
 `battle.open()` resolves, which is exactly when the briefing's loading bar
 fills — so `three/battle.ts` takes a `running` predicate and the frame is a

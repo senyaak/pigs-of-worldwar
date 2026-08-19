@@ -33,8 +33,10 @@ import { createBriefingBar } from './briefingBar'
 import { createBattleMap } from './battleMap'
 import type { Blip, Eye } from '../../../lib/game/scanner'
 import type { MapRaster } from '../../../lib/game/mapRaster'
+import { createPauseMenu } from './pauseMenu'
 import { createSkillMenu } from './skillMenu'
 import type { FloatingNumber, PigPlate } from '../contracts/overlay'
+import type { PauseState } from '../../../lib/game/pauseMenu'
 import type { SkillMenu } from './skillMenu'
 
 const DASHBOARD = 'Language/Tims/dashtims.mad'
@@ -253,6 +255,19 @@ export interface HudState {
   /** Seconds since the last frame — the briefing bar's slide and scroll run
    * on it; nothing else on the dashboard moves by itself. */
   delta: number
+  /**
+   * The PAUSE MENU's state while it is up, or null (lib/game/pauseMenu.ts).
+   * It is drawn last of everything, because it is the one thing on the
+   * dashboard that is modal.
+   */
+  pause: PauseState | null
+  /**
+   * Whether the game is PAUSED. The dashboard keeps drawing — the frozen
+   * world behind it is the point — but everything on it that moves by itself
+   * stops, because a briefing bar scrolling over a still battle reads as the
+   * game still running.
+   */
+  paused: boolean
   /** Seconds left in the turn; the clock shows two digits of it. */
   seconds: number
   /** Every living pig, projected by the scene. */
@@ -351,6 +366,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
   // What the pig is carrying, in the game's own frame. Its art is loaded
   // beside the dashboard's and it draws over everything else.
   const skills = createSkillMenu()
+  const pauseMenu = createPauseMenu()
   let art: SpriteSet | null = null
   let font: Font | null = null
   /** The same letters painted the heal's own colour — the pink a heal's number
@@ -412,6 +428,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         await bar.load()
         await battleMap.load()
         await skills.load()
+        await pauseMenu.load(dashboard)
         loaded = true
       } catch (error) {
         // A stripped install has no dashboard. Warn rather than error: the
@@ -444,10 +461,16 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
 
       const scale = canvas.height / AUTHORED_HEIGHT
       const viewWidth = canvas.width / scale
+      // WHAT THE PAUSE STOPS. The dashboard is still drawn — the point of a
+      // pause is to look at the frozen battle — but everything on it that
+      // moves under its own clock is handed a delta of zero, so the bar stops
+      // scrolling, the map stops sliding in and the plates stop fading. The
+      // world behind them is not stepping; neither should they.
+      const delta = state.paused ? 0 : state.delta
 
       // The bar runs on its own clock and its own art, so it neither waits
       // for the dashboard to decode nor stops when the dashboard is missing.
-      bar.update(state.delta)
+      bar.update(delta)
       context.save()
       context.scale(scale, scale)
       bar.draw(context, viewWidth)
@@ -643,7 +666,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       context.save()
       context.scale(scale, scale)
       battleMap.draw(context, viewWidth, AUTHORED_HEIGHT, {
-        delta: state.delta,
+        delta,
         eye: state.eye,
         blips: state.blips,
         charging: state.charge !== null
@@ -652,7 +675,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
 
       // The skill menu goes over the brass, since it is a MODE rather than
       // another gauge: while it is up the pig cannot be driven.
-      skills.update(state.delta)
+      skills.update(delta)
       if (skills.open()) {
         context.save()
         context.scale(scale, scale)
@@ -708,7 +731,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       // …or the moment anybody's number goes DOWN, standing still or not: the
       // water hurts silently and invisibly, and without this nothing on screen
       // says so (`PLATE.hurt`).
-      hurtFor = Math.max(0, hurtFor - state.delta)
+      hurtFor = Math.max(0, hurtFor - delta)
       for (const plate of state.pigs) {
         const before = wasHealth.get(plate.name)
         if (before !== undefined && plate.health < before) hurtFor = PLATE.hurt
@@ -746,6 +769,16 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         font.draw(context, health, healthLeft + heartSize.width + gap, healthTop)
       }
       context.restore()
+
+      // …AND THE PAUSE OVER ALL OF IT. Last, because it is the only modal
+      // thing the dashboard carries: the exe draws it over the live frame too
+      // and the world behind it is simply not stepping (ui/pauseMenu.ts).
+      if (state.pause) {
+        context.save()
+        context.scale(scale, scale)
+        pauseMenu.draw(context, viewWidth, state.pause, state.strings)
+        context.restore()
+      }
     }
   }
 }

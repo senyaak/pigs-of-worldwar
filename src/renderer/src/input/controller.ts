@@ -384,6 +384,20 @@ declare global {
       /** The PIG MAP — which of the chain's phases is up (ui/pigMap.ts):
        * 'off', 'world', 'zoom' or 'region'. */
       pigMap?: { phase(): string; patches(): number; flags(): number }
+      /** THE BATTLE itself: whether it is frozen, and a way to freeze it
+       * without the keyboard (ui/battle.ts). */
+      battle?: {
+        paused(): boolean
+        menu(): {
+          row: number
+          confirming: boolean
+          yes: boolean
+          master: number
+          sfx: number
+          speech: boolean
+        } | null
+        pause(wanted?: boolean): boolean
+      }
       /** The BRIEFING — whether the load is in and a key would start the
        * mission (ui/briefing.ts). */
       briefing?: { ready(): boolean }

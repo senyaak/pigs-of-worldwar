@@ -13,6 +13,7 @@ export const ACTIONS = [
   'aimDown',
   'aimMode',
   'endTurn',
+  'pause',
   'menuUp',
   'menuDown',
   'menuLeft',
@@ -142,7 +143,12 @@ export const DEFAULT_BINDINGS: Record<string, Action> = {
   // Forward runs the script on; back is the level starting over and running to
   // the step behind, because a broken dummy does not stand up again.
   F11: 'trainingBack',
-  F12: 'trainingNext'
+  F12: 'trainingNext',
+  // **ESCAPE is the PAUSE**, and it is the battle's own — not the frontend's
+  // `menuBack`, which every screen binds and which the battle deliberately
+  // drops (`MENU_ACTIONS`). The original does the same: in a mission the same
+  // button that backs out of a menu freezes the game instead.
+  Escape: 'pause'
   // …and there is no key for ENDING a turn. That is a SKILL — 65, SKIP TURN,
   // always in the menu whatever the pig carries — taken in hand from the menu
   // like a weapon and applied with FIRE (lib/game/controls.ts). Enter used to be

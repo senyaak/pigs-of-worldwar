@@ -13,7 +13,7 @@
 // One voice at a time: a new line cuts the one before it, because the
 // sergeant does not talk over himself.
 
-import { context } from './bank'
+import { context, speechOut } from './bank'
 
 /** The only speech set the game ships, and the language it ships in. */
 const SET = 1
@@ -57,7 +57,7 @@ export function createSpeech(): Speech {
     stop()
     const playing = ctx.createBufferSource()
     playing.buffer = buffer
-    playing.connect(ctx.destination)
+    playing.connect(speechOut() ?? ctx.destination)
     playing.onended = () => {
       if (source === playing) {
         source = null

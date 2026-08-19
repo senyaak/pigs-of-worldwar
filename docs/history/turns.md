@@ -242,3 +242,81 @@ Two things this pass turned up that are worth keeping:
   beats between two turns, so it sat there for the whole ten-second "press any
   key". `nextTurn(page)` in `e2e/controller.ts` is the handover a spec now has to
   take, and a spec that fires twice on one clock is a spec that is wrong.
+
+## THE PAUSE, AND THE MENU OVER IT — 2026-08-19
+
+Play asked whether there was an escape menu yet and said to build one. There
+was not: Escape reached nothing at all in a battle, because the only binding
+for it anywhere was the frontend's `menuBack`, and every screen's binder is
+gated on being the view that is up.
+
+**It was read before it was built, twice, and by two agents that did not see
+each other's answers.** They agreed, which is worth saying because the last
+thing this repo built off a single reading was the pig map's flags. Between
+them they also retired three things `frontend/notes.md` had said: the fourth
+row is SPEECH (175) and not PIG VOICES (240) — 240 has no reader in `.text`
+at all, and the one nearby hit for 0xF0 is `push 0F0h; push 140h`, the pair
+(320, 240) — the `0x45B3xx` block is not a networked second draw but the grey
+pass of the same function, and the menu has five rows because the lit row
+dispatches through a five-entry jump table. No RESTART. No INSTRUCTIONS.
+
+**A pause is three things stopping, each in its own domain.** The world stops
+because `running` already gated the whole battle frame (it is what keeps the
+drop-in from running under the loading screen), so `engine.update` is never
+reached and the fixed-step accumulator never sees the time — the exe does the
+same thing one level lower, not advancing `[0x520878]` and snapping its own
+accumulator forward so there is no catch-up burst. The sound stops by
+suspending the one shared `AudioContext`, which is a suspend and not a stop on
+purpose: the sergeant resumes mid-word rather than losing his line. And the
+dashboard keeps DRAWING, because the frozen battle behind the menu is the
+point, but is handed a delta of zero so the briefing bar stops scrolling and
+the map stops sliding in.
+
+That third one is the answer to what play recorded on 2026-08-11 and asked to
+be kept for later: alt-tabbing froze the world and the instructor talked on.
+The frame clamp in `three/scene.ts` was never a pause and said so.
+
+**Where the input goes.** Escape is a battle action of its own, `pause`, and
+not `menuBack` — that one lives in `MENU_ACTIONS`, which the battle
+deliberately drops, so binding the menu to it would have gone round the repo's
+own rule. The poll rides the scene's INPUT pass, which runs before the frame
+the pause freezes, so the key that starts a pause is also the key that ends
+one. While the menu is up the battle's own keys are the menu's: the walking
+pair steps the cursor, the turning pair works a slider, FIRE chooses. That is
+the skill menu's borrowing, and it is what the exe does by having one pad.
+
+**The art.** `dashtims.mad` entries 28..35 — `pause1..pause8` — were down in
+`todo.md` as "five two-frame widgets, built the same way as the dial". They
+are not: they are the **nine-slice frame** of the menu's panel, eight 16×16
+tiles drawn by 0x45B580. Which tile is which corner is nowhere in the code, so
+it was measured off the art instead: decoded, each corner tile is exactly the
+union of the two edge tiles that meet there, which puts them in reading order
+TL, T, TR, L, R, BL, B, BR.
+
+**One extra `AudioContext`, and it earns its keep.** Every noise the menu
+makes is one sample at three pitches — `S_SELECT`, at 0x64 for the cursor and
+for opening and closing, 0x96 after a volume step so the new level is heard,
+0x82 for a toggle. But a pause SUSPENDS the game's context, and a suspended
+context renders nothing at all, clicks included. The exe has no such trouble:
+it parks twelve channel slots by hand and then plays on the same engine. A
+second context for one buffer is the cheapest thing that keeps both halves —
+the line held exactly where it was, and a menu that answers.
+
+**The volumes had to become real.** Two rows of the menu are sliders and a
+third is a switch, and sliders that move nothing are a lie, so `audio/bank.ts`
+grew a mixer: a master gain with SFX and SPEECH under it, and everything the
+game plays routed through one of the two. The exe keeps the same three on its
+sound manager (`+0x14`, `+0x1A`, `+0x18`) and the in-mission menu writes them
+directly — which is why a volume set in a mission is not in the options screen
+afterwards, and why these last as long as the process and no longer.
+
+**Two things are the remake's own and both say so where they live.** The floor
+on a volume — the exe clamps only the top, and its bottom is a word going
+through zero, which is an overflow rather than a behaviour. And Escape over an
+armed ARE YOU SURE? takes the question down rather than the whole pause: the
+toggle was read, the confirm flag's fate across one was not.
+
+Still not built: the MISSION ABORTED screen (gtext 189) the exe shows after an
+abort. ABORT here goes straight back to the squad, which is what `aborted`
+already did — and which matches the exe in skipping the debrief and the
+newspaper.

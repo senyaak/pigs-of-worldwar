@@ -30,6 +30,7 @@ import { controller } from './controller'
 import { modeOf, readControls, verbOf, wakes } from '../../../lib/game/controls'
 import type { ControlMode, Held } from '../../../lib/game/controls'
 import { SKILL } from '../../../lib/game/skills'
+import type { PauseVerb } from '../../../lib/game/pauseMenu'
 import { choosableIn } from '../../../lib/game/indoors'
 import type { Battle } from '../../../lib/game/battle'
 import type { Emit } from '../../../lib/game/events'
@@ -49,12 +50,34 @@ export interface BattleInputHost {
   skills: SkillMenu
   /** Whether the battle is the view on screen. */
   up(): boolean
+  /** Whether the game is frozen. While it is, nothing here drives the pig. */
+  paused(): boolean
+  /** Freeze the game, or let it go again (ui/battle.ts). */
+  togglePause(): void
+  /** One press against the pause menu, while it is up (ui/battle.ts). */
+  pauseVerb(verb: PauseVerb): void
 }
 
 export interface BattleInput {
   /** Read the controls and act on them. Once a frame, before the game steps. */
   poll(): void
 }
+
+/**
+ * The battle's own keys, while the PAUSE MENU has them: the walking pair for
+ * the cursor, the turning pair for a slider, FIRE to choose.
+ *
+ * FIRE rather than jump because the exe's SELECT is the button that fires
+ * (bit 0x20, 0x493796) and the remake split those two apart — so the menu
+ * follows the meaning, not the key.
+ */
+const PAUSED_KEYS: readonly [Action, PauseVerb][] = [
+  ['walkForward', 'up'],
+  ['walkBack', 'down'],
+  ['turnLeft', 'left'],
+  ['turnRight', 'right'],
+  ['fire', 'select']
+]
 
 export function createBattleInput(host: BattleInputHost): BattleInput {
   /**
@@ -279,8 +302,43 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
       pending.length = 0
       return
     }
+    // FROZEN. The poll still runs — it rides the scene's input pass, which is
+    // ahead of the frame the pause stops — but the only verb that means
+    // anything is the one that ends the pause. Everything else is dropped
+    // rather than banked, the same way a key pressed off-screen is: a queue
+    // emptied on resume would spend a turn's worth of presses at once.
+    if (host.paused()) {
+      // THE MENU TAKES THE PIG'S OWN KEYS. The exe reads one pad and the same
+      // buttons mean the menu's rows while the pause is up; here the walking
+      // pair steps the cursor, the turning pair works a slider, and FIRE
+      // chooses — exactly the way the skill menu borrows them. Escape steps
+      // back out.
+      //
+      // Everything is read on the EDGE. `tookPress` consumes the latch a held
+      // key sets, so holding W walks the cursor one row and no more.
+      for (const action of pending.splice(0, pending.length)) {
+        if (action === 'pause') host.pauseVerb('back')
+      }
+      for (const [action, verb] of PAUSED_KEYS) {
+        if (controller.tookPress(action)) host.pauseVerb(verb)
+      }
+      pressed = new Set()
+      stepped = { x: 0, y: 0 }
+      return
+    }
     pressed = new Set(HELD_ACTIONS.filter((action) => controller.tookPress(action)))
-    const verbs = pending.splice(0, pending.length)
+    const queued = pending.splice(0, pending.length)
+    // ESCAPE never reaches the rules. It is not a thing a pig does and it has
+    // no mode: whatever the control set, whatever is in hand, it freezes the
+    // game (ui/battle.ts). Taken out here rather than added to `verbOf`,
+    // which is the ENGINE's table of what a control MEANS.
+    const verbs = queued.filter((action) => action !== 'pause')
+    if (verbs.length !== queued.length) {
+      host.togglePause()
+      // …and the pause is spent alone. Anything queued alongside it belongs to
+      // the frame the player has just stopped.
+      return
+    }
 
     let mode = liveMode(down('aimMode'), wakes(freshHeld(), verbs.length))
     // The VERBS go first, because one of them hands over a different set — R

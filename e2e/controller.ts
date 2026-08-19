@@ -23,6 +23,8 @@ export type Action =
   | 'aimDown'
   | 'skills'
   | 'endTurn'
+  // ESCAPE, in a battle: the pause and its menu (lib/game/pauseMenu.ts).
+  | 'pause'
   | 'menuUp'
   | 'menuDown'
   | 'menuLeft'

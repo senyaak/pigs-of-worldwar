@@ -55,8 +55,8 @@ models, maps, textures and sounds straight out of your own installation of
 - **No AI and no second player.** A map's other sides stand where they spawned.
   CAMP fields one pig, which is what the training ground carries; `pow.swapMap`
   in the devtools console opens the other 60 maps to walk around.
-- **No multiplayer or options screens**, no escape menu, no pause, and no map on
-  the dashboard.
+- **No multiplayer or options screens.** The escape menu, the pause and the
+  dashboard's map are in.
 - **Not everything is decoded.** A grenade's fuse and blast radius, the sink of
   a pig that cannot swim, and a bridge sounding like wood are the remake's own
   numbers rather than the game's, and each says so where it lives.

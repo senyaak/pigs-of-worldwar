@@ -441,12 +441,16 @@ actually seen.
     should run the whole list.
   - **The ESCAPE chain**: frontend ESC → REALLY QUIT? (24) from the squad,
     REALLY QUIT APP? (43) from the main menu (kind 19 IS the app-quit
-    code); **in a MISSION esc is the PAUSE binding** — the game's own pause
-    (sim frozen, sound suspended, "-GAME PAUSED-" gtext 173 with
-    CONTINUE / MASTER / SFX / PIG VOICES / ABORT rows; the in-mission
-    volume tweaks touch only the engine and do not persist; ABORT asks ARE
-    YOU SURE and ends the mission). The remake's escape menu can reuse the
-    kind-12 confirm module for the quits.
+    code); **in a MISSION esc is the PAUSE binding** — and that half is
+    BUILT (2026-08-19): the game's own pause, sim frozen, sound suspended,
+    "-GAME PAUSED-" gtext 173 over CONTINUE / MASTER VOLUME / SFX VOLUME /
+    **SPEECH** / ABORT, the in-mission volume tweaks touching only the
+    engine, ABORT asking ARE YOU SURE? on NO. `lib/game/pauseMenu.ts`,
+    `ui/pauseMenu.ts`, `e2e/002/pause.spec.ts`. **The fourth row is SPEECH
+    (175), not PIG VOICES (240)** — an earlier reading of this line said
+    the latter and 240 has no reader in `.text` at all. What is still the
+    FRONTEND's half — REALLY QUIT? and REALLY QUIT APP? — can reuse the
+    kind-12 confirm module.
 
 ## A. THE TUTORIAL — finish the training ground
 
@@ -1290,19 +1294,20 @@ not pulled, written here so nobody has to remember an address.
 - **The rest of the battle screen** in the order play asks for it.
 - **The two unbuilt menu screens** — MULTI-PLAYER leads somewhere, OPTIONS does
   not.
-- **There is no ESCAPE MENU**, and play named it (2026-08-11). The original has
-  one and its ART SHIPS: `dashtims.mad` entries 26..35 are `score1`, `score2`
-  and `pause1..pause8`, and the battle's dashboard init LOADS ALL TEN at
-  startup — five two-frame widgets, built the same way as the dial and the
-  gauge (the loop at 0x45709D..0x45734F, two pages an iteration; see "THE
-  DASHBOARD" in `library/notes.md`). The exe's own pause is a MODE: the beat
-  at the top of a turn lists the pause button as one of its three ways out
-  (0x4d8a2c, `turns/notes.md`). So an escape menu has a decoded skeleton to
-  sit on — the widget machinery, the art, and a mode to enter — and this is
-  the job that would justify transcribing the layout tables (D's loose end 5),
-  because a new UI wants the original's coordinates rather than fresh eyework.
-  Note the remake's own constraint from play: a real pause is single-player
-  only, and multiplayer must never stop (docs/history/status.md, "Threads left mid-pull").
+- ~~**There is no ESCAPE MENU**~~ — **BUILT, 2026-08-19.** Play named it on
+  2026-08-11 and asked for it on 2026-08-19. `pause1..pause8` turned out not
+  to be five two-frame widgets at all: they are the **nine-slice frame** of
+  the menu's panel, eight 16×16 tiles drawn by 0x45B580, and which is which
+  corner was measured off the art. The pause is a MODE (8), the world's tick
+  is simply not advanced while it is up, and the menu is five rows drawn with
+  the battle's small letters over the live frame. `lib/game/pauseMenu.ts` has
+  the rules, `ui/pauseMenu.ts` draws them, `unit/pauseMenu.spec.ts` and
+  `e2e/002/pause.spec.ts` pin both halves. Play's own constraint stands and is
+  written into the code: a real pause is SINGLE-PLAYER only and multiplayer
+  must never stop (docs/history/status.md, "Threads left mid-pull").
+  Still not built off this: the MISSION ABORTED screen (gtext 189) the exe
+  shows after an abort — the remake goes straight back to the squad, which is
+  what `aborted` already did.
 - **The sky is DONE and shown — this entry is provenance, not work.** The dome,
   the mood's fog and the weather are in and answered by play (2026-08-12);
   nothing below is a defect and none of it is visible. It is here so the next

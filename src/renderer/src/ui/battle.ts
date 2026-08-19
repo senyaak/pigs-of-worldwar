@@ -15,6 +15,11 @@ import { createBattleInput } from '../input/battleInput'
 import { buildBattle } from '../three/battle'
 import type { BattleScene } from '../three/battle'
 import { controller } from '../input/controller'
+import { resumeAudio, setMasterVolume, setSfxVolume, setSpeechOn, suspendAudio } from '../audio/bank'
+import { GAME_SOUNDS } from '../audio/battleSound'
+import { loadMenuClick, playMenuClick } from '../audio/menuClick'
+import { PAUSE_PITCH, PAUSE_SOUND, VOLUME_MAX, newPause, pausePress } from '../../../lib/game/pauseMenu'
+import type { PauseState, PauseVerb } from '../../../lib/game/pauseMenu'
 import { LAYOUT, createHud } from './hud'
 import { missionTitle } from './titleCard'
 import { createSpeech } from '../audio/speech'
@@ -362,6 +367,8 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     const ended = scene.battle.view().ending
     hud.draw({
       delta,
+      paused,
+      pause,
       seconds: game.timeLeft,
       pigs: scene.plates(hudCanvas.clientWidth, hudCanvas.clientHeight, LAYOUT.plate.lift),
       numbers: scene.numbers(hudCanvas.clientWidth, hudCanvas.clientHeight),
@@ -419,6 +426,93 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
   const isBattleUp = (): boolean => !battleEl.classList.contains('hidden')
 
   /**
+   * THE PAUSE, and it is one flag with three consequences.
+   *
+   * Play asked for it and gave the reason: alt-tabbing froze the world and
+   * left the sergeant talking — "надо в будущем паузу делать, эскейп меню"
+   * (`docs/todo.md` B4b). The frame clamp in `three/scene.ts` stops a ten
+   * second step resolving a whole shot at once; it was never a pause and says
+   * so.
+   *
+   * The three consequences, each in the domain that owns it:
+   *
+   * - the WORLD stops — `running` is what `three/battle.ts` gates its whole
+   *   frame on, so `engine.update` is never reached and the fixed-step
+   *   accumulator never sees the time (lib/game/engine.ts);
+   * - the SOUND stops, by suspending the one shared context, which keeps a
+   *   half-spoken line exactly where it was (audio/bank.ts);
+   * - the DASHBOARD keeps drawing but stops moving (ui/hud.ts).
+   *
+   * Single player only. Play's rule, and it is not a detail: "в мп вообще
+   * никаких остановок" — a lockstep battle cannot have one side stop the
+   * clock, so the day multiplayer lands this is gated on being alone.
+   */
+  let paused = false
+  const isRunning = (): boolean => isBattleUp() && !paused
+
+  /** The menu's own state while it is up, and nothing while it is not. */
+  let pause: PauseState | null = null
+  /**
+   * The three settings the menu works, kept OUT of it: the menu is opened
+   * fresh every time and these are not, the same way the exe's live on the
+   * sound manager rather than on the pause. They last as long as the process
+   * — the exe's do too, which is why a volume set in a mission is not in the
+   * options screen afterwards.
+   */
+  const mix = { master: VOLUME_MAX, sfx: VOLUME_MAX, speech: true }
+  // The one sample the menu makes every one of its noises with, on a context
+  // of its own because the pause suspends the game's (audio/menuClick.ts).
+  void loadMenuClick(GAME_SOUNDS, PAUSE_SOUND)
+
+  const setPaused = (wanted: boolean): void => {
+    if (paused === wanted || !isBattleUp()) return
+    paused = wanted
+    // Opening and closing make the same noise the cursor does — the exe plays
+    // its one sample at 0x64 on both (0x491F84, 0x491FC7).
+    playMenuClick(PAUSE_PITCH.plain)
+    if (paused) {
+      pause = newPause(mix)
+      suspendAudio()
+      // Nothing stays HELD across a pause. The controller does the same on
+      // blur, and for the same reason: a key that went down before the freeze
+      // would drive the pig the moment it lifts.
+      controller.releaseAll()
+    } else {
+      pause = null
+      resumeAudio()
+    }
+  }
+
+  /**
+   * One key press against the pause menu: the rules say what it means and
+   * what noise it makes (lib/game/pauseMenu.ts), and this is where the four
+   * things it can ask for actually happen.
+   */
+  const pauseVerb = (verb: PauseVerb): void => {
+    if (!pause) return
+    const outcome = pausePress(pause, verb)
+    if (outcome.sound) playMenuClick(PAUSE_PITCH[outcome.sound])
+    // The settings live past the menu, so they are copied back out of it.
+    mix.master = pause.master
+    mix.sfx = pause.sfx
+    mix.speech = pause.speech
+    setMasterVolume(mix.master)
+    setSfxVolume(mix.sfx)
+    setSpeechOn(mix.speech)
+    // Turning SPEECH off cuts the line in the air, rather than waiting for it
+    // to finish quietly (0x4923EB).
+    if (outcome.cutSpeech) speech.stop()
+    if (outcome.resume) setPaused(false)
+    if (outcome.abort) {
+      // The exe's mode 17: the mission simply ends, and the debrief and the
+      // newspaper are both skipped — which is what `aborted` already does
+      // here (main.ts sends it straight back to the squad).
+      setPaused(false)
+      leave()
+    }
+  }
+
+  /**
    * The controls, read once a frame in the SCENE's own loop
    * (`input/battleInput.ts`). This file used to interpret them itself, on a
    * change notification, and both halves of that were wrong: a control set can
@@ -435,7 +529,14 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
     // (lib/game/events.ts).
     emit: (event) => scene?.battle.announce(event),
     skills: hud.skills,
-    up: isBattleUp
+    up: isBattleUp,
+    paused: () => paused,
+    pauseVerb,
+    // ESCAPE, read in the battle's own poll like every other verb — and the
+    // poll rides the scene's INPUT pass, which is ahead of the frame the
+    // pause freezes, so the key that starts a pause is also the key that can
+    // end one (three/scene.ts).
+    togglePause: () => setPaused(!paused)
   })
   controller.bindKeyboard(isBattleUp)
 
@@ -700,7 +801,7 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
       onCollected: collected,
       bus,
       sound,
-      running: isBattleUp
+      running: isRunning
     })
     // The dashboard's map, built once off the same ground the mesh came from
     // — one pixel a tile, the whole world (lib/game/mapRaster.ts). Not
@@ -772,6 +873,18 @@ export function initBattle(onLeave: (exit: BattleExit) => void): BattleView {
       game.currentPig.holding = skill
       updateHud()
       return true
+    },
+    // Whether the game is FROZEN, and a way to freeze it that is not the
+    // keyboard — the same reader every view gives a spec (docs/testing.md).
+    battle: {
+      paused: () => paused,
+      /** The menu's own state while it is up — which row is lit, whether the
+       * question is armed, and the three settings. */
+      menu: () => (pause ? { ...pause } : null),
+      pause: (wanted = true) => {
+        setPaused(wanted)
+        return paused
+      }
     }
   }
 
