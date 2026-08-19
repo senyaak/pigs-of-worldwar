@@ -903,6 +903,18 @@ and the weakest of them were invented here:
   geometry sits in the exe's collision world is still open (0x406bb0
   undecoded); the remake builds the play-observed behaviour from the decoded
   step-up/sidestep constants instead.
+- `[play]` **A hillside is walked DOWN, and only a face past 45° is fallen
+  off.** The exe's fall trigger is "no ground within 32 below the feet at the
+  step's end" — at its stride and doubled heights a slope test at 31.6°,
+  which is 17.1° in this engine's halved heights; the first build compared
+  ground a whole LOOK_AHEAD out instead of a stride and got 13.0°, under
+  CAMP's median slope of 14°, so most descents were a stutter of launches
+  ("спускаюсь с горки — падаю - иду - падаю"). The look-ahead now hunts a
+  BREAK — more than STEP_DOWN lost within one FACE_PROBE — so any grade up
+  to 45° is walked pinned to the ground (the climb has no limit at all) and
+  a real lip still launches a walking step ahead. `FACE_PROBE` in
+  `lib/game/movement.ts`; pinned in `unit/movement.spec.ts` and the downhill
+  walk in `unit/locomotion.spec.ts`.
 - `[CHECK — remake]` **The wall scrabble wears the Scramble clip.** The exe's
   wedge branch never touches the animation — only the eject (0x470c70) does —
   but a pig pushing at a wall visibly scrabbles in play, and clip 11 is what

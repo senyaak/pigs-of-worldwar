@@ -93,6 +93,25 @@ test('walking is kinematic: pinned to the ground, straight, at walking speed', {
   expect(s.clip).toBe(ANIM.RUN)
 })
 
+test('walking DOWNHILL is kinematic too — a grade is not a cliff', { tag: '@nodata' }, () => {
+  // The same 26.6° hillside, walked down instead of up. Play reported the
+  // descent as a stutter — "иду - падаю - иду - падаю" — because the fall
+  // look-ahead was a SLOPE test at 13° and half of every map is steeper. A
+  // hill is walked down pinned to the ground; only a face steeper than the
+  // feet can follow (lib/game/movement.ts, FACE_PROBE) is fallen off.
+  const hill = terrain((_x, z) => Math.max(0, z) * 0.5)
+  const south = Math.PI
+  const s = createLocomotion(hill, 0, 2000, south)
+  run(s, hill, { walk: 1 }, 1)
+  expect(s.z).toBeCloseTo(2000 - WALK_SPEED, 0)
+  expect(s.x).toBeCloseTo(0)
+  expect(s.y).toBeCloseTo(hill.height(s.x, s.z))
+  // Never airborne, never landing: the whole way down is a walk.
+  expect(s.airborne).toBeNull()
+  expect(s.getUp).toBe(0)
+  expect(s.clip).toBe(ANIM.RUN)
+})
+
 // The exe's own numbers, spelled out rather than recomputed from the
 // constants they came from: 64 units a frame asked for, 13/16 of it granted
 // to a grunt, and the backward request clamped to -32 before that scale.

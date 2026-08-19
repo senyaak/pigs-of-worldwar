@@ -235,3 +235,31 @@ grin, 004 an open scream. `three/faces.ts` uploads the 004 pair and
 `Soldier.wearFace` repaints the two face-group materials — scared from
 `dropOpened` (a cut canopy keeps it), the pig's own back on `dropLanded`.
 `[CHECK — remake]` on the choice of pair; correcting it is one name.
+
+## The downhill stutter — a slope test wearing a cliff test's name (2026-08-20)
+
+Play: "когда я спускаюсь с горки я какбы стукаюсь — падаю, иду, падаю, иду".
+Measured before fixing: on the 26.6° spec hillside a driven pig covered 1299
+units in a second of "walking" — the fall carries 1.5× walking speed, so the
+stutter is also a speed exploit — and the clip chain re-cued RUN → JUMP →
+LAND three times a second.
+
+The cause was one `if` in `movement.ts`: the fall look-ahead compared the
+terrain a whole LOOK_AHEAD (69.3 units — the exe's 52-unit stride inflated by
+the play-only WALK_SCALE) ahead against the terrain underfoot, and called
+anything more than STEP_DOWN (16) lower a fall. That is a slope test at
+13.0°, and CAMP's median slope is 14°: more than half the map read as a
+cliff. The exe asks a different question — is there ground within 32 below
+the feet where the step ENDS (`TryMove` step 6) — which at its own stride and
+doubled heights only fires past 31.6°.
+
+The test is a BREAK test now: the look-ahead is walked in FACE_PROBE-long
+probes and a fall wants more than STEP_DOWN lost within ONE probe — a face
+past 45°, which feet cannot follow. A hillside of any lesser grade is walked
+down pinned to the ground, the mirror of the climb (which never had a limit);
+a real lip still launches from a whole walking step out, which is the spec
+that forced the fixed look-ahead in the first place. The old
+"drop-deeper-than-step-down falls" unit test encoded the bug — 34 over 200 is
+a 9.7° hillside — and now pins the opposite; the cliff fixtures were rebuilt
+one tile-face steep (51°), since fixture terrain interpolates over 512-unit
+tiles and a "step function" was never a discontinuity to begin with.

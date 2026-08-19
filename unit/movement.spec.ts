@@ -38,8 +38,20 @@ test('a steep climb is still just a step — terrain height never refuses', { ta
   expect(move.z).toBeCloseTo(STRIDE)
 })
 
-test('a drop deeper than the step-down is walked off, not stopped at', { tag: '@nodata' }, () => {
-  const move = step(slope(-(STEP_DOWN + 18)), 0, 0, NORTH, STRIDE)
+test('a hillside is walked DOWN — a grade is not a cliff', { tag: '@nodata' }, () => {
+  // These exact numbers used to pin 'falling', and that WAS the stutter play
+  // reported ("спускаюсь с горки — падаю - иду - падаю"): 34 over 200 is a
+  // 9.7° hillside, not a drop-off. CAMP's median slope is 14°.
+  expect(step(slope(-(STEP_DOWN + 18)), 0, 0, NORTH, STRIDE).outcome).toBe('moved')
+  // CAMP's own median, and twice it: both are ground, walked pinned.
+  expect(step(slope(-50), 0, 0, NORTH, STRIDE).outcome).toBe('moved')
+  expect(step(slope(-100), 0, 0, NORTH, STRIDE).outcome).toBe('moved')
+})
+
+test('a face steeper than the feet can follow is walked off', { tag: '@nodata' }, () => {
+  // Past 45° — more than STEP_DOWN lost within one FACE_PROBE — the ground
+  // stops reading as ground and the step leaves it.
+  const move = step(slope(-(STRIDE * 1.2)), 0, 0, NORTH, STRIDE)
   expect(move.outcome).toBe('falling')
   expect(move.z).toBeCloseTo(STRIDE)
 })
@@ -96,9 +108,10 @@ test('the world limit refuses the step rather than sliding along it', { tag: '@n
 })
 
 test('an edge is seen a walking step ahead, not a frame ahead', { tag: '@nodata' }, () => {
-  // The drop starts one LOOK_AHEAD north of the pig, and is deep enough to
-  // clear STEP_DOWN over that distance but not over a tenth of it.
-  const cliff = terrain((_x, z) => (z > LOOK_AHEAD ? 0 : -20 * STEP_DOWN))
+  // The drop starts one LOOK_AHEAD north of the pig — a 51° face, since the
+  // fixture's vertices are a tile apart — and a face that steep is a cliff
+  // however short the step that approaches it.
+  const cliff = terrain((_x, z) => (z > LOOK_AHEAD ? 0 : -40 * STEP_DOWN))
 
   // A tiny step — one frame of a fast machine — still sees the edge coming
   // and launches. Tie the look-ahead to the frame and this walks off the lip

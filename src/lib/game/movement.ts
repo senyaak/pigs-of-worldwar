@@ -11,7 +11,8 @@
 // under its feet.
 //
 //   1. clamp the candidate to the world limits — nothing left, refuse
-//   2. the ground there is more than STEP_DOWN below — walk off and fall
+//   2. the ground BREAKS ahead — loses more than STEP_DOWN within one
+//      FACE_PROBE — walk off and fall
 //   3. otherwise walk, and take the ground height with you
 //
 // NOTHING about the ground refuses a step — not its height and not the wall
@@ -108,6 +109,27 @@ export const WALK_BACK_SPEED = fromExeSpeed((32 * PIG_CLASS_SPEED) / 16) * WALK_
 export const STEP_DOWN = fromExeY(32)
 
 /**
+ * What tells a CLIFF from a HILLSIDE: a fall wants the ground to lose more
+ * than STEP_DOWN within one probe THIS long — a face steeper than 45°, which
+ * feet cannot follow. Anything shallower is a grade and is WALKED down,
+ * pinned to the ground the whole way, the mirror of the climb (which has no
+ * limit at all).
+ *
+ * `[play]` — this line is the remake's own. The exe starts a fall when the
+ * step's endpoint finds no ground within 32 below the feet (`TryMove` step 6,
+ * movement/notes.md), which at its 52-unit stride and doubled heights is a
+ * slope test at 31.6°; converted to this engine's halved heights that is
+ * 17.1°, and the first build compared the terrain a whole LOOK_AHEAD out
+ * instead of a stride, which pushed it to 13.0° — under CAMP's own median
+ * slope of 14°. Play walked down a hill and reported the result exactly:
+ * "спускаюсь с горки — стукаюсь: падаю - иду - падаю - иду". A slope test of
+ * ANY threshold keeps that stutter on whatever ground is steeper than it, so
+ * the test is a BREAK test now, and the number is where a slope stops reading
+ * as ground.
+ */
+export const FACE_PROBE = STEP_DOWN
+
+/**
  * How far ahead the ground is checked for an edge: one of the original's
  * walking steps. Its `TryMove` runs once a logic frame and moves `nDist`, so
  * the check and the step were the same distance; ours must not shrink with
@@ -167,19 +189,32 @@ export function step(
   // no single step ever clears STEP_DOWN, and the pig creeps over the lip
   // and walks down the face while gravity does the work. It should leave the
   // ground.
+  //
+  // …and what is looked FOR is a BREAK, not a grade. One comparison across
+  // the whole reach is a slope test — it fired on every hillside steeper
+  // than 13° and turned a descent into a stutter of launches (FACE_PROBE has
+  // the derivation). So the reach is walked in probes instead: a fall is the
+  // ground losing more than STEP_DOWN within ONE probe, which a hill never
+  // does and the lip of a cliff always does — still a whole walking step
+  // out, so a running pig still leaves from the lip.
   const reach = Math.max(Math.abs(distance), LOOK_AHEAD)
-  const aheadX = x + Math.sin(heading) * Math.sign(distance) * reach
-  const aheadZ = z + Math.cos(heading) * Math.sign(distance) * reach
-  // Game-space heights grow DOWNWARD, so a bigger height is lower ground.
-  const here = query.height(x, z)
-  if (
-    query.height(aheadX, aheadZ) - here > STEP_DOWN &&
-    !query.isWater(toX, toZ) &&
-    !supported(aheadX, aheadZ)
-  ) {
-    return { outcome: 'falling', x: toX, z: toZ }
+  const dirX = Math.sin(heading) * Math.sign(distance)
+  const dirZ = Math.cos(heading) * Math.sign(distance)
+  if (!query.isWater(toX, toZ)) {
+    // Game-space heights grow DOWNWARD, so a bigger height is lower ground.
+    let last = query.height(x, z)
+    for (let at = FACE_PROBE; ; at += FACE_PROBE) {
+      const along = Math.min(at, reach)
+      const sx = x + dirX * along
+      const sz = z + dirZ * along
+      const there = query.height(sx, sz)
+      if (there - last > STEP_DOWN && !supported(sx, sz)) {
+        return { outcome: 'falling', x: toX, z: toZ }
+      }
+      last = there
+      if (along >= reach) break
+    }
   }
-  const drop = query.height(toX, toZ) - here
   // No wall refusal, because the original has none. `0x415590` turns the
   // landscape into friction 0.01 / restitution 0.99 wherever
   // `Map::IsBlocked` says yes, and that is the whole of it: the pig walks
