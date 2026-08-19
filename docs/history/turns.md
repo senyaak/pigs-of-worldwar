@@ -368,12 +368,12 @@ struct.
 or undo.** `fall()` in `lib/game/roster.ts` is the only thing that could mark a
 pig down and its single caller in the whole tree is a unit spec; a battle
 musters off the MAP rather than off the save's roster, so `losses` in
-`missionWon()` is always zero today and `save.squad` is never touched by a
-battle at all. Nor is anything staged on a loss: `missionWon()` runs only on a
-win, builds a NEW object into `pending` and leaves `save` alone, so the
-`discardMission()` both keys call is a no-op there.
+`missionWonResult()` is always zero today and `save.squad` is never touched by
+a battle at all. Nor is anything staged on a loss: `missionWonResult()` runs on
+a WIN alone, builds a NEW object into `pending` and leaves `save` where it was,
+so the `discardMission()` both keys call is a no-op there.
 
-**And `missionWon()` does not write to disk** — that is the half the whole
+**And `missionWonResult()` does not write to disk** — that is the half the whole
 answer rests on. It stages; `acceptMission()` is what promotes `pending` to
 `save` and writes. There are exactly FOUR writers in `campaign.ts`, and it is
 worth having them listed because "the debrief saves" is the easy assumption:
@@ -390,6 +390,6 @@ which the remake deliberately does not have), and `adopt()` — loading somebody
 else's slot — writes nothing, because what it takes is already on disk.
 
 So this becomes a real question on exactly one day: when a battle starts
-fielding the SAVE's pigs — the `[gap]` `missionWon()` already names, "the
+fielding the SAVE's pigs — the `[gap]` `missionWonResult()` already names, "the
 fallen arrive with that link". That is when RETRY has to undo the writeback
 and EDIT SQUAD has to keep it.

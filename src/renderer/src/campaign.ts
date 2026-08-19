@@ -87,8 +87,17 @@ export function adopt(from: { slot: string; save: SaveGame }): SaveGame {
 }
 
 /**
- * The mission was WON: settle the roster, step the campaign and hold the
- * result for the debrief. The tokens earned are the manual's own rule; the
+ * The mission was WON: work out what that RESULT is — the settled roster, the
+ * stepped campaign, the tokens — and hold it for the debrief.
+ *
+ * **It is named for what it returns because it writes nothing.** `save` is not
+ * touched and the disk is not touched; the result waits in `pending` until
+ * CONTINUE takes it through `acceptMission`, which is the only reason RETRY
+ * and EDIT SQUAD have nothing to undo (`docs/history/turns.md`). The four
+ * writers in this file are `begin`, `acceptMission`, `amend` and
+ * `skipTutorial`, and this is not one of them.
+ *
+ * The tokens earned are the manual's own rule; the
  * enemy nation comes off the table the campaign was born with (`enemies.ts`),
  * with the training ground's `(own + 1) % 6` covering a loaded save from
  * before the table existed.
@@ -97,7 +106,7 @@ export function adopt(from: { slot: string; save: SaveGame }): SaveGame {
  * roster untouched, because a battle does not yet field the SAVE's pigs
  * (`docs/todo.md`); the fallen arrive with that link.
  */
-export function missionWon(): SaveGame | null {
+export function missionWonResult(): SaveGame | null {
   if (!save) return null
   const losses = SQUAD_SIZE - standingCount(save.squad)
   const won = finishMission(

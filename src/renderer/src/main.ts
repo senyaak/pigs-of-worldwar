@@ -194,7 +194,8 @@ const briefing = initBriefing({
 
 // How a battle comes back decides where it lands: a walked-out mission goes
 // straight to the squad, a decided one goes through the debrief — where a WIN
-// is settled (`campaign.missionWon`) and waits to be accepted or replayed.
+// is worked out (`campaign.missionWonResult`) and waits to be accepted or
+// replayed — nothing of it reaches the disk until CONTINUE does.
 //
 // **The pause menu's ABORT is not `aborted` — it arrives as a LOSS**, because
 // that is what the exe makes it: it writes −2 into the outcome word and falls
@@ -217,7 +218,7 @@ const battle = initBattle((exit) => {
     show('menu')
     return
   }
-  if (exit === 'won') campaign.missionWon()
+  if (exit === 'won') campaign.missionWonResult()
   // The debrief reads the save AS THE MISSION FOUND IT — the position still
   // naming the played mission, the squad carrying its fell marks; the settled
   // result waits in `campaign.afterMission()` for CONTINUE to take it.

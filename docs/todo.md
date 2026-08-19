@@ -411,7 +411,7 @@ actually seen.
   - **the enemy table is rolled at the team's birth** (0x482940) — balanced
     five of each other nation over positions 1..24, FINAL always Team Lard —
     **and the remake now does the same**: `lib/game/enemies.ts`, rolled in
-    `campaign.begin`, read back by `missionWon`. `[exe]`.
+    `campaign.begin`, read back by `missionWonResult`. `[exe]`.
   - the full-screen map art (`lselpc*`) is MULTIPLAYER's SELECT LEVEL
     (record 28, kind 20, arm 0x41E579) — a screen for the `net` worktree's
     future, not the campaign's.
