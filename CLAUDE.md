@@ -720,6 +720,14 @@ and the weakest of them were invented here:
   against what `missionReward` actually hands out. The two must never be
   allowed to disagree again — play caught the screen promising two points for
   a mission worth none.
+- `[deliberate]` **The squad board counts DEATHS, and the original does not.**
+  Its `pigpro` board carries two counts — battles and kills — and no deaths
+  number exists anywhere in the exe: a death there is only the fall order and
+  the slot emptying. The remake adds a third pair, `deaths` on the roster pig
+  (counted by `regroup` when a pig gets up, so a replay counts nothing and a
+  pig gone for good takes its number with it), drawn with the debrief's
+  tombstone scaled to the markup icons' 22. Asked for by name: "давай добавим
+  — чего нет". `lib/game/roster.ts`, `ui/playerScreen.ts`.
 - `[deliberate]` **A name is judged and kept TRIMMED.** The exe's ENTER tests
   the buffer's first byte alone (0x42AF50), so a team called one SPACE passes;
   `press` in `lib/game/nameEntry.ts` trims before it refuses and hands the

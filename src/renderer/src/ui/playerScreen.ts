@@ -50,8 +50,8 @@ import type { Font } from './font'
 import { drive } from './drive'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
-import { loadSprites } from './sprites'
-import type { SpriteSet } from './sprites'
+import { loadDebriefSprites, loadSprites } from './sprites'
+import type { Sprite, SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { initPigMenu } from './pigMenu'
@@ -69,12 +69,24 @@ import {
 } from '../../../lib/game/ranks'
 
 /** A piece of one of the board's lines: words, or one of the markup icons.
- * `after` overrides the gap the board leaves before whatever comes next. */
+ * `after` overrides the gap the board leaves before whatever comes next.
+ * `sprite` is art from OUTSIDE the frontend set — the deaths count borrows
+ * the debrief's tombstone — drawn scaled to `height`. */
 interface BoardPiece {
   text?: string
   icon?: string
+  sprite?: Sprite
+  height?: number
   after?: number
 }
+
+/** How tall the markup icons are — what a borrowed sprite is scaled to. */
+const ICON_TALL = 22
+
+/** The debrief's tombstone (`Language/Tims/debrief`), standing in as the
+ * deaths count's icon: the frontend's own thirteen have no such picture,
+ * because the original never counts deaths. */
+const RIP_ART = 'r_i_p'
 
 /** The six career badges, in the order the exe's own table counts them —
  * `careerOf` returns that order (0x4D29C0's first byte). */
@@ -364,6 +376,9 @@ export function initPlayerScreen(handlers: {
 
   let bank: Bank = SILENT
   let art: SpriteSet | null = null
+  /** The deaths count's tombstone, or null while the debrief art is missing —
+   * which costs the icon, never the screen. */
+  let rip: Sprite | null = null
   let lit: Font | null = null
   let plain: Font | null = null
   let loaded = false
@@ -718,8 +733,14 @@ export function initPlayerScreen(handlers: {
     pieces: BoardPiece[]
   ): void => {
     const board = layout.board
-    const widthOf = (piece: BoardPiece): number =>
-      piece.text !== undefined ? font.measure(piece.text) : sprites.get(piece.icon ?? '').width
+    const widthOf = (piece: BoardPiece): number => {
+      if (piece.text !== undefined) return font.measure(piece.text)
+      if (piece.sprite) {
+        const tall = piece.height ?? piece.sprite.height
+        return Math.round((piece.sprite.width * tall) / piece.sprite.height)
+      }
+      return sprites.get(piece.icon ?? '').width
+    }
     const after = (piece: BoardPiece): number => piece.after ?? board.gap
     const total = pieces.reduce(
       (width, piece, i) => width + widthOf(piece) + (i < pieces.length - 1 ? after(piece) : 0),
@@ -728,7 +749,10 @@ export function initPlayerScreen(handlers: {
     let x = Math.round(board.centre - total / 2)
     for (const piece of pieces) {
       if (piece.text !== undefined) font.draw(context, piece.text, x, y + offset)
-      else context.drawImage(sprites.get(piece.icon ?? '').image, x, y - board.lift + offset)
+      else if (piece.sprite) {
+        const tall = piece.height ?? piece.sprite.height
+        context.drawImage(piece.sprite.image, x, y - board.lift + offset, widthOf(piece), tall)
+      } else context.drawImage(sprites.get(piece.icon ?? '').image, x, y - board.lift + offset)
       x += widthOf(piece) + after(piece)
     }
   }
@@ -755,12 +779,18 @@ export function initPlayerScreen(handlers: {
         { text: String(Math.min(...ways.map((way) => way.cost))) }
       ])
     }
-    // The two counts, with the board's own wider gap between the pair.
+    // The counts, with the board's own wider gap between the pairs. The
+    // third is the remake's own (`[deliberate]`, lib/game/roster.ts): how
+    // many times this pig has died and come back. The original's board has
+    // two counts and no deaths anywhere; the icon is the debrief's tombstone
+    // scaled to the markup set's 22, or the letters where the art is missing.
     boardLine(context, sprites, font, lines.counts, [
       { icon: 'battle' },
       { text: String(pig.missions), after: gap + layout.board.spread },
       { icon: 'kills' },
-      { text: String(pig.score) }
+      { text: String(pig.score), after: gap + layout.board.spread },
+      rip ? { sprite: rip, height: ICON_TALL } : { text: 'RIP' },
+      { text: String(pig.deaths) }
     ])
   }
 
@@ -815,6 +845,13 @@ export function initPlayerScreen(handlers: {
         return
       }
       loaded = true
+      // The tombstone comes from the DEBRIEF's folder, so it fails on its
+      // own: an install without it loses the icon and keeps the screen.
+      try {
+        rip = (await loadDebriefSprites([RIP_ART])).get(RIP_ART)
+      } catch (error) {
+        console.warn(String(error))
+      }
       menu.use(bank)
       career.use(bank)
       run(visible)

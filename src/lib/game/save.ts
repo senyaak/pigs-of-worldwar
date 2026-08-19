@@ -180,6 +180,10 @@ export function parse(text: string): SaveGame | null {
   if (!Array.isArray(save.enemies) || !save.enemies.every(isCount)) return null
   if (!Array.isArray(save.squad) || save.squad.length !== SQUAD_SIZE) return null
   if (!save.squad.every(isPig)) return null
+  // `deaths` arrived after the shape shipped — the remake's own counter, the
+  // original keeps none — so a file from before it holds pigs that simply
+  // have not died yet. Repaired here, at the door, like `tutorial`.
+  for (const pig of save.squad) if (!isCount(pig.deaths)) pig.deaths = 0
   // `tutorial` arrived after the shape shipped; a file without it is from
   // before the question existed, and the honest answer for it is "not played".
   if (typeof save.tutorial !== 'boolean') save.tutorial = false

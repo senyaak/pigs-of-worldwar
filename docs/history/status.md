@@ -1239,3 +1239,16 @@ So the remake does the same, in three short steps:
 The one divergence worth naming: kills the ENEMY takes are counted nowhere,
 because the enemy has no roster — same as the original, whose writeback only
 runs over the player's team.
+
+**And a third count, the same day, asked for by name: DEATHS.** The original
+has none — the icon set's thirteen pictures have no tombstone because there
+is nothing to put one beside — so this one is `[deliberate]` and lives in
+the divergence list. `deaths` sits on the roster pig, `parse` repairs older
+saves to zero at the door like `tutorial`, and `regroup` counts it at the
+moment a fallen pig GETS UP: a replay counts nothing, a lost mission counts
+nothing, and a pig gone for good leaves the roster before anyone could ask
+its total — so the number a player reads is "times this pig came back from
+the dead". The board draws the pair after battles and kills, with the
+debrief's `r_i_p` scaled to the markup icons' 22 (its own load, its own
+failure — a missing debrief folder costs the icon, not the screen).
+`unit/kills.spec.ts` pins the count at `regroup` and the repair at `parse`.

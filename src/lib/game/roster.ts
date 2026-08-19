@@ -68,6 +68,12 @@ export interface Pig {
   /** How many had already fallen when this one did, or -1 while it stands —
    *  the original's `pig+0x2C`. */
   fell: number
+  /** How many times it has gone down and COME BACK — the remake's own
+   *  (`[deliberate]`): the original keeps no such number, a death there being
+   *  only `fell` and the slot emptying. Counted by `regroup`, so only a
+   *  settled mission counts one, and a pig gone for good takes its count off
+   *  the roster with it. */
+  deaths: number
 }
 
 /** Is this pig on the roster? The original asks the same of one byte. */
@@ -100,7 +106,8 @@ export function newSquad(names: string[], identities: number[]): Pig[] {
     rank: 0,
     missions: 0,
     score: 0,
-    fell: -1
+    fell: -1,
+    deaths: 0
   }))
 }
 
@@ -164,7 +171,10 @@ export function regroup(squad: Pig[], drafts: number, word = 'DRAFT'): Regrouped
     }
     if (pig.fell < holes - RETURNING) continue
     returned.push(slot)
-    out.push({ ...pig, fell: -1 })
+    // …and getting up is when the death is COUNTED (`deaths` on the pig):
+    // only a settled mission reaches here, so a replay counts nothing, and
+    // the ones that stay down are off the roster before anyone could ask.
+    out.push({ ...pig, fell: -1, deaths: pig.deaths + 1 })
   }
 
   // …and a draft fills every place that left, at the BACK.
@@ -176,7 +186,8 @@ export function regroup(squad: Pig[], drafts: number, word = 'DRAFT'): Regrouped
       rank: 0,
       missions: 0,
       score: 0,
-      fell: -1
+      fell: -1,
+      deaths: 0
     })
   }
   return { squad: out, drafts: count, returned }

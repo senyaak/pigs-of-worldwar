@@ -15,7 +15,8 @@ import { burst } from '../src/lib/game/blast'
 import { blastReach } from '../src/lib/game/grenade'
 import { createBus } from '../src/lib/game/events'
 import type { BattleEvent } from '../src/lib/game/events'
-import { credit, newSquad } from '../src/lib/game/roster'
+import { credit, fall, newSquad, regroup } from '../src/lib/game/roster'
+import { newGame, parse, serialise } from '../src/lib/game/save'
 
 const twoPigs = (): Game =>
   new Game({
@@ -82,4 +83,31 @@ test('a mission on the record: the fielded count it, and the kills land by slot'
   const quiet = credit(squad, 5, [])
   expect(quiet[4].missions).toBe(1)
   expect(quiet[4].score).toBe(0)
+})
+
+test('a death is counted when the pig GETS UP — the remake\'s own third number', { tag: '@nodata' }, () => {
+  // Three down: the first to fall is gone for good, the last two return —
+  // and the RETURN is the count, so what leaves the roster takes its number
+  // with it and a squad of eight never carries a dead pig's total.
+  const squad = newSquad(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], [])
+  fall(squad, 0)
+  fall(squad, 1)
+  fall(squad, 2)
+  const { squad: after } = regroup(squad, 0)
+  // A is gone; B and C are back, each one death the wiser.
+  expect(after.map((pig) => pig.name).slice(0, 2)).toEqual(['B', 'C'])
+  expect(after[0].deaths).toBe(1)
+  expect(after[1].deaths).toBe(1)
+  // The untouched five and the draft all stand at zero.
+  expect(after.slice(2).every((pig) => pig.deaths === 0)).toBe(true)
+})
+
+test('a save from before the deaths counter is repaired at the door', { tag: '@nodata' }, () => {
+  const save = newGame('OLD', 0, newSquad(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], []), '2026-01-01')
+  // Strip the field the way an old file simply never had it.
+  const raw = JSON.parse(serialise(save)) as { squad: Record<string, unknown>[] }
+  for (const pig of raw.squad) delete pig.deaths
+  const read = parse(JSON.stringify(raw))
+  expect(read).not.toBeNull()
+  expect(read!.squad.every((pig) => pig.deaths === 0)).toBe(true)
 })
