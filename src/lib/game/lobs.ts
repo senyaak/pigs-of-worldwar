@@ -146,7 +146,8 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       { x: shot.x, y: shot.y, z: shot.z },
       { damage: row.damage, reach: blastRange(row) },
       world,
-      emit
+      emit,
+      shot.owner
     )
   }
 
@@ -264,6 +265,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       const shot = lob(skill, from, pig.heading, aim, charge, world.random)
       if (!shot) return false
       shot.id = named++
+      shot.owner = pig.id
       flying.push(shot)
       // …and the barrel is heard. Every weapon's fire arm plays a sound of its
       // own — the bazooka's is decoded (audio/battle.ts) — and a lob whose sound
@@ -294,6 +296,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       const shot = lob(skill, at, pig.heading, 0, 0, world.random)
       if (!shot) return false
       shot.id = named++
+      shot.owner = pig.id
       // It is DOWN, not landing: nothing has to fall for a charge to be placed,
       // and a resting lob is what the renderer draws lying still.
       shot.resting = true

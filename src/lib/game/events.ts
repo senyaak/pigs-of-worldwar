@@ -35,8 +35,12 @@ export type BattleEvent =
   | { kind: 'struck'; skill: number; at: Point }
   /** Something took points here — the number that floats off it. */
   | { kind: 'damaged'; at: Point; amount: number }
-  /** This pig has just gone down. */
-  | { kind: 'killed'; pig: PigId }
+  /** This pig has just gone down. `by` is the pig whose weapon did it — the
+   * bullet's firer, the lob's thrower, the blade's swinger — the same attacker
+   * the exe's damage handler tallies kills against (0x467c30, 0x467E11).
+   * Water, a minefield and the nowhere-to-swim drown have no attacker and
+   * carry none. */
+  | { kind: 'killed'; pig: PigId; by?: PigId }
   /** Something went off here, and WHICH effect id it spawns: a grenade and a
    * mine do not look alike (lib/game/blast.ts, `Charge.effect`). */
   | { kind: 'blasted'; at: Point; effect: number }

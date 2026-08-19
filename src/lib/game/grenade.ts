@@ -399,6 +399,10 @@ export interface Lobbed {
   /** Seconds of sinking left, and only a doused one has any
    * (`WATER_SINK_SECONDS`). */
   sinking: number
+  /** The pig that threw or planted it — set beside `id` by `createLobs`, so
+   * its blast's kills can be tallied against their attacker
+   * (lib/game/events.ts, `killed`). A spec-built lob has none. */
+  owner?: number
 }
 
 /**

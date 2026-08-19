@@ -150,7 +150,9 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
       // been read — so this puts it on the body, which is where the damage
       // number goes too.
       emit({ kind: 'struck', skill, at: body })
-      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: target.id })
+      if (outcome === 'died' || outcome === 'gibbed') {
+        emit({ kind: 'killed', pig: target.id, by: attacker.id })
+      }
     }
 
     // …and the dummies, through the identical test. The exe runs it as a

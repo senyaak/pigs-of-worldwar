@@ -165,7 +165,9 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       const amount = damageOf(shot.skill)
       const outcome = hurt(pig, amount, world.training)
       emit({ kind: 'damaged', at: body, amount })
-      if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id })
+      if (outcome === 'died' || outcome === 'gibbed') {
+        emit({ kind: 'killed', pig: pig.id, by: shot.owner })
+      }
       return true
     }
     // …and a target with NO collider at all — a bush, a low prop, anything the
@@ -192,6 +194,7 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       const shot = fireShot(skill, from, pig.heading, aim)
       if (!shot) return false
       shot.id = named++
+      shot.owner = pig.id
       flying.push(shot)
       emit({ kind: 'fired', skill })
       return true

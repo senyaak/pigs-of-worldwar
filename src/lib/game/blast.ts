@@ -120,8 +120,13 @@ export const flingSpeed = (points: number): number =>
  * The announcement comes FIRST and unconditionally — the beat after a blow hangs
  * off it and the fireball is drawn from it, so a blast that hit nothing still
  * has to be seen (lib/game/battle.ts).
+ *
+ * `by` is the pig whose weapon this blast is — the lob's own `owner` — and it
+ * rides out on any `killed` the blast causes, which is how a kill finds its
+ * attacker (lib/game/events.ts). A MINE passes none: nobody's weapon, the
+ * map's own.
  */
-export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit): void {
+export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, by?: number): void {
   emit({
     kind: 'blasted',
     at: { x: at.x, y: at.y, z: at.z },
@@ -138,7 +143,7 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit):
     if (amount <= 0) continue
     const outcome = hurt(pig, amount, world.training)
     emit({ kind: 'damaged', at: body, amount })
-    if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id })
+    if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id, by })
     // …AND IT GOES FLYING. Away from the blast — the bearing from the centre to
     // the pig — as hard as the damage it just took (`flingSpeed`), which is what
     // makes standing back save your footing as well as your health. A corpse flies

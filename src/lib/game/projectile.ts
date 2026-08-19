@@ -116,6 +116,10 @@ export interface Shot {
   /** Frames since it left, against `life`. */
   age: number
   life: number
+  /** The pig that fired it — set beside `id` by `createBullets.fire`, so a
+   * kill can be tallied against its attacker (lib/game/events.ts, `killed`).
+   * A spec-built shot has none. */
+  owner?: number
 }
 
 /**
