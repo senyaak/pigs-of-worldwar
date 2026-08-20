@@ -174,6 +174,23 @@ const LAYOUT = {
    */
   selectorRows: [64, 138, 212, 286, 360],
   /**
+   * The BADGE line's own five rows — how far under its row the class picture,
+   * its trapezoid and its stripes hang, and **a different number per row**.
+   *
+   * `[play]`, measured live in the console: 43, 43, 41, 42, 44. It has to be a
+   * table and not the one number it used to be because the portraits' rows are
+   * not evenly spaced either — their pitch is 74, 74, 73, 72, the exe's two
+   * per-row nudges (see `rows`) — so a badge sitting a flat distance under
+   * them drifts. It lives beside `rows` for the same reason those do: it is
+   * the SLOT's number, not the column's, and both columns read it.
+   *
+   * **The right column's three were not measured.** Play tuned the left one
+   * and did not try the other; it takes the same numbers here until it is
+   * measured in play, which is the honest default — the two columns hold the
+   * same art on the same rows.
+   */
+  badgeRows: [43, 43, 41, 42, 44],
+  /**
    * One entry a column, carrying every x that column decides.
    *
    * `face` is the portrait: `scaleX(0) − 10 + 462·column + 67`, and a face is
@@ -187,34 +204,34 @@ const LAYOUT = {
    * 0x41D8BB and 0x41D930, the dials at 0x41ED3D and 0x41EDB4, and the two
    * panels come out exactly symmetric about x 320.
    *
-   * **Every piece carries BOTH of its numbers**, and the y is measured from
-   * the slot's own row. They used to share one `drop` table between the two
-   * columns — an x here, a y over there — which meant a piece could only be
-   * moved sideways from the place it belonged to. The badge's 40 is the arm's
-   * own 44 (0x74 against the portrait's 0x48) less the four play took off it
-   * to close the gap over the plate; the trapezoid follows the badge, being
-   * that plate's own leg.
+   * **The badge and its stripes carry only an x here.** Their y is `badgeRows`
+   * above — a table, because it is a different number on every row — and the
+   * trapezoid follows the badge, being that plate's own leg. The arm's own
+   * number was 44 (0x74 against the portrait's 0x48), which is what play's
+   * five sit either side of.
    *
    * **The NAME is its own box** (`x`, `width`, `y`), not a line hung off the
-   * badge — `[play]`, twice over: it is written across the portrait's top
-   * edge by default and nothing about the class picture moves it. The exe
-   * writes no words for a pig at all (record 12 has just the two actions), so
-   * all three numbers are `[CHECK — remake]`.
+   * badge — `[play]`, twice over: nothing about the class picture moves it.
+   * The exe writes no words for a pig at all (record 12 has just the two
+   * actions), so all three numbers are the remake's own and play's to set.
+   * The LEFT column's (157, 21) are play's, measured live; the right column's
+   * were not tried, and take the left's own relationship to the badge —
+   * `badge.x − 4` — until they are (`[CHECK — remake]`).
    */
   columns: [
     {
       face: 57,
-      badge: { x: 161, y: 40 },
-      stripes: { x: 181, y: 40 },
-      name: { x: 57, y: 0, width: 70 },
+      badge: { x: 161 },
+      stripes: { x: 181 },
+      name: { x: 157, y: 21, width: 70 },
       selector: { x: -32, mirror: false },
       panel: { x: -32, y: -12, width: 298, height: 480, mirror: false }
     },
     {
       face: 519,
-      badge: { x: 427, y: 40 },
-      stripes: { x: 447, y: 40 },
-      name: { x: 519, y: 0, width: 70 },
+      badge: { x: 427 },
+      stripes: { x: 447 },
+      name: { x: 423, y: 21, width: 70 },
       selector: { x: 672, mirror: true },
       panel: { x: 672, y: -12, width: 298, height: 301, mirror: true }
     }
@@ -244,11 +261,13 @@ const LAYOUT = {
    */
   flag: { x: [203, 406], drop: 49, fly: 23 },
   /**
-   * `pigpro` 200×191 at the bottom centre, the arm's LAST blit (0x41DB85) so
-   * it stands in front of everything — and it is **the BOARD**: a black face
-   * the screen writes the team's and the lit pig's numbers across (`[play]`).
-   * Five lines, centred on the board: the team's tokens, the pig's name, its
-   * class, what its next promotion costs, and its two counts side by side.
+   * `pigpro` 200×191 at the bottom centre — the arm's LAST blit (0x41DB85),
+   * which would stand it in front of everything, and **play ruled it BEHIND
+   * the two columns** instead, so `draw` puts it down first. It is **the
+   * BOARD**: a black face the screen writes the team's and the lit pig's
+   * numbers across (`[play]`). Five lines, centred on the board: the team's
+   * tokens, the pig's name, its class, what its next promotion costs, and its
+   * two counts side by side.
    *
    * The board's own x/y are the exe's; **every line's y is
    * `[CHECK — remake]`** — nothing writes this text in any arm that has been
@@ -282,11 +301,12 @@ const LAYOUT = {
   options: {
     x: 428,
     width: 200,
-    /** **Sixteen lower than the tail's own 337** — `[play]`: "слишком высоко
-     * поднято, надо ниже сам элемент". The number the arm folds to is kept in
-     * this comment rather than in the field, since the fold itself is the
-     * suspect part (see the note above). */
-    rows: [353],
+    /** **Forty-eight lower than the tail's own 337** — `[play]`, twice: first
+     * sixteen ("слишком высоко поднято, надо ниже сам элемент"), then the rest
+     * of the way, measured live in the console. The number the arm folds to is
+     * kept in this comment rather than in the field, since the fold itself is
+     * the suspect part (see the note above). */
+    rows: [385],
     /**
      * How far the words sit off the plate's own MIDDLE — zero is centred, and
      * that is what this is now.
@@ -295,9 +315,10 @@ const LAYOUT = {
      * number nobody can pick without the art in front of them: play reported
      * the letters low twice running. Centring is the thing that was actually
      * wanted, so the row asks the plate how tall it is and the knob is left
-     * here for a nudge either way.
+     * here for a nudge either way — and play used it, live, to put the words
+     * FOURTEEN above that centre. The plate's window is not its middle.
      */
-    text: 0,
+    text: -14,
     lamp: { x: [429, 601], drop: 16 }
   },
   /** Record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12) — and
@@ -319,6 +340,7 @@ export type PlayerLayout = typeof LAYOUT
 const cloneLayout = (): PlayerLayout => ({
   rows: [...LAYOUT.rows],
   selectorRows: [...LAYOUT.selectorRows],
+  badgeRows: [...LAYOUT.badgeRows],
   columns: LAYOUT.columns.map((column) => ({
     ...column,
     badge: { ...column.badge },
@@ -576,11 +598,13 @@ export function initPlayerScreen(handlers: {
     }
   )
 
-  /** Which column and row slot `n` stands in — five down, then three. */
-  const place = (slot: number): { column: number; x: number; y: number } => {
+  /** Which column and row slot `n` stands in — five down, then three. The
+   * ROW comes back with it because the badge line is placed by its own
+   * per-row table (`badgeRows`) rather than by a drop off `y`. */
+  const place = (slot: number): { column: number; row: number; x: number; y: number } => {
     const column = slot < COLUMN[0] ? 0 : 1
     const row = column === 0 ? slot : slot - COLUMN[0]
-    return { column, x: layout.columns[column].face, y: layout.rows[row] }
+    return { column, row, x: layout.columns[column].face, y: layout.rows[row] }
   }
 
   const centred = (font: Font, text: string, x: number, width: number): number =>
@@ -619,6 +643,19 @@ export function initPlayerScreen(handlers: {
       )
       context.restore()
     }
+
+    // `pigpro` FIRST, so the two column panels stand OVER its edges — and it
+    // is the BOARD: five lines about the team and the lit pig, written across
+    // its black face (`[play]`).
+    //
+    // **This is NOT the arm's order.** 0x41DB85 blits `pigpro` LAST, in front
+    // of everything, and that is what this file used to do. Play saw it in
+    // the game and ruled the other way: the board belongs BEHIND the two
+    // columns. The board is 200 wide at x 232 and the panels close to 266 and
+    // 374, so a strip either side of it tucks under them — which is the whole
+    // visible difference, the portraits themselves never reaching it.
+    put('pigpro', layout.pigpro.x, layout.pigpro.y)
+    writeBoard(context, sprites, light)
 
     // One panel a column — and the RIGHT one is the left one cut short and
     // capped, which is how three slots come out of a panel built for five.
@@ -672,7 +709,10 @@ export function initPlayerScreen(handlers: {
       const leg = sprites.get('bgdark')
       const badge = sprites.get(BADGE[careerOf(pig.rank)] ?? 'pcHweap')
       const legX = column.badge.x - Math.round((leg.width - badge.width) / 2)
-      context.drawImage(leg.image, legX, y + column.badge.y)
+      // The badge line hangs by the ROW's own number, not by one the column
+      // holds: the rows are unevenly pitched, so this is a table (`badgeRows`).
+      const badgeY = y + layout.badgeRows[at.row]
+      context.drawImage(leg.image, legX, badgeY)
 
       // The CAREER's badge, and the stripes of its step — 0 wears none. Both
       // sit inboard of the portrait, on the column's own hand.
@@ -682,12 +722,12 @@ export function initPlayerScreen(handlers: {
       // and the original shows a pig with no class at all until it is promoted.
       // The trapezoid stays — it is the plate's own leg, not the badge's.
       if (pig.rank !== GRUNT) {
-        context.drawImage(badge.image, column.badge.x, y + column.badge.y)
+        context.drawImage(badge.image, column.badge.x, badgeY)
       }
       const step_ = stepOf(pig.rank)
       if (step_ > 0) {
         const stripes = sprites.get(STRIPES[step_ - 1] ?? STRIPES[0])
-        context.drawImage(stripes.image, column.stripes.x, y + column.stripes.y)
+        context.drawImage(stripes.image, column.stripes.x, badgeY)
       }
 
       // The PROMOTION FLAG — this pig can be promoted RIGHT NOW (0x41D70E).
@@ -776,12 +816,6 @@ export function initPlayerScreen(handlers: {
         layout.text.title.y + offset
       )
     }
-
-    // `pigpro` LAST, which is where the arm puts it — in front of everything —
-    // and it is the BOARD: five lines about the team and the lit pig, written
-    // across its black face (`[play]`).
-    put('pigpro', layout.pigpro.x, layout.pigpro.y)
-    writeBoard(context, sprites, light)
 
     // An OVERLAY dims the squad to two thirds under it — the exe ramps the
     // record's own brightness 120 → 80 — and stands on top, bright.

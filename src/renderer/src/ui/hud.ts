@@ -44,15 +44,18 @@ const MARKERS = 'Language/Tims/MAPICONS.MTD'
 /** The battle's own big letters — the title card and the floating numbers. */
 const TEXT_FONT = 'BIG'
 /**
- * The letters over a pig's head: the battle's SMALL, drawn at TWICE its size
- * (`LAYOUT.plate.scale`), team-coloured per pig.
+ * The letters over a pig's head: the battle's BIG, drawn SMALLER than its own
+ * size (`LAYOUT.plate.scale`), team-coloured per pig.
  *
- * Play ruled BIG's 32 too big and put up a screenshot of the original: its
- * plate stands about 24 tall in chunky doubled pixels, which is exactly
- * SMALL's 12 at two — and which font the exe's own plate drawer uses is not
- * read (`0x459B20`, scanner/notes.md), so the screenshot is the ruling.
+ * Play ruled BIG's 32 too big and the plate was moved to SMALL doubled, which
+ * is 24 tall. Play then saw that in the game and ruled the LETTERS wrong —
+ * "не тот шрифт! верни тот что был — но просто сделай меньше его" — so it is
+ * BIG's shapes at a plate height that is still about 24: BIG's 32 at 0.75.
+ * The same 24 either way, the glyphs BIG's. Which font the exe's own plate
+ * drawer uses is still not read (`0x459B20`, scanner/notes.md), so play's
+ * word is the ruling.
  */
-const PLATE_FONT = 'SMALL'
+const PLATE_FONT = 'BIG'
 /** The height the dashboard art was drawn for. */
 const AUTHORED_HEIGHT = 480
 
@@ -76,10 +79,11 @@ const AUTHORED_HEIGHT = 480
  *   into a ring — with `ang5` capping its right end.
  * - PLATE: the name over a pig, the health under it beside a heart, both
  *   lines in the pig's TEAM colour (contracts/overlay.ts). The heart is a
- *   10×11 map marker standing next to letters 24 tall (SMALL doubled — see
- *   PLATE_FONT), so it is drawn at twice its size; it and the fans ship
- *   WHITE for the game to paint, and the heart's pink and the fans' green
- *   are matched to play rather than measured.
+ *   10×11 map marker standing next to letters 24 tall (BIG at 0.75 — see
+ *   PLATE_FONT), so it is drawn at twice its size, on a scale of its OWN
+ *   that no longer follows the letters'; it and the fans ship WHITE for the
+ *   game to paint, and the heart's pink and the fans' green are matched to
+ *   play rather than measured.
  */
 export const LAYOUT = {
   clock: {
@@ -253,9 +257,11 @@ export const LAYOUT = {
      * was two thirds of a pig's height of empty air and stopped meaning
      * anything when the model's scale moved. */
     lift: 120,
-    /** SMALL's glyphs doubled — the chunky letters the original's plate shows
-     * (see PLATE_FONT). */
-    scale: 2,
+    /** BIG's glyphs shrunk — 32 at 0.75 is the 24-tall plate play measured
+     * off the original's screenshot (see PLATE_FONT). A fraction softens a
+     * bitmap glyph, and the console's own knob is here if play wants the
+     * clean half instead. */
+    scale: 0.75,
     heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
   }
   // THE MAP has no entry here on purpose: nothing about its placement or its
