@@ -903,6 +903,19 @@ and the weakest of them were invented here:
   geometry sits in the exe's collision world is still open (0x406bb0
   undecoded); the remake builds the play-observed behaviour from the decoded
   step-up/sidestep constants instead.
+- `[play]` **EVERYONE drops in together.** The POG's parachute bit picks out
+  one side of a campaign map — the player's, with the enemy standing on the
+  ground, which is what the exe builds — and play rules otherwise: "все
+  свины падают на парашютах". One flagged marker among the fielded sides
+  puts the whole battle under canopies (`mapSquads`, lib/game/muster.ts); a
+  map that flags nobody still stands everyone, and the bit itself stays read
+  as the exe reads it (`e2e/002/parachute.spec.ts` pins the data).
+- `[CHECK — remake]` **The drop face is the 004 pair.** An arriving pig wears
+  `eyes004`/`gobs004` out of `Chars/FACES.MTD` — the stare and the scream —
+  from `dropOpened` to `dropLanded` (three/faces.ts). The exe loads that
+  archive unconditionally (0x486030) but HOW it picks a face is undecoded,
+  and which pair is "scared" was judged by looking at the art. Correct it in
+  play; an expression is one name there.
 - `[play]` **A hillside is walked DOWN, and only a face past WALK_OFF_GRADE
   (60°) is fallen off — and that number is PLAY'S DIAL.** The first build's
   fall test was a slope test at 13.0°, under CAMP's median slope of 14°, so
