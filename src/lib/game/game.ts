@@ -81,6 +81,13 @@ export interface Pig {
   heading: number
   /** Class index — what the pig is, before it is anywhere. */
   pigClass: number
+  /**
+   * The body is OFF the map: its death has finished playing out and only the
+   * boots are left (lib/game/corpses.ts) — the exe's state 8 against DEAD's 6
+   * (`debrief/notes.md`, roster writeback on `+0x2EC == 8`). A dead pig is
+   * still a body a blast can throw; a gone one is nothing at all.
+   */
+  gone: boolean
   /** Whether it arrives by parachute when the level opens. Where it lands is
    * where it was always going to stand, so nothing else in the domain cares;
    * the battle scene owns the descent. */
@@ -187,6 +194,7 @@ export class Game {
             body: at.body ?? NO_BODY,
             heading: at.heading ?? 0,
             pigClass,
+            gone: false,
             parachutes: at.parachutes ?? false
           }
         })

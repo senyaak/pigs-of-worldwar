@@ -40,6 +40,7 @@ import { createMines } from './mines'
 import type { Mines } from './mines'
 import { createTumbles } from './tumble'
 import type { Tumbles } from './tumble'
+import { createCorpses } from './corpses'
 import { createEffectField } from './effectField'
 import type { EffectField } from './effectField'
 import { createDamageNumbers } from './damage'
@@ -270,9 +271,13 @@ export function createEngine(parts: EngineParts): Engine {
         if (once) anim.playOnce(one, index)
         else anim.setClip(one, index)
       },
-      killed: ({ pig }) => {
+      // A death PLAYS OUT — the dying clip, the corpse blast, the boots — and
+      // all of it is the corpse list's business (lib/game/corpses.ts). Built
+      // further down (it waits on the tumbles); nothing can be killed while
+      // the engine is still assembling.
+      killed: ({ pig, gibbed }) => {
         const one = pigOf(pig)
-        if (one) anim.playOnce(one, ANIM.DYING)
+        if (one) corpses.claim(one, gibbed === true)
       },
       // A crate on the ground is something to walk into again. Collision, not
       // art — the canopy coming off is the scene's half of the same event.
@@ -382,6 +387,10 @@ export function createEngine(parts: EngineParts): Engine {
   const tumbles = createTumbles({ query, pigs, obstacles }, bus.emit)
   const fling = (pig: Pig, speed: number, bearing: number): void =>
     battle.fling(pig, speed, bearing)
+  /** What becomes of a body once it is killed: the dying clip, the corpse
+   * blast, the boots (lib/game/corpses.ts). After the tumbles, because a body
+   * a blast threw finishes its flight before it finishes its death. */
+  const corpses = createCorpses({ anim, query, tumbling: (pig) => tumbles.has(pig) }, bus.emit)
   /** What is already buried in the ground: the map's MINEFIELDS, which are a bit
    * in a tile rather than anything anybody put there (lib/game/mines.ts). Before
    * the grenades, because a thrown thing sets one off the same way a foot does. */
@@ -449,6 +458,9 @@ export function createEngine(parts: EngineParts): Engine {
     // (lib/game/tumble.ts). After the mines, because a mine going off this step is
     // what launched them.
     tumbles.update(STEP_SECONDS)
+    // The deaths playing out — after the tumbles, so a thrown corpse lands
+    // before it goes off (lib/game/corpses.ts).
+    corpses.update(STEP_SECONDS)
     airDrops.update(STEP_SECONDS)
   }
 

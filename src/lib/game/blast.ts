@@ -143,7 +143,8 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     if (amount <= 0) continue
     const outcome = hurt(pig, amount, world.training)
     emit({ kind: 'damaged', at: body, amount })
-    if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id, by })
+    if (outcome === 'died' || outcome === 'gibbed')
+      emit({ kind: 'killed', pig: pig.id, by, gibbed: outcome === 'gibbed' })
     // …AND IT GOES FLYING. Away from the blast — the bearing from the centre to
     // the pig — as hard as the damage it just took (`flingSpeed`), which is what
     // makes standing back save your footing as well as your health. A corpse flies

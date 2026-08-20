@@ -49,6 +49,7 @@ import { createBulletArt } from './shots'
 import { crossedTowards, sightBlockers, silhouetteOf } from '../../../lib/game/seeThrough'
 import { createGrenadeArt } from './grenades'
 import { createMineArt } from './mineArt'
+import { createRemainsArt } from './remains'
 import { PIG_HEIGHT, PIG_HOLD, PIG_RADIUS } from '../../../lib/game/obstacles'
 import { weaponLayer } from '../../../lib/game/controls'
 import { advanceTraining, nextBreak } from '../../../lib/game/training'
@@ -329,6 +330,13 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       // on landing — a pig falling free has even more to be scared of.
       dropCut: ({ pig }) => dropInArt.cut(pig),
       dropLanded: ({ pig }) => faces.calm(pig),
+      // A death has finished playing out: the body comes off the scene for
+      // good and the boots go down where it lay (lib/game/corpses.ts). The
+      // blast that goes with it arrives as an ordinary `blasted`.
+      remains: ({ pig, at, heading }) => {
+        squad.bury(pig)
+        remainsArt.leave(at, heading)
+      },
       crateSent: ({ id }) => airDropArt.open(id),
       crateLanded: ({ id }) => airDropArt.land(id),
       canopiesCut: () => airDropArt.cutAll(),
@@ -403,6 +411,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   /** …and the mines a pig who KNOWS about them can see, plus the trodden ones,
    * which wear the MAP's own `WE_APMIN` (three/mineArt.ts). */
   const mineArt = createMineArt(root, (name) => props.spawn(name))
+  /** …and the boots a finished death leaves on the spot (three/remains.ts). */
+  const remainsArt = createRemainsArt(root, (name) => props.spawn(name))
   /**
    * Camera and marker onto a pig, wherever it happens to be standing — or
    * hanging: a pig still on its canopy is watched from the front, face on,
@@ -728,6 +738,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     for (const soldier of squad.members) {
       if (pigShot(soldier.pig.id)?.sheltered) soldier.node.visible = false
     }
+    // A CORPSE is drawn where the engine says its body is: a blast still
+    // throws it, and a death in the water SINKS it (lib/game/corpses.ts) —
+    // and nothing else places a pig that is not acting. After the acting
+    // placement above, so a dead acting pig follows its own body too.
+    for (const one of now.pigs) {
+      if (one.health > 0) continue
+      squad.of(one.id)?.place(one.x, one.y, one.z, one.heading)
+    }
     // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts a
     // field of view is the library's and the library is not in the install, so
     // SCOPE_MAGNIFY is the remake's pick and three/chase.ts says so.
@@ -1019,7 +1037,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     battle,
     focus,
     dropping: () => now.dropping,
-    plates: (width, height, lift) => squad.plates(host.camera, width, height, lift),
+    plates: (width, height, lift) =>
+      squad.plates(host.camera, width, height, lift, game.players.indexOf(game.currentPlayer)),
     numbers: (width, height) => projectDamage(now.numbers, host.camera, root, width, height),
     still: () => now.still,
     eye,
@@ -1042,6 +1061,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       bulletArt.dispose()
       grenadeArt.dispose()
       mineArt.dispose()
+      remainsArt.dispose()
       airDropArt.dispose()
       weapons.dispose()
       squad.dispose()

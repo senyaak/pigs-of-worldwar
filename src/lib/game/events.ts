@@ -39,8 +39,15 @@ export type BattleEvent =
    * bullet's firer, the lob's thrower, the blade's swinger — the same attacker
    * the exe's damage handler tallies kills against (0x467c30, 0x467E11).
    * Water, a minefield and the nowhere-to-swim drown have no attacker and
-   * carry none. */
-  | { kind: 'killed'; pig: PigId; by?: PigId }
+   * carry none. `gibbed` is the messier death — sixty points PAST dead
+   * (lib/game/health.ts, GIB_BELOW): no dying clip, the body simply goes
+   * (lib/game/corpses.ts). */
+  | { kind: 'killed'; pig: PigId; by?: PigId; gibbed?: boolean }
+  /** …and its body is DONE: the corpse has blown up (or been overkilled away)
+   * and what is left on the spot is a pair of boots (lib/game/corpses.ts).
+   * `at` is the soles, `heading` the way the pig faced — where and which way
+   * the boots stand. The pig stops being drawn from here. */
+  | { kind: 'remains'; pig: PigId; at: Point; heading: number }
   /** Something went off here, and WHICH effect id it spawns: a grenade and a
    * mine do not look alike (lib/game/blast.ts, `Charge.effect`). */
   | { kind: 'blasted'; at: Point; effect: number }

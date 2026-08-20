@@ -868,10 +868,10 @@ see "The SHOT, end to end" in [weapons.md](weapons.md).
    short list at the end of `script/notes.md`, and none of it
    blocks anything.
 
-Two smaller ones noted in play and not acted on: **a dying pig should come
-apart and leave its boots** (the exe already splits the two deaths and so
-does `lib/game/health.ts` — `died` and `gibbed` — but both wear clip 47 for
-now), and **`THREE.Clock` is deprecated** in favour of `THREE.Timer`.
+Two smaller ones noted in play: ~~**a dying pig should come apart and leave
+its boots**~~ — DONE 2026-08-20, the whole death plays out now
+(`lib/game/corpses.ts`; "A DEATH PLAYS OUT" in [pig.md](pig.md)) — and
+**`THREE.Clock` is deprecated** in favour of `THREE.Timer`, still open.
 
 **Nothing is failing.** `e2e/002/hud.spec.ts:168` was, since 300fc6e, and the
 poll fixed one half of it and a measurement fixed the other — see "INPUT:

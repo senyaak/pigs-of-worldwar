@@ -274,3 +274,39 @@ hills from cliff walls either. So the criterion stays a grade but the number
 is openly play's dial: WALK_OFF_GRADE = tan 60°, ground falling away steeper
 than that within one FACE_PROBE is a cliff face, anything less is walked. A
 walked surface found past 60° in play moves the number, nothing else.
+
+## A DEATH PLAYS OUT, and the plates grow up (2026-08-20)
+
+Play asked for the whole death in one message: at zero the pig explodes (in
+water it sinks and explodes under the surface), an overkill just disappears,
+and either way ONLY THE BOOTS stay — "щас полностью свинья остаётся". Plus
+the plates: the font too big, blocks drawn over each other, no team colour.
+
+**The death is `lib/game/corpses.ts`**, driven off the same `killed` the
+scoreboard hears (now carrying `gibbed`, which every damage source computed
+and threw away): the dying clip runs out (47 on land, the name table's 50 —
+Drowning — in water, the dispatcher's own pick being unread), a water death
+then sinks at `SINK_SPEED` (`[CHECK — remake]`) to the terrain floor, and the
+corpse goes off as an ordinary `blasted` (row 0 under id 0x54) wherever it
+lies — under the surface for the drowned. A gib skips both clip and bang.
+Then one new event, `remains`: the engine marks the pig `gone` (the exe's own
+state 8 next to DEAD's 6, `debrief/notes.md`), the renderer buries the model
+(`Squad.bury`) and stands **`BOOTS`** on the spot — a model every one of the
+61 map archives carries, spawned the way a trodden mine's `WE_APMIN` is
+(`three/remains.ts`, lift measured off the geometry's own +y). No pickup
+drop: the exe rolls one off a dying pig (`skills/notes.md`) and play said
+"какой ещё пикап?". A corpse is also DRAWN off the engine's position now
+(`three/battle.ts`, after the acting placement) — nothing else ever placed a
+non-acting body, so the sink and a thrown corpse's flight were invisible.
+`unit/corpses.spec.ts` pins all three arms.
+
+**The plates** (`ui/hud.ts`, `three/squad.ts`): SMALL at ×2 — play put up a
+screenshot of the original's ~24-tall chunky letters against BIG's 32, and
+which font `0x459B20` uses is unread — painted per TEAM through the
+until-now-unused `SKIN_COLOURS` (skin, not nation), heart keeping its pink;
+the number rides the same colour, as the screenshot shows. Overlapping
+blocks unstack upward (nothing read about the original's answer — remake's
+own). The stand-still delay came down 2 → 1 s ("не 2 секунды а меньше"), and
+the espionage rule the exe applies to the plate (`0x459BA7`, the blip's
+identical test) is on it now: a scout/sniper/spy of a side not acting is
+unlabelled, both ways.

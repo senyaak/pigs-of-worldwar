@@ -22,6 +22,10 @@ export interface PigPlate {
   /** Points, not a percentage — the maximum is the pig's CLASS's
    * (lib/game/health.ts). */
   health: number
+  /** The TEAM's colour, by the pig's skin — the same table the exe paints its
+   * markers from (lib/game/nations.ts, SKIN_COLOURS). The letters and the
+   * number wear it; the heart keeps its own pink. */
+  colour: readonly [number, number, number]
 }
 
 /** One damage number floating off whatever was just hurt. */

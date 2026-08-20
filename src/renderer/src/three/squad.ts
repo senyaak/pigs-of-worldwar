@@ -21,7 +21,8 @@ import type { Quat } from '../../../lib/game/quaternion'
 import { classArt } from './soldiers'
 import { HEAD, unresolve } from './heldWeapon'
 import { buildModelGeometry, buildTextureMaterials } from './modelMesh'
-import { HAT_CLASSES } from '../../../lib/game/nations'
+import { HAT_CLASSES, SKIN_COLOURS, skinOf } from '../../../lib/game/nations'
+import { HIDDEN_CLASSES } from '../../../lib/game/scanner'
 import type { PigPlate } from '../contracts/overlay'
 
 /**
@@ -62,6 +63,9 @@ export interface Soldier {
    * head — only the heavy-gunner family gets one (lib/game/nations.ts). */
   readonly nation: number
   readonly hat: boolean
+  /** Which SIDE fielded it — what the espionage rule compares against whose
+   * turn it is (lib/game/scanner.ts, HIDDEN_CLASSES). */
+  readonly side: number
   /**
    * Wear this pose: one parent-relative turn per bone, in HIR order.
    *
@@ -95,8 +99,17 @@ export interface Squad {
   bodies(except: Soldier): { x: number; y: number; z: number }[]
   /** Where each living pig's name hangs, in a view this big. `lift` is how far
    * over the crown the name floats — the dashboard's own number, passed in
-   * rather than read, so this module owes `ui/` nothing. */
-  plates(camera: THREE.Camera, width: number, height: number, lift: number): PigPlate[]
+   * rather than read, so this module owes `ui/` nothing. `acting` is the SIDE
+   * whose turn it is: an espionage pig of any other side goes unlabelled, the
+   * same test that takes its blip off the map (lib/game/scanner.ts). */
+  plates(camera: THREE.Camera, width: number, height: number, lift: number, acting: number): PigPlate[]
+  /**
+   * This pig's body is GONE — its death has finished playing out
+   * (lib/game/corpses.ts, `remains`) — so its model comes off the scene for
+   * good. What stays on the spot is the boots, and those are not this
+   * module's (three/remains.ts).
+   */
+  bury(pig: number): void
   dispose(): void
 }
 
@@ -167,8 +180,12 @@ export function fieldSquad(
 
   const pigs = squads.flat()
   const nationOf = new Map<number, number>()
+  const sideOf = new Map<number, number>()
   squads.forEach((side, index) => {
-    for (const pig of side) nationOf.set(pig.id, assets.nations[index] ?? index)
+    for (const pig of side) {
+      nationOf.set(pig.id, assets.nations[index] ?? index)
+      sideOf.set(pig.id, index)
+    }
   })
 
   const members = pigs.map((pig) => {
@@ -203,6 +220,7 @@ export function fieldSquad(
       art: art.base,
       nation,
       hat,
+      side: sideOf.get(pig.id) ?? 0,
       pose(turns, root) {
         const count = Math.min(turns.length, mesh.bones.length)
         for (let bone = 0; bone < count; bone++) {
@@ -238,6 +256,10 @@ export function fieldSquad(
     return soldier
   })
 
+  /** Bodies whose death has finished — off the scene and off `members`, held
+   * only so their meshes are disposed with the battle. */
+  const fallen: Soldier[] = []
+
   return {
     members,
     of: (id) => members.find((soldier) => soldier.pig.id === id),
@@ -245,11 +267,15 @@ export function fieldSquad(
       members
         .filter((soldier) => soldier !== except)
         .map((soldier) => ({ ...soldier.pig.position })),
-    plates(camera, width, height, lift) {
+    plates(camera, width, height, lift, acting) {
       const at = new THREE.Vector3()
       const out: PigPlate[] = []
       for (const soldier of members) {
         if (isDead(soldier.pig)) continue
+        // A scout, a sniper or a spy is unlabelled whenever it is not its own
+        // team's turn — the exe's one rule about the plate, the identical test
+        // its blip takes, and it cuts both ways (0x459BA7, lib/game/scanner.ts).
+        if (HIDDEN_CLASSES.has(soldier.pig.pigClass) && soldier.side !== acting) continue
         soldier.node.getWorldPosition(at)
         // World space is Y-up, so the plate hangs above by ADDING to y. The
         // node sits at the model's ORIGIN — the hip — so clear the rise to
@@ -267,13 +293,26 @@ export function fieldSquad(
           // its plate `health >> 7` and drops the 128ths. Water takes fractions
           // of a point (lib/game/drowning.ts), so without this the plate would
           // read 43.7265625.
-          health: Math.floor(soldier.pig.health)
+          health: Math.floor(soldier.pig.health),
+          // The team's colour by SKIN, not nation — the art's own index, the
+          // way every table of the exe's is keyed (lib/game/nations.ts).
+          colour: SKIN_COLOURS[skinOf(soldier.nation)] ?? [255, 255, 255]
         })
       }
       return out
     },
+    bury(pig) {
+      const at = members.findIndex((soldier) => soldier.pig.id === pig)
+      if (at < 0) return
+      const [gone] = members.splice(at, 1)
+      gone.node.parent?.remove(gone.node)
+      // Off the members list so nothing poses, plates or collides with it —
+      // but its GPU resources live until the battle's own teardown, with
+      // everyone else's.
+      fallen.push(gone)
+    },
     dispose() {
-      for (const { mesh } of members) mesh.dispose()
+      for (const { mesh } of [...members, ...fallen]) mesh.dispose()
     }
   }
 }

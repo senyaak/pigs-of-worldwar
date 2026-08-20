@@ -41,8 +41,18 @@ import type { SkillMenu } from './skillMenu'
 
 const DASHBOARD = 'Language/Tims/dashtims.mad'
 const MARKERS = 'Language/Tims/MAPICONS.MTD'
-/** The letters over a pig's head are the big ones, as in the original. */
-const PLATE_FONT = 'BIG'
+/** The battle's own big letters — the title card and the floating numbers. */
+const TEXT_FONT = 'BIG'
+/**
+ * The letters over a pig's head: the battle's SMALL, drawn at TWICE its size
+ * (`LAYOUT.plate.scale`), team-coloured per pig.
+ *
+ * Play ruled BIG's 32 too big and put up a screenshot of the original: its
+ * plate stands about 24 tall in chunky doubled pixels, which is exactly
+ * SMALL's 12 at two — and which font the exe's own plate drawer uses is not
+ * read (`0x459B20`, scanner/notes.md), so the screenshot is the ruling.
+ */
+const PLATE_FONT = 'SMALL'
 /** The height the dashboard art was drawn for. */
 const AUTHORED_HEIGHT = 480
 
@@ -64,10 +74,12 @@ const AUTHORED_HEIGHT = 480
  *   and painted a see-through green; the slot is `ang2` over `ang4` — they
  *   OVERLAP by seven rows of plain black, which is what closes their rim
  *   into a ring — with `ang5` capping its right end.
- * - PLATE: the name over a pig, the health under it beside a heart. The
- *   heart is a 10×11 map marker standing next to letters 32 tall, so it is
- *   drawn at twice its size; it and the fans ship WHITE for the game to
- *   paint, and both colours here are matched to play rather than measured.
+ * - PLATE: the name over a pig, the health under it beside a heart, both
+ *   lines in the pig's TEAM colour (contracts/overlay.ts). The heart is a
+ *   10×11 map marker standing next to letters 24 tall (SMALL doubled — see
+ *   PLATE_FONT), so it is drawn at twice its size; it and the fans ship
+ *   WHITE for the game to paint, and the heart's pink and the fans' green
+ *   are matched to play rather than measured.
  */
 export const LAYOUT = {
   clock: {
@@ -218,8 +230,9 @@ export const LAYOUT = {
     overlap: 1
   },
   plate: {
-    /** Seconds a pig must have stood still before its name comes back. */
-    delay: 2,
+    /** Seconds a pig must have stood still before its name comes back. Play
+     * on the original: "задержка есть — но не 2 секунды а меньше". */
+    delay: 1,
     /**
      * …and seconds it is shown for after its number went DOWN, whatever it is
      * doing.
@@ -240,6 +253,9 @@ export const LAYOUT = {
      * was two thirds of a pig's height of empty air and stopped meaning
      * anything when the model's scale moved. */
     lift: 120,
+    /** SMALL's glyphs doubled — the chunky letters the original's plate shows
+     * (see PLATE_FONT). */
+    scale: 2,
     heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
   }
   // THE MAP has no entry here on purpose: nothing about its placement or its
@@ -372,6 +388,25 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
   /** The same letters painted the heal's own colour — the pink a heal's number
    * comes up in (lib/game/damage.ts). */
   let healFont: Font | null = null
+  /** The plate's own letters (PLATE_FONT), unpainted — the fallback while a
+   * team's painted copy is still decoding. */
+  let plateFont: Font | null = null
+  /** …and one painted copy per TEAM colour seen, made the frame a plate first
+   * arrives in that colour (contracts/overlay.ts). */
+  const teamFonts = new Map<string, Font>()
+  const teamLoads = new Set<string>()
+  const teamFontFor = (colour: readonly [number, number, number]): Font | null => {
+    const key = colour.join(',')
+    const had = teamFonts.get(key)
+    if (had) return had
+    if (!teamLoads.has(key)) {
+      teamLoads.add(key)
+      void loadFont(PLATE_FONT, { colour: [colour[0], colour[1], colour[2]] }).then((painted) => {
+        teamFonts.set(key, painted)
+      })
+    }
+    return plateFont
+  }
   let digits: Sprite[] = []
   let fans: Sprite[] = []
   let heart: Sprite | null = null
@@ -394,7 +429,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     heart = await tinted(white.heart, LAYOUT.plate.heart.colour)
     // The heal's letters take the same colour its heart does, so nudging one in
     // the console moves both.
-    healFont = await loadFont(PLATE_FONT, { colour: LAYOUT.plate.heart.colour })
+    healFont = await loadFont(TEXT_FONT, { colour: LAYOUT.plate.heart.colour })
   }
 
   const resize = (): boolean => {
@@ -412,13 +447,15 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     async load() {
       if (loaded) return
       try {
-        const [dashboard, markers, big] = await Promise.all([
+        const [dashboard, markers, big, small] = await Promise.all([
           loadTims(DASHBOARD),
           loadTims(MARKERS),
+          loadFont(TEXT_FONT),
           loadFont(PLATE_FONT)
         ])
         art = dashboard
         font = big
+        plateFont = small
         digits = art.frames('timer', 0, 9)
         white = {
           fans: [dashboard.get('wedge1'), dashboard.get('wedge2')],
@@ -733,10 +770,12 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       // noises, and nothing was ever painted, because a pig that had not been
       // standing still long enough took the whole rest of the frame with it.
       // Play saw exactly that.
-      const drawPlates = (font: Font, heart: Sprite): void => {
+      const drawPlates = (base: Font, heart: Sprite): void => {
         // A pig's name, and its health beside a heart under it — once it has
         // stood still long enough. Drawn in the widget's own units, with the
-        // scene's screen positions brought back into them.
+        // scene's screen positions brought back into them. The letters are
+        // SMALL at PLATE.scale, painted the pig's TEAM colour; the heart keeps
+        // its own pink (contracts/overlay.ts).
         //
         // …or the moment anybody's number goes DOWN, standing still or not: the
         // water hurts silently and invisibly, and without this nothing on screen
@@ -748,27 +787,92 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           wasHealth.set(plate.name, plate.health)
         }
         if (state.still < PLATE.delay && hurtFor <= 0) return
-        const line = font.height
-        const gap = font.measure(' ')
+        const factor = PLATE.scale
+        const line = base.height * factor
+        const gap = base.measure(' ') * factor
         context.save()
         context.scale(scale, scale)
         const heartSize = {
           width: heart.width * PLATE.heart.scale,
           height: heart.height * PLATE.heart.scale
         }
+        /** A run of the base font's letters at the plate's own factor — the
+         * glyphs stay the atlas's pixels, only bigger, which is what keeps
+         * them the original's chunky doubling rather than a resample. */
+        const letters = (font: Font, text: string, x: number, y: number): void => {
+          context.save()
+          context.translate(x, y)
+          context.scale(factor, factor)
+          font.draw(context, text, 0, 0)
+          context.restore()
+        }
+        // Lay every block out FIRST, then unstack: two pigs shoulder to
+        // shoulder put their plates on top of each other, and neither the exe
+        // nor its notes say what the original does about it
+        // (scanner/notes.md), so the remake's own answer is the plain one —
+        // the later block climbs above the one it landed on.
+        interface Block {
+          x: number
+          top: number
+          left: number
+          width: number
+          height: number
+          font: Font
+          name: string
+          nameWidth: number
+          health: string
+          healthWidth: number
+        }
+        const blocks: Block[] = []
         for (const plate of state.pigs) {
           const at = { x: plate.x / scale, y: plate.y / scale }
-          const health = String(plate.health)
-          const healthWidth = heartSize.width + gap + font.measure(health)
-          // Two lines are drawn UPWARD from the anchor, so a pig near the top
-          // of the view puts them off it. Slide the block down to the edge
-          // rather than dropping it: a name that vanishes reads as a bug, and
-          // did.
-          const top = Math.max(0, at.y - line * 2 - PLATE.gap)
           if (at.y > canvas.height / scale) continue
-          font.draw(context, plate.name, Math.round(at.x - font.measure(plate.name) / 2), Math.round(top))
-          const healthLeft = Math.round(at.x - healthWidth / 2)
-          const healthTop = Math.round(top + line + PLATE.gap)
+          const health = String(plate.health)
+          const nameWidth = base.measure(plate.name) * factor
+          const healthWidth = heartSize.width + gap + base.measure(health) * factor
+          const width = Math.max(nameWidth, healthWidth)
+          const height = line * 2 + PLATE.gap
+          blocks.push({
+            x: at.x,
+            // Two lines are drawn UPWARD from the anchor, so a pig near the top
+            // of the view puts them off it. Slide the block down to the edge
+            // rather than dropping it: a name that vanishes reads as a bug, and
+            // did.
+            top: Math.max(0, at.y - height),
+            left: at.x - width / 2,
+            width,
+            height,
+            font: teamFontFor(plate.colour) ?? base,
+            name: plate.name,
+            nameWidth,
+            health,
+            healthWidth
+          })
+        }
+        blocks.sort((a, b) => a.top - b.top)
+        const placed: Block[] = []
+        for (const block of blocks) {
+          let bumped = true
+          while (bumped) {
+            bumped = false
+            for (const other of placed) {
+              const apart =
+                block.left >= other.left + other.width ||
+                other.left >= block.left + block.width ||
+                block.top >= other.top + other.height + PLATE.gap ||
+                other.top >= block.top + block.height + PLATE.gap
+              if (!apart) {
+                block.top = other.top - block.height - PLATE.gap
+                bumped = true
+              }
+            }
+          }
+          placed.push(block)
+        }
+        for (const block of placed) {
+          letters(block.font, block.name, Math.round(block.x - block.nameWidth / 2), Math.round(block.top))
+          const healthLeft = Math.round(block.x - block.healthWidth / 2)
+          const healthTop = Math.round(block.top + line + PLATE.gap)
           context.drawImage(
             heart.image,
             healthLeft,
@@ -776,11 +880,11 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
             heartSize.width,
             heartSize.height
           )
-          font.draw(context, health, healthLeft + heartSize.width + gap, healthTop)
+          letters(block.font, block.health, healthLeft + heartSize.width + gap, healthTop)
         }
         context.restore()
       }
-      drawPlates(font, heart)
+      if (plateFont) drawPlates(plateFont, heart)
 
       // …AND THE PAUSE OVER ALL OF IT. Last, because it is the only modal
       // thing the dashboard carries: the exe draws it over the live frame too

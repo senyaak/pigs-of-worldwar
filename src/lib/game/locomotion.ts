@@ -233,6 +233,12 @@ export const ANIM = {
    * picks between them in 0x47d080, which is not decoded; the remake plays
    * the first and says so (lib/game/health.ts). */
   DYING: 47,
+  /** Going under. The death dispatcher 0x4680E0 takes a KIND — 0 ordinary,
+   * 2 the drown-on-the-spot — and which clip each kind picks is NOT read
+   * (`water/notes.md`); 50 is the name table's "Drowning", the one slot in
+   * the dying band the three decoded call sites leave. Play rules a death in
+   * the water wears it (lib/game/corpses.ts). */
+  DROWNING: 50,
   /** Hanging under a canopy — the level's opening drop (lib/game/parachute). */
   PARACHUTE: 82
 } as const

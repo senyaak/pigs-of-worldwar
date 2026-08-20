@@ -151,7 +151,7 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
       // number goes too.
       emit({ kind: 'struck', skill, at: body })
       if (outcome === 'died' || outcome === 'gibbed') {
-        emit({ kind: 'killed', pig: target.id, by: attacker.id })
+        emit({ kind: 'killed', pig: target.id, by: attacker.id, gibbed: outcome === 'gibbed' })
       }
     }
 

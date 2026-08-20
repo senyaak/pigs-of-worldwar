@@ -166,7 +166,7 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       const outcome = hurt(pig, amount, world.training)
       emit({ kind: 'damaged', at: body, amount })
       if (outcome === 'died' || outcome === 'gibbed') {
-        emit({ kind: 'killed', pig: pig.id, by: shot.owner })
+        emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })
       }
       return true
     }
