@@ -9,6 +9,88 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 
 ---
 
+## P0. PLAY'S LIST, 2026-08-20 evening — NEXT UP, nothing here is started
+
+Written down at play's request to survive the chat ending ("запиши это всё — в
+новом чате продолжим"). Everything below is a report from a session, in play's
+own order; the numbers at the end are ones play tuned live in the console and
+they are the ANSWER, not a starting point — type them in and look, then paste
+them into the source.
+
+### P0.1 The battle plate wears the WRONG FONT — put BIG back, just smaller
+
+**Reverting a decision made earlier the same day.** The names and health over
+the pigs used to be `FEText/BIG` at its own size; play called that too big, put
+up a screenshot of the original, and the plate was moved to `SMALL` drawn at
+×2 (`PLATE_FONT` and `LAYOUT.plate.scale` in `ui/hud.ts`). Play has now seen
+it in the game: **"не тот шрифт! верни тот что был — но просто сделай меньше
+его."** So the letters are BIG's after all and what was wanted is BIG DRAWN
+SMALLER — the plate keeps its own scale knob, at a fraction rather than at 2.
+
+The blitter draws a glyph at whatever transform is on the context
+(`letters()` in `ui/hud.ts` already scales), so this is `PLATE_FONT = 'BIG'`
+and a scale under 1 — try 0.75 and let play move it. Bitmap glyphs shrunk by
+a fraction will soften; if that reads badly the other lever is `imageSmoothing`
+off (the HUD already sets it) and a scale that is a clean 1/2.
+
+### P0.2 A BAYONET does not throw the body it hits
+
+No knockback from a melee hit at all. The blast has one
+(`flingSpeed`/`fling` in `lib/game/blast.ts`, `lib/game/tumble.ts`); the blade
+lands its damage in `lib/game/strikes.ts` and pushes nothing. Read the exe's
+melee arm before inventing a number — `Pig::HitByHandToHand` is 0x478618 and
+the blast's own kick goes through `0x4A9260`, which is where a swing's would
+be too.
+
+### P0.3 There is no MUSIC on a level
+
+Nothing plays. The install's music and how a level picks its track have not
+been looked at at all — start with what the loader opens beside `FESounds`,
+and with whether the battle's own bank has a channel for it
+(`audio/bank.ts`, `audio/battleSound.ts`).
+
+### P0.4 The turn's opening BARK, and a beat before GET READY can be skipped
+
+Two halves of one moment:
+
+- **No line at the start of a turn.** Play thinks only the player's own side
+  says one in the original. There IS a bark event on the bus (`kind: 'bark'`)
+  and the battle emits it for a firing line (`lib/game/battle.ts`), so what is
+  missing is the turn's own — the voice bank's categories are in
+  `speech/pigs.md` and `audio/pigVoice.ts`.
+- **GET READY takes a key too early.** The card can be dismissed on the first
+  frame; play wants **at least a second** before any press moves the game on.
+  `game.starting` is the beat (`lib/game/game.ts`, ended by the input layer —
+  `input/battleInput.ts`, the `starting` control set), so the floor goes in
+  the rules, not in the input.
+
+### P0.5 `pigpro` belongs BEHIND the columns
+
+The board is drawn LAST on the squad screen — the arm's own order (0x41DB85),
+so it stands in front of everything — and play wants it behind the two
+columns of pigs. `ui/playerScreen.ts`, the `put('pigpro', …)` near the end of
+`draw`.
+
+### P0.6 The numbers play tuned live — paste these in
+
+All of them are `pow.screen.layout.player.*` on the SQUAD screen. The left
+column is the one play measured; **the right column was not tried** and needs
+the same pass.
+
+- **START MISSION**, `options`: `rows: [385]` and `text: -14` (the rest
+  unchanged — `x: 428`, `width: 200`, `lamp.x [429, 601]`, `lamp.drop 16`).
+  Note `text` is now an offset from the plate's own MIDDLE, so −14 is fourteen
+  above centre.
+- **The name**, `columns[0].name`: `y: 21`, `x: 157`.
+- **The class badge**, `columns[0].badge.y` — and this is the interesting one,
+  because **it wants a DIFFERENT y per ROW**: 43 for rows 1 and 2, 41 for row
+  3, 42 for row 4, 44 for row 5. The portraits' own rows are not evenly
+  spaced either (74, 74, 73, 72 — the exe's two per-row nudges), so the badge
+  needs its own per-row table beside `LAYOUT.rows` rather than one number.
+  Measure the right column in play before writing it down.
+
+---
+
 ## 0. THE CAMPAIGN'S SPINE — a save, then NEW GAME and LOAD GAME
 
 Play's order, 2026-08-13, and it is the next thing to build. The frontend is
