@@ -36,6 +36,7 @@ import { byId } from './dom'
 import type { Font } from './font'
 import { widget, LAMP_BLINK } from './frames'
 import { drive } from './drive'
+import { trackRows } from './mouseRows'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
 import { loadSprites } from './sprites'
@@ -147,6 +148,10 @@ const LAYOUT = {
  * line and a `print()`, not an edit.
  */
 const ROW_X = 380
+
+/** How tall a row's own hit band is where the letters have not loaded — the
+ * pitch of the exe's own boxes (216 → 238), and only the mouse reads it. */
+const ROW_HEIGHT = 22
 
 /** What the exe's own table says row x is, kept so the divergence is visible. */
 export const EXE_ROW_X = 404
@@ -325,6 +330,31 @@ export function initTeamScreen(handlers: {
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
 
   /**
+   * THE MOUSE, the same way the bar screens have it (ui/mouseRows.ts): the
+   * light walks to whatever the pointer rests on, a row a tick, and a click on
+   * the lit row chooses it. Play asked for it — "выбор отряда - мышкой не
+   * выбирается" — and it costs this screen only its rows, which the draw loop
+   * already has: the exe's own boxes, plus the entrance's offset, and a band
+   * as tall as the letters that stand in them.
+   */
+  const mouse = trackRows(
+    canvas,
+    () =>
+      Array.from({ length: NATIONS }, (_, i) => {
+        const box = layout.text.rows[i]
+        return {
+          x: box.x,
+          y: box.y + offset,
+          width: box.width,
+          height: lit?.height ?? ROW_HEIGHT
+        }
+      }),
+    (row) => {
+      if (row === selection) choose()
+    }
+  )
+
+  /**
    * A line in one of the exe's boxes: centred across it with its TOP at the
    * box's own y, and riding the entrance with everything else.
    */
@@ -445,6 +475,14 @@ export function initTeamScreen(handlers: {
 
   const advance = (): void => {
     driveOn.tick()
+    // The pointer moves the light one row a tick, exactly as a held key would
+    // — never a jump, or the reel would be asked for a frame it cannot walk to
+    // in time and the emblem would tear through five armies at once.
+    const hovered = mouse.hovered()
+    if (hovered >= 0) {
+      if (hovered === selection) mouse.clear()
+      else step(hovered > selection ? 1 : -1)
+    }
     // The reel clicks when it LANDS, not once per frame it passes: the
     // builder plays it on the step that reaches the frame it was aimed at.
     if (reel.tick() && !reel.walking()) bank.play(CLICK.name, { gain: CLICK.gain })

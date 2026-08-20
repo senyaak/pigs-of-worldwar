@@ -928,3 +928,37 @@ pole: the whole zoom makes three blits, the veil, the patch and the page.
 `pow.pigMap.flags()` joins `patches()`, for the reason `patches()` exists —
 a page of bare poles looks like a perfectly good page, and this is the second
 time a silent miss on this screen was found by a player rather than by a run.
+
+## A play pass over the menus — the pointer, the needle and the lit row (2026-08-20)
+
+Seven reports in one message, all of them from playing the chain rather than
+from reading anything, and each is written where it lives:
+
+- **The needle pointed at the floor on ONE PLAYER.** `needleFrame` spread the
+  dial's twelve frames over however many bars a screen had, which is the exe's
+  own 0, 4, 7, 11 on a four-bar screen and nonsense anywhere else: LOAD GAME,
+  row 1 of 2, took frame 11 — the bottom of the travel. The exe's arithmetic is
+  per-ROW, not per-screen (`4*row - (4*row > 4 ? 1 : 0)`, 0x427C90), so two
+  bars are frames 0 and 4. `ui/barScreen.ts`.
+- **The MOUSE reached two more screens**, and the hit test became one module.
+  `ui/mouseRows.ts` carries what `barScreen` had inline — un-letterboxing a
+  canvas laid out with `object-fit: contain`, hitting a list of rectangles the
+  screen hands in fresh each event (they ride the entrance), and remembering
+  the row rather than acting on it, so the light walks there one row a tick and
+  the reel, the needle and the lamps animate as they do under a key. SELECT
+  TEAM feeds it the exe's own text boxes; the squad screen feeds it eight
+  portraits and the option plate, and refuses everything while an overlay is up.
+- **LOAD lights its lit row's LETTERS** (`[play]`, against the read: the exe's
+  family shows the selection with the blinking plate and never recolours a
+  label). Eight identical lines with a plate behind them did not read as a
+  cursor.
+- **The squad screen**: the pig's name went up to the portrait's top edge (16
+  had it written across the middle of every face); START MISSION moved down 16
+  with its words up 8 inside the plate; and its two lamps now blink `lit1..3`
+  on the rack's own script while the row is lit, where they used to sit on the
+  dark frame for ever — an action that never lit up.
+- **The board lost its third pair.** Deaths came off it (`[play]`); the count
+  stays on the roster. It was also what pushed that line past `pigpro`'s own
+  200 px, which is the crowding the same message reported.
+- **The briefing's PRESS ANY KEY stops twelve lower**, resting over the bar
+  instead of climbing into the page's words.

@@ -48,12 +48,14 @@ import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
 import type { Font } from './font'
 import { drive } from './drive'
+import { LAMP_BLINK, widget } from './frames'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
-import { loadDebriefSprites, loadSprites } from './sprites'
-import type { Sprite, SpriteSet } from './sprites'
+import { loadSprites } from './sprites'
+import type { SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
+import { trackRows } from './mouseRows'
 import { initPigMenu } from './pigMenu'
 import type { PromoteResult } from './pigMenu'
 import { initCareerPath } from './careerPath'
@@ -69,24 +71,12 @@ import {
 } from '../../../lib/game/ranks'
 
 /** A piece of one of the board's lines: words, or one of the markup icons.
- * `after` overrides the gap the board leaves before whatever comes next.
- * `sprite` is art from OUTSIDE the frontend set — the deaths count borrows
- * the debrief's tombstone — drawn scaled to `height`. */
+ * `after` overrides the gap the board leaves before whatever comes next. */
 interface BoardPiece {
   text?: string
   icon?: string
-  sprite?: Sprite
-  height?: number
   after?: number
 }
-
-/** How tall the markup icons are — what a borrowed sprite is scaled to. */
-const ICON_TALL = 22
-
-/** The debrief's tombstone (`Language/Tims/debrief`), standing in as the
- * deaths count's icon: the frontend's own thirteen have no such picture,
- * because the original never counts deaths. */
-const RIP_ART = 'r_i_p'
 
 /** The six career badges, in the order the exe's own table counts them —
  * `careerOf` returns that order (0x4D29C0's first byte). */
@@ -124,8 +114,9 @@ const ART = [
   // `kills` how many it has killed (`frontend/notes.md` — the archive's name
   // is honest, whatever an earlier note said).
   'vp', 'battle', 'kills',
-  // The option plate behind START MISSION and the lamp that flanks it.
-  'sqoptsf', 'lit1',
+  // The option plate behind START MISSION and the lamps that flank it — three
+  // shades, dark to bright, the way the rack's `light1..3` are.
+  'sqoptsf', 'lit1', 'lit2', 'lit3',
   // The FURNITURE, every piece of it placed by the arm's tail: `sqpic` is the
   // panel a column stands on, cut short for the right one; `sqname01..06` one
   // widget carrying the TEAM's name across the top; `sqdial01..06` the pig
@@ -136,6 +127,10 @@ const ART = [
 
 /** `Fesounds.srl` entry 4 — the same click every other frontend screen makes. */
 const CLICK = { name: 'CLICK1', gain: 0.6 }
+
+/** START MISSION's lamp, dark to bright — the frames `LAMP_BLINK` counts in
+ * (ui/frames.ts), the same three shades the rack's `light1..3` are. */
+const LAMPS = ['lit1', 'lit2', 'lit3']
 
 /** Record 12's first item, START MISSION — the one action this screen keeps.
  * The original's second, SAVE TEAM (fetext 51), went with the SAVE ARMY screen:
@@ -226,8 +221,14 @@ const LAYOUT = {
    * ABOVE the badge and inside the widget rather than under the portrait
    * (`[play]`), which is `[CHECK — remake]` in the number only: the exe writes
    * no words for a pig at all, record 12 having just the two actions.
+   *
+   * **The name went UP to the portrait's own top edge**, from 16 — play:
+   * "имена свиней надо выше показывать, там где они щас — показываются их
+   * классы". Sixteen put the letters across the middle of the face, a row of
+   * words through every snout on the screen; at 0 they sit along the top of
+   * the portrait and the class badge below has the plate to itself.
    */
-  drop: { badge: 40, stripes: 40, name: 16 },
+  drop: { badge: 40, stripes: 40, name: 0 },
   /** The portrait: `width` is what its name is centred across, `inset` how far
    * its backing — the three `backgr~1` entries (`[play]`) — reaches past the
    * face on every side. */
@@ -277,9 +278,15 @@ const LAYOUT = {
   options: {
     x: 428,
     width: 200,
-    rows: [337],
-    /** How far into its plate a row's words sit — `[CHECK — remake]`. */
-    text: 38,
+    /** **Sixteen lower than the tail's own 337** — `[play]`: "слишком высоко
+     * поднято, надо ниже сам элемент". The number the arm folds to is kept in
+     * this comment rather than in the field, since the fold itself is the
+     * suspect part (see the note above). */
+    rows: [353],
+    /** How far into its plate a row's words sit — `[CHECK — remake]`, and
+     * play took it up from 38: the letters were riding the plate's bottom
+     * edge ("текст немного смещён в низ от элемента"). */
+    text: 30,
     lamp: { x: [429, 601], drop: 16 }
   },
   /** Record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12) — and
@@ -376,9 +383,6 @@ export function initPlayerScreen(handlers: {
 
   let bank: Bank = SILENT
   let art: SpriteSet | null = null
-  /** The deaths count's tombstone, or null while the debrief art is missing —
-   * which costs the icon, never the screen. */
-  let rip: Sprite | null = null
   let lit: Font | null = null
   let plain: Font | null = null
   let loaded = false
@@ -398,6 +402,9 @@ export function initPlayerScreen(handlers: {
   const columnRow = [0, 0]
 
   const driveOn = drive(ENTERS_FROM)
+  /** START MISSION's own lamp, which blinks while the row is lit and rests on
+   * the dark frame while it is not — the rack's script, one screen over. */
+  const startLamp = widget(0)
   let leaving: (() => void) | null = null
 
   /** SWAP POSITION's armed pig, or −1 — the exe's `[0x4C0C58]`, and the one
@@ -519,6 +526,42 @@ export function initPlayerScreen(handlers: {
     }
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
+
+  /**
+   * THE MOUSE (ui/mouseRows.ts), which play asked for by name: the light walks
+   * to whatever the pointer rests on, a place a tick, and a click on the lit
+   * place chooses it — a pig opens its menu, START MISSION leaves.
+   *
+   * The rows are the nine places in `selection`'s own order: eight portraits
+   * off `place(slot)` at the portrait's own size, then the option plate. While
+   * an OVERLAY is up the screen answers nothing (neither the pig menu nor the
+   * career path has geometry of its own), so the list goes empty and the
+   * pointer falls through to nothing rather than lighting pigs underneath it.
+   */
+  const mouse = trackRows(
+    canvas,
+    () => {
+      if (!art || overlaid()) return []
+      const face = art.get('face1a')
+      const plate = art.get('sqoptsf')
+      const places = Array.from({ length: SQUAD_SIZE }, (_, slot) => {
+        const at = place(slot)
+        return { x: at.x, y: at.y + offset, width: face.width, height: face.height }
+      })
+      return [
+        ...places,
+        {
+          x: layout.options.x,
+          y: layout.options.rows[0] + offset,
+          width: plate.width,
+          height: plate.height
+        }
+      ]
+    },
+    (row) => {
+      if (row === selection) choose()
+    }
+  )
 
   /** Which column and row slot `n` stands in — five down, then three. */
   const place = (slot: number): { column: number; x: number; y: number } => {
@@ -681,9 +724,17 @@ export function initPlayerScreen(handlers: {
     // START MISSION on the tail's own option row, on its plate with its two
     // lamps. It is the screen's only action now — SAVE TEAM went with the
     // autosave (`[play]`).
+    //
+    // **THE LAMPS LIGHT WHEN THE ROW IS LIT**, which is the rack's own
+    // behaviour one screen over (ui/barScreen.ts): the lit row's lamp runs
+    // script 1002 and every other rests on the dark frame. This screen drew
+    // `lit1` — the dark one — flat, whatever was selected, and play saw an
+    // action that never answers ("Старт меню не загорается когда выбрано —
+    // должны лампочки загораться зелёным").
     const options = layout.options
     put('sqoptsf', options.x, options.rows[0])
-    options.lamp.x.forEach((x) => put('lit1', x, options.rows[0] + options.lamp.drop))
+    const lamp = LAMPS[Math.min(startLamp.frame(), LAMPS.length - 1)] ?? LAMPS[0]
+    options.lamp.x.forEach((x) => put(lamp, x, options.rows[0] + options.lamp.drop))
     const startLabel = feText(START_TEXT)
     const startFont = selection === START ? light : dark
     startFont.draw(
@@ -733,14 +784,8 @@ export function initPlayerScreen(handlers: {
     pieces: BoardPiece[]
   ): void => {
     const board = layout.board
-    const widthOf = (piece: BoardPiece): number => {
-      if (piece.text !== undefined) return font.measure(piece.text)
-      if (piece.sprite) {
-        const tall = piece.height ?? piece.sprite.height
-        return Math.round((piece.sprite.width * tall) / piece.sprite.height)
-      }
-      return sprites.get(piece.icon ?? '').width
-    }
+    const widthOf = (piece: BoardPiece): number =>
+      piece.text !== undefined ? font.measure(piece.text) : sprites.get(piece.icon ?? '').width
     const after = (piece: BoardPiece): number => piece.after ?? board.gap
     const total = pieces.reduce(
       (width, piece, i) => width + widthOf(piece) + (i < pieces.length - 1 ? after(piece) : 0),
@@ -749,10 +794,7 @@ export function initPlayerScreen(handlers: {
     let x = Math.round(board.centre - total / 2)
     for (const piece of pieces) {
       if (piece.text !== undefined) font.draw(context, piece.text, x, y + offset)
-      else if (piece.sprite) {
-        const tall = piece.height ?? piece.sprite.height
-        context.drawImage(piece.sprite.image, x, y - board.lift + offset, widthOf(piece), tall)
-      } else context.drawImage(sprites.get(piece.icon ?? '').image, x, y - board.lift + offset)
+      else context.drawImage(sprites.get(piece.icon ?? '').image, x, y - board.lift + offset)
       x += widthOf(piece) + after(piece)
     }
   }
@@ -779,24 +821,37 @@ export function initPlayerScreen(handlers: {
         { text: String(Math.min(...ways.map((way) => way.cost))) }
       ])
     }
-    // The counts, with the board's own wider gap between the pairs. The
-    // third is the remake's own (`[deliberate]`, lib/game/roster.ts): how
-    // many times this pig has died and come back. The original's board has
-    // two counts and no deaths anywhere; the icon is the debrief's tombstone
-    // scaled to the markup set's 22, or the letters where the art is missing.
+    // The counts: how many battles, how many kills, with the board's own wider
+    // gap between the pairs — **TWO pairs, which is what the original's board
+    // carries**. A third was added here for the deaths the remake counts, and
+    // play threw it out: "третья иконка не нужна — только сколько битв и
+    // сколько убил врагов". It was also what pushed this line past the board's
+    // own 200 px, which is the crowding play saw. The count itself stays on
+    // the roster (lib/game/roster.ts); nothing draws it now.
     boardLine(context, sprites, font, lines.counts, [
       { icon: 'battle' },
       { text: String(pig.missions), after: gap + layout.board.spread },
       { icon: 'kills' },
-      { text: String(pig.score), after: gap + layout.board.spread },
-      rip ? { sprite: rip, height: ICON_TALL } : { text: 'RIP' },
-      { text: String(pig.deaths) }
+      { text: String(pig.score) }
     ])
   }
 
   const advance = (): void => {
     driveOn.tick()
+    // The pointer moves the light one place a tick, the way every other screen
+    // that has the mouse does it (ui/mouseRows.ts) — so the click, the board
+    // and each column's remembered row all go through `step` as usual.
+    const hovered = mouse.hovered()
+    if (hovered >= 0) {
+      if (hovered === selection) mouse.clear()
+      else step(hovered > selection ? 1 : -1)
+    }
     pulse += PULSE_STEP
+    // The action's lamp: blinking while its row is lit, dark otherwise.
+    if (selection === START) {
+      if (!startLamp.walking()) startLamp.play(LAMP_BLINK)
+    } else if (startLamp.frame() !== 0) startLamp.goTo(0)
+    startLamp.tick()
     if (driveOn.phase() === 'here' && flagFly < layout.flag.fly) flagFly++
     menu.tick()
     if (career.state() === 'open') career.tick()
@@ -845,13 +900,6 @@ export function initPlayerScreen(handlers: {
         return
       }
       loaded = true
-      // The tombstone comes from the DEBRIEF's folder, so it fails on its
-      // own: an install without it loses the icon and keeps the screen.
-      try {
-        rip = (await loadDebriefSprites([RIP_ART])).get(RIP_ART)
-      } catch (error) {
-        console.warn(String(error))
-      }
       menu.use(bank)
       career.use(bank)
       run(visible)

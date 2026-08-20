@@ -49,6 +49,7 @@ import { MENU_BINDINGS } from '../input/actions'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { drive } from './drive'
 import { LAMP_BLINK, widget } from './frames'
+import { trackRows } from './mouseRows'
 
 /** The frontend's own bank — 27 sounds, the menu's clicks among them. */
 const FRONTEND_SOUNDS = 'FESounds/Fesounds.srl'
@@ -386,8 +387,6 @@ export function initBarScreen(config: {
 
   let selection = 0
   let visible = false
-  /** The bar the mouse is over, taken up one bar a tick. */
-  let hovered = -1
   /** The screen's own arrival and departure: one y displacement added to
    * everything the machine draws, and one the tracks carry. The backdrop is
    * NOT displaced — the exe blits it before the switch that applies this. */
@@ -499,34 +498,22 @@ export function initBarScreen(config: {
     }
   }
 
-  const barUnder = (event: MouseEvent): number => {
-    const box = canvas.getBoundingClientRect()
-    // The canvas is letterboxed inside its box by object-fit: contain.
-    const scale = Math.min(box.width / SCREEN.width, box.height / SCREEN.height)
-    const x = (event.clientX - box.left - (box.width - SCREEN.width * scale) / 2) / scale
-    const y = (event.clientY - box.top - (box.height - SCREEN.height * scale) / 2) / scale
-    if (!art) return -1
-    const plate = art.get('chose1')
-    for (let i = 0; i < bars.length; i++) {
-      const row = rowBox(i, plate)
-      if (x >= row.x && x < row.x + row.width && y >= row.y && y < row.y + plate.height) {
-        return i
-      }
-    }
-    return -1
-  }
   // Where the pointer rests is remembered rather than acted on: the machine
-  // works its way there a bar at a time, so dragging down the column reads
-  // as several turns of the cog and not as one jump.
-  canvas.addEventListener('mousemove', (event) => {
-    hovered = barUnder(event)
-  })
-  canvas.addEventListener('mouseleave', () => {
-    hovered = -1
-  })
-  canvas.addEventListener('click', (event) => {
-    if (barUnder(event) === selection) choose()
-  })
+  // works its way there a bar at a time (`tick` below), so dragging down the
+  // column reads as several turns of the cog and not as one jump. The hit test
+  // itself is shared with every other screen that offers the mouse
+  // (ui/mouseRows.ts).
+  const mouse = trackRows(
+    canvas,
+    () => {
+      if (!art) return []
+      const plate = art.get('chose1')
+      return bars.map((_, i) => ({ ...rowBox(i, plate), height: plate.height }))
+    },
+    (row) => {
+      if (row === selection) choose()
+    }
+  )
 
   const centred = (
     context: CanvasRenderingContext2D,
@@ -577,18 +564,22 @@ export function initBarScreen(config: {
   /**
    * Which frame of the dial POINTS at a row.
    *
-   * The needle following the lit bar is the exe's, not an invention to be
-   * corrected: the screen's selection handler aims it with
-   * `0x423E10(1, 4, 4*row - (4*row > 4 ? 1 : 0), 1, 1)`, which for the four
-   * rows is frames 0, 4, 7 and 11 of twelve — and the widget walks there one
-   * frame a tick, so it SWEEPS. Spreading the frames evenly over the rows
-   * gives exactly those four back, and gives a sensible answer on a screen
-   * with a different number of bars, whose own arm has not been read.
+   * The needle following the lit bar is the exe's, and so is the ARITHMETIC:
+   * the selection handler aims it with
+   * `0x423E10(1, 4, 4*row - (4*row > 4 ? 1 : 0), 1, 1)` — frames 0, 4, 7 and
+   * 11 of twelve for the four rows — and the widget walks there one frame a
+   * tick, so it SWEEPS.
+   *
+   * **It is the ROW's own frame, not a spread over however many bars there
+   * are.** This used to divide by `bars.length - 1`, which is the same four
+   * frames on a four-bar screen and nonsense on any other: ONE PLAYER has two
+   * bars, so LOAD GAME — row 1 of 2 — took frame 11, the bottom of the dial's
+   * travel, and play saw the needle pointing at the floor instead of at the
+   * row. Two bars are rows 0 and 1 of the same twelve-frame dial: frames 0
+   * and 4.
    */
-  const needleFrame = (row: number): number => {
-    const across = bars.length > 1 ? row / (bars.length - 1) : 0
-    return Math.round(across * 11)
-  }
+  const needleFrame = (row: number): number =>
+    Math.min(11, 4 * row - (4 * row > 4 ? 1 : 0))
 
   const draw = (): void => {
     const context = canvas.getContext('2d')
@@ -772,9 +763,10 @@ export function initBarScreen(config: {
     for (const lamp of rowLamps) lamp.tick()
 
     // The mouse is the remake's own convenience, and it moves the light the
-    // only way the machine can: a bar at a time.
+    // only way the machine can: a bar at a time (ui/mouseRows.ts).
+    const hovered = mouse.hovered()
     if (hovered >= 0) {
-      if (hovered === selection) hovered = -1
+      if (hovered === selection) mouse.clear()
       else step(hovered > selection ? 1 : -1)
     }
 

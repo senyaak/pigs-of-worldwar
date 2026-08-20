@@ -36,7 +36,11 @@ const WALK_MS = 2500
 const PRESS_TEXT = 257
 const PRESS_FROM = 451
 const PRESS_STEP = 2
-const PRESS_TOP = 420
+/** Where the creep STOPS. Play took it down twelve — "чуть ниже надо" — so
+ * the line rests just over the bar instead of climbing into the briefing's
+ * own words; the 420 the exe's own creep would reach is `[CHECK — remake]`
+ * either way, since only its start and its step were read. */
+const PRESS_TOP = 432
 
 /** The enemy portrait's paste point on the level-1 page (0x45C530). */
 const PORTRAIT = { x: 342, y: 190 }

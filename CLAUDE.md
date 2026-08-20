@@ -735,14 +735,23 @@ and the weakest of them were invented here:
   shipped archives in `e2e/000/timpadding.spec.ts` — exactly `hog2/sau3/
   sau4/trot2` and `timer0..9`, and nothing else, because `pause5`'s dark rim
   and `fpole`'s solid columns are art an eager rule would eat.
-- `[deliberate]` **The squad board counts DEATHS, and the original does not.**
-  Its `pigpro` board carries two counts — battles and kills — and no deaths
-  number exists anywhere in the exe: a death there is only the fall order and
-  the slot emptying. The remake adds a third pair, `deaths` on the roster pig
-  (counted by `regroup` when a pig gets up, so a replay counts nothing and a
-  pig gone for good takes its number with it), drawn with the debrief's
-  tombstone scaled to the markup icons' 22. Asked for by name: "давай добавим
-  — чего нет". `lib/game/roster.ts`, `ui/playerScreen.ts`.
+- `[deliberate]` **The roster counts DEATHS, and nothing draws them.** The
+  exe has no deaths number at all — a death there is the fall order and the
+  slot emptying — and the remake keeps one on the roster pig (`deaths`,
+  counted by `regroup` when a pig gets up, so a replay counts nothing and a
+  pig gone for good takes its number with it). It was on the `pigpro` board
+  as a third pair beside battles and kills, and **play took it off again**:
+  "третья иконка не нужна — только сколько битв и сколько убил врагов". The
+  board is the original's two counts. `lib/game/roster.ts`,
+  `ui/playerScreen.ts`.
+- `[play]` **The MOUSE drives every menu screen, and the lit row is told
+  apart by its LETTERS.** The original is keyboard and pad (it ships
+  `nomouse.com`) and its LOAD screen never recolours a label — the plate
+  behind it blinks instead. Both are overridden: `ui/mouseRows.ts` is the one
+  hit test (un-letterbox the canvas, hit the rows the screen is drawing with,
+  walk the light one row a tick so nothing jumps), and a lit row is written in
+  the light shade wherever a row is written at all. A screen the pointer
+  cannot drive reads as broken however faithful it is.
 - `[deliberate]` **A name is judged and kept TRIMMED.** The exe's ENTER tests
   the buffer's first byte alone (0x42AF50), so a team called one SPACE passes;
   `press` in `lib/game/nameEntry.ts` trims before it refuses and hands the

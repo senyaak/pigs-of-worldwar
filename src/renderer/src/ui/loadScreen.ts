@@ -260,14 +260,21 @@ export function initLoadScreen(handlers: {
       layout.panel.y + yOff
     )
 
-    // The labels: the team's name, or the exe's own `---`, always the plain
-    // shade — the selection is the plate's business.
+    // The labels: the team's name, or the exe's own `---`, and **the LIT slot
+    // is written in the light shade** — `[play]`: "выделенный вариант — текст
+    // не подсвечивается белым как в других меню". The exe does not do this
+    // (its selection is the plate's business alone and the words never change
+    // colour, which is what this file used to say and draw), but every other
+    // screen in the remake's frontend tells the lit row apart by its letters,
+    // and a plate blinking behind eight identical lines does not read as a
+    // cursor. Play's call overrides the read, by design (CLAUDE.md).
     entries.forEach((entry, i) => {
       const label = entry ? entry.save.name : EMPTY
-      plain?.draw(
+      const font = i === selection ? lit : plain
+      font?.draw(
         context,
         label,
-        centred(plain, label, layout.rows.x + wordsOff, layout.rows.width),
+        centred(font, label, layout.rows.x + wordsOff, layout.rows.width),
         layout.rows.y[i] + yOff
       )
     })
