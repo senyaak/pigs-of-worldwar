@@ -410,7 +410,10 @@ declare global {
       nameScreen?: BarScreenView & { typed(): string; type(character: string): void }
       /** The PLAYER screen — the eight pigs and START MISSION
        * (ui/playerScreen.ts). `selected` is 0..7 a pig, then START. */
-      playerScreen?: BarScreenView
+      /** The SQUAD screen, plus what its `pigpro` board is saying: the
+       * team's tokens, then either the lit pig's lines or — while START
+       * MISSION is lit — the next mission's name and number. */
+      playerScreen?: BarScreenView & { board(): string[] }
       /** The PIG MENU over the squad — PROMOTE / SWAP POSITION / RENAME
        * (ui/pigMenu.ts); `open` says whether it is up at all. */
       pigMenu?: BarScreenView & { open(): boolean }

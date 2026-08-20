@@ -56,6 +56,7 @@ import type { SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { trackRows } from './mouseRows'
+import { missionTitleParts } from './titleCard'
 import { initPigMenu } from './pigMenu'
 import type { PromoteResult } from './pigMenu'
 import { initCareerPath } from './careerPath'
@@ -282,6 +283,13 @@ const LAYOUT = {
      * верху не хватает"). `pigpro` stands at y 304, so the first line now
      * clears its edge by 30 rather than by 18. */
     lines: { tokens: 334, name: 358, rank: 382, promote: 406, counts: 428 },
+    /** How far inside `pigpro`'s own edges the words stay — what a line is
+     * WRAPPED against. `[CHECK — remake]`: the board's dark face has not been
+     * measured off the art the way the name screen's panel was, and 8 is an
+     * eye. It matters for exactly one string, COMMUNICATION BREAKDOWN, which
+     * is 202 pixels of CHARS2 against a board 200 wide — every other mission
+     * name in the game fits on one line. */
+    margin: 8,
     /** Between a piece of a line and the next, and how far the 22-tall icons
      * ride above the letters' own top. */
     gap: 6,
@@ -376,20 +384,39 @@ export interface PlayerScreen {
   load(): Promise<void>
   leave(): void
   enter(): void
-  /** The squad to show, the team's name and its unspent tokens — the board
+  /**
+   * The squad to show, the team's name and its unspent tokens — the board
    * writes the last of those. Called before the screen is entered, and again
-   * whenever an edit moved the save under the screen. */
-  show(squad: Pig[], teamName: string, tokens: number): void
+   * whenever an edit moved the save under the screen.
+   *
+   * `mission` is where the campaign STANDS: the map START MISSION would open
+   * and its position in the campaign. The board says its name while that row
+   * is lit (`[play]`). Null for a campaign that has run out of missions.
+   */
+  show(squad: Pig[], teamName: string, tokens: number, mission?: NextMission | null): void
   /** Which of the nine places is lit: 0..7 a pig, 8 START MISSION. */
   selected(): number
   labels(): string[]
   values(): (string | null)[]
   flipping(): boolean
+  /** What the BOARD is saying, line by line — the team's tokens first, then
+   * either the lit pig's lines or the next mission's. A spec's only way to
+   * ask WHICH words are up; that they were PAINTED is a separate question and
+   * a canvas read (CLAUDE.md). */
+  board(): string[]
   /** The PIG MENU riding over the squad (ui/pigMenu.ts). */
   menu: OverlayView
   /** …and CAREER PATH, the same way (ui/careerPath.ts). */
   career: OverlayView
   layout: PlayerLayout
+}
+
+/** Where the campaign stands — what START MISSION would open. */
+export interface NextMission {
+  /** The map's own name, `CAMP` or `ROAD`. */
+  map: string
+  /** Its place in the campaign, which is the number the title carries. */
+  position: number
 }
 
 /** The one action lives past the eight pigs, the way the name entry's keys
@@ -426,9 +453,16 @@ export function initPlayerScreen(handlers: {
   let squad: Pig[] = []
   let teamName = ''
   let tokens = 0
+  /** What START MISSION would open, or null — see `show`. */
+  let mission: NextMission | null = null
+  /** `gtext`, the GAME's strings rather than the frontend's: a mission's
+   * display name is `gtext 11 + mapId` and lives in that table alone
+   * (ui/titleCard.ts). Empty until `load` has been through. */
+  let battleText: string[] = []
   let selection = 0
-  /** Which pig the BOARD is about. The board never goes blank, so choosing an
-   * action leaves it on the pig that was last lit. */
+  /** Which pig the BOARD is about while a PIG is lit. The board never goes
+   * blank, so choosing an action leaves it on the pig that was last lit — and
+   * START MISSION has a subject of its own, the next mission (`writeBoard`). */
   let boardPig = 0
   let pulse = 0
   /** **Each column's selector is its own and only travels UP and DOWN**
@@ -831,6 +865,30 @@ export function initPlayerScreen(handlers: {
     if (spent) light.draw(context, String(spent.cost), SPENT.x, SPENT.y)
   }
 
+  /**
+   * Break a line at its spaces so no piece of it is wider than `room`, over at
+   * most TWO lines — the board has three free rows when it is showing a
+   * mission and the third is the number under it.
+   *
+   * A word too long to fit on its own is left over the edge rather than cut:
+   * a truncated mission name reads worse than one touching the frame, and no
+   * shipped name is that long anyway.
+   */
+  const wrap = (font: Font, text: string, room: number): string[] => {
+    if (font.measure(text) <= room) return [text]
+    const words = text.split(' ')
+    let first = ''
+    for (let take = words.length - 1; take >= 1; take--) {
+      const head = words.slice(0, take).join(' ')
+      if (font.measure(head) <= room) {
+        first = head
+        break
+      }
+    }
+    if (!first) return [text]
+    return [first, words.slice(first.split(' ').length).join(' ')]
+  }
+
   /** One line of the board: pieces laid out left to right and centred as a
    * group, a piece being either words or one of the markup icons. */
   const boardLine = (
@@ -856,19 +914,78 @@ export function initPlayerScreen(handlers: {
     }
   }
 
+  /**
+   * WHAT the board is about — the one decision `writeBoard` and the debug
+   * report both make, so the words a spec reads cannot drift from the words
+   * that are drawn.
+   *
+   * **START MISSION lit means the MISSION**, `[play]`: "когда наводится на
+   * старт мишн на экране отряда, там показывается что следующая миссия
+   * называется такто". Anything else means the pig that was last lit — the
+   * board never goes blank.
+   */
+  type BoardSubject =
+    | { kind: 'mission'; name: string; lead: string }
+    | { kind: 'pig'; pig: Pig }
+  const boardSubject = (): BoardSubject | null => {
+    if (selection === START) {
+      const title = mission && missionTitleParts(battleText, mission.map, mission.position)
+      return title ? { kind: 'mission', name: title.name, lead: title.lead } : null
+    }
+    const pig = squad[boardPig]
+    return pig ? { kind: 'pig', pig } : null
+  }
+
+  /** …the same board as WORDS, for a spec. The tokens line first, whatever is
+   * lit, because they are the TEAM's rather than any pig's. */
+  const boardText = (): string[] => {
+    const subject = boardSubject()
+    const rows = [String(tokens)]
+    if (!subject) return rows
+    if (subject.kind === 'mission') return [...rows, subject.name, subject.lead]
+    const ways = promotionsFrom(subject.pig.rank)
+    return [
+      ...rows,
+      subject.pig.name,
+      feText(rankText(subject.pig.rank)),
+      ...(ways.length > 0
+        ? [`${feText(PROMOTE_TEXT)} ${Math.min(...ways.map((way) => way.cost))}`]
+        : []),
+      `${subject.pig.missions} ${subject.pig.score}`
+    ]
+  }
+
   const writeBoard = (
     context: CanvasRenderingContext2D,
     sprites: SpriteSet,
     font: Font
   ): void => {
-    const pig = squad[boardPig]
-    if (!pig) return
     const lines = layout.board.lines
     const gap = layout.board.gap
+    // The TOKENS are the TEAM's line, not a pig's, so they stand whatever is
+    // lit — the mission below included.
+    boardLine(context, sprites, font, lines.tokens, [{ icon: 'vp' }, { text: String(tokens) }])
+
+    const subject = boardSubject()
+    if (!subject) return
+
+    // The MISSION, stacked rather than written as one line: the card's own
+    // format is "MISSION >2N : >S" across 640 pixels (ui/titleCard.ts) and the
+    // board is 200 wide, so the NAME takes the line play asked about — over
+    // two rows if it has to — and the number sits under it.
+    if (subject.kind === 'mission') {
+      const room = sprites.get('pigpro').width - layout.board.margin * 2
+      const rows = [lines.name, lines.rank, lines.promote]
+      const wrapped = wrap(font, subject.name, room)
+      wrapped.forEach((line, i) => boardLine(context, sprites, font, rows[i], [{ text: line }]))
+      boardLine(context, sprites, font, rows[wrapped.length], [{ text: subject.lead }])
+      return
+    }
+
+    const pig = subject.pig
     // What the cheapest way out of this class costs. A HERO has none, and its
     // line is left off rather than written with a dash.
     const ways = promotionsFrom(pig.rank)
-    boardLine(context, sprites, font, lines.tokens, [{ icon: 'vp' }, { text: String(tokens) }])
     boardLine(context, sprites, font, lines.name, [{ text: pig.name }])
     boardLine(context, sprites, font, lines.rank, [{ text: feText(rankText(pig.rank)) }])
     if (ways.length > 0) {
@@ -947,11 +1064,20 @@ export function initPlayerScreen(handlers: {
     async load() {
       if (loaded) return
       try {
-        const [shared, sprites] = await Promise.all([loadFrontend(), loadSprites(ART)])
+        // …and `gtext` beside the frontend's own, because the one thing on this
+        // screen that is not a frontend string is the MISSION's name
+        // (ui/titleCard.ts). A failed load leaves the board's mission line off
+        // rather than the screen.
+        const [shared, sprites, strings] = await Promise.all([
+          loadFrontend(),
+          loadSprites(ART),
+          window.api.loadGameText('gtext')
+        ])
         bank = shared.bank
         lit = shared.lit
         plain = shared.plain
         art = sprites
+        if (strings.ok) battleText = strings.strings
       } catch (error) {
         console.warn(String(error))
         return
@@ -983,10 +1109,11 @@ export function initPlayerScreen(handlers: {
       draw()
       run(true)
     },
-    show(pigs, name, unspent) {
+    show(pigs, name, unspent, next = null) {
       squad = pigs
       teamName = name
       tokens = unspent
+      mission = next
     },
     selected: () => selection,
     labels: () => squad.map((pig) => pig.name).concat([feText(START_TEXT)]),
@@ -995,6 +1122,7 @@ export function initPlayerScreen(handlers: {
       null
     ],
     flipping: () => driveOn.phase() !== 'here',
+    board: () => boardText(),
     menu: {
       selected: () => menu.selected(),
       labels: () => menu.labels(),

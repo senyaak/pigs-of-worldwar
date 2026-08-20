@@ -1009,3 +1009,35 @@ it used to be centred on the trapezoid and dropped by the badge's number, so
 nudging the class picture dragged the letters with it. Play found that the way
 it finds everything: "имена привязаны к columns[0].badge зачем-то, но имена
 отдельно."
+
+## THE BOARD GOT A SECOND SUBJECT — 2026-08-20
+
+Play: "когда наводится на старт мишн на экране отряда — там показывается что
+следующая миссия называется такто." The `pigpro` board had one subject, the
+lit pig, and kept it when an action was chosen ("the board never goes blank");
+now START MISSION has a subject of its own.
+
+Three things had to be found first, and none of them was hard — which is the
+point, because the screen had been treated as finished:
+
+- **the MISSION's name is not a frontend string.** Every other word on this
+  screen is `fetext`, read through `feText`; a mission's display name is
+  `gtext 11 + mapId` and `gtext` had never been loaded outside a battle. The
+  squad screen loads it in `load()` now, beside the frontend's own, and a
+  failed load leaves the mission line off rather than the screen.
+- **the screen does not know where the campaign stands**, and should not: the
+  composition root holds the save, so `show` takes a `NextMission` — the map
+  `nextMap(save)` gives and its position — and the screen only draws it.
+- **the card's format does not fit the board.** `gtext 158` is
+  "MISSION >2N : >S" written across 640 pixels; the board is 200 wide, and
+  measured over CHARS2 the 26 campaign names run 55 to 202 — so
+  COMMUNICATION BREAKDOWN is two pixels wider than the whole board on its own.
+  `missionTitleParts` splits the format at its `>S`, the NAME takes the line
+  play asked about, and `wrap` puts it over two rows when it has to with the
+  number under it.
+
+One thing was tidied on the way: `writeBoard` and the new `pow.playerScreen
+.board()` share a `boardSubject()`, so the words a spec reads cannot drift
+from the words that are drawn — and the spec still counts the ink in the
+board's own rows afterwards, because a debug read is not a paint check.
+

@@ -16,6 +16,7 @@ import { initDebrief } from './ui/debrief'
 import { initTeamScreen } from './ui/teamScreen'
 import { initNameScreen } from './ui/nameScreen'
 import { initPlayerScreen } from './ui/playerScreen'
+import type { NextMission } from './ui/playerScreen'
 import { initMultiPlayer } from './ui/multiPlayer'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
@@ -145,6 +146,14 @@ const NO_CAMPAIGN_MAP = 'CAMP'
  * skirmish leaves the way it always has, back to the main menu. */
 let campaignBattle = false
 
+/** What START MISSION would open — the map and its place in the campaign, which
+ * is what the squad screen's board says while that row is lit. Null once the
+ * campaign has run out of missions. */
+const nextMission = (save: NonNullable<ReturnType<typeof campaign.current>>): NextMission | null => {
+  const map = nextMap(save)
+  return map ? { map, position: save.position } : null
+}
+
 /** The squad screen, standing on whatever the campaign now says. */
 function toSquad(): void {
   const save = campaign.current()
@@ -152,7 +161,7 @@ function toSquad(): void {
     show('menu')
     return
   }
-  playerScreen.show(save.squad, save.name, save.tokens)
+  playerScreen.show(save.squad, save.name, save.tokens, nextMission(save))
   show('player')
   void playerScreen.load()
 }
@@ -385,7 +394,7 @@ const nameScreen = initNameScreen({
 
 /** An edit went through: the squad screen shows the moved save. */
 const refreshSquad = (save: ReturnType<typeof campaign.current>): void => {
-  if (save) playerScreen.show(save.squad, save.name, save.tokens)
+  if (save) playerScreen.show(save.squad, save.name, save.tokens, nextMission(save))
 }
 
 // …and the squad it raised is the PLAYER screen, record 12: eight pigs, their
@@ -523,7 +532,9 @@ if (window.pow) {
   window.pow.briefing = { ready: briefing.ready }
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }
-  window.pow.playerScreen = view(playerScreen)
+  // …and the SQUAD screen carries one more read than the rack does: what its
+  // BOARD is saying (ui/playerScreen.ts).
+  window.pow.playerScreen = { ...view(playerScreen), board: playerScreen.board }
   // The squad's two overlays read through the same window, plus whether each
   // is up at all.
   window.pow.pigMenu = playerScreen.menu
