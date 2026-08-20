@@ -159,17 +159,16 @@ Nothing to build. Three things want play's EAR or EYE:
 
 ---
 
-## P1. THE SERGEANT'S OTHER NINETEEN — an EAR's job, not a reader's
+## P1. THE SERGEANT — **HEARD AND PLACED 2026-08-20**, and he named a system
 
-Two of his 22 categories are built (a kill, a loss — `lib/game/sergeant.ts`).
-The other nineteen have their MOMENT read out of the exe and their WORDS read
-by nobody: the lines are never printed, neither `gtext` nor `fetext` holds one,
-so **listening is the only way to place them.** Everything needed is in the
-app already — `pow.sarge` is installed from the app's own start, so a mission
-does not have to be open:
+Two of his 22 categories were built off the exe alone (a kill, a loss —
+`lib/game/sergeant.ts`). The other nineteen had their MOMENT read and their
+WORDS read by nobody: the lines are never printed, neither `gtext` nor `fetext`
+holds one, so listening was the only way. Play listened the same evening and
+the table below is what he heard, against what the exe had said.
 
 ```
-pow.sarge.list()          // what each of the 22 is, as far as the exe says
+pow.sarge.list()          // what each of the 22 is
 pow.sarge.file(3, 1)      // hear SGEN0301 — the praise for a kill
 pow.sarge.play(2, 1)      // …the same line by the exe's own SECTION argument
 pow.sarge.stop()
@@ -178,18 +177,52 @@ pow.sarge.stop()
 `file` takes the FILE's number, which is what the folder shows; `play` takes
 the section, which is one lower and is what the exe's call sites pass.
 
-What the read gives, and what it does not:
-
-| file | the moment (READ) | what to listen for |
+| file | the moment (READ) | what he SAYS (heard) |
 | --- | --- | --- |
-| 01 | end of turn, you LOST a pig, your side behind | **built** |
-| 03 | end of turn, you KILLED, your side ahead | **built** |
-| 02, 04 | START of turn, behind / ahead | worth building next: same pair, other end of the turn |
-| 05..10 | a crate collected, by PICKUP TYPE — 5/6 by an item byte, 7 for types 2 and 14, 8 for 4 and 16 (it takes something OFF the pig), 9 for type 7, 10 for type 8 | which crate is which is the whole question |
-| 11, 12 | start of turn, said ONCE a battle each (two latches) | probably the level's own advice |
-| 13+14 | the clock running out — ONE pool of sixteen across the two files | |
-| 15..21 | MULTIPLAYER, by the pig's nation: variants 1..4 praise, 5..8 commiseration | seven nations, one file each |
-| 22 | the FRONT END — the menu, and its idle nag after twelve idle ticks | seven long lines, up to 1.6 MB |
+| 01 | end of turn, you LOST a pig, behind | **built** — a threat: one more loss and he has your guts |
+| 03 | end of turn, you KILLED, ahead | **built** — you and your boys have no equal |
+| 02 | START of turn, behind | "will you really let these amateurs beat you?" |
+| 04 | START of turn, ahead | "this could be a victory of legendary proportions" |
+| 05 | crate, item byte not 0xFF | a SUPPLY drop — useful equipment, use it wisely |
+| 06 | crate, item byte 0xFF (type 7) | MEDICAL supplies — bandages cost money, do not waste them |
+| 07 | crate, pickup type 2 or 14 | a MEDAL awarded — "I am so impressed I am dropping you a medal" |
+| 08 | crate, type 4 or 16 — takes something OFF the pig | a MEDAL TAKEN BACK — "I told you not to blow that up"; "that belonged to us" |
+| 09 | crate, type 7, the other arm | the DROP POINT reached — "here are some toys" |
+| 10 | crate, pickup type 8 | a MEDAL for doing it IN TIME — "a big fat medal" |
+| 11 | start of turn, ONCE a battle | there may be things lying about, medals included |
+| 12 | start of turn, ONCE a battle | collect medals or you will not be promoted |
+| 13+14 | the clock running out, ONE pool of sixteen | "tick tock, get a move on" / "time is of the essence" |
+| 15..21 | MULTIPLAYER, by nation: 1..4 praise, 5..8 commiseration | 16 confirmed as praise; the other six unheard |
+| 22 | **the exe's front-end arm** | **NOT an idle nag — the MEDAL CEREMONY on the squad screen after a mission**, played over the award animation |
+
+**The ear found a SYSTEM the reader had missed: the crates are a MEDAL
+ECONOMY.** Five of the six crate categories talk about medals — given (07, 10),
+refused, taken back (08) — and 12 says what they are for: *collect them or you
+are not promoted*. So the exe's pickup types are the PP tokens the save
+already carries, and the sergeant is the voice of that economy. That is a
+bigger finding than the lines: it says what a crate IS.
+
+**One reading was wrong and is corrected.** 22 was written up as "the front end
+and its idle nag after twelve idle ticks". Play placed it as the ceremony after
+the first mission, on the squad screen, once the award animation has run —
+which is consistent with the call site being in the front end, and its seven
+lines being 13 to 37 seconds long where every other category runs 1 to 9. The
+idle-nag half of that entry is unproven and should not be repeated.
+
+**What can be built now, in order of cheapness:**
+
+- **02 and 04** — the same pair as 01/03 at the other end of the turn, on the
+  `turnBegan` event that already exists and the `winOrLose` value that is
+  already computed. The gate is presumably the same one; the call site says
+  start of turn and the ear agrees.
+- **11 and 12** — one latch each per battle, at a turn start. No new state
+  beyond two booleans on the battle.
+- **13+14** — wants the exe's own threshold on the turn clock, which has not
+  been read yet: the pool is sixteen lines across two files and the trigger is
+  a call site in the clock's own arm.
+- **05..10** — blocked on the crates, not on the sergeant: the remake has no
+  medals and no pickup TYPE, only the crate. This is the item the finding above
+  turns into real work.
 
 **The gate on 01 and 03 is worth remembering before judging the others**: the
 praise is refused unless your side leads on TOTAL TEAM HEALTH, so it is not

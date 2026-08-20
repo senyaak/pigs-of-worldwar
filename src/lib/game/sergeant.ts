@@ -31,12 +31,14 @@
  * Which SECTION each moment passes — the argument, not the file number. The
  * file's category is `section + 1` (see `sargeFile`).
  *
- * Only the two this module decides are named. The other nineteen are decoded
- * and not built: 4..9 are the crates (by item type), 10 and 11 are one-shot
+ * Only the two this module decides are named. The other nineteen are decoded,
+ * HEARD (play, 2026-08-20) and not built: 1 and 3 are this same pair at the
+ * START of a turn, 4..9 are the crates by item type — and they turn out to be
+ * a MEDAL economy, one of them taking a medal BACK — 10 and 11 are one-shot
  * hints latched per battle, 12 is the "hurry up" pool of SIXTEEN that spans
  * files 13 and 14, 14..20 are the MULTIPLAYER pair chosen by the pig's own
- * nation, and 21 is the front end's. Every one of the 21 call sites is written
- * up in `docs/history/turns.md`.
+ * nation, and 21 is the medal ceremony after a mission. The call sites are in
+ * `docs/history/turns.md`; what he actually says is in `docs/todo.md` P1.
  */
 export const SARGE_LOST = 0
 export const SARGE_WON = 2

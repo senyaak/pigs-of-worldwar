@@ -869,3 +869,37 @@ The lines carry no subtitles — neither text table holds a word of them — so
 `pow.sarge.play(section, line)` is the console's way in, the same arrangement
 `pow.sfx` has for the sounds whose names only play can settle.
 
+### The other nineteen, HEARD — 2026-08-20, the same evening
+
+The lines carry no subtitles, so `pow.sarge.file(category, line)` was installed
+from the app's own start and play walked twenty-two of them. The full table is
+in `docs/todo.md` P1; three things came out of it that belong here.
+
+**The crates are a MEDAL ECONOMY, and the reader had no way to see it.** Six
+categories are one crate each, sorted by the pickup type the exe switches on,
+and five of the six talk about medals: 07 (types 2 and 14) awards one, 10 (type
+8) awards one for beating the clock, and **08 — the arm the disassembly had
+described only as "takes something off the pig" — TAKES A MEDAL BACK**, for
+blowing up something that was not yours to blow up. 12 says what they are for:
+collect them or you are not promoted. So a pickup type is a PP token, which is
+the currency the save already carries and the squad screen already prints, and
+the sergeant is that economy's voice. The exe's arm and the ear agree exactly
+on 08, which is the strongest confirmation in the whole table.
+
+**The two supply categories are the ones without a medal in them.** 05 (item
+byte set) is equipment — "use it wisely"; 06 (item byte 0xFF) is MEDICAL, and
+he complains about what bandages cost. 09 is the drop point being reached,
+"here are some toys". So the three moments a crate can be are: you were given
+kit, you were given health, you were given a medal.
+
+**One reading was WRONG.** Category 22 had been written up as the front end
+plus an idle nag; it is the **medal ceremony on the squad screen after a
+mission**, over the award animation. The call site being in the front end still
+holds, and so does the shape of the files — seven lines of 13 to 37 seconds
+against 1 to 9 everywhere else, which is narration, not a bark. The idle-nag
+half was an inference and is withdrawn.
+
+02 and 04 came back as read: the goad when you are behind ("will you really let
+these amateurs beat you?") and the flourish when you are ahead. They are the
+same pair as 01/03 at the other end of the turn and are the cheapest thing left
+to build, because `turnBegan` and `winOrLose` both already exist.
