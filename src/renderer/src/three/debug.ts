@@ -374,7 +374,10 @@ export function exposeBattleDebug(parts: DebugParts): void {
         }
       },
       warp: parts.warp,
-      beginTurn: () => game.beginTurn(),
+      /** Skip the beat at the top of a turn outright — the FLOOR under it
+       * included, which a player's own press waits out (lib/game/game.ts).
+       * Same reason as `cutTurnBeat` below. */
+      beginTurn: () => game.cutTurnStart(),
       /** Hand the turn over NOW, cutting the beat at the end of it short. The
        * player has no way to do this — a turn ending is not something anybody
        * hurries — so it is here for the specs that are not about the beat, the

@@ -11,6 +11,7 @@
 //
 // Game space (Y-down) throughout.
 
+import { fromExeSpeed } from './ballistics'
 import { advanceSwing, beginSwing, caught, meleeOf, strikeGap, strikeOffsets } from './melee'
 import type { StrikeGap, SwingState } from './melee'
 import { amountOf, spend } from './inventory'
@@ -69,6 +70,12 @@ export interface StrikeWorld {
   /** How long each clip runs — indexed as the exe indexes them
    * (lib/game/locomotion.ts, ANIM). */
   clips: ClipTiming[]
+  /**
+   * Throw a struck pig — the same seam the blast's own toss goes through
+   * (lib/game/battle.ts). OPTIONAL for the same reason `BlastWorld.fling` is:
+   * a spec about damage alone needs no bodies to move.
+   */
+  fling?: (pig: Pig, speed: number, bearing: number, ejected?: boolean) => void
 }
 
 export interface Strikes {
@@ -150,6 +157,25 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
       // been read — so this puts it on the body, which is where the damage
       // number goes too.
       emit({ kind: 'struck', skill, at: body })
+      // …AND IT THROWS THE BODY. Play: a bayonet moved nothing at all.
+      //
+      // The exe's melee arm ends on two calls the blast's does not have:
+      // `0x4a9100(knockback, 0x200, bearing, 0)` at 0x4786c1, which SETS the
+      // velocity — the blast's own toss is not in the exe's damage arm at all
+      // and is the physics contact instead (lib/game/blast.ts) — and then
+      // 0x470c70, which puts the pig in movement state 5 and calls for clip 38
+      // (0x470cf5). So the body flies rather than bounces, and is not driven
+      // or turned until it lands. `ejected` is that clip.
+      //
+      // The bearing is the ATTACKER'S line to the body, which is the same
+      // local the 67.5° cone test measures the swing by, so a pig is pushed
+      // straight away from whoever hit it — and the same convention the blast
+      // uses, atan2 on the difference with the target's own heading as the
+      // fallback for a body standing exactly on the point.
+      const dx = body.x - from.x
+      const dz = body.z - from.z
+      const away = Math.hypot(dx, dz) < 1 ? target.heading : Math.atan2(dx, dz)
+      world.fling?.(target, fromExeSpeed(weapon.knockback), away, true)
       if (outcome === 'died' || outcome === 'gibbed') {
         emit({ kind: 'killed', pig: target.id, by: attacker.id, gibbed: outcome === 'gibbed' })
       }

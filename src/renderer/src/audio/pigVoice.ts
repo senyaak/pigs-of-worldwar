@@ -46,6 +46,34 @@ const VARIANTS = 6
 export const FIRE_LINES = 12
 const FIRE_CATEGORY = 1
 
+/**
+ * The line numbers `Pig::React(7)` walks at the TOP OF A TURN — and this arm
+ * passes **category 0**, which is not a category at all but the builder's own
+ * signal to pick the line off the pig's HEALTH (0x43b1e3):
+ *
+ * ```
+ * health >  0xC80          -> line
+ * health >  0x500          -> line + 2
+ * otherwise                -> line + 4
+ * ```
+ *
+ * and `category++` afterwards makes every one of them file **01** — the
+ * category nothing had been placed in. The exe stores health in 128ths of a
+ * point (lib/game/health.ts), so 0xC80 is **25** whole points and 0x500 is
+ * **10**: an absolute pair of thresholds, not a fraction of the class's own
+ * ceiling.
+ *
+ * The line inside a band is a rotation like the firing one, but over **two**
+ * rather than twelve: the counter is the squad's byte 4 and it wraps above 1
+ * (0x472589). So a healthy pig alternates 01 and 02, a hurt one 03 and 04, and
+ * one nearly out of it 05 and 06.
+ */
+export const TURN_LINES = 2
+const TURN_CATEGORY = 0
+/** Whole points, the exe's 0xC80 and 0x500 out of 128ths (0x43b1e3). */
+export const TURN_HEALTHY = 25
+export const TURN_HURT = 10
+
 /** How many voices ship: Speech/Sku1/Pig01..Pig09. */
 const VOICES = 9
 
@@ -61,6 +89,15 @@ export const voiceFor = (squad: number): number => (Math.max(0, squad) % VOICES)
 export interface PigVoice {
   /** Say the next firing line for this squad, 0-based. */
   fire(squad: number): void
+  /**
+   * …and the line at the TOP OF A TURN, which the pig's own health picks.
+   *
+   * **Only a pig NOBODY is driving says one.** The exe's own arm splits on the
+   * controller before it gets here (`cmp eax,2` at 0x4724e5): the local human's
+   * pig gets a plain grunt instead, which is the bank's business rather than
+   * the voice's (audio/battleSound.ts).
+   */
+  turn(squad: number, health: number): void
   /** Every file played, in order: the only way a spec can hear this. */
   spoken(): string[]
   /** Whether a line is still going. The SHOT waits for it (lib/game/shot.ts). */
@@ -91,6 +128,9 @@ export function createPigVoice(): PigVoice {
   const heard: string[] = []
   /** `[squad+5]`, one a squad: 0..11 and round again. */
   const counters = new Map<number, number>()
+  /** …and `[squad+4]`, the TURN line's own, over two. Separate because the exe
+   * keeps them in separate bytes: a shot must not step a turn's line on. */
+  const turnCounters = new Map<number, number>()
   let disposed = false
 
   /**
@@ -148,6 +188,17 @@ export function createPigVoice(): PigVoice {
       const at = counters.get(squad) ?? 0
       counters.set(squad, at + 1 > FIRE_LINES - 1 ? 0 : at + 1)
       const path = voiceFile(voiceFor(squad), at + 1)
+      heard.push(path)
+      saying++
+      if (buffers.has(path)) start(path)
+      else void load(path).then(() => start(path))
+    },
+    turn(squad, health) {
+      if (disposed) return
+      const at = turnCounters.get(squad) ?? 0
+      turnCounters.set(squad, at + 1 > TURN_LINES - 1 ? 0 : at + 1)
+      const band = health > TURN_HEALTHY ? 0 : health > TURN_HURT ? 2 : 4
+      const path = voiceFile(voiceFor(squad), at + 1 + band, TURN_CATEGORY)
       heard.push(path)
       saying++
       if (buffers.has(path)) start(path)

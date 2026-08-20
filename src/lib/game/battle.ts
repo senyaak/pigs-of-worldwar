@@ -206,7 +206,12 @@ export interface Battle {
      * (lib/game/ai.ts). */
     computerTurn: boolean
   }
-  /** End the beat at the top of a turn: any input does. */
+  /**
+   * End the beat at the top of a turn: any input does — and it only OFFERS the
+   * press, the way `leaveMission` does. Nothing happens for the beat's first
+   * second (`TURN_START_FLOOR_SECONDS`, lib/game/game.ts): the card has to be
+   * on screen long enough to read.
+   */
   beginTurn(): void
   /**
    * End the beat at the END of a turn now, handing over on the spot.
@@ -241,7 +246,7 @@ export interface Battle {
    * own (lib/game/tumble.ts). Two states over one pig would fight over its
    * position, and this is the seam that keeps there being one.
    */
-  fling(pig: Pig, speed: number, bearing: number): void
+  fling(pig: Pig, speed: number, bearing: number, ejected?: boolean): void
   /** Warp the acting pig — the debug surface the e2e suite drives through. */
   warp(x: number, z: number, heading: number): void
 }
@@ -290,6 +295,10 @@ export function createBattle(parts: BattleParts): Battle {
     clips: parts.clips,
     bark: () => emit({ kind: 'bark', player: game.players.indexOf(game.currentPlayer) })
   })
+  /** Whether the opening drop was still running LAST step. The FIRST turn's
+   * card goes up the frame this falls (`announceTurn`); every later one goes
+   * up in `handOver`. */
+  let wasDropping = true
   /** The beat after a kill: the clock stops, the camera stays on the spot. */
   let aftermath: Aftermath | null = null
   /** …and the beat at the END of a turn: the exe's mode 13, WALK AWAY. Nobody
@@ -520,6 +529,27 @@ export function createBattle(parts: BattleParts): Battle {
    * crate lands, the beat at the end of the turn runs, and only then does anyone
    * notice there is nothing left to knock down.
    */
+  /**
+   * **THE CARD GOES UP** — the exe's mode 4 entry (0x4911e0), run once a turn,
+   * and the moment two different noises hang off (audio/battleSound.ts).
+   *
+   * Not a poll on `game.starting`: the beat can be cut before any step reads
+   * it — a spec's own door does exactly that (`cutTurnStart`) — and a turn
+   * whose card was never seen would go by in silence. So it is announced where
+   * the turn actually STARTS, and there are two such places: the handover, and
+   * the frame the opening drop lands.
+   */
+  const announceTurn = (): void => {
+    emit({
+      kind: 'turnBegan',
+      player: game.players.indexOf(game.currentPlayer),
+      // The exe splits on whose CONTROLLER the pig has (`cmp eax,2` at
+      // 0x4724e5), and this is that split: whoever is not on the keyboard.
+      computer: computerTurn(),
+      health: game.currentPig.health
+    })
+  }
+
   const handOver = (): void => {
     // Side 0 is OURS — the campaign's own, which `spawnTeams` orders first off
     // the map's player bit — and the verdict tells it apart from the rest the
@@ -544,6 +574,7 @@ export function createBattle(parts: BattleParts): Battle {
     }
     game.endTurn()
     focus(game.currentPig)
+    announceTurn()
   }
 
   // The battle LISTENS to its own weapons for the two things that stop a turn.
@@ -640,6 +671,13 @@ export function createBattle(parts: BattleParts): Battle {
       attack.swallow()
       onChanged()
       return
+    }
+    // …and the frame it lands is the frame the FIRST turn's card goes up. Every
+    // later one is announced by the handover; this one has no handover behind
+    // it, and the drop is what has been holding it off.
+    if (wasDropping) {
+      wasDropping = false
+      announceTurn()
     }
 
     // **THE MISSION IS OVER**, and this beat is the last thing the battle does:
@@ -1367,15 +1405,15 @@ export function createBattle(parts: BattleParts): Battle {
       leaveRequested = true
     },
     announce: emit,
-    fling(pig, speed, bearing) {
+    fling(pig, speed, bearing, ejected = false) {
       if (pig !== game.currentPig) {
-        tumbles.fling(pig, speed, bearing)
+        tumbles.fling(pig, speed, bearing, ejected)
         return
       }
       // The acting pig's flight is `loco`'s, and `bouncing` is what tells the
       // clip chain it was thrown rather than jumped (lib/game/locomotion.ts).
       const { vx, vy, vz } = flingVelocity(speed, bearing)
-      loco.airborne = { vx, vy, vz, bouncing: true, pushIn: null }
+      loco.airborne = { vx, vy, vz, bouncing: true, pushIn: null, ejected }
       loco.getUp = 0
     },
     warp(x, z, heading) {

@@ -55,6 +55,14 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    */
   jump: { sound: 'P_SNORT1', volume: 60, pitch: 90, jitter: 15 },
   /**
+   * THE TOP OF YOUR OWN TURN. DECODED, and it is the whole of what your own
+   * pig says: `Pig::React(7)` splits on the controller (0x4724e5) and the
+   * LOCAL HUMAN's arm plays **69 P_HMMM** at volume 0x3C and a pitch of
+   * `0x5A + (rand & 0xF)` (0x4725be) — a thinking grunt and no voice line at
+   * all. Every OTHER side's pig speaks instead (audio/pigVoice.ts).
+   */
+  ready: { sound: 'P_HMMM', volume: 60, pitch: 90, jitter: 15 },
+  /**
    * Coming to rest after any flight. DECODED, and it is NOT the file called
    * P_LAND1: `Pig::Land` (0x470910) plays **30 I_PICKUP** at volume 40 and
    * pitch 150 (0x470b0c), and the parachute's landing plays the same 30 at

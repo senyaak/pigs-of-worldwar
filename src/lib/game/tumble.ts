@@ -48,7 +48,7 @@ export interface Tumbles {
    * (`PITCH` below). Throwing one that is already in the air REPLACES what it had:
    * a second blast catching a pig mid-flight is the last word on where it goes.
    */
-  fling(pig: Pig, speed: number, bearing: number): void
+  fling(pig: Pig, speed: number, bearing: number, ejected?: boolean): void
   /** One frame of every flight. */
   update(delta: number): void
   /** How many are in the air — what a turn cannot be handed over through
@@ -101,7 +101,7 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
     )
 
   return {
-    fling(pig, speed, bearing) {
+    fling(pig, speed, bearing, ejected = false) {
       // Built where the pig IS, standing on whatever it is standing on — a pig
       // blown off a crate must not be measured from the ground under it
       // (lib/game/locomotion.ts `Footing`).
@@ -117,8 +117,11 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
       const { vx, vy, vz } = flingVelocity(speed, bearing)
       // `bouncing` is what makes it read as being thrown rather than jumping:
       // the clip is the BOUNCE and the landing bounces on before it settles
-      // (lib/game/locomotion.ts).
-      state.airborne = { vx, vy, vz, bouncing: true, pushIn: null }
+      // (lib/game/locomotion.ts). `ejected` swaps that clip for the FLYING
+      // one — which is what a MELEE hit wears, the exe putting a struck pig
+      // through 0x470c70 and that arm calling for clip 38 (0x470cf5), the
+      // same clip a pig thrown out of a wall gets.
+      state.airborne = { vx, vy, vz, bouncing: true, pushIn: null, ejected }
       state.getUp = 0
       flying.set(pig.id, state)
       // Nothing is announced HERE: the clip the pig will wear is the one the first

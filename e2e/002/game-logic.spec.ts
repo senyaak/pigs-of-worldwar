@@ -4,7 +4,12 @@
 
 import { test, expect } from '@playwright/test'
 
-import { DEFAULT_TURN_SECONDS, Game, TURN_START_SECONDS } from '../../src/lib/game/game'
+import {
+  DEFAULT_TURN_SECONDS,
+  Game,
+  TURN_START_FLOOR_SECONDS,
+  TURN_START_SECONDS
+} from '../../src/lib/game/game'
 import { endsTurn } from '../../src/lib/game/spend'
 import { SKILL } from '../../src/lib/game/skills'
 import { TerrainQuery } from '../../src/lib/game/terrain'
@@ -58,18 +63,32 @@ test('the turn does not begin at once — the clock waits out a beat first', () 
   game.tick(1)
   expect(game.timeLeft).toBe(9)
 
-  // ...and every later turn gets its own, which any input can cut short.
+  // ...and every later turn gets its own, which any input can cut short —
+  // but NOT AT ONCE. Play wants the card on screen at least a second before a
+  // press moves the game on, so the first second of the beat answers nothing
+  // (TURN_START_FLOOR_SECONDS).
   game.endTurn()
   expect(game.starting).toBe(true)
-  game.beginTurn()
+  expect(game.beginTurn(), 'too early: the card has just gone up').toBe(false)
+  expect(game.starting, 'so the beat is still running').toBe(true)
+  expect(game.timeLeft, 'and the clock has still not moved').toBe(10)
+
+  game.tick(TURN_START_FLOOR_SECONDS)
+  expect(game.beginTurn(), 'and now it takes the press').toBe(true)
   expect(game.starting).toBe(false)
   game.tick(2)
   expect(game.timeLeft).toBe(8)
+
+  // The SPECS' own door skips the floor with the beat — nothing a player has.
+  game.endTurn()
+  expect(game.starting).toBe(true)
+  game.cutTurnStart()
+  expect(game.starting).toBe(false)
 })
 
 test('the turn clock ticks down, expires exactly once, and refills', () => {
   const game = new Game({ ...config, turnSeconds: 10 })
-  game.beginTurn()
+  game.cutTurnStart()
   expect(game.timeLeft).toBe(10)
   expect(game.tick(4)).toBe(false)
   expect(game.timeLeft).toBe(6)
@@ -85,7 +104,7 @@ test('the turn clock ticks down, expires exactly once, and refills', () => {
   expect(game.tick(7)).toBe(true)
   expect(game.tick(1)).toBe(false)
   game.endTurn()
-  game.beginTurn()
+  game.cutTurnStart()
   expect(game.timeLeft).toBe(10)
 
   expect(new Game(config).timeLeft).toBe(DEFAULT_TURN_SECONDS)

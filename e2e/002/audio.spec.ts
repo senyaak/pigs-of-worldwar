@@ -24,7 +24,17 @@ import {
   SURFACE_SOUNDS
 } from '../../src/renderer/src/audio/battle'
 import { WOOD } from '../../src/lib/game/underfoot'
-import { beginTurn, debugState, hold, press, release, releaseAll, tap, warp } from '../controller'
+import {
+  beginTurn,
+  debugState,
+  hold,
+  press,
+  release,
+  releaseAll,
+  skipTurn,
+  tap,
+  warp
+} from '../controller'
 import { startGame } from '../menu'
 
 const bank = (relPath: string): ReturnType<typeof parseSrl> =>
@@ -120,6 +130,11 @@ test('a walking pig sounds like the ground it is on', async ({ app }) => {
   // stays on its own tile cannot walk onto a different material — or, at this
   // end of CAMP, onto the climbing tiles a few steps north, which play no
   // footstep at all because clip 11 carries none.
+  // The turn's own grunt (P_HMMM) goes down as the GET READY card does, and it
+  // WAITS for the bank if the bank is still loading (audio/battleSound.ts) —
+  // so it can land after the warp. Wait for it rather than slicing over it, or
+  // the footsteps below are read one out of step.
+  await expect.poll(async () => (await heard()).includes('P_HMMM')).toBe(true)
   const before = (await heard()).length
   await press(page, 'turnLeft')
   await page.waitForTimeout(900)
@@ -163,6 +178,11 @@ test('…and on a BRIDGE it sounds like the bridge, not like the ditch', async (
 
   // And it is heard. Turning on the spot rather than walking on: clip 4 carries
   // two footfalls a lap (lib/game/footsteps.ts) and the pig stays on the deck.
+  // The turn's own grunt (P_HMMM) goes down as the GET READY card does, and it
+  // WAITS for the bank if the bank is still loading (audio/battleSound.ts) —
+  // so it can land after the warp. Wait for it rather than slicing over it, or
+  // the footsteps below are read one out of step.
+  await expect.poll(async () => (await heard()).includes('P_HMMM')).toBe(true)
   const before = (await heard()).length
   await press(page, 'turnLeft')
   await page.waitForTimeout(900)
@@ -176,5 +196,46 @@ test('…and on a BRIDGE it sounds like the bridge, not like the ditch', async (
   }
 
   await releaseAll(page)
+  expect(app.errors()).toEqual([])
+})
+
+test('a level plays MUSIC, and the TURN is what asks for it', async ({ app }) => {
+  // Play: nothing played at all, and nothing in the remake had ever opened the
+  // MUSIC folder — so this asserts the whole road rather than one link: the
+  // file is found, decoded, and sounding.
+  //
+  // The exe's own arm is `0x491240`, in the START OF TURN mode and only on the
+  // arm the local human's controller takes: `clip = counter + 4·set`, volume
+  // 0x46, and then the counter steps 0..3. So a side owns four tracks, they
+  // come one A TURN, and a track running out is followed by quiet
+  // (audio/music.ts). Which SET a side owns is `[CHECK — remake]`; the
+  // arithmetic around it is the exe's, and that is what this pins.
+  const { page } = app
+  await startGame(page)
+  await expect(page.locator('#battle')).toBeVisible()
+
+  const music = (): Promise<{ clip: number | null; track: string | null; played: number[] }> =>
+    page.evaluate(() => window.pow!.music!.now())
+
+  // The track is fetched and decoded before it sounds, so it lands a beat into
+  // the turn it belongs to.
+  await expect.poll(async () => (await music()).clip !== null, { timeout: 15_000 }).toBe(true)
+
+  const first = await music()
+  expect(first.clip, 'a clip of the thirty').toBeGreaterThanOrEqual(0)
+  expect(first.clip!).toBeLessThan(30)
+  // Clip N is the MCI pair (N+3, N+4), so the file is Track{N+3} — which is
+  // what lands the thirty clips on Track03..Track32 (0x43b4c0).
+  expect(first.track).toBe(`MUSIC/Track${String(first.clip! + 3).padStart(2, '0')}.ogg`)
+  // A side's first turn opens on the first of its four: the exe plays the
+  // counter's clip and THEN steps it.
+  expect(first.clip! % 4, 'the first of the set').toBe(0)
+
+  // …and the NEXT turn takes the next of the four rather than the same one.
+  await skipTurn(page)
+  await expect.poll(async () => (await music()).played.length, { timeout: 20_000 }).toBeGreaterThan(1)
+  const asked = (await music()).played
+  expect(asked[1], 'the second of the set, in order').toBe(asked[0] + 1)
+
   expect(app.errors()).toEqual([])
 })

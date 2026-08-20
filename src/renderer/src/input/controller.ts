@@ -439,6 +439,17 @@ declare global {
         ): string | null
         print(): Record<string, unknown>
       }
+      /** The level's MUSIC, live — which of the thirty clips is sounding, and
+       * a way to hear any of them: `pow.music.play(7)`, `pow.music.turn(0)`,
+       * `pow.music.stop()` (audio/music.ts). Which SET of four a side owns is
+       * the one thing about it that has not been read, so this is how it gets
+       * settled by ear. */
+      music?: {
+        play(clip: number): number
+        turn(side: number): number
+        stop(): void
+        now(): { clip: number | null; track: string | null; played: number[] }
+      }
       /** Console command: restart the battle on another map —
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
       swapMap?(name?: string): Promise<boolean>

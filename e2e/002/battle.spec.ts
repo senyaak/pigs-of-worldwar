@@ -197,12 +197,23 @@ test('a turn waits a beat before it starts, and any input cuts it short', async 
   // "START OF TURN": the clock is full and not moving.
   expect((await hud(page)).starting).toBe(true)
   const before = await debugState(page)
-  await page.waitForTimeout(150)
-  const held = await debugState(page)
-  expect(Math.hypot(held.x - before.x, held.z - before.z), 'nothing drives yet').toBeLessThan(1)
 
-  // A press ends it AND is acted on вЂ” nothing a player does is swallowed,
-  // which is the whole risk in putting a pause here.
+  // A press in the beat's FIRST SECOND does nothing at all. Play wants the
+  // card readable before it can be dismissed — the floor is a rule about the
+  // turn and lives in `lib/game/game.ts`, so the timeout and the pad both wait
+  // it out. This press lands a moment in, well inside it.
+  await hold(page, 'walkForward', 120)
+  expect((await hud(page)).starting, 'too early to dismiss the card').toBe(true)
+  const early = await debugState(page)
+  expect(
+    Math.hypot(early.x - before.x, early.z - before.z),
+    'and nothing drives yet either'
+  ).toBeLessThan(1)
+
+  // …and once the floor is out, a press ends the beat AND is acted on —
+  // nothing a player does is swallowed, which is the whole risk in putting a
+  // pause here.
+  await page.waitForTimeout(1000)
   await hold(page, 'walkForward', 400)
   expect((await hud(page)).starting).toBe(false)
   const walked = await debugState(page)

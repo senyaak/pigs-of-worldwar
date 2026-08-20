@@ -367,7 +367,18 @@ export function createEngine(parts: EngineParts): Engine {
 
   /** What a bayonet does when the fire key goes down, blade and all. */
   const swings = createStrikes(
-    { pigs, targets, present, training, pose, clips: world.clips },
+    {
+      pigs,
+      targets,
+      present,
+      training,
+      pose,
+      clips: world.clips,
+      // A swing throws what it hits, through the same seam the blast's toss
+      // takes. `fling` is declared below and only ever called inside a step,
+      // by which time `battle` exists.
+      fling: (pig, speed, bearing, ejected) => fling(pig, speed, bearing, ejected)
+    },
     bus.emit
   )
   /** What a GUN does: the flight, the substepping and every verdict about what
@@ -385,8 +396,8 @@ export function createEngine(parts: EngineParts): Engine {
    * inside a step, by which time it exists.
    */
   const tumbles = createTumbles({ query, pigs, obstacles }, bus.emit)
-  const fling = (pig: Pig, speed: number, bearing: number): void =>
-    battle.fling(pig, speed, bearing)
+  const fling = (pig: Pig, speed: number, bearing: number, ejected?: boolean): void =>
+    battle.fling(pig, speed, bearing, ejected)
   /** What becomes of a body once it is killed: the dying clip, the corpse
    * blast, the boots (lib/game/corpses.ts). After the tumbles, because a body
    * a blast threw finishes its flight before it finishes its death. */

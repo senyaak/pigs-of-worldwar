@@ -335,7 +335,7 @@ test('planting one keeps the turn and cuts the clock to four seconds', () => {
     spawns: [{ x: 0, z: 0 }],
     turnSeconds: 99
   })
-  game.beginTurn()
+  game.cutTurnStart()
   game.tick(1)
   expect(game.timeLeft).toBe(98)
   // A SET, not a bonus: ninety-eight seconds becomes four.

@@ -149,7 +149,7 @@ test('the rules build a battle out of real map data — no renderer in the graph
 function drive(built: Built): void {
   const { engine, game } = built
   while (engine.dropIn.running()) engine.update(FRAME)
-  game.beginTurn()
+  game.cutTurnStart()
   const script: [number, number][] = [
     [1, 0],
     [1, -1],
@@ -196,7 +196,7 @@ test('a gun finds its own barrel — the engine poses the skeleton itself', asyn
   }
   const { engine, game, heard } = await buildHeadless()
   while (engine.dropIn.running()) engine.update(FRAME)
-  game.beginTurn()
+  game.cutTurnStart()
 
   const pig = game.currentPig
   give(pig.carrying, RIFLE, 5)
@@ -255,7 +255,7 @@ test('the last dummy ENDS the training mission, and three seconds later it lets 
   /** Run the clock out and take the handover — the only place a mission ends. */
   const handOver = async ({ engine, game }: Built): Promise<void> => {
     while (engine.dropIn.running()) engine.update(FRAME)
-    game.beginTurn()
+    game.cutTurnStart()
     game.hurryTurn(0.1)
     for (let frame = 0; frame < 10; frame++) engine.update(FRAME)
     // The beat at the END of the turn is not what this is about (walkAway.ts).
@@ -312,7 +312,7 @@ test('the clock running out on an idle turn is announced — once', async () => 
 
   const wasted = (): number => heard.filter((event) => event.kind === 'turnWasted').length
 
-  game.beginTurn()
+  game.cutTurnStart()
   game.hurryTurn(0.1)
   for (let frame = 0; frame < 10; frame++) engine.update(FRAME)
   expect(wasted(), 'a turn spent walking about is a turn wasted').toBe(1)
@@ -321,7 +321,7 @@ test('the clock running out on an idle turn is announced — once', async () => 
   // the handover's reset refuses (0x48F50C). Take the beat, then run another
   // clock out.
   engine.battle.cutTurnBeat()
-  game.beginTurn()
+  game.cutTurnStart()
   game.hurryTurn(0.1)
   for (let frame = 0; frame < 10; frame++) engine.update(FRAME)
   expect(wasted(), 'the line is once a level').toBe(1)
@@ -354,7 +354,7 @@ test('it steps: the drop lands, the clock runs, and the pig walks where it is to
 
   // The turn's beat is the input layer's to end (lib/game/battle.ts), and
   // there is no input layer here.
-  game.beginTurn()
+  game.cutTurnStart()
   const before = { x: pig.position.x, z: pig.position.z }
   const clockBefore = game.timeLeft
 

@@ -40,10 +40,20 @@ export interface MeleeWeapon {
   /** Health points off the target — 0x4785c0's own five-way switch. */
   damage: number
   /**
-   * The impulse the hit carries, at 45° up along the bearing (0x4a9100).
-   * Decoded and NOT applied: only the acting pig has a locomotion state in
-   * this engine, so there is nothing to push. Kept because it is the number,
-   * and because it is what a struck pig will want when it has one.
+   * The impulse the hit carries, at 45° up along the bearing — the `edi` of
+   * 0x4785c0's own five-way switch, handed to `0x4a9100` at 0x4786c1 as
+   * `(knockback, 0x200, bearing, 0)`.
+   *
+   * **In the exe's own speed units, a distance a FRAME**, so it reaches the
+   * engine through `fromExeSpeed` like every other speed here: a bayonet's 75
+   * is 1125 a second, which is five twelfths of a grenade at its core and five
+   * eighths of a mine (lib/game/blast.ts). The cattle prod's 200 is exactly
+   * `FLING_CAP`, so the hardest swing in the game throws a body as far as TNT
+   * does — which is the reading agreeing with itself.
+   *
+   * It is LIVE now (lib/game/strikes.ts). It used to say "decoded and not
+   * applied", from back when only the acting pig had a state to be pushed on;
+   * `tumbles` gives every other pig one.
    */
   knockback: number
   impact: Impact

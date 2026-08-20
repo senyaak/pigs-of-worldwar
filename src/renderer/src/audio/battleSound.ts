@@ -17,6 +17,10 @@ import { createBattleAudio } from './battleAudio'
 import { createPigVoice } from './pigVoice'
 import type { PigVoice } from './pigVoice'
 import { createSoundConsole } from './console'
+import { createMusic, trackFor } from './music'
+import type { Music } from './music'
+import { BATTLE_SOUNDS, playCue } from './battle'
+import type { Cue } from './battle'
 import { handling } from '../../../lib/game/events'
 import type { BattleBus } from '../../../lib/game/events'
 import type { SceneSound } from '../contracts/sound'
@@ -25,20 +29,43 @@ import type { SceneSound } from '../contracts/sound'
 export const GAME_SOUNDS = 'Audio/sfxday.srl'
 
 export interface BattleSound extends SceneSound {
+  /** Which music clips have been started, in order — a spec's only ear on the
+   * level's track (audio/music.ts). */
+  music(): number[]
   dispose(): void
 }
 
 /**
  * Subscribe the whole of sound to `bus`. Nothing is returned that draws, and
  * nothing that draws is needed to build it.
+ *
  */
 export function createBattleSound(bus: BattleBus): BattleSound {
   let bank: Bank = SILENT
   let sounds: BattleSounds = createBattleSounds(bank)
+  /**
+   * A cue asked for BEFORE the bank arrived, held rather than dropped.
+   *
+   * The battle's very first turn begins the frame the opening drop lands, and
+   * on a slow load that is still inside the bank's own `await` — so the one
+   * noise the player's first turn makes would simply be lost. One slot, not a
+   * queue: nothing else here fires that early, and a backlog played all at
+   * once the moment the bank lands would be worse than silence.
+   */
+  let waiting: Cue | null = null
   void loadBank(GAME_SOUNDS).then((loaded) => {
     bank = loaded
     sounds = createBattleSounds(bank)
+    if (waiting) {
+      playCue(bank, waiting)
+      waiting = null
+    }
   })
+  /** Play through the bank, or hold it for the bank to arrive. */
+  const cue = (which: Cue): void => {
+    if (bank === SILENT) waiting = which
+    else playCue(bank, which)
+  }
   // …and the console gets at it, because half the table is a name pick that
   // only play can settle: `pow.sfx.list()`, `pow.sfx.set('jump', …)`.
   if (window.pow) window.pow.sfx = createSoundConsole(() => bank)
@@ -50,7 +77,54 @@ export function createBattleSound(bus: BattleBus): BattleSound {
   const voice: PigVoice = createPigVoice()
   bus.on(handling({ bark: ({ player }) => voice.fire(player) }))
 
+  /** The level's MUSIC — a side's four tracks, one a turn (audio/music.ts). */
+  const music: Music = createMusic()
+
+  /**
+   * THE TOP OF A TURN, which is one moment with two halves and a fork between
+   * them — the exe's `Pig::React(7)` (0x472320, case 7) splitting on whose
+   * controller the acting pig has:
+   *
+   * - **anybody else's pig SPEAKS**, a line its own health picks out of
+   *   category 01 (audio/pigVoice.ts);
+   * - **your own pig only GRUNTS** — P_HMMM, no words — and the side's MUSIC
+   *   steps instead, which is the one place a level's track is asked for
+   *   (0x491240, audio/music.ts).
+   *
+   * So the thing you hear on your own turn is the music, and the thing you
+   * hear on theirs is a pig. Play expected the other way round ("only the
+   * player's own side says one") and the arm is not ambiguous, so this follows
+   * the arm — the report to play says which.
+   */
+  bus.on(
+    handling({
+      turnBegan: ({ player, computer, health }) => {
+        if (computer) {
+          voice.turn(player, health)
+          return
+        }
+        cue(BATTLE_SOUNDS.ready)
+        music.turn(player)
+      }
+    })
+  )
+  // …and the console drives it, because WHICH set of four a side owns is the
+  // one thing about the music that has not been read (audio/music.ts) and only
+  // an ear can settle it: `pow.music.play(7)` to hear any of the thirty.
+  if (window.pow) {
+    window.pow.music = {
+      play: (clip) => (music.play(clip), clip),
+      turn: (side) => (music.turn(side), side),
+      stop: () => music.stop(),
+      now: () => {
+        const clip = music.playing()
+        return { clip, track: clip === null ? null : trackFor(clip), played: music.played() }
+      }
+    }
+  }
+
   return {
+    music: () => music.played(),
     follow: (loco, inWater) => sounds.follow(loco, inWater),
     reset: () => sounds.reset(),
     chuteOverhead: audio.chuteOverhead,
@@ -58,6 +132,7 @@ export function createBattleSound(bus: BattleBus): BattleSound {
     spoken: () => voice.spoken(),
     saying: () => voice.saying(),
     dispose() {
+      music.dispose()
       voice.dispose()
       bank.dispose()
     }

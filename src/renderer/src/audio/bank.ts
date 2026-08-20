@@ -52,37 +52,48 @@ export function context(): AudioContext | null {
 }
 
 /**
- * THE MIXER — three knobs, and they are the pause menu's.
+ * THE MIXER — a master with three buses under it, and the knobs are the pause
+ * menu's.
  *
- * Everything the game plays goes through one of two gains under a master:
- * SFX carries the bank, SPEECH carries the sergeant and the pig voices. The
- * exe keeps the same three on its sound manager — master at `[+0x14]`, sfx at
- * `[+0x1A]` and speech as a flag at `[+0x18]` — and the in-mission menu writes
- * them directly, which is why a volume set there lasts as long as the process
- * and no longer.
+ * SFX carries the bank, SPEECH carries the sergeant and the pig voices, MUSIC
+ * carries the level's track (audio/music.ts). The exe keeps the same three on
+ * its sound manager — master at `[+0x14]`, sfx at `[+0x1A]` and speech as a
+ * flag at `[+0x18]` — and the in-mission menu writes them directly, which is
+ * why a volume set there lasts as long as the process and no longer.
+ *
+ * **The music hangs under the MASTER on purpose**, which buys two things for
+ * nothing: the pause's `suspendAudio` freezes the track mid-bar with
+ * everything else, and the master knob reaches it — which is what the exe does
+ * too, its master path being re-applied to the music (0x43C720). The exe has
+ * no separate music slider, and neither does this.
  */
 let masterGain: GainNode | null = null
 let sfxGain: GainNode | null = null
 let speechGain: GainNode | null = null
+let musicGain: GainNode | null = null
 
-function mixer(): { sfx: GainNode; speech: GainNode } | null {
+function mixer(): { sfx: GainNode; speech: GainNode; music: GainNode } | null {
   const ctx = context()
   if (!ctx) return null
-  if (!masterGain || !sfxGain || !speechGain) {
+  if (!masterGain || !sfxGain || !speechGain || !musicGain) {
     masterGain = ctx.createGain()
     masterGain.connect(ctx.destination)
     sfxGain = ctx.createGain()
     sfxGain.connect(masterGain)
     speechGain = ctx.createGain()
     speechGain.connect(masterGain)
+    musicGain = ctx.createGain()
+    musicGain.connect(masterGain)
   }
-  return { sfx: sfxGain, speech: speechGain }
+  return { sfx: sfxGain, speech: speechGain, music: musicGain }
 }
 
 /** Where a sound EFFECT goes. Null only when there is no audio at all. */
 export const sfxOut = (): AudioNode | null => mixer()?.sfx ?? null
 /** Where a SPOKEN line goes — the sergeant, and a pig's own noises. */
 export const speechOut = (): AudioNode | null => mixer()?.speech ?? null
+/** Where the level's TRACK goes (audio/music.ts). */
+export const musicOut = (): AudioNode | null => mixer()?.music ?? null
 
 /** 0..100, the same range the menu's twenty-cell bar counts in fives. */
 export function setMasterVolume(percent: number): void {
@@ -93,6 +104,19 @@ export function setMasterVolume(percent: number): void {
 export function setSfxVolume(percent: number): void {
   const level = mixer()
   if (level) level.sfx.gain.value = Math.max(0, Math.min(100, percent)) / 100
+}
+
+/**
+ * …and the MUSIC's own trim, which no menu writes.
+ *
+ * The exe passes 70 of 128 as the volume at every in-battle music site
+ * (`push 0x46` before 0x43b4c0), so the track sits well under the effects
+ * rather than level with them. `audio/music.ts` sets it once and leaves it;
+ * the console can move it.
+ */
+export function setMusicVolume(percent: number): void {
+  const level = mixer()
+  if (level) level.music.gain.value = Math.max(0, Math.min(100, percent)) / 100
 }
 
 /**

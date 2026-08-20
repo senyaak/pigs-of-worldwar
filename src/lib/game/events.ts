@@ -153,6 +153,19 @@ export type BattleEvent =
   | { kind: 'chose'; skill: number }
   /** The acting pig says a firing line, per squad. */
   | { kind: 'bark'; player: number }
+  /**
+   * A TURN HAS BEGUN — the exe's mode 4 going up, the GET READY card, and the
+   * one moment two different noises hang off (audio/battleSound.ts).
+   *
+   * The mode's entry runs `Pig::React(7)` on the acting pig (0x4911f8) and
+   * then splits on whose controller it is (`cmp eax,2` at 0x49120b): the LOCAL
+   * HUMAN's pig only grunts, and the side's music steps instead; anybody
+   * else's SAYS a line, picked off its own health.
+   *
+   * `computer` is that split — whoever is not on the keyboard this turn — and
+   * `health` is the acting pig's, which is what chooses the line.
+   */
+  | { kind: 'turnBegan'; player: number; computer: boolean; health: number }
 
 /** What a module of the engine is handed: somewhere to say what happened. */
 export type Emit = (event: BattleEvent) => void

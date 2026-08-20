@@ -153,6 +153,28 @@ export const DEFAULT_TURN_SECONDS = 45
  */
 export const TURN_START_SECONDS = 9.98
 
+/**
+ * …and how much of that beat NOBODY can skip.
+ *
+ * The card can otherwise be dismissed on the frame it appears — a key still
+ * down from the turn just ended does not do it (`freshHeld` in
+ * `input/battleInput.ts` only reads what went down this frame), but a player
+ * tapping through the handover never sees GET READY at all. Play: **at least a
+ * second** before any press moves the game on.
+ *
+ * It lives HERE and not in the input layer because it is a rule about the
+ * turn, not about the keyboard: the timeout, the pad and the pause button are
+ * all three ways out of the same mode in the original (0x49134d, 0x491314,
+ * 0x491329), and a floor only one of them respects would be a floor in name.
+ * The original's own mode machine is not decoded far enough to say whether it
+ * has one, so this is `[play]`.
+ *
+ * The machine's side waits `AI_START_SECONDS` (lib/game/ai.ts), which is
+ * longer — keep it that way, or its `begin` will be refused and the brain will
+ * think a turn it has not started.
+ */
+export const TURN_START_FLOOR_SECONDS = 1
+
 export class Game {
   readonly players: Player[]
   readonly turnSeconds: number
@@ -228,9 +250,34 @@ export class Game {
     return this.startingFor > 0
   }
 
+  /**
+   * Whether the beat will take an answer yet — false for its first
+   * TURN_START_FLOOR_SECONDS, so the card is always on screen long enough to
+   * be read.
+   */
+  get startingSettled(): boolean {
+    return this.startingFor <= TURN_START_SECONDS - TURN_START_FLOOR_SECONDS
+  }
+
   /** Begin the turn now: what any input does, and what the wait does on its
-   * own once it runs out. */
-  beginTurn(): void {
+   * own once it runs out. Refused — and answered `false` — while the floor
+   * above still holds. */
+  beginTurn(): boolean {
+    if (!this.startingSettled) return false
+    this.startingFor = 0
+    return true
+  }
+
+  /**
+   * End the beat outright, floor and all — the SPEC's door, not the player's.
+   *
+   * The same thing `cutTurnBeat` is for the beat at the END of a turn
+   * (lib/game/battle.ts): a suite this size cannot pay ten seconds a turn for
+   * a card it is not testing, and a spec cannot press a key to skip it because
+   * every key also drives the pig. The spec that IS about the beat goes
+   * through `beginTurn` like a player and gets the floor with it.
+   */
+  cutTurnStart(): void {
     this.startingFor = 0
   }
 
