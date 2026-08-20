@@ -18,6 +18,7 @@ const driving = (over: Partial<Held> = {}): Held => ({ ...still, walk: 1, turn: 
 
 const at = (over: Partial<Situation> = {}): Situation => ({
   ending: false,
+  dropping: false,
   starting: false,
   inventory: false,
   locked: false,
@@ -46,6 +47,34 @@ test('the modes fall in priority order', { tag: '@nodata' }, () => {
   // was in the middle of, it is not doing it any more (lib/game/endOfGame.ts).
   expect(modeOf(at({ ending: true }))).toBe('ending')
   expect(modeOf(at({ ending: true, starting: true, inventory: true }))).toBe('ending')
+  // …and the opening DROP sits between the two: it beats the turn's own beat,
+  // whose clock has not started while the squad is in the air, and it loses to
+  // a mission that is over.
+  expect(modeOf(at({ dropping: true }))).toBe('dropping')
+  expect(modeOf(at({ dropping: true, starting: true, locked: true }))).toBe('dropping')
+  expect(modeOf(at({ dropping: true, ending: true }))).toBe('ending')
+})
+
+test('COMING DOWN answers the chute and nothing else', { tag: '@nodata' }, () => {
+  // The drop stops the whole battle (lib/game/battle.ts returns out of its step
+  // for every frame of it), so nothing here drives.
+  expect(readControls('dropping', driving({ aim: 1, firing: true }))).toMatchObject({
+    walk: 0,
+    turn: 0,
+    aim: 0,
+    firing: false
+  })
+  // ONE key answers, and it cuts the canopies. It is deliberately not the
+  // beat's "any key": the GET READY card belongs to the ground, and while the
+  // chute cut went through `beginTurn` it spent that card as well — then the
+  // floor under the beat stopped the cut working at all.
+  expect(verbOf('dropping', 'jump')).toBe('cutChute')
+  for (const action of HELD_ACTIONS) {
+    if (action === 'jump') continue
+    expect(verbOf('dropping', action), action).toBe(null)
+  }
+  expect(verbOf('dropping', 'endTurn')).toBe(null)
+  expect(verbOf('dropping', 'skills')).toBe(null)
 })
 
 test('the ENDING drives nothing, and any key puts the battle away', { tag: '@nodata' }, () => {

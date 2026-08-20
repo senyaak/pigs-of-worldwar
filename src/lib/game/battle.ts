@@ -197,6 +197,8 @@ export interface Battle {
    * (lib/game/controls.ts). */
   situation(): {
     ending: boolean
+    /** The opening drop is still in the air, and answers only the chute cut. */
+    dropping: boolean
     starting: boolean
     locked: boolean
     charging: boolean
@@ -467,7 +469,10 @@ export function createBattle(parts: BattleParts): Battle {
         scenery.obstacles,
         everyone()
           .filter((pig) => pig !== game.currentPig && !isDead(pig))
-          .map((pig) => ({ ...pig.position }))
+          .map((pig) => ({ ...pig.position })),
+        // …minus any body it is already inside: a flight that starts in an
+        // overlap has no way out of one (lib/game/obstacles.ts).
+        { x: loco.x, y: loco.y, z: loco.z }
       )
     )
     game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
@@ -1165,7 +1170,8 @@ export function createBattle(parts: BattleParts): Battle {
         scenery.obstacles,
         everyone()
           .filter((pig) => pig !== acting)
-          .map((pig) => ({ ...pig.position }))
+          .map((pig) => ({ ...pig.position })),
+        { x: loco.x, y: loco.y, z: loco.z }
       )
     )
     jumpRequested = false
@@ -1365,6 +1371,10 @@ export function createBattle(parts: BattleParts): Battle {
     situation: () => ({
       // Over everything: a mission that has ended has ended.
       ending: ending !== null,
+      // …and under that, the opening DROP, which answers one key and no other
+      // (lib/game/controls.ts). It is above `starting` because the beat's own
+      // clock does not run while the squad is in the air.
+      dropping: dropIn.running(),
       starting: game.starting,
       // A gauge filling is its OWN control set rather than a hole in the lock,
       // which is what it was for a commit and what play corrected.

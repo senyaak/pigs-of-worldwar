@@ -27,6 +27,7 @@ import { isGun } from './projectile'
  */
 export type ControlMode =
   | 'ending'
+  | 'dropping'
   | 'starting'
   | 'battle'
   | 'sights'
@@ -90,6 +91,18 @@ export interface Situation {
    * it — except that the key does nothing for the first three seconds.
    */
   ending: boolean
+  /**
+   * The level's OPENING DROP is still in the air.
+   *
+   * A set of its own, and it has to be: the drop stops everything else in the
+   * battle and answers exactly one key, the one that cuts the canopies away
+   * (lib/game/dropIn.ts, and the exe's own branch does no more either). It used
+   * to fall through to `starting`, because the turn's beat has not run its
+   * clock yet while the squad is coming down — so cutting a chute went through
+   * `beginTurn` and silently spent the GET READY card as well, and the moment
+   * that beat grew a floor under it the chutes could not be cut at all.
+   */
+  dropping: boolean
   /** The beat at the top of a turn — "START OF TURN, press any key". */
   starting: boolean
   /** The skill menu is up. */
@@ -183,6 +196,9 @@ export function modeOf(situation: Situation): ControlMode {
   // Above everything, because it outlives everything: a mission that is over is
   // over whatever the pig was in the middle of when the turn ended.
   if (situation.ending) return 'ending'
+  // …and the opening drop under it: a mission cannot end while the squad is
+  // still in the air, and the turn's own beat has not started counting yet.
+  if (situation.dropping) return 'dropping'
   if (situation.starting) return 'starting'
   if (situation.inventory) return 'inventory'
   if (situation.charging) return 'charging'
@@ -279,7 +295,14 @@ export function readControls(mode: ControlMode, held: Held): Intent {
   }
   // …and `ending` beside them for the same reason `starting` is there: any input
   // resolves the beat and the axes are never asked for in it.
-  if (mode === 'locked' || mode === 'starting' || mode === 'ending') return { ...STILL }
+  if (
+    mode === 'locked' ||
+    mode === 'dropping' ||
+    mode === 'starting' ||
+    mode === 'ending'
+  ) {
+    return { ...STILL }
+  }
   if (mode === 'sights') {
     return {
       walk: 0,
@@ -329,6 +352,9 @@ export function verbOf(mode: ControlMode, action: string): Verb | null {
   // caller then re-reads the same input in the set that follows, so nothing a
   // player does is swallowed.
   if (mode === 'starting') return 'beginTurn'
+  // Coming down: the jump key cuts the canopy and NOTHING else answers. It is
+  // deliberately not 'beginTurn' — the card belongs to the ground.
+  if (mode === 'dropping') return action === 'jump' ? 'cutChute' : null
   if (mode === 'inventory') {
     // SPACE is the SELECT key here, as it is in the original: it takes the skill
     // under the cursor and puts the menu away. Nothing fires it.

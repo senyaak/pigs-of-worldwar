@@ -539,17 +539,45 @@ export interface PigBody {
   y: number
 }
 
+/** Whether two bodies are standing in each other — the same test `withPigs`
+ * blocks a step by, asked about a pair rather than about a destination. */
+export const bodiesOverlap = (a: PigBody, b: PigBody): boolean => {
+  if (a.y - PIG_HEIGHT >= b.y || a.y <= b.y - PIG_HEIGHT) return false
+  const dx = a.x - b.x
+  const dz = a.z - b.z
+  return dx * dx + dz * dz <= (PIG_RADIUS * 2) * (PIG_RADIUS * 2)
+}
+
 /**
  * The static field plus the pigs that are not the one moving. A pig is
  * never something to stand on: its top is a whole body height up, which no
  * step-up envelope reaches, so it can only ever be in the way.
+ *
+ * **`at` is where the moving body IS, and every pig it is ALREADY inside is
+ * dropped from the list.** Without it a body that overlaps another is held
+ * there for good: `blocks` is a test on the DESTINATION alone, the flight
+ * zeroes its horizontal velocity the first frame one comes back true
+ * (lib/game/locomotion.ts), and every direction out of an overlap is still
+ * inside it. Play found what that costs on a BAYONET — "свинья будто на месте
+ * летит пол секунды вместо настоящего отбрасывания" — and the arithmetic says
+ * it could never have worked: a walking pig is stopped at exactly `2·
+ * PIG_RADIUS` from the one it is walking at, which is the same distance this
+ * blocks at, so a body struck at melee range starts its flight already on the
+ * boundary. A blast catching two pigs shoulder to shoulder is the same trap,
+ * which is the other half of what play saw ("граната тоже както странно
+ * отбросила").
+ *
+ * A body cannot be pushed further INTO the pig it overlaps by this, because it
+ * cannot be pushed at all — the only thing being dropped is a refusal that had
+ * no way out.
  */
-export function withPigs(field: Obstruction, pigs: PigBody[]): Obstruction {
+export function withPigs(field: Obstruction, pigs: PigBody[], at?: PigBody): Obstruction {
+  const inTheWay = at ? pigs.filter((pig) => !bodiesOverlap(pig, at)) : pigs
   return {
     standOn: (x, z, footY, reach) => field.standOn(x, z, footY, reach),
     blocks(x, z, footY, reach) {
       if (field.blocks(x, z, footY, reach)) return true
-      for (const pig of pigs) {
+      for (const pig of inTheWay) {
         // Feet far enough apart in height and they miss each other entirely.
         if (pig.y - PIG_HEIGHT >= footY || pig.y <= footY - PIG_HEIGHT) continue
         const dx = x - pig.x

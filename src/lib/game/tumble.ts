@@ -89,15 +89,18 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
   /** One locomotion state per pig in the air, by id. */
   const flying = new Map<number, LocomotionState>()
 
-  /** Everything in the way of the pig at `id`: the map's objects and every OTHER
-   * pig, which is the same body list the driven walk is given. */
-  const around = (id: number): Obstruction =>
+  /** Everything in the way of the body at `id`, which is standing at `at`: the
+   * map's objects and every OTHER pig, the same body list the driven walk is
+   * given — minus any it is already inside, or it would never get out
+   * (lib/game/obstacles.ts). A body struck by a BAYONET always starts there. */
+  const around = (id: number, at: LocomotionState): Obstruction =>
     withPigs(
       world.obstacles,
       world
         .pigs()
         .filter((pig) => pig.id !== id && !isDead(pig))
-        .map((pig) => ({ ...pig.position }))
+        .map((pig) => ({ ...pig.position })),
+      { x: at.x, y: at.y, z: at.z }
     )
 
   return {
@@ -138,7 +141,7 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
         const was = state.clip
         // Nothing is DRIVEN here: no walk, no turn, no jump. The exe skips the
         // whole movement update for a pig in the air and so does this.
-        updateLocomotion(state, query, { walk: 0, turn: 0, jump: false }, delta, around(id))
+        updateLocomotion(state, query, { walk: 0, turn: 0, jump: false }, delta, around(id, state))
         pig.position = { x: state.x, y: state.y, z: state.z }
         // A dead pig still flies — it is a body, and the exe throws corpses about
         // as happily as anything else — but it must not be told to stand up out of

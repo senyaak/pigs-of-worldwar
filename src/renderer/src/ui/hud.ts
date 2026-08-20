@@ -262,6 +262,20 @@ export const LAYOUT = {
      * bitmap glyph, and the console's own knob is here if play wants the
      * clean half instead. */
     scale: 0.75,
+    /**
+     * How far the BLACK OUTLINE stands off the letters, in screen pixels.
+     *
+     * `[play]`: "отсутствует чёрная обводка текста для имён и хп". A plate is
+     * read against grass, snow, mud and a pig's own colours, and a team colour
+     * on its own disappears into half of them — the original outlines it. Zero
+     * turns it off.
+     *
+     * It is in SCREEN pixels rather than the plate's own units on purpose: an
+     * outline is a constant hairline whatever `scale` is doing to the glyphs,
+     * and at a fractional scale an offset multiplied by it would land between
+     * two device pixels and fade.
+     */
+    outline: 1,
     heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
   }
   // THE MAP has no entry here on purpose: nothing about its placement or its
@@ -397,6 +411,9 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
   /** The plate's own letters (PLATE_FONT), unpainted — the fallback while a
    * team's painted copy is still decoding. */
   let plateFont: Font | null = null
+  /** …and the same letters painted BLACK, which is what the outline is drawn
+   * with (`LAYOUT.plate.outline`). */
+  let plateOutline: Font | null = null
   /** …and one painted copy per TEAM colour seen, made the frame a plate first
    * arrives in that colour (contracts/overlay.ts). */
   const teamFonts = new Map<string, Font>()
@@ -453,15 +470,17 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     async load() {
       if (loaded) return
       try {
-        const [dashboard, markers, big, small] = await Promise.all([
+        const [dashboard, markers, big, small, outline] = await Promise.all([
           loadTims(DASHBOARD),
           loadTims(MARKERS),
           loadFont(TEXT_FONT),
-          loadFont(PLATE_FONT)
+          loadFont(PLATE_FONT),
+          loadFont(PLATE_FONT, { colour: [0, 0, 0] })
         ])
         art = dashboard
         font = big
         plateFont = small
+        plateOutline = outline
         digits = art.frames('timer', 0, 9)
         white = {
           fans: [dashboard.get('wedge1'), dashboard.get('wedge2')],
@@ -802,15 +821,37 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           width: heart.width * PLATE.heart.scale,
           height: heart.height * PLATE.heart.scale
         }
-        /** A run of the base font's letters at the plate's own factor — the
-         * glyphs stay the atlas's pixels, only bigger, which is what keeps
-         * them the original's chunky doubling rather than a resample. */
-        const letters = (font: Font, text: string, x: number, y: number): void => {
+        /** One run of glyphs at the plate's own factor, at a screen position —
+         * the glyphs stay the atlas's pixels, only resized, which is what keeps
+         * them the original's shapes rather than a resample. */
+        const run = (font: Font, text: string, x: number, y: number): void => {
           context.save()
           context.translate(x, y)
           context.scale(factor, factor)
           font.draw(context, text, 0, 0)
           context.restore()
+        }
+        /**
+         * …and a line of the plate: the BLACK OUTLINE first, then the letters
+         * over it.
+         *
+         * Eight offsets rather than four, because four leaves the diagonals of
+         * a glyph bare and the whole point is that no edge of a letter meets
+         * the ground directly. The offsets are applied OUTSIDE the plate's own
+         * scale (see `LAYOUT.plate.outline`), so the hairline is one screen
+         * pixel whatever the letters are being drawn at.
+         */
+        const AROUND = [
+          [-1, -1], [0, -1], [1, -1],
+          [-1, 0], [1, 0],
+          [-1, 1], [0, 1], [1, 1]
+        ] as const
+        const letters = (font: Font, text: string, x: number, y: number): void => {
+          const off = PLATE.outline
+          if (off > 0 && plateOutline) {
+            for (const [dx, dy] of AROUND) run(plateOutline, text, x + dx * off, y + dy * off)
+          }
+          run(font, text, x, y)
         }
         // Lay every block out FIRST, then unstack: two pigs shoulder to
         // shoulder put their plates on top of each other, and neither the exe

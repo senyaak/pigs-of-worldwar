@@ -436,8 +436,11 @@ test('…and the APP hands the turn over on the deck, which is where play watche
   const waiting = await debugState(page)
   expect(Math.abs(waiting.nodeY - deck.nodeY), 'the beat left it where it stood').toBeLessThan(32)
 
-  // ANY BUTTON. The beat ends and the turn is played, and this is the frame the
-  // pig used to be written back to the ground under the bridge — 512 down.
+  // ANY BUTTON — once the card has been up its first second, which is the
+  // floor under the beat (`TURN_START_FLOOR_SECONDS`, lib/game/game.ts). The
+  // beat ends and the turn is played, and this is the frame the pig used to be
+  // written back to the ground under the bridge — 512 down.
+  await page.waitForTimeout(1100)
   await tap(page, 'turnRight')
   await expect.poll(async () => (await hud(page)).starting).toBe(false)
   const driven = await debugState(page)

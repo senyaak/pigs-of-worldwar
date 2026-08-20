@@ -736,3 +736,74 @@ And the wait's list grew the entry the exe always had (`0x47D800`, no pig
 still busy): `corpses.live()` is in `settling()` now, so a kill is watched
 through the dying clip, the sink and the boots before anything hands the
 turn over — modes 15/16, "watching dying pig", by another door.
+
+## THE DROP IS ITS OWN CONTROL SET — 2026-08-20
+
+Play, the same evening the beat at the top of a turn grew a floor under it:
+"нельзя пропустить парашуты как раньше — ты заблокировал." Exactly so, and the
+floor only exposed it.
+
+The turn's beat does not run its clock while the squad is coming down — the
+battle returns out of its whole step for every frame of the drop — but
+`game.starting` is true throughout, so the CONTROL SET during the drop was
+`starting`, whose rule is "any key ends the beat and is then read again in the
+set that follows". Cutting a canopy therefore went: press → `beginTurn` →
+`startingFor = 0` → re-ask → `battle` → jump. It worked, and it silently spent
+the GET READY card as well. Then the floor made `beginTurn` answer `false` for
+the beat's first second — a second that never elapses while the drop holds the
+clock — and the chutes could not be cut at all.
+
+So the drop is a set of its own now, above `starting` and below `ending`: it
+drives nothing and answers ONE key, the chute cut. Which is also what the exe
+does with it — the parachute is its own mode there, and its canopy branch tests
+the pad for a fresh press and nothing else.
+
+### …and the specs the floor and the set caught out (2026-08-20)
+
+The floor under GET READY and the drop's own control set between them turned
+five specs red, and every one of them was the spec being right about the old
+rules:
+
+- `002/game-logic.spec.ts` and `000/engine-headless.spec.ts` called
+  `game.beginTurn()` to skip the beat. That is a PLAYER's press now and the
+  floor refuses it; the debug door is `cutTurnStart()`, and the one spec that
+  is ABOUT the beat presses like a player and asserts the refusal.
+- `002/battle.spec.ts` and `002/ramp.spec.ts` pressed a key the frame the card
+  went up. They wait the floor out now, which is what a player does.
+- `002/audio.spec.ts` sliced the heard-sounds list from a baseline the turn's
+  own P_HMMM had not landed in yet — it WAITS for the bank if the bank is
+  still loading, so its arrival is not fixed relative to a spec's baseline.
+  Three tests there wait for the grunt before taking one.
+
+**And one spec was already red and said so about something else.** The player's
+own side has worn the TEAM's name since the campaign landed — side 0 is fielded
+from the SAVE, everybody else out of `fetext` — and `002/battle.spec.ts` and
+`002/hud.spec.ts` still expected the nation's TOMMY'S TROTTERS. Fixing that
+uncovered two more expectations of the same age underneath it, because the test
+had been failing before it reached them: `pow.swapMap` re-opens with no save
+behind it, so after a swap every side IS named out of `fetext` again; and the
+toolbar's walk-out of a CAMPAIGN battle lands on the SQUAD screen, not on the
+menu. The test runs the whole way through now, which is also why it needed a
+timeout of its own — it drives two map swaps and a machine turn.
+
+### The drop ends INSIDE the step, one frame after the poll (2026-08-20)
+
+Giving the drop its own control set cost a day's worth of hunting on its own,
+and the lesson is about the ORDER of the frame rather than about parachutes.
+
+The input poll runs in the SCENE's frame, ahead of the game's step
+(`three/scene.ts`, `onInput`) — that is deliberate, so a press is read and acted
+on in the same frame. But `dropIn.running()` goes false inside the step, which
+means the poll that FIRST sees the drop over is the one a frame LATER. And a set
+change that does not carry releases every driving key. So anything pressed
+between the drop's last frame and the next poll was wiped: a pig stood on its
+landing frame with W held down and never walked. Two specs said so
+(`002/walkcycle.spec.ts` samples the clips a held W produces and got the get-up
+and the idle; `002/ramp.spec.ts` walked nowhere) and a player would have said
+so next.
+
+Carrying the whole set out of the drop was tried first and is wrong: the LATCH
+is a one-shot press, and one that arrived while the squad was in the air belongs
+to the drop. So the two halves are separate now — leaving the drop keeps what is
+HELD and drops the latch — and that is the only transition that wants the split.
+

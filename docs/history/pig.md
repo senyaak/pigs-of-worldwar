@@ -310,3 +310,45 @@ own). The stand-still delay came down 2 → 1 s ("не 2 секунды а ме�
 the espionage rule the exe applies to the plate (`0x459BA7`, the blip's
 identical test) is on it now: a scout/sniper/spy of a side not acting is
 unlabelled, both ways.
+
+## A PLAY PASS OVER THE BATTLE — 2026-08-20 evening
+
+Four reports in one message, and two of them were the same mistake in two
+places.
+
+**The plate wears BIG again, at 0.75.** Play had ruled BIG's 32 too big; the
+plate went to SMALL at ×2, which is the same 24 pixels tall — and play saw it
+in the game and ruled the LETTERS wrong: "не тот шрифт! верни тот что был — но
+просто сделай меньше его." So it is BIG's shapes at a plate height that has not
+moved. The heart keeps a scale of its own.
+
+**…and the letters are OUTLINED.** "отсутствует чёрная обводка текста для имён
+и хп". A team colour on its own disappears into half the ground in this game;
+the plate carries a one-pixel black edge now, drawn from a black-painted copy of
+the same font at eight offsets. The offsets are in SCREEN pixels and not the
+plate's own units, because an outline is a hairline whatever the letters are
+being drawn at — multiplied by a fractional scale it would land between two
+device pixels and fade. `LAYOUT.plate.outline`, and the hud spec measures it by
+turning the knob off and counting the difference.
+
+**A BODY ALREADY INSIDE ANOTHER COULD NOT BE THROWN, and the arithmetic said so
+before the game did.** Play, on the bayonet knock that had just been built:
+"свинья будто на месте летит пол секунды вместо настоящего отбрасывания —
+похоже застревания какието", and then "граната тоже както странно отбросила",
+which is what named it as general rather than melee's.
+
+`withPigs` blocks a step within `2·PIG_RADIUS` of another body; `blocks` is a
+test on the DESTINATION alone; and a blocked step IN THE AIR zeroes the
+horizontal velocity for good (`lib/game/locomotion.ts`). Put together: every
+direction out of an overlap is still inside it, so a body that starts its
+flight overlapping never leaves the spot — it goes up, comes down, and lands
+where it stood. A walking pig is stopped at exactly `2·PIG_RADIUS` from the one
+it is walking at, which is exactly where this blocks, so a MELEE victim starts
+on the boundary every single time; two pigs shoulder to shoulder in a blast are
+the same trap, which is the half play saw with the grenade.
+
+`withPigs` takes the moving body's own position now and drops every pig it is
+already inside. Nothing can be pushed further in by that, because it could not
+be pushed at all. `e2e/002/tumble.spec.ts` throws a body from one unit away and
+fails without the fix.
+

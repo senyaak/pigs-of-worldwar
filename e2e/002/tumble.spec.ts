@@ -20,7 +20,7 @@ import { MINE_DAMAGE, createMines } from '../../src/lib/game/mines'
 import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
 import { FLING_CAP, FLING_PER_POINT, burst, flingSpeed } from '../../src/lib/game/blast'
 import { PITCH, createTumbles, flingVelocity } from '../../src/lib/game/tumble'
-import { NO_OBSTACLES } from '../../src/lib/game/obstacles'
+import { NO_OBSTACLES, PIG_RADIUS, withPigs } from '../../src/lib/game/obstacles'
 import { BLAST_CORE, blastReach, blastShare } from '../../src/lib/game/grenade'
 import { fromExeSpeed } from '../../src/lib/game/ballistics'
 import { Game } from '../../src/lib/game/game'
@@ -263,4 +263,37 @@ test('a blast with nobody to throw it to still hurts — the fling is optional',
   )
   expect(pig.health).toBe(30)
   expect(heard.filter((one) => one.kind === 'blasted')).toHaveLength(1)
+})
+
+test('a body thrown while it is INSIDE another still travels', () => {
+  // Play, on a bayonet: "свинья будто на месте летит пол секунды вместо
+  // настоящего отбрасывания — похоже застревания какието", and the arithmetic
+  // agreed before the game did: a walking pig is stopped at exactly 2·PIG_RADIUS
+  // from the one it is walking at, `withPigs` blocks at exactly that distance,
+  // and a blocked step in the air ZEROES the horizontal velocity for good
+  // (lib/game/locomotion.ts). So a body struck at melee range began its flight
+  // already on the boundary and never left the spot.
+  //
+  // The two pigs here stand ONE unit apart — as deep inside each other as two
+  // bodies can be — which is the worst case of the same thing.
+  const { game, tumbles, pigs, query } = fielded(1)
+  const thrown = pigs()[1]
+  const from = { ...thrown.position }
+  const obstacles = withPigs(
+    NO_OBSTACLES,
+    [{ ...game.currentPig.position }],
+    { ...thrown.position }
+  )
+  expect(
+    obstacles.blocks(from.x + 10, from.z, from.y, 0),
+    'the body it is inside is not in its way'
+  ).toBe(false)
+
+  tumbles.fling(thrown, flingSpeed(30), Math.PI / 2)
+  for (let i = 0; i < 200 && tumbles.live() > 0; i++) tumbles.update(STEP)
+  const went = Math.hypot(thrown.position.x - from.x, thrown.position.z - from.z)
+  expect(went, 'it was thrown, not held').toBeGreaterThan(PIG_RADIUS * 4)
+  // …and along the bearing it was given, which is +x.
+  expect(thrown.position.x - from.x).toBeGreaterThan(0)
+  expect(query).toBeDefined()
 })

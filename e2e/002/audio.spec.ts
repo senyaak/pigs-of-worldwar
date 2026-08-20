@@ -101,6 +101,12 @@ test('the pig is heard jumping and landing', async ({ app }) => {
   // parachute drop that has already made its own noises (002/parachute), and
   // `arrayContaining` over everything heard so far would be satisfied by the
   // drop's landing before this jump had even come down.
+  //
+  // The turn's own grunt has to have landed FIRST. It goes down as the GET
+  // READY card does and it WAITS for the bank if the bank is still loading
+  // (audio/battleSound.ts), so on a slow load it arrives after the warp and
+  // lands inside the slice below.
+  await expect.poll(async () => (await heard()).includes('P_HMMM')).toBe(true)
   const beforeJump = (await heard()).length
   await tap(page, 'jump')
   await expect

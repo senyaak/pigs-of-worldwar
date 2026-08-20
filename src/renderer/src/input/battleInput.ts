@@ -131,6 +131,7 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
 
   const blank = {
     ending: false,
+    dropping: false,
     starting: false,
     locked: false,
     charging: false,
@@ -206,14 +207,29 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
       //    that follows. Dropping it would eat the very key that woke the turn,
       //    and `starting` drives nothing, so there is nothing stale to drop.
       const carries = wasMode === null || wasMode === 'starting'
+      /**
+       * …and leaving the DROP keeps what is HELD without keeping the LATCH,
+       * which is a case of its own and was found the hard way.
+       *
+       * The drop drives nothing, so a key the player is still holding across it
+       * is not stale — and releasing it is not harmless, because the drop ENDS
+       * inside the game's step, which runs AFTER this poll. So the frame that
+       * sees the mode change is one frame LATER than the frame the drop
+       * finished, and anything pressed in between was wiped: a pig stood on the
+       * landing frame with W down and never walked, which is two specs
+       * (`002/walkcycle.spec.ts`, `002/ramp.spec.ts`) and would have been the
+       * next thing play reported.
+       *
+       * The LATCH still goes, because a one-shot press that arrived while the
+       * squad was in the air belongs to the drop and not to the turn.
+       */
+      const keepsHeld = carries || wasMode === 'dropping'
       wasMode = mode
       // The LATCH goes with the keys, or a key that went down on this very
       // frame would drive the set it was not pressed in.
-      if (!carries) {
-        for (const action of DRIVING_ACTIONS) {
-          controller.release(action)
-          pressed.delete(action)
-        }
+      for (const action of DRIVING_ACTIONS) {
+        if (!keepsHeld) controller.release(action)
+        if (!carries) pressed.delete(action)
       }
     }
     return mode

@@ -15,7 +15,7 @@ import path from 'node:path'
 
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
-import { startGame } from '../menu'
+import { TEST_TEAM, startGame } from '../menu'
 import { hud, press, release, tap } from '../controller'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseTim } from '../../src/lib/formats/tim'
@@ -156,7 +156,10 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
   const before = await hud(page)
   // Fifty, not a hundred: health is the pig's CLASS's and NOBBY is a grunt
   // (lib/game/health.ts, out of the table at exe 0x4d02e0).
-  expect(before).toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
+  // The player's own side wears the TEAM's name: side 0 is fielded from the
+  // SAVE, every other side out of `fetext` (lib/game/muster.ts, and
+  // 002/battle.spec.ts carries the same note beside the swap that undoes it).
+  expect(before).toMatchObject({ turn: 1, side: TEST_TEAM, pig: 'NOBBY', health: 50 })
   expect(before.seconds).toBeGreaterThan(40)
   await expect
     .poll(async () => (await hud(page)).seconds, { message: 'the clock running down' })
@@ -220,6 +223,28 @@ test('a pig wears its name while it rests, and drops it while it walks', async (
   await expect.poll(still, { message: 'the pig settles' }).toBeGreaterThan(PLATE_DELAY)
   const resting = await painted()
   expect(resting - walking, 'the name is up while it rests').toBeGreaterThan(NAME)
+
+  // …AND IT IS OUTLINED. Play: "отсутсвует чёрная обводка текста для
+  // имён и хп" — a team colour on its own vanishes into half the ground in
+  // this game. Measured through the layout's own knob rather than by hunting
+  // black pixels, because the dashboard art is full of black already: with the
+  // outline off the plate is only its letters, and with it on the same letters
+  // carry a hairline all the way round.
+  const outlineTo = (off: number): Promise<void> =>
+    page.evaluate((value) => {
+      const layout = window.pow!.hud!.layout as { plate: { outline: number } }
+      layout.plate.outline = value
+    }, off)
+
+  await outlineTo(0)
+  const bare = await painted()
+  await outlineTo(1)
+  const outlined = await painted()
+  // A hairline round ten glyphs at the plate's own scale, not a second name:
+  // measured at about 500 pixels against the plate's own few thousand, so the
+  // floor is well under that and well over the handful the clock's digits move
+  // by as they tick.
+  expect(outlined - bare, 'the letters wear a black edge').toBeGreaterThan(200)
 
   // And goes again the moment it is driven.
   await press(page, 'walkForward')
