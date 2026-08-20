@@ -255,7 +255,11 @@ export function createBattle(parts: BattleParts): Battle {
    * that thinks and passes, today (lib/game/ai.ts). */
   const computer = parts.computer ?? (() => false)
   const brain = createStubBrain()
-  const computerTurn = (): boolean => computer(game.players.indexOf(game.currentPlayer))
+  /** …LATCHED at the turn's start (`focus`), not re-asked every frame: whose
+   * hands a turn is in is decided when it is handed over, so a mid-turn flip
+   * of the predicate (`pow.hotseat`) waits for the next turn. Play's call. */
+  let machineTurn = computer(game.players.indexOf(game.currentPlayer))
+  const computerTurn = (): boolean => machineTurn
 
   /** Every pig on the map, as bodies to walk into. */
   const everyone = (): Pig[] => game.players.flatMap((player) => player.pigs)
@@ -618,8 +622,10 @@ export function createBattle(parts: BattleParts): Battle {
     struck = false
     sights.setHeld(false)
     swings.reset()
-    // A turn is a fresh start for the machine too (lib/game/ai.ts).
+    // A turn is a fresh start for the machine too (lib/game/ai.ts) — and the
+    // moment its SEAT is decided (`machineTurn` above).
     brain.reset()
+    machineTurn = computer(game.players.indexOf(game.currentPlayer))
     emit({ kind: 'cameraReset' })
   }
 

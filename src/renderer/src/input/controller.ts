@@ -443,7 +443,8 @@ declare global {
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
       swapMap?(name?: string): Promise<boolean>
       /** Console command: hand the machine's sides to the keyboard for THIS
-       * battle — `pow.hotseat()` toggles, a boolean sets. The next battle is
+       * battle — `pow.hotseat()` toggles, a boolean sets, and it lands on the
+       * NEXT turn (the seat is decided at each handover). The next battle is
        * machine-on again (three/battle.ts). For testing weapons from both
        * ends; the original has no such thing. */
       hotseat?(on?: boolean): boolean

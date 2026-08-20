@@ -378,8 +378,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     bus,
     // The MACHINE plays everyone but side 0 — the campaign's own, which the
     // spawn order puts first (lib/game/muster.ts). Today its brain only
-    // passes (lib/game/ai.ts); multiplayer will rewire this seam. Asked per
-    // call, so `pow.hotseat()` above flips it mid-battle.
+    // passes (lib/game/ai.ts); multiplayer will rewire this seam. The battle
+    // latches the answer at each turn's start, so `pow.hotseat()` above
+    // lands on the NEXT handover (play's call: "достаточно только на начале
+    // хода").
     computer: (side) => side > 0 && !hotseat
   })
   const { battle, scenery, obstacles, anim, swings, shots, grenades, mines, effects, numbers, airDrops, dropIn } =
@@ -948,8 +950,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       hotseat = on ?? !hotseat
       console.info(
         hotseat
-          ? 'pow: hotseat ON — the enemy is on the keyboard until this battle ends'
-          : 'pow: hotseat off — the machine plays the enemy again'
+          ? 'pow: hotseat ON from the next turn — the enemy is on the keyboard until this battle ends'
+          : 'pow: hotseat off — the machine plays the enemy again from the next turn'
       )
       return hotseat
     },
