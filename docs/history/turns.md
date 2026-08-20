@@ -710,3 +710,29 @@ pig and the same keyboard drove it. What landed is the SEAM, not a mind:
 own 9.98 s before the brain was ever asked while it held);
 `e2e/002/battle.spec.ts`'s rotation now watches the French pass their own
 turn instead of clicking it away.
+
+## The camera holds the blow, and never goes back to the shooter (2026-08-20)
+
+Play: "выстрел должен держать камеру после попадания (или взрыва), щас
+иногда сразу возвращается к свинье — возврата к свинье в оригинале вообще
+нет." Both halves were real:
+
+- **A gun never earned the beat.** The aftermath began only on `broke` and
+  `blasted`, so a rifle shot that hit a pig — or the ground — snapped the
+  camera straight home. The exe's wait runs after EVERY weapon use
+  (`turns/aftermath.md`, one mode, one list); now `lib/game/bullets.ts`
+  announces `shotLanded` wherever a bullet ends — body, ground, box, thin
+  air — and the battle opens the same aftermath on it.
+- **The end of the beat emitted `cameraReset`**, a teleport back to the
+  shooter, and then WALK AWAY framed the old pig anyway. The exe's wait
+  exits straight into mode 13 (0x495316 → 0x494570) with no return. Now a
+  SPENT turn leaves the aftermath standing: the camera stays on the spot
+  through the walk-away and the next pig's `focus` (or the mission's
+  ending) is what clears it. The reset survives only for a blow that did
+  not end the turn — a mine trodden mid-walk, a training break — where the
+  same pig is about to be driven again.
+
+And the wait's list grew the entry the exe always had (`0x47D800`, no pig
+still busy): `corpses.live()` is in `settling()` now, so a kill is watched
+through the dying clip, the sink and the boots before anything hands the
+turn over — modes 15/16, "watching dying pig", by another door.

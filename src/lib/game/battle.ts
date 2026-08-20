@@ -52,6 +52,7 @@ import type { EffectField } from './effectField'
 import type { DamageNumbers } from './damage'
 import type { AirDrops } from './airDrop'
 import type { DropIn } from './dropIn'
+import type { Corpses } from './corpses'
 import type { Drowning } from './drowning'
 import type { Point } from './pose'
 import type { Random } from './random'
@@ -77,6 +78,10 @@ export interface BattleParts {
   /** Pigs a blast has THROWN — every pig but the one being driven
    * (lib/game/tumble.ts). */
   tumbles: Tumbles
+  /** The deaths still playing out — the dying clip, the sink, the corpse
+   * blast (lib/game/corpses.ts). On the exe's own wait list: `0x47D800`, no
+   * pig is still busy, and a body coming apart is busy. */
+  corpses: Corpses
   effects: EffectField
   numbers: DamageNumbers
   airDrops: AirDrops
@@ -243,7 +248,7 @@ export interface Battle {
 
 export function createBattle(parts: BattleParts): Battle {
   const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, effects, numbers } = parts
-  const { tumbles, airDrops, dropIn, drowning, onChanged } = parts
+  const { tumbles, corpses, airDrops, dropIn, drowning, onChanged } = parts
   const emit = parts.bus.emit
 
   /** Which sides the machine plays, and the brain that plays them — the stub
@@ -411,6 +416,11 @@ export function createBattle(parts: BattleParts): Battle {
     // fuse runs out inside the beat that ends the turn, and a beat that does not
     // wait for the flight hands the turn on before the pig has moved a unit.
     tumbles.live() > 0 ||
+    // …and a DEATH still playing out — the dying clip, the sink, the boots
+    // (lib/game/corpses.ts). The exe's list asks the same (`0x47D800`, no pig
+    // still busy), and it is what keeps the camera on a kill until the body
+    // has finished coming apart.
+    corpses.live() > 0 ||
     loco.airborne !== null ||
     // …and a pig part-way through climbing INTO a building: the clip runs 17
     // frames and the turn must not be handed over on top of it
@@ -521,6 +531,10 @@ export function createBattle(parts: BattleParts): Battle {
       // the exe's `[gameMode+0x40C]`, which its own `NextPlayer` has just
       // incremented (lib/game/tutorial.ts).
       ending = beginEndOfGame(outcome === 'won', watchable())
+      // The spot a spent turn's camera was left on (see the aftermath block):
+      // the tour owns the camera from here, and only `focus` would otherwise
+      // clear it — which a battle that is over never reaches.
+      aftermath = null
       emit({ kind: 'missionOver', won: outcome === 'won', turns: game.turn })
       return
     }
@@ -551,6 +565,14 @@ export function createBattle(parts: BattleParts): Battle {
       // what makes the burst visible at all: the camera leaves the grenade the
       // frame it stops existing.
       blasted: ({ at }) => {
+        if (!aftermath) aftermath = beginAftermath(at)
+      },
+      // …and a BULLET earns the same beat wherever it ended — a body, the
+      // ground, a box. The exe's wait runs after every weapon use, not only
+      // the ones that break something (`turns/aftermath.md`); without this a
+      // rifle shot snapped straight back to the shooter, and play named it:
+      // "выстрел должен держать камеру после попадания".
+      shotLanded: ({ at }) => {
         if (!aftermath) aftermath = beginAftermath(at)
       }
     })
@@ -860,8 +882,18 @@ export function createBattle(parts: BattleParts): Battle {
       // nothing knocks one into the water yet.
       const held = pending !== null || swings.running() || anim.animating(acting) || settling()
       if (advanceAftermath(aftermath, delta, held)) {
-        aftermath = null
-        emit({ kind: 'cameraReset' })
+        // **THE CAMERA NEVER GOES BACK TO THE SHOOTER.** The exe's wait exits
+        // straight into WALK AWAY (0x495316 → 0x494570), and play remembers no
+        // return: "возврата к свинье в оригинале вообще нет". So when the
+        // weapon SPENT the turn, the spot stays the camera's through the beat
+        // at the end of it — the aftermath is left standing for the view and
+        // the next pig's `focus` is what clears it. Only a blow that did NOT
+        // end the turn (a mine trodden mid-walk, a training break) hands the
+        // camera back, because the same pig is about to be driven again.
+        if (!spent) {
+          aftermath = null
+          emit({ kind: 'cameraReset' })
+        }
       } else {
         // Follow the crate down; a spot with nothing coming stays the spot.
         const crate = airDrops.watching()

@@ -211,7 +211,12 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
           advanceShot(shot, delta / steps)
           done = land(shot) || spentShot(shot)
         }
-        if (done) flying.splice(i, 1)
+        if (done) {
+          flying.splice(i, 1)
+          // Wherever it ended — a body, the ground, a box, thin air — the
+          // camera's beat wants the spot (lib/game/battle.ts, `shotLanded`).
+          emit({ kind: 'shotLanded', at: { x: shot.x, y: shot.y, z: shot.z } })
+        }
       }
     },
     live: () => flying,

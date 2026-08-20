@@ -51,6 +51,11 @@ export type BattleEvent =
   /** Something went off here, and WHICH effect id it spawns: a grenade and a
    * mine do not look alike (lib/game/blast.ts, `Charge.effect`). */
   | { kind: 'blasted'; at: Point; effect: number }
+  /** A BULLET is done, wherever it ended — a body, the ground, a box, or the
+   * end of its reach (lib/game/bullets.ts). What the beat after a blow hangs
+   * off for a gun: the exe's wait runs after EVERY weapon use, not only the
+   * ones that break something (`turns/aftermath.md`). */
+  | { kind: 'shotLanded'; at: Point }
   /** This pig has JUMPED INTO a building, and stops being drawn from here
    * (lib/game/indoors.ts). */
   | { kind: 'wentIn'; pig: PigId; building: number }

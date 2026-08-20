@@ -426,6 +426,7 @@ export function createEngine(parts: EngineParts): Engine {
     mines,
     swings,
     tumbles,
+    corpses,
     effects,
     numbers,
     airDrops,
