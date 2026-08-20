@@ -541,13 +541,24 @@ if (window.pow) {
           Object.fromEntries(Object.entries(screens).map(([n, s]) => [n, s.layout]))
         )
       ),
-    /** Throw the saved nudges away and go back to what the code says. */
+    /**
+     * Throw the saved nudges away and go back to what the code says.
+     *
+     * **`keep` is why this used to be a no-op**, and play found it the hard
+     * way — "я нечайно поломал лэйаут, и резет не спасает". Clearing the key
+     * and reloading fires `beforeunload` on the way out, which wrote the LIVE
+     * layout — the broken one, still in memory — straight back into the key
+     * that had just been emptied. So the reset is a promise not to save.
+     */
     reset: () => {
+      keep = false
       localStorage.removeItem(LAYOUT_KEY)
       localStorage.removeItem(LAYOUT_KEY_V1)
       location.reload()
     }
   }
+  /** Whether the way out should write anything down (see `reset`). */
+  let keep = true
 
   // **A nudge SURVIVES the window closing.** An evening of moving furniture in
   // the console used to die with the app — the layouts live in the renderer's
@@ -618,6 +629,7 @@ if (window.pow) {
     console.warn(`pow: the saved layout would not load (${String(error)})`)
   }
   window.addEventListener('beforeunload', () => {
+    if (!keep) return
     // ONLY what was moved. Everything else follows the source, so a number
     // changed in `ui/*.ts` lands on the next run instead of being painted over
     // by a snapshot of the way things used to be.

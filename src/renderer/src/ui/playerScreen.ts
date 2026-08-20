@@ -186,19 +186,35 @@ const LAYOUT = {
    * is that copy's RIGHT edge. Both are the tail's own numbers: the panels at
    * 0x41D8BB and 0x41D930, the dials at 0x41ED3D and 0x41EDB4, and the two
    * panels come out exactly symmetric about x 320.
+   *
+   * **Every piece carries BOTH of its numbers**, and the y is measured from
+   * the slot's own row. They used to share one `drop` table between the two
+   * columns — an x here, a y over there — which meant a piece could only be
+   * moved sideways from the place it belonged to. The badge's 40 is the arm's
+   * own 44 (0x74 against the portrait's 0x48) less the four play took off it
+   * to close the gap over the plate; the trapezoid follows the badge, being
+   * that plate's own leg.
+   *
+   * **The NAME is its own box** (`x`, `width`, `y`), not a line hung off the
+   * badge — `[play]`, twice over: it is written across the portrait's top
+   * edge by default and nothing about the class picture moves it. The exe
+   * writes no words for a pig at all (record 12 has just the two actions), so
+   * all three numbers are `[CHECK — remake]`.
    */
   columns: [
     {
       face: 57,
-      badge: 161,
-      stripes: 181,
+      badge: { x: 161, y: 40 },
+      stripes: { x: 181, y: 40 },
+      name: { x: 57, y: 0, width: 70 },
       selector: { x: -32, mirror: false },
       panel: { x: -32, y: -12, width: 298, height: 480, mirror: false }
     },
     {
       face: 519,
-      badge: 427,
-      stripes: 447,
+      badge: { x: 427, y: 40 },
+      stripes: { x: 447, y: 40 },
+      name: { x: 519, y: 0, width: 70 },
       selector: { x: 672, mirror: true },
       panel: { x: 672, y: -12, width: 298, height: 301, mirror: true }
     }
@@ -212,23 +228,6 @@ const LAYOUT = {
    * `x`/`y` are that flipped copy's right and bottom edges.
    */
   cap: { x: 672, y: 369, width: 120, height: 100 },
-  /**
-   * How far below its row each piece hangs.
-   *
-   * The badge's is the arm's 44 (0x74 against the portrait's 0x48) less the
-   * four play took off it to close the gap over the plate — `[play]`, and the
-   * trapezoid follows it because it is that plate's own leg. The NAME sits
-   * ABOVE the badge and inside the widget rather than under the portrait
-   * (`[play]`), which is `[CHECK — remake]` in the number only: the exe writes
-   * no words for a pig at all, record 12 having just the two actions.
-   *
-   * **The name went UP to the portrait's own top edge**, from 16 — play:
-   * "имена свиней надо выше показывать, там где они щас — показываются их
-   * классы". Sixteen put the letters across the middle of the face, a row of
-   * words through every snout on the screen; at 0 they sit along the top of
-   * the portrait and the class badge below has the plate to itself.
-   */
-  drop: { badge: 40, stripes: 40, name: 0 },
   /** The portrait: `width` is what its name is centred across, `inset` how far
    * its backing — the three `backgr~1` entries (`[play]`) — reaches past the
    * face on every side. */
@@ -322,11 +321,13 @@ const cloneLayout = (): PlayerLayout => ({
   selectorRows: [...LAYOUT.selectorRows],
   columns: LAYOUT.columns.map((column) => ({
     ...column,
+    badge: { ...column.badge },
+    stripes: { ...column.stripes },
+    name: { ...column.name },
     selector: { ...column.selector },
     panel: { ...column.panel }
   })),
   cap: { ...LAYOUT.cap },
-  drop: { ...LAYOUT.drop },
   portrait: { ...LAYOUT.portrait },
   team: { ...LAYOUT.team },
   flag: { ...LAYOUT.flag, x: [...LAYOUT.flag.x] },
@@ -670,8 +671,8 @@ export function initPlayerScreen(handlers: {
       const column = layout.columns[at.column]
       const leg = sprites.get('bgdark')
       const badge = sprites.get(BADGE[careerOf(pig.rank)] ?? 'pcHweap')
-      const legX = column.badge - Math.round((leg.width - badge.width) / 2)
-      context.drawImage(leg.image, legX, y + layout.drop.badge)
+      const legX = column.badge.x - Math.round((leg.width - badge.width) / 2)
+      context.drawImage(leg.image, legX, y + column.badge.y)
 
       // The CAREER's badge, and the stripes of its step — 0 wears none. Both
       // sit inboard of the portrait, on the column's own hand.
@@ -681,12 +682,12 @@ export function initPlayerScreen(handlers: {
       // and the original shows a pig with no class at all until it is promoted.
       // The trapezoid stays — it is the plate's own leg, not the badge's.
       if (pig.rank !== GRUNT) {
-        context.drawImage(badge.image, column.badge, y + layout.drop.badge)
+        context.drawImage(badge.image, column.badge.x, y + column.badge.y)
       }
       const step_ = stepOf(pig.rank)
       if (step_ > 0) {
         const stripes = sprites.get(STRIPES[step_ - 1] ?? STRIPES[0])
-        context.drawImage(stripes.image, column.stripes, y + layout.drop.stripes)
+        context.drawImage(stripes.image, column.stripes.x, y + column.stripes.y)
       }
 
       // The PROMOTION FLAG — this pig can be promoted RIGHT NOW (0x41D70E).
@@ -703,16 +704,20 @@ export function initPlayerScreen(handlers: {
         context.drawImage(flag.image, x, at.y + layout.flag.drop + offset)
       }
 
-      // Its NAME, ABOVE the badge and centred on the plate's own leg rather
-      // than on the portrait (`[play]`) — it belongs inside the widget, not
-      // under the face. The RANK is the badge and the pips beside it; the arm
-      // writes no words for a pig at all.
+      // Its NAME, in a BOX OF ITS OWN — `[play]`: "имена привязаны к
+      // columns[0].badge зачем-то, но имена отдельно". It used to be centred
+      // on the trapezoid and dropped by the badge's own number, so every nudge
+      // of the class picture dragged the letters with it and the name could
+      // not be placed at all without moving the badge. It has an x, a width
+      // and a y like every other piece now, and the default puts it across
+      // the portrait's own top edge. The RANK is still the badge and the pips
+      // beside it; the arm writes no words for a pig at all.
       const font = slot === selection ? light : dark
       font.draw(
         context,
         pig.name,
-        centred(font, pig.name, legX, leg.width),
-        y + layout.drop.name
+        centred(font, pig.name, column.name.x, column.name.width),
+        y + column.name.y
       )
     }
 

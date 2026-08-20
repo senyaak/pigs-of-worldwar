@@ -991,3 +991,21 @@ the bottom where play said it was already right, and START MISSION's words are
 CENTRED in their plate now — the drop-from-the-top number had been guessed
 twice and reported low twice, so `options.text` is a nudge off the centre
 instead.
+
+### The reset that saved what it was resetting (2026-08-20)
+
+Play: "я нечайно поломал лэйаут — и резет не спасает." Exactly so, and it had
+never worked: `pow.screen.reset()` cleared the key and called
+`location.reload()`, and a reload fires `beforeunload` — which wrote the LIVE
+layout, the broken one still sitting in memory, straight back into the key
+that had just been emptied. The way out is a promise not to save: `keep` goes
+false before the reload and the writer returns early.
+
+Two more of the squad screen's pieces stopped sharing numbers at the same
+time. Each column's badge and stripes carry their OWN y now (they used to take
+an x from the column and a y from a `drop` table shared with the other
+column), and **the pig's NAME has a box of its own** — x, width and y — where
+it used to be centred on the trapezoid and dropped by the badge's number, so
+nudging the class picture dragged the letters with it. Play found that the way
+it finds everything: "имена привязаны к columns[0].badge зачем-то, но имена
+отдельно."
