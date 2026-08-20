@@ -181,6 +181,10 @@ export interface DebugParts {
    * testing (lib/game/battle.ts). */
   cutTurnBeat: () => void
   warp: (x: number, z: number, heading: number) => void
+  /** Console command, not a spec hook: hand the machine's sides to the
+   * keyboard for THIS battle (three/battle.ts). No argument toggles; returns
+   * where it stands. */
+  hotseat: (on?: boolean) => boolean
 }
 
 /** Hang the battle's debug surface off `window.pow`, keeping whatever else
@@ -189,6 +193,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
   const { game, query, obstruction, squad, dropIn, props, camera } = parts
   window.pow = {
     ...(window.pow ?? { controller }),
+    // Beside `debug`, not in it: it is a play convenience like `pow.swapMap`,
+    // and rebuilt with the scene — so the next battle starts machine-on.
+    hotseat: parts.hotseat,
     debug: {
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,

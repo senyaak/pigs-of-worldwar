@@ -442,6 +442,11 @@ declare global {
       /** Console command: restart the battle on another map —
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
       swapMap?(name?: string): Promise<boolean>
+      /** Console command: hand the machine's sides to the keyboard for THIS
+       * battle — `pow.hotseat()` toggles, a boolean sets. The next battle is
+       * machine-on again (three/battle.ts). For testing weapons from both
+       * ends; the original has no such thing. */
+      hotseat?(on?: boolean): boolean
       /** Console command: put a line through the briefing bar —
        * `pow.say('USE SHIFT BUTTON TO JUMP THE GAP.')`. With no argument it
        * sends the tutorial's own line 227. The tutorial script drives the

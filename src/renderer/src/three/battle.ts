@@ -352,6 +352,13 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    *
    * What this file does below is feed it art and READ what it did.
    */
+  /**
+   * Console: `pow.hotseat()` hands the machine's sides to the keyboard —
+   * hotseat, the way the pure specs already play — so play can drive the
+   * enemy and test weapons from both ends. FOR THIS BATTLE ONLY: the flag
+   * lives in the scene and the next battle builds a fresh one, machine on.
+   */
+  let hotseat = false
   const engine = createEngine({
     world: {
       game,
@@ -371,8 +378,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     bus,
     // The MACHINE plays everyone but side 0 — the campaign's own, which the
     // spawn order puts first (lib/game/muster.ts). Today its brain only
-    // passes (lib/game/ai.ts); multiplayer will rewire this seam.
-    computer: (side) => side > 0
+    // passes (lib/game/ai.ts); multiplayer will rewire this seam. Asked per
+    // call, so `pow.hotseat()` above flips it mid-battle.
+    computer: (side) => side > 0 && !hotseat
   })
   const { battle, scenery, obstacles, anim, swings, shots, grenades, mines, effects, numbers, airDrops, dropIn } =
     engine
@@ -936,6 +944,15 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     squad,
     dropIn,
     props,
+    hotseat: (on) => {
+      hotseat = on ?? !hotseat
+      console.info(
+        hotseat
+          ? 'pow: hotseat ON — the enemy is on the keyboard until this battle ends'
+          : 'pow: hotseat off — the machine plays the enemy again'
+      )
+      return hotseat
+    },
     objectCount: assets.objects.length,
     camera: host.camera,
     // Measured against the eye as it stood at the end of the last frame,
