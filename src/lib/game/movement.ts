@@ -11,8 +11,8 @@
 // under its feet.
 //
 //   1. clamp the candidate to the world limits — nothing left, refuse
-//   2. the ground BREAKS ahead — loses more than STEP_DOWN within one
-//      FACE_PROBE — walk off and fall
+//   2. a CLIFF FACE ahead — ground falling away steeper than WALK_OFF_GRADE
+//      within one FACE_PROBE — walk off and fall
 //   3. otherwise walk, and take the ground height with you
 //
 // NOTHING about the ground refuses a step — not its height and not the wall
@@ -109,25 +109,31 @@ export const WALK_BACK_SPEED = fromExeSpeed((32 * PIG_CLASS_SPEED) / 16) * WALK_
 export const STEP_DOWN = fromExeY(32)
 
 /**
- * What tells a CLIFF from a HILLSIDE: a fall wants the ground to lose more
- * than STEP_DOWN within one probe THIS long — a face steeper than 45°, which
- * feet cannot follow. Anything shallower is a grade and is WALKED down,
- * pinned to the ground the whole way, the mirror of the climb (which has no
- * limit at all).
+ * What tells a CLIFF from a HILLSIDE: a fall wants the ground to fall away
+ * steeper than WALK_OFF_GRADE within one probe THIS long. Anything
+ * shallower is a grade and is WALKED down, pinned to the ground the whole
+ * way, the mirror of the climb (which has no limit at all).
  *
- * `[play]` — this line is the remake's own. The exe starts a fall when the
- * step's endpoint finds no ground within 32 below the feet (`TryMove` step 6,
- * movement/notes.md), which at its 52-unit stride and doubled heights is a
- * slope test at 31.6°; converted to this engine's halved heights that is
- * 17.1°, and the first build compared the terrain a whole LOOK_AHEAD out
- * instead of a stride, which pushed it to 13.0° — under CAMP's own median
- * slope of 14°. Play walked down a hill and reported the result exactly:
- * "спускаюсь с горки — стукаюсь: падаю - иду - падаю - иду". A slope test of
- * ANY threshold keeps that stutter on whatever ground is steeper than it, so
- * the test is a BREAK test now, and the number is where a slope stops reading
- * as ground.
+ * `[play]` — both numbers are the remake's own, and the grade is PLAY'S
+ * DIAL. The exe starts a fall when the step's endpoint finds no ground
+ * within 32 below the feet (`TryMove` step 6, movement/notes.md); naively
+ * converted to this engine's halved heights that is a slope test at 17.1°,
+ * and the first build compared terrain a whole LOOK_AHEAD out instead of a
+ * stride, which pushed it to 13.0° — under CAMP's own median slope of 14°,
+ * so most descents were a stutter of launches ("спускаюсь с горки —
+ * стукаюсь: падаю - иду - падаю - иду"). And there is no natural line to
+ * move it to: a census of every shipped map's tile faces
+ * (movement/slope-census.mjs, 2026-08-20) runs CONTINUOUSLY from flat to
+ * ~88° — 12% of non-wall tiles are past 45°, and play confirms surfaces
+ * past 45° are walked both ways. 60° is where cliff walls plausibly begin
+ * in that census; a real walked surface found past it in play moves the
+ * number, nothing else.
  */
 export const FACE_PROBE = STEP_DOWN
+
+/** The grade a fall wants the ground to exceed within one FACE_PROBE — 60°.
+ * See FACE_PROBE for why it is a dial and not a fact. */
+export const WALK_OFF_GRADE = Math.tan((60 * Math.PI) / 180)
 
 /**
  * How far ahead the ground is checked for an edge: one of the original's
@@ -190,28 +196,31 @@ export function step(
   // and walks down the face while gravity does the work. It should leave the
   // ground.
   //
-  // …and what is looked FOR is a BREAK, not a grade. One comparison across
-  // the whole reach is a slope test — it fired on every hillside steeper
-  // than 13° and turned a descent into a stutter of launches (FACE_PROBE has
-  // the derivation). So the reach is walked in probes instead: a fall is the
-  // ground losing more than STEP_DOWN within ONE probe, which a hill never
-  // does and the lip of a cliff always does — still a whole walking step
-  // out, so a running pig still leaves from the lip.
+  // …and what is looked FOR is a CLIFF FACE, not a hillside. One comparison
+  // across the whole reach is a slope test — it fired on every hillside
+  // steeper than 13° and turned a descent into a stutter of launches
+  // (FACE_PROBE has the derivation). So the reach is walked in probes
+  // instead: a fall is the ground falling away steeper than WALK_OFF_GRADE
+  // within ONE probe, which walked ground never does and a cliff wall always
+  // does — still a whole walking step out, so a running pig still leaves
+  // from the lip.
   const reach = Math.max(Math.abs(distance), LOOK_AHEAD)
   const dirX = Math.sin(heading) * Math.sign(distance)
   const dirZ = Math.cos(heading) * Math.sign(distance)
   if (!query.isWater(toX, toZ)) {
     // Game-space heights grow DOWNWARD, so a bigger height is lower ground.
     let last = query.height(x, z)
+    let lastAlong = 0
     for (let at = FACE_PROBE; ; at += FACE_PROBE) {
       const along = Math.min(at, reach)
       const sx = x + dirX * along
       const sz = z + dirZ * along
       const there = query.height(sx, sz)
-      if (there - last > STEP_DOWN && !supported(sx, sz)) {
+      if (there - last > (along - lastAlong) * WALK_OFF_GRADE && !supported(sx, sz)) {
         return { outcome: 'falling', x: toX, z: toZ }
       }
       last = there
+      lastAlong = along
       if (along >= reach) break
     }
   }

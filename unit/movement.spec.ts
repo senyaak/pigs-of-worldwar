@@ -46,12 +46,15 @@ test('a hillside is walked DOWN — a grade is not a cliff', { tag: '@nodata' },
   // CAMP's own median, and twice it: both are ground, walked pinned.
   expect(step(slope(-50), 0, 0, NORTH, STRIDE).outcome).toBe('moved')
   expect(step(slope(-100), 0, 0, NORTH, STRIDE).outcome).toBe('moved')
+  // …and past 45° is STILL ground — play walks such faces both ways, and the
+  // shipped maps run continuously up to ~88° (movement/slope-census.mjs).
+  expect(step(slope(-(STRIDE * 1.2)), 0, 0, NORTH, STRIDE).outcome).toBe('moved')
 })
 
 test('a face steeper than the feet can follow is walked off', { tag: '@nodata' }, () => {
-  // Past 45° — more than STEP_DOWN lost within one FACE_PROBE — the ground
-  // stops reading as ground and the step leaves it.
-  const move = step(slope(-(STRIDE * 1.2)), 0, 0, NORTH, STRIDE)
+  // Past WALK_OFF_GRADE (60°) the ground stops reading as ground and the
+  // step leaves it. 65.5° here.
+  const move = step(slope(-(STRIDE * 2.2)), 0, 0, NORTH, STRIDE)
   expect(move.outcome).toBe('falling')
   expect(move.z).toBeCloseTo(STRIDE)
 })
@@ -77,9 +80,10 @@ test('a wall does not refuse the step — nothing about the ground does', { tag:
   expect(walled.walkable(move.x, move.z)).toBe(false)
 
   // And the lip of a cliff, which is a wall tile too, is walked off rather
-  // than walled against: refusing here trapped pigs on top of cliffs.
+  // than walled against: refusing here trapped pigs on top of cliffs. The
+  // face is one tile wide in the fixture, so 80 step-downs make it 68°.
   const ledge = terrain(
-    (_x, z) => (z >= 1024 ? -40 * STEP_DOWN : 0),
+    (_x, z) => (z >= 1024 ? -80 * STEP_DOWN : 0),
     (_x, z) => (z >= 512 ? { type: 0x80, slip: 0 } : {})
   )
   expect(step(ledge, 0, 400, NORTH, STRIDE).outcome).toBe('falling')
@@ -108,10 +112,10 @@ test('the world limit refuses the step rather than sliding along it', { tag: '@n
 })
 
 test('an edge is seen a walking step ahead, not a frame ahead', { tag: '@nodata' }, () => {
-  // The drop starts one LOOK_AHEAD north of the pig — a 51° face, since the
+  // The drop starts one LOOK_AHEAD north of the pig — a 68° face, since the
   // fixture's vertices are a tile apart — and a face that steep is a cliff
   // however short the step that approaches it.
-  const cliff = terrain((_x, z) => (z > LOOK_AHEAD ? 0 : -40 * STEP_DOWN))
+  const cliff = terrain((_x, z) => (z > LOOK_AHEAD ? 0 : -80 * STEP_DOWN))
 
   // A tiny step — one frame of a fast machine — still sees the edge coming
   // and launches. Tie the look-ahead to the frame and this walks off the lip

@@ -263,3 +263,14 @@ that forced the fixed look-ahead in the first place. The old
 a 9.7° hillside — and now pins the opposite; the cliff fixtures were rebuilt
 one tile-face steep (51°), since fixture terrain interpolates over 512-unit
 tiles and a "step function" was never a discontinuity to begin with.
+
+**Corrected the same day: the 45° was wrong, and play caught it in one
+message** — "вроде там где-то есть поверхности больше 45 по которым можно
+подниматься и спускаться спокойно". Measured instead of argued: a census of
+every shipped map's tile faces (movement/slope-census.mjs) found NO natural
+line — non-wall faces run continuously from flat to ~88°, with 12% past 45°
+and thousands in every band up to 70°, and the wall flag does not separate
+hills from cliff walls either. So the criterion stays a grade but the number
+is openly play's dial: WALK_OFF_GRADE = tan 60°, ground falling away steeper
+than that within one FACE_PROBE is a cliff face, anything less is walked. A
+walked surface found past 60° in play moves the number, nothing else.
