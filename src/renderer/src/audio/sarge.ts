@@ -36,6 +36,73 @@ export interface Sarge {
   dispose(): void
 }
 
+/**
+ * WHAT EACH CATEGORY IS, as far as the exe says — the file's number, not the
+ * section argument, because the folder is what an ear browses.
+ *
+ * Twenty-one call sites were read and every one of them is here; what is
+ * missing is not the MOMENT but the WORDS, and no table in the game holds
+ * them — the lines are never printed, so nothing but listening will say which
+ * of the crate categories is which. `pow.sarge.list()` prints this.
+ */
+export const SARGE_CATEGORIES: Readonly<Record<number, string>> = {
+  1: 'end of turn, you LOST a pig and your side is behind — BUILT',
+  2: 'start of turn, your side is behind',
+  3: 'end of turn, you KILLED and your side is ahead — BUILT',
+  4: 'start of turn, your side is ahead',
+  5: 'a crate collected, item byte not 0xFF',
+  6: 'a crate collected, item byte 0xFF (and pickup type 7)',
+  7: 'a crate collected, pickup type 2 or 14',
+  8: 'a crate collected, pickup type 4 or 16 — takes something off the pig',
+  9: 'a crate collected, pickup type 7, the other arm',
+  10: 'a crate collected, pickup type 8',
+  11: 'start of turn, said ONCE a battle (latched)',
+  12: 'start of turn, said ONCE a battle (the second latch)',
+  13: 'the clock running out — one pool of SIXTEEN with 14',
+  14: '…the other half of that pool',
+  15: 'multiplayer, by the pig NATION: 1..4 praise, 5..8 commiseration',
+  16: 'multiplayer, nation 1',
+  17: 'multiplayer, nation 2',
+  18: 'multiplayer, nation 3',
+  19: 'multiplayer, nation 4',
+  20: 'multiplayer, nation 5',
+  21: 'multiplayer, nation 6',
+  22: 'the FRONT END — the menu, and its idle nag'
+}
+
+/** The one sergeant, made on first use. A battle takes him and gives him back
+ * (`stop`, never `dispose`), so the console keeps him between missions. */
+let shared: Sarge | null = null
+export function sarge(): Sarge {
+  if (!shared) shared = createSarge()
+  return shared
+}
+
+/**
+ * `pow.sarge` — because WHICH of his 22 categories belongs to which moment is
+ * an EAR's question and nobody else's, and the browser console is where this
+ * project settles those (`pow.sfx` is the same arrangement for the bank).
+ *
+ * Installed from the app's own start rather than from a battle, so the lines
+ * can be walked from the menu.
+ */
+export function installSargeConsole(): void {
+  if (!window.pow) return
+  window.pow.sarge = {
+    play: (section, line) => (sarge().play(section, line), sargeFile(section, line)),
+    // …and by the FILE's own number, which is what the folder shows and what an
+    // ear is actually browsing. One higher than the section, always.
+    file: (category, line) => {
+      const path = sargeFile(category - 1, line)
+      sarge().play(category - 1, line)
+      return path
+    },
+    stop: () => sarge().stop(),
+    spoken: () => sarge().spoken(),
+    list: () => ({ ...SARGE_CATEGORIES })
+  }
+}
+
 export function createSarge(): Sarge {
   const buffers = new Map<string, AudioBuffer | null>()
   const heard: string[] = []

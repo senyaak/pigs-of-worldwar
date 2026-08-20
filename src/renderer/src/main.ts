@@ -23,6 +23,7 @@ import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 import { feText } from './ui/barScreen'
+import { installSargeConsole } from './audio/sarge'
 import { fall, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
 import { fieldedAt, mapAt, mapId } from '../../lib/game/missions'
 import { nextMap } from '../../lib/game/save'
@@ -531,6 +532,11 @@ if (window.pow) {
     values: screen.values,
     flipping: screen.flipping
   })
+  // THE SERGEANT, from the app's own start rather than from a battle: which of
+  // his 22 categories belongs to which moment is an EAR's question, the lines
+  // carry no subtitles anywhere, and browsing them should not need a mission
+  // open (audio/sarge.ts). `pow.sarge.list()` says what is known.
+  installSargeConsole()
   window.pow.menu = view(menu)
   window.pow.onePlayer = view(onePlayer)
   window.pow.loadScreen = view(loadScreen)

@@ -15,8 +15,7 @@ import { createBattleSounds } from './battle'
 import type { BattleSounds } from './battle'
 import { createBattleAudio } from './battleAudio'
 import { createPigVoice } from './pigVoice'
-import { createSarge } from './sarge'
-import { sargeFile } from '../../../lib/game/sergeant'
+import { sarge as theSarge } from './sarge'
 import type { Sarge } from './sarge'
 import type { PigVoice } from './pigVoice'
 import { createSoundConsole } from './console'
@@ -89,21 +88,13 @@ export function createBattleSound(bus: BattleBus): BattleSound {
    * THE SERGEANT, and the one thing he says that is built: well done for a
    * KILL, bad luck for a LOSS, at the end of the turn that did it. The rules
    * pick the line (lib/game/sergeant.ts); this speaks it.
+   *
+   * BORROWED rather than made: there is one of him, installed with the console
+   * at the app's own start (audio/sarge.ts), and a battle only hands him a
+   * moment to speak at.
    */
-  const sarge: Sarge = createSarge()
+  const sarge: Sarge = theSarge()
   bus.on(handling({ sergeant: ({ section, line }) => sarge.play(section, line) }))
-  // …and the console hears any of them, because WHICH of his 22 categories
-  // belongs to which moment is settled by EAR: the lines carry no subtitles —
-  // neither text table holds a word of them — so only play can say what
-  // SGEN07 is. Nineteen of the 22 are decoded and unbuilt; this is how the
-  // next one gets placed. `pow.sarge.play(2, 1)` is the praise.
-  if (window.pow) {
-    window.pow.sarge = {
-      play: (section, line) => (sarge.play(section, line), sargeFile(section, line)),
-      stop: () => sarge.stop(),
-      spoken: () => sarge.spoken()
-    }
-  }
 
   /**
    * THE TOP OF A TURN, which is one moment with two halves and a fork between
@@ -160,7 +151,9 @@ export function createBattleSound(bus: BattleBus): BattleSound {
     sargeSpoken: () => sarge.spoken(),
     saying: () => voice.saying(),
     dispose() {
-      sarge.dispose()
+      // STOPPED, not disposed: he outlives the battle, and the console keeps
+      // him between missions.
+      sarge.stop()
       music.dispose()
       voice.dispose()
       bank.dispose()

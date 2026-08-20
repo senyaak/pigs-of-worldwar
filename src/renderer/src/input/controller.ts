@@ -457,9 +457,16 @@ declare global {
        * up, and waiting for a moment to be pinned to (docs/history/turns.md).
        */
       sarge?: {
+        /** By the exe's own SECTION argument, 0-based. */
         play(section: number, line: number): string
+        /** …and by the FILE's number, which is what the folder shows: `file(3,
+         * 1)` is SGEN0301, the praise. One higher than the section, always. */
+        file(category: number, line: number): string
         stop(): void
         spoken(): string[]
+        /** What each of the 22 is, as far as the exe says — the MOMENT is read,
+         * the WORDS are not, and no table in the game holds them. */
+        list(): Record<number, string>
       }
       /** The level's MUSIC, live — which of the thirty clips is sounding, and
        * a way to hear any of them: `pow.music.play(7)`, `pow.music.turn(0)`,

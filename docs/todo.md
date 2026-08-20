@@ -159,6 +159,45 @@ Nothing to build. Three things want play's EAR or EYE:
 
 ---
 
+## P1. THE SERGEANT'S OTHER NINETEEN — an EAR's job, not a reader's
+
+Two of his 22 categories are built (a kill, a loss — `lib/game/sergeant.ts`).
+The other nineteen have their MOMENT read out of the exe and their WORDS read
+by nobody: the lines are never printed, neither `gtext` nor `fetext` holds one,
+so **listening is the only way to place them.** Everything needed is in the
+app already — `pow.sarge` is installed from the app's own start, so a mission
+does not have to be open:
+
+```
+pow.sarge.list()          // what each of the 22 is, as far as the exe says
+pow.sarge.file(3, 1)      // hear SGEN0301 — the praise for a kill
+pow.sarge.play(2, 1)      // …the same line by the exe's own SECTION argument
+pow.sarge.stop()
+```
+
+`file` takes the FILE's number, which is what the folder shows; `play` takes
+the section, which is one lower and is what the exe's call sites pass.
+
+What the read gives, and what it does not:
+
+| file | the moment (READ) | what to listen for |
+| --- | --- | --- |
+| 01 | end of turn, you LOST a pig, your side behind | **built** |
+| 03 | end of turn, you KILLED, your side ahead | **built** |
+| 02, 04 | START of turn, behind / ahead | worth building next: same pair, other end of the turn |
+| 05..10 | a crate collected, by PICKUP TYPE — 5/6 by an item byte, 7 for types 2 and 14, 8 for 4 and 16 (it takes something OFF the pig), 9 for type 7, 10 for type 8 | which crate is which is the whole question |
+| 11, 12 | start of turn, said ONCE a battle each (two latches) | probably the level's own advice |
+| 13+14 | the clock running out — ONE pool of sixteen across the two files | |
+| 15..21 | MULTIPLAYER, by the pig's nation: variants 1..4 praise, 5..8 commiseration | seven nations, one file each |
+| 22 | the FRONT END — the menu, and its idle nag after twelve idle ticks | seven long lines, up to 1.6 MB |
+
+**The gate on 01 and 03 is worth remembering before judging the others**: the
+praise is refused unless your side leads on TOTAL TEAM HEALTH, so it is not
+heard after every kill. The whole chain — the builder at `0x43B850`, all 21
+call sites, the camera and the beat — is in `docs/history/turns.md`.
+
+---
+
 ## 0. THE CAMPAIGN'S SPINE — a save, then NEW GAME and LOAD GAME
 
 Play's order, 2026-08-13, and it is the next thing to build. The frontend is
