@@ -16,7 +16,6 @@ import { initDebrief } from './ui/debrief'
 import { initTeamScreen } from './ui/teamScreen'
 import { initNameScreen } from './ui/nameScreen'
 import { initPlayerScreen } from './ui/playerScreen'
-import type { NextMission } from './ui/playerScreen'
 import { initMultiPlayer } from './ui/multiPlayer'
 import { initFileBrowser } from './ui/fileBrowser'
 import { initArchiveView } from './ui/archiveView'
@@ -27,6 +26,7 @@ import { feText } from './ui/barScreen'
 import { fall, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
 import { fieldedAt, mapAt, mapId } from '../../lib/game/missions'
 import { nextMap } from '../../lib/game/save'
+import { isTrainingGround } from '../../lib/game/tutorial'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
 import * as campaign from './campaign'
@@ -146,12 +146,21 @@ const NO_CAMPAIGN_MAP = 'CAMP'
  * skirmish leaves the way it always has, back to the main menu. */
 let campaignBattle = false
 
-/** What START MISSION would open — the map and its place in the campaign, which
- * is what the squad screen's board says while that row is lit. Null once the
- * campaign has run out of missions. */
-const nextMission = (save: NonNullable<ReturnType<typeof campaign.current>>): NextMission | null => {
-  const map = nextMap(save)
-  return map ? { map, position: save.position } : null
+/**
+ * Which MAP the squad screen's board names while START MISSION is lit. Null
+ * once the campaign has run out of missions.
+ *
+ * **The TRAINING GROUND is skipped, and that is play's ruling over the arm.**
+ * The exe names the map the position byte actually points at (`team+0x53`
+ * through the order table at 0x4D17F0, 0x428ADF), which at position 0 is BOOT
+ * CAMP. Play: "буткэмп это не первая миссия, это своего рода детур — сразу
+ * первую показывать надо." So the board names what comes AFTER it while the
+ * campaign still stands there. What the action OPENS is unchanged: START
+ * MISSION at position 0 still asks about the training ground.
+ */
+const nextMission = (save: NonNullable<ReturnType<typeof campaign.current>>): string | null => {
+  const here = nextMap(save)
+  return here && isTrainingGround(here) ? mapAt(save.position + 1) : here
 }
 
 /** The squad screen, standing on whatever the campaign now says. */

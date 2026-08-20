@@ -96,9 +96,13 @@ test('it opens on START MISSION, and the grid is two columns of five and three',
 
 test('the board names the NEXT MISSION while START MISSION is lit', async ({ app }) => {
   // `[play]`: "когда наводится на старт мишн на экране отряда — там
-  // показывается что следующая миссия называется такто". A fresh campaign stands at
-  // position 0, which is the training ground: gtext 21 BOOT CAMP under gtext
-  // 159's own lead (ui/titleCard.ts).
+  // показывается что следующая миссия называется такто", and the arm agrees —
+  // 0x428A95 writes `fetext 247` over `fetext 249 + mapId` on the board
+  // whenever the lit item is an option row.
+  //
+  // A fresh campaign stands at position 0, the training ground — and play
+  // rules that a DETOUR, so the board names what comes after it: position 1 is
+  // ESTU, `fetext 274` THE WAR FOUNDATION.
   const { page } = app
   await toPlayerScreen(page)
 
@@ -113,7 +117,7 @@ test('the board names the NEXT MISSION while START MISSION is lit', async ({ app
   expect(await selection(page, 'playerScreen')).toBe(8)
   await expect
     .poll(board, { message: 'the board is still without its strings' })
-    .toEqual(['0', 'BOOT CAMP', 'TRAINING MISSION'])
+    .toEqual(['0', 'NEXT MISSION =', 'THE WAR FOUNDATION'])
 
   // …and a PIG takes it back — the board is one surface with two subjects.
   await tap(page, 'menuUp')
@@ -125,13 +129,13 @@ test('the board names the NEXT MISSION while START MISSION is lit', async ({ app
   // BACK to the action, and the words return.
   await tap(page, 'menuDown')
   expect(await selection(page, 'playerScreen')).toBe(8)
-  expect(await board()).toEqual(['0', 'BOOT CAMP', 'TRAINING MISSION'])
+  expect(await board()).toEqual(['0', 'NEXT MISSION =', 'THE WAR FOUNDATION'])
 
   // AND IT IS PAINTED. A debug read says which words are up, never that a
   // pixel was laid down (CLAUDE.md) — so count what the board's own rows
   // carry with the mission on them against the same rows blanked. `pigpro`
-  // stands at (232, 304) 200 wide and the three lines this writes run
-  // y 334..406 (ui/playerScreen.ts, LAYOUT.board).
+  // stands at (232, 304) 200 wide and the two lines this writes run
+  // y 382..406 (ui/playerScreen.ts, LAYOUT.board).
   const inkInBoard = (): Promise<number> =>
     page.evaluate(() => {
       const canvas = document.getElementById('player-screen') as HTMLCanvasElement

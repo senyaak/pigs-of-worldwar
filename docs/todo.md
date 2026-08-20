@@ -405,11 +405,19 @@ Section 0A has the sweep and the one bug it turned up.
        LAST and in front. `sqpics00..10` is `sqpic`'s own arrival animation;
        `parrow1..3` and `sqarmy` are dead on this screen; `backgr~1` is no draw
        arm's — it stays on play's word as the portrait's backing. The BOARD is
-       `pigpro`'s face (`[play]`): tokens, name, class, PROMOTE cost, battles
-       and kills, written with markup icons `vp`/`battle`/`kills` — every
-       line's y is `[CHECK — remake]`, nothing writes that text in any read
-       arm. Still unread: `0x4267A0` (the option list's scroll) and which of
-       2/4 `[0x4C0D44]` carries for record 12.
+       `pigpro`'s face: tokens, name, class, PROMOTE cost, battles and
+       kills, written with markup icons `vp`/`battle`/`kills`. **The arm that
+       writes it was FOUND 2026-08-20** and it is not in the draw arm at all —
+       it is the frontend's title/caption drawer `0x4285A0`, kind 5's arm
+       `0x4287CB`, which also answers both of the two remaining questions:
+       `[0x4C0D44]` is **2** for record 12 (4 for record 34), and `0x4267A0` is
+       **not the option list's scroll** but the PORTRAIT HIGHLIGHT — eight
+       slots walking a 0..3 counter through the four brightness copies of each
+       face. And a lit OPTION row makes the board name the NEXT MISSION,
+       `fetext 247` over `fetext 249 + mapId` — built, `frontend/notes.md` and
+       `docs/history/frontend.md` carry the chain. Every line's y is still
+       `[CHECK — remake]`: the arm's own pen ladder is arithmetic off a box at
+       (215, 334) and has not been checked against a running game.
      - ~~**SAVE TEAM does nothing** and PROMOTE is not there at all~~ **BOTH
        SETTLED 2026-08-18.** SAVE TEAM is REMOVED — the autosave's screen-side
        half, promised where SAVE ARMY was ruled out. And the PIG MENU (record

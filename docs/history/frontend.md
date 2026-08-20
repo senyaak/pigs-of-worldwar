@@ -1010,34 +1010,52 @@ nudging the class picture dragged the letters with it. Play found that the way
 it finds everything: "имена привязаны к columns[0].badge зачем-то, но имена
 отдельно."
 
-## THE BOARD GOT A SECOND SUBJECT — 2026-08-20
+## THE BOARD GOT A SECOND SUBJECT, AND THE ARM WAS THERE ALL ALONG — 2026-08-20
 
 Play: "когда наводится на старт мишн на экране отряда — там показывается что
-следующая миссия называется такто." The `pigpro` board had one subject, the
-lit pig, and kept it when an action was chosen ("the board never goes blank");
-now START MISSION has a subject of its own.
+следующая миссия называется такто." The `pigpro` board had one subject, the lit
+pig, and kept it when an action was chosen ("the board never goes blank").
 
-Three things had to be found first, and none of them was hard — which is the
-point, because the screen had been treated as finished:
+**The first pass built it out of `gtext` and was wrong.** A mission's name in
+the battle's own title card is `gtext 11 + mapId` under the format
+"MISSION >2N : >S", so that is what the board was given — split in two and
+wrapped, because the format is written across 640 pixels and the board is 200.
+It worked and it was an invention.
 
-- **the MISSION's name is not a frontend string.** Every other word on this
-  screen is `fetext`, read through `feText`; a mission's display name is
-  `gtext 11 + mapId` and `gtext` had never been loaded outside a battle. The
-  squad screen loads it in `load()` now, beside the frontend's own, and a
-  failed load leaves the mission line off rather than the screen.
-- **the screen does not know where the campaign stands**, and should not: the
-  composition root holds the save, so `show` takes a `NextMission` — the map
-  `nextMap(save)` gives and its position — and the screen only draws it.
-- **the card's format does not fit the board.** `gtext 158` is
-  "MISSION >2N : >S" written across 640 pixels; the board is 200 wide, and
-  measured over CHARS2 the 26 campaign names run 55 to 202 — so
-  COMMUNICATION BREAKDOWN is two pixels wider than the whole board on its own.
-  `missionTitleParts` splits the format at its `>S`, the NAME takes the line
-  play asked about, and `wrap` puts it over two rows when it has to with the
-  number under it.
+**Then the arm turned up, and it is not in the draw arm at all.** The note this
+file carried — "nothing writes this text in any arm that has been read" — was
+right about `0x41D285`'s tail and wrong about the screen: the words are written
+by the frontend's TITLE/CAPTION drawer `0x4285A0`, which has a per-KIND arm,
+and kind 5's is `0x4287CB`. That arm draws the team's name into record 12's
+title box, then switches to the other text object and writes the BOARD:
 
-One thing was tidied on the way: `writeBoard` and the new `pow.playerScreen
-.board()` share a `boardSubject()`, so the words a spec reads cannot drift
-from the words that are drawn — and the spec still counts the ink in the
-board's own rows afterwards, because a debug read is not a paint check.
+- `0x428952` compares the lit item against `[0x4C0D44]`, the screen's own
+  OPTION COUNT — **2 for record 12**, settled two ways (the arm at `0x42CEA3`
+  writes it, and `[0x4C0EE8 + 4·12]` is 10 = 2 options + 8 pigs). Below it is an
+  option row; at or above it is a pig.
+- a pig gets name / class / `PROMOTE - <cost>` / battles+kills, which is the
+  five-line board this screen already drew.
+- an option row gets **`fetext 247` "NEXT MISSION =" over `fetext 249 + mapId`**
+  (`0x428AC5` and `0x428AEF`), the map coming off the campaign order at
+  `0x4D17F0` indexed by `team+0x53`. A blank line separates it from the points.
+
+So the strings are the FRONTEND's, not the battle's — two tables holding the
+same 26 names in a different order — and `missionTitleParts`, the split this
+session had invented, went out again with the wrap: **`fetext 253` carries a
+literal `/N`**, COMMUNICATION/NBREAKDOWN, so the one name too wide for the board
+is broken by the DATA and nothing has to measure anything.
+
+**One thing stays play's over the arm.** The exe names the map the position
+byte actually points at, which at position 0 is BOOT CAMP; play: "буткэмп это
+не первая миссия, это своего рода детур — сразу первую показывать надо." So the
+board skips the training ground and names what comes after it.
+
+Two more things came out of the same read and are written down rather than
+built: `[0x4C0D44]` is 4 for record 34, which is why the multiplayer screen
+draws one column of five; and **`0x4267A0` is not "the option list's scroll"**,
+which was the last unread thing on this screen — it is the PORTRAIT HIGHLIGHT,
+eight slots each walking a 0..3 counter one step a frame through the four
+brightness copies of its face (`face1a..face9d`, `[0x511920]`), the lit one
+ramping up and the rest ramping down. Ours swells the portrait's WIDTH instead,
+off a different arm (0x41D365).
 

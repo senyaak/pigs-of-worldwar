@@ -34,32 +34,6 @@ export const CARD_Y = 160
  * the training ground is not one, which is the other half of why the exe has
  * two formats.
  */
-/**
- * The same title in TWO pieces — what the format says before the name, and the
- * name itself.
- *
- * The card writes them as one line across 640 pixels; the squad screen's board
- * is 200 wide and cannot (ui/playerScreen.ts), so it stacks them. Both formats
- * end in `>S`, so the lead is simply everything before it, with the separator
- * the format carries — a colon in both — trimmed off the end.
- */
-export function missionTitleParts(
-  strings: string[],
-  map: string,
-  position = 0
-): { lead: string; name: string } | null {
-  const at = missionNameIndex(map)
-  if (at < 0) return null
-  const name = strings[at]
-  const format = strings[isTrainingGround(map) ? TRAINING_TITLE : MISSION_TITLE]
-  if (!format || !name) return null
-  const lead = format
-    .slice(0, format.indexOf('>S'))
-    .replace('>2N', String(position).padStart(2, '0'))
-    .replace(/[\s:]+$/, '')
-  return { lead, name }
-}
-
 export function missionTitle(strings: string[], map: string, position = 0): string | null {
   const at = missionNameIndex(map)
   if (at < 0) return null

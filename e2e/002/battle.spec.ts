@@ -23,7 +23,7 @@ import {
   swapMap,
   warp
 } from '../controller'
-import { choose, startGame, toBattle } from '../menu'
+import { TEST_TEAM, choose, startGame, startMission, toBattle } from '../menu'
 import { TILE_STEP, TILE_WALL, TILE_WATER, parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
 import { readFileSync } from 'node:fs'
@@ -100,6 +100,13 @@ test.beforeAll(() => {
 })
 
 test('New Game: squads on the map, turns rotate, the scene draws', async ({ app }) => {
+  // The longest test in the phase: a whole battle, TWO map swaps, and a turn
+  // the MACHINE plays out at its own pace (2 s on the card, 2 s thinking,
+  // lib/game/ai.ts) with a second of GET READY floor on every beat besides.
+  // It sat over the suite's 30 s for a while behind an assertion that failed
+  // before any of it ran (`e2e/002/pause.spec.ts` takes its own for the same
+  // kind of reason).
+  test.setTimeout(90_000)
   const { page } = app
   await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()
@@ -107,9 +114,17 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   // Turn 1: first player's first pig, full health, the clock running. Full is
   // FIFTY for a grunt — the maximum is the class's, out of the record at
   // 0x4d02e0, and it is not 100 (lib/game/health.ts).
+  //
+  // **The player's own side wears the TEAM's name, not its nation's**, and
+  // that is the campaign landing rather than a slip: side 0 is fielded from
+  // the SAVE — the name as it was typed at PLEASE NAME YOUR TEAM — while
+  // every other side takes its nation's name out of `fetext`
+  // (lib/game/muster.ts, `OwnSquad`). This spec predates there being a save to
+  // take one from and expected the NATION's name here. The enemy below is what
+  // keeps both halves pinned.
   await expect
     .poll(() => hud(page))
-    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
+    .toMatchObject({ turn: 1, side: TEST_TEAM, pig: 'NOBBY', health: 50 })
 
   // The battle canvas draws something that is not background.
   const foregroundPixels = async (): Promise<number> =>
@@ -151,17 +166,25 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   await skipTurn(page)
   await expect
     .poll(() => hud(page))
-    .toMatchObject({ turn: 2, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
+    .toMatchObject({ turn: 2, side: TEST_TEAM, pig: 'NOBBY', health: 50 })
   expect(await secondsLeft()).toBeGreaterThan(40)
 
   // Two sides rotate the way two sides do вЂ” on a map that HAS two.
+  //
+  // **And the side wears its NATION's name again from here**: `pow.swapMap`
+  // is the console's own re-open (ui/battle.ts) and it calls `start` with no
+  // save behind it, so there is no `OwnSquad` and every side — the player's
+  // included — is fielded out of `fetext` like an enemy's. FIRST_ARMY is the
+  // British, whose name is TOMMY'S TROTTERS.
   expect(await swapMap(page, 'LIBERATE')).toBe(true)
   await expect
     .poll(() => hud(page))
     .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY' })
   await skipTurn(page)
   // The second side is the map's own choice: LIBERATE sets the French bit,
-  // so the enemy IS the Garlic Grunts (lib/game/teams.ts).
+  // so the enemy IS the Garlic Grunts (lib/game/teams.ts) — and it wears
+  // that NATION's name, which is the other half of the split above: only side
+  // 0 is named out of the save.
   await expect
     .poll(() => hud(page))
     .toMatchObject({ turn: 1, side: 'GARLIC GRUNTS', pig: 'BASTILLE' })
@@ -175,13 +198,22 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   // Back to the map the rest of the phase warps around on.
   expect(await swapMap(page, 'CAMP')).toBe(true)
 
-  // Leaving lands back on the menu; a fresh New Game starts over at turn 1.
+  // **Leaving lands on the SQUAD, not on the menu** — the toolbar's walk-out
+  // is `aborted`, and a campaign mission walked out of goes straight back to
+  // the squad with nothing written to the save (src/renderer/src/main.ts). Only
+  // a battle with no campaign behind it leaves to the menu, which is what this
+  // line used to assert, from before there was a campaign to belong to.
   await page.locator('#battle-leave').click()
-  await expect(page.locator('#menu')).toBeVisible()
-  await startGame(page)
+  await expect(page.locator('#player')).toBeVisible()
+
+  // …and START MISSION opens it again, at turn 1 with a full clock: nothing
+  // was written, so the campaign has not moved.
+  await startMission(page)
+  await expect(page.locator('#battle')).toBeVisible()
+  await landed(page)
   await expect
     .poll(() => hud(page))
-    .toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
+    .toMatchObject({ turn: 1, side: TEST_TEAM, pig: 'NOBBY', health: 50 })
 
 
   expect(app.errors()).toEqual([])

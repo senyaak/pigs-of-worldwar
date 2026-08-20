@@ -56,7 +56,7 @@ import type { SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { trackRows } from './mouseRows'
-import { missionTitleParts } from './titleCard'
+import { mapId } from '../../../lib/game/missions'
 import { initPigMenu } from './pigMenu'
 import type { PromoteResult } from './pigMenu'
 import { initCareerPath } from './careerPath'
@@ -139,6 +139,25 @@ const LAMPS = ['lit1', 'lit2', 'lit3']
  * docs/todo.md). The items after them are the pigs, named at runtime, which is
  * why their fetext ids run into the next screen's words (`frontend/notes.md`). */
 const START_TEXT = 50
+
+/**
+ * The board's own two strings while an OPTION row is lit — **`fetext`, not
+ * `gtext`**, which is the surprise in this arm and the reason nothing found it
+ * for so long. The card the LEVEL opens with takes its words from `gtext`
+ * (ui/titleCard.ts, `gtext 11 + mapId` under "MISSION >2N : >S"); this screen
+ * has a table of its own with no format around it — **`fetext 247` "NEXT
+ * MISSION =" over `fetext 249 + mapId`** (0x428AC5 and 0x428AEF, which reads
+ * the campaign order at 0x4D17F0 with `team+0x53`).
+ *
+ * The names in the two tables are the same words in a different order, and
+ * `fetext 253` carries a literal `/N` — COMMUNICATION/NBREAKDOWN, the one
+ * name too wide for the board, wrapped by the DATA rather than by any code.
+ */
+const NEXT_MISSION_TEXT = 247
+const MISSION_NAME_TEXT = 249
+/** The line break the frontend's own strings carry (`0x431AC0` on `/N`). Only
+ * one mission name uses it, and it is the only one that would not fit. */
+const MARKUP_BREAK = '/N'
 
 const ENTERS_FROM = -700
 
@@ -283,13 +302,6 @@ const LAYOUT = {
      * верху не хватает"). `pigpro` stands at y 304, so the first line now
      * clears its edge by 30 rather than by 18. */
     lines: { tokens: 334, name: 358, rank: 382, promote: 406, counts: 428 },
-    /** How far inside `pigpro`'s own edges the words stay — what a line is
-     * WRAPPED against. `[CHECK — remake]`: the board's dark face has not been
-     * measured off the art the way the name screen's panel was, and 8 is an
-     * eye. It matters for exactly one string, COMMUNICATION BREAKDOWN, which
-     * is 202 pixels of CHARS2 against a board 200 wide — every other mission
-     * name in the game fits on one line. */
-    margin: 8,
     /** Between a piece of a line and the next, and how far the 22-tall icons
      * ride above the letters' own top. */
     gap: 6,
@@ -389,11 +401,12 @@ export interface PlayerScreen {
    * writes the last of those. Called before the screen is entered, and again
    * whenever an edit moved the save under the screen.
    *
-   * `mission` is where the campaign STANDS: the map START MISSION would open
-   * and its position in the campaign. The board says its name while that row
-   * is lit (`[play]`). Null for a campaign that has run out of missions.
+   * `mission` is the MAP the campaign is standing on — what START MISSION
+   * would open. The board names it while that row is lit. Null for a campaign
+   * that has run out of missions, and for a skirmish, which is the exe's own
+   * rule: the board draws nothing at all off a multiplayer record (0x428AA7).
    */
-  show(squad: Pig[], teamName: string, tokens: number, mission?: NextMission | null): void
+  show(squad: Pig[], teamName: string, tokens: number, mission?: string | null): void
   /** Which of the nine places is lit: 0..7 a pig, 8 START MISSION. */
   selected(): number
   labels(): string[]
@@ -409,14 +422,6 @@ export interface PlayerScreen {
   /** …and CAREER PATH, the same way (ui/careerPath.ts). */
   career: OverlayView
   layout: PlayerLayout
-}
-
-/** Where the campaign stands — what START MISSION would open. */
-export interface NextMission {
-  /** The map's own name, `CAMP` or `ROAD`. */
-  map: string
-  /** Its place in the campaign, which is the number the title carries. */
-  position: number
 }
 
 /** The one action lives past the eight pigs, the way the name entry's keys
@@ -454,11 +459,7 @@ export function initPlayerScreen(handlers: {
   let teamName = ''
   let tokens = 0
   /** What START MISSION would open, or null — see `show`. */
-  let mission: NextMission | null = null
-  /** `gtext`, the GAME's strings rather than the frontend's: a mission's
-   * display name is `gtext 11 + mapId` and lives in that table alone
-   * (ui/titleCard.ts). Empty until `load` has been through. */
-  let battleText: string[] = []
+  let mission: string | null = null
   let selection = 0
   /** Which pig the BOARD is about while a PIG is lit. The board never goes
    * blank, so choosing an action leaves it on the pig that was last lit — and
@@ -865,30 +866,6 @@ export function initPlayerScreen(handlers: {
     if (spent) light.draw(context, String(spent.cost), SPENT.x, SPENT.y)
   }
 
-  /**
-   * Break a line at its spaces so no piece of it is wider than `room`, over at
-   * most TWO lines — the board has three free rows when it is showing a
-   * mission and the third is the number under it.
-   *
-   * A word too long to fit on its own is left over the edge rather than cut:
-   * a truncated mission name reads worse than one touching the frame, and no
-   * shipped name is that long anyway.
-   */
-  const wrap = (font: Font, text: string, room: number): string[] => {
-    if (font.measure(text) <= room) return [text]
-    const words = text.split(' ')
-    let first = ''
-    for (let take = words.length - 1; take >= 1; take--) {
-      const head = words.slice(0, take).join(' ')
-      if (font.measure(head) <= room) {
-        first = head
-        break
-      }
-    }
-    if (!first) return [text]
-    return [first, words.slice(first.split(' ').length).join(' ')]
-  }
-
   /** One line of the board: pieces laid out left to right and centred as a
    * group, a piece being either words or one of the markup icons. */
   const boardLine = (
@@ -924,13 +901,12 @@ export function initPlayerScreen(handlers: {
    * называется такто". Anything else means the pig that was last lit — the
    * board never goes blank.
    */
-  type BoardSubject =
-    | { kind: 'mission'; name: string; lead: string }
-    | { kind: 'pig'; pig: Pig }
+  type BoardSubject = { kind: 'mission'; name: string } | { kind: 'pig'; pig: Pig }
   const boardSubject = (): BoardSubject | null => {
     if (selection === START) {
-      const title = mission && missionTitleParts(battleText, mission.map, mission.position)
-      return title ? { kind: 'mission', name: title.name, lead: title.lead } : null
+      const id = mission ? mapId(mission) : -1
+      if (id < 0) return null
+      return { kind: 'mission', name: feText(MISSION_NAME_TEXT + id) }
     }
     const pig = squad[boardPig]
     return pig ? { kind: 'pig', pig } : null
@@ -942,7 +918,9 @@ export function initPlayerScreen(handlers: {
     const subject = boardSubject()
     const rows = [String(tokens)]
     if (!subject) return rows
-    if (subject.kind === 'mission') return [...rows, subject.name, subject.lead]
+    if (subject.kind === 'mission') {
+      return [...rows, feText(NEXT_MISSION_TEXT), ...subject.name.split(MARKUP_BREAK)]
+    }
     const ways = promotionsFrom(subject.pig.rank)
     return [
       ...rows,
@@ -969,16 +947,21 @@ export function initPlayerScreen(handlers: {
     const subject = boardSubject()
     if (!subject) return
 
-    // The MISSION, stacked rather than written as one line: the card's own
-    // format is "MISSION >2N : >S" across 640 pixels (ui/titleCard.ts) and the
-    // board is 200 wide, so the NAME takes the line play asked about — over
-    // two rows if it has to — and the number sits under it.
+    // The MISSION, in the arm's own shape (0x428A95): a BLANK line under the
+    // points, then "NEXT MISSION =", then the name. The blank is why the
+    // caption starts on the board's THIRD row while a pig's name starts on its
+    // second — the exe writes a newline before it and nothing on that line.
+    //
+    // The name wraps only where its own string says to: `fetext 253` carries a
+    // literal `/N` and no other name does, so the DATA does the one break that
+    // is needed and this file does not measure anything.
     if (subject.kind === 'mission') {
-      const room = sprites.get('pigpro').width - layout.board.margin * 2
-      const rows = [lines.name, lines.rank, lines.promote]
-      const wrapped = wrap(font, subject.name, room)
-      wrapped.forEach((line, i) => boardLine(context, sprites, font, rows[i], [{ text: line }]))
-      boardLine(context, sprites, font, rows[wrapped.length], [{ text: subject.lead }])
+      boardLine(context, sprites, font, lines.rank, [{ text: feText(NEXT_MISSION_TEXT) }])
+      const rows = [lines.promote, lines.counts]
+      subject.name
+        .split(MARKUP_BREAK)
+        .slice(0, rows.length)
+        .forEach((line, i) => boardLine(context, sprites, font, rows[i], [{ text: line }]))
       return
     }
 
@@ -1064,20 +1047,11 @@ export function initPlayerScreen(handlers: {
     async load() {
       if (loaded) return
       try {
-        // …and `gtext` beside the frontend's own, because the one thing on this
-        // screen that is not a frontend string is the MISSION's name
-        // (ui/titleCard.ts). A failed load leaves the board's mission line off
-        // rather than the screen.
-        const [shared, sprites, strings] = await Promise.all([
-          loadFrontend(),
-          loadSprites(ART),
-          window.api.loadGameText('gtext')
-        ])
+        const [shared, sprites] = await Promise.all([loadFrontend(), loadSprites(ART)])
         bank = shared.bank
         lit = shared.lit
         plain = shared.plain
         art = sprites
-        if (strings.ok) battleText = strings.strings
       } catch (error) {
         console.warn(String(error))
         return
