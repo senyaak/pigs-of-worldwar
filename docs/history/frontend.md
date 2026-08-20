@@ -962,3 +962,32 @@ from reading anything, and each is written where it lives:
   200 px, which is the crowding the same message reported.
 - **The briefing's PRESS ANY KEY stops twelve lower**, resting over the bar
   instead of climbing into the page's words.
+
+### …and why three of those did not show up (same day)
+
+Play came back with "имена свиней не перемещены выше", "старт меню не
+переместил виджет" — three numbers changed in the source and none of them on
+the screen. Nothing was wrong with the numbers: **the console layout's own
+persistence was painting over them.**
+
+`pow.screen` stashes a session's nudges in `localStorage` on the way out and
+lays them back over the code on the way in, which is right — an evening of
+moving furniture used to die with the window. What it stashed was the WHOLE
+layout, every number the screens carried, so from the first nudge on that
+machine the saved snapshot outranked the source for ever: editing `ui/*.ts`
+changed nothing anybody could see.
+
+It stores the DIFFERENCE now. The code's own numbers are snapshotted at
+start-up before anything saved is applied, and `beforeunload` writes only the
+leaves that differ from them — an untouched screen saves nothing at all. The
+key moved to `pow.screen.layout.v2` and v1's whole-layout snapshots are
+removed on sight, so the machines that have one recover without being told to
+run `pow.screen.reset()`.
+
+The same pass finished the rest of the list: LOAD answers the mouse (empty
+slots are forgotten rather than chased, since the cursor may not rest on one),
+the board's top line came down twelve with the four under it re-spaced to keep
+the bottom where play said it was already right, and START MISSION's words are
+CENTRED in their plate now — the drop-from-the-top number had been guessed
+twice and reported low twice, so `options.text` is a nudge off the centre
+instead.

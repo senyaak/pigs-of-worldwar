@@ -258,7 +258,12 @@ const LAYOUT = {
   pigpro: { x: 232, y: 304 },
   board: {
     centre: 332,
-    lines: { tokens: 322, name: 348, rank: 372, promote: 400, counts: 428 },
+    /** **The top line came DOWN twelve**, and the four under it were re-spaced
+     * to keep the last one where it is — `[play]`: the sides and the bottom
+     * sat right and the top did not ("паддинг норм слева права и снизу — с
+     * верху не хватает"). `pigpro` stands at y 304, so the first line now
+     * clears its edge by 30 rather than by 18. */
+    lines: { tokens: 334, name: 358, rank: 382, promote: 406, counts: 428 },
     /** Between a piece of a line and the next, and how far the 22-tall icons
      * ride above the letters' own top. */
     gap: 6,
@@ -283,10 +288,17 @@ const LAYOUT = {
      * this comment rather than in the field, since the fold itself is the
      * suspect part (see the note above). */
     rows: [353],
-    /** How far into its plate a row's words sit — `[CHECK — remake]`, and
-     * play took it up from 38: the letters were riding the plate's bottom
-     * edge ("текст немного смещён в низ от элемента"). */
-    text: 30,
+    /**
+     * How far the words sit off the plate's own MIDDLE — zero is centred, and
+     * that is what this is now.
+     *
+     * It used to be a drop from the plate's top edge (38, then 30), which is a
+     * number nobody can pick without the art in front of them: play reported
+     * the letters low twice running. Centring is the thing that was actually
+     * wanted, so the row asks the plate how tall it is and the knob is left
+     * here for a nudge either way.
+     */
+    text: 0,
     lamp: { x: [429, 601], drop: 16 }
   },
   /** Record 12's title box, raw (299, 77) 400 wide (0x4C1548 + 4·12) — and
@@ -737,11 +749,17 @@ export function initPlayerScreen(handlers: {
     options.lamp.x.forEach((x) => put(lamp, x, options.rows[0] + options.lamp.drop))
     const startLabel = feText(START_TEXT)
     const startFont = selection === START ? light : dark
+    // Centred in the plate rather than dropped from its top edge, with
+    // `options.text` a nudge off that centre (see the layout).
+    const plate = sprites.get('sqoptsf')
     startFont.draw(
       context,
       startLabel,
       centred(startFont, startLabel, options.x, options.width),
-      options.rows[0] + options.text + offset
+      options.rows[0] +
+        Math.round((plate.height - startFont.height) / 2) +
+        options.text +
+        offset
     )
 
     // The team's own name across the top, which is what the player just typed.

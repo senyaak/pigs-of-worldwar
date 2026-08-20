@@ -490,8 +490,21 @@ byId<HTMLButtonElement>('browser-menu').addEventListener('click', () => show('me
 // lit are only readable through here (docs/testing.md) — and where its
 // furniture sits is eyework, so the layout is editable from the console the
 // same way the dashboard's is.
-/** Where a session's console nudges are kept between runs. */
-const LAYOUT_KEY = 'pow.screen.layout'
+/**
+ * Where a session's console nudges are kept between runs.
+ *
+ * **v2 stores the DIFFERENCE from the code, not the whole layout**, and the
+ * key moved so the old snapshots die with the old rule. What v1 did was
+ * write every number the screens were carrying and lay all of them back over
+ * the code on the next run — which means the moment anything was nudged once,
+ * that machine stopped seeing changes to ANY layout number for good. Play hit
+ * it head on: three numbers moved in the source (the squad name's drop, START
+ * MISSION's row and its words) and none of them appeared, because a snapshot
+ * taken weeks earlier was painted over them at start-up.
+ */
+const LAYOUT_KEY = 'pow.screen.layout.v2'
+/** v1's key, thrown away on sight — see above. */
+const LAYOUT_KEY_V1 = 'pow.screen.layout'
 
 if (window.pow) {
   const view = (screen: (typeof screens)[keyof typeof screens]): BarScreenView => ({
@@ -531,6 +544,7 @@ if (window.pow) {
     /** Throw the saved nudges away and go back to what the code says. */
     reset: () => {
       localStorage.removeItem(LAYOUT_KEY)
+      localStorage.removeItem(LAYOUT_KEY_V1)
       location.reload()
     }
   }
@@ -561,6 +575,37 @@ if (window.pow) {
       }
     }
   }
+  /**
+   * What one layout carries that the CODE's own does not — the nudges alone,
+   * as a tree of only the leaves that differ. An empty branch is left out
+   * entirely, so a screen nobody touched saves nothing at all.
+   */
+  const nudges = (live: unknown, base: unknown): unknown => {
+    if (Array.isArray(live) && Array.isArray(base)) {
+      const out: Record<string, unknown> = {}
+      live.forEach((item, i) => {
+        const diff = nudges(item, base[i])
+        if (diff !== undefined) out[String(i)] = diff
+      })
+      return Object.keys(out).length > 0 ? out : undefined
+    }
+    if (live && base && typeof live === 'object' && typeof base === 'object') {
+      const out: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(live as Record<string, unknown>)) {
+        const diff = nudges(value, (base as Record<string, unknown>)[key])
+        if (diff !== undefined) out[key] = diff
+      }
+      return Object.keys(out).length > 0 ? out : undefined
+    }
+    return live === base ? undefined : live
+  }
+
+  // The code's own numbers, taken BEFORE anything saved is laid over them:
+  // what the diff on the way out is measured against.
+  const asCode = JSON.parse(JSON.stringify(window.pow.screen.print()))
+  // v1's whole-layout snapshots are not a diff and would smother the code the
+  // way they have been doing; the key is simply dropped.
+  localStorage.removeItem(LAYOUT_KEY_V1)
   try {
     const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? 'null')
     if (saved) {
@@ -573,7 +618,12 @@ if (window.pow) {
     console.warn(`pow: the saved layout would not load (${String(error)})`)
   }
   window.addEventListener('beforeunload', () => {
-    localStorage.setItem(LAYOUT_KEY, JSON.stringify(window.pow?.screen?.print() ?? {}))
+    // ONLY what was moved. Everything else follows the source, so a number
+    // changed in `ui/*.ts` lands on the next run instead of being painted over
+    // by a snapshot of the way things used to be.
+    const moved = nudges(window.pow?.screen?.print() ?? {}, asCode)
+    if (moved === undefined) localStorage.removeItem(LAYOUT_KEY)
+    else localStorage.setItem(LAYOUT_KEY, JSON.stringify(moved))
   })
 }
 

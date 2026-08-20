@@ -27,6 +27,7 @@ import { spring, launch, still } from './springs'
 import type { Motion } from './springs'
 import { widget } from './frames'
 import type { Script, Widget } from './frames'
+import { trackRows } from './mouseRows'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
 import { loadSprites } from './sprites'
@@ -43,6 +44,10 @@ const MISSION_TEXT = 248
 
 /** What an empty slot says — the exe's own string (0x4C0E50). */
 const EMPTY = '---'
+
+/** A slot's hit band where the letters have not loaded — the rows' own pitch,
+ * and only the mouse reads it (ui/mouseRows.ts). */
+const ROW_HEIGHT = 22
 
 /** The plate's three shades, widget frames 0..2. */
 const PLATES = ['pclit0', 'pclit1', 'pclit2']
@@ -204,6 +209,30 @@ export function initLoadScreen(handlers: {
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
 
+  /**
+   * THE MOUSE (ui/mouseRows.ts) — the eight slots, at the boxes their labels
+   * are centred in, riding the screen's climb. A click on the lit slot loads
+   * it.
+   *
+   * An EMPTY slot is not a place the cursor may rest (`step` hops over one),
+   * so the pointer resting on one is simply forgotten in `advance` — without
+   * that the light would chase a row it is never allowed to reach and walk the
+   * list for ever.
+   */
+  const mouse = trackRows(
+    canvas,
+    () =>
+      SLOTS.map((_, i) => ({
+        x: layout.rows.x,
+        y: layout.rows.y[i] + scaleY(y.value) - scaleY(REST.y),
+        width: layout.rows.width,
+        height: plain?.height ?? ROW_HEIGHT
+      })),
+    (row) => {
+      if (row === selection) choose()
+    }
+  )
+
   const advance = (): void => {
     if (phase === 'leaving') {
       // The panel rolls shut and the plates park mid-shade; only once the
@@ -218,6 +247,14 @@ export function initLoadScreen(handlers: {
         queueMicrotask(go)
       }
       return
+    }
+
+    // The pointer walks the light a slot a tick, and an empty slot — which
+    // the cursor may not rest on — is forgotten rather than chased.
+    const hovered = mouse.hovered()
+    if (hovered >= 0) {
+      if (hovered === selection || !entries[hovered]) mouse.clear()
+      else step(hovered > selection ? 1 : -1)
     }
 
     const home = spring(y, REST.y, CLIMB)
