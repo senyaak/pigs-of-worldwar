@@ -154,6 +154,15 @@ export type BattleEvent =
   /** The acting pig says a firing line, per squad. */
   | { kind: 'bark'; player: number }
   /**
+   * THE SERGEANT SAYS SOMETHING — a section and a line of
+   * `Speech/Sku1/Sarge/` (lib/game/sergeant.ts).
+   *
+   * The one this engine emits is the end-of-turn remark: well done for a KILL
+   * while your side leads, commiserations for a LOSS while it trails. The
+   * other nineteen sections are decoded and unbuilt.
+   */
+  | { kind: 'sergeant'; section: number; line: number }
+  /**
    * A TURN HAS BEGUN — the exe's mode 4 going up, the GET READY card, and the
    * one moment two different noises hang off (audio/battleSound.ts).
    *

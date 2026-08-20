@@ -872,6 +872,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // is still talking before they step (play's rule, lib/game/shot.ts). Ahead
     // of `engine.update`, like every other input.
     battle.setSpeaking(sounds.saying())
+    // …and the SERGEANT's line the same way: the beat between the walk away and
+    // the handover lasts exactly as long as he does (lib/game/sergeant.ts).
+    battle.setSargeSpeaking(sounds.sargeSaying())
     // The GAME, in whole steps — the order of events and everything running
     // with it, the engine's own business from end to end. A step that is about
     // to run leaves behind where the pig stood, which is what the picture is
@@ -1041,6 +1044,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       }
     },
     walkAway: () => battle.view().walkAway,
+    sergeant: () => battle.view().sergeant,
+    sargeSpoken: () => sounds.sargeSpoken(),
     ending: () => {
       const ending = battle.view().ending
       return ending === null

@@ -807,3 +807,65 @@ is a one-shot press, and one that arrived while the squad was in the air belongs
 to the drop. So the two halves are separate now — leaving the drop keeps what is
 HELD and drops the latch — and that is the only transition that wants the split.
 
+## THE SERGEANT — 2026-08-20, off play's memory and found whole
+
+Play: "потом сам свин который убил показывается и что-то говорится… этого вроде
+нет сейчас — но должно быть — именно убить надо и тебя похвалят типо." It was
+not there, it should be, and the arm turned out to be complete.
+
+**The lead was in the install.** `Speech/Sku1/Sarge/` — 175 files, `SGEN{CC}{VV}
+.wav`, 21 categories of eight short lines and a twenty-second of seven long
+ones — and nothing in the remake had ever opened it. It is not a pig's voice:
+the pig player `0x43AF70` has exactly four callers and all five of its
+categories are placed (a shot, the top of a turn, getting up after a blast).
+And these files carry **no language code**, where a pig's and the training
+instructor's both do — one set, English, for every nation.
+
+**`0x43B850` is `Sound::PlaySargeSpeech`.** Its own arithmetic, transcribed: 22
+sections with anything past them clamped to nought and complained about
+("eSpeechSection is wrong = %d"), a line passed whole when the range is −1 or
+picked out of it at random, **a line past EIGHT spilling into the next
+category** — which is how the "hurry up" pool of sixteen spans files 13 and 14
+— and then `SGEN%02d%02d.wav`. It shares nothing with the pig's builder but the
+audio manager: a separate hand-written body, different constants, different
+`ret N`. The exe tells the two apart by a tag byte, and its "is he still
+talking" test answers **3** for a Sarge line against 2 for a training one.
+
+**Twenty-one call sites, all of them read.** Sections 4..9 are the crates by
+item type, 10 and 11 are one-shot hints latched per battle, 12 is the clock
+running down, 14..20 are the multiplayer pair chosen by the pig's own nation,
+21 is the front end's — and the two this engine now builds:
+
+- **section 2 → `SGEN03xx`, WELL DONE**, at the end of a turn in which you
+  killed;
+- **section 0 → `SGEN01xx`, BAD LUCK**, at the end of one in which you lost a
+  pig.
+
+**And the gate is about the SCORE, not only about the kill** (0x4983CD): the
+praise wants your side strictly ahead on TOTAL TEAM HEALTH, the commiseration
+wants it strictly behind. A kill from behind is met with silence. The exe's own
+debug line names the comparison — "Current player health = %d. Min, Max Other
+Players' health = %d, %d" — and the first draft of the headless spec proved it
+by accident, killing one of five heavy gunners at 90 and hearing nothing,
+because four of them still outweighed five grunts.
+
+**The camera and the beat.** After the per-casualty death cams the exe pushes
+its state, goes to **state 13**, points the camera at `[[turnController+0x4FC]
++0x10]` — the ACTING pig, the one that took the shot — in camera mode 3, and
+plays `Pig::React(15)` or `React(16)` on it. Both of those are animation only,
+a coin toss between clips 30/54 and 31/33, which is the other half of the voice
+being the sergeant's alone. The state is released by asking whether he is still
+talking, with a floor of 125 ms under it, and then the camera goes back to mode
+4 and the pig makes its own turn-start noise.
+
+Built the same shape: `lib/game/sergeant.ts` is pure (the tally, the health
+comparison, the rotation, the file name), the battle counts the turn's dead by
+side and opens the beat between the WALK AWAY and the handover, and the scene
+pushes "is he talking" back into the rules the way it already does for a pig's
+firing line. `audio/sarge.ts` speaks it.
+
+**What is NOT built is nineteen categories, and only an EAR can place them.**
+The lines carry no subtitles — neither text table holds a word of them — so
+`pow.sarge.play(section, line)` is the console's way in, the same arrangement
+`pow.sfx` has for the sounds whose names only play can settle.
+

@@ -26,6 +26,7 @@ import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
 import { createStubBrain } from './ai'
 import { beginWalkAway } from './walkAway'
+import { SARGE_FLOOR, SARGE_WON, noTally, sargeAfterTurn, winOrLose } from './sergeant'
 import type { WalkAway } from './walkAway'
 import { advanceEndOfGame, beginEndOfGame, outcomeOf } from './endOfGame'
 import type { EndOfGame } from './endOfGame'
@@ -141,6 +142,9 @@ export interface BattleView {
    * see out of the water (lib/game/walkAway.ts). Null when a turn is being
    * played. */
   walkAway: { swimming: number } | null
+  /** The SERGEANT is making his end-of-turn remark, and the camera belongs to
+   * the pig that earned it (lib/game/sergeant.ts). */
+  sergeant: boolean
   /** The MISSION being over, and which pig the tour is on — the exe's mode 2
    * (lib/game/endOfGame.ts). Null for as long as there is a game to play. */
   ending: EndOfGame | null
@@ -188,6 +192,12 @@ export interface Battle {
    * layer at all. What that costs is written up in `lib/game/shot.ts`.
    */
   setSpeaking(saying: boolean): void
+  /**
+   * …and whether the SERGEANT is, which is what the beat between the walk away
+   * and the handover holds on (lib/game/sergeant.ts). The same road and the
+   * same reason as the one above.
+   */
+  setSargeSpeaking(saying: boolean): void
   /** How full the power gauge is, 0..1 — or null when nothing in hand charges,
    * which is what the dashboard hides it on. */
   charging(): number | null
@@ -555,6 +565,42 @@ export function createBattle(parts: BattleParts): Battle {
     })
   }
 
+  /**
+   * Open the sergeant's beat, or answer false for a turn he sits out.
+   *
+   * **The remark is gated on the SCORE as well as on the kill** and that is the
+   * arm, not a taste (0x4983CD): well done for killing only while your side
+   * leads on total health, bad luck for losing one only while it trails. A kill
+   * from behind is met with silence.
+   *
+   * The tally is cleared here rather than at the handover because the exe
+   * clears it at the START of a turn (0x48FD92) — same moment, and doing it
+   * here keeps the two reads of it, this one and the clear, side by side.
+   */
+  const beginSarge = (): boolean => {
+    const health = game.players.map((player) =>
+      player.pigs.reduce((sum, pig) => sum + Math.max(0, pig.health), 0)
+    )
+    const mine = game.players.indexOf(game.currentPlayer)
+    const said = sargeAfterTurn(
+      tally,
+      winOrLose(health[mine] ?? 0, health.filter((_, side) => side !== mine)),
+      sargeLines
+    )
+    tally = noTally()
+    if (!said) return false
+    sarge = { floor: SARGE_FLOOR }
+    // The camera comes off the blow and back to the pig that made it — which is
+    // what `focus` would do at the handover anyway, only the remark happens
+    // first and wants to be watched.
+    aftermath = null
+    const acting = game.currentPig
+    const cheer = said.section === SARGE_WON ? ANIM.CHEERED : ANIM.SLUMPED
+    anim.playOnce(acting, cheer[parts.random() < 0.5 ? 0 : 1])
+    emit({ kind: 'sergeant', section: said.section, line: said.line })
+    return true
+  }
+
   const handOver = (): void => {
     // Side 0 is OURS — the campaign's own, which `spawnTeams` orders first off
     // the map's player bit — and the verdict tells it apart from the rest the
@@ -585,8 +631,42 @@ export function createBattle(parts: BattleParts): Battle {
   // The battle LISTENS to its own weapons for the two things that stop a turn.
   // A blow does not decide that a turn ends; the OBJECT breaking does, which is
   // where the exe hangs it too (0x48d750), and every weapon simply announces.
+  /**
+   * WHAT THIS TURN DID, by side — the exe's `[0x537F14]` and `[0x537F18]`,
+   * which six separate death sites all step and which are cleared at the START
+   * of every turn (0x48FD92). It is what the sergeant's end-of-turn remark is
+   * decided by (lib/game/sergeant.ts).
+   *
+   * A pig that kills its OWN counts for both, because the exe steps the second
+   * tally unconditionally after comparing the sides.
+   */
+  let tally = noTally()
+  /** The sergeant's own rotation, one counter a section — the exe steps its
+   * byte after the call and wraps past eight (0x498402), so the lines come
+   * round in order rather than at random. */
+  const sargeLines = new Map<number, number>()
+  /**
+   * The beat the sergeant's remark holds, between the WALK AWAY and the
+   * handover — the exe's state 13 (0x4978CD), which it stays in until the wav
+   * is done (0x491192) with a floor of 125 ms under it (0x490CBD).
+   *
+   * The camera is on the ACTING pig for it: `0x49EC20` takes the current
+   * squad's own pig as its subject, which is the one that took the shot, and
+   * `0x49F740(3, 1)` is a mode of its own — not the turn's 4.
+   */
+  let sarge: { floor: number } | null = null
+  /** Whether the SERGEANT is still talking — the scene's poll, the same road
+   * the firing bark's takes (contracts/sound.ts). */
+  let sargeSpeaking = false
+
   parts.bus.on(
     handling({
+      killed: ({ pig }) => {
+        const dead = everyone().find((one) => one.id === pig)
+        if (!dead) return
+        if (game.currentPlayer.pigs.includes(dead)) tally.losses++
+        else tally.kills++
+      },
       broke: ({ target, at }) => {
         // A different effect from the hit, and the one play remembers as smoke.
         effects.broke(at)
@@ -789,6 +869,20 @@ export function createBattle(parts: BattleParts): Battle {
       loco.swimming = inWater(query, loco.x, loco.z, loco.y)
       if (done) {
         walkAway = null
+        if (!beginSarge()) handOver()
+      }
+      onChanged()
+      return
+    }
+
+    // **THE SERGEANT'S REMARK.** The turn is over, nobody is driving, and the
+    // camera is back on the pig that took the shot while he says his piece.
+    if (sarge) {
+      jumpRequested = false
+      attack.swallow()
+      sarge.floor = Math.max(0, sarge.floor - delta)
+      if (sarge.floor <= 0 && !sargeSpeaking) {
+        sarge = null
         handOver()
       }
       onChanged()
@@ -1332,6 +1426,9 @@ export function createBattle(parts: BattleParts): Battle {
       firing: attack.firing(),
       aftermath,
       walkAway: walkAway === null ? null : { swimming: walkAway.swimming() },
+      // The sergeant's beat, so the scene can hold the camera on the pig he is
+      // talking about rather than snapping to the next turn's.
+      sergeant: sarge !== null,
       ending,
       inside: indoors.inside(game.currentPig),
       doorway: indoors.reachable(game.currentPig)
@@ -1366,6 +1463,9 @@ export function createBattle(parts: BattleParts): Battle {
     setAim: sights.push,
     setSighting: sights.setHeld,
     setSpeaking: attack.setSpeaking,
+    setSargeSpeaking(saying) {
+      sargeSpeaking = saying
+    },
     charging: () => attack.gauge(game.currentPig.holding),
     aim: () => (weaponOf(holding).aims ? sights.angle() : null),
     situation: () => ({
@@ -1394,6 +1494,7 @@ export function createBattle(parts: BattleParts): Battle {
         spent ||
         aftermath !== null ||
         walkAway !== null ||
+        sarge !== null ||
         climbing !== null ||
         leaving !== null ||
         carry !== null,

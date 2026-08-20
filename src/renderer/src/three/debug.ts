@@ -155,6 +155,11 @@ export interface DebugParts {
   /** The beat at the END of a turn, and how many pigs are still in the water
    * (lib/game/walkAway.ts). Null while a turn is being played. */
   walkAway: () => { swimming: number } | null
+  /** The SERGEANT's own beat, between the walk away and the handover
+   * (lib/game/sergeant.ts). */
+  sergeant: () => boolean
+  /** …and every line of his that has been played (audio/sarge.ts). */
+  sargeSpoken: () => string[]
   /** The MISSION being over: whether it was won, which pig the tour is on and
    * how long it has been running (lib/game/endOfGame.ts). Null while there is a
    * game to play — and the only thing on this surface that says the training
@@ -292,6 +297,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
        * can drive, the clock is stopped and `swimming` is how many pigs are
        * still making for the shore (lib/game/walkAway.ts). */
       walkAway: () => parts.walkAway(),
+      sergeant: () => parts.sergeant(),
+      sargeSpoken: () => parts.sargeSpoken(),
       /** The mission being over — the exe's mode 2, END OF GAME. Nothing else a
        * spec can look at says the training ground finished (lib/game/endOfGame.ts). */
       ending: () => parts.ending(),

@@ -248,6 +248,11 @@ export interface DebugHooks {
    * many pigs it is still waiting to see out of the water. Null while a turn is
    * being played (lib/game/walkAway.ts). */
   walkAway(): { swimming: number } | null
+  /** The SERGEANT's own beat, between the walk away and the handover — he says
+   * well done for a kill and bad luck for a loss (lib/game/sergeant.ts). */
+  sergeant(): boolean
+  /** …and which of his lines have been played, as file paths (audio/sarge.ts). */
+  sargeSpoken(): string[]
   /** The MISSION being over — the exe's mode 2, END OF GAME: whether it was won,
    * which pig the camera's tour is on and how long the beat has run. Null while
    * there is a game to play (lib/game/endOfGame.ts). */
@@ -441,6 +446,20 @@ declare global {
           mix?: { volume?: number; pitch?: number; jitter?: number }
         ): string | null
         print(): Record<string, unknown>
+      }
+      /**
+       * The SERGEANT, live — `pow.sarge.play(2, 1)` is the praise for a kill.
+       *
+       * Which of his 22 categories belongs to which moment is an EAR's
+       * question and nobody else's: the lines carry no subtitles anywhere in
+       * either text table, so listening is the only way to place one. Two are
+       * built (lib/game/sergeant.ts); the other nineteen are decoded, written
+       * up, and waiting for a moment to be pinned to (docs/history/turns.md).
+       */
+      sarge?: {
+        play(section: number, line: number): string
+        stop(): void
+        spoken(): string[]
       }
       /** The level's MUSIC, live — which of the thirty clips is sounding, and
        * a way to hear any of them: `pow.music.play(7)`, `pow.music.turn(0)`,

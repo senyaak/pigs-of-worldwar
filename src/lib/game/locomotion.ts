@@ -239,6 +239,22 @@ export const ANIM = {
    * the dying band the three decoded call sites leave. Play rules a death in
    * the water wears it (lib/game/corpses.ts). */
   DROWNING: 50,
+  /**
+   * **WELL DONE, and BAD LUCK** — what a pig wears while the sergeant makes his
+   * end-of-turn remark about it (lib/game/sergeant.ts).
+   *
+   * `Pig::React(15)` and `React(16)`, cases 0xF and 0x10 of the table at
+   * 0x47281C, and both are ANIMATION ONLY — neither says a word, which is the
+   * other half of the sergeant's line being the sergeant's. Each tosses a coin
+   * for one of two clips (`call rand ; test al,1`, 0x472789 and its twin):
+   * **30 or 54** on the good news, **31 or 33** on the bad.
+   *
+   * WHAT each of the four is, is the name table's business and the name table
+   * has been wrong before, so they are named for the moment rather than for
+   * the pose.
+   */
+  CHEERED: [30, 54] as const,
+  SLUMPED: [31, 33] as const,
   /** Hanging under a canopy — the level's opening drop (lib/game/parachute). */
   PARACHUTE: 82
 } as const

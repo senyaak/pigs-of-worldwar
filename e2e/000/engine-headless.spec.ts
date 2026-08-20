@@ -21,6 +21,7 @@ import { nations } from '../../src/lib/game/teams'
 import { fielded, mapSquads, musterGame } from '../../src/lib/game/muster'
 import { buildQuery, createEngine } from '../../src/lib/game/engine'
 import { createBus } from '../../src/lib/game/events'
+import type { BattleBus } from '../../src/lib/game/events'
 import { bodyExtent } from '../../src/lib/game/body'
 import { give } from '../../src/lib/game/inventory'
 import { restingY } from '../../src/lib/game/locomotion'
@@ -46,15 +47,22 @@ interface Built {
   engine: Engine
   game: Game
   heard: BattleEvent[]
+  /** The battle's own bus, so a test can ANNOUNCE as well as listen — which is
+   * how a casualty is arranged without a weapon to arrange it with. */
+  bus: BattleBus
 }
 
 /** Records to leave OFF the map, by model name — how a mission is put into a
  * state the training ground would take the whole tutorial to reach. */
-async function buildHeadless(seed?: number, without: string[] = []): Promise<Built> {
+async function buildHeadless(
+  seed?: number,
+  without: string[] = [],
+  map: string = MAP
+): Promise<Built> {
   const maps = path.join(GAME_DIR, 'Maps')
   const chars = path.join(GAME_DIR, 'Chars')
-  const terrain = await loadTerrain(path.join(maps, `${MAP}.PMG`))
-  const loaded = await loadMapObjects(path.join(maps, `${MAP}.POG`))
+  const terrain = await loadTerrain(path.join(maps, `${map}.PMG`))
+  const loaded = await loadMapObjects(path.join(maps, `${map}.POG`))
   const clips = await loadClips(chars)
   const teams = nations(await loadGameText(GAME_DIR, 'fetext'))
   const art = await loadModel(path.join(chars, 'british.mad'), GRUNT)
@@ -66,11 +74,11 @@ async function buildHeadless(seed?: number, without: string[] = []): Promise<Bui
   // No campaign behind this run, so each side wears its own slot — which is
   // what `mapSquads` does with an empty list (lib/game/nations.ts).
   const squads = mapSquads(objects, teams, [])
-  expect(squads.length, `${MAP} carries spawn markers`).toBeGreaterThan(0)
+  expect(squads.length, `${map} carries spawn markers`).toBeGreaterThan(0)
 
   const game = musterGame({
     squads,
-    map: MAP,
+    map,
     ground: query,
     bodyOf: () => bodyExtent(art.model.positions)
   })
@@ -89,7 +97,7 @@ async function buildHeadless(seed?: number, without: string[] = []): Promise<Bui
       objects,
       clips,
       skeleton: art.skeleton,
-      map: MAP,
+      map,
       parachutes: true
     },
     query,
@@ -97,7 +105,7 @@ async function buildHeadless(seed?: number, without: string[] = []): Promise<Bui
     onChanged: () => {},
     bus
   })
-  return { engine, game, heard }
+  return { engine, game, heard, bus }
 }
 
 /** Everything about the battle that two machines have to agree on. */
@@ -368,4 +376,56 @@ test('it steps: the drop lands, the clock runs, and the pig walks where it is to
   // …and it is still on the ground it walked over, not sunk into it or flying.
   const under = restingY(engine.query, pig.position.x, pig.position.z)
   expect(Math.abs(battle.view().loco.y - under), 'still standing on the map').toBeLessThan(30)
+})
+
+test('THE SERGEANT says well done, and the turn waits for him', async () => {
+  if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
+    test.skip(true, `no game install at ${GAME_DIR}`)
+  }
+  // Play asked for this off their own memory — "именно убить надо и
+  // тебя похвалят типо" — and the arm is decoded end to end
+  // (lib/game/sergeant.ts). LIBERATE rather than the training ground, because
+  // CAMP fields ONE pig and there is nobody to kill.
+  const { engine, game, heard, bus } = await buildHeadless(1, [], 'LIBERATE')
+  while (engine.dropIn.running()) engine.update(FRAME)
+  game.cutTurnStart()
+  expect(game.players.length, 'LIBERATE fields two sides').toBeGreaterThan(1)
+
+  // **A BATTERED ENEMY**, because the praise is gated on the SCORE as well as
+  // on the kill and that is the half nobody would guess: 0x4983CD asks the
+  // health comparison BEFORE it looks at the tally. Killing one pig of a team
+  // that is still stronger than yours earns silence, which is what the first
+  // draft of this test proved by accident — their five heavy gunners at 90
+  // outweighed our five grunts even a man down.
+  const mine = game.currentPlayer
+  const theirs = game.players.find((player) => player !== mine)!
+  for (const pig of theirs.pigs) pig.health = 10
+
+  // …and a casualty among them, announced the way a weapon announces one.
+  const victim = theirs.pigs[0]
+  victim.health = 0
+  bus.emit({ kind: 'killed', pig: victim.id })
+
+  // Run the clock out and take the beats: the WALK AWAY first, then his.
+  game.hurryTurn(0.1)
+  const said = (): BattleEvent[] => heard.filter((event) => event.kind === 'sergeant')
+  let spoke = false
+  for (let frame = 0; frame < 60 * 20 && said().length === 0; frame++) {
+    engine.update(FRAME)
+    spoke = spoke || engine.battle.view().sergeant
+  }
+
+  const lines = said()
+  expect(lines.length, 'he said his piece').toBe(1)
+  // Section 2 is the praise — `SGEN03xx`, and the FIRST of its eight, because
+  // his counters start where the exe's bytes do.
+  expect(lines[0]).toMatchObject({ kind: 'sergeant', section: 2, line: 1 })
+  expect(spoke, 'and the turn was held while he did').toBe(true)
+
+  // …and the beat ENDS: there is no sound in a headless battle, so only the
+  // exe's own 125 ms floor holds it (SARGE_FLOOR).
+  for (let frame = 0; frame < 60 * 5 && engine.battle.view().sergeant; frame++) {
+    engine.update(FRAME)
+  }
+  expect(engine.battle.view().sergeant, 'and then it hands over').toBe(false)
 })

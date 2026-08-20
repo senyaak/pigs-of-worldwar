@@ -15,6 +15,9 @@ import { createBattleSounds } from './battle'
 import type { BattleSounds } from './battle'
 import { createBattleAudio } from './battleAudio'
 import { createPigVoice } from './pigVoice'
+import { createSarge } from './sarge'
+import { sargeFile } from '../../../lib/game/sergeant'
+import type { Sarge } from './sarge'
 import type { PigVoice } from './pigVoice'
 import { createSoundConsole } from './console'
 import { createMusic, trackFor } from './music'
@@ -29,6 +32,8 @@ import type { SceneSound } from '../contracts/sound'
 export const GAME_SOUNDS = 'Audio/sfxday.srl'
 
 export interface BattleSound extends SceneSound {
+  /** Which of the sergeant's lines have been played (audio/sarge.ts). */
+  sargeSpoken(): string[]
   /** Which music clips have been started, in order — a spec's only ear on the
    * level's track (audio/music.ts). */
   music(): number[]
@@ -81,6 +86,26 @@ export function createBattleSound(bus: BattleBus): BattleSound {
   const music: Music = createMusic()
 
   /**
+   * THE SERGEANT, and the one thing he says that is built: well done for a
+   * KILL, bad luck for a LOSS, at the end of the turn that did it. The rules
+   * pick the line (lib/game/sergeant.ts); this speaks it.
+   */
+  const sarge: Sarge = createSarge()
+  bus.on(handling({ sergeant: ({ section, line }) => sarge.play(section, line) }))
+  // …and the console hears any of them, because WHICH of his 22 categories
+  // belongs to which moment is settled by EAR: the lines carry no subtitles —
+  // neither text table holds a word of them — so only play can say what
+  // SGEN07 is. Nineteen of the 22 are decoded and unbuilt; this is how the
+  // next one gets placed. `pow.sarge.play(2, 1)` is the praise.
+  if (window.pow) {
+    window.pow.sarge = {
+      play: (section, line) => (sarge.play(section, line), sargeFile(section, line)),
+      stop: () => sarge.stop(),
+      spoken: () => sarge.spoken()
+    }
+  }
+
+  /**
    * THE TOP OF A TURN, which is one moment with two halves and a fork between
    * them — the exe's `Pig::React(7)` (0x472320, case 7) splitting on whose
    * controller the acting pig has:
@@ -130,8 +155,12 @@ export function createBattleSound(bus: BattleBus): BattleSound {
     chuteOverhead: audio.chuteOverhead,
     played: () => bank.played(),
     spoken: () => voice.spoken(),
+    sargeSaying: () => sarge.saying(),
+    /** Every line of his played, in order — a spec's only ear on him. */
+    sargeSpoken: () => sarge.spoken(),
     saying: () => voice.saying(),
     dispose() {
+      sarge.dispose()
       music.dispose()
       voice.dispose()
       bank.dispose()

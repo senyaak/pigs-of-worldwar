@@ -42,4 +42,12 @@ export interface SceneSound {
    * battle once a frame; nothing here knows what a battle is.
    */
   saying(): boolean
+  /**
+   * …and whether the SERGEANT is, which is the other poll the RULES read: the
+   * beat between the walk away and the handover lasts exactly as long as his
+   * line (lib/game/sergeant.ts).
+   */
+  sargeSaying(): boolean
+  /** Every line of his played, in order — what a spec listens to. */
+  sargeSpoken(): string[]
 }
