@@ -904,7 +904,10 @@ What is actually missing, in the order it is worth doing:
    DOES something — and it must stay a function of stepped time and the
    battle's one random stream, because lockstep (the `net` branch) will feed
    the same seam. The pure specs and `engine-headless` stay hotseat: nobody
-   is the computer unless the assembler says so.
+   is the computer unless the assembler says so. **The brain's design is
+   settled and written — [ai.md](ai.md)**: orders over the Battle verbs, one
+   HP-differential evaluation over the kit, difficulty as quality of thought,
+   our own pathfinder, HIDE as armour against memory.
 
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens
