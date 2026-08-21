@@ -255,28 +255,37 @@ footstep nor a pig and said what each one is; the table lives where the wiring
 is (`src/renderer/src/audio/battle.ts`, above `BATTLE_SOUNDS`) with the
 measured length beside each.
 
-**FOUND, after the whole bank was walked**: the burning fuse is not in the
-BATTLE bank — it is in the **FRONT END's**. The install holds 2019 audio files
-and the three `.srl` banks name 126 of them; `FESounds/` carries **`hiss1`
-(0.58 s), `hiss2` (0.59 s) and `Sparks02` (0.60 s)**, plus three steams, two
-coins and a crunch, and the only thing that plays any of them is the menu
-machine. Play walked all ninety-nine of the battle's and said so plainly:
-"короче там ничего нет - но звук фитиля точно где-то есть ещё." Right on both
-halves. `pow.sfx.file('FESounds/hiss1.wav')` hears one; picking between the
-hisses and the sparks is an ear's call, and then a battle borrows it the way it
-borrows anything else.
+**SETTLED, after every effect in the install was heard**: there is **no
+burning fuse in the game**. Play walked the battle bank's ninety-nine, then
+the pig's own forty-one, then the front end's — and the front end is the only
+other place with effects in it. `hiss1` is hydraulics or gas escaping,
+`Sparks02` is electricity, `Steam001` is steam, `Crunch` is the menu's "you
+cannot press that": all of it is the machine.
 
-**Two more loose ends the same sweep turned up**: `Audio/AMB_1N.wav` and
+The arithmetic closes: 2019 audio files, 1823 of them speech and 31 music,
+leaving 165 — the battle's 99, the front end's 64, and two orphaned night
+ambiences. A sweep for embedded WAVE headers across every other file in the
+install came back empty. And a MEASUREMENT agrees with the ear — ranked by
+noisiness against steadiness of envelope, the only three hisses in the game
+are `BG_GAS`, `hiss1` and `hiss2`, and all three are placed elsewhere.
+
+So a charge's burn is its TIMER and nothing else, and that is an answer rather
+than a gap. Every identification is written up above `BATTLE_SOUNDS`
+(`src/renderer/src/audio/battle.ts`).
+
+**Two loose ends the same sweep turned up**: `Audio/AMB_1N.wav` and
 `AMB_2N.wav` — the NIGHT ambience pair — are indexed by nothing, because
 `sfxnight.srl` is byte-identical to `sfxday.srl` and names the DAY pair. And
 thirty-seven `FESounds/Indu0NN.wav` are in the folder and in no bank, two of
 them named "Looped".
 
-**The old answer, now superseded**: there is no burning fuse in the battle
-bank. `BG_GAS` is the gas grenade — "газовая граната так делает" — and
-`L_FLAME` is napalm going off, not something burning steadily. So a planted
-charge is heard as its TIMER and nothing else, and the entry that had borrowed
-the gas is gone rather than left wrong.
+**How to hear any of it** (all installed from the app's own start, no mission
+needed): `pow.sfx.next(undefined, false)` steps all ninety-nine in bank order,
+`pow.sfx.next()` steps only what is not yet placed, `pow.sfx.left()` says
+what that is, `pow.sfx.walk(filter, { fresh })` does it hands-free paced by
+each sample's own length, `pow.sfx.file('FESounds/hiss1.wav')` plays anything
+in the install by path, and `pow.sfx.queue([...paths])` points the stepper at
+a shortlist. `pow.sfx.set('fuseTimer', 'NAME')` rebinds a moment live.
 
 **What is placed and wired to nothing**, roughly in the order it would be worth
 doing:

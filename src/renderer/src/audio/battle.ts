@@ -96,18 +96,59 @@ export interface Cue {
  * 98 S_UNHOLS 0.60  putting a weapon AWAY
  * ```
  *
- * **There is no burning fuse in it** — play walked the other forty-one, the
- * pig's own, and came back with "короче там ничего нет". The pig's list is in
- * `audio/pigVoice.ts`; the short of it is a body and its moods, nothing that
- * burns.
+ * **AND THE PIG'S OWN FORTY-ONE**, walked the same evening. Eight were already
+ * placed (`P_HMMM`, `P_SNORT1`, `P_SLIP`, `P_CHUTE`, `P_OWW`, `P_PUNCH`,
+ * `P_SIGH`, `P_WHOOPE`); the rest are a body and its moods, and every one of
+ * them is a moment this engine has or will have:
  *
- * **But the sound exists, in the FRONT END's bank.** The install holds 2019
- * audio files and the three `.srl` banks name 126 of them; `FESounds/` carries
- * `hiss1` (0.58 s), `hiss2` (0.59 s), `Sparks02` (0.60 s), three steams, two
- * coins and a crunch, and only the menu machine plays any of them. Nothing
- * stops a battle borrowing one — `pow.sfx.file('FESounds/hiss1.wav')` hears it
- * — and that is where the charge's burn should come from once play has picked.
- * See `docs/todo.md`.
+ * ```
+ * P_BOUNCE  the clock stopping, and something sticking in
+ * P_BREAT1  a sigh — pigs make these when you stand near one or walk past
+ * P_BREAT2  another sigh
+ * P_BRRR    they are COLD
+ * P_BRUSH   brushing itself down
+ * P_BURP    a burp
+ * P_BUSH    walking through bushes
+ * P_CHUTE1  something tearing
+ * P_CLAP    clapping its trotters
+ * P_COUGH1  a cough — poisoned?
+ * P_COWER1  a groan
+ * P_COWER2  …another
+ * P_COWER3  …another
+ * P_DROWN   drowning
+ * P_EXERT   a jump?
+ * P_FART1   a fart
+ * P_FART2   …
+ * P_FART3   …
+ * P_FLAP1   a ROPE
+ * P_HAND1   rubbing its trotters together
+ * P_HEAL    the heal SKILL, done by hand
+ * P_HEAL1   …and the heal done with a syringe
+ * P_ITCH    scratching
+ * P_LAND1   it FELL
+ * P_LAUGH1  a snigger
+ * P_LAUGH2  …
+ * P_LAUGH3  …
+ * P_MAD1    wild squealing — no idea what for
+ * P_MAD2    …
+ * P_MOAN    a groan
+ * P_MUTTER  swearing under its breath
+ * P_WHIST1  hiding behind the sniper
+ * ```
+ *
+ * **AND THE FRONT END'S BANK, walked after it** — `FESounds/`, which is the
+ * only other place with sound effects in it. `hiss1` is hydraulics or gas
+ * escaping, `Sparks02` is electricity, `Steam001` is steam, `Crunch` is the
+ * menu's "you cannot press that". All of it is the menu machine.
+ *
+ * **SO THERE IS NO BURNING FUSE IN THE GAME.** Every effect in the install has
+ * now been heard: 2019 audio files, of which 1823 are speech and 31 are music,
+ * leaving 165 — the battle's 99, the front end's 64, and two orphaned night
+ * ambiences. A sweep for embedded WAVE headers across every other file in the
+ * install came back empty. And a measurement agrees with the ear: ranked by
+ * noisiness against steadiness, the only three hisses in the game are
+ * `BG_GAS`, `hiss1` and `hiss2`, all three of them placed elsewhere. So the
+ * charge's burn is its TIMER, and that is an answer rather than a gap.
  *
  * The rest of this is a work list rather than a table: nine of these are
  * placed by ear and wired to nothing — the turn clock's own warning, a round
