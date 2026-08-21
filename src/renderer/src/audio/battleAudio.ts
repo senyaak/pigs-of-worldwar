@@ -29,7 +29,19 @@ export interface BattleAudio {
    * first frame the sound exists. Call it once a frame while the drop runs.
    */
   chuteOverhead(running: boolean): void
+  /** A planted charge burning: one tick every `FUSE_TICK` for as long as any
+   * of them is alight (`BATTLE_SOUNDS.fuse`). */
+  fuseBurning(alight: number, delta: number): void
 }
+
+/**
+ * How often the burning fuse is heard, in seconds.
+ *
+ * `[CHECK — remake]` with the cue it plays: nothing in the bank is a fuse, so
+ * both the sound and its rate are picks. A charge burns for a touch under six
+ * seconds (lib/game/grenade.ts), so this is a dozen ticks and then the blast.
+ */
+export const FUSE_TICK = 0.45
 
 /**
  * `bank` is asked for rather than held: it loads beside the scene and the
@@ -37,8 +49,21 @@ export interface BattleAudio {
  */
 export function createBattleAudio(bank: () => Bank): BattleAudio {
   let chuteHeard = false
+  /** Seconds until the next tick of a burning fuse; reset the moment nothing
+   * is alight, so the first tick of the next charge is prompt. */
+  let sinceTick = 0
 
   return {
+    fuseBurning(alight, delta) {
+      if (alight <= 0) {
+        sinceTick = 0
+        return
+      }
+      sinceTick -= delta
+      if (sinceTick > 0) return
+      sinceTick = FUSE_TICK
+      playCue(bank(), BATTLE_SOUNDS.fuse)
+    },
     listen: handling({
       // ——— weapons ———
       // A barrel this table names, or the rifle's report for any GUN it does not

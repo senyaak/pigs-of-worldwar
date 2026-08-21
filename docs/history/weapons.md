@@ -1204,3 +1204,57 @@ first step places one, exactly as the exe's `Pig::ClearInventory` does.
 `unit/kits.spec.ts` pins the grunt's row, the commando's un-truncated one,
 the 17-row table with the grunt fallback past its end, and that a fresh
 battle deals every pig its own copy.
+
+## THE BURNING FUSE — 2026-08-21, four of play's five on one charge
+
+Play: "пофикси фитиль динамита - там щас фигня какая-то." No detail, so the
+first move was a MEASUREMENT rather than a guess — the charge driven headless,
+with nothing drawing it:
+
+- planted, hands empty, the bundle standing on the ground;
+- fuse **5.88 s** (50 frames of arming + 125 of fuse + 0..7 of jitter, at the
+  exe's own 1/30 rather than the walk's stretched 1/15);
+- the turn clock cut to **4 s** on the plant, the blast landing about two
+  seconds after it ran out, inside the beat that ends the turn;
+- damage dealt, turn handed over.
+
+So nothing about the timing was wrong, and what was wrong was everything AROUND
+it. Play named the rest on the next pass and all four are built.
+
+**It burns in SPARKS, not smoke — `[play]` over the arm.** The exe's row is not
+in doubt: effect 0x1D's update lays four a frame of particle type 0x18, whose
+setter (0x486f16) gives colour 0x14A5 — five of thirty-one on every channel —
+in puffs of 0x10, twice a grenade's. That is dark smoke, and play remembers
+sparks. What is KEPT off the exe is the shape — effect 0x1D, four a frame, hung
+`FUSE_LIFT` = 0x3C above the bundle; what is play's is the three fields that
+make a spark a spark: lit rather than tinted (additive), small, short-lived,
+and thrown clear of the fuse instead of stacked on it. A planted charge does
+not move, so without that last one all four land on top of each other.
+
+**The scatter is a PORT, not a roll.** `lib/game` never reaches for
+`Math.random` (CLAUDE.md), and a trail is drawn rather than played, so
+`advanceTrail` takes an optional `jitter()` and the renderer supplies it. Left
+out, nothing scatters — which is every row the exe lays along a segment.
+
+**Planting was SILENT, and the sound was already read.** Nothing announced a
+charge going down at all: the `fired` arm is skipped for a planted charge
+(there is nothing to loose) and the announcement went with it. `lobs.plant` now
+emits `fired`, and the cue is decoded rather than picked — the per-weapon fire
+column gives skill 37 index **35 `L_ARTIL`**, which had been read and left
+unwired on purpose.
+
+**The BURN, though, has nothing to play.** Play asked for it — "звука нет
+горения фитиля" — and all ninety-nine names in `sfxday.srl` were listed looking
+for a hiss. There is none: the nearest thing is `S_CLOCK`, a tick. So the fuse
+TICKS rather than hisses, one every 0.45 s, and both the cue and the rate are
+`[CHECK — remake]`. It is a poll rather than an event for the same reason the
+canopies are one — what a fuse makes is a noise for as long as it lasts.
+
+**And the camera goes to the charge.** Play: "камера должна перемещаться на
+динамит - а она остаётся на свине." It goes at the END of the turn and not the
+moment the charge is laid, because those four seconds are the whole of "plant
+it and run" and a camera that leaves the pig takes the running with it. From
+the beat onward nobody is driving anything and the beat is already waiting for
+the fuse, so what there is to watch is the thing about to go off. It is the
+same aftermath camera a broken object already uses; the exe's own arm for a
+burning charge has not been read, so it is `[CHECK — remake]`.

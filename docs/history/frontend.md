@@ -1059,3 +1059,19 @@ brightness copies of its face (`face1a..face9d`, `[0x511920]`), the lit one
 ramping up and the rest ramping down. Ours swells the portrait's WIDTH instead,
 off a different arm (0x41D365).
 
+## Two of play's, 2026-08-21 — the squad screen's ESCAPE and the plate's outline
+
+**ESCAPE on the squad screen went to a BLACK PAGE.** Its BACK handler showed
+the NAME screen without telling that screen which name it was entering or
+loading its art, so the page came up with nothing on it. Play's ruling settles
+where it should go instead: "если на экране отряда нажать esc надо возвращаться
+на главное меню." `[play]` — the exe's own back arm returns to the screen the
+squad is arrived at FROM, and the main menu is what a player expects.
+
+**The plate's outline was too thin.** It was one screen pixel and eight
+offsets, which is exactly right at one pixel and wrong at any more: a ring of
+eight becomes eight SPOKES with the letter's own edge showing between them the
+moment the radius grows. So the stamp is now every whole offset within the
+radius — twenty-four of them at two — built once per radius and kept, because
+the plate is drawn for every pig on the screen. `LAYOUT.plate.outline` is the
+knob and it is at **2**; play asked for "больше".

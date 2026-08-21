@@ -39,6 +39,7 @@ import type { WalkAway } from './walkAway'
 import { advanceEndOfGame, beginEndOfGame, outcomeOf } from './endOfGame'
 import type { EndOfGame } from './endOfGame'
 import { endsTurn, hurryFor } from './spend'
+import { isPlanted } from './grenade'
 import { createSights } from './sights'
 import { createAttack } from './attack'
 import { SKILL } from './skills'
@@ -518,6 +519,18 @@ export function createBattle(parts: BattleParts): Battle {
       if (pig === game.currentPig && loco.airborne !== null) continue
       anim.setClip(pig, ANIM.IDLE)
     }
+    // **AND THE CAMERA GOES TO THE CHARGE.** Play: "камера должна перемещаться
+    // на динамит - а она остаётся на свине." It goes at the END of the turn and
+    // not the moment the charge is laid, because those four seconds are the
+    // whole of "plant it and run" (lib/game/spend.ts) and a camera that leaves
+    // the pig takes the running with it. From here nobody is driving anything,
+    // the beat is already waiting for the fuse (`settling`), and what there is
+    // to watch is the thing that is about to go off.
+    //
+    // `[CHECK — remake]`: the exe's own camera arm for a burning charge has not
+    // been read. This is the aftermath camera a broken object already uses.
+    const burning = grenades.all().find((one) => isPlanted(one.skill) && !one.doused)
+    if (burning) aftermath = beginAftermath({ x: burning.x, y: burning.y, z: burning.z })
     walkAway = beginWalkAway({
       pigs: everyone,
       query,

@@ -88,6 +88,20 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * the nominal one, which is what most of the binary asks for. */
   splash: { sound: 'I_SPLASH', volume: 100, pitch: 100 },
   /**
+   * A CHARGE going down — DECODED, index 35 `L_ARTIL` off the per-weapon fire
+   * column (see `BARREL_SOUND`).
+   */
+  charge: { sound: 'L_ARTIL', volume: 100, pitch: 100 },
+  /**
+   * …and the FUSE burning, which is **`[CHECK — remake]` and the bank says
+   * why**. Play asked for it — "звука нет горения фитиля" — and there is no
+   * hiss in `sfxday.srl` to give them: all ninety-nine names were listed and
+   * the nearest thing to a burning fuse is `S_CLOCK`, a tick. So the burn is a
+   * TICKING rather than a hiss, one every `FUSE_TICK`, and it is a pick and not
+   * a reading. Swap the name in play through `pow.sfx`.
+   */
+  fuse: { sound: 'S_CLOCK', volume: 70, pitch: 120, jitter: 10 },
+  /**
    * A thrown thing being DOUSED by water. DECODED, mix and all: the projectile's
    * water arm plays index **25** at volume **0x50** with a pitch of
    * `0x5F + (rand & 0x1F)` (0x437cf3), and index 25 of `Audio/sfxday.srl` is
@@ -239,9 +253,13 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
  * pin, not a blast), 30 GRENADE LAUNCHER 36 like the bazooka, 37 TNT 35
  * `L_ARTIL`. They are one line each the day they are wanted.
  */
-export const BARREL_SOUND: Record<number, 'pistol' | 'rifle' | 'bazooka'> = {
+export const BARREL_SOUND: Record<number, 'pistol' | 'rifle' | 'bazooka' | 'charge'> = {
   6: 'pistol',
-  29: 'bazooka'
+  29: 'bazooka',
+  // **37 TNT — DECODED, off the same column as the bazooka's**, and wired now
+  // that a charge going down announces itself at all (lib/game/lobs.ts): its
+  // fire arm plays index 35, which is `L_ARTIL`. Play: planting was silent.
+  37: 'charge'
 }
 
 /**

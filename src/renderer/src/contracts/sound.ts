@@ -28,6 +28,14 @@ export interface SceneSound {
    */
   chuteOverhead(running: boolean): void
   /**
+   * A planted charge BURNING, and how long since the last frame.
+   *
+   * A poll for the same reason the canopies are one: what a fuse makes is a
+   * repeating noise for as long as it lasts, and there is no single moment to
+   * fire it on. `alight` is how many are burning right now.
+   */
+  fuseBurning(alight: number, delta: number): void
+  /**
    * What a SPEC listens to: the cues played, and the lines the pigs have
    * spoken. A sound is a file being decoded and nothing an assertion can hear,
    * so the debug window reads these instead (three/debug.ts).

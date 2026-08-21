@@ -144,6 +144,7 @@ export function createBattleSound(bus: BattleBus): BattleSound {
     follow: (loco, inWater) => sounds.follow(loco, inWater),
     reset: () => sounds.reset(),
     chuteOverhead: audio.chuteOverhead,
+    fuseBurning: audio.fuseBurning,
     played: () => bank.played(),
     spoken: () => voice.spoken(),
     sargeSaying: () => sarge.saying(),

@@ -84,6 +84,23 @@ export interface TrailKind {
   colour: [number, number, number]
   /** The particle setter's own size argument. */
   size: number
+  /**
+   * Drawn as a SPARK rather than a puff — lit rather than tinted, so it adds to
+   * what is behind it instead of sitting over it.
+   *
+   * `[play]` and nothing else: the exe's own numbers make the burning fuse dark
+   * smoke (see `FUSE_TRAIL`), and play remembers sparks. The row stays the
+   * exe's everywhere it can; this is the one field that is a ruling.
+   */
+  spark?: boolean
+  /**
+   * How far a particle is scattered from the point it is laid at, in exe units.
+   *
+   * Nought everywhere the exe lays a trail along a SEGMENT — a moving thing
+   * spreads its own puffs. A planted charge does not move, so without this its
+   * four a frame land on one another; sparks want to fly off.
+   */
+  scatter?: number
 }
 
 /**
@@ -123,19 +140,29 @@ export const LOB_TRAIL: TrailKind = {
  * particle type **0x18** — whose setter (0x486f16) gives colour **0x14A5** and
  * size **0x10**, against the grenade's 0x4210 and 8.
  *
- * So the fuse is DARK smoke, five of thirty-one on every channel, in puffs
- * twice the size of a grenade's, four a frame. A planted charge does not move,
- * so all four land on the same spot: a column of smoke standing off the fuse,
- * which is what a burning one looks like. There is no fire in it — the same
- * answer the grenade's trail gave.
+ * So the ARM makes it dark smoke, five of thirty-one on every channel, in
+ * puffs twice the size of a grenade's, four a frame — and a planted charge does
+ * not move, so all four would land on one another.
+ *
+ * **`[play]` overrules the colour and the size**: "в оригинале там не дым а
+ * искры когда он горит." What is kept off the exe is the shape of the thing —
+ * effect 0x1D, four a frame, hung `FUSE_LIFT` above the bundle. What is play's
+ * is that they are SPARKS: lit rather than tinted, small, short-lived and
+ * thrown clear of the fuse instead of stacked on it. The three fields that
+ * changed say so; `ageStep` at 0x28 is two and a half frames alive against the
+ * smoke's five, which is what makes a spark a spark rather than a slow ember.
  */
 export const FUSE_TRAIL: TrailKind = {
   id: 0x1d,
   steps: 4,
-  ageStep: 0x14,
+  ageStep: 0x28,
   particle: 0x18,
-  colour: [5, 5, 5],
-  size: 0x10
+  // Nearly white with a warm edge, in the effect system's own five bits a
+  // channel: 31/24/8 comes out about (248, 192, 64).
+  colour: [31, 24, 8],
+  size: 6,
+  spark: true,
+  scatter: 0x18
 }
 
 /** How far above the charge the effect is hung — `0x3C`, exe units, the one
@@ -233,17 +260,28 @@ export function advanceTrail(
   trail: Trail,
   /** Where the projectile is, or null once it is gone — the last few still have
    * to fade out, and nothing more goes down. */
-  at: { x: number; y: number; z: number } | null
+  at: { x: number; y: number; z: number } | null,
+  /**
+   * How far to throw one particle off the point it is laid at, in the caller's
+   * OWN units — a whole displacement, signed, one call an axis.
+   *
+   * A port rather than a roll: nothing in `lib/game` reaches for `Math.random`
+   * (CLAUDE.md), and a trail is drawn rather than played, so the scatter a
+   * SPARK row asks for belongs to whoever is drawing it. Left out, nothing
+   * scatters, which is every row the exe lays along a segment.
+   */
+  jitter?: () => number
 ): void {
   const { steps, ageStep } = trail.kind
   const from = at ? trail.last : null
+  const off = (): number => (jitter && trail.kind.scatter ? jitter() : 0)
   if (at && from) {
     for (let n = 1; n <= steps; n++) {
       const t = n / steps
       trail.puffs.push({
-        x: from.x + (at.x - from.x) * t,
-        y: from.y + (at.y - from.y) * t,
-        z: from.z + (at.z - from.z) * t,
+        x: from.x + (at.x - from.x) * t + off(),
+        y: from.y + (at.y - from.y) * t + off(),
+        z: from.z + (at.z - from.z) * t + off(),
         age: 0
       })
     }

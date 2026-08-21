@@ -127,6 +127,16 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
         sprite.scale.setScalar(PUFF_UNIT * trail.kind.size * (rocket ? ROCKET_SWELL : 1))
         const [r, g, b] = trail.kind.colour
         sprite.material.color.setRGB(r / 31, g / 31, b / 31)
+        // A SPARK is LIT: it adds to whatever is behind it rather than sitting
+        // over it, which is the whole difference between a bright puff and
+        // something burning (lib/game/trail.ts, `TrailKind.spark`). The pool is
+        // shared, so the blending is set only when it actually changes —
+        // writing it every frame would ask three to recompile the material.
+        const wanted = trail.kind.spark ? THREE.AdditiveBlending : THREE.NormalBlending
+        if (sprite.material.blending !== wanted) {
+          sprite.material.blending = wanted
+          sprite.material.needsUpdate = true
+        }
         sprite.material.opacity =
           (rocket ? ROCKET_ALPHA : PUFF_ALPHA) * (1 - puff.age / TRAIL_DEAD)
       }
@@ -159,7 +169,10 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
         for (const [who, trail] of trails) {
           // A grenade that is gone lays nothing more; its last six still fade.
           const at = where.get(who) ?? null
-          advanceTrail(trail, at)
+          // The SCATTER a spark row asks for, turned into world units here
+          // because the roll belongs to whoever draws (lib/game/trail.ts).
+          const spread = (trail.kind.scatter ?? 0) * MODEL_SCALE
+          advanceTrail(trail, at, spread > 0 ? () => (Math.random() - 0.5) * spread : undefined)
           if (!at && trailSpent(trail)) trails.delete(who)
         }
       }

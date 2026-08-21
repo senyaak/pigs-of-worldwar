@@ -15,6 +15,7 @@ import { createEngine } from '../../../lib/game/engine'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { aimRadians } from '../../../lib/game/aim'
 import { weaponModelName } from '../../../lib/game/weapons'
+import { isPlanted } from '../../../lib/game/grenade'
 import { meleeOf } from '../../../lib/game/melee'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
@@ -711,6 +712,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // the canopies heard the first frame the bank can play them.
     dropInArt.draw(arriving, (one) => drawnAt(`drop:${one.id}`, one))
     sounds.chuteOverhead(now.dropping)
+    // …and a planted charge burning, which is a noise for as long as the fuse
+    // lasts rather than a moment (audio/battleAudio.ts, `FUSE_TICK`).
+    sounds.fuseBurning(now.lobs.filter((one) => isPlanted(one.skill)).length, delta)
     const active = squad.of(now.acting)
     if (!active) return
     if (!now.dropping && !now.starting && !now.over) {

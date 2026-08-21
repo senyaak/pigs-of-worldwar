@@ -424,7 +424,11 @@ const playerScreen = initPlayerScreen({
     }
     startMission()
   },
-  onBack: () => show('name'),
+  // **BACK is the MAIN MENU**, `[play]`: "если на экране отряда нажать esc надо
+  // возвращаться на главное меню." It used to hand over to the NAME screen —
+  // where the squad is arrived at FROM — without telling that screen which name
+  // it was entering or loading its art, so the page came up black.
+  onBack: () => show('menu'),
   promote: (slot) => {
     const save = campaign.current()
     const pig = save?.squad[slot]

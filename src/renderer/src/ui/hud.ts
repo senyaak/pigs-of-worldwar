@@ -275,13 +275,34 @@ export const LAYOUT = {
      * and at a fractional scale an offset multiplied by it would land between
      * two device pixels and fade.
      */
-    outline: 1,
+    outline: 2,
     heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
   }
   // THE MAP has no entry here on purpose: nothing about its placement or its
   // size is free. Where it sits, how big it is, how far it tilts and how it
   // turns are all read out of the library, and they live with the reading in
   // `lib/game/scanner.ts`.
+}
+
+/**
+ * Every whole offset within `radius` screen pixels of a glyph, the centre left
+ * out — the outline's own stamp (`LAYOUT.plate.outline`). Built once per radius
+ * and kept, because the plate is drawn for every pig on the screen and the set
+ * is twenty-four wide at a radius of two.
+ */
+const rings = new Map<number, readonly (readonly [number, number])[]>()
+const aroundBy = (radius: number): readonly (readonly [number, number])[] => {
+  const had = rings.get(radius)
+  if (had) return had
+  const out: [number, number][] = []
+  const r = Math.max(1, Math.round(radius))
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx !== 0 || dy !== 0) out.push([dx, dy])
+    }
+  }
+  rings.set(radius, out)
+  return out
 }
 
 /** What the specs wait for; the console tweaks `LAYOUT.plate.delay`. */
@@ -835,21 +856,21 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
          * …and a line of the plate: the BLACK OUTLINE first, then the letters
          * over it.
          *
-         * Eight offsets rather than four, because four leaves the diagonals of
-         * a glyph bare and the whole point is that no edge of a letter meets
-         * the ground directly. The offsets are applied OUTSIDE the plate's own
-         * scale (see `LAYOUT.plate.outline`), so the hairline is one screen
-         * pixel whatever the letters are being drawn at.
+         * **Every offset within the radius, not a ring of eight.** A ring alone
+         * is right at one pixel and wrong at any more: the eight points become
+         * eight spokes with the letter's own edge showing between them, and
+         * play asked for a thicker outline rather than a spikier one
+         * ("обводка имён слишком тонкая - надо больше"). At two that is
+         * twenty-four passes a line, which is why it is built once and kept.
+         *
+         * The offsets are applied OUTSIDE the plate's own scale (see
+         * `LAYOUT.plate.outline`), so the outline is the same weight in screen
+         * pixels whatever `scale` is doing to the glyphs.
          */
-        const AROUND = [
-          [-1, -1], [0, -1], [1, -1],
-          [-1, 0], [1, 0],
-          [-1, 1], [0, 1], [1, 1]
-        ] as const
         const letters = (font: Font, text: string, x: number, y: number): void => {
           const off = PLATE.outline
           if (off > 0 && plateOutline) {
-            for (const [dx, dy] of AROUND) run(plateOutline, text, x + dx * off, y + dy * off)
+            for (const [dx, dy] of aroundBy(off)) run(plateOutline, text, x + dx, y + dy)
           }
           run(font, text, x, y)
         }

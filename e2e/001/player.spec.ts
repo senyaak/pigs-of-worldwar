@@ -55,7 +55,11 @@ test('the squad arrives with eight named pigs, all GRUNTs', async ({ app }) => {
   await expect.poll(distinctColors, { message: 'the painted player screen' }).toBeGreaterThan(50)
 
   await tap(page, 'menuBack')
-  await expect(page.locator('#name')).toBeVisible()
+  // **BACK from the squad is the MAIN MENU**, `[play]`, 2026-08-21: "если на
+  // экране отряда нажать esc надо возвращаться на главное меню." It used to
+  // hand over to the NAME screen, which came up black because nothing had told
+  // that screen what it was naming (src/renderer/src/main.ts).
+  await expect(page.locator('#menu')).toBeVisible()
   expect(app.errors()).toEqual([])
 })
 
@@ -90,7 +94,11 @@ test('it opens on START MISSION, and the grid is two columns of five and three',
   expect(await selection(page, 'playerScreen')).toBe(1)
 
   await tap(page, 'menuBack')
-  await expect(page.locator('#name')).toBeVisible()
+  // **BACK from the squad is the MAIN MENU**, `[play]`, 2026-08-21: "если на
+  // экране отряда нажать esc надо возвращаться на главное меню." It used to
+  // hand over to the NAME screen, which came up black because nothing had told
+  // that screen what it was naming (src/renderer/src/main.ts).
+  await expect(page.locator('#menu')).toBeVisible()
   expect(app.errors()).toEqual([])
 })
 
@@ -160,6 +168,10 @@ test('the board names the NEXT MISSION while START MISSION is lit', async ({ app
   expect(await inkInBoard(), 'letters on the board, not just a black plate').toBeGreaterThan(4)
 
   await tap(page, 'menuBack')
-  await expect(page.locator('#name')).toBeVisible()
+  // **BACK from the squad is the MAIN MENU**, `[play]`, 2026-08-21: "если на
+  // экране отряда нажать esc надо возвращаться на главное меню." It used to
+  // hand over to the NAME screen, which came up black because nothing had told
+  // that screen what it was naming (src/renderer/src/main.ts).
+  await expect(page.locator('#menu')).toBeVisible()
   expect(app.errors()).toEqual([])
 })
