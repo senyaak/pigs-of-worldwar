@@ -440,13 +440,20 @@ declare global {
         list(filter?: string): { index: number; name: string }[]
         play(which: string | number): string | null
         /** Walk the bank hands-free, each sound held for its own length.
-         * `pow.sfx.walk('L_')` is the launches; the handle stops it. */
+         * `pow.sfx.walk('L_')` is the launches, `walk(undefined, { fresh: true })`
+         * is everything not heard yet; the handle stops it. */
         walk(
           filter?: string,
-          gap?: number
+          opts?: { gap?: number; fresh?: boolean }
         ): { stop(): void; at(): string | null; heard(): string[] }
-        /** …or step it by hand: `const g = pow.sfx.each('I_'); g.next()`. */
-        each(filter?: string): Generator<{ index: number; name: string }, void, unknown>
+        /** …or step it by hand: `const g = pow.sfx.each('I_'); g.next()`.
+         * `each(undefined, true)` skips what has already sounded. */
+        each(
+          filter?: string,
+          fresh?: boolean
+        ): Generator<{ index: number; name: string }, void, unknown>
+        /** What is left to hear — the same list `fresh` walks. */
+        left(filter?: string): { index: number; name: string }[]
         now(): Record<string, unknown>
         set(
           moment: string,

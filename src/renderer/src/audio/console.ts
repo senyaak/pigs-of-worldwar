@@ -61,13 +61,25 @@ export interface SoundConsole {
    * dead air. `pow.sfx.walk('L_')` is the launches, `walk()` is all
    * ninety-nine. It returns a handle — `stop()` ends it.
    */
-  walk(filter?: string, gap?: number): SoundWalk
+  walk(filter?: string, opts?: { gap?: number; fresh?: boolean }): SoundWalk
   /**
    * …or step it by hand: a GENERATOR over the same list. `next()` plays the
    * next one and hands back its row, so an ear that wants to sit on one sound
    * is not fighting a timer.
    */
-  each(filter?: string): Generator<SoundRow, void, unknown>
+  each(filter?: string, fresh?: boolean): Generator<SoundRow, void, unknown>
+  /**
+   * What has NOT been heard yet — every name the bank has played, dropped.
+   *
+   * An ear working through ninety-nine of them stops and starts, and starting
+   * again from the top is the whole of what makes it a chore. `fresh` on the
+   * walk and the generator is this same list.
+   *
+   * It counts anything the BANK played, the game's own noises included — which
+   * from the menu is nothing, and inside a battle is a reason to browse from
+   * the menu.
+   */
+  left(filter?: string): SoundRow[]
   now(): Record<string, Cue>
   set(
     moment: string,
@@ -110,17 +122,23 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
 
   /** The rows a filter matches — what both the walk and the generator step
    * through, and the same test `list` uses. */
-  const matching = (filter?: string): SoundRow[] => {
+  const matching = (filter?: string, fresh?: boolean): SoundRow[] => {
     const wanted = filter?.toUpperCase()
+    const heard = fresh ? new Set(bank().played()) : null
     return bank()
       .names()
       .map((name, index) => ({ index, name }))
       .filter((row) => !wanted || row.name.includes(wanted))
+      .filter((row) => !heard || !heard.has(row.name))
   }
 
   return {
-    walk(filter, gap = 0.4) {
-      const rows = matching(filter)
+    left: (filter) => matching(filter, true),
+    walk(filter, opts) {
+      const gap = opts?.gap ?? 0.4
+      // Taken ONCE, at the start: the walk plays as it goes, so a list that
+      // re-read itself would drop everything it had just done.
+      const rows = matching(filter, opts?.fresh)
       const played: string[] = []
       let now: string | null = null
       let stopped = false
@@ -146,8 +164,8 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
         heard: () => [...played]
       }
     },
-    *each(filter) {
-      for (const row of matching(filter)) {
+    *each(filter, fresh) {
+      for (const row of matching(filter, fresh)) {
         bank().play(row.name)
         console.log(`${String(row.index).padStart(3)}  ${row.name}`)
         yield row
