@@ -91,6 +91,13 @@ export type BattleEvent =
   | { kind: 'healed'; at: Point; amount: number; pig: PigId }
   /** …or had no room for: "THIS LITTLE PIG ALREADY HAS TOO MANY TOYS". */
   | { kind: 'refused'; skill: number | null; amount: number; pig: PigId }
+  /**
+   * A PROMOTION POINT taken off the ground — the campaign's own currency,
+   * which is a pickup and not a crate (lib/game/pickups.ts). `total` is how
+   * many this battle has yielded so far, so the debrief can pay them out
+   * without counting anything of its own.
+   */
+  | { kind: 'promotionPoint'; pig: PigId; total: number }
 
   // ——— things coming down ———
   /** A crate is on its way: the aeroplane, and a canopy to hang over it. */

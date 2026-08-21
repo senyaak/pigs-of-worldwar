@@ -109,9 +109,24 @@ export const PIG_HEIGHT = 5 * BOX_UNIT
  */
 export const CRATE_TYPES = new Set([67, 68, 388])
 
-/** A crate with something in it — walk into it, do not walk round it. */
+/**
+ * The PROMOTION POINT, object type 395 — the campaign's own currency lying on
+ * the ground, and the one thing on a map that is walked into and is not a
+ * crate.
+ *
+ * Eleven records over the 61 shipped maps and ten of them live: DESVAL and
+ * EMPLACE carry two each, MASHED, GUNS, LIBERATE, FJORDS, EYRIE and TESTER one
+ * each, and BAY's is inert because its field 14 is 0 rather than the 19 that
+ * means a record hands something over. All ten live ones are IDENTICAL —
+ * field 15 reads `weapon 1, link 0` and field 16 is 1 — so nothing in the
+ * record says how much it is worth and every one of them is worth the same.
+ */
+export const PROPOINT_TYPE = 395
+
+/** Something walked into rather than round: a crate with something in it, or
+ * a promotion point. */
 export const isPickup = (object: MapObject): boolean =>
-  CRATE_TYPES.has(object.type) && object.contents !== null
+  (CRATE_TYPES.has(object.type) || object.type === PROPOINT_TYPE) && object.contents !== null
 
 /**
  * **What is too small to stop a pig — measured on the FOOTPRINT, not on the

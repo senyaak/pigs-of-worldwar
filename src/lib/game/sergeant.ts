@@ -33,8 +33,8 @@
  *
  * Only the two this module decides are named. The other nineteen are decoded,
  * HEARD (play, 2026-08-20) and not built: 1 and 3 are this same pair at the
- * START of a turn, 4..9 are the crates by item type — and they turn out to be
- * a MEDAL economy, one of them taking a medal BACK — 10 and 11 are one-shot
+ * START of a turn, 4..9 are an OBJECT being finished — a MEDAL economy, one of
+ * them taking a medal back off `[pig+0x1DE]` — 10 and 11 are one-shot
  * hints latched per battle, 12 is the "hurry up" pool of SIXTEEN that spans
  * files 13 and 14, 14..20 are the MULTIPLAYER pair chosen by the pig's own
  * nation, and 21 is the medal ceremony after a mission. The call sites are in
@@ -186,6 +186,25 @@ export function sargeAtTurnStart(
   if (section === null) return null
   if (roll() >= 1 / SARGE_GOAD_ODDS) return null
   return take(section, counters)
+}
+
+/**
+ * What he says when a PROMOTION POINT is walked into — section 8, file **09**,
+ * whose lines are "congratulations, you reached the drop point, here are some
+ * toys" and "good piggy, dropping you something".
+ *
+ * **`[CHECK — remake]`.** The WORDS are play's, off the folder, and they name
+ * this moment and no other; the CALL SITE is not. The exe reaches file 09 from
+ * 0x4A7CA5, inside the arm that runs when an object is finished off and a
+ * second record is found whose link byte matches — a machine the remake has
+ * none of yet. Nothing in the exe plays a line for walking onto a PROPOINT,
+ * because a PROPOINT there is a plain pickup record. Move the constant if the
+ * ear says another category fits better; it is one number.
+ */
+export const SARGE_POINT = 8
+
+export function sargeOnPoint(counters: Map<number, number>): SargeLine {
+  return take(SARGE_POINT, counters)
 }
 
 /** One step of a section's rotation: the line to say now, and the byte moved

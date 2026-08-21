@@ -69,6 +69,12 @@ export interface Scenery {
   /** Hand over any crate this pig is standing in. */
   collect(pig: Pig): void
   /**
+   * How many PROMOTION POINTS this side has picked up off the ground — what
+   * the debrief pays out as its SPECIAL BONUS (lib/game/save.ts,
+   * `missionReward`). One battle's count, not a running total.
+   */
+  points(): number
+  /**
    * Something has been finished — a crate collected, a dummy broken — so run
    * its command and put on the map whatever was waiting on it.
    *
@@ -107,6 +113,8 @@ export function createScenery(
   /** Crates a full pig has already been told it cannot carry: the refusal is
    * said once, not once a frame while it stands there. */
   const refused = new Set<number>()
+  /** Promotion points taken this battle. */
+  let points = 0
 
   // Most of what CAMP carries is not on its ground at the start — eight
   // dummies, the second bridge, and every crate but the first three.
@@ -166,12 +174,26 @@ export function createScenery(
     },
     restingY: (id) => places.get(id)?.y ?? null,
     at: (id) => places.get(id) ?? null,
+    points: () => points,
     collect(pig) {
       for (let i = pickups.length - 1; i >= 0; i--) {
         const pickup = pickups[i]
         // A crate the script has not placed yet is not there to be walked into.
         if (script.absent(pickup.id)) continue
         if (!reached(pickup, pig.position.x, pig.position.z)) continue
+        // **A PROMOTION POINT IS NOT A CRATE.** It never reaches the pig's
+        // inventory, it cannot be refused, and what it is worth is not in the
+        // record — the ten live ones all read the same (lib/game/obstacles.ts).
+        // It leaves the map the way a crate does, command and all.
+        if (pickup.kind === 'point') {
+          points++
+          pickups.splice(i, 1)
+          emit({ kind: 'taken', id: pickup.id })
+          obstacles.remove(pickup.id)
+          advance(pickup.id, places.get(pickup.id)?.y ?? 0)
+          emit({ kind: 'promotionPoint', pig: pig.id, total: points })
+          continue
+        }
         const worth = worthOf(pickup, training)
         let result: GiveResult = 'taken'
         let given = worth

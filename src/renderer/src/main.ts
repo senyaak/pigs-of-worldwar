@@ -244,7 +244,7 @@ const briefing = initBriefing({
 // carries those words and has no reader anywhere in the executable. What is
 // left calling itself `aborted` is the toolbar's walk-out, which is the
 // remake's own button and has no original to be faithful to.
-const battle = initBattle((exit, fallen, kills) => {
+const battle = initBattle((exit, fallen, kills, points) => {
   if (!campaignBattle || !campaign.current()) {
     show('menu')
     return
@@ -264,11 +264,11 @@ const battle = initBattle((exit, fallen, kills) => {
   // Never written to disk here: CONTINUE settles it through `acceptMission`,
   // and every other way out stands the squad back up (`discardMission`).
   for (const slot of fallen) fall(save.squad, slot)
-  if (exit === 'won') campaign.missionWonResult(kills)
+  if (exit === 'won') campaign.missionWonResult(kills, points)
   // The debrief reads the save AS THE MISSION FOUND IT — the position still
   // naming the played mission, the squad carrying its fell marks; the settled
   // result waits in `campaign.afterMission()` for CONTINUE to take it.
-  debrief.show(exit === 'won', save)
+  debrief.show(exit === 'won', save, points)
   show('debrief')
   void debrief.load()
 })

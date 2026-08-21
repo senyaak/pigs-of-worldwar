@@ -45,23 +45,29 @@ export interface Sarge {
  * no table in the game prints one of these lines. Where the two disagree the
  * ear wins and the entry says so.
  *
- * **What the listening turned up is a whole SYSTEM: the crates are a MEDAL
- * economy.** Six of the categories are one crate each and five of the six talk
- * about medals — awarded, refused, taken back — and 12 says what they are for:
- * collect them or you are not promoted. So the exe's pickup types are the PP
- * tokens the save already carries. `pow.sarge.list()` prints this.
+ * **What the listening turned up is a whole SYSTEM: a MEDAL economy**, five of
+ * whose six categories talk about medals — awarded, refused, taken back — with
+ * 12 saying what they are for: collect them or you are not promoted. The
+ * counter is `[pig+0x1DE]` and category 08's own call site is the instruction
+ * that subtracts from it.
+ *
+ * **What they hang off was got wrong here first.** They are NOT the weapon
+ * crate: an ordinary crate never reaches that code. They are an OBJECT being
+ * finished — a gun, a tent, a pillbox — through an action record built at load
+ * out of the POG's fields 14..16. `docs/todo.md` carries the whole dispatch.
+ * `pow.sarge.list()` prints this.
  */
 export const SARGE_CATEGORIES: Readonly<Record<number, string>> = {
   1: 'end of turn, you LOST a pig and your side is behind — BUILT. A threat',
   2: "START of a turn that is not yours, THEY are behind — BUILT. Amateurs",
   3: 'end of turn, you KILLED and your side is ahead — BUILT. Praise',
   4: "START of a turn that is not yours, THEY are ahead — BUILT. A comeback",
-  5: 'crate, item byte not 0xFF — a SUPPLY drop, useful equipment, "use it wisely"',
-  6: 'crate, item byte 0xFF (pickup type 7) — MEDICAL supplies, and do not waste them',
-  7: 'crate, pickup type 2 or 14 — a MEDAL awarded: "I am dropping you a medal"',
-  8: 'crate, pickup type 4 or 16 — a MEDAL TAKEN BACK, for blowing up what was ours',
-  9: 'crate, pickup type 7, the other arm — the DROP POINT reached: "some toys"',
-  10: 'crate, pickup type 8 — a MEDAL for doing it IN TIME, "a big fat medal"',
+  5: 'an OBJECT finished, action kind 13, value not 0xFF — a SUPPLY drop',
+  6: 'the same, value 0xFF — MEDICAL supplies, and do not waste them',
+  7: 'action kind 2 or 14 — a MEDAL dropped: "I am dropping you a medal"',
+  8: 'action kind 4 or 16 — a MEDAL TAKEN BACK, `[pig+0x1DE] -= value`',
+  9: 'an object finished and its LINK partner found — the DROP POINT',
+  10: 'the same arm, the other branch — a MEDAL for doing it IN TIME',
   11: 'start of turn, ONCE a battle (latched): things lie about, medals included',
   12: 'start of turn, ONCE a battle (second latch): collect medals or no promotion',
   13: 'the clock running out, MULTIPLAYER only — one pool of SIXTEEN with 14',

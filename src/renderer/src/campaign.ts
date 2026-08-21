@@ -110,14 +110,14 @@ export function adopt(from: { slot: string; save: SaveGame }): SaveGame {
  * played and the kills taken, for every pig that was fielded — before the
  * roster regroups, the original's own order (`Team::EndOfMission`).
  */
-export function missionWonResult(kills: readonly number[] = []): SaveGame | null {
+export function missionWonResult(kills: readonly number[] = [], points = 0): SaveGame | null {
   if (!save) return null
   const losses = SQUAD_SIZE - standingCount(save.squad)
   const won = finishMission(
     save,
     credit(save.squad, fieldedAt(save.position), kills),
     save.enemies[save.position] ?? bootCampEnemy(save.nation),
-    save.tokens + missionReward(save.position, losses),
+    save.tokens + missionReward(save.position, losses, points),
     new Date().toISOString()
   )
   // Winning the training ground is what sets the tutorial flag.

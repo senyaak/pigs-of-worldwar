@@ -165,7 +165,7 @@ export interface BattleView {
  * lifetime scores when a win is taken.
  */
 export function initBattle(
-  onLeave: (exit: BattleExit, fallen: number[], kills: number[]) => void
+  onLeave: (exit: BattleExit, fallen: number[], kills: number[], points: number) => void
 ): BattleView {
   const canvasHost = byId<HTMLDivElement>('battle-canvas')
   const hudCanvas = byId<HTMLCanvasElement>('battle-hud')
@@ -590,6 +590,10 @@ export function initBattle(
    * death with no attacker — water, a mine — is nobody's. */
   let kills: number[] = []
 
+  /** PROMOTION POINTS picked up off the ground this battle — what the debrief
+   * pays as its SPECIAL BONUS (lib/game/scenery.ts). */
+  let points = 0
+
   /** Put the battle away: the LEAVE button, and the end of a mission. */
   const leave = (): void => {
     controller.releaseAll()
@@ -601,7 +605,7 @@ export function initBattle(
     painted = 0
     speech.stop()
     hud.clear()
-    onLeave(verdict ?? 'aborted', fallen, kills)
+    onLeave(verdict ?? 'aborted', fallen, kills, points)
   }
 
   byId<HTMLButtonElement>('battle-leave').addEventListener('click', leave)
@@ -644,6 +648,7 @@ export function initBattle(
     verdict = null
     fallen = []
     kills = []
+    points = 0
     // A fresh level is the tutorial's first rung again, whoever asked for it —
     // the menu, `pow.swapMap`, or a step BACK, which sets its own want on the
     // far side of this.
@@ -778,6 +783,9 @@ export function initBattle(
           if (by === undefined || one) return
           const killer = game?.players[0]?.pigs.find((p) => p.id === by)
           if (killer) kills[killer.index] = (kills[killer.index] ?? 0) + 1
+        },
+        promotionPoint: ({ total }) => {
+          points = total
         },
         placed: ({ skill, amount }) => {
           step = 0

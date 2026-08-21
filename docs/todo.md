@@ -183,24 +183,26 @@ the section, which is one lower and is what the exe's call sites pass.
 | 03 | end of turn, you KILLED, ahead | **built** — you and your boys have no equal |
 | 02 | START of a turn that is not yours, THEY are behind | **built** — "will you really let these amateurs beat you?" |
 | 04 | START of a turn that is not yours, THEY are ahead | **built** — "a victory of legendary proportions" |
-| 05 | crate, item byte not 0xFF | a SUPPLY drop — useful equipment, use it wisely |
-| 06 | crate, item byte 0xFF (type 7) | MEDICAL supplies — bandages cost money, do not waste them |
-| 07 | crate, pickup type 2 or 14 | a MEDAL awarded — "I am so impressed I am dropping you a medal" |
-| 08 | crate, type 4 or 16 — takes something OFF the pig | a MEDAL TAKEN BACK — "I told you not to blow that up"; "that belonged to us" |
-| 09 | crate, type 7, the other arm | the DROP POINT reached — "here are some toys" |
-| 10 | crate, pickup type 8 | a MEDAL for doing it IN TIME — "a big fat medal" |
+| 05 | an OBJECT finished, action kind 13, value byte not 0xFF | a SUPPLY drop — useful equipment, use it wisely |
+| 06 | the same, value byte 0xFF | MEDICAL supplies — bandages cost money, do not waste them |
+| 07 | action kind 2 or 14 — a medal dropped at the record's own spot | "I am so impressed I am dropping you a medal" |
+| 08 | action kind 4 or 16 — `[pig+0x1DE] -= value`, one instruction | a MEDAL TAKEN BACK — "I told you not to blow that up" |
+| 09 | an object finished and its LINK partner found (0x4A7600) | the DROP POINT reached — "here are some toys". **Built on the PROPOINT** `[CHECK — remake]` |
+| 10 | the same arm, the other branch | a MEDAL for doing it IN TIME — "a big fat medal" |
 | 11 | start of turn, ONCE a battle | there may be things lying about, medals included |
 | 12 | start of turn, ONCE a battle | collect medals or you will not be promoted |
 | 13+14 | the clock running out, ONE pool of sixteen — **MULTIPLAYER ONLY** | "tick tock, get a move on" / "time is of the essence" |
 | 15..21 | MULTIPLAYER, by nation: 1..4 praise, 5..8 commiseration | 16 confirmed as praise; the other six unheard |
 | 22 | **the exe's front-end arm** | **NOT an idle nag — the MEDAL CEREMONY on the squad screen after a mission**, played over the award animation |
 
-**The ear found a SYSTEM the reader had missed: the crates are a MEDAL
-ECONOMY.** Five of the six crate categories talk about medals — given (07, 10),
-refused, taken back (08) — and 12 says what they are for: *collect them or you
-are not promoted*. So the exe's pickup types are the PP tokens the save
-already carries, and the sergeant is the voice of that economy. That is a
-bigger finding than the lines: it says what a crate IS.
+**The ear found a SYSTEM the reader had missed: there is a MEDAL ECONOMY, and
+12 says what it is for — *collect them or you are not promoted*.** Five of the
+six categories talk about medals: given (07, 10), refused, taken back (08).
+
+**What they hang off was got WRONG here first and is corrected below**: these
+are not the weapon crate. They are an OBJECT being finished — a gun, a tent, a
+pillbox — through an action record the ordinary crate never gets. See "The
+OBJECTIVES machine" further down; the medal counter is `[pig+0x1DE]`.
 
 **One reading was wrong and is corrected.** 22 was written up as "the front end
 and its idle nag after twelve idle ticks". Play placed it as the ceremony after
@@ -551,21 +553,74 @@ Section 0A has the sweep and the one bug it turned up.
    campaign past position 0 unrewarded, the flag staying down — skipped is not
    finished. What YES/NO do in the ORIGINAL is unread; this fork is `[play]`.
 
-### The PROPOINT tokens — deferred until one comes up in play
+### The PROPOINT tokens — **BUILT 2026-08-21**
 
 Play's ruling, 2026-08-18: **one point for finishing, one for coming through
 without a death, and UP TO THREE tokens on a map — and not all of them stand
-on it: some spawn only through EVENTS.** That reading explains the deficit
-the measurement found — the POG places tokens on only nine maps (DESVAL and
-EMPLACE two each; MASHED, GUNS, LIBERATE, FJORDS, EYRIE, BAY, TESTER one
-each; 52 maps none) while the debrief's display table (0x4D3560) promises up
-to five — the missing ones are event-spawned (crates? the map script?), and
-where the table says four or five, play remembers three. `[play]` overrides
-the table's top end; the spawner is unread.
+on it: some spawn only through EVENTS.** The measurement agrees and is now
+pinned in `e2e/000/propoint.spec.ts`: the POG places **eleven** PROPOINT
+records over the 61 maps, **ten of them live** on **eight** maps (DESVAL and
+EMPLACE two each; MASHED, GUNS, LIBERATE, FJORDS, EYRIE, TESTER one each) —
+BAY's carries field 14 = 0 where every other carries 19, so the map draws it
+and it hands over nothing. The debrief's display table (0x4D3560) promises up
+to five. The missing ones are event-spawned and that spawner is now READ; see
+the objectives note below.
 
-**Deferred**: nothing here is built until a token map is reached in play —
-the order is the menus, then the FIRST MISSION, and the tokens when one is
-actually seen.
+**What is built.** A PROPOINT is object type **395** and is a pickup of its
+own KIND rather than a crate (`lib/game/pickups.ts`), because what the record
+says is inside it — weapon 1, one round, the same on all ten — is not what it
+gives. Walking into one counts it, takes it off the map with its own script
+command the way a crate goes, and says so on the bus (`promotionPoint`). The
+count leaves the battle beside the kills, reaches `missionReward`'s third
+argument — which had been sitting there unused since the day it was written —
+and lights the debrief's SPECIAL BONUS row, which had been hardcoded grey.
+The sergeant says his drop-point line over it, and that one line is
+`[CHECK — remake]`: the words are play's and they name this moment, the CALL
+SITE is not (`SARGE_POINT` in `lib/game/sergeant.ts` is one number to move).
+
+**What to watch in play**: eight maps out of sixty-one carry one, so on the
+other fifty-three there is nothing to see. LIBERATE is the earliest.
+
+### The OBJECTIVES machine — read 2026-08-21, and it is what the sergeant's six crate lines belong to
+
+**This corrects the P1 entry above.** The six categories were written up as
+"a crate collected, by pickup type". They are not: the ordinary weapon crate
+never reaches that code at all.
+
+- **A record's ACTION is a 20-byte thing built at LOAD** (0x4A7130, from
+  0x4a6287) out of POG fields **14** (the kind), **15**'s low byte (a LINK id,
+  which is the byte `formats/pog.ts` calls "not decoded"), 15's high byte (a
+  VALUE), **16** (an amount) and **25/27** (where a reward drops, quantised to
+  the 512 tile).
+- **An ordinary crate gets none.** For field 14 = 19 the loader takes an arm of
+  its own (0x4a62b2) that builds an action only when a global is 1 AND field
+  15's low byte is non-zero — and **552 of the 561** field-14-19 records carry
+  0 there. So a crate's weapon and count are read somewhere else entirely,
+  which is why the remake's crates work without any of this.
+- **The collect dispatch is 0x4AA170**, on the action's own type through a
+  23-entry byte table at 0x4AA814 into seven arms:
+  - types **4 and 16** → `[pig+0x1DE] -= value`, then file **08**. That
+    instruction is the whole medal economy in one place, and it is the reason
+    the disassembly's flat "takes something off the pig" and play's "попрощайся
+    с медалью" are the same sentence.
+  - types **2 and 14** → spawn model 0x17 at the record's own spot, call
+    0x495420, file **07** — a medal dropped for you.
+  - type **13** → spawn model 0x15 with the amount when the value byte is 0xFF,
+    else model 0x14: files **06** (medical) and **05** (equipment).
+  - type **1** → spawn model 0x15. Types **20, 21** find the pickup whose link
+    matches and finish it; **22, 23** their own pair; everything else nothing.
+- **What carries these is not crates.** Over the 61 maps: 31 records of kind 1,
+  13 of kind 2, 25 of kind 7, 14 of kind 13, 9 of kind 14, 14 of kind 20 — on
+  PILLBOX, BIG_GUN, TANK, M_TENT1, BRIDGE_C, TENT_S, DUMMY and the spawn
+  markers. **This is the mission-objective machine**: blow up the gun, take the
+  pillbox, and the sergeant remarks on it. Files 09 and 10 hang off 0x4A7600,
+  the arm that runs when an object is finished off and a partner record is
+  found by its link byte.
+
+**Not built, and this is now the shape of the work**: an object's action, the
+link between two records, `[pig+0x1DE]` as a per-pig tally, and the four
+spawned models. It is a bigger piece than the tokens and it is what the rest
+of the sergeant is waiting on.
 
 ### What gates what
 

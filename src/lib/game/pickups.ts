@@ -20,7 +20,7 @@
 //
 // Pure: objects in, pickups out, plus the reach test.
 
-import { PIG_RADIUS, boxOf, isPickup, penetrates } from './obstacles'
+import { PIG_RADIUS, PROPOINT_TYPE, boxOf, isPickup, penetrates } from './obstacles'
 import type { Obstacle } from './obstacles'
 import type { MapObject } from '../formats/pog'
 import { skillFromCrate } from './skills'
@@ -34,12 +34,23 @@ export const TRAINING_HEALTH = 50
 // A 50-point crate on a 50-point grunt leaves it at a hundred and the
 // original allows it (lib/game/health.ts).
 
+/**
+ * What walking into this hands over. A `point` is a PROPOINT — the campaign's
+ * promotion currency — and it goes nowhere near the pig's inventory, so every
+ * reader tells the two apart HERE rather than by what is inside.
+ */
+export type PickupKind = 'crate' | 'point'
+
 export interface Pickup {
   /** The POG record's own 1-based id — what identifies its art. */
   id: number
   x: number
   z: number
-  /** Skill id, or null on a health crate. */
+  /** Crate or promotion point (lib/game/obstacles.ts, `PROPOINT_TYPE`). */
+  kind: PickupKind
+  /** Skill id, or null on a health crate. On a POINT this is what the record
+   * happens to say — all ten read weapon 1, one round — and nothing reads it:
+   * a point is taken by its KIND. */
   skill: number | null
   /** Rounds of that skill, or health points. */
   amount: number
@@ -59,6 +70,7 @@ export function pickupsOf(objects: MapObject[]): Pickup[] {
       id: object.id,
       x: object.x,
       z: object.z,
+      kind: object.type === PROPOINT_TYPE ? 'point' : 'crate',
       skill: crateByte === null ? null : skillFromCrate(crateByte),
       amount: object.contents.amount,
       body: boxOf(object)

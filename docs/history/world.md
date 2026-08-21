@@ -599,3 +599,61 @@ differently enough that every sample moves. What the spec holds the dome to
 instead is `pow.debug.sky()` — the mood, 544 triangles, four skins, and the
 distance from its centre to the eye, which is the one number a screenshot could
 never have shown.
+
+## THE PROMOTION POINT, and the objectives machine behind the sergeant — 2026-08-21
+
+Play asked for "the crates" off the previous session's summary, and the read
+that followed **corrected that summary**: the sergeant's six crate categories
+do not hang off a crate at all.
+
+**What a record's ACTION is.** At load (0x4a6287) a 20-byte thing is built by
+0x4A7130 out of the POG record's fields **14** (a KIND), **15**'s low byte (a
+LINK id — the byte `formats/pog.ts` calls "not padding and not decoded"), 15's
+high byte (a VALUE), **16** (an amount) and **25/27** (where a reward is to
+drop, quantised to the 512 tile). It hangs off the object at `[obj+0x48]`.
+
+**An ordinary crate never gets one.** Field 14 = 19 takes its own arm
+(0x4a62b2): an action is built only when a global is 1 AND field 15's low byte
+is non-zero, and **552 of the 561** field-14-19 records carry 0 there. So the
+weapon and the count in a crate are read somewhere else entirely — which is
+why the remake's crates have always worked with none of this decoded.
+
+**The collect dispatch is 0x4AA170**, switching on the action's type through a
+23-entry byte table at 0x4AA814 into seven arms. Types 4 and 16 do
+`[pig+0x1DE] -= value` and say file 08; types 2 and 14 spawn model 0x17 at the
+record's own spot, call 0x495420 and say file 07; type 13 spawns model 0x15
+with the amount when the value byte is 0xFF and model 0x14 otherwise, saying
+file 06 or 05. Types 20 and 21 hunt the pickup whose link byte matches and
+finish it. **`[pig+0x1DE]` is the pig's own medal tally**, and file 08's arm is
+the single instruction that proves it — the disassembly's flat "takes something
+off the pig" and play's "попрощайся с медалью" turn out to be one sentence.
+
+What carries these kinds, measured over all 61 maps: PILLBOX, BIG_GUN, TANK,
+M_TENT1, BRIDGE_C, TENT_S, DUMMY — around 130 records in total. **It is the
+mission-objective machine**, and it is not built.
+
+**What IS built is the PROMOTION POINT**, which is none of the above. Object
+type **395**, `PROPOINT`, eleven records over the shipped maps and ten of them
+live on eight maps; BAY's carries field 14 = 0 where the rest carry 19, so it
+is drawn and hands over nothing. All ten live ones read identically — weapon 1,
+one round — so **the record does not say what a point is worth and every one is
+worth the same**, which is why it is a pickup of its own KIND rather than a
+crate with odd contents (`lib/game/pickups.ts`). Walking into one counts it,
+takes it off the map with its own script command exactly as a crate goes, and
+announces `promotionPoint`. The count leaves the battle beside the kills and
+lands on `missionReward`'s third argument — which had been written, documented
+as waiting on this, and passed by nobody — and lights the debrief's SPECIAL
+BONUS row, which had been hardcoded grey for the same reason.
+
+Two things about that row. The exe's bonus table (0x4D3560) is **display only**
+and promises up to five where the maps place at most two, so the row is drawn
+as long as the greater of the two numbers and a point that was picked up is
+never left off it. And the sergeant's drop-point line over it is
+`[CHECK — remake]`: the WORDS are play's and they name this moment — "you
+reached the drop point, here are some toys" — but the exe reaches that file
+from 0x4A7CA5, inside the link-partner arm, and plays nothing at all for
+walking onto a PROPOINT.
+
+`e2e/000/propoint.spec.ts` pins the census, because eight maps out of sixty-one
+carry one and "I never saw it" is the expected experience everywhere else.
+LIBERATE is the earliest map with one.

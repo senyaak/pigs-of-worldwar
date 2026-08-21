@@ -149,7 +149,7 @@ export interface DebriefScreen {
   enter(): void
   /** The mission's outcome and the save AS THE MISSION FOUND IT — position
    * still on the played mission, the squad carrying its `fell` marks. */
-  show(won: boolean, save: SaveGame): void
+  show(won: boolean, save: SaveGame, earned: number): void
   layout: DebriefLayout
 }
 
@@ -177,6 +177,8 @@ export function initDebrief(handlers: {
 
   let won = false
   let save: SaveGame | null = null
+  /** Promotion points actually picked up on the field this mission. */
+  let earned = 0
   let selection = 0
 
   const gameText = (index: number): string => strings[index] ?? ''
@@ -314,9 +316,13 @@ export function initDebrief(handlers: {
       } else {
         write(context, small, gameText(NONE_TEXT), centre, layout.column.none)
       }
-      // SPECIAL BONUS: the level's own tokens, the unearned greyed — and
-      // nothing earns one yet, the PROPOINT pickup being a gap.
-      const available = bonusPoints(save.position)
+      // SPECIAL BONUS: the level's own tokens, the unearned greyed — and what
+      // earns one is a PROMOTION POINT walked into on the field
+      // (lib/game/scenery.ts). `bonusPoints` is the exe's own table and is
+      // DISPLAY ONLY: the award counts what was actually picked up, so a row
+      // is as long as the greater of the two and a point that was taken is
+      // never left off it.
+      const available = Math.max(bonusPoints(save.position), earned)
       if (available > 0) {
         write(context, small, gameText(SPECIAL_TEXT), centre, layout.column.special)
         const width = layout.column.specialRow.step * available
@@ -325,7 +331,7 @@ export function initDebrief(handlers: {
             context,
             Math.round(centre - width / 2 + layout.column.specialRow.step * i),
             layout.column.specialRow.y,
-            true
+            i >= earned
           )
         }
       }
@@ -391,9 +397,10 @@ export function initDebrief(handlers: {
       draw()
       run(true)
     },
-    show(outcome, state) {
+    show(outcome, state, points) {
       won = outcome
       save = state
+      earned = points
     },
     layout
   }

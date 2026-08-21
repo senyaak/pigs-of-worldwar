@@ -32,6 +32,7 @@ import {
   noTally,
   sargeAfterTurn,
   sargeAtTurnStart,
+  sargeOnPoint,
   winOrLose
 } from './sergeant'
 import type { WalkAway } from './walkAway'
@@ -685,6 +686,12 @@ export function createBattle(parts: BattleParts): Battle {
         if (!dead) return
         if (game.currentPlayer.pigs.includes(dead)) tally.losses++
         else tally.kills++
+      },
+      // A promotion point off the ground is worth a word from him — the one
+      // category whose lines name a drop point (lib/game/sergeant.ts).
+      promotionPoint: () => {
+        const said = sargeOnPoint(sargeLines)
+        emit({ kind: 'sergeant', section: said.section, line: said.line })
       },
       broke: ({ target, at }) => {
         // A different effect from the hit, and the one play remembers as smoke.
