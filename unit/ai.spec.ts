@@ -1,37 +1,42 @@
 // PHASE 002 (domain) — the computer's turn: the stub brain. Pure, no Electron.
 //
-// The brain is a function of the battle's own stepped time — never the wall
-// clock — because a lockstep battle has to roll the same on both machines
-// (lib/game/ai.ts). Today it thinks for a moment and passes.
+// A brain is asked ONCE per free pair of hands (think when idle) and answers
+// with one order; the actuator works it out (unit/actuator.spec.ts). The
+// stub's whole game: wait out the card, begin, take SKIP TURN, think, pass —
+// and the pass is a FIRE order, because skipping IS using SKIP TURN, on the
+// player's own road (lib/game/ai.ts).
 
 import { test, expect } from '@playwright/test'
 
 import { AI_START_SECONDS, AI_THINK_SECONDS, createStubBrain } from '../src/lib/game/ai'
+import type { AiWorld } from '../src/lib/game/ai'
+import { SKILL } from '../src/lib/game/skills'
 
-test('the stub waits out the card, begins, thinks once, and passes', { tag: '@nodata' }, () => {
+const world = (starting: boolean): AiWorld => ({ starting, timeLeft: 45, previous: null })
+
+test('the stub waits out the card, begins, takes SKIP TURN, thinks, and passes', { tag: '@nodata' }, () => {
   const brain = createStubBrain()
-  // The GET READY card hangs while the beat at the top of the turn holds.
-  expect(brain.update(AI_START_SECONDS / 2, true)).toBe('wait')
-  expect(brain.update(AI_START_SECONDS / 2, true)).toBe('begin')
-  // THINK is said once — it is the order that takes SKIP TURN in hand — and
-  // the quiet after it is the thinking itself.
-  expect(brain.update(0, false)).toBe('think')
-  expect(brain.update(AI_THINK_SECONDS / 2, false)).toBe('wait')
-  expect(brain.update(AI_THINK_SECONDS / 2, false)).toBe('pass')
+  expect(brain.decide(world(true))).toEqual({ kind: 'wait', seconds: AI_START_SECONDS })
+  expect(brain.decide(world(true))).toEqual({ kind: 'begin' })
+  expect(brain.decide(world(false))).toEqual({ kind: 'hold', skill: SKILL.SKIP_TURN })
+  expect(brain.decide(world(false))).toEqual({ kind: 'wait', seconds: AI_THINK_SECONDS })
+  expect(brain.decide(world(false))).toEqual({ kind: 'fire', charge: 0 })
 })
 
 test('a beat resolved by its own timeout still gets a think before the pass', { tag: '@nodata' }, () => {
   // The beat can expire on its own (game.ts burns it down in tick), so the
   // brain may never be asked while `starting` is up.
   const brain = createStubBrain()
-  expect(brain.update(1, false)).toBe('think')
-  expect(brain.update(AI_THINK_SECONDS, false)).toBe('pass')
+  expect(brain.decide(world(false))).toEqual({ kind: 'hold', skill: SKILL.SKIP_TURN })
+  expect(brain.decide(world(false))).toEqual({ kind: 'wait', seconds: AI_THINK_SECONDS })
+  expect(brain.decide(world(false))).toEqual({ kind: 'fire', charge: 0 })
 })
 
 test('a reset is a fresh turn', { tag: '@nodata' }, () => {
   const brain = createStubBrain()
-  brain.update(AI_START_SECONDS, true)
-  brain.update(0, false)
+  brain.decide(world(true))
+  brain.decide(world(true))
+  brain.decide(world(false))
   brain.reset()
-  expect(brain.update(AI_START_SECONDS / 2, true)).toBe('wait')
+  expect(brain.decide(world(true))).toEqual({ kind: 'wait', seconds: AI_START_SECONDS })
 })

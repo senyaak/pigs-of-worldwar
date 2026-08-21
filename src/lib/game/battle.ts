@@ -25,6 +25,7 @@ import type { Firing } from './shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
 import { createStubBrain } from './ai'
+import { createActuator } from './actuator'
 import { beginWalkAway } from './walkAway'
 import {
   SARGE_FLOOR,
@@ -315,6 +316,50 @@ export function createBattle(parts: BattleParts): Battle {
     anim,
     clips: parts.clips,
     bark: () => emit({ kind: 'bark', player: game.players.indexOf(game.currentPlayer) })
+  })
+  /**
+   * The FIRE button's one write, shared by the player's verb (`setFiring`)
+   * and the machine's rig below so both take the same refusal.
+   *
+   * **NOTHING IS FIRED FROM THE AIR.** Play: "можно во время прыжка начать
+   * заряжать оружие — баг." `Pig::MayAct` refuses it outright — `[pig+0x2EC]`
+   * is the pig's own mode and 5 is being airborne, the same value
+   * `UpdateMovement` returns on so that a flying pig is neither walked nor
+   * turned (0x467a28, 0x46b205). The whole press is dropped rather than the
+   * hold alone, or a gauge already filling would loose on the way up.
+   */
+  const applyFiring = (held: boolean, pressed: boolean): void => {
+    if (loco.airborne !== null) {
+      attack.swallow()
+      attack.hold(false)
+      return
+    }
+    // The PRESS is what a gun and a blade answer to; the gauge wants the
+    // whole hold, and the frame it ends.
+    if (pressed) attack.press()
+    attack.hold(held)
+  }
+  /** The machine's HANDS (lib/game/actuator.ts): a brain's order becomes the
+   * same inputs the player's keys write, and nothing else — every read on
+   * this rig is something the screen shows anyway. */
+  const actuator = createActuator({
+    at: () => ({
+      x: game.currentPig.position.x,
+      z: game.currentPig.position.z,
+      heading: game.currentPig.heading
+    }),
+    aim: () => sights.angle(),
+    gauge: () => attack.gauge(game.currentPig.holding),
+    intent(walk, turn) {
+      intent.walk = walk
+      intent.turn = turn
+    },
+    aimStep: sights.push,
+    fire: applyFiring,
+    begin: () => game.beginTurn(),
+    hold(skill) {
+      game.currentPig.holding = skill
+    }
   })
   /** Whether the opening drop was still running LAST step. The FIRST turn's
    * card goes up the frame this falls (`announceTurn`); every later one goes
@@ -778,8 +823,10 @@ export function createBattle(parts: BattleParts): Battle {
     sights.setHeld(false)
     swings.reset()
     // A turn is a fresh start for the machine too (lib/game/ai.ts) — and the
-    // moment its SEAT is decided (`machineTurn` above).
+    // moment its SEAT is decided (`machineTurn` above). The hands let go of
+    // whatever they were doing and still every control they hold.
     brain.reset()
+    actuator.reset()
     machineTurn = computer(game.players.indexOf(game.currentPlayer))
     emit({ kind: 'cameraReset' })
   }
@@ -967,33 +1014,27 @@ export function createBattle(parts: BattleParts): Battle {
 
     // **THE COMPUTER'S TURN.** The machine plays this side, so nothing the
     // player holds is read past here — input is muted at the source too
-    // (input/battleInput.ts) — and the brain's orders are carried out instead:
-    // it waits out the GET READY card, begins the beat, stands THINKING with
-    // SKIP TURN in hand, and passes. The pass goes through the same
-    // `endTurnBeat` every other way of ending a turn takes, so the WALK AWAY
-    // beat and the one place a mission can end stay one road. If the brain
-    // ever stalls, the clock above still runs the turn out.
+    // (input/battleInput.ts). The brain is asked what it wants only while
+    // the hands are FREE — think when idle, so an order is thought about
+    // once, not sixty times a second — and the actuator then works the order
+    // into the same inputs the player's keys write. **NO RETURN**: the
+    // driving code below carries those inputs out exactly as it would a
+    // player's, so every clamp and speed holds, the pass is SKIP TURN fired
+    // like any skill (`attack.begin` answers 'skip' and the one road through
+    // `endTurnBeat` stays one road), and the THINKING pose is the ordinary
+    // skill-in-hand rule further down. If the brain ever stalls, the clock
+    // above still runs the turn out.
     if (computerTurn()) {
-      switch (brain.update(delta, game.starting)) {
-        case 'begin':
-          game.beginTurn()
-          break
-        case 'think':
-          // In hand for the dashboard's slot; the pose is put on HERE because
-          // the player's own SKIP-TURN block further down is never reached.
-          acting.holding = SKILL.SKIP_TURN
-          anim.setClip(acting, ANIM.THINKING)
-          anim.overlay(acting, -1, 0)
-          break
-        case 'pass':
-          acting.holding = null
-          // The same announcement the player's skip makes (the menu's noise).
-          emit({ kind: 'skillUsed' })
-          endTurnBeat()
-          break
+      if (actuator.idle()) {
+        actuator.take(
+          brain.decide({
+            starting: game.starting,
+            timeLeft: game.timeLeft,
+            previous: actuator.outcome()
+          })
+        )
       }
-      onChanged()
-      return
+      actuator.step(delta)
     }
 
     // "START OF TURN - press any key to continue": the pig stands, and nothing

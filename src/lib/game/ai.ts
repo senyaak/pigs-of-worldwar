@@ -1,26 +1,43 @@
-// The computer's turn: the seam an AI will live in, and the stub that holds
-// the seat today.
+// The computer's turn: the BRAIN's seat, and the stub that holds it today.
 //
-// The original has one — the exe carries an AI passability map (0x461f60)
-// and per-class behaviour nobody has read yet — and the remake has none.
-// What exists NOW is the shape: which side the machine plays is the battle's
-// `computer(side)` (side 0 is the campaign's own; in the app every other
-// side is the machine's), input never drives a computer pig
-// (input/battleInput.ts), and the machine's turn travels the one road every
-// turn takes — `endTurnBeat`, the WALK AWAY beat, the handover
-// (lib/game/battle.ts). The brain only says WHAT the side does with its
-// turn, and today's brain thinks for a moment and PASSES.
+// The design is docs/ai.md and the shape is three parts. The brain (here)
+// is asked what it wants ONLY when the hands are free — think when idle —
+// and answers with one order (lib/game/orders.ts). The actuator
+// (lib/game/actuator.ts) then works that order through the player's own
+// inputs, and the battle's ordinary driving code carries them out. What the
+// brain DECIDES and what the world RESOLVES are different things, and every
+// honest miss lives in that gap.
 //
-// Deterministic on purpose: an order is a function of the battle's own
-// stepped time, never the wall clock, because a lockstep battle has to roll
-// the same on both machines (CLAUDE.md, "the engine steps in fixed quanta").
-// A real brain keeps that rule and draws any chance from the battle's one
-// random stream.
-//
-// Pure: stepped time in, orders out.
+// Deterministic on purpose: a decision is a function of the world it is
+// shown and nothing else — never the wall clock — because a lockstep battle
+// has to roll the same on both machines (CLAUDE.md, "the engine steps in
+// fixed quanta"). A real brain draws any chance from the battle's one
+// random stream, and any trajectory it dry-runs takes a THROWAWAY rng
+// (docs/ai.md) so the lookahead never eats the battle's own numbers.
 
-/** What the brain wants done this step. The battle carries it out. */
-export type Order = 'wait' | 'begin' | 'think' | 'pass'
+import type { Order } from './orders'
+import type { Outcome } from './actuator'
+import { SKILL } from './skills'
+
+/** What the brain is shown: the read-only face of the battle. It GROWS with
+ * the brain — nothing goes on it until a decision reads it. */
+export interface AiWorld {
+  /** The beat at the top of the turn, still unresolved. */
+  starting: boolean
+  /** The turn clock, seconds. */
+  timeLeft: number
+  /** How the last order ended — `blocked` is the world saying no, and the
+   * cue to think of something else. Null before the first order finishes. */
+  previous: Outcome | null
+}
+
+export interface Brain {
+  /** One decision. Asked only while the actuator is idle, so an order is
+   * thought about once, not sixty times a second. */
+  decide(world: AiWorld): Order
+  /** A new turn: forget the old one. The battle calls it on every handover. */
+  reset(): void
+}
 
 /**
  * How long the GET READY card hangs on the computer's turn before it begins.
@@ -36,38 +53,40 @@ export const AI_START_SECONDS = 2
  * before it passes. `[deliberate]`, same as above. */
 export const AI_THINK_SECONDS = 2
 
-export interface Brain {
-  /** One engine step of the computer's turn: what it wants done now.
-   * `starting` is the beat at the top of the turn, still unresolved. */
-  update(delta: number, starting: boolean): Order
-  /** A new turn: forget the old one. The battle calls it on every handover. */
-  reset(): void
-}
-
-/** The stand-in: wait out the card, begin, think, pass. */
+/**
+ * The stand-in: wait out the card, begin, take SKIP TURN in hand, think,
+ * and pass. The pass IS a fire order — SKIP TURN used like any skill — so
+ * it travels the player's whole road: `attack.begin` answers 'skip', the
+ * same `endTurnBeat` runs, and the THINKING pose comes off the ordinary
+ * skill-in-hand rule (lib/game/battle.ts), not off anything special here.
+ */
 export function createStubBrain(): Brain {
-  let seconds = 0
-  let thought = false
+  let stage = 0
   return {
-    update(delta, starting) {
-      seconds += delta
-      if (starting) {
-        if (seconds < AI_START_SECONDS) return 'wait'
-        seconds = 0
-        return 'begin'
+    decide(world) {
+      if (world.starting) {
+        if (stage === 0) {
+          stage = 1
+          return { kind: 'wait', seconds: AI_START_SECONDS }
+        }
+        return { kind: 'begin' }
       }
-      // 'think' is said ONCE — it is the order that takes SKIP TURN in hand
-      // and puts the pose on; the wait after it is the thinking itself.
-      if (!thought) {
-        thought = true
-        seconds = 0
-        return 'think'
+      // The beat can resolve on its own (game.ts burns it down in tick), so
+      // the brain may never be asked while `starting` is up — the pass still
+      // gets its think.
+      if (stage < 2) stage = 2
+      if (stage === 2) {
+        stage = 3
+        return { kind: 'hold', skill: SKILL.SKIP_TURN }
       }
-      return seconds >= AI_THINK_SECONDS ? 'pass' : 'wait'
+      if (stage === 3) {
+        stage = 4
+        return { kind: 'wait', seconds: AI_THINK_SECONDS }
+      }
+      return { kind: 'fire', charge: 0 }
     },
     reset() {
-      seconds = 0
-      thought = false
+      stage = 0
     }
   }
 }
