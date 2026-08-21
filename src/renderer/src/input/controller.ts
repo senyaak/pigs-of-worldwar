@@ -459,6 +459,9 @@ declare global {
         next(filter?: string): { index: number; name: string } | null
         /** Start `next()` over. */
         rewind(): void
+        /** Point `next()` at a list of FILE PATHS instead of at the bank —
+         * a shortlist, stepped one key at a time. */
+        queue(paths: readonly string[]): number
         /** Any audio file in the install, by path — the battle bank is not all
          * there is: `pow.sfx.file('FESounds/hiss1.wav')`. */
         file(path: string): Promise<string>

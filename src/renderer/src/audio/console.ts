@@ -94,6 +94,16 @@ export interface SoundConsole {
   /** Start the stepping over. */
   rewind(): void
   /**
+   * Point `next()` at a LIST OF PATHS instead of at the bank — any files in
+   * the install, in whatever order you want them.
+   *
+   * What it is for: a shortlist. The battle bank is ninety-nine and the loose
+   * files are another sixty, and walking all of them to find one sound is the
+   * chore. Measure or reason your way to a dozen candidates, queue those, and
+   * step them. Returns how many are queued.
+   */
+  queue(paths: readonly string[]): number
+  /**
    * **ANY audio file in the install, by path** — because the battle bank is
    * not all there is.
    *
@@ -162,9 +172,17 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
       .filter((row) => !heard || !heard.has(row.name))
   }
 
-  /** Where `next()` has got to: the list it is walking and the filter it was
-   * built for. */
-  let stepping: { filter: string | undefined; rows: SoundRow[]; at: number } | null = null
+  /**
+   * Where `next()` has got to: the list it is walking and the filter it was
+   * built for. `paths` means the rows are FILES rather than bank names, and
+   * then the filter is meaningless and stays null.
+   */
+  let stepping: {
+    filter: string | undefined
+    rows: SoundRow[]
+    at: number
+    paths: boolean
+  } | null = null
 
   /** Files played by path rather than by bank, decoded once each. */
   const loose = new Map<string, AudioBuffer | null>()
@@ -199,20 +217,38 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
     rewind() {
       stepping = null
     },
-    next(filter) {
-      if (!stepping || stepping.filter !== filter) {
-        stepping = { filter, rows: matching(filter, true), at: 0 }
+    queue(paths) {
+      stepping = {
+        filter: undefined,
+        rows: paths.map((name, index) => ({ index, name })),
+        at: 0,
+        paths: true
       }
-      const row = stepping.rows[stepping.at]
+      return paths.length
+    },
+    next(filter) {
+      // A queued list of paths outlives a bare `next()`; asking with a filter
+      // is what says "back to the bank".
+      const queued = stepping?.paths === true && filter === undefined
+      if (!queued && (!stepping || stepping.filter !== filter || stepping.paths)) {
+        stepping = { filter, rows: matching(filter, true), at: 0, paths: false }
+      }
+      const walking = stepping!
+      const row = walking.rows[walking.at]
       if (!row) {
         console.log('nothing left')
         return null
       }
-      stepping.at++
-      bank().play(row.name)
-      console.log(
-        `${String(row.index).padStart(3)}  ${row.name}   (${stepping.at}/${stepping.rows.length})`
-      )
+      walking.at++
+      const where = `(${walking.at}/${walking.rows.length})`
+      if (walking.paths) {
+        // `file` decodes before it can say how long the thing is, so the line
+        // it prints arrives a beat after this one.
+        void this.file(row.name).then((said) => console.log(`${said}   ${where}`))
+      } else {
+        bank().play(row.name)
+        console.log(`${String(row.index).padStart(3)}  ${row.name}   ${where}`)
+      }
       return row
     },
     walk(filter, opts) {
