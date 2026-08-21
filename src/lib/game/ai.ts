@@ -52,6 +52,9 @@ export interface AiWorld {
     z: number
     heading: number
     aim: number
+    /** Its own health bar — the blast pricing counts the thrower among the
+     * bodies a bad throw costs (lib/game/evaluate.ts). */
+    health: number
     holding: number | null
     carrying: Slot[]
   }
@@ -66,6 +69,9 @@ export interface AiWorld {
    * outside the world. Empty when standing as close as the ground allows.
    */
   route(to: { x: number; z: number }): { x: number; z: number }[] | null
+  /** The collision ground at a point, Y-DOWN — what a dry-run throw lands
+   * against (lib/game/evaluate.ts). */
+  groundAt(x: number, z: number): number
 }
 
 export interface Brain {

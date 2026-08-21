@@ -911,12 +911,18 @@ What is actually missing, in the order it is worth doing:
    best-effort routes; the grunt walks its corners), aim PITCH (soles to
    soles, asked once), and the SEED of the HP differential — best gun by
    the damage table, best target by worth with the KILL_BONUS (a finishable
-   foe outbids a nearer healthy one). What is next, off ai.md's pass 1: the
-   kit-wide evaluation proper — the LOBS (a charge solved by dry-running
-   the parabola with a throwaway rng), splash priced against friends, heals
-   when the mechanic lands — and then the level knobs on top. The pure
-   specs and `engine-headless` stay hotseat: nobody is the computer unless
-   the assembler says so.
+   foe outbids a nearer healthy one). The kit-wide PRICE LIST is in
+   (`lib/game/evaluate.ts`, 2026-08-21): guns, blades and LOBS priced
+   class-blind in one currency — the grenade's charge solved by dry-running
+   the engine's own parabola (constant rng, the battle's stream untouched),
+   the blast priced over EVERYONE including the thrower, which bought
+   self-preservation out of arithmetic: at 800 units the grunt keeps the
+   rifle because the grenade's rim (~1100) would bill him ~19 of his own.
+   What is next, off ai.md's pass 1: the heals when the mechanic lands, the
+   PLANTED family (TNT arms in the price list when a kit carries it), the
+   environment in the ledger (knockback into water/mines), and then the
+   level knobs on top. The pure specs and `engine-headless` stay hotseat:
+   nobody is the computer unless the assembler says so.
 
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens

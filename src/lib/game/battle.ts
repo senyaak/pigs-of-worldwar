@@ -1063,6 +1063,7 @@ export function createBattle(parts: BattleParts): Battle {
               z: acting.position.z,
               heading: acting.heading,
               aim: sights.angle(),
+              health: acting.health,
               holding: acting.holding,
               carrying: acting.carrying.map((slot) => ({ ...slot }))
             },
@@ -1084,7 +1085,8 @@ export function createBattle(parts: BattleParts): Battle {
                 { ground: query, obstruction: scenery.obstacles, swims: false },
                 { x: acting.position.x, z: acting.position.z, y: acting.position.y },
                 to
-              )
+              ),
+            groundAt: (x, z) => query.height(x, z)
           })
         )
         actuator.step(delta)

@@ -9,7 +9,8 @@
 
 import { test, expect } from '@playwright/test'
 
-import { createGruntBrain, CLOSE_TO, SIDE_STEP, FRIEND_CLEARANCE, PITCH_WITHIN } from '../src/lib/game/grunt'
+import { createGruntBrain, SIDE_STEP, FRIEND_CLEARANCE, PITCH_WITHIN } from '../src/lib/game/grunt'
+import { CLOSE_TO } from '../src/lib/game/evaluate'
 import type { AiWorld, Seen } from '../src/lib/game/ai'
 import { SKILL } from '../src/lib/game/skills'
 import { UNLIMITED } from '../src/lib/game/inventory'
@@ -37,13 +38,15 @@ const world = (over: {
     z: 0,
     heading: over.heading ?? 0,
     aim: over.aim ?? 0,
+    health: 50,
     holding: over.holding ?? null,
     carrying: over.carrying ?? [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
   },
   foes: over.foes ?? [foe()],
   friends: over.friends ?? [],
   // An open field unless a test says otherwise: the route is the goal.
-  route: over.route ?? ((to) => [to])
+  route: over.route ?? ((to) => [to]),
+  groundAt: () => 0
 })
 
 test('no gun is the stub game: SKIP TURN in hand, then the pass', { tag: '@nodata' }, () => {
@@ -190,6 +193,20 @@ test('a pitch already close enough is not chased', { tag: '@nodata' }, () => {
   const brain = createGruntBrain()
   const level = world({ holding: SKILL.RIFLE, aim: PITCH_WITHIN / 2 })
   expect(brain.decide(level)).toEqual({ kind: 'fire' })
+})
+
+test('a lob is fired WITH its solved charge, facing the target', { tag: '@nodata' }, () => {
+  const brain = createGruntBrain()
+  const kit = [{ skill: SKILL.GRENADE, amount: 3 }]
+  const throwing = world({ carrying: kit, foes: [foe({ z: 800 })] })
+  expect(brain.decide(throwing)).toEqual({ kind: 'hold', skill: SKILL.GRENADE })
+  const order = brain.decide(world({ carrying: kit, holding: SKILL.GRENADE, foes: [foe({ z: 800 })] }))
+  expect(order.kind).toBe('fire')
+  if (order.kind !== 'fire') return
+  // The charge is the lob's AIM: solved, not defaulted — and no aimTo came
+  // first, because a grenade keeps its 45° come-up.
+  expect(order.charge).toBeGreaterThan(0)
+  expect(order.charge!).toBeLessThanOrEqual(1)
 })
 
 test('blocked in range: shoot from where it stands', { tag: '@nodata' }, () => {
