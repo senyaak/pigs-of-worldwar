@@ -21,7 +21,6 @@ function bench(options: { frozen?: boolean; aimFloor?: number; gaugeRate?: numbe
   let gauge: number | null = null
   const last = { walk: 0, turn: 0, aim: 0 }
   const fires: { held: boolean; pressed: boolean }[] = []
-  let begun = 0
   let holding: number | null | 'untouched' = 'untouched'
 
   const actuator = createActuator({
@@ -40,7 +39,6 @@ function bench(options: { frozen?: boolean; aimFloor?: number; gaugeRate?: numbe
       if (pressed) gauge = 0
       if (!held) gauge = null
     },
-    begin: () => begun++,
     hold(skill) {
       holding = skill
     }
@@ -70,7 +68,7 @@ function bench(options: { frozen?: boolean; aimFloor?: number; gaugeRate?: numbe
     return ticks
   }
 
-  return { pig, last, fires, actuator, tick, run, begun: () => begun, holding: () => holding }
+  return { pig, last, fires, actuator, tick, run, holding: () => holding }
 }
 
 test('walkTo turns onto the bearing, walks, and arrives stilled', { tag: '@nodata' }, () => {
@@ -97,21 +95,8 @@ test('a walk that stops progressing finishes blocked', { tag: '@nodata' }, () =>
   expect(ticks * STEP).toBeGreaterThanOrEqual(STUCK_SECONDS)
 })
 
-test('wait counts the battle clock down and nothing else', { tag: '@nodata' }, () => {
+test('hold is a one-step order through the skill menu write', { tag: '@nodata' }, () => {
   const b = bench()
-  const ticks = b.run({ kind: 'wait', seconds: 0.5 })
-  // To within one step: thirty subtractions of 1/60 leave ~5e-17 on the
-  // clock, and the actuator rightly spends one more tick on it.
-  expect(ticks * STEP).toBeGreaterThanOrEqual(0.5)
-  expect(ticks * STEP).toBeLessThanOrEqual(0.5 + STEP)
-  expect(b.fires).toEqual([])
-  expect(b.begun()).toBe(0)
-})
-
-test('begin and hold are one-step orders through their own verbs', { tag: '@nodata' }, () => {
-  const b = bench()
-  b.run({ kind: 'begin' })
-  expect(b.begun()).toBe(1)
   b.run({ kind: 'hold', skill: 7 })
   expect(b.holding()).toBe(7)
 })
@@ -148,7 +133,8 @@ test('a gun answers the press itself: no gauge, one press, straight out', { tag:
   // The toy gauge only exists while fire is held AND the bench fills it; a
   // null gauge is the engine saying nothing in hand charges.
   b.fires.length = 0
-  b.actuator.take({ kind: 'fire', charge: 0 })
+  // No charge given at all: a gun's press needs none.
+  b.actuator.take({ kind: 'fire' })
   b.tick()
   b.tick()
   expect(b.actuator.idle()).toBe(true)

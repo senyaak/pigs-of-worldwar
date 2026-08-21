@@ -188,12 +188,14 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   await expect
     .poll(() => hud(page))
     .toMatchObject({ turn: 1, side: 'GARLIC GRUNTS', pig: 'BASTILLE' })
-  // …and the MACHINE plays them: its brain waits out the card, stands
-  // thinking, and passes on its own (lib/game/ai.ts). Nothing is pressed here
-  // — pressing would do nothing anyway, because input is muted on the
-  // machine's turn (input/battleInput.ts).
+  // …and the MACHINE plays them: the GRUNT brain takes its rifle out, closes
+  // on the nearest pig and shoots — or passes when it cannot — and either
+  // road ends the turn on its own (lib/game/grunt.ts). Nothing is pressed
+  // here — pressing would do nothing anyway, because input is muted on the
+  // machine's turn (input/battleInput.ts). What is pinned is the HANDOVER,
+  // not the outcome of the shot: the turn comes back by itself.
   await expect
-    .poll(() => hud(page), { timeout: 30_000, message: 'the machine passes its own turn' })
+    .poll(() => hud(page), { timeout: 30_000, message: 'the machine plays its own turn' })
     .toMatchObject({ turn: 2, side: "TOMMY'S TROTTERS", pig: 'GINGER' })
   // Back to the map the rest of the phase warps around on.
   expect(await swapMap(page, 'CAMP')).toBe(true)

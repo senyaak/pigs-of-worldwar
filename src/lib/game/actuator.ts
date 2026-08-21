@@ -35,8 +35,6 @@ export interface Rig {
   aimStep(direction: number): void
   /** The fire button — `Battle.setFiring`, airborne guard included. */
   fire(held: boolean, pressed: boolean): void
-  /** Any key on the GET READY card — `Battle.beginTurn`. */
-  begin(): void
   /** The skill menu's write: what the pig holds. */
   hold(skill: number | null): void
 }
@@ -75,8 +73,8 @@ const AIM_STUCK_SECONDS = 0.5
  * on the spot first. */
 const WALK_CONE = Math.PI / 4
 
-/** The shortest way round: (-π, π]. */
-const shortest = (angle: number): number => {
+/** The shortest way round: (-π, π]. Brains borrow it (lib/game/grunt.ts). */
+export const shortest = (angle: number): number => {
   const turn = 2 * Math.PI
   const wound = ((angle % turn) + turn) % turn
   return wound > Math.PI ? wound - turn : wound
@@ -85,8 +83,8 @@ const shortest = (angle: number): number => {
 export function createActuator(rig: Rig): Actuator {
   let order: Order | null = null
   let ended: Outcome | null = null
-  /** The wait's clock. */
-  let remaining = 0
+  /** The fire order's charge, normalised once at `take`. */
+  let charge = 0
   /** The walk's (or the aim's) best distance so far, and how long since it
    * improved. */
   let best = Infinity
@@ -109,15 +107,6 @@ export function createActuator(rig: Rig): Actuator {
   const step = (delta: number): void => {
     if (order === null) return
     switch (order.kind) {
-      case 'wait': {
-        remaining -= delta
-        if (remaining <= 0) finish('done')
-        return
-      }
-      case 'begin':
-        rig.begin()
-        finish('done')
-        return
       case 'hold':
         rig.hold(order.skill)
         finish('done')
@@ -183,7 +172,7 @@ export function createActuator(rig: Rig): Actuator {
           return
         }
         const gauge = rig.gauge()
-        if (gauge === null || gauge >= order.charge) {
+        if (gauge === null || gauge >= charge) {
           // Letting go is what looses a charged weapon; a gun already went
           // on the press and reads null here.
           rig.fire(false, false)
@@ -197,7 +186,7 @@ export function createActuator(rig: Rig): Actuator {
   }
 
   const clear = (): void => {
-    remaining = 0
+    charge = 0
     best = Infinity
     stalled = 0
     pressed = false
@@ -206,12 +195,9 @@ export function createActuator(rig: Rig): Actuator {
   return {
     idle: () => order === null,
     take(next) {
-      order =
-        next.kind === 'fire'
-          ? { kind: 'fire', charge: Math.max(0, Math.min(1, next.charge)) }
-          : next
+      order = next
       clear()
-      if (next.kind === 'wait') remaining = next.seconds
+      if (next.kind === 'fire') charge = Math.max(0, Math.min(1, next.charge ?? 0))
     },
     step,
     outcome: () => ended,

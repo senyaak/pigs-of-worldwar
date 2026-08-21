@@ -24,8 +24,9 @@ import { weaponOf } from './weapons'
 import type { Firing } from './shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
-import { createStubBrain } from './ai'
+import { AI_MULL_SECONDS, AI_START_SECONDS } from './ai'
 import { createActuator } from './actuator'
+import { createGruntBrain } from './grunt'
 import { beginWalkAway } from './walkAway'
 import {
   SARGE_FLOOR,
@@ -278,10 +279,11 @@ export function createBattle(parts: BattleParts): Battle {
   const { tumbles, corpses, airDrops, dropIn, drowning, onChanged } = parts
   const emit = parts.bus.emit
 
-  /** Which sides the machine plays, and the brain that plays them — the stub
-   * that thinks and passes, today (lib/game/ai.ts). */
+  /** Which sides the machine plays, and the brain that plays them — the
+   * GRUNT: nearest foe, close to range, do not shoot through a friend, fire
+   * (lib/game/grunt.ts; the seat's shape is lib/game/ai.ts). */
   const computer = parts.computer ?? (() => false)
-  const brain = createStubBrain()
+  const brain = createGruntBrain()
   /** …LATCHED at the turn's start (`focus`), not re-asked every frame: whose
    * hands a turn is in is decided when it is handed over, so a mid-turn flip
    * of the predicate (`pow.hotseat`) waits for the next turn. Play's call. */
@@ -356,11 +358,15 @@ export function createBattle(parts: BattleParts): Battle {
     },
     aimStep: sights.push,
     fire: applyFiring,
-    begin: () => game.beginTurn(),
     hold(skill) {
       game.currentPig.holding = skill
     }
   })
+  /** The seat's two pacing clocks (lib/game/ai.ts): how long the GET READY
+   * card has hung, and how long the hands have been free since the last
+   * order — both reset at every handover. */
+  let cardSeconds = 0
+  let mullSeconds = 0
   /** Whether the opening drop was still running LAST step. The FIRST turn's
    * card goes up the frame this falls (`announceTurn`); every later one goes
    * up in `handOver`. */
@@ -827,6 +833,8 @@ export function createBattle(parts: BattleParts): Battle {
     // whatever they were doing and still every control they hold.
     brain.reset()
     actuator.reset()
+    cardSeconds = 0
+    mullSeconds = 0
     machineTurn = computer(game.players.indexOf(game.currentPlayer))
     emit({ kind: 'cameraReset' })
   }
@@ -1025,16 +1033,45 @@ export function createBattle(parts: BattleParts): Battle {
     // skill-in-hand rule further down. If the brain ever stalls, the clock
     // above still runs the turn out.
     if (computerTurn()) {
-      if (actuator.idle()) {
+      if (game.starting) {
+        // The card is read out by the SEAT, not decided by the brain —
+        // pacing is theatre (lib/game/ai.ts). `beginTurn` only OFFERS the
+        // press, same as a player's key.
+        if ((cardSeconds += delta) >= AI_START_SECONDS) game.beginTurn()
+      } else if (!actuator.idle()) {
+        actuator.step(delta)
+        mullSeconds = 0
+      } else if ((mullSeconds += delta) >= AI_MULL_SECONDS) {
+        // Hands free and the mulling beat spent: one decision, and the
+        // hands take it up the same step. The world handed over is the
+        // brain's whole view — read-only copies, nothing live (docs/ai.md).
+        const actingSide = game.players.indexOf(game.currentPlayer)
+        const seen = (pig: Pig): { x: number; z: number; health: number } => ({
+          x: pig.position.x,
+          z: pig.position.z,
+          health: pig.health
+        })
         actuator.take(
           brain.decide({
-            starting: game.starting,
             timeLeft: game.timeLeft,
-            previous: actuator.outcome()
+            previous: actuator.outcome(),
+            acting: {
+              x: acting.position.x,
+              z: acting.position.z,
+              heading: acting.heading,
+              holding: acting.holding,
+              carrying: acting.carrying.map((slot) => ({ ...slot }))
+            },
+            foes: game.players.flatMap((player, side) =>
+              side === actingSide ? [] : player.pigs.filter((pig) => !isDead(pig)).map(seen)
+            ),
+            friends: game.currentPlayer.pigs
+              .filter((pig) => pig !== acting && !isDead(pig))
+              .map(seen)
           })
         )
+        actuator.step(delta)
       }
-      actuator.step(delta)
     }
 
     // "START OF TURN - press any key to continue": the pig stands, and nothing

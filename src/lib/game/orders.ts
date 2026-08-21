@@ -8,12 +8,13 @@
 // THERE", not "stick forward this frame", so a brain reads as tactics and
 // the frame-by-frame steering stays the actuator's business.
 
+// There is no "wait" and no "begin" here on purpose: pacing is THEATRE, not
+// thought. The seat itself reads the GET READY card out and mulls between
+// decisions (lib/game/battle.ts, AI_START_SECONDS / AI_MULL_SECONDS) — a
+// brain only ever says what it WANTS.
+
 /** One wish. The actuator carries it out over as many steps as it takes. */
 export type Order =
-  /** Stand for this long — the thinking pause, the card being read. */
-  | { kind: 'wait'; seconds: number }
-  /** Answer the GET READY card, the way any key does for a player. */
-  | { kind: 'begin' }
   /** Take a skill in hand (or put it away with null) — what the player's
    * skill menu writes. SKIP TURN in hand is the THINKING pose. */
   | { kind: 'hold'; skill: number | null }
@@ -27,6 +28,7 @@ export type Order =
    * turn, +1023..-1023). Finishes `blocked` when the clamp refuses it. */
   | { kind: 'aimTo'; angle: number }
   /** Press fire; for a gauge weapon hold until it reads `charge` (0..1) and
-   * let go. A gun answers the press itself and `charge` is ignored. Firing
-   * SKIP TURN is the pass — the same road the player's skip takes. */
-  | { kind: 'fire'; charge: number }
+   * let go. A gun answers the press itself, so `charge` is optional and
+   * means nothing to one. Firing SKIP TURN is the pass — the same road the
+   * player's skip takes. */
+  | { kind: 'fire'; charge?: number }

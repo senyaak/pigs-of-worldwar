@@ -893,21 +893,25 @@ What is actually missing, in the order it is worth doing:
    every campaign map by name, arenas on the 45 default,
    `unit/turns.spec.ts` pinning the corners.
 
-5. **There is no AI — but its SEAT is built, 2026-08-20.** The battle knows
-   which sides the machine plays (`computer(side)` — the app hands in
-   "everyone but side 0"), input never drives a machine pig
-   (`input/battleInput.ts` mutes everything but ESCAPE on its turn), and the
-   machine's turn runs itself through the one road every turn takes:
-   `lib/game/ai.ts` is the brain, and today's brain waits out the GET READY
-   card, stands THINKING (clip 46), and passes. So a mission plays start to
-   finish with the enemy passing every turn; what is left is a brain that
-   DOES something — and it must stay a function of stepped time and the
-   battle's one random stream, because lockstep (the `net` branch) will feed
-   the same seam. The pure specs and `engine-headless` stay hotseat: nobody
-   is the computer unless the assembler says so. **The brain's design is
-   settled and written — [ai.md](ai.md)**: orders over the Battle verbs, one
-   HP-differential evaluation over the kit, difficulty as quality of thought,
-   our own pathfinder, HIDE as armour against memory.
+5. **The AI's first brain PLAYS, 2026-08-21 — the GRUNT.** The design is
+   [ai.md](ai.md) and the first pass of it is built: a brain decides ONE
+   order when the hands are free (`lib/game/ai.ts` the seat's contract,
+   `lib/game/orders.ts` the vocabulary), the actuator works the order out
+   through the player's own inputs under the player's own speeds and clamps
+   (`lib/game/actuator.ts`, `blocked` when the world refuses), and the
+   battle's machine block FALLS THROUGH into the ordinary driving code —
+   the pass is SKIP TURN fired like any skill. The GRUNT
+   (`lib/game/grunt.ts`): gun out, close on the nearest foe to 0.6 of the
+   gun's own range, step aside rather than shoot through a friend, turn,
+   fire level; pass when unarmed or grounded out of reach. Pacing is the
+   seat's, not the brain's (`AI_START_SECONDS`, `AI_MULL_SECONDS`).
+   Deterministic throughout — stepped time, no chance drawn yet — because
+   lockstep (the `net` branch) feeds this seam. What is next, off ai.md's
+   pass 1: the PATHFINDER (walkTo is a straight line today — water, mines
+   and walls are all just `blocked`), aim PITCH against ground that is not
+   flat, and the kit-wide HP-differential evaluation with the level knobs
+   on top. The pure specs and `engine-headless` stay hotseat: nobody is the
+   computer unless the assembler says so.
 
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens
