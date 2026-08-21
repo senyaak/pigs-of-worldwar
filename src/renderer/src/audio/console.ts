@@ -40,9 +40,34 @@ export interface SoundRow {
   name: string
 }
 
+/** What a WALK hands back: stop it, or ask where it got to. */
+export interface SoundWalk {
+  stop(): void
+  /** What is sounding right now, or null once it has finished. */
+  at(): string | null
+  /** Everything it has played so far, in order. */
+  heard(): string[]
+}
+
 export interface SoundConsole {
   list(filter?: string): SoundRow[]
   play(which: string | number): string | null
+  /**
+   * **WALK the bank**, hands-free: every matching sound in turn, each held for
+   * its own length plus a breath, its name logged as it starts.
+   *
+   * Paced by the SAMPLE rather than by a fixed gap, because the lengths run
+   * from 0.06 s to 4.26 s and a fixed gap either runs them together or leaves
+   * dead air. `pow.sfx.walk('L_')` is the launches, `walk()` is all
+   * ninety-nine. It returns a handle — `stop()` ends it.
+   */
+  walk(filter?: string, gap?: number): SoundWalk
+  /**
+   * …or step it by hand: a GENERATOR over the same list. `next()` plays the
+   * next one and hands back its row, so an ear that wants to sit on one sound
+   * is not fighting a timer.
+   */
+  each(filter?: string): Generator<SoundRow, void, unknown>
   now(): Record<string, Cue>
   set(
     moment: string,
@@ -83,7 +108,51 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
     return bank().has(which) ? which : null
   }
 
+  /** The rows a filter matches — what both the walk and the generator step
+   * through, and the same test `list` uses. */
+  const matching = (filter?: string): SoundRow[] => {
+    const wanted = filter?.toUpperCase()
+    return bank()
+      .names()
+      .map((name, index) => ({ index, name }))
+      .filter((row) => !wanted || row.name.includes(wanted))
+  }
+
   return {
+    walk(filter, gap = 0.4) {
+      const rows = matching(filter)
+      const played: string[] = []
+      let now: string | null = null
+      let stopped = false
+      void (async () => {
+        for (const row of rows) {
+          if (stopped) break
+          const seconds = await bank().seconds(row.name)
+          if (stopped) break
+          now = row.name
+          played.push(row.name)
+          console.log(`${String(row.index).padStart(3)}  ${row.name}  ${seconds.toFixed(2)}s`)
+          bank().play(row.name)
+          await new Promise((done) => setTimeout(done, (seconds + gap) * 1000))
+        }
+        now = null
+      })()
+      return {
+        stop() {
+          stopped = true
+          now = null
+        },
+        at: () => now,
+        heard: () => [...played]
+      }
+    },
+    *each(filter) {
+      for (const row of matching(filter)) {
+        bank().play(row.name)
+        console.log(`${String(row.index).padStart(3)}  ${row.name}`)
+        yield row
+      }
+    },
     list(filter) {
       const wanted = filter?.toUpperCase()
       const rows = bank()

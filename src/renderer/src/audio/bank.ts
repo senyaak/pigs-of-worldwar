@@ -24,6 +24,15 @@ export interface Bank {
   has(name: string): boolean
   /** Every name the bank carries, in index order. */
   names(): string[]
+  /**
+   * How long a sound is, in seconds — decoding it first if it has not been
+   * heard yet, and 0 for a name the bank does not have.
+   *
+   * It is what a WALK through the bank is paced by (audio/console.ts): every
+   * cue here is fire-and-forget, so anything played on a timer has to know how
+   * long the last one lasts or the two lie on top of each other.
+   */
+  seconds(name: string): Promise<number>
   /** What has been played, in order — the only way a spec can hear. */
   played(): string[]
   dispose(): void
@@ -34,6 +43,7 @@ export const SILENT: Bank = {
   play: () => {},
   has: () => false,
   names: () => [],
+  seconds: async () => 0,
   played: () => [],
   dispose: () => {}
 }
@@ -226,6 +236,11 @@ export async function loadBank(srlPath: string): Promise<Bank> {
   return {
     has: (name) => entries.has(name),
     names: () => [...entries.keys()],
+    async seconds(name) {
+      if (!entries.has(name)) return 0
+      if (!buffers.has(name)) await fetch(name)
+      return buffers.get(name)?.duration ?? 0
+    },
     played: () => [...heard],
     play(name, options) {
       if (!entries.has(name) || disposed) return

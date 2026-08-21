@@ -439,6 +439,14 @@ declare global {
       sfx?: {
         list(filter?: string): { index: number; name: string }[]
         play(which: string | number): string | null
+        /** Walk the bank hands-free, each sound held for its own length.
+         * `pow.sfx.walk('L_')` is the launches; the handle stops it. */
+        walk(
+          filter?: string,
+          gap?: number
+        ): { stop(): void; at(): string | null; heard(): string[] }
+        /** …or step it by hand: `const g = pow.sfx.each('I_'); g.next()`. */
+        each(filter?: string): Generator<{ index: number; name: string }, void, unknown>
         now(): Record<string, unknown>
         set(
           moment: string,
