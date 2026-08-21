@@ -490,9 +490,17 @@ export function createEngine(parts: EngineParts): Engine {
     vx: number
     vy: number
     vz: number
+    fuse?: number
+    doused?: boolean
   }): FlightShot => ({
     id: one.id,
     skill: one.skill,
+    // A bullet has no fuse, a rocket's is infinite, and a DOUSED one has
+    // stopped — nothing steps it but the sink (lib/game/lobs.ts). All three
+    // travel as −1, so nothing downstream has to know which it was
+    // (lib/game/snapshot.ts).
+    fuse:
+      one.fuse !== undefined && Number.isFinite(one.fuse) && one.doused !== true ? one.fuse : -1,
     x: one.x,
     y: one.y,
     z: one.z,

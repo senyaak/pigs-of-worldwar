@@ -257,11 +257,18 @@ export const LAYOUT = {
      * was two thirds of a pig's height of empty air and stopped meaning
      * anything when the model's scale moved. */
     lift: 120,
-    /** BIG's glyphs shrunk — 32 at 0.75 is the 24-tall plate play measured
-     * off the original's screenshot (see PLATE_FONT). A fraction softens a
-     * bitmap glyph, and the console's own knob is here if play wants the
-     * clean half instead. */
-    scale: 0.75,
+    /**
+     * BIG's glyphs shrunk. It was 0.75 — 32 at 0.75 being the 24-tall plate
+     * measured off the original — and play took it down another **70 per
+     * cent** on seeing it beside the thicker outline: "шрифт поменьше -
+     * процентов 70 от текущего". 0.75 × 0.7 = 0.525, so a glyph is about
+     * seventeen pixels tall.
+     *
+     * The outline below does NOT follow it and that is the point: letters that
+     * shrink against an outline that does not are letters with more black
+     * around them, which is what the pair of changes was asking for.
+     */
+    scale: 0.525,
     /**
      * How far the BLACK OUTLINE stands off the letters, in screen pixels.
      *
@@ -271,11 +278,14 @@ export const LAYOUT = {
      * turns it off.
      *
      * It is in SCREEN pixels rather than the plate's own units on purpose: an
-     * outline is a constant hairline whatever `scale` is doing to the glyphs,
-     * and at a fractional scale an offset multiplied by it would land between
-     * two device pixels and fade.
+     * outline is a constant weight whatever `scale` is doing to the glyphs, and
+     * at a fractional scale an offset multiplied by it would land between two
+     * device pixels and fade.
+     *
+     * It is a RADIUS and the stamp is a filled disc, not a ring — see
+     * `aroundBy`. Play has moved it twice, 1 → 2 → 3, each time on seeing it.
      */
-    outline: 2,
+    outline: 3,
     heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
   }
   // THE MAP has no entry here on purpose: nothing about its placement or its

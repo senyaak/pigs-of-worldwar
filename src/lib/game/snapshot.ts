@@ -68,6 +68,14 @@ export interface PigShot {
 export interface FlightShot {
   id: number
   skill: number
+  /**
+   * Seconds of fuse left, or **−1** for something with none — a rocket, which
+   * goes off on touch (lib/game/grenade.ts, `Lob.contact`).
+   *
+   * Minus one rather than infinity because a snapshot is meant to survive a
+   * JSON round trip, and `Infinity` does not.
+   */
+  fuse: number
   x: number
   y: number
   z: number

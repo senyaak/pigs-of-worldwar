@@ -714,7 +714,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     sounds.chuteOverhead(now.dropping)
     // …and a planted charge burning, which is a noise for as long as the fuse
     // lasts rather than a moment (audio/battleAudio.ts, `FUSE_TICK`).
-    sounds.fuseBurning(now.lobs.filter((one) => isPlanted(one.skill)).length, delta)
+    sounds.fuseBurning(
+      // …still BURNING: a charge doused in the water has stopped counting and
+      // travels as −1 (lib/game/snapshot.ts).
+      now.lobs.filter((one) => isPlanted(one.skill) && one.fuse >= 0).map((one) => one.fuse),
+      delta
+    )
     const active = squad.of(now.acting)
     if (!active) return
     if (!now.dropping && !now.starting && !now.over) {

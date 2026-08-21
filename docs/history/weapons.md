@@ -1236,19 +1236,39 @@ not move, so without that last one all four land on top of each other.
 `advanceTrail` takes an optional `jitter()` and the renderer supplies it. Left
 out, nothing scatters — which is every row the exe lays along a segment.
 
-**Planting was SILENT, and the sound was already read.** Nothing announced a
-charge going down at all: the `fired` arm is skipped for a planted charge
-(there is nothing to loose) and the announcement went with it. `lobs.plant` now
-emits `fired`, and the cue is decoded rather than picked — the per-weapon fire
-column gives skill 37 index **35 `L_ARTIL`**, which had been read and left
-unwired on purpose.
+**And they come off the FUSE, not off the sticks.** Play, on seeing them:
+"искры идут из фителя а не из самого динамита." They were: the sparks were laid
+at `FUSE_LIFT` — 0x3C, the exe's own offset — above the projectile's ORIGIN,
+and the origin is where the bundle sits on the ground, so sixty units up is the
+middle of it. The ART answers this instead. The bundle is authored lying down
+and stood on its end (`STAND`), which puts the black stub at the model's
+highest point, so the tip is the posed bounding box's least y and nothing has
+to be measured by hand (`tipOf`, three/grenades.ts).
 
-**The BURN, though, has nothing to play.** Play asked for it — "звука нет
-горения фитиля" — and all ninety-nine names in `sfxday.srl` were listed looking
-for a hiss. There is none: the nearest thing is `S_CLOCK`, a tick. So the fuse
-TICKS rather than hisses, one every 0.45 s, and both the cue and the rate are
-`[CHECK — remake]`. It is a poll rather than an event for the same reason the
-canopies are one — what a fuse makes is a noise for as long as it lasts.
+**Planting was silent, and the first answer to that was WRONG.** `lobs.plant`
+was made to emit `fired` so the per-weapon column's own index — 35 `L_ARTIL`,
+read and long unwired — could play. Play threw it out on sight: "какой ещё
+файред на динамит???" Right, and it is not a taste: a charge being put on the
+ground looses nothing and reports nothing, and the noise it makes is its FUSE.
+Both the event and the cue are gone again; skill 37 is deliberately absent from
+`BARREL_SOUND` with the reading kept beside it.
+
+**A burning charge makes THREE noises**, which is play's list: "звук горения
+фитиля + таймер + звук когда кончается таймер". None of the three is in the
+binary — every one of the bank's ninety-nine names was listed looking for a
+hiss and there is no fuse in it — so all three are `[CHECK — remake]` picks out
+of what the bank does have: `BG_GAS` for the hiss, `S_CLOCK` for the timer over
+it, `L_MINETR` for the click as it runs out.
+
+**And the RATES are the samples' own lengths, which is the whole lesson.** A
+cue is fire-and-forget with no handle to stop it, so anything repeated faster
+than it lasts piles copies on top of one another and the last of them go on
+sounding after the thing that started them is gone. The first pass fired
+`S_CLOCK` — **1.06 s** — every 0.45, and play heard exactly that: "щас он тикает
+даже после взрыва." The three rates are now 0.36 s for a 0.38-second hiss,
+1.1 s for the 1.06-second clock, and one shot of the 0.23-second click at half
+a second left. The lengths came out of the shipped wavs, and a doused charge
+reports no fuse at all so a charge that fell in the water goes quiet.
 
 **And the camera goes to the charge.** Play: "камера должна перемещаться на
 динамит - а она остаётся на свине." It goes at the END of the turn and not the

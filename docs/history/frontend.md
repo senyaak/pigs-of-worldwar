@@ -1072,6 +1072,13 @@ squad is arrived at FROM, and the main menu is what a player expects.
 offsets, which is exactly right at one pixel and wrong at any more: a ring of
 eight becomes eight SPOKES with the letter's own edge showing between them the
 moment the radius grows. So the stamp is now every whole offset within the
-radius — twenty-four of them at two — built once per radius and kept, because
-the plate is drawn for every pig on the screen. `LAYOUT.plate.outline` is the
-knob and it is at **2**; play asked for "больше".
+radius — a filled disc, built once per radius and kept, because the plate is
+drawn for every pig on the screen.
+
+Play moved it twice in one sitting, 1 → 2 → **3**, and took the LETTERS the
+other way at the same time: "шрифт поменьше - процентов 70 от текущего", so
+`scale` went 0.75 → **0.525**. The two knobs are deliberately in different
+units — the letters in the plate's own scale, the outline in screen pixels —
+which is what lets them move apart: smaller letters inside an outline that does
+not shrink with them is more black around each glyph, which is what the pair of
+requests adds up to.

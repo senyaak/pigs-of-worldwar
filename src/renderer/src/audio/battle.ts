@@ -88,19 +88,26 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * the nominal one, which is what most of the binary asks for. */
   splash: { sound: 'I_SPLASH', volume: 100, pitch: 100 },
   /**
-   * A CHARGE going down — DECODED, index 35 `L_ARTIL` off the per-weapon fire
-   * column (see `BARREL_SOUND`).
+   * **A BURNING CHARGE MAKES THREE NOISES**, and play named all three: "звук
+   * горения фитиля + таймер + звук когда кончается таймер". None of them is
+   * decoded — every one of the bank's ninety-nine names was listed looking for
+   * a fuse and there is no hiss in it — so all three are `[CHECK — remake]`
+   * picks out of what the bank does have, chosen so they can be swapped in one
+   * line each through `pow.sfx`.
+   *
+   * The LENGTHS are what made the picks: a cue is fire-and-forget, so anything
+   * repeated has to be shorter than the gap it is repeated at or the copies lie
+   * on top of one another — which is exactly what went wrong first time round,
+   * `S_CLOCK` being 1.06 s and fired every 0.45.
    */
-  charge: { sound: 'L_ARTIL', volume: 100, pitch: 100 },
-  /**
-   * …and the FUSE burning, which is **`[CHECK — remake]` and the bank says
-   * why**. Play asked for it — "звука нет горения фитиля" — and there is no
-   * hiss in `sfxday.srl` to give them: all ninety-nine names were listed and
-   * the nearest thing to a burning fuse is `S_CLOCK`, a tick. So the burn is a
-   * TICKING rather than a hiss, one every `FUSE_TICK`, and it is a pick and not
-   * a reading. Swap the name in play through `pow.sfx`.
-   */
-  fuse: { sound: 'S_CLOCK', volume: 70, pitch: 120, jitter: 10 },
+  /** The fuse BURNING: `BG_GAS`, 0.38 s of hiss, repeated close enough to run
+   * together. */
+  fuse: { sound: 'BG_GAS', volume: 55, pitch: 130, jitter: 8 },
+  /** The TIMER: `S_CLOCK`, 1.06 s, one a second and no faster. */
+  fuseTimer: { sound: 'S_CLOCK', volume: 80, pitch: 100 },
+  /** …and the timer RUNNING OUT: `L_MINETR`, 0.23 s, the trigger click that
+   * comes just before the blast. */
+  fuseOut: { sound: 'L_MINETR', volume: 100, pitch: 100 },
   /**
    * A thrown thing being DOUSED by water. DECODED, mix and all: the projectile's
    * water arm plays index **25** at volume **0x50** with a pitch of
@@ -253,13 +260,12 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
  * pin, not a blast), 30 GRENADE LAUNCHER 36 like the bazooka, 37 TNT 35
  * `L_ARTIL`. They are one line each the day they are wanted.
  */
-export const BARREL_SOUND: Record<number, 'pistol' | 'rifle' | 'bazooka' | 'charge'> = {
+export const BARREL_SOUND: Record<number, 'pistol' | 'rifle' | 'bazooka'> = {
   6: 'pistol',
-  29: 'bazooka',
-  // **37 TNT — DECODED, off the same column as the bazooka's**, and wired now
-  // that a charge going down announces itself at all (lib/game/lobs.ts): its
-  // fire arm plays index 35, which is `L_ARTIL`. Play: planting was silent.
-  37: 'charge'
+  29: 'bazooka'
+  // **37 TNT is deliberately NOT here.** Its own index is read — 35 `L_ARTIL`,
+  // off the same column as the bazooka's — and play refused it: a charge being
+  // put on the ground is not a weapon going off, and what it makes is a fuse.
 }
 
 /**

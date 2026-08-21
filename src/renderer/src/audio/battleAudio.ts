@@ -29,19 +29,29 @@ export interface BattleAudio {
    * first frame the sound exists. Call it once a frame while the drop runs.
    */
   chuteOverhead(running: boolean): void
-  /** A planted charge burning: one tick every `FUSE_TICK` for as long as any
-   * of them is alight (`BATTLE_SOUNDS.fuse`). */
-  fuseBurning(alight: number, delta: number): void
+  /**
+   * Every planted charge burning, by the seconds of fuse it has left: the hiss,
+   * the timer over it, and the click as the timer runs out
+   * (`BATTLE_SOUNDS.fuse`, `.fuseTimer`, `.fuseOut`).
+   */
+  fuseBurning(remaining: readonly number[], delta: number): void
 }
 
 /**
- * How often the burning fuse is heard, in seconds.
- *
- * `[CHECK — remake]` with the cue it plays: nothing in the bank is a fuse, so
- * both the sound and its rate are picks. A charge burns for a touch under six
- * seconds (lib/game/grenade.ts), so this is a dozen ticks and then the blast.
+ * **EVERY RATE HERE IS THE SAMPLE'S OWN LENGTH**, and that is not a nicety: a
+ * cue is fire-and-forget with no handle to stop, so a sound repeated faster
+ * than it lasts piles copies on top of each other and the last of them go on
+ * sounding after the thing that started them is gone. Play heard exactly that
+ * — "щас он тикает даже после взрыва" — off a 1.06-second clock fired every
+ * 0.45.
  */
-export const FUSE_TICK = 0.45
+/** The HISS: `BG_GAS` is 0.38 s, so this runs them together with no gap. */
+export const FUSE_HISS = 0.36
+/** The TIMER: `S_CLOCK` is 1.06 s. One a second, and never two at once. */
+export const FUSE_TICK = 1.1
+/** How much fuse is left when the timer is heard RUNNING OUT — `L_MINETR`, a
+ * fifth of a second, so it lands clear of the blast. */
+export const FUSE_LAST = 0.5
 
 /**
  * `bank` is asked for rather than held: it loads beside the scene and the
@@ -49,20 +59,40 @@ export const FUSE_TICK = 0.45
  */
 export function createBattleAudio(bank: () => Bank): BattleAudio {
   let chuteHeard = false
-  /** Seconds until the next tick of a burning fuse; reset the moment nothing
-   * is alight, so the first tick of the next charge is prompt. */
-  let sinceTick = 0
+  /** Seconds until the next hiss and the next tick of a burning fuse. Both are
+   * cleared the moment nothing is alight, so the next charge is prompt. */
+  let untilHiss = 0
+  let untilTick = 0
+  /** Whether a fuse was already inside its last half second last frame — the
+   * click is one per charge, not one a frame. */
+  let running = false
 
   return {
-    fuseBurning(alight, delta) {
-      if (alight <= 0) {
-        sinceTick = 0
+    fuseBurning(remaining, delta) {
+      if (remaining.length === 0) {
+        // Everything stops the frame the charge is gone. Nothing new is
+        // started; what is already sounding is a fifth of a second at most,
+        // which is what the rates above are for.
+        untilHiss = 0
+        untilTick = 0
+        running = false
         return
       }
-      sinceTick -= delta
-      if (sinceTick > 0) return
-      sinceTick = FUSE_TICK
-      playCue(bank(), BATTLE_SOUNDS.fuse)
+      untilHiss -= delta
+      if (untilHiss <= 0) {
+        untilHiss = FUSE_HISS
+        playCue(bank(), BATTLE_SOUNDS.fuse)
+      }
+      untilTick -= delta
+      if (untilTick <= 0) {
+        untilTick = FUSE_TICK
+        playCue(bank(), BATTLE_SOUNDS.fuseTimer)
+      }
+      // …and the TIMER RUNNING OUT, once, as the shortest fuse crosses into
+      // its last half second.
+      const out = Math.min(...remaining) <= FUSE_LAST
+      if (out && !running) playCue(bank(), BATTLE_SOUNDS.fuseOut)
+      running = out
     },
     listen: handling({
       // ——— weapons ———

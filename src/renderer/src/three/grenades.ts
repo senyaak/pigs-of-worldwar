@@ -18,7 +18,7 @@ import { projectileModel } from '../../../lib/game/ammo'
 import { isPlanted, lobOf } from '../../../lib/game/grenade'
 import { createLobArt } from './lobArt'
 import { createLobTrails } from './lobTrail'
-import { FUSE_LIFT, FUSE_TRAIL, LOB_TRAIL, ROCKET_TRAIL } from '../../../lib/game/trail'
+import { FUSE_TRAIL, LOB_TRAIL, ROCKET_TRAIL } from '../../../lib/game/trail'
 import { fromExeY } from '../../../lib/game/terrain'
 
 /**
@@ -114,15 +114,32 @@ const heading = new THREE.Vector3()
  * (model x 77) rather than the 32 its half-height gave it lying down, which is
  * why the same bundle that used to sink is now on its end and on the ground.
  */
-const liftOf = (mesh: THREE.Mesh, skill: number): number => {
-  if (!isPlanted(skill)) return MESH_LIFT
+const posedBox = (mesh: THREE.Mesh): THREE.Box3 | null => {
   if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
   const box = mesh.geometry.boundingBox
-  if (!box) return MESH_LIFT
+  if (!box) return null
+  return posed.copy(box).applyMatrix4(pose.makeRotationFromEuler(mesh.rotation))
+}
+
+const liftOf = (mesh: THREE.Mesh, skill: number): number => {
+  if (!isPlanted(skill)) return MESH_LIFT
   // Y-DOWN: the LOWEST corner is the greatest y, and that is what has to come
   // off the ground.
-  return posed.copy(box).applyMatrix4(pose.makeRotationFromEuler(mesh.rotation)).max.y
+  return posedBox(mesh)?.max.y ?? MESH_LIFT
 }
+
+/**
+ * **WHERE THE FUSE TIP IS**, as an offset from the mesh's own origin — the
+ * posed box's HIGHEST point, which in Y-down is its least y.
+ *
+ * Play: "искры идут из фитиля а не из самого динамита." They were: the sparks
+ * were laid `FUSE_LIFT` (0x3C, the exe's own offset) above the projectile's
+ * ORIGIN, and the origin is where the bundle sits on the ground. Sixty units up
+ * from there is the middle of the sticks. Standing, the model's highest point
+ * IS the black stub the fuse is (`STAND` above measures the same model the
+ * other way), so the art answers this rather than a number.
+ */
+const tipOf = (mesh: THREE.Mesh): number => posedBox(mesh)?.min.y ?? 0
 
 export function createGrenadeArt(
   root: THREE.Object3D,
@@ -210,13 +227,14 @@ export function createGrenadeArt(
             fuse: { x: facing.x, y: facing.y, z: facing.z },
             base: mesh.position.y + lift
           })
-          // …and its own trail comes off the fuse rather than off the bundle:
-          // the exe hangs effect 0x1D on the projectile with an offset of 0x3C
-          // where the grenade's arm passes zero (lib/game/trail.ts). Off the
-          // MESH's own origin, so the lift is counted once.
+          // …and its own trail comes off the FUSE TIP rather than off the
+          // bundle — the exe hangs effect 0x1D on the projectile with an offset
+          // of 0x3C (`FUSE_LIFT`), which is measured from the charge's own base
+          // and lands in the middle of the sticks. Play saw that and it is the
+          // art that answers it (`tipOf`).
           alight.set(shot.id, {
             x: mesh.position.x,
-            y: mesh.position.y - fromExeY(FUSE_LIFT),
+            y: mesh.position.y + tipOf(mesh) * MODEL_SCALE,
             z: mesh.position.z
           })
         }

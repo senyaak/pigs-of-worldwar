@@ -301,13 +301,10 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       // and a resting lob is what the renderer draws lying still.
       shot.resting = true
       flying.push(shot)
-      // **A CHARGE GOING DOWN IS A WEAPON GOING OFF.** Nothing announced it
-      // before, so planting was silent — the `fired` arm is skipped for a
-      // planted charge (lib/game/attack.ts) because there is nothing to loose,
-      // and the announcement went with it. The exe plays a sound here like any
-      // other weapon: its per-weapon fire table gives skill 37 index 35
-      // `L_ARTIL` (audio/battle.ts).
-      emit({ kind: 'fired', skill })
+      // **AND IT IS NOT A WEAPON FIRING.** `fired` was emitted here for one
+      // commit and play threw it out on sight — "какой ещё файред на динамит".
+      // Right: nothing is loosed, nothing reports, and the noise a charge makes
+      // is its FUSE rather than its going down (audio/battleAudio.ts).
       return true
     },
     update(delta) {
