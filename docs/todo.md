@@ -255,7 +255,24 @@ footstep nor a pig and said what each one is; the table lives where the wiring
 is (`src/renderer/src/audio/battle.ts`, above `BATTLE_SOUNDS`) with the
 measured length beside each.
 
-**The one that settled the day's question**: there is NO burning fuse in the
+**FOUND, after the whole bank was walked**: the burning fuse is not in the
+BATTLE bank — it is in the **FRONT END's**. The install holds 2019 audio files
+and the three `.srl` banks name 126 of them; `FESounds/` carries **`hiss1`
+(0.58 s), `hiss2` (0.59 s) and `Sparks02` (0.60 s)**, plus three steams, two
+coins and a crunch, and the only thing that plays any of them is the menu
+machine. Play walked all ninety-nine of the battle's and said so plainly:
+"короче там ничего нет - но звук фитиля точно где-то есть ещё." Right on both
+halves. `pow.sfx.file('FESounds/hiss1.wav')` hears one; picking between the
+hisses and the sparks is an ear's call, and then a battle borrows it the way it
+borrows anything else.
+
+**Two more loose ends the same sweep turned up**: `Audio/AMB_1N.wav` and
+`AMB_2N.wav` — the NIGHT ambience pair — are indexed by nothing, because
+`sfxnight.srl` is byte-identical to `sfxday.srl` and names the DAY pair. And
+thirty-seven `FESounds/Indu0NN.wav` are in the folder and in no bank, two of
+them named "Looped".
+
+**The old answer, now superseded**: there is no burning fuse in the battle
 bank. `BG_GAS` is the gas grenade — "газовая граната так делает" — and
 `L_FLAME` is napalm going off, not something burning steadily. So a planted
 charge is heard as its TIMER and nothing else, and the entry that had borrowed

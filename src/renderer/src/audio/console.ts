@@ -27,6 +27,7 @@
 import { BATTLE_SOUNDS, placedSounds, playCue } from './battle'
 import type { Cue } from './battle'
 import { SILENT } from './bank'
+import { context, sfxOut } from './bank'
 import type { Bank } from './bank'
 
 /** A cue as the source spells it, so `print()` output pastes straight in. */
@@ -92,6 +93,21 @@ export interface SoundConsole {
   next(filter?: string): SoundRow | null
   /** Start the stepping over. */
   rewind(): void
+  /**
+   * **ANY audio file in the install, by path** — because the battle bank is
+   * not all there is.
+   *
+   * The install holds 2019 audio files and the three `.srl` banks name 126 of
+   * them. Play walked the battle's ninety-nine looking for a burning fuse and
+   * came out with "короче там ничего нет - но звук фитиля точно где-то есть
+   * ещё", which was right: `FESounds/` carries `hiss1`, `hiss2`, `Sparks02`,
+   * three steams and two coins, and the FRONT END is the only thing that
+   * plays them.
+   *
+   * `pow.sfx.file('FESounds/hiss1.wav')`. Paths are relative to the install
+   * and it decodes each one once.
+   */
+  file(path: string): Promise<string>
   now(): Record<string, Cue>
   set(
     moment: string,
@@ -150,7 +166,35 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
    * built for. */
   let stepping: { filter: string | undefined; rows: SoundRow[]; at: number } | null = null
 
+  /** Files played by path rather than by bank, decoded once each. */
+  const loose = new Map<string, AudioBuffer | null>()
+
   return {
+    async file(path) {
+      const ctx = context()
+      if (!ctx) return 'no audio context'
+      if (ctx.state === 'suspended') await ctx.resume()
+      if (!loose.has(path)) {
+        const got = await window.api.loadSound(path)
+        if (!got.ok) {
+          loose.set(path, null)
+        } else {
+          try {
+            const bytes = new Uint8Array(got.data)
+            loose.set(path, await ctx.decodeAudioData(bytes.buffer as ArrayBuffer))
+          } catch {
+            loose.set(path, null)
+          }
+        }
+      }
+      const buffer = loose.get(path)
+      if (!buffer) return `no sound at ${path}`
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+      source.connect(sfxOut() ?? ctx.destination)
+      source.start()
+      return `${path}  ${buffer.duration.toFixed(2)}s`
+    },
     left: (filter) => matching(filter, true),
     rewind() {
       stepping = null

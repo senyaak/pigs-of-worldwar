@@ -96,8 +96,18 @@ export interface Cue {
  * 98 S_UNHOLS 0.60  putting a weapon AWAY
  * ```
  *
- * **There is no burning fuse in it**, which is why a charge is heard as its
- * timer alone (`fuseTimer` below).
+ * **There is no burning fuse in it** — play walked the other forty-one, the
+ * pig's own, and came back with "короче там ничего нет". The pig's list is in
+ * `audio/pigVoice.ts`; the short of it is a body and its moods, nothing that
+ * burns.
+ *
+ * **But the sound exists, in the FRONT END's bank.** The install holds 2019
+ * audio files and the three `.srl` banks name 126 of them; `FESounds/` carries
+ * `hiss1` (0.58 s), `hiss2` (0.59 s), `Sparks02` (0.60 s), three steams, two
+ * coins and a crunch, and only the menu machine plays any of them. Nothing
+ * stops a battle borrowing one — `pow.sfx.file('FESounds/hiss1.wav')` hears it
+ * — and that is where the charge's burn should come from once play has picked.
+ * See `docs/todo.md`.
  *
  * The rest of this is a work list rather than a table: nine of these are
  * placed by ear and wired to nothing — the turn clock's own warning, a round
