@@ -89,8 +89,13 @@ export interface SoundConsole {
    *
    * The list is taken once, when the stepping starts, and again whenever the
    * filter changes or `rewind()` is called.
+   *
+   * `fresh` defaults to TRUE — the settled names are skipped. Pass `false` to
+   * step **all ninety-nine in bank order**, which is what an ear that wants
+   * the whole thing in one sitting is after:
+   * `pow.sfx.next(undefined, false)`.
    */
-  next(filter?: string): SoundRow | null
+  next(filter?: string, fresh?: boolean): SoundRow | null
   /** Start the stepping over. */
   rewind(): void
   /**
@@ -179,6 +184,7 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
    */
   let stepping: {
     filter: string | undefined
+    fresh: boolean
     rows: SoundRow[]
     at: number
     paths: boolean
@@ -220,18 +226,22 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
     queue(paths) {
       stepping = {
         filter: undefined,
+        fresh: false,
         rows: paths.map((name, index) => ({ index, name })),
         at: 0,
         paths: true
       }
       return paths.length
     },
-    next(filter) {
-      // A queued list of paths outlives a bare `next()`; asking with a filter
-      // is what says "back to the bank".
-      const queued = stepping?.paths === true && filter === undefined
-      if (!queued && (!stepping || stepping.filter !== filter || stepping.paths)) {
-        stepping = { filter, rows: matching(filter, true), at: 0, paths: false }
+    next(filter, fresh = true) {
+      // A queued list of paths outlives a bare `next()`; asking with a filter,
+      // or for the whole bank, is what says "back to the bank".
+      const queued = stepping?.paths === true && filter === undefined && fresh
+      if (
+        !queued &&
+        (!stepping || stepping.filter !== filter || stepping.fresh !== fresh || stepping.paths)
+      ) {
+        stepping = { filter, fresh, rows: matching(filter, fresh), at: 0, paths: false }
       }
       const walking = stepping!
       const row = walking.rows[walking.at]

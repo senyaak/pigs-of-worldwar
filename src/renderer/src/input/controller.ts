@@ -456,7 +456,12 @@ declare global {
         left(filter?: string): { index: number; name: string }[]
         /** One more each time you ask: the generator kept for you, so the
          * console's up-arrow is the whole interface. */
-        next(filter?: string): { index: number; name: string } | null
+        next(
+          filter?: string,
+          /** Skip what is already settled. TRUE by default; `false` steps all
+           * ninety-nine in bank order. */
+          fresh?: boolean
+        ): { index: number; name: string } | null
         /** Start `next()` over. */
         rewind(): void
         /** Point `next()` at a list of FILE PATHS instead of at the bank —
