@@ -105,6 +105,39 @@ export interface Cue {
  * the swing that missed, holstering, the battle ambience, the two birds, and
  * the airships nothing on our maps flies. See `docs/todo.md`.
  */
+/**
+ * **WHAT IS ALREADY PLACED** — by ear, by wiring, or by the exe's own table.
+ *
+ * `pow.sfx.left()` subtracts this. The runtime "what has sounded" list cannot
+ * do the job on its own: it empties every time the app restarts, so an ear
+ * three sessions into the bank would be handed the whole ninety-nine again.
+ * Play hit exactly that — "там всё ещё то что я тебе уже рассказал!"
+ *
+ * The thirty-seven play walked on 2026-08-21 are in the table above; the
+ * thirteen `FT_*` are one a surface and read out of `Pig::Footstep`
+ * (lib/game/footsteps.ts). What is NOT in here is the pig's own forty-odd
+ * `P_*`, which is the next ear's job and the biggest pile of name picks left.
+ */
+const PLACED_BY_EAR = [
+  'AMB_1D', 'AMB_2D', 'BATT_L1', 'BATT_L2', 'BATT_L3', 'BATT_S1', 'BATT_S2',
+  'BATT_S3', 'BG_GAS', 'BG_PLANE', 'EN_BIP', 'EN_TANK', 'E_1', 'E_1000P',
+  'I_BUILD', 'I_BULIT1', 'I_METAL', 'I_PICKUP', 'I_SPLASH', 'I_STAB',
+  'I_SWMISS', 'I_SWORD', 'L_ARTIL', 'L_BAZOO', 'L_FLAME', 'L_HVYMG', 'L_MGUN',
+  'L_MINETR', 'L_MORT', 'L_PISTOL', 'L_RIFLE', 'L_ROC', 'L_SHOTG', 'S_CLOCK',
+  'S_OPEN', 'S_SELECT', 'S_UNHOLS',
+  // …and the surfaces, which are read rather than heard.
+  'FT_GRASS', 'FT_ICE', 'FT_LAVA', 'FT_METAL', 'FT_MUD', 'FT_QUAG', 'FT_ROCK',
+  'FT_SAND', 'FT_SNOW', 'FT_STONE', 'FT_SWIM', 'FT_WATER', 'FT_WOOD'
+]
+
+/** Every name whose moment is settled: the list above plus anything the cue
+ * table already plays. */
+export const placedSounds = (): Set<string> => {
+  const out = new Set(PLACED_BY_EAR)
+  for (const cue of Object.values(BATTLE_SOUNDS)) out.add(cue.sound)
+  return out
+}
+
 export const BATTLE_SOUNDS: Record<string, Cue> = {
   /**
    * Leaving the ground under the player's own power. DECODED, and play named

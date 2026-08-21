@@ -24,7 +24,7 @@
 // so the next jump uses the new one. Nothing here persists — `print()` is
 // what carries a decision back into the source.
 
-import { BATTLE_SOUNDS, playCue } from './battle'
+import { BATTLE_SOUNDS, placedSounds, playCue } from './battle'
 import type { Cue } from './battle'
 import { SILENT } from './bank'
 import type { Bank } from './bank'
@@ -124,7 +124,9 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
    * through, and the same test `list` uses. */
   const matching = (filter?: string, fresh?: boolean): SoundRow[] => {
     const wanted = filter?.toUpperCase()
-    const heard = fresh ? new Set(bank().played()) : null
+    // What has SOUNDED this run, and what was settled long before it — the
+    // second is the half that survives a restart (audio/battle.ts).
+    const heard = fresh ? new Set([...bank().played(), ...placedSounds()]) : null
     return bank()
       .names()
       .map((name, index) => ({ index, name }))
