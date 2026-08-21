@@ -247,6 +247,49 @@ call sites, the camera and the beat — is in `docs/history/turns.md`.
 
 ---
 
+## P2. THE SOUND BANK, IDENTIFIED BY EAR — 2026-08-21, and nine of them are unwired
+
+Ninety-nine entries and the exe names them by NUMBER, so what a file IS was
+always a guess from its name. Play walked all thirty-seven that are neither a
+footstep nor a pig and said what each one is; the table lives where the wiring
+is (`src/renderer/src/audio/battle.ts`, above `BATTLE_SOUNDS`) with the
+measured length beside each.
+
+**The one that settled the day's question**: there is NO burning fuse in the
+bank. `BG_GAS` is the gas grenade — "газовая граната так делает" — and
+`L_FLAME` is napalm going off, not something burning steadily. So a planted
+charge is heard as its TIMER and nothing else, and the entry that had borrowed
+the gas is gone rather than left wrong.
+
+**What is placed and wired to nothing**, roughly in the order it would be worth
+doing:
+
+- **`S_CLOCK` is the TURN CLOCK starting to run out** — "также когда время
+  кончаться начинает вроде". We play it for the charge's timer and nowhere for
+  the clock itself, which is the thing it is actually for. One listener on the
+  turn clock crossing its warning mark.
+- **`I_BUILD` against `I_BULIT1`/`I_STAB`**: a round hitting a WALL against a
+  round hitting MEAT. The engine already knows which it hit (lib/game/bullets.ts)
+  and plays neither.
+- **`I_METAL`** — a blast inside a bunker, a tank, a stationary machine. The
+  engine knows a pig is indoors (lib/game/indoors.ts).
+- **`I_SWMISS`** is a swing that MISSED, and it is currently wired as the
+  grenade's `whoosh`. Two moments, one sound; the swing's own miss is decided
+  in lib/game/strikes.ts.
+- **`S_UNHOLS`** — putting a weapon away, which the last bayonet and every
+  weapon swap already do.
+- **`BATT_L1..3` and `BATT_S1..3`** — the battle going on somewhere else, three
+  long and three short. Ambience nothing schedules.
+- **`AMB_1D`/`AMB_2D`** — a falcon and another bird.
+- **`EN_BIP`** — the AIRSHIPS that fly over a map, and **play notes we have
+  none**: "дережабли летают на картах - их кстати щас нет вроде". That is a
+  missing PROP before it is a missing sound.
+- The weapon reports we do not field yet — `L_ARTIL`, `L_MORT`, `L_ROC`,
+  `L_SHOTG`, `L_HVYMG`, `L_MGUN`, `L_FLAME` — one line each the day their
+  weapon lands (`BARREL_SOUND`).
+
+---
+
 ## 0. THE CAMPAIGN'S SPINE — a save, then NEW GAME and LOAD GAME
 
 Play's order, 2026-08-13, and it is the next thing to build. The frontend is

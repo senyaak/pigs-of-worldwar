@@ -45,8 +45,6 @@ export interface BattleAudio {
  * — "щас он тикает даже после взрыва" — off a 1.06-second clock fired every
  * 0.45.
  */
-/** The HISS: `BG_GAS` is 0.38 s, so this runs them together with no gap. */
-export const FUSE_HISS = 0.36
 /** The TIMER: `S_CLOCK` is 1.06 s. One a second, and never two at once. */
 export const FUSE_TICK = 1.1
 /** How much fuse is left when the timer is heard RUNNING OUT — `L_MINETR`, a
@@ -59,9 +57,8 @@ export const FUSE_LAST = 0.5
  */
 export function createBattleAudio(bank: () => Bank): BattleAudio {
   let chuteHeard = false
-  /** Seconds until the next hiss and the next tick of a burning fuse. Both are
-   * cleared the moment nothing is alight, so the next charge is prompt. */
-  let untilHiss = 0
+  /** Seconds until the next tick of a burning fuse, cleared the moment nothing
+   * is alight so the next charge is prompt. */
   let untilTick = 0
   /** Whether a fuse was already inside its last half second last frame — the
    * click is one per charge, not one a frame. */
@@ -73,15 +70,9 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
         // Everything stops the frame the charge is gone. Nothing new is
         // started; what is already sounding is a fifth of a second at most,
         // which is what the rates above are for.
-        untilHiss = 0
         untilTick = 0
         running = false
         return
-      }
-      untilHiss -= delta
-      if (untilHiss <= 0) {
-        untilHiss = FUSE_HISS
-        playCue(bank(), BATTLE_SOUNDS.fuse)
       }
       untilTick -= delta
       if (untilTick <= 0) {

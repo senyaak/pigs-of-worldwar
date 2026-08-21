@@ -46,6 +46,65 @@ export interface Cue {
  * from a file name. Every read goes through this object, so a rebind takes
  * effect on the next event.
  */
+/**
+ * **THE BANK, IDENTIFIED BY EAR — play, 2026-08-21.**
+ *
+ * Ninety-nine entries in `Audio/sfxday.srl` and the exe names them by NUMBER,
+ * so what a file IS has always been a guess from its name. Play walked every
+ * one of the thirty-seven that is neither a footstep (`FT_*`, thirteen, one a
+ * surface) nor a pig (`P_*`, forty-nine) and said what it heard. The lengths
+ * are measured off the shipped wavs and they matter: a cue is fire-and-forget,
+ * so anything repeated must be repeated slower than it lasts.
+ *
+ * ```
+ *  0 AMB_1D   2.17  a falcon
+ *  1 AMB_2D   1.64  another bird
+ *  2 BATT_L1  4.26  a blast with echo behind it
+ *  3 BATT_L2  2.27  rifle fire
+ *  4 BATT_L3  2.57  a burst — a machine gun
+ *  5 BATT_S1  0.95  a blast or a mortar going off
+ *  6 BATT_S2  0.83  …the same, duller
+ *  7 BATT_S3  0.83  …duller again
+ *  8 BG_GAS   0.38  THE GAS GRENADE
+ *  9 BG_PLANE 1.08  (wired: the plane overhead)
+ * 10 EN_BIP   1.15  the AIRSHIPS that fly over a map — and we have none
+ * 11 EN_TANK  1.34  a stationary machine turning, perhaps
+ * 12 E_1      1.48  (wired: the blast)
+ * 13 E_1000P  2.05  a blast with echo
+ * 27 I_BUILD  0.80  a round hitting a WALL
+ * 28 I_BULIT1 0.36  a round hitting MEAT
+ * 29 I_METAL  1.11  a blast inside a bunker, a tank, a machine
+ * 30 I_PICKUP 0.29  (wired: landing)
+ * 31 I_SPLASH 1.80  (wired: water)
+ * 32 I_STAB   0.66  into meat
+ * 33 I_SWMISS 0.30  a swing that MISSED
+ * 34 I_SWORD  0.65  (wired: the blade)
+ * 35 L_ARTIL  2.06  a tank or something like it firing
+ * 36 L_BAZOO  1.74  (wired: the bazooka)
+ * 37 L_FLAME  2.27  napalm going off
+ * 38 L_HVYMG  0.65  a gun — a rifle or a pistol
+ * 39 L_MGUN   0.72  a pistol
+ * 40 L_MINETR 0.23  (wired: the mine, and the fuse running out)
+ * 41 L_MORT   1.44  a mortar
+ * 42 L_PISTOL 0.87  another pistol
+ * 43 L_RIFLE  1.12  (wired: every gun this engine has)
+ * 44 L_ROC    1.54  a rocket
+ * 45 L_SHOTG  0.81  a shotgun
+ * 95 S_CLOCK  1.06  the TURN CLOCK starting to run out
+ * 96 S_OPEN   0.83  (wired: the weapon menu)
+ * 97 S_SELECT 0.46  (wired: a skill used)
+ * 98 S_UNHOLS 0.60  putting a weapon AWAY
+ * ```
+ *
+ * **There is no burning fuse in it**, which is why a charge is heard as its
+ * timer alone (`fuseTimer` below).
+ *
+ * The rest of this is a work list rather than a table: nine of these are
+ * placed by ear and wired to nothing — the turn clock's own warning, a round
+ * hitting a wall against a round hitting meat, the blast inside a building,
+ * the swing that missed, holstering, the battle ambience, the two birds, and
+ * the airships nothing on our maps flies. See `docs/todo.md`.
+ */
 export const BATTLE_SOUNDS: Record<string, Cue> = {
   /**
    * Leaving the ground under the player's own power. DECODED, and play named
@@ -100,9 +159,15 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * on top of one another — which is exactly what went wrong first time round,
    * `S_CLOCK` being 1.06 s and fired every 0.45.
    */
-  /** The fuse BURNING: `BG_GAS`, 0.38 s of hiss, repeated close enough to run
-   * together. */
-  fuse: { sound: 'BG_GAS', volume: 55, pitch: 130, jitter: 8 },
+  /**
+   * **THE BURN HAS NO SOUND, and that is now a MEASURED answer rather than a
+   * missing one.** Play listened to all thirty-seven of the bank's non-pig,
+   * non-footstep entries (the inventory below) and there is no hiss among
+   * them: `BG_GAS` is the gas grenade — "газовая граната так делает" — and
+   * `L_FLAME` is napalm going off, not something burning steadily. So a
+   * charge's fuse is heard as its TIMER and nothing else, and the entry that
+   * borrowed the gas is gone rather than left wrong.
+   */
   /** The TIMER: `S_CLOCK`, 1.06 s, one a second and no faster. */
   fuseTimer: { sound: 'S_CLOCK', volume: 80, pitch: 100 },
   /** …and the timer RUNNING OUT: `L_MINETR`, 0.23 s, the trigger click that
