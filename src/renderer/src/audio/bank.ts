@@ -155,6 +155,21 @@ export function resumeAudio(): void {
  * hundred bytes — and each sound is fetched and decoded the first time it
  * is asked for, so a map that never lands in lava never loads FT_LAVA.
  */
+/**
+ * The battle bank, loaded ONCE for the whole app.
+ *
+ * A battle used to load its own every time it opened, which was fine while the
+ * bank was only ever heard inside one — and it is not: `pow.sfx` is how a name
+ * pick gets settled, and play asked to browse the sounds without starting a
+ * mission ("может я сам послушаю?"), exactly as they did with the sergeant
+ * (audio/sarge.ts). One promise, kept, and a battle borrows it.
+ */
+let theBank: Promise<Bank> | null = null
+export function sharedBank(srlPath: string): Promise<Bank> {
+  if (!theBank) theBank = loadBank(srlPath)
+  return theBank
+}
+
 export async function loadBank(srlPath: string): Promise<Bank> {
   const result = await window.api.loadSoundBank(srlPath)
   if (!result.ok) {

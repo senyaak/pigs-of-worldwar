@@ -24,6 +24,9 @@ import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
 import { feText } from './ui/barScreen'
 import { installSargeConsole } from './audio/sarge'
+import { installSoundConsole } from './audio/console'
+import { sharedBank } from './audio/bank'
+import { GAME_SOUNDS } from './audio/battleSound'
 import { fall, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
 import { fieldedAt, mapAt, mapId } from '../../lib/game/missions'
 import { nextMap } from '../../lib/game/save'
@@ -541,6 +544,9 @@ if (window.pow) {
   // carry no subtitles anywhere, and browsing them should not need a mission
   // open (audio/sarge.ts). `pow.sarge.list()` says what is known.
   installSargeConsole()
+  // …and the SOUND bank beside him, for the same reason: most of the table is
+  // a name pick and only an ear settles one (audio/console.ts).
+  installSoundConsole(() => sharedBank(GAME_SOUNDS))
   window.pow.menu = view(menu)
   window.pow.onePlayer = view(onePlayer)
   window.pow.loadScreen = view(loadScreen)

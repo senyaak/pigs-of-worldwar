@@ -9,7 +9,7 @@
 // install with no `Audio` folder is silent for good — so everything here asks
 // for it through a getter rather than holding one.
 
-import { SILENT, loadBank } from './bank'
+import { SILENT, sharedBank } from './bank'
 import type { Bank } from './bank'
 import { createBattleSounds } from './battle'
 import type { BattleSounds } from './battle'
@@ -57,7 +57,7 @@ export function createBattleSound(bus: BattleBus): BattleSound {
    * once the moment the bank lands would be worse than silence.
    */
   let waiting: Cue | null = null
-  void loadBank(GAME_SOUNDS).then((loaded) => {
+  void sharedBank(GAME_SOUNDS).then((loaded) => {
     bank = loaded
     sounds = createBattleSounds(bank)
     if (waiting) {

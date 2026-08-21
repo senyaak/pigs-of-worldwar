@@ -26,6 +26,7 @@
 
 import { BATTLE_SOUNDS, playCue } from './battle'
 import type { Cue } from './battle'
+import { SILENT } from './bank'
 import type { Bank } from './bank'
 
 /** A cue as the source spells it, so `print()` output pastes straight in. */
@@ -56,6 +57,24 @@ export interface SoundConsole {
  * because the battle loads it beside the scene and swaps it in when it
  * arrives — the same reason everything else in this folder takes a getter.
  */
+/**
+ * `pow.sfx`, installed from the APP's own start rather than from a battle —
+ * the same arrangement `pow.sarge` has, and for the same reason: most of the
+ * sound table is a name pick and only an EAR settles one, so the browsing must
+ * not require a mission to be open.
+ *
+ * A battle installs its own over this when it opens; both point at the one
+ * shared bank (audio/bank.ts), so it is the same list either way.
+ */
+export function installSoundConsole(load: () => Promise<Bank>): void {
+  if (!window.pow) return
+  let loaded: Bank = SILENT
+  void load().then((bank) => {
+    loaded = bank
+  })
+  window.pow.sfx = createSoundConsole(() => loaded)
+}
+
 export function createSoundConsole(bank: () => Bank): SoundConsole {
   /** A name, an index, or something that is neither. */
   const resolve = (which: string | number): string | null => {
