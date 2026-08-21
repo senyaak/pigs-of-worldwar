@@ -10,12 +10,16 @@
 import { test, expect } from '@playwright/test'
 
 import {
+  SARGE_AHEAD,
+  SARGE_BEHIND,
+  SARGE_GOAD_ODDS,
   SARGE_LINES,
   SARGE_LOST,
   SARGE_SECTIONS,
   SARGE_WON,
   noTally,
   sargeAfterTurn,
+  sargeAtTurnStart,
   sargeFile,
   winOrLose
 } from '../src/lib/game/sergeant'
@@ -91,4 +95,50 @@ test('…and commiserates a loss only from BEHIND', { tag: '@nodata' }, () => {
   // The two sections count SEPARATELY — one byte each in the exe.
   expect(sargeAfterTurn({ kills: 0, losses: 1 }, -1, counters)?.line).toBe(2)
   expect(sargeAfterTurn({ kills: 1, losses: 0 }, 1, counters)?.line).toBe(1)
+})
+
+test('…and he GOADS you over the top of the enemy turn', { tag: '@nodata' }, () => {
+  const counters = new Map<number, number>()
+  const always = (): number => 0
+  const never = (): number => 1 / SARGE_GOAD_ODDS
+
+  // The enemy strictly BEHIND: "will you really let these amateurs beat you?"
+  expect(sargeAtTurnStart(true, -1, always, counters)).toEqual({
+    section: SARGE_BEHIND,
+    line: 1
+  })
+  // …strictly AHEAD: the hole you would have to climb out of.
+  expect(sargeAtTurnStart(true, 1, always, counters)).toEqual({
+    section: SARGE_AHEAD,
+    line: 1
+  })
+  // Level either way is silence, the same as the end-of-turn pair.
+  expect(sargeAtTurnStart(true, 0, always, counters)).toBe(null)
+  expect(sargeAtTurnStart(true, 2, always, counters)).toBe(null)
+
+  // **It is not YOUR turn he says these on** (0x497F80 wants the acting
+  // controller to be somebody other than the local human).
+  expect(sargeAtTurnStart(false, -1, always, counters)).toBe(null)
+
+  // One turn in FOUR — and the roll is drawn only once the section is
+  // settled, so the battle's stream is touched in the exe's own order.
+  let rolled = 0
+  const counted = (): number => {
+    rolled++
+    return 1 / SARGE_GOAD_ODDS
+  }
+  expect(sargeAtTurnStart(true, 0, counted, counters)).toBe(null)
+  expect(rolled).toBe(0)
+  expect(sargeAtTurnStart(true, 1, never, counters)).toBe(null)
+
+  // The rotation is the same one the end-of-turn lines walk, a byte a section.
+  expect(sargeAtTurnStart(true, -1, always, counters)?.line).toBe(2)
+  for (let i = 3; i <= SARGE_LINES; i++) {
+    expect(sargeAtTurnStart(true, -1, always, counters)?.line).toBe(i)
+  }
+  expect(sargeAtTurnStart(true, -1, always, counters)?.line).toBe(1)
+
+  // And the files they come to are 02 and 04.
+  expect(sargeFile(SARGE_BEHIND, 1)).toBe('Speech/Sku1/Sarge/SGEN0201.wav')
+  expect(sargeFile(SARGE_AHEAD, 1)).toBe('Speech/Sku1/Sarge/SGEN0401.wav')
 })

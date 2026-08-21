@@ -26,7 +26,14 @@ import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
 import { createStubBrain } from './ai'
 import { beginWalkAway } from './walkAway'
-import { SARGE_FLOOR, SARGE_WON, noTally, sargeAfterTurn, winOrLose } from './sergeant'
+import {
+  SARGE_FLOOR,
+  SARGE_WON,
+  noTally,
+  sargeAfterTurn,
+  sargeAtTurnStart,
+  winOrLose
+} from './sergeant'
 import type { WalkAway } from './walkAway'
 import { advanceEndOfGame, beginEndOfGame, outcomeOf } from './endOfGame'
 import type { EndOfGame } from './endOfGame'
@@ -563,6 +570,26 @@ export function createBattle(parts: BattleParts): Battle {
       computer: computerTurn(),
       health: game.currentPig.health
     })
+    // …and the SERGEANT's own remark on the top of somebody else's turn
+    // (0x497F80): the goad when they are behind, the challenge when they are
+    // ahead, one turn in four. It holds nothing up — unlike the end-of-turn
+    // remark there is no state 13 here, the line simply plays over the card.
+    const goad = sargeAtTurnStart(computerTurn(), standing(), parts.random, sargeLines)
+    if (goad) emit({ kind: 'sergeant', section: goad.section, line: goad.line })
+  }
+
+  /**
+   * The acting side's WIN OR LOSE value — its total health against every other
+   * side's (lib/game/sergeant.ts, 0x498620). Both of the sergeant's moments
+   * turn on it, and it is the ACTING side's in each: the exe takes
+   * `[turn+0x4fc]`'s own total and compares that one to the rest.
+   */
+  const standing = (): number => {
+    const health = game.players.map((player) =>
+      player.pigs.reduce((sum, pig) => sum + Math.max(0, pig.health), 0)
+    )
+    const mine = game.players.indexOf(game.currentPlayer)
+    return winOrLose(health[mine] ?? 0, health.filter((_, side) => side !== mine))
   }
 
   /**
@@ -578,15 +605,7 @@ export function createBattle(parts: BattleParts): Battle {
    * here keeps the two reads of it, this one and the clear, side by side.
    */
   const beginSarge = (): boolean => {
-    const health = game.players.map((player) =>
-      player.pigs.reduce((sum, pig) => sum + Math.max(0, pig.health), 0)
-    )
-    const mine = game.players.indexOf(game.currentPlayer)
-    const said = sargeAfterTurn(
-      tally,
-      winOrLose(health[mine] ?? 0, health.filter((_, side) => side !== mine)),
-      sargeLines
-    )
+    const said = sargeAfterTurn(tally, standing(), sargeLines)
     tally = noTally()
     if (!said) return false
     sarge = { floor: SARGE_FLOOR }

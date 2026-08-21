@@ -53,9 +53,9 @@ export interface Sarge {
  */
 export const SARGE_CATEGORIES: Readonly<Record<number, string>> = {
   1: 'end of turn, you LOST a pig and your side is behind — BUILT. A threat',
-  2: 'START of turn, behind: "will you really let these amateurs beat you?"',
+  2: "START of a turn that is not yours, THEY are behind — BUILT. Amateurs",
   3: 'end of turn, you KILLED and your side is ahead — BUILT. Praise',
-  4: 'START of turn, ahead: "this could be a victory of legendary proportions"',
+  4: "START of a turn that is not yours, THEY are ahead — BUILT. A comeback",
   5: 'crate, item byte not 0xFF — a SUPPLY drop, useful equipment, "use it wisely"',
   6: 'crate, item byte 0xFF (pickup type 7) — MEDICAL supplies, and do not waste them',
   7: 'crate, pickup type 2 or 14 — a MEDAL awarded: "I am dropping you a medal"',
@@ -64,7 +64,7 @@ export const SARGE_CATEGORIES: Readonly<Record<number, string>> = {
   10: 'crate, pickup type 8 — a MEDAL for doing it IN TIME, "a big fat medal"',
   11: 'start of turn, ONCE a battle (latched): things lie about, medals included',
   12: 'start of turn, ONCE a battle (second latch): collect medals or no promotion',
-  13: 'the clock running out — one pool of SIXTEEN with 14. "Tick tock"',
+  13: 'the clock running out, MULTIPLAYER only — one pool of SIXTEEN with 14',
   14: '…the other half of that pool. "Time is of the essence, be quick now"',
   15: 'multiplayer, by the pig NATION: 1..4 praise, 5..8 commiseration',
   16: 'multiplayer, nation 1 — heard: praise',

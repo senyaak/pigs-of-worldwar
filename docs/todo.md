@@ -181,8 +181,8 @@ the section, which is one lower and is what the exe's call sites pass.
 | --- | --- | --- |
 | 01 | end of turn, you LOST a pig, behind | **built** — a threat: one more loss and he has your guts |
 | 03 | end of turn, you KILLED, ahead | **built** — you and your boys have no equal |
-| 02 | START of turn, behind | "will you really let these amateurs beat you?" |
-| 04 | START of turn, ahead | "this could be a victory of legendary proportions" |
+| 02 | START of a turn that is not yours, THEY are behind | **built** — "will you really let these amateurs beat you?" |
+| 04 | START of a turn that is not yours, THEY are ahead | **built** — "a victory of legendary proportions" |
 | 05 | crate, item byte not 0xFF | a SUPPLY drop — useful equipment, use it wisely |
 | 06 | crate, item byte 0xFF (type 7) | MEDICAL supplies — bandages cost money, do not waste them |
 | 07 | crate, pickup type 2 or 14 | a MEDAL awarded — "I am so impressed I am dropping you a medal" |
@@ -191,7 +191,7 @@ the section, which is one lower and is what the exe's call sites pass.
 | 10 | crate, pickup type 8 | a MEDAL for doing it IN TIME — "a big fat medal" |
 | 11 | start of turn, ONCE a battle | there may be things lying about, medals included |
 | 12 | start of turn, ONCE a battle | collect medals or you will not be promoted |
-| 13+14 | the clock running out, ONE pool of sixteen | "tick tock, get a move on" / "time is of the essence" |
+| 13+14 | the clock running out, ONE pool of sixteen — **MULTIPLAYER ONLY** | "tick tock, get a move on" / "time is of the essence" |
 | 15..21 | MULTIPLAYER, by nation: 1..4 praise, 5..8 commiseration | 16 confirmed as praise; the other six unheard |
 | 22 | **the exe's front-end arm** | **NOT an idle nag — the MEDAL CEREMONY on the squad screen after a mission**, played over the award animation |
 
@@ -209,20 +209,34 @@ which is consistent with the call site being in the front end, and its seven
 lines being 13 to 37 seconds long where every other category runs 1 to 9. The
 idle-nag half of that entry is unproven and should not be repeated.
 
-**What can be built now, in order of cheapness:**
+**02 and 04 are BUILT** (2026-08-21) — `sargeAtTurnStart` in
+`lib/game/sergeant.ts`, emitted from `announceTurn` in `lib/game/battle.ts`,
+pinned in `unit/sergeant.spec.ts`. He speaks over the top of a turn that is not
+yours, one turn in four, about how the side that is MOVING stands. Two count
+gates in that arm are read and deliberately not applied; the reason is written
+where the code is.
 
-- **02 and 04** — the same pair as 01/03 at the other end of the turn, on the
-  `turnBegan` event that already exists and the `winOrLose` value that is
-  already computed. The gate is presumably the same one; the call site says
-  start of turn and the ear agrees.
-- **11 and 12** — one latch each per battle, at a turn start. No new state
-  beyond two booleans on the battle.
-- **13+14** — wants the exe's own threshold on the turn clock, which has not
-  been read yet: the pool is sixteen lines across two files and the trigger is
-  a call site in the clock's own arm.
-- **05..10** — blocked on the crates, not on the sergeant: the remake has no
-  medals and no pickup TYPE, only the crate. This is the item the finding above
-  turns into real work.
+**What is left, and what each one is really blocked on:**
+
+- **05..10 — the CRATES, and this is the real item.** Not blocked on the
+  sergeant at all: the remake has no medals and no pickup TYPE, only a crate.
+  The exe's shape is now known end to end — a pickup carries a type word and a
+  value byte, the pig carries the tally at `[pig+0x1DE]`, and file 08's own
+  call site is the instruction that SUBTRACTS one from the other. Build the
+  economy and six of his categories fall out of it.
+- **22 — the ceremony after a mission**, which needs the medals above before
+  there is anything to award.
+- **11 and 12** — one latch each per battle, but their gates are the medal
+  crates again: 11 wants an uncollected pickup of type 2 or 8 still on the map,
+  12 an objective of kind 3. They come with the crates, not before.
+- **13+14 — MULTIPLAYER ONLY**, and that is read rather than assumed
+  (`[0x5206F0] > 1` at 0x4915E9). The window is ten to six seconds left on a
+  turn limit over fifteen seconds, once a turn, out of a pool of sixteen. It
+  belongs with the net work, not with the campaign.
+- **15..21** — multiplayer, one file a nation.
+
+So the sergeant is FINISHED for the single-player campaign as it stands today:
+what is left of him is either the medal economy or the network.
 
 **The gate on 01 and 03 is worth remembering before judging the others**: the
 praise is refused unless your side leads on TOTAL TEAM HEALTH, so it is not

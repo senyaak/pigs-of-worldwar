@@ -125,6 +125,72 @@ export function sargeAfterTurn(
     : value === -1 && tally.losses > 0 ? SARGE_LOST
     : null
   if (section === null) return null
+  return take(section, counters)
+}
+
+/**
+ * The two GOAD sections — files **02** and **04** — and they are the same pair
+ * as 01/03 at the OTHER end of a turn. Read at 0x497F80, whose first three
+ * tests name the moment: a flag that says he has already spoken this turn
+ * (`[turn+0x537]`), and `[turn+0x510] == 4`, which is the START OF TURN card
+ * (the same mode the side's music steps in, 0x491222).
+ *
+ * **He speaks over somebody ELSE's turn.** The arm wants the acting
+ * controller's kind to be 0 and a controller of kind 2 — the local human, the
+ * value the music and the pig's own grunt both test for (0x491208, 0x4724E5) —
+ * to exist beside it. So these are remarks made to you while the enemy moves.
+ *
+ * And the health value they turn on is the ACTING side's, not yours (0x498656
+ * takes `[turn+0x4fc]`'s own total and compares it to every other): the enemy
+ * strictly ahead gets file 04, the enemy strictly behind gets file 02. Both
+ * lines read that way round — "will you really let these AMATEURS beat you"
+ * about a side that is losing, and "a victory of legendary proportions" about
+ * a hole you would have to climb out of.
+ */
+export const SARGE_BEHIND = 1
+export const SARGE_AHEAD = 3
+
+/**
+ * One turn in four. The exe rolls `rand()` and tests `al & 3`, speaking only
+ * on nought (0x4981A9 for the one, 0x49821E for the other) — so the goad is
+ * occasional rather than every single turn.
+ */
+export const SARGE_GOAD_ODDS = 4
+
+/**
+ * What he says as somebody else's turn STARTS, or null for a turn he sits out.
+ *
+ * `roll` is drawn only once the section is settled, because the exe rolls
+ * inside the arm rather than before it — a battle's random stream has to be
+ * touched in the same order on both machines to stay in lockstep.
+ *
+ * **Two gates are READ AND NOT APPLIED**, and they are counts of the squad by
+ * the pig's own movement state (`[pig+0x2ec]`, the field 0x470C88 puts at 5
+ * for a body in flight): file 04 wants the human side under a count of two and
+ * at least one the other way (0x49818B, 0x49819B), file 02 wants three or more
+ * of the acting side's (0x498210). Which way round the two routines 0x499070
+ * and 0x4990A0 count — one totals the pigs whose state IS 8, the other the
+ * pigs whose state is NOT — decides whether those read as "alive" or "lost",
+ * and state 8 has exactly one writer in the image (0x468232), too little to
+ * settle it. They are filters on top of the section, never the choice of it,
+ * so leaving them out makes him speak MORE often, not wrongly.
+ */
+export function sargeAtTurnStart(
+  computer: boolean,
+  value: number,
+  roll: () => number,
+  counters: Map<number, number>
+): SargeLine | null {
+  if (!computer) return null
+  const section = value === 1 ? SARGE_AHEAD : value === -1 ? SARGE_BEHIND : null
+  if (section === null) return null
+  if (roll() >= 1 / SARGE_GOAD_ODDS) return null
+  return take(section, counters)
+}
+
+/** One step of a section's rotation: the line to say now, and the byte moved
+ * on past it, wrapping after the eighth (0x498402). */
+function take(section: number, counters: Map<number, number>): SargeLine {
   const at = counters.get(section) ?? 1
   counters.set(section, at + 1 > SARGE_LINES ? 1 : at + 1)
   return { section, line: at }

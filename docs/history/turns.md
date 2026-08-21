@@ -903,3 +903,66 @@ half was an inference and is withdrawn.
 these amateurs beat you?") and the flourish when you are ahead. They are the
 same pair as 01/03 at the other end of the turn and are the cheapest thing left
 to build, because `turnBegan` and `winOrLose` both already exist.
+
+### The goad at the top of somebody else's turn — BUILT, files 02 and 04
+
+Read on 2026-08-21, straight after the listening. **`0x497F80` is the
+start-of-turn arm**, and its own first tests name the moment: a byte that says
+he has already spoken this turn (`[turn+0x537]`), and `[turn+0x510] == 4` —
+mode 4, the GET READY card, the same mode the side's music steps in.
+
+**He speaks over somebody ELSE's turn.** The arm wants the acting controller's
+kind to be **0** and a controller of kind **2** to exist beside it. Kind 2 is
+the local human: it is the value the music tests before it plays (0x491208) and
+the value the pig's own turn-start grunt tests (0x4724E5). The four controller
+classes were found by their vtables — the kind is the slot at **+0x18** and it
+is the only slot the four disagree on: `0x4BC690` returns 2, `0x4BC918`
+returns 0, and `0x4BD400`/`0x4BD528` both return 1, the last of which is the
+base every one of them is constructed through (0x498BB0).
+
+**And the health value is the ACTING side's, not yours.** 0x498656 takes
+`[turn+0x4fc]`'s own total (`0x4991A0`) and walks `[0x537F30]` comparing it to
+every other side. So the enemy strictly ahead gets file 04 and the enemy
+strictly behind gets file 02 — and both lines read that way round, "will you
+really let these AMATEURS beat you" about a side that is losing, and "a victory
+of legendary proportions" about a hole you would have to climb out of. One turn
+in four: `rand()` with `test al,3` (0x4981A9, 0x49821E). The line rotates on
+`[turn+0x53d]` and `[turn+0x53f]`, wrapping past eight exactly as 01 and 03 do.
+
+**Two gates are read and NOT applied**, and they are honest about why. Both
+arms also count the squad by the pig's own movement state — the `[pig+0x2ec]`
+that 0x470C88 puts at 5 for a body in flight — through two routines that are
+each other's mirror: `0x499070` totals the pigs whose state is NOT 8,
+`0x4990A0` the pigs whose state IS. Which of those means "still standing"
+decides whether file 04 wants you down to two pigs or merely under two losses,
+and **state 8 has exactly one writer in the whole image** (0x468232), which is
+too little to settle it. They are filters on top of the section and never the
+choice of it, so leaving them out makes him speak more often, not wrongly.
+
+**The builder's signature, now that every site has been read**:
+`PlaySargeSpeech(section, lineLo, lineHi, volume, flag)`, pushed in reverse.
+`lineHi == -1` means the line is taken whole; otherwise it is `rand()` in
+`[lo, hi]`, which is how the crate lines and the two hints pick one of eight.
+Every site passes volume 100 and flag 0. **0x495A9C is a TEST HOOK** — it plays
+`rand() % 22` at a random line, the only site that does not name its section.
+
+### Three things the same read settled, and none of them are built
+
+- **The "hurry up" pool is MULTIPLAYER ONLY.** 0x4915E9 refuses unless
+  `[0x5206F0] > 1`, the same global whose `== 1` is the single-player arm of
+  everything above. It wants mode 6, a turn limit over 1500, and the clock in
+  the window `limit-1000 < elapsed < limit-600` — hundredths, so **between ten
+  and six seconds left** — then latches `[turn+0x539]` for the turn. Its
+  counter is `[turn+0x540]` and it wraps past **16**, not 8, which is the pool
+  spanning files 13 and 14 seen from the other end.
+- **File 11 is gated on a MEDAL still lying about.** 0x49809E walks
+  `[0x537FBC]`, the pickups, and looks for one whose type word is **2 or 8**
+  with `[obj+0x30] == 1` — and 2 and 8 are exactly the two types whose own
+  crate lines award a medal (files 07 and 10). File 12 is gated on the
+  `[0x51ED90]` list holding an entry with `[+0x80] == 3`. Both latch for the
+  battle (`[turn+0x53a]`, `[turn+0x53b]`), and there is an un-latched repeat
+  arm behind them at one turn in four.
+- **The medal counter is `[pig+0x1DE]`, and file 08 SUBTRACTS from it**
+  (0x4AA3C6: `movzx ax, byte [item+3]; neg eax; add word [pig+0x1de], ax`).
+  That is the whole economy in one instruction — a pickup's own value, taken
+  off the pig that blew up what was not his.
