@@ -23,6 +23,7 @@ const world = (over: {
   foes?: Seen[]
   friends?: Seen[]
   previous?: 'done' | 'blocked' | null
+  route?: AiWorld['route']
 }): AiWorld => ({
   timeLeft: 45,
   previous: over.previous ?? null,
@@ -34,7 +35,9 @@ const world = (over: {
     carrying: over.carrying ?? [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
   },
   foes: over.foes ?? [{ x: 0, z: RANGE * 0.5, health: 50 }],
-  friends: over.friends ?? []
+  friends: over.friends ?? [],
+  // An open field unless a test says otherwise: the route is the goal.
+  route: over.route ?? ((to) => [to])
 })
 
 test('no gun is the stub game: SKIP TURN in hand, then the pass', { tag: '@nodata' }, () => {
@@ -62,6 +65,30 @@ test('too far: walk at the nearest foe, stopping shy of the range', { tag: '@nod
   // On the line to the foe, and short of it by CLOSE_TO's own shy margin.
   expect(order.x).toBeCloseTo(0, 5)
   expect(foe.z - order.z).toBeCloseTo(RANGE * CLOSE_TO * 0.8, 5)
+})
+
+test('a bending route is walked by its NEXT corner, not the crow line', { tag: '@nodata' }, () => {
+  const brain = createGruntBrain()
+  const corner = { x: 600, z: 600 }
+  const order = brain.decide(
+    world({
+      holding: SKILL.RIFLE,
+      foes: [{ x: 0, z: RANGE * 2, health: 50 }],
+      route: () => [corner, { x: 0, z: RANGE * 1.2 }]
+    })
+  )
+  expect(order).toEqual({ kind: 'walkTo', ...corner })
+})
+
+test('a route already walked out is GROUNDED: no reach, so a pass', { tag: '@nodata' }, () => {
+  // The pathfinder answers best-effort with nothing left to walk — the foe
+  // is beyond reach across something uncrossable — and the grunt passes
+  // rather than volleying into the void.
+  const brain = createGruntBrain()
+  const order = brain.decide(
+    world({ holding: SKILL.RIFLE, foes: [{ x: 0, z: RANGE * 2, health: 50 }], route: () => [] })
+  )
+  expect(order).toEqual({ kind: 'hold', skill: SKILL.SKIP_TURN })
 })
 
 test('in range but facing away: turn onto the bearing first', { tag: '@nodata' }, () => {

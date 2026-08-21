@@ -53,6 +53,13 @@ export interface AiWorld {
   foes: Seen[]
   /** Everybody alive on this side, the acting pig excepted. */
   friends: Seen[]
+  /**
+   * The route from where the acting pig stands to a point, as the corners
+   * of a walk — BEST EFFORT, the nearest reachable approach when the goal
+   * cannot be had (lib/game/pathfind.ts). Null only when the start is
+   * outside the world. Empty when standing as close as the ground allows.
+   */
+  route(to: { x: number; z: number }): { x: number; z: number }[] | null
 }
 
 export interface Brain {

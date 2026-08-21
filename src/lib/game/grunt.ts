@@ -6,20 +6,23 @@
 //
 //   1. no gun, no foes — pass, the stub's old game (SKIP TURN, fire).
 //   2. gun not in hand — take it out.
-//   3. too far — walk at the nearest foe, stopping shy of the gun's range.
+//   3. too far — ROUTE to a point shy of the gun's range at the nearest foe
+//      (world.route, lib/game/pathfind.ts) and walk the next corner of it.
 //   4. a friend on the firing line — step aside instead of shooting through
 //      him: the one grain of "do not damage your own" the grunt has.
 //   5. facing off — turn onto the bearing.
 //   6. fire, level, from wherever it stands. No lead, no pitch, no wind of
 //      any kind (there is none, docs/ai.md) — the grunt's misses are honest.
 //
-// A `blocked` walk flips the one bit of memory: stop trying to close in,
-// shoot if there is any reach at all, pass otherwise. Better a poor shot
-// than a pig grinding a wall until the clock takes the turn away.
+// A `blocked` walk — or a route already walked to its best end — flips the
+// one bit of memory: stop trying to close in, shoot if there is any reach
+// at all, pass otherwise. Better a poor shot than a pig grinding a wall
+// until the clock takes the turn away.
 
 import type { AiWorld, Brain, Seen } from './ai'
 import type { Order } from './orders'
 import { shortest } from './actuator'
+import { GRID_STEP } from './pathfind'
 import { SKILL } from './skills'
 import { projectileOf, rangeOf } from './projectile'
 
@@ -94,13 +97,21 @@ export function createGruntBrain(): Brain {
       if (me.holding !== gun.skill) return { kind: 'hold', skill: gun.skill }
 
       if (distance > range * CLOSE_TO && !grounded) {
-        // Stop short of the range mark, so arrival lands INSIDE it.
+        // Stop short of the range mark, so arrival lands INSIDE it — and go
+        // by the ROUTE, not the crow's line: the next corner of the best
+        // path round the walls, the water and the known mines. A route with
+        // no corner left to walk means this is as close as the ground
+        // allows, and the grunt is grounded the same as a refused step.
         const shy = range * CLOSE_TO * 0.8
-        return {
-          kind: 'walkTo',
+        const corners = world.route({
           x: target.x - (dx / distance) * shy,
           z: target.z - (dz / distance) * shy
-        }
+        })
+        const next = corners?.find(
+          (corner) => Math.hypot(corner.x - me.x, corner.z - me.z) > GRID_STEP / 2
+        )
+        if (next) return { kind: 'walkTo', x: next.x, z: next.z }
+        grounded = true
       }
 
       const friend = inTheWay(me, target, world.friends)

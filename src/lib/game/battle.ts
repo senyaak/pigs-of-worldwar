@@ -14,6 +14,7 @@
 // Game space (Y-down) throughout.
 
 import { ANIM, copyLocomotion, createLocomotion, inWater, updateLocomotion } from './locomotion'
+import { route } from './pathfind'
 import { advanceCarry, carryIn, carryOut, doorwayStart } from './doorway'
 import type { Carry } from './doorway'
 import type { LocomotionState } from './locomotion'
@@ -1067,7 +1068,20 @@ export function createBattle(parts: BattleParts): Battle {
             ),
             friends: game.currentPlayer.pigs
               .filter((pig) => pig !== acting && !isDead(pig))
-              .map(seen)
+              .map(seen),
+            // The route round the world (lib/game/pathfind.ts): the props
+            // are both the walls and the WALKWAYS — a bridge deck is stood
+            // on the way the walk stands on it. The squad is not in the
+            // plan: pigs move between the plan and the walk, and the
+            // actuator's `blocked` guards that difference. Nobody swims
+            // yet: the machine spawns grunts `[gap]` — the swimming classes
+            // read this flag when classes land (docs/ai.md).
+            route: (to) =>
+              route(
+                { ground: query, obstruction: scenery.obstacles, swims: false },
+                { x: acting.position.x, z: acting.position.z, y: acting.position.y },
+                to
+              )
           })
         )
         actuator.step(delta)

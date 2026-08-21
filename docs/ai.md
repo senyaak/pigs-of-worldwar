@@ -119,12 +119,18 @@ and works worse against a veteran, exactly like against a human.
 
 ## The pathfinder: ours, coarse, verified by the walk
 
-There is none today and the original's is unread. The plan: a coarse A* over
-tiles on `walkable`/`standOn`, costs carrying the score's own judgments —
-known mines forbidden, water lethal per class, climbs dear — and the final
-leg validated by the movement simulator (`movement.ts` `step`), so an order
-to walk somewhere is an order the legs can actually carry out. No navmesh;
-the maps are 64×64 tiles and the turn clock bounds the search.
+There is none today and the original's is unread. The plan: a coarse A* on
+`walkable`/`standOn` — and the cost model is the engine's own, which is to
+say THERE ISN'T ONE: a step costs its distance everywhere, because the walk
+is one speed on any slope (`WALK_SPEED` is flat; only a wounded pig slows,
+and that is the pig's property, not the ground's). The world is BINARY —
+walkable, forbidden (wall, void, known mine), lethal (water for a
+non-swimmer) — with one real subtlety: the graph is DIRECTED. A drop of any
+height is walked off; the way back up is capped by the climb envelope
+(`WALL_CLIMB`, 128), so an edge down is not an edge up. Soft preferences
+(keep out of a firing lane, don't bunch up) are the BRAIN's weights on the
+destination, never fake costs in the ground. No navmesh; the maps are 64×64
+tiles and the turn clock bounds the search.
 
 ## The passes
 
