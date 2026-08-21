@@ -26,9 +26,11 @@ import type { Outcome } from './actuator'
 import type { Slot } from './inventory'
 
 /** A pig as the brain SEES one — a position and a health bar, which is what
- * the screen shows a player about anybody else's pig. */
+ * the screen shows a player about anybody else's pig. `y` is the SOLES,
+ * Y-DOWN like everything in the engine: higher ground is the smaller y. */
 export interface Seen {
   x: number
+  y: number
   z: number
   health: number
 }
@@ -41,11 +43,15 @@ export interface AiWorld {
   /** How the last order ended — `blocked` is the world saying no, and the
    * cue to think of something else. Null before the first order finishes. */
   previous: Outcome | null
-  /** The pig being played: where it stands, what it holds, what it carries. */
+  /** The pig being played: where it stands, what it holds, what it carries
+   * — and where the weapon POINTS (aim units, lib/game/aim.ts), because a
+   * brain that wants a different pitch has to know the one it has. */
   acting: {
     x: number
+    y: number
     z: number
     heading: number
+    aim: number
     holding: number | null
     carrying: Slot[]
   }

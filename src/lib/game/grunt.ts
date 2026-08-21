@@ -2,17 +2,27 @@
 // climbs. One thought at a time, nothing clever on purpose.
 //
 // Its whole game, re-derived on every decision from the world it is shown
-// (almost stateless — only "the walking has failed me" is remembered):
+// (almost stateless — "the walking has failed me" and "I have set my pitch"
+// are the only memories):
 //
 //   1. no gun, no foes — pass, the stub's old game (SKIP TURN, fire).
-//   2. gun not in hand — take it out.
-//   3. too far — ROUTE to a point shy of the gun's range at the nearest foe
-//      (world.route, lib/game/pathfind.ts) and walk the next corner of it.
-//   4. a friend on the firing line — step aside instead of shooting through
+//   2. the BEST gun in the kit, by its own damage table — and the best
+//      TARGET by the seed of docs/ai.md's HP differential: what a shot is
+//      WORTH is the health it takes, and a foe it would FINISH is worth a
+//      kill bonus on top, because a dead pig loses every future turn. 30
+//      into a pig with 20 left beats 30 into a pig with 120.
+//   3. gun not in hand — take it out.
+//   4. too far — ROUTE to a point shy of the gun's range (world.route,
+//      lib/game/pathfind.ts) and walk the next corner of it.
+//   5. a friend on the firing line — step aside instead of shooting through
 //      him: the one grain of "do not damage your own" the grunt has.
-//   5. facing off — turn onto the bearing.
-//   6. fire, level, from wherever it stands. No lead, no pitch, no wind of
-//      any kind (there is none, docs/ai.md) — the grunt's misses are honest.
+//   6. facing off — turn onto the bearing.
+//   7. the ground is not flat — PITCH the barrel at the target: soles to
+//      soles, which is chest to chest, because both stand the same height
+//      over their feet. Asked for ONCE; what the clamp refuses stays
+//      refused (the actuator's blocked), and the shot goes as it lies.
+//   8. fire. No lead and no wind (there is none, docs/ai.md) — the grunt's
+//      misses are honest.
 //
 // A `blocked` walk — or a route already walked to its best end — flips the
 // one bit of memory: stop trying to close in, shoot if there is any reach
@@ -22,9 +32,10 @@
 import type { AiWorld, Brain, Seen } from './ai'
 import type { Order } from './orders'
 import { shortest } from './actuator'
+import { AIM_UNITS } from './aim'
 import { GRID_STEP } from './pathfind'
 import { SKILL } from './skills'
-import { projectileOf, rangeOf } from './projectile'
+import { damageOf, projectileOf, rangeOf } from './projectile'
 
 /** Close enough on the heading to trust the shot — under two turn steps. */
 export const FACING = 0.02
@@ -40,12 +51,31 @@ export const FRIEND_CLEARANCE = 60
 /** How far aside the grunt steps to clear a friend off the line. */
 export const SIDE_STEP = 150
 
-const nearest = (from: { x: number; z: number }, seen: Seen[]): Seen =>
-  seen.reduce((best, foe) =>
-    Math.hypot(foe.x - from.x, foe.z - from.z) < Math.hypot(best.x - from.x, best.z - from.z)
+/** What FINISHING a pig is worth on top of the health it takes — the seed
+ * of the kill bonus docs/ai.md prices whole turns at. In health points, so
+ * a kill outbids any wound the kit can deal instead. */
+export const KILL_BONUS = 50
+
+/** The pitch is corrected when it is off by more than this (aim units) —
+ * twice the actuator's own arrival tolerance, so a wanted angle it has
+ * already reached is never re-asked. */
+export const PITCH_WITHIN = 12
+
+/** What one shot of `damage` at this foe is WORTH. */
+const worth = (damage: number, foe: Seen): number =>
+  Math.min(damage, foe.health) + (damage >= foe.health ? KILL_BONUS : 0)
+
+/** The best-paying target; the NEARER one on equal pay. */
+const bestTarget = (from: { x: number; z: number }, damage: number, foes: Seen[]): Seen =>
+  foes.reduce((best, foe) => {
+    const pay = worth(damage, foe) - worth(damage, best)
+    if (pay > 0) return foe
+    if (pay < 0) return best
+    return Math.hypot(foe.x - from.x, foe.z - from.z) <
+      Math.hypot(best.x - from.x, best.z - from.z)
       ? foe
       : best
-  )
+  })
 
 /** The friend most in the way of a shot from `at` toward `target`, or null
  * for a clear lane. Flat geometry: distance from the segment, 2D. */
@@ -70,8 +100,10 @@ const inTheWay = (
 }
 
 export function createGruntBrain(): Brain {
-  /** The one memory: walking has been refused, stop trying to close in. */
+  /** Walking has been refused: stop trying to close in. */
   let grounded = false
+  /** The pitch has been set (or refused by the clamp): do not chase it. */
+  let pitched = false
 
   const pass = (world: AiWorld): Order =>
     world.acting.holding === SKILL.SKIP_TURN
@@ -82,13 +114,18 @@ export function createGruntBrain(): Brain {
     decide(world) {
       if (world.previous === 'blocked') grounded = true
 
-      const gun = world.acting.carrying.find(
-        (slot) => slot.amount !== 0 && projectileOf(slot.skill) !== null
-      )
+      // The best gun the kit holds, by the damage table's own word.
+      const gun = world.acting.carrying
+        .filter((slot) => slot.amount !== 0 && projectileOf(slot.skill) !== null)
+        .reduce<{ skill: number } | null>(
+          (best, slot) =>
+            best === null || damageOf(slot.skill) > damageOf(best.skill) ? slot : best,
+          null
+        )
       if (!gun || world.foes.length === 0) return pass(world)
 
       const me = world.acting
-      const target = nearest(me, world.foes)
+      const target = bestTarget(me, damageOf(gun.skill), world.foes)
       const dx = target.x - me.x
       const dz = target.z - me.z
       const distance = Math.hypot(dx, dz)
@@ -131,10 +168,24 @@ export function createGruntBrain(): Brain {
       if (Math.abs(shortest(bearing - me.heading)) > FACING) {
         return { kind: 'turnTo', heading: bearing }
       }
+
+      // The pitch: Y-DOWN, so standing ABOVE the target means my y is the
+      // smaller and the barrel goes DOWN — atan2 of the drop over the reach,
+      // in the aim's own 4096-a-turn units. Once.
+      if (!pitched) {
+        const wanted = Math.round(
+          (Math.atan2(me.y - target.y, distance) / (2 * Math.PI)) * AIM_UNITS
+        )
+        if (Math.abs(wanted - me.aim) > PITCH_WITHIN) {
+          pitched = true
+          return { kind: 'aimTo', angle: wanted }
+        }
+      }
       return { kind: 'fire' }
     },
     reset() {
       grounded = false
+      pitched = false
     }
   }
 }

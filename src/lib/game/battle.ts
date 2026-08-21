@@ -1047,8 +1047,9 @@ export function createBattle(parts: BattleParts): Battle {
         // hands take it up the same step. The world handed over is the
         // brain's whole view — read-only copies, nothing live (docs/ai.md).
         const actingSide = game.players.indexOf(game.currentPlayer)
-        const seen = (pig: Pig): { x: number; z: number; health: number } => ({
+        const seen = (pig: Pig): { x: number; y: number; z: number; health: number } => ({
           x: pig.position.x,
+          y: pig.position.y,
           z: pig.position.z,
           health: pig.health
         })
@@ -1058,8 +1059,10 @@ export function createBattle(parts: BattleParts): Battle {
             previous: actuator.outcome(),
             acting: {
               x: acting.position.x,
+              y: acting.position.y,
               z: acting.position.z,
               heading: acting.heading,
+              aim: sights.angle(),
               holding: acting.holding,
               carrying: acting.carrying.map((slot) => ({ ...slot }))
             },

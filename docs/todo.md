@@ -906,12 +906,17 @@ What is actually missing, in the order it is worth doing:
    fire level; pass when unarmed or grounded out of reach. Pacing is the
    seat's, not the brain's (`AI_START_SECONDS`, `AI_MULL_SECONDS`).
    Deterministic throughout — stepped time, no chance drawn yet — because
-   lockstep (the `net` branch) feeds this seam. What is next, off ai.md's
-   pass 1: the PATHFINDER (walkTo is a straight line today — water, mines
-   and walls are all just `blocked`), aim PITCH against ground that is not
-   flat, and the kit-wide HP-differential evaluation with the level knobs
-   on top. The pure specs and `engine-headless` stay hotseat: nobody is the
-   computer unless the assembler says so.
+   lockstep (the `net` branch) feeds this seam. Built since: the PATHFINDER
+   (`lib/game/pathfind.ts` — binary directed world, bridge decks are roads,
+   best-effort routes; the grunt walks its corners), aim PITCH (soles to
+   soles, asked once), and the SEED of the HP differential — best gun by
+   the damage table, best target by worth with the KILL_BONUS (a finishable
+   foe outbids a nearer healthy one). What is next, off ai.md's pass 1: the
+   kit-wide evaluation proper — the LOBS (a charge solved by dry-running
+   the parabola with a throwaway rng), splash priced against friends, heals
+   when the mechanic lands — and then the level knobs on top. The pure
+   specs and `engine-headless` stay hotseat: nobody is the computer unless
+   the assembler says so.
 
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens
