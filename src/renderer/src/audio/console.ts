@@ -80,6 +80,18 @@ export interface SoundConsole {
    * the menu.
    */
   left(filter?: string): SoundRow[]
+  /**
+   * **ONE MORE, each time you ask** — the generator kept for you, so nothing
+   * has to be held in a variable and the console's own up-arrow is the whole
+   * interface. `pow.sfx.next()` plays the next unheard sound and prints where
+   * it has got to; null when the list runs out.
+   *
+   * The list is taken once, when the stepping starts, and again whenever the
+   * filter changes or `rewind()` is called.
+   */
+  next(filter?: string): SoundRow | null
+  /** Start the stepping over. */
+  rewind(): void
   now(): Record<string, Cue>
   set(
     moment: string,
@@ -134,8 +146,31 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
       .filter((row) => !heard || !heard.has(row.name))
   }
 
+  /** Where `next()` has got to: the list it is walking and the filter it was
+   * built for. */
+  let stepping: { filter: string | undefined; rows: SoundRow[]; at: number } | null = null
+
   return {
     left: (filter) => matching(filter, true),
+    rewind() {
+      stepping = null
+    },
+    next(filter) {
+      if (!stepping || stepping.filter !== filter) {
+        stepping = { filter, rows: matching(filter, true), at: 0 }
+      }
+      const row = stepping.rows[stepping.at]
+      if (!row) {
+        console.log('nothing left')
+        return null
+      }
+      stepping.at++
+      bank().play(row.name)
+      console.log(
+        `${String(row.index).padStart(3)}  ${row.name}   (${stepping.at}/${stepping.rows.length})`
+      )
+      return row
+    },
     walk(filter, opts) {
       const gap = opts?.gap ?? 0.4
       // Taken ONCE, at the start: the walk plays as it goes, so a list that

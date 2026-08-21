@@ -454,6 +454,11 @@ declare global {
         ): Generator<{ index: number; name: string }, void, unknown>
         /** What is left to hear — the same list `fresh` walks. */
         left(filter?: string): { index: number; name: string }[]
+        /** One more each time you ask: the generator kept for you, so the
+         * console's up-arrow is the whole interface. */
+        next(filter?: string): { index: number; name: string } | null
+        /** Start `next()` over. */
+        rewind(): void
         now(): Record<string, unknown>
         set(
           moment: string,
