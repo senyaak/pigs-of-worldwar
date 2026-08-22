@@ -74,7 +74,9 @@ export interface AiWorld {
    */
   route(to: { x: number; z: number }): { x: number; z: number }[] | null
   /** The collision ground at a point, Y-DOWN — what a dry-run throw lands
-   * against (lib/game/evaluate.ts). */
+   * against (lib/game/evaluate.ts). Over water this is the SURFACE, not the
+   * seabed: the engine douses a lob at the waterline, and a dry run that
+   * flies on down to the basin floor invents an arc the throw cannot have. */
   groundAt(x: number, z: number): number
   /** Whether a point is WATER — a glance any player takes. */
   wet(x: number, z: number): boolean
@@ -121,3 +123,12 @@ export const AI_START_SECONDS = 2
  * "thought" between one order finishing and the next being asked for.
  * `[deliberate]`, same as above. */
 export const AI_MULL_SECONDS = 1
+
+/** …except while the machine's OWN GRENADE is live: none at all. The fire
+ * key is the detonator, and the window a thrown grenade spends rolling past
+ * a foe is a fraction of a second — a once-a-second glance missed it every
+ * time (measured on ESTU: the roll crossed the foe's whole core between two
+ * mulls, detonated "at rest" 2300 units past him, and the endgame looped on
+ * that throw for a simulated hour). Watching a fuse is not thinking; the
+ * mull is theatre and the theatre yields to the trigger. */
+export const AI_FUSE_SECONDS = 0

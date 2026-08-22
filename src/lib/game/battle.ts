@@ -25,7 +25,7 @@ import { weaponOf } from './weapons'
 import type { Firing } from './shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
-import { AI_MULL_SECONDS, AI_START_SECONDS } from './ai'
+import { AI_FUSE_SECONDS, AI_MULL_SECONDS, AI_START_SECONDS } from './ai'
 import { createActuator } from './actuator'
 import { createGruntBrain } from './grunt'
 import { beginWalkAway } from './walkAway'
@@ -58,8 +58,7 @@ import { INOUT_CLIP } from './buildings'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
 import type { Mines } from './mines'
-import type { Tumbles } from './tumble'
-import { flingVelocity } from './tumble'
+import type { Tumbles, Velocity } from './tumble'
 import type { Strikes } from './strikes'
 import type { EffectField } from './effectField'
 import type { DamageNumbers } from './damage'
@@ -274,7 +273,7 @@ export interface Battle {
    * own (lib/game/tumble.ts). Two states over one pig would fight over its
    * position, and this is the seam that keeps there being one.
    */
-  fling(pig: Pig, speed: number, bearing: number, ejected?: boolean): void
+  fling(pig: Pig, velocity: Velocity, ejected?: boolean): void
   /** Warp the acting pig — the debug surface the e2e suite drives through. */
   warp(x: number, z: number, heading: number): void
 }
@@ -1060,7 +1059,10 @@ export function createBattle(parts: BattleParts): Battle {
       } else if (!actuator.idle()) {
         actuator.step(delta)
         mullSeconds = 0
-      } else if ((mullSeconds += delta) >= AI_MULL_SECONDS) {
+      } else if (
+        (mullSeconds += delta) >=
+        (grenades.thrown() > 0 ? AI_FUSE_SECONDS : AI_MULL_SECONDS)
+      ) {
         // Hands free and the mulling beat spent: one decision, and the
         // hands take it up the same step. The world handed over is the
         // brain's whole view — read-only copies, nothing live (docs/ai.md).
@@ -1110,7 +1112,13 @@ export function createBattle(parts: BattleParts): Battle {
                 { x: acting.position.x, z: acting.position.z, y: acting.position.y },
                 to
               ),
-            groundAt: (x, z) => query.height(x, z),
+            // What a dry-run throw lands against: over water that is the
+            // SURFACE, not the seabed under it — the engine douses a lob at
+            // the waterline (lib/game/grenade.ts), and a dry run that flew
+            // on to the basin floor once priced an 8700-unit "arc" off a
+            // clifftop and threw grenades into the bay every turn for a
+            // simulated hour (the machine-mission stall guard caught it).
+            groundAt: (x, z) => (query.isWater(x, z) ? query.surface(x, z) : query.height(x, z)),
             wet: (x, z) => query.isWater(x, z),
             swimming: loco.swimming,
             swims: !drowns(acting.pigClass),
@@ -1709,14 +1717,14 @@ export function createBattle(parts: BattleParts): Battle {
       leaveRequested = true
     },
     announce: emit,
-    fling(pig, speed, bearing, ejected = false) {
+    fling(pig, velocity, ejected = false) {
       if (pig !== game.currentPig) {
-        tumbles.fling(pig, speed, bearing, ejected)
+        tumbles.fling(pig, velocity, ejected)
         return
       }
       // The acting pig's flight is `loco`'s, and `bouncing` is what tells the
       // clip chain it was thrown rather than jumped (lib/game/locomotion.ts).
-      const { vx, vy, vz } = flingVelocity(speed, bearing)
+      const { vx, vy, vz } = velocity
       loco.airborne = { vx, vy, vz, bouncing: true, pushIn: null, ejected }
       loco.getUp = 0
     },

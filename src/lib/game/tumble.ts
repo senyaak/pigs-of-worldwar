@@ -39,16 +39,22 @@ export interface TumbleWorld {
   obstacles: Obstruction
 }
 
+/** A throw, as the velocity it starts with — game space, up is −Y. Built by
+ * the THROWER: the melee's is `flingVelocity` (the exe's own 45°), a blast's
+ * is `hurlVelocity` (the line from the burst to the body's centre). */
+export interface Velocity {
+  vx: number
+  vy: number
+  vz: number
+}
+
 export interface Tumbles {
   /**
-   * Throw this pig: `speed` in game units a second, along `bearing`, at 45° up.
-   *
-   * The pitch is the engine's own and not a taste — every knock-about in the exe
-   * goes through `0x4a9100(speed, 0x200, bearing, 0)`, and 0x200 of 4096 is 45°
-   * (`PITCH` below). Throwing one that is already in the air REPLACES what it had:
+   * Throw this pig with `velocity` — whoever throws says HOW, this only owns
+   * the flight. Throwing one that is already in the air REPLACES what it had:
    * a second blast catching a pig mid-flight is the last word on where it goes.
    */
-  fling(pig: Pig, speed: number, bearing: number, ejected?: boolean): void
+  fling(pig: Pig, velocity: Velocity, ejected?: boolean): void
   /** One frame of every flight. */
   update(delta: number): void
   /** How many are in the air — what a turn cannot be handed over through
@@ -73,16 +79,39 @@ export const PITCH = Math.PI / 4
 
 /** The velocity a throw of this speed and bearing comes to — spherical, the way
  * `0x4a9100` builds it, and up is −Y. */
-export const flingVelocity = (
-  speed: number,
-  bearing: number
-): { vx: number; vy: number; vz: number } => ({
+export const flingVelocity = (speed: number, bearing: number): Velocity => ({
   // Heading 0 faces +Z and x is its sine, which is the convention the walk and
   // the jump's own push already use (lib/game/locomotion.ts).
   vx: Math.cos(PITCH) * speed * Math.sin(bearing),
   vy: -Math.sin(PITCH) * speed,
   vz: Math.cos(PITCH) * speed * Math.cos(bearing)
 })
+
+/**
+ * The velocity of a throw ALONG a line — a BLAST's: from the burst point to
+ * the body's own centre of gravity, in all three dimensions.
+ *
+ * The exe throws blast victims through a physics CONTACT with the effect's own
+ * sphere, and a contact's impulse runs along its normal — which IS this line —
+ * so the geometry is the read's in spirit while the read itself stays undecoded
+ * (`weapons/fire.md`). What it buys is exactly what play asked for: a charge
+ * going off UNDER the trotters throws the pig straight UP, one level with the
+ * chest shoves it flat away, and one on a ledge OVERHEAD slams it down. The
+ * fixed 45° above stays the melee's, where it is read (0x4a9100).
+ * `[CHECK — remake]` for the line standing in for the undecoded contact.
+ *
+ * A line too short to have a direction — the charge is inside the body — goes
+ * straight up: the one way a burst under everything can send it.
+ */
+export const hurlVelocity = (speed: number, along: { x: number; y: number; z: number }): Velocity => {
+  const span = Math.hypot(along.x, along.y, along.z)
+  if (span < 1) return { vx: 0, vy: -speed, vz: 0 }
+  return {
+    vx: (along.x / span) * speed,
+    vy: (along.y / span) * speed,
+    vz: (along.z / span) * speed
+  }
+}
 
 export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
   const { query } = world
@@ -104,7 +133,7 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
     )
 
   return {
-    fling(pig, speed, bearing, ejected = false) {
+    fling(pig, velocity, ejected = false) {
       // Built where the pig IS, standing on whatever it is standing on — a pig
       // blown off a crate must not be measured from the ground under it
       // (lib/game/locomotion.ts `Footing`).
@@ -117,7 +146,7 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
       state.x = pig.position.x
       state.z = pig.position.z
       state.y = pig.position.y
-      const { vx, vy, vz } = flingVelocity(speed, bearing)
+      const { vx, vy, vz } = velocity
       // `bouncing` is what makes it read as being thrown rather than jumping:
       // the clip is the BOUNCE and the landing bounces on before it settles
       // (lib/game/locomotion.ts). `ejected` swaps that clip for the FLYING

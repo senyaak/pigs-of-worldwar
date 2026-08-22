@@ -1278,3 +1278,55 @@ the beat onward nobody is driving anything and the beat is already waiting for
 the fuse, so what there is to watch is the thing about to go off. It is the
 same aftermath camera a broken object already uses; the exe's own arm for a
 burning charge has not been read, so it is `[CHECK — remake]`.
+
+
+## The blast's DIRECTION — the centre-of-gravity line (2026-08-23)
+
+Play, queued from the first AI session: "граната до сих пор как-то странно
+отбрасывает — похоже ещё не очень работает взрыв", with the spec arriving
+alongside the fix order: "надо хорошие тесты — чтобы свинья летала если
+граната ниже центра тяжести свиньи итд итп."
+
+**The suspect list closed on the 45°.** The speed (`flingSpeed`, six a point,
+capped at the prod's 200) survived; the seam survived; what was wrong was the
+DIRECTION: every blast threw its victims at the melee's fixed 45° along the
+flat bearing, and a charge going off UNDER a pig — both legs of the bearing
+nil — threw it 45° toward wherever it happened to face. The replacement is
+one line: **the throw runs from the burst point to the body's own centre of
+gravity, in all three dimensions** (`hurlVelocity`, lib/game/tumble.ts).
+The exe's own blast toss is a physics CONTACT with the effect's 35-radius
+sphere (weapons/fire.md, still undecoded), and a contact's impulse runs along
+its normal — which is this line — so the geometry is the read's in spirit and
+tagged `[CHECK — remake]` where it stands in for it. Under the trotters is
+straight up; level with the chest is a flat shove; a ledge overhead slams
+DOWN. The melee keeps its 45°, where `0x4a9100(speed, 0x200, …)` is read.
+The `fling` seam now carries a VELOCITY and the thrower builds it, so the
+two models never meet in the middle. Pinned six ways in unit/blast.spec.ts,
+and the mine's own throw — straight up, down on the same spot — in
+e2e/002/tumble.spec.ts.
+
+**The machine-mission stall guard then earned its keep twice.** The new
+trajectories reshuffled the endgame of the headless ESTU mission and it ran
+an hour without a verdict: two grunts on a clifftop lobbing grenades at a
+third 8700 units away, every turn, forever. Two real bugs under it, both the
+AI's, neither the blast's:
+
+- **The dry-run priced throws the engine cannot deliver.** `flight()` broke
+  on `groundAt` — the SEABED under water — so a lob dry-ran through the bay's
+  surface to its floor, and off a clifftop the first ground contact really
+  was 8700 units out (the roll downhill is the engine's own). Two fixes: the
+  battle now hands the brain a `groundAt` that answers the WATER SURFACE over
+  water (the engine douses a lob at the waterline), and a solved landing that
+  comes down ON water prices to nothing at all — no blast, no worth
+  (lib/game/evaluate.ts; pinned in unit/evaluate.spec.ts).
+- **The detonator was on a one-second glance.** The seat mulled
+  `AI_MULL_SECONDS` between decisions while its grenade rolled, and the
+  fraction of a second the roll spent inside the foe's core fell between two
+  glances — the brain detonated "at rest" 2300 units past him, deterministic,
+  every turn. `AI_FUSE_SECONDS = 0`: while the machine's own grenade is live
+  the seat decides every frame. Watching a fuse is not thinking, and the
+  pacing was always the seat's, not the brain's (docs/ai.md).
+
+Measured after: the mission verdicts at ~271 s with five kills over thirteen
+shots, 1v0 — faster and deadlier than before the pass, because a thrown
+grenade now goes off beside the foe it was thrown at.

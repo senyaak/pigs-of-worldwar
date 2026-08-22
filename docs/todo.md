@@ -928,19 +928,26 @@ What is actually missing, in the order it is worth doing:
    `engine-headless` stay hotseat: nobody is the computer unless the
    assembler says so — and `e2e/002/machine-mission.spec.ts` is the
    exception that proves the seat: ESTU, both sides handed to the machine,
-   stepped headless to a verdict (~3 minutes of battle, five kills over ten
-   rifle shots — the difference is the grenades — one grunt left standing).
+   stepped headless to a verdict (~4.5 minutes of battle, five kills over
+   thirteen shots — the grenades connect now that the fuse is watched every
+   frame — one grunt left standing).
 
 **Play's open reports from the first AI session (2026-08-23), in their
 order:**
 
-1. **The GRENADE: "до сих пор как-то странно отбрасывает — похоже ещё не
-   очень работает взрыв."** Next up, play's own sequencing. Suspects to
-   check against the reads: `flingSpeed` (6 × points, cap 200) off the
-   blast's damage share, the 45° toss bearing, and whether the blast's
-   knockback runs through the same `fling` seam the melee's does
-   (lib/game/blast.ts, lib/game/tumble.ts; the exe's blast toss is a
-   physics CONTACT, not a damage-arm call — weapons/fire.md).
+1. ~~**The GRENADE: "до сих пор как-то странно отбрасывает — похоже ещё не
+   очень работает взрыв."**~~ DONE 2026-08-23 — the suspect was the 45°
+   toss: a blast now throws along the LINE from the burst to the body's
+   centre of gravity (`hurlVelocity`, the exe's contact normal in spirit) —
+   under the trotters is straight UP, per play's own spec: "чтобы свинья
+   летала если граната ниже центра тяжести". The 45° stays the melee's,
+   where it is read. Pinned in unit/blast.spec.ts (six geometries) and
+   e2e/002/tumble.spec.ts. The hunt also caught two AI grenade bugs — the
+   dry-run pricing throws that douse on water or fly to the seabed, and the
+   1 Hz mull missing the detonation window as the grenade rolled past the
+   foe (`AI_FUSE_SECONDS`) — details in docs/history/weapons.md. WATCH IN
+   PLAY: a distant blast now SHOVES flat instead of tossing 45° up; if that
+   reads wrong, the knob is the direction line, not the speed.
 2. **The rest of the sound survey** — the P1 trio is wired (damaged/killed/
    shotLanded, commit 640d1df); still unwired, in the survey's priority:
    `broke` (props by bullet/blade), the TURN CLOCK's own S_CLOCK warning

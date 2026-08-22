@@ -21,6 +21,7 @@ const world = (over: {
   health?: number
   crates?: AiWorld['crates']
   wits?: number
+  wet?: AiWorld['wet']
 }): AiWorld => ({
   timeLeft: 45,
   wits: over.wits ?? 0,
@@ -40,7 +41,7 @@ const world = (over: {
   route: (to) => [to],
   // Flat ground at zero: the dry-run throw lands when it falls back to it.
   groundAt: () => 0,
-  wet: () => false,
+  wet: over.wet ?? (() => false),
   swimming: false,
   swims: false,
   thrown: null,
@@ -74,6 +75,22 @@ test('against a LONE foe out of self-splash the grenade outbids the rifle', { ta
   // In the arc, so the gauge is SOLVED: a real charge, not a default.
   expect(option.charge).toBeGreaterThan(0)
   expect(option.charge).toBeLessThanOrEqual(1)
+})
+
+test('a throw that comes down ON WATER is worth nothing — the engine douses it', { tag: '@nodata' }, () => {
+  // The same foe the dry test above prices a grenade for, but he stands in
+  // the shallows: the landing is wet, there is no blast to price, and a kit
+  // with only the grenade passes rather than feeding the bay. This is the
+  // machine-mission stall in miniature — two pigs once threw doused
+  // grenades at each other for a simulated hour.
+  const option = priceKit(
+    world({
+      carrying: [{ skill: SKILL.GRENADE, amount: 3 }],
+      foes: [foe({ z: 1500 })],
+      wet: (_x, z) => z > 800
+    })
+  )
+  expect(option).toBeNull()
 })
 
 test('a throw that would catch the THROWER is priced down: up close the rifle wins', { tag: '@nodata' }, () => {

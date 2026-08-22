@@ -39,7 +39,7 @@ import type { Lobs } from './lobs'
 import { createMines } from './mines'
 import type { Mines } from './mines'
 import { createTumbles } from './tumble'
-import type { Tumbles } from './tumble'
+import type { Tumbles, Velocity } from './tumble'
 import { createCorpses } from './corpses'
 import { createEffectField } from './effectField'
 import type { EffectField } from './effectField'
@@ -378,7 +378,7 @@ export function createEngine(parts: EngineParts): Engine {
       // A swing throws what it hits, through the same seam the blast's toss
       // takes. `fling` is declared below and only ever called inside a step,
       // by which time `battle` exists.
-      fling: (pig, speed, bearing, ejected) => fling(pig, speed, bearing, ejected)
+      fling: (pig, velocity, ejected) => fling(pig, velocity, ejected)
     },
     bus.emit
   )
@@ -397,8 +397,8 @@ export function createEngine(parts: EngineParts): Engine {
    * inside a step, by which time it exists.
    */
   const tumbles = createTumbles({ query, pigs, obstacles }, bus.emit)
-  const fling = (pig: Pig, speed: number, bearing: number, ejected?: boolean): void =>
-    battle.fling(pig, speed, bearing, ejected)
+  const fling = (pig: Pig, velocity: Velocity, ejected?: boolean): void =>
+    battle.fling(pig, velocity, ejected)
   /** What becomes of a body once it is killed: the dying clip, the corpse
    * blast, the boots (lib/game/corpses.ts). After the tumbles, because a body
    * a blast threw finishes its flight before it finishes its death. */

@@ -12,6 +12,8 @@
 // Pure, and game space (Y-down) like the rest of lib/game.
 
 import { blastShare } from './grenade'
+import { hurlVelocity } from './tumble'
+import type { Velocity } from './tumble'
 import { DAMAGE_UNIT } from './projectile'
 import { fromExeSpeed } from './ballistics'
 import { hurt, isDead } from './health'
@@ -56,15 +58,15 @@ export interface BlastWorld {
   present: (id: number) => boolean
   training: boolean
   /**
-   * Throw a pig: `speed` game units a second along `bearing`, 45° up
-   * (lib/game/tumble.ts). WHERE the velocity goes is the caller's business — the
-   * acting pig has a locomotion state of its own and everybody else has one made
-   * for the flight (lib/game/battle.ts).
+   * Throw a pig with this starting velocity (lib/game/tumble.ts,
+   * `hurlVelocity` builds the blast's). WHERE the velocity goes is the
+   * caller's business — the acting pig has a locomotion state of its own and
+   * everybody else has one made for the flight (lib/game/battle.ts).
    *
    * Optional, and a blast without it only hurts: the pure specs that measure
    * damage have no bodies to move and no ground to land on.
    */
-  fling?: (pig: Pig, speed: number, bearing: number) => void
+  fling?: (pig: Pig, velocity: Velocity) => void
 }
 
 /**
@@ -105,6 +107,15 @@ export interface BlastWorld {
  * original throws a pig through something this pass did not find, most likely the
  * physics: the blast effect has a BODY, a sphere of radius 35 (`weapons/fire.md`),
  * and that contact's impulse is not decoded.
+ *
+ * The DIRECTION follows the same undecoded contact in spirit: an impulse runs
+ * along the contact's normal, which is the line from the burst to the body's
+ * centre of gravity — `hurlVelocity` (lib/game/tumble.ts). A first pass threw
+ * every victim at the melee's fixed 45° instead, and play called it at once:
+ * "граната до сих пор как-то странно отбрасывает — похоже ещё не очень
+ * работает взрыв." A charge under the trotters was the tell — it flung the pig
+ * 45° toward wherever it happened to face, where a burst UNDER a body has
+ * nowhere to send it but UP.
  */
 export const FLING_PER_POINT = 6
 /** …and no harder than the hardest knock in the engine: the cattle prod's. */
@@ -138,24 +149,22 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     if (isDead(pig)) continue
     const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
     const dx = body.x - at.x
+    const dy = body.y - at.y
     const dz = body.z - at.z
-    const amount = took(dx, body.y - at.y, dz)
+    const amount = took(dx, dy, dz)
     if (amount <= 0) continue
     const outcome = hurt(pig, amount, world.training)
     emit({ kind: 'damaged', at: body, amount, pig: pig.id })
     if (outcome === 'died' || outcome === 'gibbed')
       emit({ kind: 'killed', pig: pig.id, by, gibbed: outcome === 'gibbed' })
-    // …AND IT GOES FLYING. Away from the blast — the bearing from the centre to
-    // the pig — as hard as the damage it just took (`flingSpeed`), which is what
-    // makes standing back save your footing as well as your health. A corpse flies
-    // too: the exe throws bodies about, and a pig killed by the blast is a body
-    // from that instant.
-    //
-    // A charge that went off UNDER the trotters has no direction to give (both
-    // legs of the bearing are nil), and the pitch is fixed at 45° — so it throws
-    // the pig the way it was facing rather than the way +Z happens to point.
-    const away = Math.hypot(dx, dz) < 1 ? pig.heading : Math.atan2(dx, dz)
-    world.fling?.(pig, flingSpeed(amount), away)
+    // …AND IT GOES FLYING. Along the line from the burst to its own centre of
+    // gravity — under the trotters is straight UP, level with the chest is flat
+    // away, overhead is downward (`hurlVelocity` says why that line) — as hard
+    // as the damage it just took (`flingSpeed`), which is what makes standing
+    // back save your footing as well as your health. A corpse flies too: the
+    // exe throws bodies about, and a pig killed by the blast is a body from
+    // that instant.
+    world.fling?.(pig, hurlVelocity(flingSpeed(amount), { x: dx, y: dy, z: dz }))
   }
   const standing = world.targets
   for (let i = standing.length - 1; i >= 0; i--) {

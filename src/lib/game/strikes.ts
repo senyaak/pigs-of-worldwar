@@ -12,6 +12,8 @@
 // Game space (Y-down) throughout.
 
 import { fromExeSpeed } from './ballistics'
+import { flingVelocity } from './tumble'
+import type { Velocity } from './tumble'
 import { advanceSwing, beginSwing, caught, meleeOf, strikeGap, strikeOffsets } from './melee'
 import type { StrikeGap, SwingState } from './melee'
 import { amountOf, spend } from './inventory'
@@ -72,10 +74,12 @@ export interface StrikeWorld {
   clips: ClipTiming[]
   /**
    * Throw a struck pig — the same seam the blast's own toss goes through
-   * (lib/game/battle.ts). OPTIONAL for the same reason `BlastWorld.fling` is:
-   * a spec about damage alone needs no bodies to move.
+   * (lib/game/battle.ts), and the thrower builds the velocity: the melee's
+   * is the exe's own 45° along the bearing (`flingVelocity`). OPTIONAL for
+   * the same reason `BlastWorld.fling` is: a spec about damage alone needs
+   * no bodies to move.
    */
-  fling?: (pig: Pig, speed: number, bearing: number, ejected?: boolean) => void
+  fling?: (pig: Pig, velocity: Velocity, ejected?: boolean) => void
 }
 
 export interface Strikes {
@@ -175,7 +179,7 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
       const dx = body.x - from.x
       const dz = body.z - from.z
       const away = Math.hypot(dx, dz) < 1 ? target.heading : Math.atan2(dx, dz)
-      world.fling?.(target, fromExeSpeed(weapon.knockback), away, true)
+      world.fling?.(target, flingVelocity(fromExeSpeed(weapon.knockback), away), true)
       if (outcome === 'died' || outcome === 'gibbed') {
         emit({ kind: 'killed', pig: target.id, by: attacker.id, gibbed: outcome === 'gibbed' })
       }

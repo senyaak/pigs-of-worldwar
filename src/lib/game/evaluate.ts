@@ -227,7 +227,11 @@ const lobOption = (world: AiWorld, skill: number): Option | null => {
       }
       const charge = (low + high) / 2
       const landing = flight(world, skill, heading, charge)
-      const worth = blastWorth(world, landing, damage, spread)
+      // A lob that comes down ON WATER is worth nothing at all: the engine
+      // DOUSES it at the surface (lib/game/grenade.ts) and there is no
+      // blast to price. Without this line a doused throw scored like a dry
+      // one, and a brain repeated it every turn forever.
+      const worth = world.wet(landing.x, landing.z) ? 0 : blastWorth(world, landing, damage, spread)
       if (!best || worth > best.score) {
         best = {
           skill,

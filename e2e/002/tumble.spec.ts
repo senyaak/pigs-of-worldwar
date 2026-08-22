@@ -90,16 +90,19 @@ function fielded(apart: number): {
       // Every pig here is a pig nobody is driving, which is the whole case this
       // spec is about — the battle's own seam sends the ACTING one to `loco`
       // instead (lib/game/battle.ts `fling`).
-      fling: (pig, speed, bearing) => tumbles.fling(pig, speed, bearing)
+      fling: (pig, velocity) => tumbles.fling(pig, velocity)
     },
     bus.emit
   )
   return { game, heard, mines, tumbles, query, pigs }
 }
 
-test('a fling is 45° UP along its bearing — the engine\'s own pitch', () => {
-  // `0x4a9100(speed, 0x200, bearing, 0)` at every site that throws a pig about,
-  // and 0x200 of 4096 is 45°.
+test('the MELEE throws 45° UP along its bearing — the exe\'s own pitch', () => {
+  // `0x4a9100(speed, 0x200, bearing, 0)` at every DECODED site that throws a
+  // pig about — the melee's knockback, one body shoving another — and 0x200
+  // of 4096 is 45°. A BLAST does not use this any more: its direction is the
+  // line from the burst to the body's centre of gravity, pinned in
+  // unit/blast.spec.ts (lib/game/tumble.ts `hurlVelocity`).
   expect(PITCH).toBeCloseTo(Math.PI / 4, 10)
 
   const speed = fromExeSpeed(0x40)
@@ -134,7 +137,7 @@ test('a fling is 45° UP along its bearing — the engine\'s own pitch', () => {
   expect(flingSpeed(500), 'nothing throws harder than the cap').toBe(FLING_CAP)
 })
 
-test('a mine THROWS the pig that trod on it — off the ground and down again', () => {
+test('a mine THROWS the pig that trod on it — straight UP, and down again', () => {
   const { game, mines, tumbles, query } = fielded(4000)
   const pig = game.currentPig
   const from = { ...pig.position }
@@ -145,11 +148,15 @@ test('a mine THROWS the pig that trod on it — off the ground and down again', 
   expect(mines.live(), 'it went off').toBe(0)
 
   // It is in the air THE SAME STEP the blast lands: a pig with a mine under its
-  // trotters is inside the core, so it takes the whole impulse.
+  // trotters is inside the core, so it takes the whole impulse — and a burst
+  // directly UNDER a body has nowhere to send it but UP. Play's own ask:
+  // "чтобы свинья летала если граната ниже центра тяжести."
   expect(tumbles.live(), 'nothing was thrown').toBe(1)
   expect(tumbles.has(pig)).toBe(true)
   const launch = tumbles.at()[0]
   expect(launch.vy, 'it was not thrown upward').toBeLessThan(0)
+  expect(Math.abs(launch.vx), 'a charge under the trotters has no sideways to give').toBeLessThan(1)
+  expect(Math.abs(launch.vz)).toBeLessThan(1)
   // Twenty points at the core, so six times that a frame — 0x78.
   expect(Math.hypot(launch.vx, launch.vy, launch.vz)).toBeCloseTo(flingSpeed(20), 4)
 
@@ -161,12 +168,11 @@ test('a mine THROWS the pig that trod on it — off the ground and down again', 
   }
   expect(ground - highest, 'it never left the ground').toBeGreaterThan(50)
 
-  // It comes down, and it comes down somewhere else — which is the whole of what
-  // play asked for.
+  // It comes down — and having gone straight up, it comes down where it stood.
   for (let i = 0; i < 600 && tumbles.live() > 0; i++) tumbles.update(STEP)
   expect(tumbles.live(), 'it is still in the air after ten seconds').toBe(0)
   const moved = Math.hypot(pig.position.x - from.x, pig.position.z - from.z)
-  expect(moved, 'it landed where it started').toBeGreaterThan(50)
+  expect(moved, 'a vertical throw drifted sideways').toBeLessThan(50)
   expect(pig.position.y, 'it did not come back down').toBeCloseTo(
     query.height(pig.position.x, pig.position.z),
     0
@@ -188,9 +194,12 @@ test('…and the pig NEXT to it is thrown too, away from the blast and less hard
   const thrown = tumbles.at()
   const one = thrown.find((each) => each.pig === near.id)!
   const other = thrown.find((each) => each.pig === far.id)!
-  // AWAY from it: the far pig sits at +x of the blast and goes on out that way.
+  // AWAY from it: the far pig sits at +x of the blast and goes on out that way
+  // — and mostly FLAT, because at 800 units out the line from the burst to its
+  // centre of gravity is nearly level (lib/game/tumble.ts `hurlVelocity`).
   expect(other.vx, 'it was thrown back into the blast').toBeGreaterThan(0)
   expect(Math.abs(other.vz)).toBeLessThan(Math.abs(other.vx))
+  expect(Math.abs(other.vy), 'a distant shove is a shove, not a toss').toBeLessThan(other.vx)
   // …and by the share the damage took, which is what makes standing back worth
   // doing: the one under it keeps the whole impulse.
   const share = blastShare(apart, blastReach(1024))
@@ -202,7 +211,8 @@ test('…and the pig NEXT to it is thrown too, away from the blast and less hard
   // (lib/game/body.ts).
   const flat = flingSpeed(Math.round((MINE_DAMAGE * share) / DAMAGE_UNIT))
   const got = Math.hypot(other.vx, other.vy, other.vz)
-  expect(got).toBeLessThanOrEqual(flat)
+  // Within a normalisation's float dust: `hurlVelocity` scales a unit line.
+  expect(got).toBeLessThanOrEqual(flat + 1e-6)
   expect(got / flat).toBeGreaterThan(0.9)
   expect(Math.hypot(one.vx, one.vy, one.vz)).toBeGreaterThan(
     Math.hypot(other.vx, other.vy, other.vz)
@@ -289,7 +299,7 @@ test('a body thrown while it is INSIDE another still travels', () => {
     'the body it is inside is not in its way'
   ).toBe(false)
 
-  tumbles.fling(thrown, flingSpeed(30), Math.PI / 2)
+  tumbles.fling(thrown, flingVelocity(flingSpeed(30), Math.PI / 2))
   for (let i = 0; i < 200 && tumbles.live() > 0; i++) tumbles.update(STEP)
   const went = Math.hypot(thrown.position.x - from.x, thrown.position.z - from.z)
   expect(went, 'it was thrown, not held').toBeGreaterThan(PIG_RADIUS * 4)
