@@ -918,11 +918,18 @@ What is actually missing, in the order it is worth doing:
    the blast priced over EVERYONE including the thrower, which bought
    self-preservation out of arithmetic: at 800 units the grunt keeps the
    rifle because the grenade's rim (~1100) would bill him ~19 of his own.
-   What is next, off ai.md's pass 1: the heals when the mechanic lands, the
-   PLANTED family (TNT arms in the price list when a kit carries it), the
-   environment in the ledger (knockback into water/mines), and then the
-   level knobs on top. The pure specs and `engine-headless` stay hotseat:
-   nobody is the computer unless the assembler says so.
+   Built since: the PLANTED family (TNT is priced where the pig stands,
+   self spared, and the FLEE is a behaviour), crates on the ledger against
+   the greed knob, and the WITS dial itself (`lib/game/wits.ts`, 0..1 by
+   campaign position, appetite its first customer). What is next, off
+   ai.md's pass 1: the heals when the mechanic lands, the environment in
+   the ledger (knockback into water/mines), and the next knobs on the dial
+   (estimate error, actuator noise, memory). The pure specs and
+   `engine-headless` stay hotseat: nobody is the computer unless the
+   assembler says so — and `e2e/002/machine-mission.spec.ts` is the
+   exception that proves the seat: ESTU, both sides handed to the machine,
+   stepped headless to a verdict (~3 minutes of battle, five kills over ten
+   rifle shots — the difference is the grenades — one grunt left standing).
 
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens
