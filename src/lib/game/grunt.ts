@@ -30,6 +30,7 @@ import type { Order } from './orders'
 import { shortest } from './actuator'
 import { AIM_UNITS } from './aim'
 import { priceKit } from './evaluate'
+import { BLAST_CORE } from './grenade'
 import { GRID_STEP } from './pathfind'
 import { SKILL } from './skills'
 
@@ -84,6 +85,18 @@ export function createGruntBrain(): Brain {
   return {
     decide(world) {
       if (world.previous === 'blocked') grounded = true
+
+      // A grenade of OURS is in the air or rolling: the fire key is the
+      // detonator now, and timing it is the whole decision. Set it off the
+      // moment it stops, or the moment it rolls inside the CORE of a foe —
+      // full damage, no reason to let it roll away again. Otherwise watch.
+      if (world.thrown !== null) {
+        const thrown = world.thrown
+        const near = world.foes.some(
+          (foe) => Math.hypot(foe.x - thrown.x, foe.z - thrown.z) <= BLAST_CORE
+        )
+        return thrown.resting || near ? { kind: 'fire' } : { kind: 'watch' }
+      }
 
       const option = priceKit(world)
       if (!option) return pass(world)

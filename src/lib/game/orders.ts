@@ -29,6 +29,11 @@ export type Order =
   | { kind: 'aimTo'; angle: number }
   /** Press fire; for a gauge weapon hold until it reads `charge` (0..1) and
    * let go. A gun answers the press itself, so `charge` is optional and
-   * means nothing to one. Firing SKIP TURN is the pass — the same road the
-   * player's skip takes. */
+   * means nothing to one. Firing SKIP TURN is the pass, and firing over a
+   * grenade ALREADY IN THE AIR is the hand-detonator — both the player's
+   * own roads (lib/game/battle.ts). */
   | { kind: 'fire'; charge?: number }
+  /** Nothing THIS beat — the brain is watching something develop (a thrown
+   * grenade rolling home) and wants asking again after the seat's mull.
+   * Tactical, not theatre: the wait has a subject. */
+  | { kind: 'watch' }

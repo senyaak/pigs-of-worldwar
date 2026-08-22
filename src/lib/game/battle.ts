@@ -1086,7 +1086,17 @@ export function createBattle(parts: BattleParts): Battle {
                 { x: acting.position.x, z: acting.position.z, y: acting.position.y },
                 to
               ),
-            groundAt: (x, z) => query.height(x, z)
+            groundAt: (x, z) => query.height(x, z),
+            // The machine's own live grenade: the newest lob while any
+            // THROWN one is live — planted charges are not it, and must
+            // never be detonated from beside (lib/game/lobs.ts).
+            thrown: (() => {
+              if (grenades.thrown() === 0) return null
+              const head = grenades.head()
+              return head === null
+                ? null
+                : { x: head.x, z: head.z, resting: head.resting }
+            })()
           })
         )
         actuator.step(delta)

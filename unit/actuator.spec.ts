@@ -101,6 +101,14 @@ test('hold is a one-step order through the skill menu write', { tag: '@nodata' }
   expect(b.holding()).toBe(7)
 })
 
+test('watch touches nothing and is done at once', { tag: '@nodata' }, () => {
+  const b = bench()
+  const ticks = b.run({ kind: 'watch' })
+  expect(ticks).toBe(1)
+  expect(b.fires).toEqual([])
+  expect(b.actuator.outcome()).toBe('done')
+})
+
 test('aimTo pushes the aim key until the pitch is close', { tag: '@nodata' }, () => {
   const b = bench()
   b.run({ kind: 'aimTo', angle: 300 })

@@ -107,6 +107,11 @@ export function createActuator(rig: Rig): Actuator {
   const step = (delta: number): void => {
     if (order === null) return
     switch (order.kind) {
+      case 'watch':
+        // Nothing to do with the hands: done at once, and the seat's mull
+        // spaces the next ask (lib/game/ai.ts).
+        finish('done')
+        return
       case 'hold':
         rig.hold(order.skill)
         finish('done')

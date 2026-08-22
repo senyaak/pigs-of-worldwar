@@ -29,6 +29,7 @@ const world = (over: {
   friends?: Seen[]
   previous?: 'done' | 'blocked' | null
   route?: AiWorld['route']
+  thrown?: AiWorld['thrown']
 }): AiWorld => ({
   timeLeft: 45,
   previous: over.previous ?? null,
@@ -46,7 +47,8 @@ const world = (over: {
   friends: over.friends ?? [],
   // An open field unless a test says otherwise: the route is the goal.
   route: over.route ?? ((to) => [to]),
-  groundAt: () => 0
+  groundAt: () => 0,
+  thrown: over.thrown ?? null
 })
 
 test('no gun is the stub game: SKIP TURN in hand, then the pass', { tag: '@nodata' }, () => {
@@ -207,6 +209,35 @@ test('a lob is fired WITH its solved charge, facing the target', { tag: '@nodata
   // first, because a grenade keeps its 45° come-up.
   expect(order.charge).toBeGreaterThan(0)
   expect(order.charge!).toBeLessThanOrEqual(1)
+})
+
+test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@nodata' }, () => {
+  const brain = createGruntBrain()
+  const kit = [{ skill: SKILL.GRENADE, amount: 3 }]
+  // Mid-flight, far from anybody: nothing to do this beat.
+  expect(
+    brain.decide(
+      world({ carrying: kit, holding: SKILL.GRENADE, thrown: { x: 0, z: 300, resting: false } })
+    )
+  ).toEqual({ kind: 'watch' })
+  // Rolled to a stop: the second press, wherever it lies.
+  expect(
+    brain.decide(
+      world({ carrying: kit, holding: SKILL.GRENADE, thrown: { x: 0, z: 700, resting: true } })
+    )
+  ).toEqual({ kind: 'fire' })
+  // Still moving but INSIDE a foe's core: full damage, no reason to let it
+  // roll away again.
+  expect(
+    brain.decide(
+      world({
+        carrying: kit,
+        holding: SKILL.GRENADE,
+        foes: [foe({ z: 800 })],
+        thrown: { x: 0, z: 750, resting: false }
+      })
+    )
+  ).toEqual({ kind: 'fire' })
 })
 
 test('blocked in range: shoot from where it stands', { tag: '@nodata' }, () => {

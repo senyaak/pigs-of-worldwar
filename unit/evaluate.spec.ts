@@ -36,7 +36,8 @@ const world = (over: {
   friends: over.friends ?? [],
   route: (to) => [to],
   // Flat ground at zero: the dry-run throw lands when it falls back to it.
-  groundAt: () => 0
+  groundAt: () => 0,
+  thrown: null
 })
 
 test('an empty kit, or an empty field, prices to nothing', { tag: '@nodata' }, () => {
