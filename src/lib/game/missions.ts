@@ -74,6 +74,14 @@ export function mapAt(position: number): string | null {
   return id === undefined ? null : MAP_NAMES[id]
 }
 
+/** …and the other way: which campaign position a map IS, or -1 outside the
+ * campaign. The campaign never repeats a map, so the two are a pair — which
+ * is what lets a mission NUMBER be derived from the map alone (the title
+ * card) and the difficulty dial off the same axis (lib/game/wits.ts). */
+export function campaignPosition(map: string): number {
+  return CAMPAIGN.findIndex((id) => MAP_NAMES[id] === map)
+}
+
 /** A map's id, or -1 for a name no table holds. */
 export function mapId(name: string): number {
   return MAP_NAMES.indexOf(name.toUpperCase() as (typeof MAP_NAMES)[number])

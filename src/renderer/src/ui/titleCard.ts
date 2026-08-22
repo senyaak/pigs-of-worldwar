@@ -9,7 +9,7 @@
 // the briefing bar's queue, which is a different thing entirely
 // (`tutorial/notes.md`).
 
-import { missionNameIndex } from '../../../lib/game/missions'
+import { campaignPosition, missionNameIndex } from '../../../lib/game/missions'
 import { isTrainingGround } from '../../../lib/game/tutorial'
 import type { Font } from './font'
 
@@ -32,15 +32,21 @@ export const CARD_Y = 160
  *
  * `>2N` is the mission NUMBER, two digits — the position in the campaign, and
  * the training ground is not one, which is the other half of why the exe has
- * two formats.
+ * two formats. The number is DERIVED from the map: the campaign never
+ * repeats one, so the pair is exact (lib/game/missions.ts,
+ * `campaignPosition`) — where a passed-in position defaulted to 0 and
+ * printed "MISSION 00" on every level, because the one caller never passed
+ * it.
  */
-export function missionTitle(strings: string[], map: string, position = 0): string | null {
+export function missionTitle(strings: string[], map: string): string | null {
   const at = missionNameIndex(map)
   if (at < 0) return null
   const name = strings[at]
   const format = strings[isTrainingGround(map) ? TRAINING_TITLE : MISSION_TITLE]
   if (!format || !name) return null
-  return format.replace('>S', name).replace('>2N', String(position).padStart(2, '0'))
+  return format
+    .replace('>S', name)
+    .replace('>2N', String(campaignPosition(map)).padStart(2, '0'))
 }
 
 /** Draw it centred across a view `viewWidth` units wide. */

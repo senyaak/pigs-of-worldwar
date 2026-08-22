@@ -17,7 +17,7 @@
 // error, the horizon, the memory (docs/ai.md's knob table). One brain,
 // turned up.
 
-import { CAMPAIGN, CAMPAIGN_LENGTH, MAP_NAMES } from './missions'
+import { CAMPAIGN_LENGTH, campaignPosition } from './missions'
 
 /** What a map OUTSIDE the campaign plays at — the skirmish arenas, until
  * they grow a picker of their own. `[deliberate]`. */
@@ -29,7 +29,7 @@ export const LARD_WITS = 1
 
 /** The machine's wits on this map, 0..1. */
 export function witsFor(map: string): number {
-  const position = CAMPAIGN.findIndex((id) => MAP_NAMES[id] === map)
+  const position = campaignPosition(map)
   if (position < 0) return ARENA_WITS
   // CAMP sits at 0/26 and fields no enemies, so its zero is never felt.
   return position / CAMPAIGN_LENGTH
