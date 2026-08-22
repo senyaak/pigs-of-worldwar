@@ -115,6 +115,23 @@ export function route(
    * verdicts (void, water, mine) are only asked when the landscape is what
    * is stood on. Y-DOWN throughout: higher ground is the SMALLER height.
    */
+  /** Water is asked at the CENTRE and at four shoulders half a cell out —
+   * the mask is finer than the grid, and a margin thinner than a cell once
+   * let a route thread a "dry" corridor straight through the bay (the
+   * actuator's own water guard caught the pig at the line, and the search
+   * then stood there shooting across for a simulated hour). The grid has to
+   * see the water the way the LEGS do. */
+  const wetted = (x: number, z: number): boolean => {
+    const half = GRID_STEP / 2
+    return (
+      ground.isWater(x, z) ||
+      ground.isWater(x + half, z) ||
+      ground.isWater(x - half, z) ||
+      ground.isWater(x, z + half) ||
+      ground.isWater(x, z - half)
+    )
+  }
+
   const step = (footY: number, cx: number, cz: number): number | null => {
     if (!inside(cx, cz)) return null
     const x = at(cx)
@@ -126,7 +143,7 @@ export function route(
       foot = deck
     } else {
       if (!ground.walkable(x, z)) return null
-      if (!swims && ground.isWater(x, z)) return null
+      if (!swims && wetted(x, z)) return null
       if (ground.hasMine(x, z)) return null
       foot = ground.height(x, z)
     }

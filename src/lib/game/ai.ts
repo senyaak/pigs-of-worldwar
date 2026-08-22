@@ -76,6 +76,12 @@ export interface AiWorld {
   /** The collision ground at a point, Y-DOWN — what a dry-run throw lands
    * against (lib/game/evaluate.ts). */
   groundAt(x: number, z: number): number
+  /** Whether a point is WATER — a glance any player takes. */
+  wet(x: number, z: number): boolean
+  /** Whether the acting pig is IN the water right now. Water KILLS a
+   * non-swimmer by degrees (docs/ai.md), so a swimming brain has exactly
+   * one thought: the shore (lib/game/grunt.ts). */
+  swimming: boolean
   /** The machine's own grenade still in the air or rolling, or null. While
    * one is live the fire key is the DETONATOR (lib/game/lobs.ts), and the
    * brain's business is timing it. */

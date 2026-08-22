@@ -354,6 +354,7 @@ export function createBattle(parts: BattleParts): Battle {
       z: game.currentPig.position.z,
       heading: game.currentPig.heading
     }),
+    wet: (x, z) => query.isWater(x, z),
     aim: () => sights.angle(),
     gauge: () => attack.gauge(game.currentPig.holding),
     intent(walk, turn) {
@@ -1049,6 +1050,7 @@ export function createBattle(parts: BattleParts): Battle {
         // Hands free and the mulling beat spent: one decision, and the
         // hands take it up the same step. The world handed over is the
         // brain's whole view — read-only copies, nothing live (docs/ai.md).
+        const AI_LOG = typeof process !== 'undefined' && process.env?.AI_LOG === '1'
         const actingSide = game.players.indexOf(game.currentPlayer)
         const seen = (pig: Pig): { x: number; y: number; z: number; health: number } => ({
           x: pig.position.x,
@@ -1056,8 +1058,7 @@ export function createBattle(parts: BattleParts): Battle {
           z: pig.position.z,
           health: pig.health
         })
-        actuator.take(
-          brain.decide({
+        const decided = brain.decide({
             timeLeft: game.timeLeft,
             wits: parts.wits ?? 0,
             previous: actuator.outcome(),
@@ -1091,6 +1092,8 @@ export function createBattle(parts: BattleParts): Battle {
                 to
               ),
             groundAt: (x, z) => query.height(x, z),
+            wet: (x, z) => query.isWater(x, z),
+            swimming: loco.swimming,
             // The machine's own live grenade: the newest lob while any
             // THROWN one is live — planted charges are not it, and must
             // never be detonated from beside (lib/game/lobs.ts).
@@ -1113,7 +1116,16 @@ export function createBattle(parts: BattleParts): Battle {
               .filter((one) => one.kind === 'crate')
               .map((one) => ({ x: one.x, z: one.z, skill: one.skill, amount: one.amount }))
           })
-        )
+        if (AI_LOG) {
+          console.log(
+            `[ai] ${acting.name} @${Math.round(acting.position.x)},${Math.round(acting.position.z)} y=${Math.round(acting.position.y)} h=${acting.heading.toFixed(2)} hp=${acting.health} prev=${actuator.outcome()} -> ${JSON.stringify(decided)}`
+          )
+        }
+        actuator.take(decided)
+        // …and the mull starts OVER: without this an instant order (watch,
+        // hold) left the counter full and the brain re-decided every frame —
+        // 904 decisions in a 185-second battle, measured before the reset.
+        mullSeconds = 0
         actuator.step(delta)
       }
     }

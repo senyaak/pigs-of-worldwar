@@ -32,6 +32,8 @@ const world = (over: {
   thrown?: AiWorld['thrown']
   planted?: AiWorld['planted']
   crates?: AiWorld['crates']
+  wet?: AiWorld['wet']
+  swimming?: boolean
 }): AiWorld => ({
   timeLeft: 45,
   wits: 0,
@@ -51,6 +53,8 @@ const world = (over: {
   // An open field unless a test says otherwise: the route is the goal.
   route: over.route ?? ((to) => [to]),
   groundAt: () => 0,
+  wet: over.wet ?? (() => false),
+  swimming: over.swimming ?? false,
   thrown: over.thrown ?? null,
   planted: over.planted ?? null,
   crates: over.crates ?? []
@@ -243,6 +247,18 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
       })
     )
   ).toEqual({ kind: 'fire' })
+})
+
+test('a SWIMMING pig has one thought — the nearest shore', { tag: '@nodata' }, () => {
+  const brain = createGruntBrain()
+  // Dry land starts at z=400; everything the price list could want is
+  // ignored — the water is killing him.
+  const order = brain.decide(
+    world({ swimming: true, wet: (_x, z) => z < 400, foes: [foe()] })
+  )
+  expect(order).toEqual({ kind: 'walkTo', x: 0, z: 450 })
+  // …and an ocean with no shore in reach is watched to its end.
+  expect(brain.decide(world({ swimming: true, wet: () => true }))).toEqual({ kind: 'watch' })
 })
 
 test('TNT at the feet of a foe: hold it, press, then RUN', { tag: '@nodata' }, () => {

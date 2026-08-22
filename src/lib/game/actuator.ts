@@ -25,6 +25,9 @@ export type Outcome = 'done' | 'blocked'
 export interface Rig {
   /** Where the acting pig stands and faces. */
   at(): { x: number; z: number; heading: number }
+  /** Whether that point is WATER — what a player sees at a glance, and what
+   * the hands refuse to march into (the walk guard below). */
+  wet(x: number, z: number): boolean
   /** The weapon's pitch, aim units (lib/game/sights.ts). */
   aim(): number
   /** The power gauge, 0..1 while one is filling, null otherwise. */
@@ -64,6 +67,19 @@ export const STUCK_SECONDS = 1.5
 
 /** Close enough on the pitch — under two taps of the aim key. */
 export const AIM_WITHIN = 6
+
+/**
+ * How far ahead of the feet the walk looks for WATER — a stride and a half.
+ *
+ * The guard of last resort under every walk order, whatever planned it:
+ * the pathfinder's grid samples cell CENTRES a quarter-tile apart, and a
+ * water margin thinner than that let a route's straight leg march a pig
+ * into the bay (measured: a grunt crossed 4300 units of ESTU and drowned
+ * holding a grenade). The hands see the water the way a player does and
+ * STOP — `blocked`, the brain thinks again. Only from DRY ground: a pig
+ * already swimming is walking OUT, and stopping it would drown it.
+ */
+export const WATER_PROBE = 150
 
 /** How long the pitch may fail to move before the clamp is taken for an
  * answer. */
@@ -135,8 +151,21 @@ export function createActuator(rig: Rig): Actuator {
         // The engine's own frame: heading 0 walks +z, positive swings to +x
         // (lib/game/movement.ts `step`), which is exactly atan2(dx, dz).
         const bearing = Math.atan2(dx, dz)
-        const off = shortest(bearing - rig.at().heading)
+        const { heading } = rig.at()
+        const off = shortest(bearing - heading)
         const walking = Math.abs(off) < WALK_CONE
+        // THE WATER GUARD: about to stride, from dry ground, onto water —
+        // stop where a player would. The probe looks along the HEADING,
+        // because that is the way the legs actually carry the pig.
+        if (
+          walking &&
+          !rig.wet(x, z) &&
+          rig.wet(x + Math.sin(heading) * WATER_PROBE, z + Math.cos(heading) * WATER_PROBE)
+        ) {
+          rig.intent(0, 0)
+          finish('blocked')
+          return
+        }
         rig.intent(walking ? 1 : 0, turnToward(bearing, delta))
         // No progress WHILE WALKING is the world saying no — a wall, a body,
         // the wedge counter — and the brain hears `blocked`. Turning on the

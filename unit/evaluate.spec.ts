@@ -40,6 +40,8 @@ const world = (over: {
   route: (to) => [to],
   // Flat ground at zero: the dry-run throw lands when it falls back to it.
   groundAt: () => 0,
+  wet: () => false,
+  swimming: false,
   thrown: null,
   planted: null,
   crates: over.crates ?? []

@@ -15,7 +15,14 @@ import { WALK_SPEED } from '../src/lib/game/movement'
 
 const STEP = 1 / 60
 
-function bench(options: { frozen?: boolean; aimFloor?: number; gaugeRate?: number } = {}) {
+function bench(
+  options: {
+    frozen?: boolean
+    aimFloor?: number
+    gaugeRate?: number
+    wet?: (x: number, z: number) => boolean
+  } = {}
+) {
   const pig = { x: 0, z: 0, heading: 0 }
   let aim = 0
   let gauge: number | null = null
@@ -25,6 +32,7 @@ function bench(options: { frozen?: boolean; aimFloor?: number; gaugeRate?: numbe
 
   const actuator = createActuator({
     at: () => ({ ...pig }),
+    wet: options.wet ?? (() => false),
     aim: () => aim,
     gauge: () => gauge,
     intent(walk, turn) {
@@ -93,6 +101,25 @@ test('a walk that stops progressing finishes blocked', { tag: '@nodata' }, () =>
   expect(b.actuator.outcome()).toBe('blocked')
   // …and it takes STUCK_SECONDS of no progress to say so, not one frame.
   expect(ticks * STEP).toBeGreaterThanOrEqual(STUCK_SECONDS)
+})
+
+test('the walk STOPS at the waterline, blocked — never a stride into it', { tag: '@nodata' }, () => {
+  // Water from z=500 on; the order wants z=1000. The guard is the hands',
+  // so it holds whatever planned the walk.
+  const b = bench({ wet: (_x, z) => z >= 500 })
+  b.run({ kind: 'walkTo', x: 0, z: 1000 })
+  expect(b.actuator.outcome()).toBe('blocked')
+  expect(b.pig.z).toBeLessThan(500)
+  expect(b.last).toMatchObject({ walk: 0, turn: 0 })
+})
+
+test('a pig already IN the water is allowed to walk OUT', { tag: '@nodata' }, () => {
+  // Wet up to z=400, the pig starts wet at the origin: the guard only
+  // holds a stride FROM dry INTO wet, or it would drown what it protects.
+  const b = bench({ wet: (_x, z) => z < 400 })
+  b.run({ kind: 'walkTo', x: 0, z: 600 })
+  expect(b.actuator.outcome()).toBe('done')
+  expect(b.pig.z).toBeGreaterThan(400)
 })
 
 test('hold is a one-step order through the skill menu write', { tag: '@nodata' }, () => {

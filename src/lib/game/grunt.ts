@@ -91,6 +91,25 @@ export function createGruntBrain(): Brain {
     decide(world) {
       if (world.previous === 'blocked') grounded = true
 
+      // IN THE WATER there is exactly one thought: THE SHORE. Water kills a
+      // non-swimmer by degrees, the engine strips the weapon from swimming
+      // hands, and pricing a kit mid-drowning is how a pig once stood in
+      // the bay re-taking its grenade every second until it died (the log
+      // is in the commit). A ring search: the nearest dry point wins, and a
+      // world with no dry point in reach is watched to its end.
+      if (world.swimming) {
+        const me = world.acting
+        for (const radius of [250, 450, 700, 1000, 1400]) {
+          for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * 2 * Math.PI
+            const x = me.x + Math.sin(angle) * radius
+            const z = me.z + Math.cos(angle) * radius
+            if (!world.wet(x, z)) return { kind: 'walkTo', x, z }
+          }
+        }
+        return { kind: 'watch' }
+      }
+
       // A grenade of OURS is in the air or rolling: the fire key is the
       // detonator now, and timing it is the whole decision. Set it off the
       // moment it stops, or the moment it rolls inside the CORE of a foe —
@@ -153,6 +172,20 @@ export function createGruntBrain(): Brain {
         return grounded ? pass(world) : { kind: 'watch' }
       }
 
+      // Only a GUN's shot travels the flat line a friend can stand in; a lob
+      // clears heads (and its blast already paid for whoever it lands near),
+      // a blade never reaches past arm's length.
+      const friend = option.kind === 'gun' ? inTheWay(me, target, world.friends) : null
+
+      // Grounded and hopeless — past the option's whole limit, or a friend
+      // in the way with nowhere left to step — is a pass, and it is asked
+      // BEFORE the hands: asked after, a grounded pig flip-flopped forever
+      // between taking the option's weapon and taking SKIP TURN to pass
+      // (measured: 249 hold decisions in one battle, rifle-skip-rifle-skip).
+      const hopeless = (): boolean =>
+        grounded && (distance > option.limit || friend !== null)
+      if (hopeless()) return pass(world)
+
       if (me.holding !== option.skill) return { kind: 'hold', skill: option.skill }
 
       // PLANTING happens where the pig already stands: press, and the flee
@@ -174,10 +207,10 @@ export function createGruntBrain(): Brain {
         grounded = true
       }
 
-      // Only a GUN's shot travels the flat line a friend can stand in; a lob
-      // clears heads (and its blast already paid for whoever it lands near),
-      // a blade never reaches past arm's length.
-      const friend = option.kind === 'gun' ? inTheWay(me, target, world.friends) : null
+      // The walk above may have GROUNDED us: ask hopeless once more before
+      // stepping around friends or firing.
+      if (hopeless()) return pass(world)
+
       if (friend !== null && !grounded) {
         // Step off the line the OTHER way from where the friend leans.
         const ux = dx / distance
@@ -185,11 +218,6 @@ export function createGruntBrain(): Brain {
         const side = -Math.sign(friend.across) * SIDE_STEP
         return { kind: 'walkTo', x: me.x + uz * side, z: me.z - ux * side }
       }
-
-      // Grounded and hopeless — past the option's whole limit, or a friend
-      // still in the way with nowhere to step — is a pass, not a blind
-      // volley.
-      if (grounded && (distance > option.limit || friend !== null)) return pass(world)
 
       const bearing = Math.atan2(dx, dz)
       if (Math.abs(shortest(bearing - me.heading)) > FACING) {
