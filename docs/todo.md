@@ -931,6 +931,27 @@ What is actually missing, in the order it is worth doing:
    stepped headless to a verdict (~3 minutes of battle, five kills over ten
    rifle shots — the difference is the grenades — one grunt left standing).
 
+**Play's open reports from the first AI session (2026-08-23), in their
+order:**
+
+1. **The GRENADE: "до сих пор как-то странно отбрасывает — похоже ещё не
+   очень работает взрыв."** Next up, play's own sequencing. Suspects to
+   check against the reads: `flingSpeed` (6 × points, cap 200) off the
+   blast's damage share, the 45° toss bearing, and whether the blast's
+   knockback runs through the same `fling` seam the melee's does
+   (lib/game/blast.ts, lib/game/tumble.ts; the exe's blast toss is a
+   physics CONTACT, not a damage-arm call — weapons/fire.md).
+2. **The rest of the sound survey** — the P1 trio is wired (damaged/killed/
+   shotLanded, commit 640d1df); still unwired, in the survey's priority:
+   `broke` (props by bullet/blade), the TURN CLOCK's own S_CLOCK warning
+   (needs an event), `chose`/holster S_UNHOLS, `promotionPoint`, the
+   parachute trio (`dropOpened`/`dropCut`/`canopiesCut` — P_CHUTE1 is the
+   tear), `wentIn`/`cameOut` I_METAL, `remains`, grenade BOUNCE (no event),
+   battle ambience BATT_* and the two birds AMB_*.
+3. The ARENA wits picker (`ARENA_WITS` is a flat 0.5 until arenas grow a
+   difficulty choice), and the machine block's `AI_LOG=1` decision tap is
+   there for the next diagnosis.
+
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens
 (`bonusPoints(1)` is 0 — the first mission pays none), the empty power-gauge
