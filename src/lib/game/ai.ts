@@ -40,6 +40,10 @@ export interface Seen {
 export interface AiWorld {
   /** The turn clock, seconds. */
   timeLeft: number
+  /** How well this machine THINKS, 0..1 — the campaign ramp's dial
+   * (lib/game/wits.ts). It slides weights (the crate appetite today);
+   * it never picks behaviours. */
+  wits: number
   /** How the last order ended — `blocked` is the world saying no, and the
    * cue to think of something else. Null before the first order finishes. */
   previous: Outcome | null

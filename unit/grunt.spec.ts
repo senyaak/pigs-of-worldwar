@@ -34,6 +34,7 @@ const world = (over: {
   crates?: AiWorld['crates']
 }): AiWorld => ({
   timeLeft: 45,
+  wits: 0,
   previous: over.previous ?? null,
   acting: {
     x: 0,

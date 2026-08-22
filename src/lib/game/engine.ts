@@ -49,6 +49,7 @@ import type { DamageNumbers } from './damage'
 import { createIndoors } from './indoors'
 import { createBattle } from './battle'
 import type { Battle } from './battle'
+import { witsFor } from './wits'
 import { DEFAULT_SEED, seeded } from './random'
 import { createBonePose } from './bonePose'
 import type { BonePose } from './bonePose'
@@ -449,7 +450,10 @@ export function createEngine(parts: EngineParts): Engine {
     onChanged,
     bus,
     random,
-    computer: parts.computer
+    computer: parts.computer,
+    // How well the machine thinks HERE: the campaign ramp's own dial
+    // (lib/game/wits.ts).
+    wits: witsFor(world.map)
   })
 
   /** One STEP of the rules: the frame's own order of events first — it reads

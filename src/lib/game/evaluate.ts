@@ -58,12 +58,17 @@ export const THROW_RISE = 120
  * its own boots. `[deliberate]`. */
 export const LEAST_CHARGE = 0.15
 
-/** How much of a crate's gain the DUMBEST brain actually feels — the
- * grunt barely bothers with pickups, by request: "он должен очень в редких
- * случаях тогда брать ящики". A NECESSITY is exempt: a pig with no weapon
- * at all takes a weapon crate at full worth. `[deliberate]` — the greed
- * knob the levels will turn. */
+/** How much of a crate's gain the DUMBEST brain feels — the grunt barely
+ * bothers with pickups, by request: "он должен очень в редких случаях
+ * тогда брать ящики". The WITS dial slides it from here to a full 1
+ * (lib/game/wits.ts): the sharpest machine values a crate at face. A
+ * NECESSITY is exempt at every level: a pig with no weapon at all takes a
+ * weapon crate at full worth. `[deliberate]` — the first level knob. */
 export const CRATE_APPETITE = 0.25
+
+/** The appetite this brain actually feels, its wits applied. */
+const appetiteOf = (world: AiWorld): number =>
+  CRATE_APPETITE + (1 - CRATE_APPETITE) * world.wits
 
 /** Standing this near a crate collects it — the walk-through hand-over
  * (lib/game/scenery.ts). */
@@ -281,12 +286,13 @@ const crateOption = (
     (best, slot) => (slot.amount !== 0 ? Math.max(best, weaponPoints(slot.skill)) : best),
     0
   )
+  const appetite = appetiteOf(world)
   const gain =
     crate.skill === null
-      ? crate.amount * CRATE_APPETITE
+      ? crate.amount * appetite
       : have === 0
         ? weaponPoints(crate.skill)
-        : Math.max(0, weaponPoints(crate.skill) - have) * CRATE_APPETITE
+        : Math.max(0, weaponPoints(crate.skill) - have) * appetite
   const away = distance2d(me, crate)
   const score = gain - (away > COLLECT_NEAR ? APPROACH_TAX : 0)
   if (score <= 0) return null

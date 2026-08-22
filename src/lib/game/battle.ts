@@ -121,6 +121,9 @@ export interface BattleParts {
    * a battle assembled without it is the hotseat every pure spec drives.
    */
   computer?: (side: number) => boolean
+  /** …and how well it thinks here, 0..1 — the campaign ramp's dial
+   * (lib/game/wits.ts). Absent is 0: the dumbest machine there is. */
+  wits?: number
 }
 
 /** What the renderer reads once the frame has run. */
@@ -1056,6 +1059,7 @@ export function createBattle(parts: BattleParts): Battle {
         actuator.take(
           brain.decide({
             timeLeft: game.timeLeft,
+            wits: parts.wits ?? 0,
             previous: actuator.outcome(),
             acting: {
               x: acting.position.x,

@@ -20,8 +20,10 @@ const world = (over: {
   friends?: Seen[]
   health?: number
   crates?: AiWorld['crates']
+  wits?: number
 }): AiWorld => ({
   timeLeft: 45,
+  wits: over.wits ?? 0,
   previous: null,
   acting: {
     x: 0,
@@ -176,6 +178,18 @@ test('TNT stays in the kit when nobody is near: no walking about with a lit bomb
   expect(
     priceKit(world({ carrying: [{ skill: SKILL.TNT, amount: 1 }], foes: [foe({ z: 3000 })] }))
   ).toBeNull()
+})
+
+test('the WITS dial turns the appetite: the sharp machine fetches what the dull one skips', { tag: '@nodata' }, () => {
+  // The same sniper upgrade, nobody left to shoot. At wits 0 a quarter of
+  // the 20-point gain does not cover the walk; at wits 1 the full gain does.
+  const upgrade = {
+    foes: [] as Seen[],
+    crates: [{ x: 0, z: 1000, skill: SKILL.SNIPER_RIFLE, amount: 2 }]
+  }
+  expect(priceKit(world({ ...upgrade, wits: 0 }))).toBeNull()
+  const sharp = priceKit(world({ ...upgrade, wits: 1 }))!
+  expect(sharp.kind).toBe('crate')
 })
 
 test('the solved charge GROWS with the throw', { tag: '@nodata' }, () => {
