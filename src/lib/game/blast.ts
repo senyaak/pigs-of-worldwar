@@ -142,7 +142,7 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     const amount = took(dx, body.y - at.y, dz)
     if (amount <= 0) continue
     const outcome = hurt(pig, amount, world.training)
-    emit({ kind: 'damaged', at: body, amount })
+    emit({ kind: 'damaged', at: body, amount, pig: pig.id })
     if (outcome === 'died' || outcome === 'gibbed')
       emit({ kind: 'killed', pig: pig.id, by, gibbed: outcome === 'gibbed' })
     // …AND IT GOES FLYING. Away from the blast — the bearing from the centre to

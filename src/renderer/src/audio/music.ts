@@ -44,7 +44,7 @@
 // Nothing here throws. An install with no MUSIC folder is a quiet one, which
 // is the same rule the sample bank keeps.
 
-import { context, musicOut, setMusicVolume } from './bank'
+import { context, musicOut, setMusicVolume, wakeAudio } from './bank'
 
 /** Clips 0..29 — the exe's own clamp (0x43b4c0). */
 export const MUSIC_CLIPS = 30
@@ -137,7 +137,8 @@ export function createMusic(): Music {
     // the counter on regardless, exactly as a played one would.
     if (!ctx || !buffer || disposed) return
     // Chromium keeps the context suspended until the page has been clicked.
-    if (ctx.state === 'suspended') void ctx.resume()
+    // Through the pause-aware wake (audio/bank.ts): a cue must not un-mute a pause.
+    wakeAudio()
     if (!trimmed) {
       setMusicVolume(MUSIC_VOLUME)
       trimmed = true

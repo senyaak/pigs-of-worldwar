@@ -31,7 +31,7 @@
 //
 // The remake keeps the rotation in the same place, per squad.
 
-import { context, speechOut } from './bank'
+import { context, speechOut, wakeAudio } from './bank'
 
 /** The languages, the rows of 0x4c2988. Only EN is used until something asks. */
 const LANGUAGE = 'EN'
@@ -152,7 +152,8 @@ export function createPigVoice(): PigVoice {
       saying = Math.max(0, saying - 1)
       return
     }
-    if (ctx.state === 'suspended') void ctx.resume()
+    // Through the pause-aware wake (audio/bank.ts): a cue must not un-mute a pause.
+    wakeAudio()
     const playing = ctx.createBufferSource()
     playing.buffer = buffer
     playing.connect(speechOut() ?? ctx.destination)

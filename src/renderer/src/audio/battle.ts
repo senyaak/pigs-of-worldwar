@@ -328,6 +328,26 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
   sword: { sound: 'I_SWORD', volume: 100, pitch: 100 },
   punch: { sound: 'P_PUNCH', volume: 100, pitch: 100 },
   /**
+   * **A ROUND ARRIVING** — the pair `docs/todo.md` asked for by name: "a
+   * round hitting a WALL against a round hitting MEAT. The engine already
+   * knows which it hit and plays neither." Now it plays both: `shotLanded`
+   * carries the verdict (lib/game/bullets.ts). NAME PICKS from the `I_`
+   * impact family; correct by ear through `pow.sfx`.
+   */
+  hitFlesh: { sound: 'I_BULIT1', volume: 100, pitch: 100 },
+  hitHard: { sound: 'I_BUILD', volume: 80, pitch: 100, jitter: 15 },
+  /**
+   * **A PIG TAKING POINTS, and a pig GOING DOWN.** Name picks out of the
+   * forty-one `P_*` moods ("the biggest pile of name picks left"): the hurt
+   * is a groan with a wide jitter so a volley does not sound like one pig,
+   * the death is the wild squeal, and a DROWNING gets the one sample the
+   * bank names for it — `P_DROWN`, identified and wired to nothing until
+   * now. All three correctable by ear through `pow.sfx`.
+   */
+  hurt: { sound: 'P_MOAN', volume: 80, pitch: 90, jitter: 31 },
+  deathCry: { sound: 'P_MAD1', volume: 100, pitch: 90, jitter: 15 },
+  drown: { sound: 'P_DROWN', volume: 100, pitch: 100 },
+  /**
    * A gun going off. DECODED, and it is the pair that proves the shot's
    * per-weapon jump table is indexed by `weapon − 6`: its first arm plays
    * **0x2A** and its second **0x2B** (0x47a26d, 0x47a329), and entries 42 and

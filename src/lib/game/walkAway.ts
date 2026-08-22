@@ -163,7 +163,7 @@ export function beginWalkAway(world: {
    * so this takes the ordinary one the rest of the engine plays. */
   const drown = (pig: Pig): void => {
     pig.health = 0
-    world.emit({ kind: 'killed', pig: pig.id })
+    world.emit({ kind: 'killed', pig: pig.id, drowned: true })
   }
 
   const swim = (pig: Pig, target: { x: number; z: number }, delta: number): void => {

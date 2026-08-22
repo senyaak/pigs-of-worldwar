@@ -14,7 +14,7 @@
 // One at a time, cutting whatever was going — the exe stops the previous handle
 // before it starts a new one (0x43BAAD).
 
-import { context, speechOut } from './bank'
+import { context, speechOut, wakeAudio } from './bank'
 import { sargeFile } from '../../../lib/game/sergeant'
 
 export interface Sarge {
@@ -138,7 +138,8 @@ export function createSarge(): Sarge {
       return
     }
     // Chromium keeps the context suspended until the page has been clicked.
-    if (ctx.state === 'suspended') void ctx.resume()
+    // Through the pause-aware wake (audio/bank.ts): a cue must not un-mute a pause.
+    wakeAudio()
     stop()
     const going = ctx.createBufferSource()
     going.buffer = buffer

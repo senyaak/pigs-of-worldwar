@@ -101,6 +101,21 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
         if (weapon) playCue(bank(), BATTLE_SOUNDS[weapon.impact])
       },
       blasted: () => playCue(bank(), BATTLE_SOUNDS.blast),
+      // A round ARRIVING: meat and masonry sound different, thin air is
+      // nothing at all (lib/game/bullets.ts carries the verdict).
+      shotLanded: ({ hit }) => {
+        if (hit === 'air') return
+        playCue(bank(), hit === 'flesh' ? BATTLE_SOUNDS.hitFlesh : BATTLE_SOUNDS.hitHard)
+      },
+      // A PIG hurting: `pig` is only on the event when the body is one — a
+      // dummy takes its points in silence.
+      damaged: ({ pig }) => {
+        if (pig !== undefined) playCue(bank(), BATTLE_SOUNDS.hurt)
+      },
+      // …and a pig going down: the squeal, or the one drowning sample the
+      // bank has carried unheard the whole time.
+      killed: ({ drowned }) =>
+        playCue(bank(), drowned ? BATTLE_SOUNDS.drown : BATTLE_SOUNDS.deathCry),
       // The CLICK under the foot. It is the only warning there is — a minefield
       // has nothing standing on it — and the bang is four tenths of a second
       // behind it (lib/game/mines.ts).

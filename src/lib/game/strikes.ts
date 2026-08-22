@@ -150,7 +150,7 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
       if (!hit) continue
       already.add(target)
       const outcome = hurt(target, weapon.damage, world.training)
-      emit({ kind: 'damaged', at: body, amount: weapon.damage })
+      emit({ kind: 'damaged', at: body, amount: weapon.damage, pig: target.id })
       // The exe throws the weapon's own effect on every body it catches
       // (0x476187, inside the same loop). WHERE exactly is not pinned — it
       // spawns off a point 0x44e8e0 writes into a stack local, which has not

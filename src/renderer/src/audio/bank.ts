@@ -152,12 +152,33 @@ export function setSpeechOn(on: boolean): void {
  * Play named the bug this answers: alt-tabbing froze the world and left the
  * instructor talking (`docs/todo.md` B4b).
  */
+/** Whether the PAUSE is holding the context down — the difference between
+ * "suspended by the pause" and "suspended by Chromium's autoplay gate",
+ * which `wakeAudio` below must not confuse. */
+let held = false
+
 export function suspendAudio(): void {
+  held = true
   void shared?.suspend()
 }
 
 export function resumeAudio(): void {
+  held = false
   void shared?.resume()
+}
+
+/**
+ * Wake the context for a sound about to play — UNLESS the pause holds it.
+ *
+ * Chromium keeps a fresh context suspended until the page has been
+ * interacted with, so every play site wants a resume in front of it; but a
+ * bare `ctx.resume()` at a play site also un-suspended the PAUSE — any cue
+ * fired while the game stood frozen quietly turned the whole mix back on.
+ * Every play site goes through this instead.
+ */
+export function wakeAudio(): void {
+  if (held) return
+  if (shared?.state === 'suspended') void shared.resume()
 }
 
 /**
@@ -221,9 +242,11 @@ export async function loadBank(srlPath: string): Promise<Bank> {
     const buffer = buffers.get(name)
     if (!ctx || !buffer || disposed) return
     // Chromium keeps the context suspended until the page has been clicked;
-    // the game's first sound often comes before that, and resuming here is
-    // what makes it audible from the next one on.
-    if (ctx.state === 'suspended') void ctx.resume()
+    // the game's first sound often comes before that, and waking here is
+    // what makes it audible from the next one on. `wakeAudio`, not a bare
+    // resume: the PAUSE also suspends this context, and a cue fired while
+    // the game stood frozen must not switch the whole mix back on.
+    wakeAudio()
     const source = ctx.createBufferSource()
     source.buffer = buffer
     source.playbackRate.value = rate

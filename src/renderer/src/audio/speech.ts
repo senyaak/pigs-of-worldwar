@@ -13,7 +13,7 @@
 // One voice at a time: a new line cuts the one before it, because the
 // sergeant does not talk over himself.
 
-import { context, speechOut } from './bank'
+import { context, speechOut, wakeAudio } from './bank'
 
 /** The only speech set the game ships, and the language it ships in. */
 const SET = 1
@@ -53,7 +53,8 @@ export function createSpeech(): Speech {
     const buffer = buffers.get(clip)
     if (!ctx || !buffer || disposed) return
     // Chromium keeps the context suspended until the page has been clicked.
-    if (ctx.state === 'suspended') void ctx.resume()
+    // Through the pause-aware wake (audio/bank.ts): a cue must not un-mute a pause.
+    wakeAudio()
     stop()
     const playing = ctx.createBufferSource()
     playing.buffer = buffer

@@ -33,8 +33,10 @@ export type BattleEvent =
   | { kind: 'whoosh' }
   /** …and it landed on a body: the weapon's own impact noise and its rings. */
   | { kind: 'struck'; skill: number; at: Point }
-  /** Something took points here — the number that floats off it. */
-  | { kind: 'damaged'; at: Point; amount: number }
+  /** Something took points here — the number that floats off it. `pig` is
+   * present when the body is a PIG — the hurt noise is his; a dummy or a
+   * prop takes its points in silence (audio/battleAudio.ts). */
+  | { kind: 'damaged'; at: Point; amount: number; pig?: PigId }
   /** This pig has just gone down. `by` is the pig whose weapon did it — the
    * bullet's firer, the lob's thrower, the blade's swinger — the same attacker
    * the exe's damage handler tallies kills against (0x467c30, 0x467E11).
@@ -42,7 +44,7 @@ export type BattleEvent =
    * carry none. `gibbed` is the messier death — sixty points PAST dead
    * (lib/game/health.ts, GIB_BELOW): no dying clip, the body simply goes
    * (lib/game/corpses.ts). */
-  | { kind: 'killed'; pig: PigId; by?: PigId; gibbed?: boolean }
+  | { kind: 'killed'; pig: PigId; by?: PigId; gibbed?: boolean; drowned?: boolean }
   /** …and its body is DONE: the corpse has blown up (or been overkilled away)
    * and what is left on the spot is a pair of boots (lib/game/corpses.ts).
    * `at` is the soles, `heading` the way the pig faced — where and which way
@@ -55,7 +57,7 @@ export type BattleEvent =
    * end of its reach (lib/game/bullets.ts). What the beat after a blow hangs
    * off for a gun: the exe's wait runs after EVERY weapon use, not only the
    * ones that break something (`turns/aftermath.md`). */
-  | { kind: 'shotLanded'; at: Point }
+  | { kind: 'shotLanded'; at: Point; hit: 'flesh' | 'hard' | 'air' }
   /** This pig has JUMPED INTO a building, and stops being drawn from here
    * (lib/game/indoors.ts). */
   | { kind: 'wentIn'; pig: PigId; building: number }

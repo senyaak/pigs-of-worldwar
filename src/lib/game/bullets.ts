@@ -121,13 +121,16 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
     Math.abs(shot.z - body.z) < HIT_RADIUS &&
     Math.abs(shot.y - body.y) < HIT_RISE
 
-  /** Resolve one bullet where it now is. True if it is spent. */
-  const land = (shot: Shot): boolean => {
+  /** Resolve one bullet where it now is: WHAT it ended in, or null for
+   * still flying — 'flesh' is a pig, 'hard' everything else that stops a
+   * round, and the difference is a different impact noise
+   * (audio/battleAudio.ts). */
+  const land = (shot: Shot): 'flesh' | 'hard' | null => {
     // The WORLD first. The exe's projectile update reads the terrain table
     // itself — four sites inside 0x436xxx, the same `[tile] & 0x1F` lookup
     // the walk uses — so a shot is stopped by the ground, and the map's own
     // boxes stop it the same way (lib/game/obstacles.ts).
-    if (shot.y >= world.query.height(shot.x, shot.z)) return true
+    if (shot.y >= world.query.height(shot.x, shot.z)) return 'hard'
     /**
      * **…and whatever BOX stopped it takes the hit, if that box is something
      * that breaks.**
@@ -156,7 +159,7 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
     if (stopper !== null) {
       const at = standing.findIndex((one) => one.id === stopper)
       if (at >= 0 && world.present(stopper)) breakInto(at, shot.skill)
-      return true
+      return 'hard'
     }
     for (const pig of world.pigs()) {
       if (isDead(pig)) continue
@@ -164,11 +167,11 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       if (!inside(shot, body)) continue
       const amount = damageOf(shot.skill)
       const outcome = hurt(pig, amount, world.training)
-      emit({ kind: 'damaged', at: body, amount })
+      emit({ kind: 'damaged', at: body, amount, pig: pig.id })
       if (outcome === 'died' || outcome === 'gibbed') {
         emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })
       }
-      return true
+      return 'flesh'
     }
     // …and a target with NO collider at all — a bush, a low prop, anything the
     // solidity rule leaves out — is still shot by the point test. That is what
@@ -178,9 +181,9 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       if (!world.present(dummy.id)) continue
       if (!inside(shot, dummy)) continue
       breakInto(i, shot.skill)
-      return true
+      return 'hard'
     }
-    return false
+    return null
   }
 
   return {
@@ -206,16 +209,17 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
         // a rifle covers 4500 units a second and a pig is 320 across.
         const speed = Math.hypot(shot.vx, shot.vy, shot.vz)
         const steps = Math.max(1, Math.ceil((speed * delta) / HIT_RADIUS))
-        let done = false
+        let done: 'flesh' | 'hard' | 'air' | null = null
         for (let step = 0; step < steps && !done; step++) {
           advanceShot(shot, delta / steps)
-          done = land(shot) || spentShot(shot)
+          done = land(shot) ?? (spentShot(shot) ? 'air' : null)
         }
         if (done) {
           flying.splice(i, 1)
           // Wherever it ended — a body, the ground, a box, thin air — the
-          // camera's beat wants the spot (lib/game/battle.ts, `shotLanded`).
-          emit({ kind: 'shotLanded', at: { x: shot.x, y: shot.y, z: shot.z } })
+          // camera's beat wants the spot, and the EAR wants to know which
+          // (lib/game/battle.ts, audio/battleAudio.ts).
+          emit({ kind: 'shotLanded', at: { x: shot.x, y: shot.y, z: shot.z }, hit: done })
         }
       }
     },

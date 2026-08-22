@@ -27,7 +27,7 @@
 import { BATTLE_SOUNDS, placedSounds, playCue } from './battle'
 import type { Cue } from './battle'
 import { SILENT } from './bank'
-import { context, sfxOut } from './bank'
+import { context, sfxOut, wakeAudio } from './bank'
 import type { Bank } from './bank'
 
 /** A cue as the source spells it, so `print()` output pastes straight in. */
@@ -197,7 +197,8 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
     async file(path) {
       const ctx = context()
       if (!ctx) return 'no audio context'
-      if (ctx.state === 'suspended') await ctx.resume()
+      // Through the pause-aware wake (audio/bank.ts): a cue must not un-mute a pause.
+      wakeAudio()
       if (!loose.has(path)) {
         const got = await window.api.loadSound(path)
         if (!got.ok) {

@@ -128,7 +128,8 @@ export function createDrowning(
         if (!drowns(pig.pigClass)) continue
         const damage = soakDamage(seconds, pig === acting && !walkAway, delta)
         const outcome = hurt(pig, damage, world.training)
-        if (outcome === 'died' || outcome === 'gibbed') emit({ kind: 'killed', pig: pig.id })
+        if (outcome === 'died' || outcome === 'gibbed')
+          emit({ kind: 'killed', pig: pig.id, drowned: true })
       }
     },
     soaked: (pig) => wet.get(pig.id) ?? 0,
