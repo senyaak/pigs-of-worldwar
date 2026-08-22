@@ -378,7 +378,14 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
     // here opens the enemy's menu, arms its weapon or cuts its GET READY
     // short. ESCAPE was taken out above and still pauses; the battle answers
     // the machine's turn itself (lib/game/ai.ts).
-    if (battle.situation().computerTurn) {
+    //
+    // …but THE ENDING OUTRANKS IT. A mission that ends on the machine's own
+    // turn never hands over, so `computerTurn` stays latched through the
+    // whole END OF GAME beat — and this mute was swallowing the any-key that
+    // leaves it: a player who LOST sat out the full twenty seconds with a
+    // dead spacebar. The ending reads exactly one thing (leaveMission, via
+    // the 'ending' control set below), so it is read.
+    if (battle.situation().computerTurn && !battle.situation().ending) {
       battle.setIntent(0, 0)
       battle.setAim(0)
       battle.setSighting(false)

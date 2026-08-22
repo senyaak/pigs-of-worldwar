@@ -114,6 +114,10 @@ export interface EndOfGame {
   elapsed: number
   /** …and since the tour last moved. */
   sinceTour: number
+  /** How many survivors the tour has shown. It goes round the list ONCE and
+   * stops looking — the exe's own single wrap (`bl` guards it, 0x490EFF) —
+   * where this used to cycle forever. */
+  visited: number
 }
 
 /**
@@ -123,7 +127,13 @@ export interface EndOfGame {
  * ways a battle ends.
  */
 export function beginEndOfGame(won: boolean, survivors: number[]): EndOfGame {
-  return { won, watching: survivors[0] ?? -1, elapsed: 0, sinceTour: 0 }
+  return {
+    won,
+    watching: survivors[0] ?? -1,
+    elapsed: 0,
+    sinceTour: 0,
+    visited: Math.min(1, survivors.length)
+  }
 }
 
 /**
@@ -144,10 +154,11 @@ export function advanceEndOfGame(
 ): boolean {
   state.elapsed += delta
   state.sinceTour += delta
-  while (state.sinceTour >= TOUR_SECONDS && survivors.length > 0) {
+  while (state.sinceTour >= TOUR_SECONDS && state.visited < survivors.length) {
     state.sinceTour -= TOUR_SECONDS
     const at = survivors.indexOf(state.watching)
     state.watching = survivors[(at + 1) % survivors.length]
+    state.visited++
   }
   if (state.elapsed < HOLD_SECONDS) return false
   return pressed || state.elapsed >= LEAVE_SECONDS

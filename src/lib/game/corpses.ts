@@ -26,6 +26,14 @@ import type { TerrainQuery } from './terrain'
  * How fast a dead pig goes under, game units a second. `[CHECK — remake]`:
  * nothing about the sink was read out of the exe — the number is sized so a
  * body of ~320 units is gone in about two seconds. Correct it in play.
+ *
+ * The descent runs for the DROWNING clip's own length and is NOT clamped to
+ * the terrain: the shipped maps' beds sit AT the waterline (measured for
+ * the grenade, lib/game/grenade.ts, "the bed is AT the water line"), so a
+ * clamp popped the body 140 units UP to the surface and burst it there on
+ * the first step — the exact opposite of play's "должен тонуть и уходить
+ * вниз и там внизу взрываться". The doused grenade's own sink through the
+ * bed is the precedent.
  */
 export const SINK_SPEED = 160
 
@@ -33,8 +41,6 @@ interface Corpse {
   pig: Pig
   /** Whether it died IN the water — the sink-and-drown arm. */
   wet: boolean
-  /** The clip has run out and the body is on its way down. */
-  sinking: boolean
 }
 
 export interface Corpses {
@@ -93,35 +99,34 @@ export function createCorpses(
         finish(pig, false)
         return
       }
-      world.anim.playOnce(pig, wet ? ANIM.DROWNING : ANIM.DYING)
-      dying.push({ pig, wet, sinking: false })
+      // The aiming ARMS come down with the pig: the weapon overlay owns the
+      // upper body and nothing else clears it on a corpse — without this a
+      // body fell over still sighting down its rifle.
+      world.anim.overlay(pig, -1, 0)
+      // Which of the three falls this pig takes is its own id's pick —
+      // deterministic, so a lockstep battle buries everyone the same way
+      // (lib/game/locomotion.ts, DEATHS).
+      world.anim.playOnce(pig, wet ? ANIM.DROWNING : ANIM.DEATHS[pig.id % ANIM.DEATHS.length])
+      dying.push({ pig, wet })
     },
 
     update(delta) {
       for (let i = dying.length - 1; i >= 0; i--) {
         const one = dying[i]
         const { pig } = one
-        if (!one.sinking) {
-          // The clip holds its last frame when it is done (lib/game/anim.ts),
-          // and a body a blast threw lands first: exploding in mid-air reads
-          // as the blast doing it twice.
-          if (world.anim.animating(pig) || world.tumbling(pig)) continue
-          if (!one.wet) {
-            finish(pig, true)
-            dying.splice(i, 1)
-            continue
-          }
-          one.sinking = true
-        }
-        // Under it goes — game space is Y-DOWN, so down is a LARGER y, and
-        // the bottom is the ground itself: `height` is the terrain with no
-        // water sheet over it (lib/game/terrain.ts).
-        const floor = world.query.height(pig.position.x, pig.position.z)
-        pig.position.y = Math.min(pig.position.y + SINK_SPEED * delta, floor)
-        if (pig.position.y >= floor) {
-          finish(pig, true)
-          dying.splice(i, 1)
-        }
+        // A wet death SINKS while its clip plays — clip 74 is a lying body
+        // carried downward, and the position goes with it. Y-DOWN: down is
+        // a larger y, and there is deliberately no floor under this (see
+        // SINK_SPEED — the shipped beds sit at the waterline).
+        if (one.wet) pig.position.y += SINK_SPEED * delta
+        // The clip holds its last frame when it is done (lib/game/anim.ts),
+        // and a body a blast threw lands first: exploding in mid-air reads
+        // as the blast doing it twice.
+        if (world.anim.animating(pig) || world.tumbling(pig)) continue
+        // The bang, where the body ENDED — under the surface for a drowned
+        // one, which the see-through sheet shows.
+        finish(pig, true)
+        dying.splice(i, 1)
       }
     },
 

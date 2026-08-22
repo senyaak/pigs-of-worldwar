@@ -212,33 +212,38 @@ export const ANIM = {
    * memory of one came from. */
   THINKING: 46,
   /**
-   * **The victory dance.** Play: "при выигрыше… он не танцует победный танец" —
-   * and the clip they mean is the one already in this table, from the other end:
-   * "анимация пропуска хода кривая, и она на победу" (docs/history/status.md,
-   * play's open list).
-   * So 46 is a celebration that SKIP TURN borrowed, not a doze — the name table
-   * calls it "Thinking" and the name table has been wrong before (`PARACHUTE`).
-   *
-   * Named twice on purpose: the two moments are different, and whichever of them
-   * turns out to want its own clip can take one without moving the other. What
-   * SKIP TURN should wear instead is still open — skills 63/65/66 are out of
-   * range of `Pig::Fire`'s dispatch, so there is no call site to read it off.
+   * **The victory dances — three real ones.** The name table's 41/42/43 are
+   * "Celebration #1..#3" (44 "Salute" beside them), they sit BELOW the
+   * tail's +24 drift, and the skeleton reads them as upright in-place clips
+   * of ~30 frames each — everything a cheer should be. No call site in the
+   * exe ever plays them; the remake spends them on the END OF GAME tour,
+   * one per pig as the camera arrives (lib/game/battle.ts). `[deliberate]`
+   * — dead art put to the use its name declares. 46 stays THINKING.
    */
-  VICTORY: 46,
+  CELEBRATIONS: [41, 42, 43] as const,
   /** Thrown out of a wall — what `0x470c70` plays, and the only thing that
    * does. Ordinary falling is JUMP_MIDDLE; the impact handler plays BOUNCE. */
   EJECTED: 38,
   BOUNCE: 39,
-  /** Falling over dead. The exe has three (47, 48, 49 — "Dying #1..#3") and
-   * picks between them in 0x47d080, which is not decoded; the remake plays
-   * the first and says so (lib/game/health.ts). */
-  DYING: 47,
-  /** Going under. The death dispatcher 0x4680E0 takes a KIND — 0 ordinary,
-   * 2 the drown-on-the-spot — and which clip each kind picks is NOT read
-   * (`water/notes.md`); 50 is the name table's "Drowning", the one slot in
-   * the dying band the three decoded call sites leave. Play rules a death in
-   * the water wears it (lib/game/corpses.ts). */
-  DROWNING: 50,
+  /**
+   * Falling over dead — THREE of them, picked per pig (lib/game/corpses.ts).
+   *
+   * NOT 47/48/49, though the name table calls those "Dying #1..#3": the
+   * table's tail drifts by +24 — proved once by the parachute (named 58,
+   * really 82) — and the SKELETON agrees. Forward kinematics over the
+   * shipped `mcap.mad` (2026-08-23, the death survey): 47..50 never leave a
+   * standing pose, while 71/72/73 — the named indices plus the same +24 —
+   * each start standing, head ~423 over the feet, and end flat on the
+   * floor. Which of the three the exe's own 0x47d080 picks, and on what,
+   * stays unread; the pig's id picks here, deterministically.
+   */
+  DEATHS: [71, 72, 73] as const,
+  /** Going under — 74: "Drowning" is named 50, and 50 + the same +24 drift
+   * is 74, the ONE clip in the archive that starts lying down and carries
+   * the root 648 units straight DOWN over ~2.8 s. The measurement and the
+   * name agree from both ends. Play rules a death in the water wears it and
+   * bursts at the bottom (lib/game/corpses.ts). */
+  DROWNING: 74,
   /**
    * **WELL DONE, and BAD LUCK** — what a pig wears while the sergeant makes his
    * end-of-turn remark about it (lib/game/sergeant.ts).

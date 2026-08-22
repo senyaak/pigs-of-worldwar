@@ -388,6 +388,9 @@ export function createBattle(parts: BattleParts): Battle {
   let ending: EndOfGame | null = null
   /** Whether the ending has already asked to be put away, so it asks once. */
   let ended = false
+  /** Who the ending's tour has already cheered — one celebration per pig,
+   * fired the frame the camera arrives (the mode-2 block). */
+  const cheeredPigs = new Set<number>()
   /** A key pressed during the ending, latched for the step the way the jump is. */
   let leaveRequested = false
   /** A script step owed to something that has broken, and not run until it has
@@ -872,13 +875,15 @@ export function createBattle(parts: BattleParts): Battle {
       jumpRequested = false
       doorRequested = false
       attack.swallow()
-      // **THE HANDS ARE EMPTY AND THE PIG DANCES.** Play: "при выигрыше остаётся
-      // оружие в руках свина, он не танцует победный танец." Both are the
-      // remake's own — the exe's mode 2 arm plays no clip and touches no weapon
-      // (0x490E7E is a camera, a countdown and the way out) — but a pig standing
-      // to attention with a bazooka is not what winning looks like. The clip is
-      // play's own identification: 46, which they named as a celebration when
-      // SKIP TURN borrowed it (lib/game/locomotion.ts, `ANIM.VICTORY`).
+      // **THE HANDS ARE EMPTY AND THE TOUR CHEERS.** Play, in two rounds:
+      // first "при выигрыше остаётся оружие в руках свина, он не танцует" —
+      // then "должно идти по свинам и каждого показывать как он радуется".
+      // The exe's mode 2 arm plays no clip and touches no weapon (0x490E7E
+      // is a camera, a countdown and the way out), so the staging is the
+      // remake's own: the pig the camera ARRIVES at plays one of the three
+      // real celebration clips ONCE (41..43, lib/game/locomotion.ts —
+      // rotated so neighbours differ), everyone else stands easy, and a
+      // loss stands everyone easy throughout.
       for (const pig of everyone()) {
         if (isDead(pig) || indoors.inside(pig)) continue
         pig.holding = null
@@ -888,7 +893,14 @@ export function createBattle(parts: BattleParts): Battle {
         // so putting the dance on the first one leaves the arms where the rifle
         // was until this clears it.
         anim.overlay(pig, -1, 0)
-        anim.setClip(pig, ending.won ? ANIM.VICTORY : ANIM.IDLE)
+        if (ending.won && pig.id === ending.watching && !cheeredPigs.has(pig.id)) {
+          cheeredPigs.add(pig.id)
+          anim.playOnce(pig, ANIM.CELEBRATIONS[cheeredPigs.size % ANIM.CELEBRATIONS.length])
+        } else if (!anim.animating(pig)) {
+          // A cheer plays OUT — setClip every frame would wipe it (the
+          // idle loop's own rule, further down).
+          anim.setClip(pig, ANIM.IDLE)
+        }
       }
       holding = null
       const leave = leaveRequested
