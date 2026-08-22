@@ -82,6 +82,12 @@ export interface AiWorld {
    * non-swimmer by degrees (docs/ai.md), so a swimming brain has exactly
    * one thought: the shore (lib/game/grunt.ts). */
   swimming: boolean
+  /** Whether the acting pig's CLASS crosses water alive — the commando
+   * family (lib/game/drowning.ts, `SWIMMERS`). Play's rule on what that
+   * buys: water is TRANSIT, never a destination — "в воде делать нечего,
+   * максимум сократить путь". The route may cross it; nothing is ever done
+   * in it, because the engine empties swimming hands. */
+  swims: boolean
   /** The machine's own grenade still in the air or rolling, or null. While
    * one is live the fire key is the DETONATOR (lib/game/lobs.ts), and the
    * brain's business is timing it. */

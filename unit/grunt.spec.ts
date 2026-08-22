@@ -34,6 +34,7 @@ const world = (over: {
   crates?: AiWorld['crates']
   wet?: AiWorld['wet']
   swimming?: boolean
+  swims?: boolean
 }): AiWorld => ({
   timeLeft: 45,
   wits: 0,
@@ -55,6 +56,7 @@ const world = (over: {
   groundAt: () => 0,
   wet: over.wet ?? (() => false),
   swimming: over.swimming ?? false,
+  swims: over.swims ?? false,
   thrown: over.thrown ?? null,
   planted: over.planted ?? null,
   crates: over.crates ?? []
@@ -259,6 +261,51 @@ test('a SWIMMING pig has one thought — the nearest shore', { tag: '@nodata' },
   expect(order).toEqual({ kind: 'walkTo', x: 0, z: 450 })
   // …and an ocean with no shore in reach is watched to its end.
   expect(brain.decide(world({ swimming: true, wet: () => true }))).toEqual({ kind: 'watch' })
+})
+
+test('a SWIMMER mid-crossing keeps swimming for the foe, not the shore', { tag: '@nodata' }, () => {
+  // Water everywhere south of the far bank; the pig is crossing it and the
+  // foe stands on dry land beyond rifle reach. Transit only: the order is
+  // the walk toward the foe's DRY approach point — never a hold or a fire,
+  // because swimming hands are empty.
+  const brain = createGruntBrain()
+  const bank = RANGE * 1.3
+  const order = brain.decide(
+    world({
+      swims: true,
+      swimming: true,
+      wet: (_x, z) => z < bank,
+      foes: [foe({ z: RANGE * 2 })]
+    })
+  )
+  expect(order.kind).toBe('walkTo')
+  if (order.kind !== 'walkTo') return
+  // The shy mark itself (z = 2R − 0.8·reach) is already on dry land, so the
+  // goal is the same one a dry pig would walk to — and it is dry.
+  expect(order.x).toBeCloseTo(0, 5)
+  expect(order.z).toBeGreaterThan(bank)
+})
+
+test('a SWIMMER never fights from the water — the goal it swims to is DRY', { tag: '@nodata' }, () => {
+  // The foe is within reach, but the shy mark falls in the water: the pig
+  // presses on toward the target until the ground is dry instead of
+  // stopping to fight where its hands are empty.
+  const brain = createGruntBrain()
+  const wet = (_x: number, z: number): boolean => z < RANGE * 0.45
+  const order = brain.decide(
+    world({ swims: true, swimming: true, wet, foes: [foe({ z: RANGE * 0.7 })] })
+  )
+  expect(order.kind).toBe('walkTo')
+  if (order.kind !== 'walkTo') return
+  expect(wet(order.x, order.z)).toBe(false)
+})
+
+test('a SWIMMER with nothing to swim FOR makes for the shore like anybody', { tag: '@nodata' }, () => {
+  const brain = createGruntBrain()
+  const order = brain.decide(
+    world({ swims: true, swimming: true, wet: (_x, z) => z < 400, foes: [], carrying: [] })
+  )
+  expect(order).toEqual({ kind: 'walkTo', x: 0, z: 450 })
 })
 
 test('TNT at the feet of a foe: hold it, press, then RUN', { tag: '@nodata' }, () => {

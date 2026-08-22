@@ -21,6 +21,7 @@ function bench(
     aimFloor?: number
     gaugeRate?: number
     wet?: (x: number, z: number) => boolean
+    swims?: boolean
   } = {}
 ) {
   const pig = { x: 0, z: 0, heading: 0 }
@@ -33,6 +34,7 @@ function bench(
   const actuator = createActuator({
     at: () => ({ ...pig }),
     wet: options.wet ?? (() => false),
+    swims: () => options.swims ?? false,
     aim: () => aim,
     gauge: () => gauge,
     intent(walk, turn) {
@@ -111,6 +113,15 @@ test('the walk STOPS at the waterline, blocked — never a stride into it', { ta
   expect(b.actuator.outcome()).toBe('blocked')
   expect(b.pig.z).toBeLessThan(500)
   expect(b.last).toMatchObject({ walk: 0, turn: 0 })
+})
+
+test('a SWIMMER walks straight through — the water guard stands down', { tag: '@nodata' }, () => {
+  // Same waterline as above, but the pig's class swims: the stride into
+  // the water is a road for it, and the order finishes where it was sent.
+  const b = bench({ wet: (_x, z) => z >= 500, swims: true })
+  b.run({ kind: 'walkTo', x: 0, z: 1000 })
+  expect(b.actuator.outcome()).toBe('done')
+  expect(Math.abs(b.pig.z - 1000)).toBeLessThanOrEqual(ARRIVE_WITHIN)
 })
 
 test('a pig already IN the water is allowed to walk OUT', { tag: '@nodata' }, () => {

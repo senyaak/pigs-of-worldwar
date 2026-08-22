@@ -46,6 +46,35 @@ test('water stops a walker and carries a swimmer', { tag: '@nodata' }, () => {
   expect(swimmer.at(-1)).toEqual({ x: 0, z: 512 })
 })
 
+test('for a swimmer the water is a SHORTCUT: across the bay, not round it', { tag: '@nodata' }, () => {
+  // A bay two cells wide spans the world except for a far land bridge at
+  // x >= 1280. Uniform cost is the whole rule (docs/ai.md): the swimmer
+  // crosses exactly because crossing is shorter, the walker takes the long
+  // way round — nothing about the water is priced, it is simply a road for
+  // one and a wall for the other.
+  const ground = flat({ isWater: (x, z) => x < 1280 && z >= 256 && z <= 512 })
+  const from = { x: 0, z: 0 }
+  const goal = { x: 0, z: 768 }
+  const length = (corners: { x: number; z: number }[]): number => {
+    let at = from
+    let sum = 0
+    for (const corner of corners) {
+      sum += Math.hypot(corner.x - at.x, corner.z - at.z)
+      at = corner
+    }
+    return sum
+  }
+  const swimmer = route({ ground, swims: true }, from, goal)!
+  const walker = route({ ground }, from, goal)!
+  expect(swimmer.at(-1)).toEqual(goal)
+  expect(walker.at(-1)).toEqual(goal)
+  // The walker's detour reaches the land bridge; the swimmer's line never
+  // leaves the column it started in.
+  expect(walker.some((corner) => corner.x >= 1280)).toBe(true)
+  expect(swimmer.every((corner) => corner.x === 0)).toBe(true)
+  expect(length(swimmer)).toBeLessThan(length(walker))
+})
+
 test('a known mine is walked ROUND, never onto', { tag: '@nodata' }, () => {
   const ground = flat({ hasMine: (x, z) => x === 256 && z === 0 })
   const corners = route({ ground }, { x: 0, z: 0 }, { x: 512, z: 0 })!

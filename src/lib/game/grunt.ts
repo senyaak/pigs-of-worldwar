@@ -54,6 +54,22 @@ export const PITCH_WITHIN = 12
  * and the margin is a stride. `[deliberate]`. */
 export const FLEE_CLEAR = 1900
 
+/** The nearest DRY ground, by ring search off the crow line: what a pig
+ * with no business in the water swims for. An ocean with no shore in reach
+ * is watched to its end. */
+const shore = (world: AiWorld): Order => {
+  const me = world.acting
+  for (const radius of [250, 450, 700, 1000, 1400]) {
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * 2 * Math.PI
+      const x = me.x + Math.sin(angle) * radius
+      const z = me.z + Math.cos(angle) * radius
+      if (!world.wet(x, z)) return { kind: 'walkTo', x, z }
+    }
+  }
+  return { kind: 'watch' }
+}
+
 /** The friend most in the way of a shot from `at` toward `target`, or null
  * for a clear lane. Flat geometry: distance from the segment, 2D. */
 const inTheWay = (
@@ -82,33 +98,28 @@ export function createGruntBrain(): Brain {
   /** The pitch has been set (or refused by the clamp): do not chase it. */
   let pitched = false
 
+  // Passing takes the hands (SKIP TURN is fired like any skill), and
+  // swimming hands are EMPTY — the engine strips them (lib/game/battle.ts)
+  // — so a pass decided in the water becomes the swim out of it.
   const pass = (world: AiWorld): Order =>
-    world.acting.holding === SKILL.SKIP_TURN
-      ? { kind: 'fire' }
-      : { kind: 'hold', skill: SKILL.SKIP_TURN }
+    world.swimming
+      ? shore(world)
+      : world.acting.holding === SKILL.SKIP_TURN
+        ? { kind: 'fire' }
+        : { kind: 'hold', skill: SKILL.SKIP_TURN }
 
   return {
     decide(world) {
       if (world.previous === 'blocked') grounded = true
 
-      // IN THE WATER there is exactly one thought: THE SHORE. Water kills a
-      // non-swimmer by degrees, the engine strips the weapon from swimming
-      // hands, and pricing a kit mid-drowning is how a pig once stood in
-      // the bay re-taking its grenade every second until it died (the log
-      // is in the commit). A ring search: the nearest dry point wins, and a
-      // world with no dry point in reach is watched to its end.
-      if (world.swimming) {
-        const me = world.acting
-        for (const radius of [250, 450, 700, 1000, 1400]) {
-          for (let i = 0; i < 12; i++) {
-            const angle = (i / 12) * 2 * Math.PI
-            const x = me.x + Math.sin(angle) * radius
-            const z = me.z + Math.cos(angle) * radius
-            if (!world.wet(x, z)) return { kind: 'walkTo', x, z }
-          }
-        }
-        return { kind: 'watch' }
-      }
+      // IN THE WATER a non-swimmer has exactly one thought: THE SHORE.
+      // Water kills it by degrees, the engine strips the weapon from
+      // swimming hands, and pricing a kit mid-drowning is how a pig once
+      // stood in the bay re-taking its grenade every second until it died
+      // (the log is in the commit). A SWIMMER falls through: the water is
+      // not killing it, so the plan below carries on — transit only, the
+      // gate past the price list keeps the hands out of it.
+      if (world.swimming && !world.swims) return shore(world)
 
       // A grenade of OURS is in the air or rolling: the fire key is the
       // detonator now, and timing it is the whole decision. Set it off the
@@ -159,6 +170,21 @@ export function createGruntBrain(): Brain {
       const dz = target.z - me.z
       const distance = Math.hypot(dx, dz)
 
+      /** The DRY point to fight from: the shy mark inside the option's
+       * reach when the ground there is dry, else pressed on toward the
+       * target until it is. A firing spot in the water is no spot at all —
+       * swimming hands are empty — and standing closer than the shy mark
+       * only ever helps the shot. The last resort is the target's own feet,
+       * wet or not: best effort, same as the route's. */
+      const dryApproach = (): { x: number; z: number } => {
+        for (const back of [0.8, 0.6, 0.4, 0.2, 0]) {
+          const x = target.x - (dx / distance) * option.reach * back
+          const z = target.z - (dz / distance) * option.reach * back
+          if (!world.wet(x, z)) return { x, z }
+        }
+        return { x: target.x, z: target.z }
+      }
+
       // A CRATE is walked onto — the hand-over is the walk itself
       // (lib/game/scenery.ts), so there is nothing to hold, face or fire.
       if (option.kind === 'crate') {
@@ -170,6 +196,17 @@ export function createGruntBrain(): Brain {
         // Standing on it (it hands over next step), or unable to get there:
         // either way the next decision sees a different world.
         return grounded ? pass(world) : { kind: 'watch' }
+      }
+
+      // A SWIMMER mid-crossing: TRANSIT ONLY. Nothing is done IN the water
+      // — the hands are empty and the engine keeps them so — the fight
+      // starts on dry ground, and the route chose the water exactly when
+      // crossing was shorter than walking round (lib/game/pathfind.ts,
+      // uniform cost). Play's rule: "в воде делать нечего — максимум
+      // сократить путь."
+      if (world.swimming) {
+        const step = grounded ? null : walkThe(dryApproach())
+        return step ?? shore(world)
       }
 
       // Only a GUN's shot travels the flat line a friend can stand in; a lob
@@ -193,16 +230,13 @@ export function createGruntBrain(): Brain {
       if (option.kind === 'plant') return { kind: 'fire' }
 
       if (distance > option.reach && !grounded) {
-        // Stop short of the reach mark, so arrival lands INSIDE it — and go
-        // by the ROUTE, not the crow's line: the next corner of the best
-        // path round the walls, the water and the known mines. A route with
-        // no corner left to walk means this is as close as the ground
-        // allows, and the grunt is grounded the same as a refused step.
-        const shy = option.reach * 0.8
-        const step = walkThe({
-          x: target.x - (dx / distance) * shy,
-          z: target.z - (dz / distance) * shy
-        })
+        // Stop short of the reach mark, so arrival lands INSIDE it — at the
+        // DRY approach, and by the ROUTE, not the crow's line: the next
+        // corner of the best path round the walls, the water and the known
+        // mines. A route with no corner left to walk means this is as close
+        // as the ground allows, and the grunt is grounded the same as a
+        // refused step.
+        const step = walkThe(dryApproach())
         if (step) return step
         grounded = true
       }

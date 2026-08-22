@@ -66,6 +66,7 @@ import type { DamageNumbers } from './damage'
 import type { AirDrops } from './airDrop'
 import type { DropIn } from './dropIn'
 import type { Corpses } from './corpses'
+import { drowns } from './drowning'
 import type { Drowning } from './drowning'
 import type { Point } from './pose'
 import type { Random } from './random'
@@ -355,6 +356,7 @@ export function createBattle(parts: BattleParts): Battle {
       heading: game.currentPig.heading
     }),
     wet: (x, z) => query.isWater(x, z),
+    swims: () => !drowns(game.currentPig.pigClass),
     aim: () => sights.angle(),
     gauge: () => attack.gauge(game.currentPig.holding),
     intent(walk, turn) {
@@ -1094,18 +1096,24 @@ export function createBattle(parts: BattleParts): Battle {
             // are both the walls and the WALKWAYS — a bridge deck is stood
             // on the way the walk stands on it. The squad is not in the
             // plan: pigs move between the plan and the walk, and the
-            // actuator's `blocked` guards that difference. Nobody swims
-            // yet: the machine spawns grunts `[gap]` — the swimming classes
-            // read this flag when classes land (docs/ai.md).
+            // actuator's `blocked` guards that difference. `swims` is the
+            // pig's CLASS (lib/game/drowning.ts): a swimmer's route may
+            // cross water — and uniform cost means it does so exactly when
+            // crossing is shorter — a grunt's never does.
             route: (to) =>
               route(
-                { ground: query, obstruction: scenery.obstacles, swims: false },
+                {
+                  ground: query,
+                  obstruction: scenery.obstacles,
+                  swims: !drowns(acting.pigClass)
+                },
                 { x: acting.position.x, z: acting.position.z, y: acting.position.y },
                 to
               ),
             groundAt: (x, z) => query.height(x, z),
             wet: (x, z) => query.isWater(x, z),
             swimming: loco.swimming,
+            swims: !drowns(acting.pigClass),
             // The machine's own live grenade: the newest lob while any
             // THROWN one is live — planted charges are not it, and must
             // never be detonated from beside (lib/game/lobs.ts).

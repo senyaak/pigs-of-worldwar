@@ -28,6 +28,10 @@ export interface Rig {
   /** Whether that point is WATER — what a player sees at a glance, and what
    * the hands refuse to march into (the walk guard below). */
   wet(x: number, z: number): boolean
+  /** Whether THIS pig crosses water alive — its class swims
+   * (lib/game/drowning.ts). The water guard stands down for one that does:
+   * for a swimmer the water is a road (docs/ai.md). */
+  swims(): boolean
   /** The weapon's pitch, aim units (lib/game/sights.ts). */
   aim(): number
   /** The power gauge, 0..1 while one is filling, null otherwise. */
@@ -156,9 +160,12 @@ export function createActuator(rig: Rig): Actuator {
         const walking = Math.abs(off) < WALK_CONE
         // THE WATER GUARD: about to stride, from dry ground, onto water —
         // stop where a player would. The probe looks along the HEADING,
-        // because that is the way the legs actually carry the pig.
+        // because that is the way the legs actually carry the pig. A pig
+        // whose class SWIMS is waved through: for it the water is a road,
+        // and the brain's own transit rule keeps it from stopping there.
         if (
           walking &&
+          !rig.swims() &&
           !rig.wet(x, z) &&
           rig.wet(x + Math.sin(heading) * WATER_PROBE, z + Math.cos(heading) * WATER_PROBE)
         ) {

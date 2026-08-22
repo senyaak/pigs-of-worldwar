@@ -42,6 +42,7 @@ const world = (over: {
   groundAt: () => 0,
   wet: () => false,
   swimming: false,
+  swims: false,
   thrown: null,
   planted: null,
   crates: over.crates ?? []

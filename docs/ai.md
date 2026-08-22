@@ -75,9 +75,17 @@ score: enumerate pairs of **(kit item × target or point)** and take the best
   water, onto a mine, or off a height can be worth more than the weapon's
   own number, and pricing that fling is a smartness lever — the veteran
   shoves where the grunt shoots.
-- **Water KILLS a pig that cannot swim** `[play]` — only COMMANDO and HERO
-  ranks swim. In the score and in the pathfinder both: lethal for most,
-  merely expensive for a swimmer.
+- **Water KILLS a pig that cannot swim** `[play]` — only the commando family
+  swims (`SWIMMERS` in lib/game/drowning.ts: classes 4, 14–16). In the
+  pathfinder that is the `swims` flag: a wall for most, a road for those.
+- **For a swimmer the water is TRANSIT, never a destination** `[play]` —
+  "если умеет плавать — можно плыть, но в воде делать нечего. максимум
+  сократить путь." Nothing needs pricing for that: with uniform step cost
+  the route crosses water exactly when crossing is shorter than walking
+  round, which IS the shortcut rule. What the brain adds is the other half:
+  no order but a walk is ever given mid-swim (the engine empties swimming
+  hands), and every standing goal — the shy mark a shot is taken from — is
+  pressed on to DRY ground first (lib/game/grunt.ts, `dryApproach`).
 - **Healing is just a kit item** whose "damage" lands on the ally side with
   a plus sign. A medic heals because his kit prices healing highest, not
   because he is a medic. Class flavour, if any is ever wanted, is a weight
