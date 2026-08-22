@@ -68,6 +68,23 @@ export const PAUSE_PITCH: Record<PauseSound, number> = {
   toggle: 130 / 100
 }
 
+/**
+ * How LOUD the menu's own click plays, 0..1 — the sliders' product.
+ *
+ * The click is the volume PREVIEW: the exe plays it at the volume-step
+ * pitch "so the player hears the new level", and riding BOTH sliders is
+ * what makes it one — stepping MASTER previews master, stepping SFX
+ * previews sfx, and a mix dragged to nothing clicks not at all. It has to
+ * be applied by the click's own player (audio/menuClick.ts): that one
+ * deliberately lives outside the game's mixer, because the pause suspends
+ * the mixer's whole context — which is exactly how the settings came to
+ * "not affect the sound": the only sound audible while setting them was
+ * the one sound the mixer could not touch.
+ */
+export const clickLevel = (master: number, sfx: number): number =>
+  (Math.max(0, Math.min(VOLUME_MAX, master)) / VOLUME_MAX) *
+  (Math.max(0, Math.min(VOLUME_MAX, sfx)) / VOLUME_MAX)
+
 export interface PauseState {
   /** Which row is lit, 0..4. It does NOT wrap (0x4922FE, 0x49232D). */
   row: number

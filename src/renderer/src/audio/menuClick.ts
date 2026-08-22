@@ -55,15 +55,28 @@ export function loadMenuClick(srlPath: string, name: string): Promise<void> {
   return loading
 }
 
-/** Play it, `rate` being the exe's pitch over its own 0x64. */
-export function playMenuClick(rate: number): void {
+/**
+ * Play it, `rate` being the exe's pitch over its own 0x64 — and `level` the
+ * mix's word on how loud, 0..1 (lib/game/pauseMenu.ts, `clickLevel`).
+ *
+ * The level is applied HERE because nothing else can apply it: this
+ * context deliberately bypasses the game's mixer (see the header), so the
+ * mixer's gains never touch it — and the click is the volume PREVIEW, the
+ * one sound a player hears while setting the sliders. Without this, MASTER
+ * at zero still clicked at full, which read as the settings doing nothing.
+ */
+export function playMenuClick(rate: number, level = 1): void {
   if (!ctx || !click) return
+  if (level <= 0) return
   // Chromium holds a fresh context suspended until the page has been clicked,
   // and a pause is a keypress rather than a click.
   if (ctx.state === 'suspended') void ctx.resume()
   const source = ctx.createBufferSource()
   source.buffer = click
   source.playbackRate.value = rate
-  source.connect(ctx.destination)
+  const gain = ctx.createGain()
+  gain.gain.value = Math.min(1, level)
+  source.connect(gain)
+  gain.connect(ctx.destination)
   source.start()
 }

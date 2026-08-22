@@ -19,7 +19,7 @@ import { controller } from '../input/controller'
 import { resumeAudio, setMasterVolume, setSfxVolume, setSpeechOn, suspendAudio } from '../audio/bank'
 import { GAME_SOUNDS } from '../audio/battleSound'
 import { loadMenuClick, playMenuClick } from '../audio/menuClick'
-import { PAUSE_PITCH, PAUSE_SOUND, VOLUME_MAX, newPause, pausePress } from '../../../lib/game/pauseMenu'
+import { PAUSE_PITCH, PAUSE_SOUND, VOLUME_MAX, clickLevel, newPause, pausePress } from '../../../lib/game/pauseMenu'
 import type { PauseState, PauseVerb } from '../../../lib/game/pauseMenu'
 import { LAYOUT, createHud } from './hud'
 import { missionTitle } from './titleCard'
@@ -483,8 +483,10 @@ export function initBattle(
     if (paused === wanted || !isBattleUp()) return
     paused = wanted
     // Opening and closing make the same noise the cursor does — the exe plays
-    // its one sample at 0x64 on both (0x491F84, 0x491FC7).
-    playMenuClick(PAUSE_PITCH.plain)
+    // its one sample at 0x64 on both (0x491F84, 0x491FC7) — at the mix's own
+    // level, because the click's player sits outside the suspended mixer
+    // (audio/menuClick.ts).
+    playMenuClick(PAUSE_PITCH.plain, clickLevel(mix.master, mix.sfx))
     if (paused) {
       pause = newPause(mix)
       suspendAudio()
@@ -506,14 +508,17 @@ export function initBattle(
   const pauseVerb = (verb: PauseVerb): void => {
     if (!pause) return
     const outcome = pausePress(pause, verb)
-    if (outcome.sound) playMenuClick(PAUSE_PITCH[outcome.sound])
-    // The settings live past the menu, so they are copied back out of it.
+    // The settings live past the menu, so they are copied back out of it —
+    // BEFORE the click, so a volume step's noise previews the NEW level,
+    // which is the whole point of the exe's volume-step pitch
+    // (lib/game/pauseMenu.ts, `clickLevel`).
     mix.master = pause.master
     mix.sfx = pause.sfx
     mix.speech = pause.speech
     setMasterVolume(mix.master)
     setSfxVolume(mix.sfx)
     setSpeechOn(mix.speech)
+    if (outcome.sound) playMenuClick(PAUSE_PITCH[outcome.sound], clickLevel(mix.master, mix.sfx))
     // Turning SPEECH off cuts the line in the air, rather than waiting for it
     // to finish quietly (0x4923EB).
     if (outcome.cutSpeech) speech.stop()

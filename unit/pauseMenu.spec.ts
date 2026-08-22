@@ -19,6 +19,7 @@ import {
   VOLUME_MAX,
   VOLUME_STEP,
   barCells,
+  clickLevel,
   newPause,
   pausePress
 } from '../src/lib/game/pauseMenu'
@@ -223,4 +224,19 @@ test('an easing is the same curve however the frames are cut', { tag: '@nodata' 
   expect(easeOver(1 / 6, 0)).toBe(0)
   expect(easeOver(1 / 6, 1000)).toBeLessThanOrEqual(1)
   expect(easeOver(1 / 6, -1)).toBe(0)
+})
+
+test('the menu CLICK rides both sliders — it is the volume preview', { tag: '@nodata' }, () => {
+  // Full mix clicks at full; either slider scales it; both at half is a
+  // quarter; a mix dragged to nothing clicks not at all. The product is what
+  // makes one click preview BOTH rows (lib/game/pauseMenu.ts, clickLevel —
+  // applied by audio/menuClick.ts, the player outside the suspended mixer).
+  expect(clickLevel(VOLUME_MAX, VOLUME_MAX)).toBe(1)
+  expect(clickLevel(50, VOLUME_MAX)).toBeCloseTo(0.5, 9)
+  expect(clickLevel(VOLUME_MAX, 50)).toBeCloseTo(0.5, 9)
+  expect(clickLevel(50, 50)).toBeCloseTo(0.25, 9)
+  expect(clickLevel(0, VOLUME_MAX)).toBe(0)
+  // …and nothing outside 0..100 leaks through the clamp.
+  expect(clickLevel(200, VOLUME_MAX)).toBe(1)
+  expect(clickLevel(-10, VOLUME_MAX)).toBe(0)
 })
