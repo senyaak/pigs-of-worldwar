@@ -68,6 +68,9 @@ export interface Scenery {
   waiting(): number[]
   /** Hand over any crate this pig is standing in. */
   collect(pig: Pig): void
+  /** What is still on the ground AND placed — the pickups an AI weighs
+   * walking to; a script-held record is not on the map yet. */
+  remaining(): readonly Pickup[]
   /**
    * How many PROMOTION POINTS this side has picked up off the ground — what
    * the debrief pays out as its SPECIAL BONUS (lib/game/save.ts,
@@ -167,6 +170,7 @@ export function createScenery(
     obstacles,
     absent: (id) => script.absent(id),
     waiting: () => script.waiting(),
+    remaining: () => pickups.filter((one) => !script.absent(one.id)),
     advance,
     remove(id) {
       emit({ kind: 'taken', id })

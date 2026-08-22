@@ -1096,7 +1096,18 @@ export function createBattle(parts: BattleParts): Battle {
               return head === null
                 ? null
                 : { x: head.x, z: head.z, resting: head.resting }
-            })()
+            })(),
+            // …and a PLANTED one: live but not thrown — the newest lob is it,
+            // because planting is the only other way a lob gets made.
+            planted: (() => {
+              if (grenades.live() <= grenades.thrown()) return null
+              const head = grenades.head()
+              return head === null ? null : { x: head.x, z: head.z }
+            })(),
+            crates: scenery
+              .remaining()
+              .filter((one) => one.kind === 'crate')
+              .map((one) => ({ x: one.x, z: one.z, skill: one.skill, amount: one.amount }))
           })
         )
         actuator.step(delta)

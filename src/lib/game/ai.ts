@@ -76,6 +76,12 @@ export interface AiWorld {
    * one is live the fire key is the DETONATOR (lib/game/lobs.ts), and the
    * brain's business is timing it. */
   thrown: { x: number; z: number; resting: boolean } | null
+  /** A charge PLANTED and armed — the brain's business is being somewhere
+   * else when it goes off (lib/game/grunt.ts, the flee). */
+  planted: { x: number; z: number } | null
+  /** The crates still on the ground: what walking over one would hand out —
+   * a skill and rounds, or health when `skill` is null. */
+  crates: { x: number; z: number; skill: number | null; amount: number }[]
 }
 
 export interface Brain {

@@ -49,6 +49,11 @@ export const SIDE_STEP = 150
  * already reached is never re-asked. */
 export const PITCH_WITHIN = 12
 
+/** How far a pig runs from a charge it has planted before it stops
+ * worrying — TNT's own rim is ~1700 (lib/game/grenade.ts, `blastReach`),
+ * and the margin is a stride. `[deliberate]`. */
+export const FLEE_CLEAR = 1900
+
 /** The friend most in the way of a shot from `at` toward `target`, or null
  * for a clear lane. Flat geometry: distance from the segment, 2D. */
 const inTheWay = (
@@ -98,16 +103,61 @@ export function createGruntBrain(): Brain {
         return thrown.resting || near ? { kind: 'fire' } : { kind: 'watch' }
       }
 
+      const me = world.acting
+
+      /** The next corner of the route to a goal, or null standing there. */
+      const walkThe = (goal: { x: number; z: number }): Order | null => {
+        const corners = world.route(goal)
+        const next = corners?.find(
+          (corner) => Math.hypot(corner.x - me.x, corner.z - me.z) > GRID_STEP / 2
+        )
+        return next ? { kind: 'walkTo', x: next.x, z: next.z } : null
+      }
+
+      // A charge of OURS is armed in the ground: BE SOMEWHERE ELSE. Run out
+      // of its rim — away from it, or straight backwards when it lies at
+      // our own feet (the pig plants facing its target; backwards is away
+      // from both). The turn was hurried to four seconds by the planting
+      // (lib/game/spend.ts); this is what they are for.
+      if (world.planted !== null) {
+        const charge = world.planted
+        const away = Math.hypot(me.x - charge.x, me.z - charge.z)
+        if (away >= FLEE_CLEAR) return { kind: 'watch' }
+        const dirX = away < 1 ? -Math.sin(me.heading) : (me.x - charge.x) / away
+        const dirZ = away < 1 ? -Math.cos(me.heading) : (me.z - charge.z) / away
+        return (
+          walkThe({ x: charge.x + dirX * FLEE_CLEAR, z: charge.z + dirZ * FLEE_CLEAR }) ?? {
+            kind: 'watch'
+          }
+        )
+      }
+
       const option = priceKit(world)
       if (!option) return pass(world)
 
-      const me = world.acting
       const target = option.target
       const dx = target.x - me.x
       const dz = target.z - me.z
       const distance = Math.hypot(dx, dz)
 
+      // A CRATE is walked onto — the hand-over is the walk itself
+      // (lib/game/scenery.ts), so there is nothing to hold, face or fire.
+      if (option.kind === 'crate') {
+        if (!grounded && distance > option.reach) {
+          const step = walkThe({ x: target.x, z: target.z })
+          if (step) return step
+          grounded = true
+        }
+        // Standing on it (it hands over next step), or unable to get there:
+        // either way the next decision sees a different world.
+        return grounded ? pass(world) : { kind: 'watch' }
+      }
+
       if (me.holding !== option.skill) return { kind: 'hold', skill: option.skill }
+
+      // PLANTING happens where the pig already stands: press, and the flee
+      // above takes over next decision.
+      if (option.kind === 'plant') return { kind: 'fire' }
 
       if (distance > option.reach && !grounded) {
         // Stop short of the reach mark, so arrival lands INSIDE it — and go
@@ -116,14 +166,11 @@ export function createGruntBrain(): Brain {
         // no corner left to walk means this is as close as the ground
         // allows, and the grunt is grounded the same as a refused step.
         const shy = option.reach * 0.8
-        const corners = world.route({
+        const step = walkThe({
           x: target.x - (dx / distance) * shy,
           z: target.z - (dz / distance) * shy
         })
-        const next = corners?.find(
-          (corner) => Math.hypot(corner.x - me.x, corner.z - me.z) > GRID_STEP / 2
-        )
-        if (next) return { kind: 'walkTo', x: next.x, z: next.z }
+        if (step) return step
         grounded = true
       }
 

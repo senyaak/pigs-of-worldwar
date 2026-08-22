@@ -19,6 +19,7 @@ const world = (over: {
   foes?: Seen[]
   friends?: Seen[]
   health?: number
+  crates?: AiWorld['crates']
 }): AiWorld => ({
   timeLeft: 45,
   previous: null,
@@ -37,7 +38,9 @@ const world = (over: {
   route: (to) => [to],
   // Flat ground at zero: the dry-run throw lands when it falls back to it.
   groundAt: () => 0,
-  thrown: null
+  thrown: null,
+  planted: null,
+  crates: over.crates ?? []
 })
 
 test('an empty kit, or an empty field, prices to nothing', { tag: '@nodata' }, () => {
@@ -134,10 +137,53 @@ test('a blade prices like everything else and wins when it is all there is', { t
   expect(option.skill).toBe(SKILL.BAYONET)
 })
 
+test('an ARMED pig barely feels a crate: the greed knob', { tag: '@nodata' }, () => {
+  // A sniper upgrade two tiles away: (40−20) × appetite 0.25 = 5 does not
+  // cover the walk's tax of 10 — the rifle in hand keeps winning. "Самый
+  // тупой комп очень редко берёт ящики."
+  const option = priceKit(
+    world({ crates: [{ x: 0, z: 1000, skill: SKILL.SNIPER_RIFLE, amount: 2 }] })
+  )!
+  expect(option.kind).toBe('gun')
+  expect(option.skill).toBe(SKILL.RIFLE)
+})
+
+test('an UNARMED pig fetches a weapon crate at full worth: necessity is not greed', { tag: '@nodata' }, () => {
+  const option = priceKit(
+    world({ carrying: [], crates: [{ x: 0, z: 2000, skill: SKILL.BAZOOKA, amount: 2 }] })
+  )!
+  expect(option.kind).toBe('crate')
+})
+
+test('with nobody left to shoot, a health crate is worth the stroll', { tag: '@nodata' }, () => {
+  const option = priceKit(
+    world({ foes: [], crates: [{ x: 0, z: 1000, skill: null, amount: 50 }] })
+  )!
+  expect(option.kind).toBe('crate')
+})
+
+test('TNT is PLANTED when a foe stands in its blast, never thrown', { tag: '@nodata' }, () => {
+  const option = priceKit(
+    world({ carrying: [{ skill: SKILL.TNT, amount: 1 }], foes: [foe({ z: 300 })] })
+  )!
+  expect(option.kind).toBe('plant')
+  expect(option.skill).toBe(SKILL.TNT)
+})
+
+test('TNT stays in the kit when nobody is near: no walking about with a lit bomb', { tag: '@nodata' }, () => {
+  // The plant is priced where the pig STANDS; a far foe gives it nothing,
+  // and the only other option is the pass.
+  expect(
+    priceKit(world({ carrying: [{ skill: SKILL.TNT, amount: 1 }], foes: [foe({ z: 3000 })] }))
+  ).toBeNull()
+})
+
 test('the solved charge GROWS with the throw', { tag: '@nodata' }, () => {
+  // Both stand clear of the thrower's own rim (~1100) — closer throws are
+  // rightly refused as self-harm and price to nothing.
   const kit = [{ skill: SKILL.GRENADE, amount: 3 }]
-  const near = priceKit(world({ carrying: kit, foes: [foe({ z: 500 })] }))!
-  const far = priceKit(world({ carrying: kit, foes: [foe({ z: 1100 })] }))!
+  const near = priceKit(world({ carrying: kit, foes: [foe({ z: 1300 })] }))!
+  const far = priceKit(world({ carrying: kit, foes: [foe({ z: 2000 })] }))!
   expect(near.charge).toBeDefined()
   expect(far.charge).toBeDefined()
   expect(far.charge!).toBeGreaterThan(near.charge!)

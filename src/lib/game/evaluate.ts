@@ -29,7 +29,7 @@
 import type { AiWorld, Seen } from './ai'
 import { damageOf, projectileOf, rangeOf } from './projectile'
 import { meleeOf } from './melee'
-import { advanceLob, blastRange, blastShare, lob, lobOf } from './grenade'
+import { advanceLob, blastRange, blastShare, isPlanted, lob, lobOf } from './grenade'
 import { GAUGE_FULL } from './gauge'
 
 /** What FINISHING a pig is worth on top of the health it takes — the kill
@@ -58,6 +58,17 @@ export const THROW_RISE = 120
  * its own boots. `[deliberate]`. */
 export const LEAST_CHARGE = 0.15
 
+/** How much of a crate's gain the DUMBEST brain actually feels — the
+ * grunt barely bothers with pickups, by request: "он должен очень в редких
+ * случаях тогда брать ящики". A NECESSITY is exempt: a pig with no weapon
+ * at all takes a weapon crate at full worth. `[deliberate]` — the greed
+ * knob the levels will turn. */
+export const CRATE_APPETITE = 0.25
+
+/** Standing this near a crate collects it — the walk-through hand-over
+ * (lib/game/scenery.ts). */
+export const COLLECT_NEAR = 40
+
 /** The dry-run's step and its longest flight — a lob's fuse is ~6 s and
  * nothing flies that long. */
 const SIM_STEP = 1 / 30
@@ -67,7 +78,7 @@ const SIM_SECONDS = 6
  * the approach tax; `worth` is the undiscounted HP differential. */
 export interface Option {
   skill: number
-  kind: 'gun' | 'melee' | 'lob'
+  kind: 'gun' | 'melee' | 'lob' | 'plant' | 'crate'
   target: Seen
   score: number
   worth: number
@@ -115,25 +126,34 @@ const flight = (
 }
 
 /** The blast at `landing`, priced over EVERYONE: foes positive, friends and
- * the thrower negative, kill bonuses on both sides of the ledger. */
+ * the thrower negative, kill bonuses on both sides of the ledger. A PLANTED
+ * charge spares the self term — the plan is to be gone before it goes off
+ * (lib/game/grunt.ts, the flee). */
 const blastWorth = (
   world: AiWorld,
   landing: { x: number; z: number },
   damage: number,
-  range: number
+  range: number,
+  spareSelf = false
 ): number => {
   const me = world.acting
   let total = 0
   for (const foe of world.foes) {
     total += worthOf(damage * blastShare(distance2d(foe, landing), range), foe)
   }
-  const own: Seen[] = [...world.friends, { x: me.x, y: me.y, z: me.z, health: me.health }]
+  const own: Seen[] = [...world.friends]
+  if (!spareSelf) own.push({ x: me.x, y: me.y, z: me.z, health: me.health })
   for (const friend of own) {
     const share = blastShare(distance2d(friend, landing), range)
     if (share > 0) total -= worthOf(damage * share, friend)
   }
   return total
 }
+
+/** What a skill is worth as a weapon, whatever family it is — the crate
+ * comparison's one number. */
+const weaponPoints = (skill: number): number =>
+  damageOf(skill) || (lobOf(skill)?.damage ?? 0) / 128 || (meleeOf(skill)?.damage ?? 0)
 
 const gunOption = (world: AiWorld, skill: number): Option | null => {
   const row = projectileOf(skill)
@@ -228,21 +248,85 @@ const lobOption = (world: AiWorld, skill: number): Option | null => {
   return best
 }
 
+/** PLANTING a charge where the pig STANDS — no approach is planned, so the
+ * option only exists when a foe already stands inside the blast: walk up
+ * carrying a lit bomb is a bigger brain's game. The self term is spared —
+ * the four hurried seconds after planting are the flee (lib/game/grunt.ts). */
+const plantOption = (world: AiWorld, skill: number): Option | null => {
+  const row = lobOf(skill)
+  if (!row || world.foes.length === 0) return null
+  const me = world.acting
+  const worth = blastWorth(world, me, row.damage / 128, blastRange(row), true)
+  if (worth <= 0) return null
+  return {
+    skill,
+    kind: 'plant',
+    // The spot IS the target: nothing to walk to, nothing to face.
+    target: { x: me.x, y: me.y, z: me.z, health: 0 },
+    score: worth,
+    worth,
+    reach: Infinity,
+    limit: Infinity
+  }
+}
+
+/** A crate weighed against the greed knob: a NECESSITY (no weapon at all)
+ * at full worth, an upgrade or a top-up at CRATE_APPETITE of it. */
+const crateOption = (
+  world: AiWorld,
+  crate: { x: number; z: number; skill: number | null; amount: number }
+): Option | null => {
+  const me = world.acting
+  const have = world.acting.carrying.reduce(
+    (best, slot) => (slot.amount !== 0 ? Math.max(best, weaponPoints(slot.skill)) : best),
+    0
+  )
+  const gain =
+    crate.skill === null
+      ? crate.amount * CRATE_APPETITE
+      : have === 0
+        ? weaponPoints(crate.skill)
+        : Math.max(0, weaponPoints(crate.skill) - have) * CRATE_APPETITE
+  const away = distance2d(me, crate)
+  const score = gain - (away > COLLECT_NEAR ? APPROACH_TAX : 0)
+  if (score <= 0) return null
+  return {
+    skill: crate.skill ?? SKILLLESS,
+    kind: 'crate',
+    target: { x: crate.x, y: 0, z: crate.z, health: 0 },
+    score,
+    worth: gain,
+    reach: COLLECT_NEAR,
+    limit: Infinity
+  }
+}
+
+/** A crate option's `skill` when the crate is health — nothing is ever held
+ * off it, the walk itself collects. */
+export const SKILLLESS = -1
+
 /**
- * The kit priced whole: the best (item × target) pair, or null when nothing
- * in the kit can be priced (no weapons, or nobody to point them at). Ties
- * go to the kit's own order — deterministic, like everything here.
+ * The kit priced whole — and the ground too: the best (item × target) pair
+ * or the best crate walk, or null when nothing scores above zero (then the
+ * pass is the honest move — a negative option is never taken just for
+ * being the only one). Ties go to the kit's own order — deterministic,
+ * like everything here.
  */
 export function priceKit(world: AiWorld): Option | null {
-  if (world.foes.length === 0) return null
   let best: Option | null = null
+  const keep = (option: Option | null): void => {
+    if (option && option.score > 0 && (!best || option.score > best.score)) best = option
+  }
   for (const slot of world.acting.carrying) {
     if (slot.amount === 0) continue
-    const option =
-      gunOption(world, slot.skill) ??
-      lobOption(world, slot.skill) ??
-      meleeOption(world, slot.skill)
-    if (option && (!best || option.score > best.score)) best = option
+    keep(
+      isPlanted(slot.skill)
+        ? plantOption(world, slot.skill)
+        : (gunOption(world, slot.skill) ??
+            lobOption(world, slot.skill) ??
+            meleeOption(world, slot.skill))
+    )
   }
+  for (const crate of world.crates) keep(crateOption(world, crate))
   return best
 }

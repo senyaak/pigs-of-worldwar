@@ -30,6 +30,8 @@ const world = (over: {
   previous?: 'done' | 'blocked' | null
   route?: AiWorld['route']
   thrown?: AiWorld['thrown']
+  planted?: AiWorld['planted']
+  crates?: AiWorld['crates']
 }): AiWorld => ({
   timeLeft: 45,
   previous: over.previous ?? null,
@@ -48,7 +50,9 @@ const world = (over: {
   // An open field unless a test says otherwise: the route is the goal.
   route: over.route ?? ((to) => [to]),
   groundAt: () => 0,
-  thrown: over.thrown ?? null
+  thrown: over.thrown ?? null,
+  planted: over.planted ?? null,
+  crates: over.crates ?? []
 })
 
 test('no gun is the stub game: SKIP TURN in hand, then the pass', { tag: '@nodata' }, () => {
@@ -238,6 +242,41 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
       })
     )
   ).toEqual({ kind: 'fire' })
+})
+
+test('TNT at the feet of a foe: hold it, press, then RUN', { tag: '@nodata' }, () => {
+  const brain = createGruntBrain()
+  const kit = [{ skill: SKILL.TNT, amount: 1 }]
+  // A foe inside the blast of where we stand: the price list says plant.
+  expect(brain.decide(world({ carrying: kit, foes: [foe({ z: 300 })] }))).toEqual({
+    kind: 'hold',
+    skill: SKILL.TNT
+  })
+  expect(
+    brain.decide(world({ carrying: kit, holding: SKILL.TNT, foes: [foe({ z: 300 })] }))
+  ).toEqual({ kind: 'fire' })
+  // Planted at our own feet, facing the foe (heading 0): the flee runs
+  // BACKWARDS, out of the rim.
+  const fleeing = brain.decide(
+    world({ carrying: [], holding: SKILL.TNT, foes: [foe({ z: 300 })], planted: { x: 0, z: 0 } })
+  )
+  expect(fleeing.kind).toBe('walkTo')
+  if (fleeing.kind !== 'walkTo') return
+  expect(fleeing.z).toBeLessThan(-1000)
+  // …and far enough out, it just watches the show.
+  expect(
+    brain.decide(world({ carrying: [], holding: SKILL.TNT, planted: { x: 0, z: 2000 } }))
+  ).toEqual({ kind: 'watch' })
+})
+
+test('an unarmed pig with no foes walks onto the crate that arms it', { tag: '@nodata' }, () => {
+  const brain = createGruntBrain()
+  const crated = world({
+    carrying: [],
+    foes: [],
+    crates: [{ x: 0, z: 2000, skill: SKILL.BAZOOKA, amount: 2 }]
+  })
+  expect(brain.decide(crated)).toEqual({ kind: 'walkTo', x: 0, z: 2000 })
 })
 
 test('blocked in range: shoot from where it stands', { tag: '@nodata' }, () => {
