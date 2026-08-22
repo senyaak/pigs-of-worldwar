@@ -1,28 +1,33 @@
 // PHASE 002 (domain) — the difficulty dial. Pure, no Electron.
 //
-// One number per map, 0..1, off the campaign order (lib/game/wits.ts): the
-// first fight is the dumbest machine, Team Lard the sharpest, and every
-// position in between a little more than the one before — smooth, where
-// the turn timer steps per island.
+// One number per map off the campaign order, over a scale of 26
+// (lib/game/wits.ts): the first fight thinks at 1/26 — a little, never
+// zero — the campaign's final at 25/26, and the full 1 is RESERVED for the
+// secret faction's second pass, the day it exists. Smooth in between,
+// where the turn timer steps per island.
 
 import { test, expect } from '@playwright/test'
 
-import { ARENA_WITS, witsFor } from '../src/lib/game/wits'
+import { ARENA_WITS, LARD_WITS, witsFor } from '../src/lib/game/wits'
 import { CAMPAIGN_LENGTH, mapAt } from '../src/lib/game/missions'
 
-test('the training ground and the first fight think at zero', { tag: '@nodata' }, () => {
-  expect(witsFor('CAMP')).toBe(0)
-  expect(witsFor(mapAt(1)!)).toBe(0)
+test('the first fight thinks a LITTLE — 1/26, never zero', { tag: '@nodata' }, () => {
+  expect(witsFor(mapAt(1)!)).toBeCloseTo(1 / 26, 10)
+  expect(witsFor(mapAt(1)!)).toBeGreaterThan(0)
 })
 
-test('Team Lard thinks at one, and the ramp between is smooth and rising', { tag: '@nodata' }, () => {
-  expect(witsFor(mapAt(CAMPAIGN_LENGTH - 1)!)).toBe(1)
+test('the campaign final stops at 25/26: the top is reserved for the purple pass', { tag: '@nodata' }, () => {
+  expect(witsFor(mapAt(CAMPAIGN_LENGTH - 1)!)).toBeCloseTo(25 / 26, 10)
+  expect(witsFor(mapAt(CAMPAIGN_LENGTH - 1)!)).toBeLessThan(LARD_WITS)
+})
+
+test('the ramp between is smooth and rising', { tag: '@nodata' }, () => {
   let last = 0
-  for (let position = 2; position < CAMPAIGN_LENGTH; position++) {
+  for (let position = 1; position < CAMPAIGN_LENGTH; position++) {
     const wits = witsFor(mapAt(position)!)
     expect(wits).toBeGreaterThan(last)
-    // SMOOTH: no step bigger than twice the even share.
-    expect(wits - last).toBeLessThanOrEqual(2 / (CAMPAIGN_LENGTH - 2))
+    // SMOOTH: every step is the same 1/26.
+    if (position > 1) expect(wits - last).toBeCloseTo(1 / 26, 10)
     last = wits
   }
 })

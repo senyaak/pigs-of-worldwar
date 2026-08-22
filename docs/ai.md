@@ -104,8 +104,14 @@ Low-level misses look ALIVE for free: the pig genuinely aimed with a bad
 estimate and shaky hands, it did not roll a die and shoot at nothing.
 
 **The ramp is per MAP, smoothly** `[play]` — every campaign position a
-little smarter across all 25, even though the turn TIMER steps per island
-(`turns.ts` keeps its own table). Arenas take a picked level.
+little smarter, even though the turn TIMER steps per island (`turns.ts`
+keeps its own table). The scale is 26ths (`lib/game/wits.ts`): the first
+fight thinks at 1/26 — a little, never zero `[play]` — and the campaign's
+own final, Team Lard, at 25/26, because **the full 1 is RESERVED**:
+`[play]`, after the campaign is beaten it is played AGAIN against the
+secret PURPLE faction, and those are the smartest enemies in the game.
+That second pass is not built yet; the reservation is. Arenas take a
+picked level (0.5 today).
 
 ## HIDE versus memory: armour, not invisibility
 
