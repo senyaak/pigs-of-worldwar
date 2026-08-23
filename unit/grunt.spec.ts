@@ -37,8 +37,9 @@ const world = (over: {
   swims?: boolean
   wits?: number
   roll?: AiWorld['roll']
+  timeLeft?: number
 }): AiWorld => ({
-  timeLeft: 45,
+  timeLeft: over.timeLeft ?? 45,
   wits: over.wits ?? 0,
   // 0.5 is the NEUTRAL roll: a misjudgment factor of exactly 1, so every
   // spec below reads the price list's own arithmetic unless it rigs one.
@@ -125,6 +126,28 @@ test('a dumb brain MISJUDGES the kit — once a turn, and held', { tag: '@nodata
   expect(
     createGruntBrain().decide(world({ carrying: kit, wits: 1, roll: () => 0.99 }))
   ).toEqual({ kind: 'hold', skill: SKILL.GRENADE })
+})
+
+test('the crate comes FIRST when the clock affords both — the errand', { tag: '@nodata' }, () => {
+  // Play's rule at the top of the wits scale: "если хватает времени взять
+  // ящик и ударить после — ящик конечно же важнее всего для самого умного."
+  const crates = [{ x: 300, z: 0, skill: null, amount: 25 }]
+  const brain = createGruntBrain()
+  // Rifle in hand, foe in reach, a health crate a stride away and the whole
+  // clock: the walk goes THROUGH the crate before any shot.
+  expect(brain.decide(world({ holding: SKILL.RIFLE, wits: 1, crates }))).toEqual({
+    kind: 'walkTo',
+    x: 300,
+    z: 0
+  })
+  // Collected (gone from the world), the same turn falls through to the
+  // fight — no memory needed.
+  expect(brain.decide(world({ holding: SKILL.RIFLE, wits: 1 })).kind).toBe('fire')
+  // …and with five seconds left there is no time for both: the shot comes
+  // first and the crate is let go (ERRAND_SPARE).
+  expect(
+    createGruntBrain().decide(world({ holding: SKILL.RIFLE, wits: 1, crates, timeLeft: 5 })).kind
+  ).toBe('fire')
 })
 
 test('too far: walk at the target, stopping shy of the range', { tag: '@nodata' }, () => {

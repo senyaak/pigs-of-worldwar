@@ -1053,3 +1053,26 @@ MISJUDGE = 0.75 `[deliberate]`, play's dial. Pinned in unit/grunt.spec.ts
 (wrong gun at wits 0 on a rigged roll, held across decisions, truth at wits
 1); the machine mission still plays to a verdict — and the other side won
 this run, which is the knob doing its job.
+
+## The errand: the crate comes FIRST, the shot after (2026-08-24)
+
+Play corrected the model, not a number: "если хватает времени взять ящик и
+ударить после — ящик конечно же важнее всего для самого умного." Right — a
+pickup spends no turn and the weapon does, so a crate is never an
+ALTERNATIVE to the attack; pricing them against each other in one
+winner-takes-all pick is what kept every pig off every crate. The crate is a
+PREFIX to the plan.
+
+So the grunt has an ERRAND rung now (lib/game/grunt.ts, before the
+approach): with a weapon option chosen, a crate whose JUDGED appetite-priced
+gain clears `ERRAND_WORTH` (lib/game/evaluate.ts, `crateErrand` — the same
+judgment as everything else, so the dumbest brain rarely believes the walk
+is worth it and the sharpest always does) is walked THROUGH first — when the
+clock affords the whole plan: the walk there, the walk onward to the
+option's own reach, and `ERRAND_SPARE` = 12 s for the shot, crow distances
+over the unscaled `WALK_SPEED` so the speed's slack covers the crow line's
+optimism. Once collected the crate leaves `world.crates` and the next
+decision falls through to the fight — the multi-step plan is emergent, no
+memory added. A plant never detours. Pinned in unit/grunt.spec.ts (errand →
+collected → fire; five seconds left → the shot comes first); the machine
+mission still plays to a verdict.

@@ -29,8 +29,9 @@ import type { AiWorld, Brain, Seen, Thought } from './ai'
 import type { Order } from './orders'
 import { shortest } from './actuator'
 import { AIM_UNITS } from './aim'
-import { crateFallback, priceKit } from './evaluate'
+import { crateErrand, crateFallback, priceKit } from './evaluate'
 import type { Option } from './evaluate'
+import { WALK_SPEED } from './movement'
 import { BLAST_CORE } from './grenade'
 import { GRID_STEP } from './pathfind'
 import { SKILL } from './skills'
@@ -72,6 +73,17 @@ export const FLEE_CLEAR = 1900
  * truth. `[deliberate]` — play's dial.
  */
 export const MISJUDGE = 0.75
+
+/**
+ * The seconds an errand must LEAVE ON THE CLOCK past its own walking — the
+ * turning, the pitch, the gauge and the mulls of the shot that has to come
+ * after the crate ("взять ящик И ударить после" — the second half is the
+ * point). The walking itself is priced over crow distances at the UNSCALED
+ * `WALK_SPEED` — the legs actually go `WALK_SCALE` faster — so the speed's
+ * own slack covers the crow line's optimism about the path.
+ * `[deliberate]` — play's dial.
+ */
+export const ERRAND_SPARE = 12
 
 /** The nearest DRY ground, by ring search off the crow line: what a pig
  * with no business in the water swims for. An ocean with no shore in reach
@@ -301,6 +313,34 @@ export function createGruntBrain(): Brain {
       if (world.swimming) {
         const step = grounded ? null : walkThe(dryApproach())
         return step ? say('transit', step) : say('shore', shore(world))
+      }
+
+      // **THE ERRAND — the crate comes FIRST when the clock affords both.**
+      // Play's rule, given at the top of the wits scale: "если хватает
+      // времени взять ящик и ударить после — ящик конечно же важнее всего
+      // для самого умного." A pickup spends no turn — the WEAPON does — so
+      // a crate worth having is collected on the way to the fight, and the
+      // attack follows in the same turn. Worth having is the same judged
+      // appetite as everything else (crateErrand): the dumbest brain rarely
+      // believes a crate is worth the walk, the sharpest always does. The
+      // clock's question: the walk there, the walk onward to the option's
+      // own reach, and ERRAND_SPARE for the shot still have to fit. Once
+      // collected the crate leaves `world.crates` and the next decision
+      // falls straight through to the fight — no memory needed. A PLANT
+      // never detours: a foe is standing in the blast.
+      if (!grounded && option.kind !== 'plant') {
+        const errand = crateErrand(world, judge)
+        if (errand) {
+          const toCrate = Math.hypot(errand.target.x - me.x, errand.target.z - me.z)
+          const onward = Math.max(
+            0,
+            Math.hypot(target.x - errand.target.x, target.z - errand.target.z) - option.reach
+          )
+          if ((toCrate + onward) / WALK_SPEED + ERRAND_SPARE <= world.timeLeft) {
+            const step = walkThe({ x: errand.target.x, z: errand.target.z })
+            if (step) return say('errand', step)
+          }
+        }
       }
 
       // Only a GUN's shot travels the flat line a friend can stand in; a lob

@@ -331,6 +331,44 @@ const crateOption = (
 export const SKILLLESS = -1
 
 /**
+ * What an ERRAND has to read as worth before the walk is made — judged
+ * points, so at the bottom of the wits scale a middling crate clears it
+ * only on a generous misjudgment ("он должен очень в редких случаях тогда
+ * брать ящики") and at the top every real crate does. `[deliberate]` —
+ * play's dial.
+ */
+export const ERRAND_WORTH = 10
+
+/**
+ * The crate worth a DETOUR ON THE WAY to the fight — play's rule, given at
+ * the top of the wits scale: "если хватает времени взять ящик и ударить
+ * после — ящик конечно же важнее всего для самого умного." A pickup spends
+ * no turn and the weapon does, so a crate is never really an ALTERNATIVE to
+ * the attack — it is a prefix to it, and pricing them against each other
+ * (one winner) is what kept every pig off every crate. Whether the clock
+ * affords the detour is the brain's question (lib/game/grunt.ts); this
+ * answers only which crate is worth it — the same appetite-priced gain as
+ * `crateOption`, read through the same judgment, best believer wins.
+ */
+export function crateErrand(
+  world: AiWorld,
+  judge?: (option: Option) => number
+): Option | null {
+  let best: Option | null = null
+  let bestJudged = 0
+  for (const crate of world.crates) {
+    const option = crateOption(world, crate, undefined)
+    if (!option) continue
+    const judged = judge ? judge(option) : option.score
+    if (judged >= ERRAND_WORTH && judged > bestJudged) {
+      best = option
+      bestJudged = judged
+    }
+  }
+  return best
+}
+
+/**
  * The crate as a NECESSITY — full face value, no appetite, nearest first.
  *
  * The appetite knob prices a pickup for a pig that has BETTER things to do;
