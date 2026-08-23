@@ -987,3 +987,46 @@ order ended and on what, the rung, the order — and `[ai:kit]` — the
 candidates best-first, winner starred, capped at six under the IPC's 512
 bytes. Nothing in the engine listens to `aiDecided`; it must never steer
 play. The headless `AI_LOG=1` tap stays and now prints the refusal too.
+
+## The telemetry pays for itself — the first diagnosed AI session (2026-08-23)
+
+One evening of play, and every fix came out of `_tmp/telemetry.log` with a
+line number instead of a guess (`_tmp/ai-session-2026-08-23.log` is the
+session, kept):
+
+- **NOBBY spun after his throw** — the log shows `turnTo 2.59` decided one
+  second after his grenade detonated: the seat kept mulling through the
+  blow's beat. The machine block now stops deciding once the weapon has
+  SPENT the turn, with the thrown-grenade detonator the one exception.
+- **GINGER fired twice** — the first `fire @0.90` finished `done` having
+  thrown nothing (the bark still held the trigger), the seat re-decided and
+  the second one threw. Left as is: the re-decide IS the recovery.
+- **DEN walked in stutters** — eleven walk legs with a second's mull
+  standing between each. A finished `walkTo` now chains into the next
+  corner with no mull (`lastOrder`): the pause between thoughts is theatre,
+  the pause between strides of one plan was a stutter.
+- **DEN marched fifty seconds into `blocked(water)` and passed — three
+  turns running, same corner.** Two causes, both fixed. The pathfinder
+  sampled water at half a cell while the legs' guard probes 150 ahead, so
+  the route and the guard disagreed on the seam and the disagreement was a
+  loop: a non-swimmer's route now refuses cells the GUARD would refuse
+  (`guarded`, WATER_PROBE + half a cell, eight-point ring). And "hopeless"
+  passes got a plan B: an option whose route cannot END within its own
+  limit is discarded for the best candidate the ground allows
+  (`playable`, lib/game/grunt.ts), and with no weapon playable a crate is
+  a NECESSITY at full worth (`crateFallback`) — the appetite knob had
+  priced every crate under zero at mission-one wits while DEN skipped
+  turns standing beside them.
+- **Play's own spec for the legs**: "повороты и хождение полностью
+  отдельными". The actuator's walk is two phases now — align on the spot to
+  the turn's own deadband, then walk STRAIGHT, re-aligning only past
+  REALIGN (π/8), two thresholds so the seam cannot oscillate.
+- The fuse watch wrote 110 identical `watch` lines into one throw's two
+  seconds (AI_FUSE_SECONDS = 0 decides every frame); the ui tap now counts
+  repeats silently and flushes "…the same, N more times".
+
+The headless machine mission still plays to a verdict (5 kills, 14 shots,
+survivors 1v0), and the whole non-AI half of the session's report — the
+death's timing against the turn's beats, the missing boots, the holster, the
+shot's shove, the wounded bearing, the debrief's medals — is queued in
+docs/todo.md, AI first by play's own order.

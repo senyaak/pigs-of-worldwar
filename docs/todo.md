@@ -995,6 +995,83 @@ order:**
    winner flip-flopping between two level-priced foes in `[ai:kit]`, and
    for `turnTo` alternating bearings in `[ai]`.
 
+**Play's reports from the second AI session (2026-08-23, evening) — the
+session log is `_tmp/ai-session-2026-08-23.log`, and every AI item below is
+DIAGNOSED from it, not guessed. Order of work: AI first (play's call).**
+
+The AI package (one session's worth, each with the log's evidence):
+
+1. **Turning and walking must be fully separate.** Play's own spec: "надо
+   сделать повороты и хождение полностью отдельными — не надо ходить и
+   поворачиваться сразу". The actuator's `walkTo` drives `intent(walk, turn)`
+   together inside `WALK_CONE`. Wanted: align first (turn only), then walk
+   STRAIGHT (turn 0), re-aligning only when the bearing drifts wide — two
+   thresholds so it cannot oscillate at one boundary (lib/game/actuator.ts).
+2. **The seat keeps deciding after the weapon spent the turn.** Log: NOBBY
+   detonates at 20:52:27, and at :28 decides `turnTo 2.59` — re-aiming a
+   throw it can never make; the pig visibly spins on the spot until the
+   handover ("крутился на месте"). GINGER's double `fire @0.90` (20:53:44
+   and :47) is the same hole from the other side: the first fire order ran
+   while the bark still had the trigger locked, finished `done` having
+   thrown nothing, and the seat re-decided. The machine block needs a gate:
+   no new decisions once the blow has spent the turn — while keeping the
+   DETONATOR alive (a live thrown grenade still needs the fire key).
+3. **The mull between ROUTE CORNERS is a stutter, not a thought.** Log: DEN
+   walks eleven `walkTo` legs 20:56:06..20:57:05, one second of standing
+   between each — play saw "ходил рывками". A `walkTo` that finished `done`
+   with the plan unfinished should chain into the next corner with no mull.
+4. **The pathfinder and the water guard disagree, and the pig loops on the
+   seam.** Log, three turns running: DEN walks toward 11392,1024, gets
+   `blocked(water)`, passes; next turn the route hands him THE SAME corner,
+   `blocked(water)` inside a second, pass; and again (20:57:09 / 20:58:41 /
+   21:00:55 — then he died standing there). The grid samples cell CENTRES
+   (lib/game/pathfind.ts) and the guard probes `WATER_PROBE` = 150 ahead
+   (lib/game/actuator.ts), so a route leg can graze water the grid never
+   saw. A non-swimmer's route needs the water inflated by the probe's
+   reach, so the route either goes AROUND or honestly ends short.
+5. **"Hopeless" needs a plan B before the pass.** Same DEN turns: from the
+   water's edge nothing in the kit reached (`pass-hopeless`), and the crates
+   on the map priced under zero at mission-1 wits (appetite 0.29), so he
+   skipped three turns straight with things to do — play: "это не тупость —
+   это идиотизм". Wanted: when the best option's route cannot END within its
+   own limit, try the next candidates; when NO weapon is playable, a crate
+   is a NECESSITY (full worth, the same exemption a weaponless pig already
+   gets); only then pass.
+6. Telemetry housekeeping: the fuse watch logs ~50 identical `watch` lines a
+   second (AI_FUSE_SECONDS = 0 decides every frame — 110 lines in NOBBY's
+   one throw). Collapse consecutive identical decisions in the ui tap.
+
+Non-AI bugs from the same session, queued after the AI:
+
+7. **The death STILL starts at the blow, and the boots went missing.** Play:
+   "умирание происходит сразу же после попадания… в оригинале сначала
+   заканчиваются все анимации, потом секунда, камера на свинью С ЛИЦА, и
+   она умирает… анимация всё ещё не та + сапогов не осталось." Diagnosis so
+   far: `stageStill()` is true almost immediately after a plain shot
+   mid-turn (no walk-away yet, nothing in flight), so the dying clip starts
+   a beat after the hit — the gate must wait for the TURN's own wind-down
+   (the end-turn beat, walk-away done, plus ~a second of quiet), not merely
+   "nothing moving this instant". The camera should come to the pig's FACE
+   (the exe's mode-3 subject swap; we ride the aftermath point instead).
+   "Анимация не та" may be the WOUNDED pose (clip 29) reading as an instant
+   death — it goes up in the damage frame by design; with the real wait in
+   front of it, re-judge. The missing BOOTS need a measurement first
+   (`Measure the miss`): DEN's corpse DID bang (21:01:47 blast at his spot),
+   so `remains` fired — check the renderer's boots placement, not the
+   engine.
+8. **The weapon is not holstered after firing** — a rifle (and a grenade)
+   stays in hand until next turn. The exe holsters after the shot
+   (S_UNHOLS is even waiting in the sound survey, item 2 above).
+9. **A rifle shot does not SHOVE the pig it hits** — play: "тут даже
+   выстрелы имеют сдвиг". Needs the disasm read: HitByProjectile
+   (0x478710) plays the squeal and likely kicks; read what it writes to
+   the body before building.
+10. **No WOUNDED bearing on a hurt pig** — the original stands a hurt pig
+    differently and walks it SLOWER. Clip 29 is in `ANIM` now (WOUNDED);
+    the stance/speed thresholds need reading or ruling.
+11. **The debrief should show MEDALS under the text** — the medal art, not
+    the promotion-point icons.
+
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens
 (`bonusPoints(1)` is 0 — the first mission pays none), the empty power-gauge

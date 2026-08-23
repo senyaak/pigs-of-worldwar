@@ -27,6 +27,7 @@ import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
 import { AI_FUSE_SECONDS, AI_MULL_SECONDS, AI_START_SECONDS } from './ai'
 import { createActuator } from './actuator'
+import type { Order } from './orders'
 import { createGruntBrain } from './grunt'
 import { beginWalkAway } from './walkAway'
 import {
@@ -377,6 +378,11 @@ export function createBattle(parts: BattleParts): Battle {
    * order — both reset at every handover. */
   let cardSeconds = 0
   let mullSeconds = 0
+  /** What the hands last took — a finished WALK chains straight into the
+   * next corner of the route, no mull: the pause between thoughts is
+   * theatre, the pause between strides of ONE plan was a stutter (play:
+   * "ходил рывками"). */
+  let lastOrder: Order['kind'] | null = null
   /** Whether the opening drop was still running LAST step. The FIRST turn's
    * card goes up the frame this falls (`announceTurn`); every later one goes
    * up in `handOver`. */
@@ -889,6 +895,7 @@ export function createBattle(parts: BattleParts): Battle {
     actuator.reset()
     cardSeconds = 0
     mullSeconds = 0
+    lastOrder = null
     machineTurn = computer(game.players.indexOf(game.currentPlayer))
     emit({ kind: 'cameraReset' })
   }
@@ -1104,9 +1111,24 @@ export function createBattle(parts: BattleParts): Battle {
       } else if (!actuator.idle()) {
         actuator.step(delta)
         mullSeconds = 0
+      } else if (spent && grenades.thrown() === 0) {
+        // **THE WEAPON HAS SPENT THE TURN: the seat is DONE.** Without this
+        // the mull ran on through the blow's own beat and the brain started
+        // a plan it could never finish — telemetry caught NOBBY, throw
+        // detonated, deciding `turnTo` a second later and spinning on the
+        // spot until the handover ("крутился на месте"). The one exception
+        // is a THROWN grenade still live: the fire key is the detonator and
+        // the decision to press it is still owed.
+        mullSeconds = 0
       } else if (
         (mullSeconds += delta) >=
-        (grenades.thrown() > 0 ? AI_FUSE_SECONDS : AI_MULL_SECONDS)
+        (grenades.thrown() > 0
+          ? AI_FUSE_SECONDS
+          : // A route is ONE plan: a walk that ended well chains into the
+            // next corner with no mull at all (see `lastOrder`).
+            lastOrder === 'walkTo' && actuator.outcome() === 'done'
+            ? 0
+            : AI_MULL_SECONDS)
       ) {
         // Hands free and the mulling beat spent: one decision, and the
         // hands take it up the same step. The world handed over is the
@@ -1220,6 +1242,7 @@ export function createBattle(parts: BattleParts): Battle {
           )
         }
         actuator.take(decided)
+        lastOrder = decided.kind
         // …and the mull starts OVER: without this an instant order (watch,
         // hold) left the counter full and the brain re-decided every frame —
         // 904 decisions in a 185-second battle, measured before the reset.

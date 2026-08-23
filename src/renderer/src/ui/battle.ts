@@ -769,6 +769,12 @@ export function initBattle(
     sound?.dispose()
     const bus = createBus()
     sound = createBattleSound(bus)
+    // The AI tap's repeat squeeze: a live grenade is watched EVERY FRAME
+    // (AI_FUSE_SECONDS = 0), which wrote 110 identical `watch` lines into one
+    // throw's two seconds. An identical decision counts up silently and the
+    // count is flushed when something new happens.
+    let aiSaid = ''
+    let aiAgain = 0
     // The instructor is a listener like any other. A crate the SCRIPT has just
     // put on the map is the half of the tutorial that says where to go next,
     // and it comes straight off the bus rather than through the scene — the
@@ -861,6 +867,17 @@ export function initBattle(
             `[ai] ${name} hp${health} @${at.x.toFixed(0)},${at.z.toFixed(0)}` +
             (previous === null ? '' : ` prev=${previous}${refusal ? `(${refusal})` : ''}`) +
             ` [${thought?.rung ?? '-'}] -> ${said}`
+          if (head === aiSaid) {
+            aiAgain++
+            return
+          }
+          if (aiAgain > 0) {
+            const again = `[ai] …the same, ${aiAgain} more times`
+            console.log(again)
+            window.api.logTelemetry(again)
+          }
+          aiSaid = head
+          aiAgain = 0
           console.log(head)
           window.api.logTelemetry(head)
           if (!thought || thought.candidates.length === 0) return

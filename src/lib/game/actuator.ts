@@ -100,9 +100,20 @@ export const WATER_PROBE = 150
  * answer. */
 const AIM_STUCK_SECONDS = 0.5
 
-/** Keep walking while facing within this of the bearing; outside it, turn
- * on the spot first. */
-const WALK_CONE = Math.PI / 4
+/**
+ * A walk is TURN FIRST, THEN GO — play's own spec, given twice: for the
+ * walk-away swim ("сначала поворот, а потом вперёд") and now for the
+ * machine's own legs ("надо сделать повороты и хождение полностью
+ * отдельными — не надо ходить и поворачиваться сразу"). Walking and turning
+ * at once curves the path and reads as a pig lurching about.
+ *
+ * Two thresholds, so the seam cannot oscillate: the walk STARTS when the
+ * turn's own deadband says aligned (one step's sweep, `turnToward`), and it
+ * only stops to RE-ALIGN when the bearing has drifted past this — wide
+ * enough that the ordinary drift of a straight leg never trips it, tight
+ * enough that a pig walking past its point stops and comes back.
+ */
+const REALIGN = Math.PI / 8
 
 /** The shortest way round: (-π, π]. Brains borrow it (lib/game/grunt.ts). */
 export const shortest = (angle: number): number => {
@@ -121,6 +132,8 @@ export function createActuator(rig: Rig): Actuator {
    * improved. */
   let best = Infinity
   let stalled = 0
+  /** The walk's phase: facing the bearing yet? Turn first, then go. */
+  let aligned = false
   /** The fire button: pressed yet? */
   let pressed = false
 
@@ -170,14 +183,26 @@ export function createActuator(rig: Rig): Actuator {
         const bearing = Math.atan2(dx, dz)
         const { heading } = rig.at()
         const off = shortest(bearing - heading)
-        const walking = Math.abs(off) < WALK_CONE
+        // TURN FIRST, THEN GO (see REALIGN above): out of alignment the legs
+        // only turn, and a straight leg only stops to re-align once the
+        // bearing has drifted wide.
+        if (aligned && Math.abs(off) > REALIGN) aligned = false
+        if (!aligned) {
+          const turn = turnToward(bearing, delta)
+          if (turn !== 0) {
+            // Turning on the spot is never a stall: a half-turn takes over
+            // four seconds and the engine never refuses one.
+            rig.intent(0, turn)
+            return
+          }
+          aligned = true
+        }
         // THE WATER GUARD: about to stride, from dry ground, onto water —
         // stop where a player would. The probe looks along the HEADING,
         // because that is the way the legs actually carry the pig. A pig
         // whose class SWIMS is waved through: for it the water is a road,
         // and the brain's own transit rule keeps it from stopping there.
         if (
-          walking &&
           !rig.swims() &&
           !rig.wet(x, z) &&
           rig.wet(x + Math.sin(heading) * WATER_PROBE, z + Math.cos(heading) * WATER_PROBE)
@@ -186,15 +211,13 @@ export function createActuator(rig: Rig): Actuator {
           finish('blocked', 'water')
           return
         }
-        rig.intent(walking ? 1 : 0, turnToward(bearing, delta))
+        rig.intent(1, 0)
         // No progress WHILE WALKING is the world saying no — a wall, a body,
-        // the wedge counter — and the brain hears `blocked`. Turning on the
-        // spot is not counted: a half-turn takes over four seconds and the
-        // engine never refuses one.
+        // the wedge counter — and the brain hears `blocked`.
         if (distance < best - PROGRESS) {
           best = distance
           stalled = 0
-        } else if (walking && (stalled += delta) >= STUCK_SECONDS) {
+        } else if ((stalled += delta) >= STUCK_SECONDS) {
           rig.intent(0, 0)
           finish('blocked', 'stuck')
         }
@@ -244,6 +267,7 @@ export function createActuator(rig: Rig): Actuator {
     best = Infinity
     stalled = 0
     pressed = false
+    aligned = false
   }
 
   return {

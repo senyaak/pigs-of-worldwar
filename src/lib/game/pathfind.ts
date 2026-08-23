@@ -37,6 +37,7 @@
 import { WORLD_LIMIT } from './terrain'
 import { SWIM_SPEED, WALL_CLIMB } from './locomotion'
 import { WALK_SPEED } from './movement'
+import { WATER_PROBE } from './actuator'
 
 /**
  * What one swum unit costs in walked ones — the engine's own two speeds,
@@ -153,6 +154,34 @@ export function route(
     )
   }
 
+  /**
+   * …and for a NON-SWIMMER the margin grows to the LEGS' OWN GUARD: the
+   * actuator refuses a stride with water `WATER_PROBE` ahead of the feet
+   * (lib/game/actuator.ts), so a cell the route hands out must hold that
+   * probe from anywhere inside it — centre offset plus probe, an eight-point
+   * ring. Without this the two disagreed on the seam and the disagreement
+   * was a LOOP: telemetry watched a grunt walk the same corner into
+   * `blocked(water)` three turns running, passing each time, until it died
+   * on the spot (`_tmp/ai-session-2026-08-23.log`, DEN). The route either
+   * goes AROUND now or honestly ends short; the swimmer's half-cell `wetted`
+   * above is untouched — for it water is a road, priced, not a grave.
+   */
+  const guarded = (x: number, z: number): boolean => {
+    if (wetted(x, z)) return true
+    const reach = WATER_PROBE + GRID_STEP / 2
+    const diag = reach * Math.SQRT1_2
+    return (
+      ground.isWater(x + reach, z) ||
+      ground.isWater(x - reach, z) ||
+      ground.isWater(x, z + reach) ||
+      ground.isWater(x, z - reach) ||
+      ground.isWater(x + diag, z + diag) ||
+      ground.isWater(x + diag, z - diag) ||
+      ground.isWater(x - diag, z + diag) ||
+      ground.isWater(x - diag, z - diag)
+    )
+  }
+
   const step = (footY: number, cx: number, cz: number): { foot: number; wade: boolean } | null => {
     if (!inside(cx, cz)) return null
     const x = at(cx)
@@ -166,7 +195,7 @@ export function route(
     } else {
       if (!ground.walkable(x, z)) return null
       wade = wetted(x, z)
-      if (wade && !swims) return null
+      if (!swims && (wade || guarded(x, z))) return null
       if (ground.hasMine(x, z)) return null
       // A swimmer's feet ride the WATERLINE, not the seabed — measured off
       // the bed, climbing out of a real bay reads as a cliff.

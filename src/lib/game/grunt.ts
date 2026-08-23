@@ -29,7 +29,8 @@ import type { AiWorld, Brain, Seen, Thought } from './ai'
 import type { Order } from './orders'
 import { shortest } from './actuator'
 import { AIM_UNITS } from './aim'
-import { priceKit } from './evaluate'
+import { crateFallback, priceKit } from './evaluate'
+import type { Option } from './evaluate'
 import { BLAST_CORE } from './grenade'
 import { GRID_STEP } from './pathfind'
 import { SKILL } from './skills'
@@ -176,7 +177,46 @@ export function createGruntBrain(): Brain {
         )
       }
 
-      const option = priceKit(world, (one) => told.candidates.push(one))
+      /**
+       * Whether an option can ever be FIRED — from here, or from where the
+       * route actually ENDS. The route is best effort (lib/game/pathfind.ts):
+       * against a bay it stops at the shore, and an option whose target
+       * stays outside its own limit from there is a march to a pass.
+       * Telemetry watched that march cost fifty seconds before this check
+       * existed (DEN, `_tmp/ai-session-2026-08-23.log`).
+       */
+      const ends = new Map<string, { x: number; z: number }>()
+      const playable = (one: Option): boolean => {
+        const away = Math.hypot(one.target.x - me.x, one.target.z - me.z)
+        if (away <= one.limit) return true
+        const spot = `${one.target.x},${one.target.z}`
+        let end = ends.get(spot)
+        if (!end) {
+          const corners = world.route({ x: one.target.x, z: one.target.z })
+          end = corners && corners.length > 0 ? corners[corners.length - 1] : { x: me.x, z: me.z }
+          ends.set(spot, end)
+        }
+        return Math.hypot(one.target.x - end.x, one.target.z - end.z) <= one.limit
+      }
+
+      const priced: Option[] = []
+      let option = priceKit(world, (one) => {
+        told.candidates.push(one)
+        priced.push(one)
+      })
+      // The winner it CANNOT play is no winner: take the best candidate the
+      // ground allows instead, and failing every weapon, a crate is a
+      // necessity (lib/game/evaluate.ts, `crateFallback`) — a pig with
+      // nothing in reach still has a job.
+      if (option && !playable(option)) {
+        option =
+          priced
+            .filter((one) => one.score > 0 && one !== option)
+            .sort((a, b) => b.score - a.score)
+            .find(playable) ??
+          crateFallback(world) ??
+          null
+      }
       told.chose = option
       if (!option) return say('pass-nothing', pass(world))
 

@@ -331,6 +331,41 @@ const crateOption = (
 export const SKILLLESS = -1
 
 /**
+ * The crate as a NECESSITY — full face value, no appetite, nearest first.
+ *
+ * The appetite knob prices a pickup for a pig that has BETTER things to do;
+ * a pig with no PLAYABLE weapon has none, and at mission-one wits the knob
+ * priced every crate under zero while the grunt skipped three turns straight
+ * standing beside them (telemetry, DEN — play: "это не тупость, это
+ * идиотизм"). The weaponless pig's own exemption already says the rule:
+ * necessity ignores appetite. This is the same exemption for a pig whose kit
+ * cannot REACH anything (lib/game/grunt.ts asks it only then). Nearest wins,
+ * because the point is having a job, not maximising it.
+ */
+export function crateFallback(world: AiWorld): Option | null {
+  const me = world.acting
+  let best: Option | null = null
+  let nearest = Infinity
+  for (const crate of world.crates) {
+    const gain = crate.skill === null ? crate.amount : weaponPoints(crate.skill)
+    if (gain <= 0) continue
+    const away = distance2d(me, crate)
+    if (away >= nearest) continue
+    nearest = away
+    best = {
+      skill: crate.skill ?? SKILLLESS,
+      kind: 'crate',
+      target: { x: crate.x, y: 0, z: crate.z, health: 0 },
+      score: gain,
+      worth: gain,
+      reach: COLLECT_NEAR,
+      limit: Infinity
+    }
+  }
+  return best
+}
+
+/**
  * The kit priced whole — and the ground too: the best (item × target) pair
  * or the best crate walk, or null when nothing scores above zero (then the
  * pass is the honest move — a negative option is never taken just for
