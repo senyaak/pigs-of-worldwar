@@ -932,6 +932,51 @@ What is actually missing, in the order it is worth doing:
    thirteen shots — the grenades connect now that the fuse is watched every
    frame — one grunt left standing).
 
+**NEXT UP — the thrown pig "rolls on the spot" (2026-08-24, play):** after
+the 45° pitch floor (commit 5ba4107) the toss visibly happens but carries
+no GROUND DISTANCE — "всё ещё нет движения по земле — будто трение слишком
+большое — катится на месте." The order is: MEASURE FIRST (memory:
+measure-the-miss) — a headless bench that flings a pig at
+flingSpeed(30)=fromExeSpeed(180) at 45° over flat ground through the REAL
+tumble+locomotion path and prints x/y/velocity per frame to a _tmp log,
+then kill suspects in the order the numbers indict them. The suspect list,
+all in lib/game/locomotion.ts `fly()` unless said otherwise:
+
+1. **The horizontal BLEED**: `a.vx *= bleed` every frame with
+   `bleed = 1 − delta·(1/FALL_TAU + 1/DRAG_TAU)` — the horizontal pays
+   BOTH the gravity relaxation and the drag; check the taus' size against
+   a ~1-second flight. The exe's own integrator has drag but its knocks
+   visibly carry — compare what 0x40 at 45° travels there (25 Hz frames)
+   vs here.
+2. **Settling DISCARDS the leftover velocity**: when the arrival's NORMAL
+   speed is under BOUNCE_CUTOFF the flight ends (`state.airborne = null`)
+   and whatever horizontal remained vanishes — no slide-out, no roll.
+   After one or two bounces the normal component is small while the
+   horizontal may still be large: that is "катится на месте". The exe
+   zeroes velocity under 25/frame too (0x471350, movement/notes.md) but
+   only reaches it at genuinely slow arrivals — check our cutoff value
+   and whether bounces bleed the PARALLEL part they should carry.
+3. **`bounceOff` + `groundMaterial`**: the comment says the slope-parallel
+   part "carries whole" — verify the material friction is not scaling it
+   per bounce (lib/game/materials or wherever groundMaterial lives; tile
+   materials were read as friction 0.25→0.15 in 4096ths —
+   movement/notes.md).
+4. **`easeBounciness`**: free pigs land with low bounciness — if the first
+   landing reflects almost nothing, item 2 fires immediately.
+5. **`obstruction.blocks` zeroes vx/vz dead** on any prop contact at reach
+   0 — a fling near scenery loses its whole horizontal in one frame.
+6. Also check `tumbles.update` is stepped with full delta during the
+   post-blast aftermath beat (lib/game/battle.ts) — a starved flight looks
+   exactly like friction.
+
+The reference behaviour `[play]`: a knocked pig should visibly TRAVEL and
+roll back along the ground ("ещё и по земле откатывает"), like the
+originals' 45° knocks. The originals' landing/bounce reads are in
+movement/notes.md (impact handler 0x4711d8: ≥25/frame bounces at 0x471247,
+under it zeroes at 0x471350; contact solver: restitution −(1+e)·vn on the
+normal, parallel untouched, friction is material product — the parallel
+part SURVIVES a bounce there).
+
 **Play's open reports from the first AI session (2026-08-23), in their
 order:**
 
