@@ -795,13 +795,31 @@ export function initBattle(
         // console: where it went off, and what velocity each victim left with.
         // Cheap (explosions only), and the next report carries numbers.
         blasted: ({ at, effect }) => {
-          console.log(`[blast] at ${at.x.toFixed(0)},${at.y.toFixed(0)},${at.z.toFixed(0)} effect 0x${effect.toString(16)}`)
+          const line = `[blast] at ${at.x.toFixed(0)},${at.y.toFixed(0)},${at.z.toFixed(0)} effect 0x${effect.toString(16)}`
+          console.log(line)
+          window.api.logTelemetry(line)
         },
         flung: ({ pig, at, vx, vy, vz }) => {
-          console.log(
+          const line =
             `[fling] pig ${pig} at ${at.x.toFixed(0)},${at.y.toFixed(0)},${at.z.toFixed(0)} ` +
-              `v ${vx.toFixed(0)},${vy.toFixed(0)},${vz.toFixed(0)} flat ${Math.hypot(vx, vz).toFixed(0)}`
-          )
+            `v ${vx.toFixed(0)},${vy.toFixed(0)},${vz.toFixed(0)} flat ${Math.hypot(vx, vz).toFixed(0)}`
+          console.log(line)
+          window.api.logTelemetry(line)
+          // …and the answer to "did it actually MOVE": the same body, three
+          // seconds later. Wall clock is fine here — this is a session log,
+          // not a spec, and the flight is over in under two.
+          setTimeout(() => {
+            const one = game?.players
+              .flatMap((player) => player.pigs)
+              .find((p) => p.id === pig)
+            if (!one) return
+            const moved = Math.hypot(one.position.x - at.x, one.position.z - at.z)
+            const end =
+              `[fling-end] pig ${pig} at ${one.position.x.toFixed(0)},${one.position.y.toFixed(0)},${one.position.z.toFixed(0)} ` +
+              `moved ${moved.toFixed(0)}`
+            console.log(end)
+            window.api.logTelemetry(end)
+          }, 3000)
         },
         promotionPoint: ({ total }) => {
           points = total

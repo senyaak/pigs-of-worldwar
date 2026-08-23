@@ -207,6 +207,8 @@ export interface Api {
   readSave(name: string): Promise<ReadSaveResult>
   writeSave(name: string, text: string): Promise<WriteSaveResult>
   deleteSave(name: string): Promise<WriteSaveResult>
+  /** One line into _tmp/telemetry.log — fire-and-forget (src/main/telemetry.ts). */
+  logTelemetry(line: string): void
   quit(): Promise<void>
 }
 

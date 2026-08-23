@@ -42,5 +42,8 @@ contextBridge.exposeInMainWorld('api', {
   writeSave: (name: string, text: string): Promise<unknown> =>
     ipcRenderer.invoke('save:write', name, text),
   deleteSave: (name: string): Promise<unknown> => ipcRenderer.invoke('save:delete', name),
+  logTelemetry: (line: string): void => {
+    ipcRenderer.send('telemetry:log', line)
+  },
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit')
 })

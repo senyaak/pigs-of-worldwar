@@ -9,6 +9,7 @@ import { promises as fs } from 'node:fs'
 import { parseArchive } from '../lib/formats/mad'
 import { getGameDir, insideGameDir, setGameDir, walkDir } from './gameDir'
 import { deleteSave, listSaves, readSave, savesDir, writeSave } from './saves'
+import { logTelemetry } from './telemetry'
 import {
   loadArchiveBmps,
   loadClips,
@@ -30,6 +31,12 @@ function fail(context: string, error: unknown): { ok: false; error: string } {
 }
 
 export function registerIpc(): void {
+  // One-way and unvalidated by design: a telemetry line is a string for a
+  // human, and dropping a malformed one costs nothing (src/main/telemetry.ts).
+  ipcMain.on('telemetry:log', (_event, line: unknown) => {
+    if (typeof line === 'string' && line.length <= 512) logTelemetry(line)
+  })
+
   ipcMain.handle('game:getDir', () => getGameDir())
 
   // The dialog below is a native picker no e2e test can drive — this is the
