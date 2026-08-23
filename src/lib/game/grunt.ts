@@ -201,9 +201,9 @@ export function createGruntBrain(): Brain {
       // A SWIMMER mid-crossing: TRANSIT ONLY. Nothing is done IN the water
       // — the hands are empty and the engine keeps them so — the fight
       // starts on dry ground, and the route chose the water exactly when
-      // crossing was shorter than walking round (lib/game/pathfind.ts,
-      // uniform cost). Play's rule: "в воде делать нечего — максимум
-      // сократить путь."
+      // crossing was QUICKER than walking round (lib/game/pathfind.ts,
+      // time cost: a stroke is SWIM_COST of a stride). Play's rule: "в
+      // воде делать нечего — максимум сократить путь."
       if (world.swimming) {
         const step = grounded ? null : walkThe(dryApproach())
         return step ?? shore(world)

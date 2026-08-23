@@ -1100,8 +1100,9 @@ export function createBattle(parts: BattleParts): Battle {
             // plan: pigs move between the plan and the walk, and the
             // actuator's `blocked` guards that difference. `swims` is the
             // pig's CLASS (lib/game/drowning.ts): a swimmer's route may
-            // cross water — and uniform cost means it does so exactly when
-            // crossing is shorter — a grunt's never does.
+            // cross water — priced at the swim's own slowness, so only
+            // when crossing is QUICKER than walking round — a grunt's
+            // never does.
             route: (to) =>
               route(
                 {

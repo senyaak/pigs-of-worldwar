@@ -47,11 +47,10 @@ test('water stops a walker and carries a swimmer', { tag: '@nodata' }, () => {
 })
 
 test('for a swimmer the water is a SHORTCUT: across the bay, not round it', { tag: '@nodata' }, () => {
-  // A bay two cells wide spans the world except for a far land bridge at
-  // x >= 1280. Uniform cost is the whole rule (docs/ai.md): the swimmer
-  // crosses exactly because crossing is shorter, the walker takes the long
-  // way round — nothing about the water is priced, it is simply a road for
-  // one and a wall for the other.
+  // A bay spans the world except for a far land bridge at x >= 1280. The
+  // cost is TIME (docs/ai.md): a wet step costs SWIM_COST (~4.3) of a dry
+  // one, and here even at that price the crossing beats the long way
+  // round — so the swimmer crosses and the walker detours.
   const ground = flat({ isWater: (x, z) => x < 1280 && z >= 256 && z <= 512 })
   const from = { x: 0, z: 0 }
   const goal = { x: 0, z: 768 }
@@ -73,6 +72,38 @@ test('for a swimmer the water is a SHORTCUT: across the bay, not round it', { ta
   expect(walker.some((corner) => corner.x >= 1280)).toBe(true)
   expect(swimmer.every((corner) => corner.x === 0)).toBe(true)
   expect(length(swimmer)).toBeLessThan(length(walker))
+})
+
+test('…and ROUND the water when the walk is quicker than the swim', { tag: '@nodata' }, () => {
+  // The same bay, but the land bridge is CLOSE (x >= 384): swimming the
+  // three wet cells costs ~2050 in walked units against a ~1300 detour, so
+  // the time model sends the swimmer round on its legs. Play's rule:
+  // "через воду намного медленнее" — a crossing that saves distance but
+  // not time is no shortcut.
+  const ground = flat({ isWater: (x, z) => x < 384 && z >= 256 && z <= 512 })
+  const swimmer = route({ ground, swims: true }, { x: 0, z: 0 }, { x: 0, z: 768 })!
+  expect(swimmer.at(-1)).toEqual({ x: 0, z: 768 })
+  expect(swimmer.some((corner) => corner.x >= 448)).toBe(true)
+})
+
+test('a swimmer rides the WATERLINE: a deep bay is crossed, and left again', { tag: '@nodata' }, () => {
+  // The bay's BED lies four climb envelopes down. Feet measured off the bed
+  // would make the far shore a cliff — routed in, never out — so a wet cell
+  // stands on the SURFACE the ground names, and the crossing completes.
+  const drowned = {
+    isWater: (_x: number, z: number) => z >= 256 && z <= 512,
+    height: (_x: number, z: number) => (z >= 256 && z <= 512 ? WALL_CLIMB * 4 : 0)
+  }
+  const out = route(
+    { ground: flat({ ...drowned, surface: () => 0 }), swims: true },
+    { x: 0, z: 0 },
+    { x: 0, z: 768 }
+  )!
+  expect(out.at(-1)).toEqual({ x: 0, z: 768 })
+  // …and without a surface the bed is all there is: the route bogs down in
+  // the bay, which is the failure the field exists to prevent.
+  const bedded = route({ ground: flat(drowned), swims: true }, { x: 0, z: 0 }, { x: 0, z: 768 })!
+  expect(bedded.at(-1)!.z).toBeLessThan(768)
 })
 
 test('a known mine is walked ROUND, never onto', { tag: '@nodata' }, () => {

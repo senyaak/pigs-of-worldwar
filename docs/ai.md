@@ -80,12 +80,15 @@ score: enumerate pairs of **(kit item × target or point)** and take the best
   pathfinder that is the `swims` flag: a wall for most, a road for those.
 - **For a swimmer the water is TRANSIT, never a destination** `[play]` —
   "если умеет плавать — можно плыть, но в воде делать нечего. максимум
-  сократить путь." Nothing needs pricing for that: with uniform step cost
-  the route crosses water exactly when crossing is shorter than walking
-  round, which IS the shortcut rule. What the brain adds is the other half:
-  no order but a walk is ever given mid-swim (the engine empties swimming
-  hands), and every standing goal — the shy mark a shot is taken from — is
-  pressed on to DRY ground first (lib/game/grunt.ts, `dryApproach`).
+  сократить путь," and the second half of the ruling prices it: "через
+  воду намного медленнее." The route's currency is TIME: a wet step costs
+  `SWIM_COST` (≈4.3 — `WALK_SPEED / SWIM_SPEED`, the engine's own two
+  speeds) of a dry one, so the water is crossed exactly when crossing
+  saves time, never merely distance (lib/game/pathfind.ts). What the brain
+  adds is the other half: no order but a walk is ever given mid-swim (the
+  engine empties swimming hands), and every standing goal — the shy mark a
+  shot is taken from — is pressed on to DRY ground first
+  (lib/game/grunt.ts, `dryApproach`).
 - **Healing is just a kit item** whose "damage" lands on the ally side with
   a plus sign. A medic heals because his kit prices healing highest, not
   because he is a medic. Class flavour, if any is ever wanted, is a weight
@@ -134,12 +137,14 @@ and works worse against a veteran, exactly like against a human.
 ## The pathfinder: ours, coarse, verified by the walk
 
 There is none today and the original's is unread. The plan: a coarse A* on
-`walkable`/`standOn` — and the cost model is the engine's own, which is to
-say THERE ISN'T ONE: a step costs its distance everywhere, because the walk
-is one speed on any slope (`WALK_SPEED` is flat; only a wounded pig slows,
-and that is the pig's property, not the ground's). The world is BINARY —
-walkable, forbidden (wall, void, known mine), lethal (water for a
-non-swimmer) — with one real subtlety: the graph is DIRECTED. A drop of any
+`walkable`/`standOn` — and the cost model is the engine's own: TIME, with
+one speed on land. A step costs its distance on any slope (`WALK_SPEED` is
+flat; only a wounded pig slows, and that is the pig's property, not the
+ground's), and the ONE exception is the engine's too: a swimmer's wet step
+costs `SWIM_COST` (≈4.3) of a dry one, because the stroke is that much
+slower than the stride. The world is otherwise BINARY — walkable, forbidden
+(wall, void, known mine), lethal (water for a non-swimmer) — with one real
+subtlety: the graph is DIRECTED. A drop of any
 height is walked off; the way back up is capped by the climb envelope
 (`WALL_CLIMB`, 128), so an edge down is not an edge up. Soft preferences
 (keep out of a firing lane, don't bunch up) are the BRAIN's weights on the

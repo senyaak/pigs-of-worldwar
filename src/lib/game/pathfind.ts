@@ -1,12 +1,16 @@
 // The route round the world: A* on a coarse grid, for brains to walk by.
 //
-// The cost model is the engine's own, which is to say THERE ISN'T ONE
-// (docs/ai.md): a step costs its distance everywhere, because the walk is
-// one speed on any slope. The world is BINARY — walkable, forbidden (wall,
-// void, known mine), lethal (water for a non-swimmer) — with one real
-// subtlety: the graph is DIRECTED. A drop of any height is walked off; the
-// way back up is capped by the climb envelope (`WALL_CLIMB`), so an edge
-// down is not an edge up.
+// The cost model is the engine's own, which is to say it is TIME and the
+// land has one speed (docs/ai.md): a step costs its distance on any slope,
+// because the walk is one speed everywhere. The ONE exception is the
+// engine's own too: a swimmer's stroke is a quarter of a stride
+// (`SWIM_COST` below — play: "через воду намного медленнее"), so a wet
+// step costs its distance times that, and the water is crossed exactly
+// when crossing SAVES TIME, never merely distance. Otherwise the world is
+// BINARY — walkable, forbidden (wall, void, known mine), lethal (water for
+// a non-swimmer) — with one real subtlety: the graph is DIRECTED. A drop
+// of any height is walked off; the way back up is capped by the climb
+// envelope (`WALL_CLIMB`), so an edge down is not an edge up.
 //
 // THE GROUND IS NOT ALWAYS THE LANDSCAPE. A bridge deck or a ramp is a
 // walkway the OBSTRUCTION world holds over the terrain (lib/game/
@@ -31,7 +35,17 @@
 // Deterministic: fixed neighbour order, no chance, pure over its inputs.
 
 import { WORLD_LIMIT } from './terrain'
-import { WALL_CLIMB } from './locomotion'
+import { SWIM_SPEED, WALL_CLIMB } from './locomotion'
+import { WALK_SPEED } from './movement'
+
+/**
+ * What one swum unit costs in walked ones — the engine's own two speeds,
+ * nothing tuned: the walk covers ~4.3 units in the time a stroke covers one
+ * (`WALK_SPEED`, `SWIM_SPEED`). This is what makes the water a SHORTCUT
+ * only when it truly is one: a swimmer crosses when the dry way round costs
+ * more time, and walks round when it does not.
+ */
+export const SWIM_COST = WALK_SPEED / SWIM_SPEED
 
 /** What the route asks of the landscape — the shape `TerrainQuery` already
  * has, and a spec fakes in ten lines. */
@@ -40,6 +54,12 @@ export interface Ground {
   height(x: number, z: number): number
   isWater(x: number, z: number): boolean
   hasMine(x: number, z: number): boolean
+  /** The WATERLINE at a wet point — where a swimmer's feet actually ride
+   * (`TerrainQuery.surface`). Without it a wet cell stands on the SEABED,
+   * and climbing out of any real bay reads as a cliff the legs refuse:
+   * the swimmer routes in and never out. Optional only for the synthetic
+   * grounds whose water has no depth. */
+  surface?(x: number, z: number): number
 }
 
 /** …and of the prop world: the walkways and the walls
@@ -58,7 +78,8 @@ export interface RouteAsk {
   /** The props — walkways to stand on, walls to refuse. None assumed. */
   obstruction?: Standing
   /** Whether water is a road or a grave (docs/ai.md: only the swimming
-   * classes cross). */
+   * classes cross) — and a SLOW road at that: a wet step costs `SWIM_COST`
+   * of a dry one. */
   swims?: boolean
 }
 
@@ -132,25 +153,29 @@ export function route(
     )
   }
 
-  const step = (footY: number, cx: number, cz: number): number | null => {
+  const step = (footY: number, cx: number, cz: number): { foot: number; wade: boolean } | null => {
     if (!inside(cx, cz)) return null
     const x = at(cx)
     const z = at(cz)
     if (props.blocks(x, z, footY, WALL_CLIMB)) return null
     const deck = props.standOn(x, z, footY, WALL_CLIMB)
     let foot: number
+    let wade = false
     if (deck !== null) {
       foot = deck
     } else {
       if (!ground.walkable(x, z)) return null
-      if (!swims && wetted(x, z)) return null
+      wade = wetted(x, z)
+      if (wade && !swims) return null
       if (ground.hasMine(x, z)) return null
-      foot = ground.height(x, z)
+      // A swimmer's feet ride the WATERLINE, not the seabed — measured off
+      // the bed, climbing out of a real bay reads as a cliff.
+      foot = wade ? (ground.surface?.(x, z) ?? ground.height(x, z)) : ground.height(x, z)
     }
     // The DIRECTED half: landing higher than the envelope reaches is a
     // climb the legs cannot make. Any drop is walked off.
     if (footY - foot > WALL_CLIMB) return null
-    return foot
+    return { foot, wade }
   }
 
   const startX = gx(from.x)
@@ -242,11 +267,15 @@ export function route(
         continue
       }
       const nk = key(nx, nz)
-      const cost = g + (way.dx !== 0 && way.dz !== 0 ? GRID_STEP * Math.SQRT2 : GRID_STEP)
+      // The stride's TIME: its length, times the swim's slowness when the
+      // landing is wet. The heuristic below prices every unit at the walk's
+      // 1, which stays admissible — no step is ever cheaper than that.
+      const stride = way.dx !== 0 && way.dz !== 0 ? GRID_STEP * Math.SQRT2 : GRID_STEP
+      const cost = g + stride * (landing.wade ? SWIM_COST : 1)
       const known = gScore.get(nk)
       if (known !== undefined && known <= cost) continue
       gScore.set(nk, cost)
-      feet.set(nk, landing)
+      feet.set(nk, landing.foot)
       parent.set(nk, k)
       push(nk, cost + heuristic(nx, nz))
     }
