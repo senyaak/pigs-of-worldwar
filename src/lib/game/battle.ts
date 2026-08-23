@@ -1719,6 +1719,14 @@ export function createBattle(parts: BattleParts): Battle {
     },
     announce: emit,
     fling(pig, velocity, ejected = false) {
+      emit({
+        kind: 'flung',
+        pig: pig.id,
+        at: { x: pig.position.x, y: pig.position.y, z: pig.position.z },
+        vx: velocity.vx,
+        vy: velocity.vy,
+        vz: velocity.vz
+      })
       if (pig !== game.currentPig) {
         tumbles.fling(pig, velocity, ejected)
         return

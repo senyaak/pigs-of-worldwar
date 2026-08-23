@@ -53,6 +53,13 @@ export type BattleEvent =
   /** Something went off here, and WHICH effect id it spawns: a grenade and a
    * mine do not look alike (lib/game/blast.ts, `Charge.effect`). */
   | { kind: 'blasted'; at: Point; effect: number }
+  /** A pig was THROWN — a blast's, a melee's or an eject's fling, with the
+   * velocity it left at (game space, up is −Y). Announced at the one seam
+   * every throw crosses (lib/game/battle.ts `fling`), and put on the bus for
+   * telemetry first: play reported flings that visibly went nowhere, and a
+   * session log that says what the launch actually was settles in one line
+   * what three headless probes could not. */
+  | { kind: 'flung'; pig: PigId; at: Point; vx: number; vy: number; vz: number }
   /** A BULLET is done, wherever it ended — a body, the ground, a box, or the
    * end of its reach (lib/game/bullets.ts). What the beat after a blow hangs
    * off for a gun: the exe's wait runs after EVERY weapon use, not only the

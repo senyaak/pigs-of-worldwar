@@ -789,6 +789,20 @@ export function initBattle(
           const killer = game?.players[0]?.pigs.find((p) => p.id === by)
           if (killer) kills[killer.index] = (kills[killer.index] ?? 0) + 1
         },
+        // FLING TELEMETRY — play has twice reported a knocked pig that went
+        // nowhere, and three headless probes could not reproduce it. These two
+        // lines put the actual launch of every real blast in the devtools
+        // console: where it went off, and what velocity each victim left with.
+        // Cheap (explosions only), and the next report carries numbers.
+        blasted: ({ at, effect }) => {
+          console.log(`[blast] at ${at.x.toFixed(0)},${at.y.toFixed(0)},${at.z.toFixed(0)} effect 0x${effect.toString(16)}`)
+        },
+        flung: ({ pig, at, vx, vy, vz }) => {
+          console.log(
+            `[fling] pig ${pig} at ${at.x.toFixed(0)},${at.y.toFixed(0)},${at.z.toFixed(0)} ` +
+              `v ${vx.toFixed(0)},${vy.toFixed(0)},${vz.toFixed(0)} flat ${Math.hypot(vx, vz).toFixed(0)}`
+          )
+        },
         promotionPoint: ({ total }) => {
           points = total
         },
