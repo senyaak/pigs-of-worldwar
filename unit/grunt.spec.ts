@@ -35,9 +35,14 @@ const world = (over: {
   wet?: AiWorld['wet']
   swimming?: boolean
   swims?: boolean
+  wits?: number
+  roll?: AiWorld['roll']
 }): AiWorld => ({
   timeLeft: 45,
-  wits: 0,
+  wits: over.wits ?? 0,
+  // 0.5 is the NEUTRAL roll: a misjudgment factor of exactly 1, so every
+  // spec below reads the price list's own arithmetic unless it rigs one.
+  roll: over.roll ?? (() => 0.5),
   previous: over.previous ?? null,
   acting: {
     x: 0,
@@ -93,6 +98,33 @@ test('of two guns the kit holds, the harder-hitting one comes out', { tag: '@nod
     })
   )
   expect(order).toEqual({ kind: 'hold', skill: stronger })
+})
+
+test('a dumb brain MISJUDGES the kit — once a turn, and held', { tag: '@nodata' }, () => {
+  const brain = createGruntBrain()
+  const kit = [
+    { skill: SKILL.RIFLE, amount: UNLIMITED },
+    { skill: SKILL.GRENADE, amount: 3 }
+  ]
+  // The rifle is judged HIGH (first roll) and the grenade LOW (second): at
+  // wits 0 the grenade's exact 30 reads under the rifle's exact 20, and the
+  // "wrong" gun comes out — an honest mistake, not a die (lib/game/grunt.ts,
+  // MISJUDGE; play: "они всегда выбирали бить свиней гранатами").
+  const rolls = [0.99, 0.01]
+  let handed = 0
+  const rigged = (): ReturnType<typeof world> =>
+    world({ carrying: kit, roll: () => rolls[Math.min(handed++, rolls.length - 1)] })
+  expect(brain.decide(rigged())).toEqual({ kind: 'hold', skill: SKILL.RIFLE })
+  // The judgment is rolled ONCE and held for the turn: the same decision
+  // asked again spends no new rolls and picks no new gun — a re-rolled
+  // judgment is the rifle-skip-rifle flip-flop by another door.
+  const asked = handed
+  expect(brain.decide(rigged())).toEqual({ kind: 'hold', skill: SKILL.RIFLE })
+  expect(handed).toBe(asked)
+  // At full wits the judgment IS the truth, whatever the roll says.
+  expect(
+    createGruntBrain().decide(world({ carrying: kit, wits: 1, roll: () => 0.99 }))
+  ).toEqual({ kind: 'hold', skill: SKILL.GRENADE })
 })
 
 test('too far: walk at the target, stopping shy of the range', { tag: '@nodata' }, () => {

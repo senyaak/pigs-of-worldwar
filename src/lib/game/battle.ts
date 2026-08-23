@@ -1153,6 +1153,9 @@ export function createBattle(parts: BattleParts): Battle {
         const decided = brain.decide({
             timeLeft: game.timeLeft,
             wits: parts.wits ?? 0,
+            // The battle's one stream: the brain's misjudgment rolls from
+            // it, so lockstep stays lockstep (lib/game/grunt.ts, MISJUDGE).
+            roll: parts.random,
             previous,
             acting: {
               x: acting.position.x,

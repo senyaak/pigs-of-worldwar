@@ -372,10 +372,24 @@ export function crateFallback(world: AiWorld): Option | null {
  * being the only one). Ties go to the kit's own order — deterministic,
  * like everything here.
  */
-export function priceKit(world: AiWorld, note?: (option: Option) => void): Option | null {
+export function priceKit(
+  world: AiWorld,
+  note?: (option: Option) => void,
+  /** The brain's own JUDGMENT of a score — misjudgment applied
+   * (lib/game/grunt.ts, `MISJUDGE`). The arithmetic above stays exact;
+   * what a dumb brain gets wrong is what it makes of the numbers. Absent,
+   * the judgment is the truth. */
+  judge?: (option: Option) => number
+): Option | null {
   let best: Option | null = null
+  let bestJudged = 0
   const keep = (option: Option | null): void => {
-    if (option && option.score > 0 && (!best || option.score > best.score)) best = option
+    if (!option) return
+    const judged = judge ? judge(option) : option.score
+    if (judged > 0 && (!best || judged > bestJudged)) {
+      best = option
+      bestJudged = judged
+    }
   }
   for (const slot of world.acting.carrying) {
     if (slot.amount === 0) continue

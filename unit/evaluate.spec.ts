@@ -25,6 +25,9 @@ const world = (over: {
 }): AiWorld => ({
   timeLeft: 45,
   wits: over.wits ?? 0,
+  // Neutral: the price list is tested on its own arithmetic — the
+  // misjudgment is the BRAIN's and pinned in unit/grunt.spec.ts.
+  roll: () => 0.5,
   previous: null,
   acting: {
     x: 0,

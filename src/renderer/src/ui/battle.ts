@@ -881,13 +881,21 @@ export function initBattle(
           console.log(head)
           window.api.logTelemetry(head)
           if (!thought || thought.candidates.length === 0) return
-          const rows = [...thought.candidates].sort((a, b) => b.score - a.score)
+          // Sorted by what the brain BELIEVED (the misjudged score, where one
+          // was made), because that is the order it chose in; the true score
+          // prints first and the belief after a tilde.
+          const rows = [...thought.candidates].sort(
+            (a, b) => (b.judged ?? b.score) - (a.judged ?? a.score)
+          )
           const shown = rows
             .slice(0, 6)
             .map(
               (c) =>
                 `${c === thought.chose ? '*' : ''}${c.kind} ${skillTag(c.skill)}->` +
-                `${spot(c.target)} s${Math.round(c.score)}`
+                `${spot(c.target)} s${Math.round(c.score)}` +
+                (c.judged !== undefined && Math.round(c.judged) !== Math.round(c.score)
+                  ? `~${Math.round(c.judged)}`
+                  : '')
             )
           const more = rows.length > 6 ? ` +${rows.length - 6} more` : ''
           const kit = `[ai:kit] ${name} ${shown.join(' | ')}${more}`

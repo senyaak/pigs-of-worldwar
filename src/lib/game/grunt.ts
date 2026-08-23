@@ -55,6 +55,24 @@ export const PITCH_WITHIN = 12
  * and the margin is a stride. `[deliberate]`. */
 export const FLEE_CLEAR = 1900
 
+/**
+ * How badly the DUMBEST brain misjudges what a thing is worth — the
+ * docs/ai.md knob table's "estimate error", applied to the JUDGMENT: the
+ * price list's arithmetic stays exact and what a low-wits brain gets wrong
+ * is what it makes of the numbers, so its odd choices are honest mistakes,
+ * not dice ("the pig genuinely aimed with a bad estimate, it did not roll a
+ * die"). Play asked for it in as many words: "умность слишком большая — они
+ * всегда выбирали бить свиней гранатами, и никогда ящик или винтовку."
+ *
+ * Each (kind, skill) pair is misjudged ONCE PER TURN — the factor is rolled
+ * lazily off the battle's one stream and held until `reset` — because a
+ * judgment re-rolled every mull flip-flops the plan mid-carry (the
+ * rifle-skip-rifle class of bug, already paid for once). At wits 0 a score
+ * reads anywhere in ±MISJUDGE of itself; at wits 1 the judgment is the
+ * truth. `[deliberate]` — play's dial.
+ */
+export const MISJUDGE = 0.75
+
 /** The nearest DRY ground, by ring search off the crow line: what a pig
  * with no business in the water swims for. An ocean with no shore in reach
  * is watched to its end. */
@@ -100,6 +118,9 @@ export function createGruntBrain(): Brain {
   let pitched = false
   /** The last decision explained — telemetry's copy, never read back. */
   let thought: Thought | null = null
+  /** This turn's misjudgments, one factor per (kind, skill) — rolled once,
+   * held to the handover, so a bad judgment is a bad PLAN, not a wobble. */
+  const judgments = new Map<string, number>()
 
   // Passing takes the hands (SKIP TURN is fired like any skill), and
   // swimming hands are EMPTY — the engine strips them (lib/game/battle.ts)
@@ -199,11 +220,29 @@ export function createGruntBrain(): Brain {
         return Math.hypot(one.target.x - end.x, one.target.z - end.z) <= one.limit
       }
 
+      // The brain's own reading of a score (see MISJUDGE): wide at the
+      // bottom of the wits scale, the truth at the top.
+      const spread = MISJUDGE * (1 - world.wits)
+      const judge = (one: Option): number => {
+        const key = `${one.kind}:${one.skill}`
+        let factor = judgments.get(key)
+        if (factor === undefined) {
+          factor = 1 + spread * (2 * world.roll() - 1)
+          judgments.set(key, factor)
+        }
+        one.judged = one.score * factor
+        return one.judged
+      }
+
       const priced: Option[] = []
-      let option = priceKit(world, (one) => {
-        told.candidates.push(one)
-        priced.push(one)
-      })
+      let option = priceKit(
+        world,
+        (one) => {
+          told.candidates.push(one)
+          priced.push(one)
+        },
+        judge
+      )
       // The winner it CANNOT play is no winner: take the best candidate the
       // ground allows instead, and failing every weapon, a crate is a
       // necessity (lib/game/evaluate.ts, `crateFallback`) — a pig with
@@ -336,6 +375,7 @@ export function createGruntBrain(): Brain {
       grounded = false
       pitched = false
       thought = null
+      judgments.clear()
     }
   }
 }

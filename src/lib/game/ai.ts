@@ -54,6 +54,11 @@ export interface Candidate {
   score: number
   /** The undiscounted HP differential. */
   worth: number
+  /** What the brain BELIEVED it was worth, misjudgment applied — set only
+   * on the options the selection actually weighed (lib/game/grunt.ts,
+   * `MISJUDGE`; the per-target losers keep their exact arithmetic). What
+   * the telemetry prints beside the true score. */
+  judged?: number
 }
 
 /**
@@ -77,9 +82,14 @@ export interface AiWorld {
   /** The turn clock, seconds. */
   timeLeft: number
   /** How well this machine THINKS, 0..1 — the campaign ramp's dial
-   * (lib/game/wits.ts). It slides weights (the crate appetite today);
-   * it never picks behaviours. */
+   * (lib/game/wits.ts). It slides weights (the crate appetite, the
+   * misjudgment); it never picks behaviours. */
   wits: number
+  /** The battle's ONE random stream (lib/game/random.ts) — what the brain's
+   * misjudgment draws from (lib/game/grunt.ts, `MISJUDGE`), because a
+   * lockstep battle rolls the same on both machines and the brain gets no
+   * stream of its own. */
+  roll(): number
   /** How the last order ended — `blocked` is the world saying no, and the
    * cue to think of something else. Null before the first order finishes. */
   previous: Outcome | null

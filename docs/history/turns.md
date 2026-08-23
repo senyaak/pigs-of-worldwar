@@ -1030,3 +1030,26 @@ survivors 1v0), and the whole non-AI half of the session's report — the
 death's timing against the turn's beats, the missing boots, the holster, the
 shot's shove, the wounded bearing, the debrief's medals — is queued in
 docs/todo.md, AI first by play's own order.
+
+## The dumbest brain misjudges — MISJUDGE, the first real wits knob (2026-08-23)
+
+The second session's log answered the first's fixes ("щас не плохо") and
+raised the next thing: "умность слишком большая — они всегда выбирали бить
+свиней гранатами, и никогда ящик или винтовку." Right — every `[ai:kit]`
+line read identically, grenade s30 over rifle s20 over crates, because the
+price list is exact and exact arithmetic has one winner.
+
+The fix is docs/ai.md's own "estimate error" knob, applied to the JUDGMENT:
+the arithmetic stays exact, and what a low-wits brain gets wrong is what it
+makes of the numbers. Each (kind, skill) pair is misjudged once per turn —
+`score × (1 + MISJUDGE·(1−wits)·(2·roll−1))`, the roll off the battle's one
+stream through the new `AiWorld.roll` — and the factor is HELD to the
+handover, because a judgment re-rolled every mull is the rifle-skip-rifle
+flip-flop by another door. At wits 1 the judgment is the truth; the
+selection in `priceKit` takes an optional `judge` and compares beliefs. The
+telemetry prints both (`s30~8` — the truth, then what the brain believed),
+and the kit line sorts by belief, since that is the order it chose in.
+MISJUDGE = 0.75 `[deliberate]`, play's dial. Pinned in unit/grunt.spec.ts
+(wrong gun at wits 0 on a rigged roll, held across decisions, truth at wits
+1); the machine mission still plays to a verdict — and the other side won
+this run, which is the knob doing its job.
