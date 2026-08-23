@@ -244,3 +244,22 @@ it will land. `chase.watch` is mode 1, `chase.pursue` is 0x0D, and `chase.ride`
 stays what it was for the CRATE (mode 0, 0x4661c2). Mode 0x0A is read and NOT
 built — 1024 ahead of the subject's heading, then the usual three springs — and
 nothing that reaches it (34, 50 JETPACK) exists here yet.
+## The fade is one layer (2026-08-23)
+
+Play, of the trees: "когда деревья перекрывают — текстуры становятся
+полупрозрачными, но их очень много и свина всёравно не видно." Right — the fade
+was one blend PER SURFACE, and a stand of trees is many surfaces: three crowns
+at SEE_THROUGH 0.4 leave 0.6³ ≈ a fifth of the pig, and a single crown is
+itself a fistful of crossed quads doing the same before its neighbour joins in.
+
+The fix is a depth prepass (`three/props.ts`): while a record is faded, a
+depth-only twin of its mesh draws first — no colour, the ghost's own lowered
+alpha test so a leaf's keyed texels stay holes — and the ghost's art then draws
+with `EqualDepth`, so exactly the NEAREST faded fragment on each pixel blends
+and everything faded behind it is dropped. One blend of SEE_THROUGH everywhere,
+one tree deep or five, and the nearest surface's own texels are what shows.
+The masks render at one order, the faded art just after, both past the water
+sheet and the weather where the old single-pass ghosts already sat; putting a
+record back solid restores `renderOrder = id`, which is the house-corner
+flicker fix. The seethrough specs count faded records and never see any of
+this; whether the stand reads right is play's to say.

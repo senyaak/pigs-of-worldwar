@@ -41,6 +41,15 @@ const SEE_THROUGH = 0.4
 const UP = new THREE.Vector3(0, 1, 0)
 const TILT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), RAMP_TILT)
 
+/**
+ * Where the fade draws in the transparent queue: every faded record's DEPTH
+ * MASK first, then every faded record's art, after everything else that
+ * blends — which is where the old single-pass ghosts already sat, their
+ * record ids being far above the water sheet's 0 and the weather's 10.
+ */
+const FADE_MASK_ORDER = 10000
+const FADE_ART_ORDER = FADE_MASK_ORDER + 1
+
 export interface MapProps {
   /** Add to the battle's game-space root; not converted on its own. */
   group: THREE.Group
@@ -122,6 +131,17 @@ export function buildMapProps(
    *
    * `depthWrite` off, or a faded wall would still hide the pig behind it — the
    * whole point of the fade — and the pig is drawn in its own pass anyway.
+   *
+   * **THE FADE IS ONE LAYER, HOWEVER MUCH STANDS IN THE WAY.** Play: "когда
+   * деревья перекрывают — текстуры становятся полупрозрачными, но их очень
+   * много и свина всёравно не видно" — three crowns at 0.4 each leave 0.6³ ≈
+   * a fifth of him, and a single crown is itself a fistful of crossed quads
+   * doing the same. So the blend must not STACK, and the way it does not is a
+   * depth prepass: while a record is faded a twin mesh draws first writing
+   * DEPTH ONLY (`maskOf` below — no colour, same alpha test so the keyed
+   * texels stay holes), and the art then draws with `EqualDepth`, which lets
+   * through exactly the nearest faded fragment on each pixel and nothing
+   * behind it. One blend of SEE_THROUGH everywhere, one tree deep or five.
    */
   const ghosts = new Map<string, THREE.Material[]>()
   const ghostOf = (name: string): THREE.Material[] | null => {
@@ -134,6 +154,9 @@ export function buildMapProps(
       copy.transparent = true
       copy.opacity = SEE_THROUGH
       copy.depthWrite = false
+      // Only the fragment the mask pass put in the depth buffer — the nearest
+      // faded one — gets to blend. See the one-layer note above.
+      copy.depthFunc = THREE.EqualDepth
       // **AND THE ALPHA TEST HAS TO COME DOWN WITH IT**, or the fade is not a
       // fade at all — it is the thing vanishing. Play: "снова пропадает вместо
       // полупрозрачности", of a dummy, a tree, a bridge and a coil of wire, all
@@ -151,6 +174,32 @@ export function buildMapProps(
     ghosts.set(name, made)
     return made
   }
+
+  /**
+   * The DEPTH-ONLY twin of the ghost: what the fade's first pass draws, so the
+   * second has a nearest-fragment to be equal to. A clone of the ghost keeps
+   * the texture and the lowered alpha test — a leaf's keyed texels must not
+   * write depth either — with the colour turned off and the depth turned on.
+   */
+  const masks = new Map<string, THREE.Material[]>()
+  const maskOf = (name: string): THREE.Material[] | null => {
+    const ghost = ghostOf(name)
+    if (!ghost) return null
+    const had = masks.get(name)
+    if (had) return had
+    const made = ghost.map((one) => {
+      const copy = one.clone()
+      copy.colorWrite = false
+      copy.depthWrite = true
+      copy.depthFunc = THREE.LessEqualDepth
+      return copy
+    })
+    masks.set(name, made)
+    return made
+  }
+  /** Each faded record's mask mesh, made once and switched with the fade. */
+  const maskById = new Map<number, THREE.Mesh>()
+
   /** Which records are faded as of the last `fade` call. */
   const dim = new Set<number>()
 
@@ -238,13 +287,34 @@ export function buildMapProps(
         if (want.has(id)) continue
         const mesh = byId.get(id)
         const solid = mesh && built.get(mesh.name)
-        if (mesh && solid) mesh.material = solid.materials
+        if (mesh && solid) {
+          mesh.material = solid.materials
+          // Back to the record's own slot in the draw order — the flicker fix.
+          mesh.renderOrder = id
+          const mask = maskById.get(id)
+          if (mask) mask.visible = false
+        }
       }
       for (const id of want) {
         if (dim.has(id)) continue
         const mesh = byId.get(id)
         const ghost = mesh && ghostOf(mesh.name)
-        if (mesh && ghost) mesh.material = ghost
+        if (!mesh || !ghost) continue
+        mesh.material = ghost
+        mesh.renderOrder = FADE_ART_ORDER
+        let mask = maskById.get(id)
+        if (!mask) {
+          const materials = maskOf(mesh.name)
+          if (materials) {
+            // A child inherits the record's whole transform, so its depth is
+            // the art's own to the last bit — which `EqualDepth` counts on.
+            mask = new THREE.Mesh(mesh.geometry, materials)
+            mask.renderOrder = FADE_MASK_ORDER
+            mesh.add(mask)
+            maskById.set(id, mask)
+          }
+        }
+        if (mask) mask.visible = true
       }
       dim.clear()
       for (const id of want) dim.add(id)
@@ -255,10 +325,13 @@ export function buildMapProps(
       byId.clear()
       restingY.clear()
       for (const { geometry, materials } of built.values()) disposeMesh(geometry, materials)
-      // The ghosts share their maps with the originals, which have just been
-      // disposed of, so only the material goes.
+      // The ghosts and their masks share their maps with the originals, which
+      // have just been disposed of, so only the materials go.
       for (const materials of ghosts.values()) for (const one of materials) one.dispose()
       ghosts.clear()
+      for (const materials of masks.values()) for (const one of materials) one.dispose()
+      masks.clear()
+      maskById.clear()
       dim.clear()
     }
   }
