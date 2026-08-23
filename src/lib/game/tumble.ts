@@ -89,23 +89,38 @@ export const flingVelocity = (speed: number, bearing: number): Velocity => ({
 
 /**
  * The velocity of a throw ALONG a line — a BLAST's: from the burst point to
- * the body's own centre of gravity, in all three dimensions.
+ * the body's own centre of gravity.
  *
- * The exe throws blast victims through a physics CONTACT with the effect's own
- * sphere, and a contact's impulse runs along its normal — which IS this line —
- * so the geometry is the read's in spirit while the read itself stays undecoded
- * (`weapons/fire.md`). What it buys is exactly what play asked for: a charge
- * going off UNDER the trotters throws the pig straight UP, one level with the
- * chest shoves it flat away, and one on a ledge OVERHEAD slams it down. The
- * fixed 45° above stays the melee's, where it is read (0x4a9100).
- * `[CHECK — remake]` for the line standing in for the undecoded contact.
+ * The line is `[play]`'s, twice over, and the whole THROW is: the PC exe's
+ * blast damage arm was read to its last instruction (2026-08-23,
+ * weapons/notes in the disasm repo) and **throws nobody at all** — what it
+ * adds to `[pig+0x1B8]` is FATIGUE, not an impulse — so "мины не
+ * отбрасывают" was the PC original's own behaviour and play's memory of
+ * being thrown is the PSX's, which overrides. The FORM is still the exe's:
+ * the one explosion that does throw — a BUILDING going off (0x44050c) —
+ * uses the line from its centre to the pig, which is this line.
  *
- * A line too short to have a direction — the charge is inside the body — goes
- * straight up: the one way a burst under everything can send it.
+ * Play shaped both ends of the pitch. A charge UNDER the trotters throws
+ * the pig straight up ("чтобы свинья летала если граната ниже центра
+ * тяжести"), and a line pointing INTO the ground is answered by the
+ * ground: the pig is shoved FLAT along it at full speed — play saw the
+ * alternative, a blast above and behind whose downward throw the ground
+ * swallowed on the spot: "он как стоял так и стоит — а должен был
+ * отброситься по земле в сторону."
+ *
+ * Two degenerate lines: no direction at all (the charge is inside the
+ * body) goes straight up, and straight-down-with-no-flat (a charge dead
+ * overhead) slams straight down — the bounce is whatever the landing says.
  */
 export const hurlVelocity = (speed: number, along: { x: number; y: number; z: number }): Velocity => {
   const span = Math.hypot(along.x, along.y, along.z)
   if (span < 1) return { vx: 0, vy: -speed, vz: 0 }
+  // Y-DOWN: a positive y leg points into the ground — flatten to the slide.
+  if (along.y > 0) {
+    const flat = Math.hypot(along.x, along.z)
+    if (flat < 1) return { vx: 0, vy: speed, vz: 0 }
+    return { vx: (along.x / flat) * speed, vy: 0, vz: (along.z / flat) * speed }
+  }
   return {
     vx: (along.x / span) * speed,
     vy: (along.y / span) * speed,

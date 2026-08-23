@@ -5,8 +5,11 @@
 // если граната ниже центра тяжести свиньи итд итп." The model that answers
 // it is one line: the throw runs along the LINE from the burst point to the
 // body's own centre of gravity (lib/game/tumble.ts `hurlVelocity`,
-// lib/game/blast.ts `burst`) — which is the normal of the physics contact
-// the exe throws with, undecoded but unambiguous about its direction.
+// lib/game/blast.ts `burst`) — the line the exe's one throwing explosion, a
+// building going off, throws every pig around it along (0x44050c; the PC
+// exe's own BLAST throws nobody at all, and the fling is play's ruling).
+// A line pointing INTO the ground is answered by the ground: flat, at full
+// speed, away.
 //
 // The worlds here are synthetic — a squad with a measured body, no terrain —
 // because what is pinned is the GEOMETRY of the launch, not the flight; the
@@ -89,12 +92,22 @@ test('level with the centre: shoved flat away, no lift at all', { tag: '@nodata'
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
 })
 
-test('a charge OVERHEAD slams the pig down and away', { tag: '@nodata' }, () => {
-  // On a ledge above the head: the line to the centre points DOWN (+Y), and
-  // the flight starts down — the ground, not this, is what stops it.
+test('a charge ABOVE AND BEHIND shoves the pig FLAT along the ground', { tag: '@nodata' }, () => {
+  // The line to the centre points down-and-away, and the ground answers the
+  // downward leg: the shove runs flat, at full speed, away from the blast.
+  // Play saw the alternative — the ground swallowing the throw whole: "он
+  // как стоял так и стоит — а должен был отброситься по земле в сторону."
   const v = thrown({ x: -100, y: -400, z: 0 })!
-  expect(v.vy).toBeGreaterThan(0)
-  expect(v.vx).toBeGreaterThan(0)
+  expect(v.vy).toBe(0)
+  expect(v.vx).toBeCloseTo(flingSpeed(30), 6)
+  expect(Math.abs(v.vz)).toBeLessThan(1e-6)
+})
+
+test('a charge DEAD OVERHEAD slams straight down — the landing does the rest', { tag: '@nodata' }, () => {
+  const v = thrown({ x: 0, y: -400, z: 0 })!
+  expect(v.vy).toBeCloseTo(flingSpeed(30), 6)
+  expect(Math.abs(v.vx)).toBeLessThan(1e-6)
+  expect(Math.abs(v.vz)).toBeLessThan(1e-6)
 })
 
 test('a burst INSIDE the body has one way to send it: straight up', { tag: '@nodata' }, () => {

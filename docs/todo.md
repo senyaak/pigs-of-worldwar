@@ -945,9 +945,12 @@ order:**
    e2e/002/tumble.spec.ts. The hunt also caught two AI grenade bugs — the
    dry-run pricing throws that douse on water or fly to the seabed, and the
    1 Hz mull missing the detonation window as the grenade rolled past the
-   foe (`AI_FUSE_SECONDS`) — details in docs/history/weapons.md. WATCH IN
-   PLAY: a distant blast now SHOVES flat instead of tossing 45° up; if that
-   reads wrong, the knob is the direction line, not the speed.
+   foe (`AI_FUSE_SECONDS`) — details in docs/history/weapons.md. Play then
+   caught the downward case (a blast above-and-behind froze the pig) and
+   ordered the disasm: the PC exe's blast throws NOBODY — `[pig+0x1B8]` is
+   fatigue, the fling is play's own PSX memory `[play]`, its line the
+   building blast's (0x44050c) — and a line into the ground now shoves
+   FLAT along it (weapons/fire.md in the disasm repo has the full read).
 2. **The rest of the sound survey** — the P1 trio is wired (damaged/killed/
    shotLanded, commit 640d1df); still unwired, in the survey's priority:
    `broke` (props by bullet/blade), the TURN CLOCK's own S_CLOCK warning

@@ -99,23 +99,24 @@ export interface BlastWorld {
  * The FALLOFF is free: the damage is already the share for the distance, so
  * standing back saves your footing along with your health.
  *
- * The six, and the cap, are the REMAKE's — play's word standing in for a read
- * that came up empty. `Pig::OnHit`'s own blast arm (0x477c22) carries no impulse at
- * all: it takes the falloff damage through `[vtbl+0x34]`, adds **twice it** to the
- * tally at `[pig+0x1b8]` — which is where the melee's knockback goes too, in
- * another scale — raises the reeling counter at `[pig+0x1b4]` and squeals. So the
- * original throws a pig through something this pass did not find, most likely the
- * physics: the blast effect has a BODY, a sphere of radius 35 (`weapons/fire.md`),
- * and that contact's impulse is not decoded.
+ * The six, and the cap, are the REMAKE's — and so is the throw itself, which
+ * the 2026-08-23 read settled for good: **the PC exe's blast throws nobody.**
+ * `Pig::OnHit`'s blast arm (0x477c22) was read to its `ret` — damage through
+ * `[vtbl+0x34]`, twice it onto `[pig+0x1b8]` (which is a FATIGUE meter, not a
+ * knockback tally: walking feeds it, panting drains it), the smoke counter at
+ * `[pig+0x1b4]`, a squeal — and every caller of the two throw primitives
+ * (0x4a9100/0x4a9260, 27 sites) is accounted for without it. So "мины не
+ * отбрасывают" was the PC original's own behaviour; play remembers the PSX,
+ * and play wins (`[play]` — the whole fling exists on that ruling).
  *
- * The DIRECTION follows the same undecoded contact in spirit: an impulse runs
- * along the contact's normal, which is the line from the burst to the body's
- * centre of gravity — `hurlVelocity` (lib/game/tumble.ts). A first pass threw
- * every victim at the melee's fixed 45° instead, and play called it at once:
- * "граната до сих пор как-то странно отбрасывает — похоже ещё не очень
- * работает взрыв." A charge under the trotters was the tell — it flung the pig
- * 45° toward wherever it happened to face, where a burst UNDER a body has
- * nowhere to send it but UP.
+ * The DIRECTION is the exe's one throwing explosion borrowed: a BUILDING
+ * going off (0x44050c) throws every pig around it along the line from its
+ * centre to the pig, and `hurlVelocity` (lib/game/tumble.ts) is that line in
+ * three dimensions, shaped at both ends by play — straight up from under the
+ * trotters, flat along the ground when the line points into it. A first pass
+ * threw every victim at the melee's fixed 45° instead, and play called it at
+ * once: "граната до сих пор как-то странно отбрасывает"; a second pass let
+ * the ground swallow the downward lines, and play called that too.
  */
 export const FLING_PER_POINT = 6
 /** …and no harder than the hardest knock in the engine: the cattle prod's. */

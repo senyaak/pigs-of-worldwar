@@ -1330,3 +1330,22 @@ AI's, neither the blast's:
 Measured after: the mission verdicts at ~271 s with five kills over thirteen
 shots, 1v0 — faster and deadlier than before the pass, because a thrown
 grenade now goes off beside the foe it was thrown at.
+**The read arrived a session later and re-anchored the whole thing
+(2026-08-23, same day).** Play reported the downward case — "взорвалась выше
+и позади свина — он как стоял так и стоит — а должен был отброситься по
+земле в сторону" — and asked for the source itself: "может задизасмить
+полностью как это в источнике?" The hunt (weapons/fire.md in the disasm
+repo) read every arm to its end and overturned the standing theory: **the PC
+exe's blast throws nobody at all.** `[pig+0x1B8]` is a FATIGUE meter —
+walking feeds it, panting and the tired idle drain it — and the "physics
+contact toss" this file guessed at is the ordinary solver doing nothing to a
+standing pig. The pigs play remembers being thrown were the PSX's, and
+play's memory outranks the PC binary by standing rule. What the read gave
+back instead is the FORM: the one explosion that does throw — a building
+going off, 0x44050c — uses the centre-to-pig line, which is exactly the line
+`hurlVelocity` already walks. Two corrections landed with it: a line
+pointing INTO the ground now throws FLAT along it at full speed (the ground
+answers the downward leg — play's report above), and a charge dead overhead
+slams straight down. The same sweep found the gun's long-lost DAMAGE
+(row+0x0C, through the Hit-in-BODY arm 0x478710) — noted in the disasm
+repo for the day the bullet tables are next touched.
