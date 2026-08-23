@@ -179,6 +179,13 @@ export interface DebugHooks {
   currentPig(): { x: number; z: number }
   currentHeading(): number
   currentNodeY(): number
+  /** Where a pig's MESH is drawn — the node, not the engine's body
+   * (three/debug.ts). Null for a pig no soldier was built for. */
+  nodeAt(id: number): { x: number; y: number; z: number } | null
+  /** Throw the first living NON-acting pig at a grenade's full 45° knock —
+   * the flung-pig paint spec's trigger (three/battle.ts). Returns who was
+   * thrown and from where, or null on a one-pig map. */
+  flingOther(): { pig: number; x: number; z: number } | null
   /** The terrain TYPE the acting pig is standing on — the tile byte's low five
    * bits (lib/game/terrain.ts). What its footsteps are picked by, and the only
    * way a spec can tell a stone one from a grass one (audio/battle.ts). */

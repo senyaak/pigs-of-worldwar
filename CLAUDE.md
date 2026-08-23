@@ -446,11 +446,15 @@ it beyond `PHASE_ENV` existing, and the fixture says so if it does not.
 Specs run against the **real** installation, read-only, with counts asserted
 as floors where savegame churn could move them and exactly where it cannot.
 
-**A DEBUG READ IS NOT A PAINT CHECK, and this has now cost two play sessions.**
+**A DEBUG READ IS NOT A PAINT CHECK, and this has now cost three play sessions.**
 `pow.*` says what a view THINKS; it says nothing about whether a pixel was
-laid down. The pig map's flags were computed and never drawn, and the pause
-menu answered its keys and made its noises with nothing on the screen — both
-passed a suite that only read state. Anything drawn on a canvas needs an
+laid down. The pig map's flags were computed and never drawn, the pause
+menu answered its keys and made its noises with nothing on the screen, and a
+blast-thrown pig flew 1700 units in the ENGINE while its mesh stood still —
+three/battle.ts placed only corpses from the snapshot, and every fling spec
+read the tumbles instead of the node. All three passed a suite that only
+read state; the third's paint check is `e2e/002/flungmesh.spec.ts`, on
+`pow.debug.nodeAt` — the DRAWN node, which is the renderer's own word. Anything drawn on a canvas needs an
 assertion that reads the CANVAS: count the distinct colours (`painted` in
 `e2e/001/mapchain.spec.ts`), count a signature colour's pixels (`greenPixels`
 in `e2e/002/pause.spec.ts`), or count the blits (`pow.pigMap.flags()`). And

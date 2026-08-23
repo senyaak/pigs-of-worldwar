@@ -17,6 +17,8 @@ import { aimRadians } from '../../../lib/game/aim'
 import { weaponModelName } from '../../../lib/game/weapons'
 import { isPlanted } from '../../../lib/game/grenade'
 import { meleeOf } from '../../../lib/game/melee'
+import { flingVelocity } from '../../../lib/game/tumble'
+import { flingSpeed } from '../../../lib/game/blast'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
@@ -757,12 +759,19 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     for (const soldier of squad.members) {
       if (pigShot(soldier.pig.id)?.sheltered) soldier.node.visible = false
     }
-    // A CORPSE is drawn where the engine says its body is: a blast still
-    // throws it, and a death in the water SINKS it (lib/game/corpses.ts) —
-    // and nothing else places a pig that is not acting. After the acting
-    // placement above, so a dead acting pig follows its own body too.
+    // EVERY pig that is not being drawn by somebody else follows its own
+    // body. This loop was corpses-only — "nothing else places a pig that is
+    // not acting" — and that line WAS the bug play hunted across a whole
+    // session: a blast throws a LIVING non-acting pig 1700 units in the
+    // engine (the tumbles write its position every step), the bounce clip
+    // plays, and the mesh stood where the squad was built — "он на месте
+    // катился". The engine's word on where a body is is this snapshot, for
+    // the living exactly as for the dead. Two exceptions keep their own
+    // painters: the interpolated acting placement above (alpha between
+    // steps), and a pig still on its parachute, which the drop draws.
     for (const one of now.pigs) {
-      if (one.health > 0) continue
+      if (one.arriving) continue
+      if (one.id === now.acting && one.health > 0) continue
       squad.of(one.id)?.place(one.x, one.y, one.z, one.heading)
     }
     // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts a
@@ -958,6 +967,15 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     squad,
     dropIn,
     props,
+    flingOther: () => {
+      const other = game.players
+        .flatMap((player) => player.pigs)
+        .find((pig) => pig !== game.currentPig && pig.health > 0)
+      if (!other) return null
+      const from = { pig: other.id, x: other.position.x, z: other.position.z }
+      battle.fling(other, flingVelocity(flingSpeed(30), 0))
+      return from
+    },
     hotseat: (on) => {
       hotseat = on ?? !hotseat
       console.info(

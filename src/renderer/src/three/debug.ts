@@ -190,6 +190,12 @@ export interface DebugParts {
    * keyboard for THIS battle (three/battle.ts). No argument toggles; returns
    * where it stands. */
   hotseat: (on?: boolean) => boolean
+  /** Throw the first living NON-acting pig at a grenade's full knock, 45°
+   * along bearing 0 (three/battle.ts). The flung-pig PAINT spec's trigger:
+   * nothing else a spec can reach flings anybody but the acting pig on
+   * demand. Returns who was thrown and from where, or null on a one-pig
+   * map. */
+  flingOther: () => { pig: number; x: number; z: number } | null
 }
 
 /** Hang the battle's debug surface off `window.pow`, keeping whatever else
@@ -204,6 +210,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
     debug: {
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
+      flingOther: parts.flingOther,
       // What a hoof landing NOW would sound like — the deck under the pig where
       // there is one and the tile it is over otherwise, which is the footstep's
       // own question (lib/game/footsteps.ts).
@@ -231,6 +238,18 @@ export function exposeBattleDebug(parts: DebugParts): void {
         starting: game.starting
       }),
       currentNodeY: () => squad.of(game.currentPig.id)?.node.position.y ?? 0,
+      /** Where a pig's MESH stands — the drawn node, not the engine's body.
+       * The difference is exactly what a spec that reads only the engine can
+       * never see, and it cost a session: the tumbles moved a thrown pig 1700
+       * units while its mesh stood still (three/battle.ts, the snapshot
+       * placement loop). A paint-side read, in the spirit of the rule that a
+       * debug read is not a paint check. */
+      nodeAt: (id: number) => {
+        const node = squad.of(id)?.node
+        return node
+          ? { x: node.position.x, y: node.position.y, z: node.position.z }
+          : null
+      },
       /** What the acting pig is carrying, in the order it picked things up:
        * the skill's id, its name, and how many (−1 is unlimited, which is
        * everything on the training ground). */

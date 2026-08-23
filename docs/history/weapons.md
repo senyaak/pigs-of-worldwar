@@ -1442,3 +1442,20 @@ down. The same session answered the OTHER report — stuck at ESTU tile 55,10
 playable world to +-0x3000 = 12288 (TryMove step 2, movement/notes.md), and
 tile 55's far edge IS 12288: the outer eight tiles of every map are drawn
 decoration the original refuses too.
+**The freeze was never the physics — it was the PAINT (2026-08-24, the
+close).** With the whole engine chain proved (probes, knockback.spec, and the
+session's own telemetry: [fling] flat 1909, [fling-end] moved 1660) play asked
+the right question — "может модель не перемещается за позицией?" — and that
+was it, in three/battle.ts's snapshot placement: only CORPSES were placed from
+the snapshot, the comment even boasting "nothing else places a pig that is not
+acting". A living non-acting pig's mesh stood at its spawn while the tumbles
+carried the body 1700 units — the bounce clip playing on a mesh nobody moved,
+which is "он на месте катился" exactly, and why the vertical mines always
+LOOKED right (no horizontal to lose) while every sideways knock read as
+broken. Every fling spec had read the ENGINE, so all of them passed — the
+third session paid to the same trap CLAUDE.md now counts three of. The loop
+places every pig from the snapshot now (the interpolated acting placement and
+the drop keep their own painters), pow.debug grew nodeAt (the DRAWN node) and
+flingOther (the trigger), and e2e/002/flungmesh.spec.ts is the paint check —
+run against the reintroduced bug it fails on the node that never moved, and
+with the fix it watches the mesh travel 400+ in the live scene.
