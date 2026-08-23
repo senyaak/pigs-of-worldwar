@@ -20,6 +20,15 @@ import { TURN_SPEED } from './locomotion'
 /** How an order ended: carried out, or the world refused it. */
 export type Outcome = 'done' | 'blocked'
 
+/**
+ * WHAT refused it — telemetry's half of `blocked`. The brain deliberately
+ * never reads this: to it every refusal is the same "think of something
+ * else". But to a person watching for stupidity they are three different
+ * stories — a wall (or a body, or the wedge) under a walk, the water guard,
+ * and the aim clamp — and a log that collapses them says only "stuck".
+ */
+export type Refusal = 'stuck' | 'water' | 'clamp'
+
 /** What the actuator holds — the player's own controls, and the readings a
  * player has anyway. Handed in by the battle (lib/game/battle.ts). */
 export interface Rig {
@@ -55,6 +64,8 @@ export interface Actuator {
   step(delta: number): void
   /** How the LAST order ended, until the next one finishes. */
   outcome(): Outcome | null
+  /** …and what refused it, when that was `blocked`. Null after a `done`. */
+  refusal(): Refusal | null
   /** A new turn: drop everything, still the controls. */
   reset(): void
 }
@@ -103,6 +114,7 @@ export const shortest = (angle: number): number => {
 export function createActuator(rig: Rig): Actuator {
   let order: Order | null = null
   let ended: Outcome | null = null
+  let refused: Refusal | null = null
   /** The fire order's charge, normalised once at `take`. */
   let charge = 0
   /** The walk's (or the aim's) best distance so far, and how long since it
@@ -112,9 +124,10 @@ export function createActuator(rig: Rig): Actuator {
   /** The fire button: pressed yet? */
   let pressed = false
 
-  const finish = (how: Outcome): void => {
+  const finish = (how: Outcome, why: Refusal | null = null): void => {
     order = null
     ended = how
+    refused = why
   }
 
   /** Turn toward `heading`: -1|0|1, or 0 when one step's sweep covers it —
@@ -170,7 +183,7 @@ export function createActuator(rig: Rig): Actuator {
           rig.wet(x + Math.sin(heading) * WATER_PROBE, z + Math.cos(heading) * WATER_PROBE)
         ) {
           rig.intent(0, 0)
-          finish('blocked')
+          finish('blocked', 'water')
           return
         }
         rig.intent(walking ? 1 : 0, turnToward(bearing, delta))
@@ -183,7 +196,7 @@ export function createActuator(rig: Rig): Actuator {
           stalled = 0
         } else if (walking && (stalled += delta) >= STUCK_SECONDS) {
           rig.intent(0, 0)
-          finish('blocked')
+          finish('blocked', 'stuck')
         }
         return
       }
@@ -202,7 +215,7 @@ export function createActuator(rig: Rig): Actuator {
           stalled = 0
         } else if ((stalled += delta) >= AIM_STUCK_SECONDS) {
           rig.aimStep(0)
-          finish('blocked')
+          finish('blocked', 'clamp')
         }
         return
       }
@@ -242,9 +255,11 @@ export function createActuator(rig: Rig): Actuator {
     },
     step,
     outcome: () => ended,
+    refusal: () => refused,
     reset() {
       order = null
       ended = null
+      refused = null
       clear()
       rig.intent(0, 0)
       rig.aimStep(0)

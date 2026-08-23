@@ -27,12 +27,48 @@ import type { Slot } from './inventory'
 
 /** A pig as the brain SEES one — a position and a health bar, which is what
  * the screen shows a player about anybody else's pig. `y` is the SOLES,
- * Y-DOWN like everything in the engine: higher ground is the smaller y. */
+ * Y-DOWN like everything in the engine: higher ground is the smaller y.
+ * `name` is the plate over its head — the brain never reads it, but the
+ * TELEMETRY line is written for a person, and "Marcel" reads where
+ * "1234,-567" does not. */
 export interface Seen {
   x: number
   y: number
   z: number
   health: number
+  name?: string
+}
+
+/**
+ * One choice as the price list weighed it (lib/game/evaluate.ts) — what the
+ * telemetry keeps where the selection would throw the losers away. The
+ * flip-flop class of bug is INVISIBLE without these: two foes pricing level
+ * makes the winner swap on a stride, and a log that shows only winners shows
+ * two sensible decisions instead of one oscillation.
+ */
+export interface Candidate {
+  skill: number
+  kind: 'gun' | 'melee' | 'lob' | 'plant' | 'crate'
+  target: Seen
+  /** What the selection compares — worth less the approach tax. */
+  score: number
+  /** The undiscounted HP differential. */
+  worth: number
+}
+
+/**
+ * One decision, explained — why the order is the order. Telemetry only:
+ * nothing in the engine reads a thought back, so it can never steer play.
+ */
+export interface Thought {
+  /** Which rung of the brain's ladder answered (lib/game/grunt.ts). */
+  rung: string
+  /** Everything the price list weighed, losers included — negatives too,
+   * because "why did it PASS" is a question about scores under zero. */
+  candidates: Candidate[]
+  /** The winner, by reference one of `candidates`, or null when nothing
+   * scored above zero. */
+  chose: Candidate | null
 }
 
 /** What the brain is shown: the read-only face of the battle. It GROWS with
@@ -106,6 +142,10 @@ export interface Brain {
   /** One decision. Asked only while the actuator is idle and the seat has
    * mulled, so an order is thought about once, not sixty times a second. */
   decide(world: AiWorld): Order
+  /** The LAST decision explained — candidates, winner and the ladder rung —
+   * for the telemetry line the seat writes (lib/game/battle.ts, `aiDecided`).
+   * Optional: a brain owes an order, not an account of itself. */
+  explain?(): Thought | null
   /** A new turn: forget the old one. The battle calls it on every handover. */
   reset(): void
 }

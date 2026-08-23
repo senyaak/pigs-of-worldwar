@@ -347,15 +347,22 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
   hitFlesh: { sound: 'I_BULIT1', volume: 100, pitch: 100 },
   hitHard: { sound: 'I_BUILD', volume: 80, pitch: 100, jitter: 15 },
   /**
-   * **A PIG TAKING POINTS, and a pig GOING DOWN.** Name picks out of the
-   * forty-one `P_*` moods ("the biggest pile of name picks left"): the hurt
-   * is a groan with a wide jitter so a volley does not sound like one pig,
-   * the death is the wild squeal, and a DROWNING gets the one sample the
-   * bank names for it — `P_DROWN`, identified and wired to nothing until
-   * now. All three correctable by ear through `pow.sfx`.
+   * **A PIG TAKING POINTS, and a pig GOING DOWN.** The hurt is a name pick —
+   * a groan with a wide jitter so a volley does not sound like one pig. The
+   * death cries are DECODED now, and the old pick was wrong twice over: play
+   * ("звук умирания не верный") and the exe agree — `P_MAD1` has no call
+   * site in the binary at all, while the blast arm's tail plays squeal
+   * **0x59/0x5A** (`weapons/fire.md`), and entries 89 and 90 of
+   * `Audio/sfxday.srl` are `P_SQUEA1`/`P_SQUEA2`. Two cues, one per squeal;
+   * the pig's own id picks between them (audio/battleAudio.ts), so a volley
+   * of kills is not one pig either. A DROWNING keeps the one sample the bank
+   * names for it — `P_DROWN`, played when the drowning CLIP starts, not at
+   * the blow (the `dying` event). The hurt and the drown stay correctable by
+   * ear through `pow.sfx`.
    */
   hurt: { sound: 'P_MOAN', volume: 80, pitch: 90, jitter: 31 },
-  deathCry: { sound: 'P_MAD1', volume: 100, pitch: 90, jitter: 15 },
+  deathCry: { sound: 'P_SQUEA1', volume: 100, pitch: 100, jitter: 15 },
+  deathCry2: { sound: 'P_SQUEA2', volume: 100, pitch: 100, jitter: 15 },
   drown: { sound: 'P_DROWN', volume: 100, pitch: 100 },
   /**
    * A gun going off. DECODED, and it is the pair that proves the shot's

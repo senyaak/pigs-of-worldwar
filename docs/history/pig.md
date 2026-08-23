@@ -300,6 +300,43 @@ drop: the exe rolls one off a dying pig (`skills/notes.md`) and play said
 non-acting body, so the sink and a thrown corpse's flight were invisible.
 `unit/corpses.spec.ts` pins all three arms.
 
+## The death waits its turn — and dies in the right voice (2026-08-23)
+
+Play, of the sequence: "сначала идёт урон, потом когда все остановились,
+выплыли из воды — тогда только идёт анимация умирания. и у тебя она не
+правильная, а также звук умирания не верный." The remake had been starting
+the dying clip in the very frame the damage landed — a collapse-from-standing
+played on a body still flying — and the disasm's third pass over
+`[pig+0x2EC]` (weapons/fire.md) says the original never does: **death is a
+state change and no clip at all.** State 6 rides the physics body wearing
+clip 0x1D — 29, "Very Wounded", a name that for once sits below the +24 drift
+and means what it says — and the dying clip is set only at the 6 → 7 edge,
+once the body is at rest and the turn manager has noticed (0x46f732; the
+water arm plays 0x4A = 74 right there, which corroborates `DROWNING`). The
+turn-mode table gives the same order from the other side: 13 WALK AWAY, 14
+WAITING FOR ALL OBJECTS TO STOP MOVING, only then 16 WATCHING DYING PIG.
+
+So `corpses.ts` is two phases now: `claim` clears the overlay, dresses the
+body in `ANIM.WOUNDED` and lets it ride; the dying clip, the sink and the
+`dying` event start when the corpse's own flight is over AND the battle says
+the stage is still — `Battle.stageStill()`, the settle list LESS the corpses
+themselves (that would deadlock — `settling()` waits ON them) and less the
+theatre, plus the walk-away's swimmers, so a kill made from the water is
+watched only after everyone is ashore. WHERE the body ended is what it dies
+in: `wet` is decided at the transition, so a corpse knocked off a deck drowns
+in the bay it landed in, not on the bridge it was hit on.
+
+The SOUND was wrong by the same reading: `P_MAD1` has no call site anywhere
+in the exe ("wild squealing — no idea what for" was the honest label), while
+the blast arm's tail plays squeal **0x59/0x5A** — entries 89/90 of
+`Audio/sfxday.srl`, `P_SQUEA1`/`P_SQUEA2`, both verified present. The kill
+now squeals one of the two by the pig's own id; the drown gurgle moved from
+the blow to the `dying` event's wet arm, with the clip and the sink it
+belongs to. Still open, and known: nothing moves the camera to the dying pig
+(the exe's mode 16), and the death VOICE LINE category the speech bank
+carries (speech/pigs.md) stays wired to nothing. `unit/corpses.spec.ts` pins
+the new order end to end.
+
 **The plates** (`ui/hud.ts`, `three/squad.ts`): SMALL at ×2 — play put up a
 screenshot of the original's ~24-tall chunky letters against BIG's 32, and
 which font `0x459B20` uses is unread — painted per TEAM through the

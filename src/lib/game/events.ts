@@ -14,6 +14,9 @@
 // Positions are game space (Y-down).
 
 import type { Point } from './pose'
+import type { Order } from './orders'
+import type { Thought } from './ai'
+import type { Outcome, Refusal } from './actuator'
 
 /**
  * A pig, as it travels: its id and nothing else (lib/game/game.ts).
@@ -45,6 +48,12 @@ export type BattleEvent =
    * (lib/game/health.ts, GIB_BELOW): no dying clip, the body simply goes
    * (lib/game/corpses.ts). */
   | { kind: 'killed'; pig: PigId; by?: PigId; gibbed?: boolean; drowned?: boolean }
+  /** …and now — everything at rest, everyone out of the water — its DYING
+   * CLIP has started (lib/game/corpses.ts). The moment is the exe's own state
+   * 6 → 7 edge: death at `killed` is a state change and a ragdoll, the dying
+   * is played out here, later. `wet` is the sink-and-drown arm — what the
+   * audio hangs the drown gurgle on. */
+  | { kind: 'dying'; pig: PigId; wet: boolean }
   /** …and its body is DONE: the corpse has blown up (or been overkilled away)
    * and what is left on the spot is a pair of boots (lib/game/corpses.ts).
    * `at` is the soles, `heading` the way the pig faced — where and which way
@@ -194,6 +203,30 @@ export type BattleEvent =
    * `health` is the acting pig's, which is what chooses the line.
    */
   | { kind: 'turnBegan'; player: number; computer: boolean; health: number }
+  /**
+   * THE MACHINE DECIDED SOMETHING — the AI seat's one announcement, made per
+   * decision (about once a second, lib/game/battle.ts's machine block).
+   *
+   * Telemetry first, like `flung` before it: play reports the machine "acting
+   * stupid" and a session log that shows what it weighed and what refused it
+   * settles in one line what watching the screen cannot. `previous`/`refusal`
+   * are how the LAST order ended (the brain's `blocked` cue and the wall it
+   * hit); `order` is what it wants now; `thought` is the account — the ladder
+   * rung, every candidate priced, the winner (lib/game/ai.ts). Nothing in the
+   * engine listens to this; it must never steer play.
+   */
+  | {
+      kind: 'aiDecided'
+      pig: PigId
+      name: string
+      at: Point
+      heading: number
+      health: number
+      previous: Outcome | null
+      refusal: Refusal | null
+      order: Order
+      thought: Thought | null
+    }
 
 /** What a module of the engine is handed: somewhere to say what happened. */
 export type Emit = (event: BattleEvent) => void

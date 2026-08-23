@@ -966,3 +966,24 @@ Every site passes volume 100 and flag 0. **0x495A9C is a TEST HOOK** — it play
   (0x4AA3C6: `movzx ax, byte [item+3]; neg eax; add word [pig+0x1de], ax`).
   That is the whole economy in one instruction — a pickup's own value, taken
   off the pig that blew up what was not his.
+
+## The machine explains itself — AI telemetry (2026-08-23)
+
+Play: "второй свин очень тупит, особенно если враги с разных сторон стоят" —
+and the seat had nothing to show for it but the chosen order. The flip-flop
+class of stupidity is invisible in a log of winners: two foes pricing level
+swap the winner on a stride, and each decision reads sensible on its own.
+
+So the decision is announced now. The price list takes a `note` callback and
+reports EVERY candidate it weighs, losers and negatives included
+(lib/game/evaluate.ts); the grunt stamps which ladder rung answered and keeps
+the account (`Thought`, lib/game/ai.ts, `explain()`); the actuator's
+`blocked` carries a reason at last — `stuck` (a wall, a body, the wedge),
+`water` (the guard), `clamp` (the aim) — because all three were one word and
+`blocked` is what grounds a grunt. The machine block emits it all as one
+`aiDecided` event (telemetry first, the `flung` road), and the ui writes two
+lines per decision to `_tmp/telemetry.log`: `[ai]` — who, where, how the last
+order ended and on what, the rung, the order — and `[ai:kit]` — the
+candidates best-first, winner starred, capped at six under the IPC's 512
+bytes. Nothing in the engine listens to `aiDecided`; it must never steer
+play. The headless `AI_LOG=1` tap stays and now prints the refusal too.

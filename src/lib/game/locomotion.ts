@@ -226,6 +226,16 @@ export const ANIM = {
   EJECTED: 38,
   BOUNCE: 39,
   /**
+   * What a body KILLED BUT NOT YET DYING wears — the exe's state 6: "DEAD,
+   * corpse still in the world", whose arm (0x46f4ef) writes no position,
+   * rides the physics body, and dresses it in clip 0x1D while it still
+   * slides (`weapons/fire.md`, the `[pig+0x2EC]` read). The name table calls
+   * 29 "Very Wounded", and it sits below the tail's +24 drift, so for once
+   * the name is the clip. The dying clip proper starts only when the world
+   * has settled (lib/game/corpses.ts).
+   */
+  WOUNDED: 29,
+  /**
    * Falling over dead — THREE of them, picked per pig (lib/game/corpses.ts).
    *
    * NOT 47/48/49, though the name table calls those "Dying #1..#3": the

@@ -982,8 +982,15 @@ order:**
    tear), `wentIn`/`cameOut` I_METAL, `remains`, grenade BOUNCE (no event),
    battle ambience BATT_* and the two birds AMB_*.
 3. The ARENA wits picker (`ARENA_WITS` is a flat 0.5 until arenas grow a
-   difficulty choice), and the machine block's `AI_LOG=1` decision tap is
-   there for the next diagnosis.
+   difficulty choice). Diagnosis has a real tap now (2026-08-23): every
+   decision is announced on the bus as `aiDecided` — the ladder rung, the
+   whole price list losers included, the last order's outcome WITH what
+   refused it (stuck/water/clamp) — and the ui writes it to
+   `_tmp/telemetry.log` as `[ai]`/`[ai:kit]` lines (ui/battle.ts). The
+   headless `AI_LOG=1` tap stays for Node runs. First suspect it was built
+   for: "второй свин тупит когда враги с разных сторон" — look for the
+   winner flip-flopping between two level-priced foes in `[ai:kit]`, and
+   for `turnTo` alternating bearings in `[ai]`.
 
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens

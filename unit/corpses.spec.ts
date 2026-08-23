@@ -1,9 +1,13 @@
 // PHASE 002 (domain) — what becomes of a body. Pure, no Electron.
 //
-// The SHAPE is play's ruling (lib/game/corpses.ts): the dying clip runs out,
-// the corpse blows up, the boots go down — in the water it SINKS WHILE the
-// drowning clip plays and goes off down there, with no floor under it,
-// because the shipped beds sit at the waterline. An overkill skips the lot.
+// The SHAPE is play's ruling and the exe's state machine both
+// (lib/game/corpses.ts): death is a state change, the body RIDES the blow out
+// in the wounded pose, and the dying clip starts only once the stage is still
+// — "сначала идёт урон, потом когда все остановились, выплыли из воды — тогда
+// только идёт анимация умирания." Then the clip runs out, the corpse blows
+// up, the boots go down — in the water it SINKS WHILE the drowning clip plays
+// and goes off down there, with no floor under it, because the shipped beds
+// sit at the waterline. An overkill skips the lot.
 
 import { test, expect } from '@playwright/test'
 
@@ -18,12 +22,20 @@ import type { Pig } from '../src/lib/game/game'
 import { terrain } from './fixture'
 
 /** The calls corpses makes of the clip state, and a hand on the answer. */
-function stubAnim(): Anim & { busy: boolean; played: number[]; overlays: number[] } {
+function stubAnim(): Anim & {
+  busy: boolean
+  played: number[]
+  worn: number[]
+  overlays: number[]
+} {
   const stub = {
     busy: false,
     played: [] as number[],
+    worn: [] as number[],
     overlays: [] as number[],
-    setClip: () => {},
+    setClip: (_pig: Pig, index: number) => {
+      stub.worn.push(index)
+    },
     playOnce: (_pig: Pig, index: number) => {
       stub.played.push(index)
       stub.busy = true
@@ -56,28 +68,44 @@ const pigAt = (x: number, y: number, z: number, id = 1): Pig =>
     parachutes: false
   }) as unknown as Pig
 
-test('a death on land: the clip, then the bang, then the boots', { tag: '@nodata' }, () => {
+test('a death on land: the ride, THEN the clip, then the bang, then the boots', { tag: '@nodata' }, () => {
   const anim = stubAnim()
   const events: BattleEvent[] = []
+  let still = false
   const corpses = createCorpses(
-    { anim, query: terrain(() => 0), tumbling: () => false },
+    { anim, query: terrain(() => 0), tumbling: () => false, cleared: () => still },
     (event) => events.push(event)
   )
   const pig = pigAt(0, 0, 0)
   corpses.claim(pig, false)
-  // One of the three FALLS, by the pig's own id — and the aiming arms come
-  // down with it: the weapon overlay is cleared on the way.
-  expect(anim.played).toEqual([ANIM.DEATHS[1 % ANIM.DEATHS.length]])
+  // Death is a STATE CHANGE: no dying clip yet — the body wears the WOUNDED
+  // pose — and the aiming arms come down with it: the weapon overlay is
+  // cleared on the way.
+  expect(anim.played).toEqual([])
+  expect(anim.worn).toEqual([ANIM.WOUNDED])
   expect(anim.overlays).toEqual([-1])
-  // Nothing happens while the clip runs — or while a blast still has the
-  // body in the air.
+  // Nothing happens while the stage is not still — the world is what the
+  // dying waits for.
   corpses.update(STEP_SECONDS)
+  corpses.update(STEP_SECONDS)
+  expect(anim.played).toEqual([])
   expect(events).toEqual([])
+  expect(corpses.live()).toBe(1)
+  // The stage clears: the dying starts — one of the three FALLS, by the
+  // pig's own id — and it is announced.
+  still = true
+  corpses.update(STEP_SECONDS)
+  expect(anim.played).toEqual([ANIM.DEATHS[1 % ANIM.DEATHS.length]])
+  expect(events.map((one) => one.kind)).toEqual(['dying'])
+  expect(events[0]).toMatchObject({ pig: 1, wet: false })
+  // Nothing more while the clip runs.
+  corpses.update(STEP_SECONDS)
+  expect(events.map((one) => one.kind)).toEqual(['dying'])
   anim.busy = false
   corpses.update(STEP_SECONDS)
-  expect(events.map((one) => one.kind)).toEqual(['blasted', 'remains'])
-  expect(events[0]).toMatchObject({ effect: BLAST_EFFECT.id })
-  expect(events[1]).toMatchObject({ pig: 1, at: { x: 0, y: 0, z: 0 }, heading: 0.5 })
+  expect(events.map((one) => one.kind)).toEqual(['dying', 'blasted', 'remains'])
+  expect(events[1]).toMatchObject({ effect: BLAST_EFFECT.id })
+  expect(events[2]).toMatchObject({ pig: 1, at: { x: 0, y: 0, z: 0 }, heading: 0.5 })
   expect(pig.gone).toBe(true)
   expect(corpses.live()).toBe(0)
 })
@@ -85,12 +113,13 @@ test('a death on land: the clip, then the bang, then the boots', { tag: '@nodata
 test('three pigs take three different falls — the id picks, deterministically', { tag: '@nodata' }, () => {
   const anim = stubAnim()
   const corpses = createCorpses(
-    { anim, query: terrain(() => 0), tumbling: () => false },
+    { anim, query: terrain(() => 0), tumbling: () => false, cleared: () => true },
     () => {}
   )
   corpses.claim(pigAt(0, 0, 0, 3), false)
   corpses.claim(pigAt(100, 0, 0, 4), false)
   corpses.claim(pigAt(200, 0, 0, 5), false)
+  corpses.update(STEP_SECONDS)
   expect(new Set(anim.played).size).toBe(3)
   for (const clip of anim.played) expect(ANIM.DEATHS).toContain(clip)
 })
@@ -99,12 +128,13 @@ test('an overkill skips the clip and the bang — the body simply goes', { tag: 
   const anim = stubAnim()
   const events: BattleEvent[] = []
   const corpses = createCorpses(
-    { anim, query: terrain(() => 0), tumbling: () => false },
+    { anim, query: terrain(() => 0), tumbling: () => false, cleared: () => true },
     (event) => events.push(event)
   )
   const pig = pigAt(0, 0, 0)
   corpses.claim(pig, true)
   expect(anim.played).toEqual([])
+  expect(anim.worn).toEqual([])
   expect(events.map((one) => one.kind)).toEqual(['remains'])
   expect(pig.gone).toBe(true)
 })
@@ -119,22 +149,30 @@ test('a death in the water sinks WHILE the clip plays and goes off down there', 
   )
   const anim = stubAnim()
   const events: BattleEvent[] = []
-  const corpses = createCorpses({ anim, query, tumbling: () => false }, (event) => events.push(event))
+  const corpses = createCorpses(
+    { anim, query, tumbling: () => false, cleared: () => true },
+    (event) => events.push(event)
+  )
   const pig = pigAt(0, 0, 0)
   corpses.claim(pig, false)
+  // Where the body ENDED is what it dies in — the wet arm is decided when
+  // the dying starts, not at the blow.
+  corpses.update(STEP_SECONDS)
   expect(anim.played).toEqual([ANIM.DROWNING])
-  // The body goes under from the FIRST step — clip and descent together.
+  expect(events.map((one) => one.kind)).toEqual(['dying'])
+  expect(events[0]).toMatchObject({ wet: true })
+  // The body goes under from the clip's first step — clip and descent
+  // together.
   corpses.update(STEP_SECONDS)
   expect(pig.position.y).toBeCloseTo(SINK_SPEED * STEP_SECONDS, 5)
-  expect(events).toEqual([])
   for (let step = 0; step < 30; step++) corpses.update(STEP_SECONDS)
   const depth = pig.position.y
   expect(depth).toBeGreaterThan(0)
   // …and the clip ending is what sets it off, DOWN where it ended.
   anim.busy = false
   corpses.update(STEP_SECONDS)
-  expect(events.map((one) => one.kind)).toEqual(['blasted', 'remains'])
-  const blasted = events[0] as Extract<BattleEvent, { kind: 'blasted' }>
+  expect(events.map((one) => one.kind)).toEqual(['dying', 'blasted', 'remains'])
+  const blasted = events[1] as Extract<BattleEvent, { kind: 'blasted' }>
   expect(blasted.at.y).toBeGreaterThan(0)
   expect(pig.gone).toBe(true)
 })

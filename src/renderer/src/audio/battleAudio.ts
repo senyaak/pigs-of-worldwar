@@ -112,10 +112,20 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       damaged: ({ pig }) => {
         if (pig !== undefined) playCue(bank(), BATTLE_SOUNDS.hurt)
       },
-      // …and a pig going down: the squeal, or the one drowning sample the
-      // bank has carried unheard the whole time.
-      killed: ({ drowned }) =>
-        playCue(bank(), drowned ? BATTLE_SOUNDS.drown : BATTLE_SOUNDS.deathCry),
+      // …and a pig going down: the exe's own squeal at the blow — 0x59/0x5A,
+      // `P_SQUEA1`/`P_SQUEA2`, the pig's id picking between them
+      // (audio/battle.ts says where both were read). A DROWNED pig went
+      // quietly — its noise is the drown gurgle below, with its clip.
+      killed: ({ pig, drowned }) => {
+        if (!drowned) playCue(bank(), pig % 2 ? BATTLE_SOUNDS.deathCry2 : BATTLE_SOUNDS.deathCry)
+      },
+      // The dying CLIP starting — everything at rest, the body about to go
+      // down for good (lib/game/corpses.ts). The wet arm is where the drown
+      // sample belongs: it gurgles with the sink, not at the blow that may
+      // have landed half a map away.
+      dying: ({ wet }) => {
+        if (wet) playCue(bank(), BATTLE_SOUNDS.drown)
+      },
       // The CLICK under the foot. It is the only warning there is — a minefield
       // has nothing standing on it — and the bang is four tenths of a second
       // behind it (lib/game/mines.ts).

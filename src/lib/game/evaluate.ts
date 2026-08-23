@@ -26,7 +26,7 @@
 // Deterministic: the dry-run's rng is a CONSTANT — the fuse it jitters is
 // not read — so the battle's own stream is never touched (docs/ai.md).
 
-import type { AiWorld, Seen } from './ai'
+import type { AiWorld, Candidate, Seen } from './ai'
 import { damageOf, projectileOf, rangeOf } from './projectile'
 import { meleeOf } from './melee'
 import { advanceLob, blastRange, blastShare, isPlanted, lob, lobOf } from './grenade'
@@ -80,13 +80,9 @@ const SIM_STEP = 1 / 30
 const SIM_SECONDS = 6
 
 /** One choice, priced. `score` is what the selection compares — worth less
- * the approach tax; `worth` is the undiscounted HP differential. */
-export interface Option {
-  skill: number
-  kind: 'gun' | 'melee' | 'lob' | 'plant' | 'crate'
-  target: Seen
-  score: number
-  worth: number
+ * the approach tax; `worth` is the undiscounted HP differential. A
+ * `Candidate` (lib/game/ai.ts) plus what the carrying-out needs. */
+export interface Option extends Candidate {
   /** Stand this near the target before firing. */
   reach: number
   /** …and past THIS it is not worth trying at all (the gun's whole range,
@@ -160,7 +156,11 @@ const blastWorth = (
 const weaponPoints = (skill: number): number =>
   damageOf(skill) || (lobOf(skill)?.damage ?? 0) / 128 || (meleeOf(skill)?.damage ?? 0)
 
-const gunOption = (world: AiWorld, skill: number): Option | null => {
+/** What the telemetry hears: every candidate PRICED, not only the winners —
+ * the losers are the whole point (lib/game/ai.ts, `Candidate`). */
+type Note = ((option: Option) => void) | undefined
+
+const gunOption = (world: AiWorld, skill: number, note: Note): Option | null => {
   const row = projectileOf(skill)
   if (!row) return null
   const damage = damageOf(skill)
@@ -170,22 +170,24 @@ const gunOption = (world: AiWorld, skill: number): Option | null => {
     const away = distance2d(me, foe)
     const worth = worthOf(damage, foe)
     const score = worth - (away > rangeOf(row) * CLOSE_TO ? APPROACH_TAX : 0)
+    const option: Option = {
+      skill,
+      kind: 'gun',
+      target: foe,
+      score,
+      worth,
+      reach: rangeOf(row) * CLOSE_TO,
+      limit: rangeOf(row)
+    }
+    note?.(option)
     if (!best || score > best.score || (score === best.score && away < distance2d(me, best.target))) {
-      best = {
-        skill,
-        kind: 'gun',
-        target: foe,
-        score,
-        worth,
-        reach: rangeOf(row) * CLOSE_TO,
-        limit: rangeOf(row)
-      }
+      best = option
     }
   }
   return best
 }
 
-const meleeOption = (world: AiWorld, skill: number): Option | null => {
+const meleeOption = (world: AiWorld, skill: number, note: Note): Option | null => {
   const blade = meleeOf(skill)
   if (!blade) return null
   const me = world.acting
@@ -194,14 +196,24 @@ const meleeOption = (world: AiWorld, skill: number): Option | null => {
     const away = distance2d(me, foe)
     const worth = worthOf(blade.damage, foe)
     const score = worth - (away > MELEE_NEAR ? APPROACH_TAX : 0)
+    const option: Option = {
+      skill,
+      kind: 'melee',
+      target: foe,
+      score,
+      worth,
+      reach: MELEE_NEAR,
+      limit: MELEE_NEAR
+    }
+    note?.(option)
     if (!best || score > best.score || (score === best.score && away < distance2d(me, best.target))) {
-      best = { skill, kind: 'melee', target: foe, score, worth, reach: MELEE_NEAR, limit: MELEE_NEAR }
+      best = option
     }
   }
   return best
 }
 
-const lobOption = (world: AiWorld, skill: number): Option | null => {
+const lobOption = (world: AiWorld, skill: number, note: Note): Option | null => {
   const row = lobOf(skill)
   if (!row) return null
   const me = world.acting
@@ -232,26 +244,26 @@ const lobOption = (world: AiWorld, skill: number): Option | null => {
       // blast to price. Without this line a doused throw scored like a dry
       // one, and a brain repeated it every turn forever.
       const worth = world.wet(landing.x, landing.z) ? 0 : blastWorth(world, landing, damage, spread)
-      if (!best || worth > best.score) {
-        best = {
-          skill,
-          kind: 'lob',
-          target: foe,
-          score: worth,
-          worth,
-          reach: away,
-          limit: arc,
-          charge: charge / GAUGE_FULL
-        }
+      const option: Option = {
+        skill,
+        kind: 'lob',
+        target: foe,
+        score: worth,
+        worth,
+        reach: away,
+        limit: arc,
+        charge: charge / GAUGE_FULL
       }
+      note?.(option)
+      if (!best || worth > best.score) best = option
     } else {
       // Out of the arc: price the throw AS IF it lands on him — the walk
       // closes the gap and the next decision solves it for real.
       const worth = blastWorth(world, foe, damage, spread)
       const score = worth - APPROACH_TAX
-      if (!best || score > best.score) {
-        best = { skill, kind: 'lob', target: foe, score, worth, reach: arc * 0.8, limit: arc }
-      }
+      const option: Option = { skill, kind: 'lob', target: foe, score, worth, reach: arc * 0.8, limit: arc }
+      note?.(option)
+      if (!best || score > best.score) best = option
     }
   }
   return best
@@ -261,13 +273,12 @@ const lobOption = (world: AiWorld, skill: number): Option | null => {
  * option only exists when a foe already stands inside the blast: walk up
  * carrying a lit bomb is a bigger brain's game. The self term is spared —
  * the four hurried seconds after planting are the flee (lib/game/grunt.ts). */
-const plantOption = (world: AiWorld, skill: number): Option | null => {
+const plantOption = (world: AiWorld, skill: number, note: Note): Option | null => {
   const row = lobOf(skill)
   if (!row || world.foes.length === 0) return null
   const me = world.acting
   const worth = blastWorth(world, me, row.damage / 128, blastRange(row), true)
-  if (worth <= 0) return null
-  return {
+  const option: Option = {
     skill,
     kind: 'plant',
     // The spot IS the target: nothing to walk to, nothing to face.
@@ -277,13 +288,16 @@ const plantOption = (world: AiWorld, skill: number): Option | null => {
     reach: Infinity,
     limit: Infinity
   }
+  note?.(option)
+  return worth <= 0 ? null : option
 }
 
 /** A crate weighed against the greed knob: a NECESSITY (no weapon at all)
  * at full worth, an upgrade or a top-up at CRATE_APPETITE of it. */
 const crateOption = (
   world: AiWorld,
-  crate: { x: number; z: number; skill: number | null; amount: number }
+  crate: { x: number; z: number; skill: number | null; amount: number },
+  note: Note
 ): Option | null => {
   const me = world.acting
   const have = world.acting.carrying.reduce(
@@ -299,8 +313,7 @@ const crateOption = (
         : Math.max(0, weaponPoints(crate.skill) - have) * appetite
   const away = distance2d(me, crate)
   const score = gain - (away > COLLECT_NEAR ? APPROACH_TAX : 0)
-  if (score <= 0) return null
-  return {
+  const option: Option = {
     skill: crate.skill ?? SKILLLESS,
     kind: 'crate',
     target: { x: crate.x, y: 0, z: crate.z, health: 0 },
@@ -309,6 +322,8 @@ const crateOption = (
     reach: COLLECT_NEAR,
     limit: Infinity
   }
+  note?.(option)
+  return score <= 0 ? null : option
 }
 
 /** A crate option's `skill` when the crate is health — nothing is ever held
@@ -322,7 +337,7 @@ export const SKILLLESS = -1
  * being the only one). Ties go to the kit's own order — deterministic,
  * like everything here.
  */
-export function priceKit(world: AiWorld): Option | null {
+export function priceKit(world: AiWorld, note?: (option: Option) => void): Option | null {
   let best: Option | null = null
   const keep = (option: Option | null): void => {
     if (option && option.score > 0 && (!best || option.score > best.score)) best = option
@@ -331,12 +346,12 @@ export function priceKit(world: AiWorld): Option | null {
     if (slot.amount === 0) continue
     keep(
       isPlanted(slot.skill)
-        ? plantOption(world, slot.skill)
-        : (gunOption(world, slot.skill) ??
-            lobOption(world, slot.skill) ??
-            meleeOption(world, slot.skill))
+        ? plantOption(world, slot.skill, note)
+        : (gunOption(world, slot.skill, note) ??
+            lobOption(world, slot.skill, note) ??
+            meleeOption(world, slot.skill, note))
     )
   }
-  for (const crate of world.crates) keep(crateOption(world, crate))
+  for (const crate of world.crates) keep(crateOption(world, crate, note))
   return best
 }

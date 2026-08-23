@@ -25,7 +25,7 @@
 // reaches, pass otherwise. Better a poor shot than a pig grinding a wall
 // until the clock takes the turn away.
 
-import type { AiWorld, Brain, Seen } from './ai'
+import type { AiWorld, Brain, Seen, Thought } from './ai'
 import type { Order } from './orders'
 import { shortest } from './actuator'
 import { AIM_UNITS } from './aim'
@@ -97,6 +97,8 @@ export function createGruntBrain(): Brain {
   let grounded = false
   /** The pitch has been set (or refused by the clamp): do not chase it. */
   let pitched = false
+  /** The last decision explained — telemetry's copy, never read back. */
+  let thought: Thought | null = null
 
   // Passing takes the hands (SKIP TURN is fired like any skill), and
   // swimming hands are EMPTY — the engine strips them (lib/game/battle.ts)
@@ -110,6 +112,15 @@ export function createGruntBrain(): Brain {
 
   return {
     decide(world) {
+      // The account of THIS decision, filled as the ladder runs: `say` stamps
+      // which rung answered, the price list pours its candidates in below.
+      const told: Thought = { rung: '?', candidates: [], chose: null }
+      thought = told
+      const say = (rung: string, order: Order): Order => {
+        told.rung = rung
+        return order
+      }
+
       if (world.previous === 'blocked') grounded = true
 
       // IN THE WATER a non-swimmer has exactly one thought: THE SHORE.
@@ -119,7 +130,7 @@ export function createGruntBrain(): Brain {
       // (the log is in the commit). A SWIMMER falls through: the water is
       // not killing it, so the plan below carries on — transit only, the
       // gate past the price list keeps the hands out of it.
-      if (world.swimming && !world.swims) return shore(world)
+      if (world.swimming && !world.swims) return say('shore', shore(world))
 
       // A grenade of OURS is in the air or rolling: the fire key is the
       // detonator now, and timing it is the whole decision. Set it off the
@@ -130,7 +141,9 @@ export function createGruntBrain(): Brain {
         const near = world.foes.some(
           (foe) => Math.hypot(foe.x - thrown.x, foe.z - thrown.z) <= BLAST_CORE
         )
-        return thrown.resting || near ? { kind: 'fire' } : { kind: 'watch' }
+        return thrown.resting || near
+          ? say('detonate', { kind: 'fire' })
+          : say('fuse', { kind: 'watch' })
       }
 
       const me = world.acting
@@ -152,18 +165,20 @@ export function createGruntBrain(): Brain {
       if (world.planted !== null) {
         const charge = world.planted
         const away = Math.hypot(me.x - charge.x, me.z - charge.z)
-        if (away >= FLEE_CLEAR) return { kind: 'watch' }
+        if (away >= FLEE_CLEAR) return say('fled', { kind: 'watch' })
         const dirX = away < 1 ? -Math.sin(me.heading) : (me.x - charge.x) / away
         const dirZ = away < 1 ? -Math.cos(me.heading) : (me.z - charge.z) / away
-        return (
+        return say(
+          'flee',
           walkThe({ x: charge.x + dirX * FLEE_CLEAR, z: charge.z + dirZ * FLEE_CLEAR }) ?? {
             kind: 'watch'
           }
         )
       }
 
-      const option = priceKit(world)
-      if (!option) return pass(world)
+      const option = priceKit(world, (one) => told.candidates.push(one))
+      told.chose = option
+      if (!option) return say('pass-nothing', pass(world))
 
       const target = option.target
       const dx = target.x - me.x
@@ -190,12 +205,12 @@ export function createGruntBrain(): Brain {
       if (option.kind === 'crate') {
         if (!grounded && distance > option.reach) {
           const step = walkThe({ x: target.x, z: target.z })
-          if (step) return step
+          if (step) return say('crate', step)
           grounded = true
         }
         // Standing on it (it hands over next step), or unable to get there:
         // either way the next decision sees a different world.
-        return grounded ? pass(world) : { kind: 'watch' }
+        return grounded ? say('pass-crate', pass(world)) : say('crate-wait', { kind: 'watch' })
       }
 
       // A SWIMMER mid-crossing: TRANSIT ONLY. Nothing is done IN the water
@@ -206,7 +221,7 @@ export function createGruntBrain(): Brain {
       // воде делать нечего — максимум сократить путь."
       if (world.swimming) {
         const step = grounded ? null : walkThe(dryApproach())
-        return step ?? shore(world)
+        return step ? say('transit', step) : say('shore', shore(world))
       }
 
       // Only a GUN's shot travels the flat line a friend can stand in; a lob
@@ -221,13 +236,13 @@ export function createGruntBrain(): Brain {
       // (measured: 249 hold decisions in one battle, rifle-skip-rifle-skip).
       const hopeless = (): boolean =>
         grounded && (distance > option.limit || friend !== null)
-      if (hopeless()) return pass(world)
+      if (hopeless()) return say('pass-hopeless', pass(world))
 
-      if (me.holding !== option.skill) return { kind: 'hold', skill: option.skill }
+      if (me.holding !== option.skill) return say('hold', { kind: 'hold', skill: option.skill })
 
       // PLANTING happens where the pig already stands: press, and the flee
       // above takes over next decision.
-      if (option.kind === 'plant') return { kind: 'fire' }
+      if (option.kind === 'plant') return say('plant', { kind: 'fire' })
 
       if (distance > option.reach && !grounded) {
         // Stop short of the reach mark, so arrival lands INSIDE it — at the
@@ -237,25 +252,25 @@ export function createGruntBrain(): Brain {
         // as the ground allows, and the grunt is grounded the same as a
         // refused step.
         const step = walkThe(dryApproach())
-        if (step) return step
+        if (step) return say('walk', step)
         grounded = true
       }
 
       // The walk above may have GROUNDED us: ask hopeless once more before
       // stepping around friends or firing.
-      if (hopeless()) return pass(world)
+      if (hopeless()) return say('pass-hopeless', pass(world))
 
       if (friend !== null && !grounded) {
         // Step off the line the OTHER way from where the friend leans.
         const ux = dx / distance
         const uz = dz / distance
         const side = -Math.sign(friend.across) * SIDE_STEP
-        return { kind: 'walkTo', x: me.x + uz * side, z: me.z - ux * side }
+        return say('sidestep', { kind: 'walkTo', x: me.x + uz * side, z: me.z - ux * side })
       }
 
       const bearing = Math.atan2(dx, dz)
       if (Math.abs(shortest(bearing - me.heading)) > FACING) {
-        return { kind: 'turnTo', heading: bearing }
+        return say('turn', { kind: 'turnTo', heading: bearing })
       }
 
       // The pitch, GUNS only: Y-DOWN, so standing ABOVE the target means my
@@ -268,16 +283,19 @@ export function createGruntBrain(): Brain {
         )
         if (Math.abs(wanted - me.aim) > PITCH_WITHIN) {
           pitched = true
-          return { kind: 'aimTo', angle: wanted }
+          return say('pitch', { kind: 'aimTo', angle: wanted })
         }
       }
-      return option.charge === undefined
-        ? { kind: 'fire' }
-        : { kind: 'fire', charge: option.charge }
+      return say(
+        'fire',
+        option.charge === undefined ? { kind: 'fire' } : { kind: 'fire', charge: option.charge }
+      )
     },
+    explain: () => thought,
     reset() {
       grounded = false
       pitched = false
+      thought = null
     }
   }
 }

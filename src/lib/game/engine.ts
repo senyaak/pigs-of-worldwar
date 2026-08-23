@@ -402,7 +402,18 @@ export function createEngine(parts: EngineParts): Engine {
   /** What becomes of a body once it is killed: the dying clip, the corpse
    * blast, the boots (lib/game/corpses.ts). After the tumbles, because a body
    * a blast threw finishes its flight before it finishes its death. */
-  const corpses = createCorpses({ anim, query, tumbling: (pig) => tumbles.has(pig) }, bus.emit)
+  const corpses = createCorpses(
+    {
+      anim,
+      query,
+      tumbling: (pig) => tumbles.has(pig),
+      // The battle is built below and only stepped after it exists, so the
+      // late binding is safe; the answer is its `stageStill` — the walk-away's
+      // swimmers included — which is what the dying clip waits behind.
+      cleared: () => battle.stageStill()
+    },
+    bus.emit
+  )
   /** What is already buried in the ground: the map's MINEFIELDS, which are a bit
    * in a tile rather than anything anybody put there (lib/game/mines.ts). Before
    * the grenades, because a thrown thing sets one off the same way a foot does. */

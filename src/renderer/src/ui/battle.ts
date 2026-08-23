@@ -821,6 +821,62 @@ export function initBattle(
             window.api.logTelemetry(end)
           }, 3000)
         },
+        // AI TELEMETRY — the machine's every decision as one or two lines in
+        // the session log (`_tmp/telemetry.log`), for exactly the report play
+        // keeps making: "свин тупит". The first line is the decision — who,
+        // where, how the last order ended (and on WHAT it was refused), which
+        // ladder rung answered, what it wants now. The second is the price
+        // list — every candidate weighed, best first, the winner starred —
+        // because the flip-flop class of stupidity lives in the RUNNER-UP:
+        // two foes pricing level swap the winner on a stride, and a log of
+        // winners alone shows two sensible choices instead of one
+        // oscillation. Lines stay under the IPC's 512 bytes (main/ipc.ts),
+        // which is what the candidate cap is for.
+        aiDecided: ({ name, at, health, previous, refusal, order, thought }) => {
+          const skillTag = (skill: number | null): string =>
+            skill === null
+              ? 'nothing'
+              : skill < 0
+                ? 'health'
+                : skillName(battleText, skill) || `#${skill}`
+          const spot = (one: { x: number; z: number; name?: string }): string =>
+            one.name ?? `${one.x.toFixed(0)},${one.z.toFixed(0)}`
+          const said = ((): string => {
+            switch (order.kind) {
+              case 'hold':
+                return `hold ${skillTag(order.skill)}`
+              case 'walkTo':
+                return `walkTo ${order.x.toFixed(0)},${order.z.toFixed(0)}`
+              case 'turnTo':
+                return `turnTo ${order.heading.toFixed(2)}`
+              case 'aimTo':
+                return `aimTo ${order.angle}`
+              case 'fire':
+                return order.charge === undefined ? 'fire' : `fire @${order.charge.toFixed(2)}`
+              case 'watch':
+                return 'watch'
+            }
+          })()
+          const head =
+            `[ai] ${name} hp${health} @${at.x.toFixed(0)},${at.z.toFixed(0)}` +
+            (previous === null ? '' : ` prev=${previous}${refusal ? `(${refusal})` : ''}`) +
+            ` [${thought?.rung ?? '-'}] -> ${said}`
+          console.log(head)
+          window.api.logTelemetry(head)
+          if (!thought || thought.candidates.length === 0) return
+          const rows = [...thought.candidates].sort((a, b) => b.score - a.score)
+          const shown = rows
+            .slice(0, 6)
+            .map(
+              (c) =>
+                `${c === thought.chose ? '*' : ''}${c.kind} ${skillTag(c.skill)}->` +
+                `${spot(c.target)} s${Math.round(c.score)}`
+            )
+          const more = rows.length > 6 ? ` +${rows.length - 6} more` : ''
+          const kit = `[ai:kit] ${name} ${shown.join(' | ')}${more}`
+          console.log(kit)
+          window.api.logTelemetry(kit)
+        },
         promotionPoint: ({ total }) => {
           points = total
         },

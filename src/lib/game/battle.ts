@@ -177,6 +177,10 @@ export interface Battle {
   /** Take the battle to a pig: a new turn, or a warp. */
   focus(pig: Pig): void
   view(): BattleView
+  /** Whether the stage is STILL — nothing in flight, nobody swimming for the
+   * shore — the gate a death waits behind before it plays out
+   * (lib/game/corpses.ts). */
+  stageStill(): boolean
   /** Tank controls: walk -1|0|1 (back/stop/forward), turn -1|0|1. */
   setIntent(walk: number, turn: number): void
   jump(): void
@@ -522,6 +526,32 @@ export function createBattle(parts: BattleParts): Battle {
     climbing !== null ||
     numbers.live() > 0 ||
     airDrops.falling() > 0
+
+  /**
+   * Whether the STAGE IS STILL — nothing left in flight, nobody swimming for
+   * the shore — which is the moment a death may start PLAYING OUT
+   * (lib/game/corpses.ts). Play named the beat and the exe's turn-mode table
+   * agrees with the order: "сначала идёт урон, потом когда все остановились,
+   * выплыли из воды — тогда только идёт анимация умирания" — mode 13 WALK
+   * AWAY, mode 14 WAITING FOR ALL OBJECTS TO STOP MOVING, and only then 16
+   * WATCHING DYING PIG (0x4d72b0; the state-6 arm at 0x46f4ef rides the
+   * physics body until then).
+   *
+   * NOT `settling`: that list waits on the corpses themselves
+   * (`corpses.live()`), and a death that waited on it would deadlock the
+   * beat. This is the same list LESS the deaths and the theatre — the smoke
+   * and the floating numbers are pictures, not motion, and the exe's own
+   * hold is `0x47D800`, a walk over the PIGS.
+   */
+  const stageStill = (): boolean =>
+    shots.live().length === 0 &&
+    grenades.live() === 0 &&
+    mines.live() === 0 &&
+    tumbles.live() === 0 &&
+    loco.airborne === null &&
+    climbing === null &&
+    airDrops.falling() === 0 &&
+    (walkAway === null || walkAway.swimming() === 0)
 
   /**
    * The acting pig's own FLIGHT, advanced wherever the frame happens to be.
@@ -1068,16 +1098,25 @@ export function createBattle(parts: BattleParts): Battle {
         // brain's whole view — read-only copies, nothing live (docs/ai.md).
         const AI_LOG = typeof process !== 'undefined' && process.env?.AI_LOG === '1'
         const actingSide = game.players.indexOf(game.currentPlayer)
-        const seen = (pig: Pig): { x: number; y: number; z: number; health: number } => ({
+        const seen = (
+          pig: Pig
+        ): { x: number; y: number; z: number; health: number; name: string } => ({
           x: pig.position.x,
           y: pig.position.y,
           z: pig.position.z,
-          health: pig.health
+          health: pig.health,
+          // For the telemetry line alone — the brain never reads a name
+          // (lib/game/ai.ts, `Seen`).
+          name: pig.name
         })
+        // How the LAST order ended, read once: the brain's cue and the
+        // telemetry's story must be the same reading.
+        const previous = actuator.outcome()
+        const refusal = actuator.refusal()
         const decided = brain.decide({
             timeLeft: game.timeLeft,
             wits: parts.wits ?? 0,
-            previous: actuator.outcome(),
+            previous,
             acting: {
               x: acting.position.x,
               y: acting.position.y,
@@ -1145,9 +1184,24 @@ export function createBattle(parts: BattleParts): Battle {
               .filter((one) => one.kind === 'crate')
               .map((one) => ({ x: one.x, z: one.z, skill: one.skill, amount: one.amount }))
           })
+        // THE DECISION, ANNOUNCED — telemetry first, the same road `flung`
+        // took (lib/game/events.ts): the session log is what a "he's acting
+        // stupid" report gets settled against. Nothing in the engine listens.
+        emit({
+          kind: 'aiDecided',
+          pig: acting.id,
+          name: acting.name,
+          at: { ...acting.position },
+          heading: acting.heading,
+          health: acting.health,
+          previous,
+          refusal,
+          order: decided,
+          thought: brain.explain?.() ?? null
+        })
         if (AI_LOG) {
           console.log(
-            `[ai] ${acting.name} @${Math.round(acting.position.x)},${Math.round(acting.position.z)} y=${Math.round(acting.position.y)} h=${acting.heading.toFixed(2)} hp=${acting.health} prev=${actuator.outcome()} -> ${JSON.stringify(decided)}`
+            `[ai] ${acting.name} @${Math.round(acting.position.x)},${Math.round(acting.position.z)} y=${Math.round(acting.position.y)} h=${acting.heading.toFixed(2)} hp=${acting.health} prev=${previous}${refusal ? `(${refusal})` : ''} -> ${JSON.stringify(decided)}`
           )
         }
         actuator.take(decided)
@@ -1615,6 +1669,7 @@ export function createBattle(parts: BattleParts): Battle {
   return {
     update,
     focus,
+    stageStill,
     view: () => ({
       loco,
       aimAngle: sights.angle(),
