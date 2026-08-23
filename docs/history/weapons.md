@@ -1384,3 +1384,15 @@ onto the behind from dead above, flat roll when offset), so nothing in
 code moved; the 79-degree sub-munition pitch is on record in the disasm
 repo if play ever wants the under-the-trotters throw at the exe's own
 angle instead of straight up.
+**The flat shove could not survive the landing (2026-08-24, play's next
+report).** "Граната попадает на свина на неровной поверхности — он никуда
+не сдвинулся": a throw with no vertical hugs the ground, the landing test
+reads only the NORMAL arrival speed — zero — and settles the flight the
+same frame, discarding the whole horizontal. The fix is what both originals
+do anyway: **the knock's 45° is the pitch FLOOR** — every read knock in
+both builds is thrown at 0x200, nothing in the engine ever throws flat, and
+the "roll along the ground" of play's memory is a 45° toss bouncing. The
+centre line still wins when STEEPER (under the trotters -> vertical, play's
+spec); dead overhead still slams down on the spot. hurlVelocity carries the
+rule, unit/blast.spec.ts pins seven geometries including the shallow-line
+floor, and the far-pig throw in e2e/002/tumble.spec.ts now asserts the 45°.

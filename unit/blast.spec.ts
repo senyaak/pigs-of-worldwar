@@ -8,8 +8,9 @@
 // lib/game/blast.ts `burst`) — the line the exe's one throwing explosion, a
 // building going off, throws every pig around it along (0x44050c; the PC
 // exe's own BLAST throws nobody at all, and the fling is play's ruling).
-// A line pointing INTO the ground is answered by the ground: flat, at full
-// speed, away.
+// The pitch floors at the engine's own 45° knock — a shallower line would
+// hug the ground and be settled away on the spot — and only a line STEEPER
+// than that wins, up to straight vertical from under the trotters.
 //
 // The worlds here are synthetic — a squad with a measured body, no terrain —
 // because what is pinned is the GEOMETRY of the launch, not the flight; the
@@ -74,33 +75,51 @@ test('a charge UNDER the trotters throws the pig straight UP', { tag: '@nodata' 
   expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
 })
 
-test('below and beside: up AND away, along the exact line to the centre', { tag: '@nodata' }, () => {
-  // The burst lies on the ground 300 to −x: the line to the centre is
-  // (300, −100, 0), so the pig flies 3 across for every 1 up, at full speed.
+test('a line STEEPER than 45° wins: up-and-across exactly along it', { tag: '@nodata' }, () => {
+  // The burst on the ground 50 to −x of a centre 100 up: the line climbs
+  // 2 for every 1 across — steeper than the knock's pitch, so the pig
+  // flies the line itself, at full speed. This is play's half of the
+  // pitch: the closer to under the body, the closer to straight up.
+  const v = thrown({ x: -50, y: 0, z: 0 })!
+  expect(v.vx).toBeGreaterThan(0)
+  expect(v.vy).toBeLessThan(0)
+  expect(Math.abs(v.vz)).toBeLessThan(1e-6)
+  expect(-v.vy).toBeCloseTo(2 * v.vx, 6)
+  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
+})
+
+test('a SHALLOW line takes the knock\'s own 45° — nothing is ever thrown flat', { tag: '@nodata' }, () => {
+  // The burst 300 out on the ground: the line climbs 1 in 3 — under 45° —
+  // and a throw that shallow would hug the ground and be eaten whole by
+  // the landing. The engine's every read knock is 0x200 = 45°, and that is
+  // the floor: away along the flat bearing, 45° up, full speed.
   const v = thrown({ x: -300, y: 0, z: 0 })!
   expect(v.vx).toBeGreaterThan(0)
   expect(v.vy).toBeLessThan(0)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
-  expect(v.vx).toBeCloseTo(-3 * v.vy, 6)
+  expect(-v.vy).toBeCloseTo(v.vx, 6)
   expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
 })
 
-test('level with the centre: shoved flat away, no lift at all', { tag: '@nodata' }, () => {
+test('level with the centre: the same 45° knock away', { tag: '@nodata' }, () => {
   const v = thrown({ x: -300, y: -BODY.footOffset, z: 0 })!
   expect(v.vx).toBeGreaterThan(0)
-  expect(Math.abs(v.vy)).toBeLessThan(1e-6)
+  expect(-v.vy).toBeCloseTo(v.vx, 6)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
 })
 
-test('a charge ABOVE AND BEHIND shoves the pig FLAT along the ground', { tag: '@nodata' }, () => {
-  // The line to the centre points down-and-away, and the ground answers the
-  // downward leg: the shove runs flat, at full speed, away from the blast.
-  // Play saw the alternative — the ground swallowing the throw whole: "он
-  // как стоял так и стоит — а должен был отброситься по земле в сторону."
+test('a charge ABOVE AND BEHIND knocks the pig 45° away — never swallowed', { tag: '@nodata' }, () => {
+  // The line to the centre points down-and-away. A first fix shoved FLAT
+  // along the ground — and the flight hugged the terrain, the landing read
+  // a zero normal arrival and settled the same frame: play, on uneven
+  // ground, "граната попадает на свина — он никуда не сдвинулся". The
+  // downward leg becomes the 45° knock instead, and the bounces are the
+  // roll-back play remembers.
   const v = thrown({ x: -100, y: -400, z: 0 })!
-  expect(v.vy).toBe(0)
-  expect(v.vx).toBeCloseTo(flingSpeed(30), 6)
+  expect(v.vx).toBeGreaterThan(0)
+  expect(-v.vy).toBeCloseTo(v.vx, 6)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
+  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
 })
 
 test('a charge DEAD OVERHEAD slams straight down — the landing does the rest', { tag: '@nodata' }, () => {

@@ -102,26 +102,35 @@ export const flingVelocity = (speed: number, bearing: number): Velocity => ({
  * 0x800FAC84) — which throws along the line from its centre to the pig:
  * this line.
  *
- * Play shaped both ends of the pitch. A charge UNDER the trotters throws
- * the pig straight up ("чтобы свинья летала если граната ниже центра
- * тяжести"), and a line pointing INTO the ground is answered by the
- * ground: the pig is shoved FLAT along it at full speed — play saw the
- * alternative, a blast above and behind whose downward throw the ground
- * swallowed on the spot: "он как стоял так и стоит — а должен был
- * отброситься по земле в сторону."
+ * The PITCH has a FLOOR at the engine's own 45° (`PITCH`), and the line
+ * only wins when it is STEEPER. Both halves are earned. The steep half is
+ * play's spec — a charge UNDER the trotters sends the pig toward vertical:
+ * "чтобы свинья летала если граната ниже центра тяжести". The floor is the
+ * read AND a bug both: every actual knock in both originals is thrown at
+ * 0x200 = 45°, nothing in the engine ever throws flat — and when this
+ * remake tried (a "flat shove" for downward lines), the flight hugged the
+ * ground, the landing test read a zero NORMAL arrival speed and settled
+ * the same frame, and the whole shove vanished — play, twice: "он как
+ * стоял так и стоит", then again on uneven ground. A 45° toss with its
+ * bounces IS the "откатывает по земле" play remembers.
  *
  * Two degenerate lines: no direction at all (the charge is inside the
  * body) goes straight up, and straight-down-with-no-flat (a charge dead
- * overhead) slams straight down — the bounce is whatever the landing says.
+ * overhead) slams straight down — the knockdown on the spot, "падает на
+ * жопу".
  */
 export const hurlVelocity = (speed: number, along: { x: number; y: number; z: number }): Velocity => {
   const span = Math.hypot(along.x, along.y, along.z)
   if (span < 1) return { vx: 0, vy: -speed, vz: 0 }
-  // Y-DOWN: a positive y leg points into the ground — flatten to the slide.
-  if (along.y > 0) {
-    const flat = Math.hypot(along.x, along.z)
-    if (flat < 1) return { vx: 0, vy: speed, vz: 0 }
-    return { vx: (along.x / flat) * speed, vy: 0, vz: (along.z / flat) * speed }
+  const flat = Math.hypot(along.x, along.z)
+  // Y-DOWN: dead overhead — down it goes, and the landing does the rest.
+  if (flat < 1 && along.y > 0) return { vx: 0, vy: speed, vz: 0 }
+  // The rise is how much the line climbs; under 45° (rise < flat, downward
+  // included) the knock's own pitch takes over, along the flat bearing.
+  const rise = -along.y
+  if (rise < flat) {
+    const run = (Math.cos(PITCH) * speed) / flat
+    return { vx: along.x * run, vy: -Math.sin(PITCH) * speed, vz: along.z * run }
   }
   return {
     vx: (along.x / span) * speed,

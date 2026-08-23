@@ -194,12 +194,16 @@ test('…and the pig NEXT to it is thrown too, away from the blast and less hard
   const thrown = tumbles.at()
   const one = thrown.find((each) => each.pig === near.id)!
   const other = thrown.find((each) => each.pig === far.id)!
-  // AWAY from it: the far pig sits at +x of the blast and goes on out that way
-  // — and mostly FLAT, because at 800 units out the line from the burst to its
-  // centre of gravity is nearly level (lib/game/tumble.ts `hurlVelocity`).
+  // AWAY from it: the far pig sits at +x of the blast and goes on out that
+  // way — at the knock's own 45°, because at 800 units out the line from the
+  // burst to its centre is far shallower than the floor
+  // (lib/game/tumble.ts `hurlVelocity`).
   expect(other.vx, 'it was thrown back into the blast').toBeGreaterThan(0)
   expect(Math.abs(other.vz)).toBeLessThan(Math.abs(other.vx))
-  expect(Math.abs(other.vy), 'a distant shove is a shove, not a toss').toBeLessThan(other.vx)
+  expect(-other.vy, 'the knock rises at its own 45°').toBeCloseTo(
+    Math.hypot(other.vx, other.vz),
+    4
+  )
   // …and by the share the damage took, which is what makes standing back worth
   // doing: the one under it keeps the whole impulse.
   const share = blastShare(apart, blastReach(1024))

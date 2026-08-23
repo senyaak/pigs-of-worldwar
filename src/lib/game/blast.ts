@@ -116,12 +116,13 @@ export interface BlastWorld {
  * The DIRECTION is the engine's one throwing explosion borrowed: a BUILDING
  * going off (PC 0x44050c at 0x40, PSX 0x800FAC84, contact arm 0x78) throws
  * every pig around it along the line from its centre to the pig, and
- * `hurlVelocity` (lib/game/tumble.ts) is that line in three dimensions,
- * shaped at both ends by play — straight up from under the trotters, flat
- * along the ground when the line points into it. A first pass threw every
- * victim at the melee's fixed 45° instead, and play called it at once:
- * "граната до сих пор как-то странно отбрасывает"; a second pass let the
- * ground swallow the downward lines, and play called that too.
+ * `hurlVelocity` (lib/game/tumble.ts) is that line in three dimensions with
+ * the engine's 45° knock as the pitch FLOOR — the line wins only when it is
+ * steeper, up to straight vertical from under the trotters. Three passes of
+ * play shaped it: the fixed 45° alone ("странно отбрасывает" — no vertical
+ * from below), then a flat shove for downward lines that the landing
+ * swallowed whole ("он никуда не сдвинулся"), and the floor is what both
+ * originals throw every knock at anyway.
  */
 export const FLING_PER_POINT = 6
 /** …and no harder than the hardest knock in the engine: the cattle prod's. */
