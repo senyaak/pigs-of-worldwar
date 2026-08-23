@@ -164,6 +164,9 @@ export type BattleEvent =
    * first 0x300 bytes.
    */
   | { kind: 'menuOpened'; first: number | null }
+  /** …and the CURSOR stepped inside it — the tick the highlight moves on.
+   * Play: "нет звука когда в инвентаре перемещаешь выделение вообще". */
+  | { kind: 'menuMoved' }
   /** …and something came OUT of it, into the pig's hands. The training
    * ground's script counts these (lib/game/tutorial.ts). */
   | { kind: 'chose'; skill: number }

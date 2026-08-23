@@ -300,6 +300,16 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * to say which index it asks for. */
   menuOpen: { sound: 'S_OPEN', volume: 100, pitch: 100 },
   /**
+   * The cursor STEPPING inside the menu — the tick the highlight moves on,
+   * which played nothing at all until play said so ("нет звука когда в
+   * инвентаре перемещаешь выделение вообще"). A NAME PICK like both its
+   * neighbours, from the same S_ interface family: S_SELECT again, but
+   * quicker and quieter than the skillUsed confirmation below so a walk
+   * along the grid does not sound like eight things going off. Correct it
+   * by ear from `pow.sfx`.
+   */
+  menuMove: { sound: 'S_SELECT', volume: 55, pitch: 135 },
+  /**
    * A skill being USED confirms itself — at the moment SKIP TURN there was
    * nothing at all, and play noticed: "нет подтверждения хода при пропуске хода."
    *

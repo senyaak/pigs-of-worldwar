@@ -45,10 +45,51 @@ export interface Spot {
  * for the wall to be in front of. The eighteen pieces of the house are ordinary
  * breakable scenery and go on fading, which is the half play asked to keep.
  */
-export const sightBlockers = (objects: MapObject[]): Obstacle[] =>
+/**
+ * What a record's ART fills, model-local units scaled to the world and
+ * measured about the record's own centre — the renderer computes it off the
+ * mesh it actually draws (three/battle.ts). Y-DOWN like everything here:
+ * `topOffset` is the highest vertex's offset from the centre (negative for
+ * anything reaching up), `bottomOffset` the lowest.
+ */
+export interface ArtExtent {
+  halfX: number
+  halfZ: number
+  topOffset: number
+  bottomOffset: number
+}
+
+export const sightBlockers = (
+  objects: MapObject[],
+  /**
+   * The drawn art's own extents by MODEL NAME (upper case), where somebody
+   * has them. The COLLISION box is the wrong box for a sight test and play
+   * found where: "текстуры листвы не делаются прозрачными когда свин закрыт
+   * ими" — a tree's collider is its TRUNK (192 across on a TREEG), the crown
+   * is four times that, and a ray from the camera to the pig went through
+   * the leaves without ever touching the box. What hides a pig is what is
+   * DRAWN, so where the art is known each box grows to cover it — never
+   * shrinks, since the majority-silhouette test above is what keeps a fat
+   * box beside the pig from fading.
+   */
+  artOf?: (name: string) => ArtExtent | null
+): Obstacle[] =>
   objects
     .filter((one) => isSolid(one) && buildingKind(one.name) === null && !isRamp(one.name))
-    .map(boxOf)
+    .map((one) => {
+      const box = boxOf(one)
+      const art = artOf?.(one.name.toUpperCase()) ?? null
+      if (!art) return box
+      const centre = (box.top + box.bottom) / 2
+      return {
+        ...box,
+        halfX: Math.max(box.halfX, art.halfX),
+        halfZ: Math.max(box.halfZ, art.halfZ),
+        // Y-DOWN: the smaller number is the higher face.
+        top: Math.min(box.top, centre + art.topOffset),
+        bottom: Math.max(box.bottom, centre + art.bottomOffset)
+      }
+    })
 
 /**
  * The pig's own SILHOUETTE, sampled: the rows up his body and the columns

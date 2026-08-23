@@ -145,6 +145,7 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       healed: () => playCue(bank(), BATTLE_SOUNDS.healed),
       skillUsed: () => playCue(bank(), BATTLE_SOUNDS.skillUsed),
       menuOpened: () => bank().play(BATTLE_SOUNDS.menuOpen.sound),
+      menuMoved: () => playCue(bank(), BATTLE_SOUNDS.menuMove),
 
       // ——— things coming down ———
       // The aeroplane first, then the canopy a beat later.

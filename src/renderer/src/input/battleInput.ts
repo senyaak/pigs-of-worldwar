@@ -405,9 +405,14 @@ export function createBattleInput(host: BattleInputHost): BattleInput {
     const intent = readControls(mode, readHeld())
     if (mode === 'inventory') {
       // The cursor steps on the EDGE, and the axes are the pig's own keys.
+      const ticked =
+        (intent.cursor.y !== 0 && stepped.y === 0) || (intent.cursor.x !== 0 && stepped.x === 0)
       if (intent.cursor.y !== 0 && stepped.y === 0) host.skills.move(0, intent.cursor.y)
       if (intent.cursor.x !== 0 && stepped.x === 0) host.skills.move(intent.cursor.x, 0)
       stepped = { ...intent.cursor }
+      // …and each step is HEARD (audio/battleAudio.ts). Play: the menu moved
+      // in silence — "нет звука когда в инвентаре перемещаешь выделение".
+      if (ticked) host.emit({ kind: 'menuMoved' })
     } else {
       stepped = { x: 0, y: 0 }
     }

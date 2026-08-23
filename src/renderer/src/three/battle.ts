@@ -50,6 +50,8 @@ import type { Collected } from '../../../lib/game/scenery'
 import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { createBulletArt } from './shots'
 import { crossedTowards, sightBlockers, silhouetteOf } from '../../../lib/game/seeThrough'
+import type { ArtExtent } from '../../../lib/game/seeThrough'
+import { MODEL_SCALE } from '../../../lib/game/scale'
 import { createGrenadeArt } from './grenades'
 import { createMineArt } from './mineArt'
 import { createRemainsArt } from './remains'
@@ -249,8 +251,31 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const props = buildMapProps(assets.objects, assets.props, assets.propTextures)
   root.add(props.group)
   /** Every box that could hide the pig from the camera (lib/game/seeThrough.ts),
-   * built once — the records do not move. */
-  const blockers = sightBlockers(assets.objects)
+   * built once — the records do not move. The boxes are grown to the ART the
+   * player actually sees, measured off each model's own vertices the way
+   * `bodyExtent` measures a pig: a tree's collider is its trunk and its crown
+   * is what hides things ("текстуры листвы не делаются прозрачными"). */
+  const artExtents = new Map<string, ArtExtent>()
+  for (const prop of assets.props) {
+    const positions = prop.model.positions
+    if (positions.length === 0) continue
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity
+    for (let i = 0; i < positions.length; i += 3) {
+      minX = Math.min(minX, positions[i]); maxX = Math.max(maxX, positions[i])
+      minY = Math.min(minY, positions[i + 1]); maxY = Math.max(maxY, positions[i + 1])
+      minZ = Math.min(minZ, positions[i + 2]); maxZ = Math.max(maxZ, positions[i + 2])
+    }
+    // The mesh is drawn at MODEL_SCALE about the record's centre and turned
+    // only about the vertical, so the flat halves are safe as the larger of
+    // the two reaches (three/props.ts).
+    artExtents.set(prop.name.toUpperCase(), {
+      halfX: Math.max(Math.abs(minX), Math.abs(maxX)) * MODEL_SCALE,
+      halfZ: Math.max(Math.abs(minZ), Math.abs(maxZ)) * MODEL_SCALE,
+      topOffset: minY * MODEL_SCALE,
+      bottomOffset: maxY * MODEL_SCALE
+    })
+  }
+  const blockers = sightBlockers(assets.objects, (name) => artExtents.get(name) ?? null)
   /** Scratch for the camera's position in GAME space: the root is turned half a
    * turn about x, so the world's y and z are the game's negated. */
   const eyeInGame = new THREE.Vector3()

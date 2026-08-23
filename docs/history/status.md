@@ -1252,3 +1252,24 @@ the dead". The board draws the pair after battles and kills, with the
 debrief's `r_i_p` scaled to the markup icons' 22 (its own load, its own
 failure — a missing debrief folder costs the icon, not the screen).
 `unit/kills.spec.ts` pins the count at `regroup` and the repair at `parse`.
+## Three play reports, one session (2026-08-24 evening)
+
+- **"Перезапуск миссии ломает звуки"** — the bank is ONE promise for the
+  whole app (`sharedBank`, audio/bank.ts) and `battleSound.dispose`
+  disposed it on every battle teardown, so the second battle of any app run
+  got the same silenced object back and nothing played until the app closed.
+  The bank is BORROWED now, the sergeant's own rule ("stopped, never
+  disposed"); pinned by the restart spec in e2e/002/audio.spec.ts, verified
+  red with the dispose reintroduced.
+- **"Нет звука когда в инвентаре перемещаешь выделение"** — the cursor's
+  step had no event and no cue. `menuMoved` rides the bus from the input's
+  edge-step (input/battleInput.ts) and the cue is a name pick beside
+  menuOpen's — S_SELECT, quicker and quieter than the skillUsed confirmation
+  (`menuMove`, audio/battle.ts; correct it by ear from `pow.sfx`).
+- **"Текстуры листвы не делаются прозрачными когда свин закрыт ими"** — the
+  see-through test ran on COLLISION boxes, and a tree's collider is its
+  trunk: the ray to the pig went through the crown without touching the box.
+  `sightBlockers` grows each box to the drawn mesh's own measured extents
+  (never shrinks — the majority-silhouette rule still decides), the renderer
+  measuring every prop model the way `bodyExtent` measures a pig
+  (three/battle.ts). unit/seeThrough.spec.ts pins the crown-vs-trunk ray.

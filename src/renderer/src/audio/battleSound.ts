@@ -157,7 +157,12 @@ export function createBattleSound(bus: BattleBus): BattleSound {
       sarge.stop()
       music.dispose()
       voice.dispose()
-      bank.dispose()
+      // The BANK is borrowed the same way the sergeant is — `sharedBank` is
+      // one promise for the whole app, and disposing it here is what play
+      // heard as "перезапуск миссии ломает звуки": the second battle got the
+      // same Bank object back with its `disposed` flag already up, and every
+      // `play()` returned early for ever. Its buffers are a cache, not a
+      // battle's property; nothing of it needs putting away.
     }
   }
 }

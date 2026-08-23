@@ -32,6 +32,7 @@ import {
   release,
   releaseAll,
   skipTurn,
+  swapMap,
   tap,
   warp
 } from '../controller'
@@ -243,5 +244,72 @@ test('a level plays MUSIC, and the TURN is what asks for it', async ({ app }) =>
   const asked = (await music()).played
   expect(asked[1], 'the second of the set, in order').toBe(asked[0] + 1)
 
+  expect(app.errors()).toEqual([])
+})
+
+test('the bank SURVIVES a mission restart — the second battle still sounds', async ({ app }) => {
+  // Play: "перезапуск миссии ломает звуки." The bank is ONE promise for the
+  // whole app (`sharedBank`, audio/bank.ts) and the first battle's dispose
+  // used to flip its `disposed` flag — so every battle after the first got
+  // the same silenced object back, and nothing played again until the app
+  // was closed. The sergeant already had the rule this pins: BORROWED things
+  // are stopped, never disposed.
+  const { page } = app
+  await startGame(page)
+  await expect(page.locator('#battle')).toBeVisible()
+
+  const heard = (): Promise<string[]> => page.evaluate(() => window.pow!.debug!.sounds())
+  // The first battle sounds — the turn's own grunt proves the bank arrived.
+  await expect.poll(async () => (await heard()).includes('P_HMMM')).toBe(true)
+
+  // A RESTART: the same battle torn down and built again, which is what the
+  // debrief's RETRY and a step back both do (ui/battle.ts `start`).
+  expect(await swapMap(page, 'CAMP')).toBe(true)
+  await beginTurn(page)
+
+  // The SECOND battle's own turn grunt — a fresh sound list (the debug
+  // surface was rebuilt with the scene), so hearing anything at all is the
+  // whole assertion. Before the fix this poll starved: the shared bank came
+  // back disposed and every play() returned early.
+  await expect.poll(async () => (await heard()).includes('P_HMMM')).toBe(true)
+
+  // …and a driven noise still lands end to end. CONTAINS rather than the
+  // first jump test's exact pair: a restarted battle has its own stragglers
+  // (a hoof, a late grunt) and which of them shares the slice is not what
+  // this spec is about — hearing anything at all is.
+  await warp(page, -4352, 8448, 0)
+  const before = (await heard()).length
+  await tap(page, 'jump')
+  await expect
+    .poll(async () => (await heard()).slice(before), { message: 'the second battle went quiet' })
+    .toEqual(
+      expect.arrayContaining([BATTLE_SOUNDS.jump.sound, BATTLE_SOUNDS.land.sound])
+    )
+
+  expect(app.errors()).toEqual([])
+})
+
+test('moving the highlight in the weapon menu CLICKS', async ({ app }) => {
+  // Play: "нет звука когда в инвентаре перемещаешь выделение вообще." The
+  // cursor's step now rides the bus (`menuMoved`, input/battleInput.ts) and
+  // the cue is a name pick beside menuOpen's (audio/battle.ts `menuMove`).
+  const { page } = app
+  await startGame(page)
+  await expect(page.locator('#battle')).toBeVisible()
+
+  const heard = (): Promise<string[]> => page.evaluate(() => window.pow!.debug!.sounds())
+  await expect.poll(async () => (await heard()).includes('P_HMMM')).toBe(true)
+
+  // Open the menu — its own noise — then step the cursor once.
+  await press(page, 'skills')
+  await expect.poll(async () => (await heard()).includes(BATTLE_SOUNDS.menuOpen.sound)).toBe(true)
+  const before = (await heard()).length
+  await tap(page, 'turnRight')
+  await expect
+    .poll(async () => (await heard()).slice(before), { message: 'the cursor moved in silence' })
+    .toContain(BATTLE_SOUNDS.menuMove.sound)
+
+  // …and the menu goes back down, so the next spec meets a battle, not a grid.
+  await press(page, 'skills')
   expect(app.errors()).toEqual([])
 })
