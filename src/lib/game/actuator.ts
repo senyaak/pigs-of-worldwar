@@ -101,17 +101,15 @@ export const WATER_PROBE = 150
 const AIM_STUCK_SECONDS = 0.5
 
 /**
- * A walk is TURN FIRST, THEN GO — play's own spec, given twice: for the
- * walk-away swim ("сначала поворот, а потом вперёд") and now for the
- * machine's own legs ("надо сделать повороты и хождение полностью
- * отдельными — не надо ходить и поворачиваться сразу"). Walking and turning
- * at once curves the path and reads as a pig lurching about.
- *
- * Two thresholds, so the seam cannot oscillate: the walk STARTS when the
- * turn's own deadband says aligned (one step's sweep, `turnToward`), and it
- * only stops to RE-ALIGN when the bearing has drifted past this — wide
- * enough that the ordinary drift of a straight leg never trips it, tight
- * enough that a pig walking past its point stops and comes back.
+ * A walk is TURN FIRST, THEN GO — play's own spec ("надо сделать повороты и
+ * хождение полностью отдельными"), refined by play once more after the
+ * strict version shipped: taken literally it made EVERY small elbow of a
+ * grid route a full stop ("повернулся — шаг — повернулся — шаг… тупил, пока
+ * время не кончилось"). So the rule is about BIG turns: outside this band
+ * the pig stops and turns on the spot; inside it, it walks and steers the
+ * small correction through — no wide curved approaches, no stuttering at
+ * bends. The route's own string-pulling (lib/game/pathfind.ts) keeps legs
+ * long and straight, so the band is rarely consulted mid-leg at all.
  */
 const REALIGN = Math.PI / 8
 
@@ -183,10 +181,13 @@ export function createActuator(rig: Rig): Actuator {
         const bearing = Math.atan2(dx, dz)
         const { heading } = rig.at()
         const off = shortest(bearing - heading)
-        // TURN FIRST, THEN GO (see REALIGN above): out of alignment the legs
-        // only turn, and a straight leg only stops to re-align once the
-        // bearing has drifted wide.
-        if (aligned && Math.abs(off) > REALIGN) aligned = false
+        // TURN FIRST, THEN GO (see REALIGN above) — with one softening play
+        // asked for after watching the strict version: a BIG turn happens on
+        // the spot, but a bend inside the band is steered THROUGH while
+        // walking ("повернулся — шаг — повернулся — шаг" was the strict
+        // version taking every small elbow as a full stop).
+        if (Math.abs(off) <= REALIGN) aligned = true
+        else if (aligned) aligned = false
         if (!aligned) {
           const turn = turnToward(bearing, delta)
           if (turn !== 0) {
@@ -211,7 +212,9 @@ export function createActuator(rig: Rig): Actuator {
           finish('blocked', 'water')
           return
         }
-        rig.intent(1, 0)
+        // Walking, with the small correction the band allows — the deadband
+        // in `turnToward` keeps it from sawing about the bearing.
+        rig.intent(1, turnToward(bearing, delta))
         // No progress WHILE WALKING is the world saying no — a wall, a body,
         // the wedge counter — and the brain hears `blocked`.
         if (distance < best - PROGRESS) {

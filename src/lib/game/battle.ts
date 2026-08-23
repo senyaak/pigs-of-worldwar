@@ -43,7 +43,7 @@ import type { WalkAway } from './walkAway'
 import { advanceEndOfGame, beginEndOfGame, outcomeOf } from './endOfGame'
 import type { EndOfGame } from './endOfGame'
 import { endsTurn, hurryFor } from './spend'
-import { isPlanted } from './grenade'
+import { blastRange, isPlanted, lobOf } from './grenade'
 import { createSights } from './sights'
 import { createAttack } from './attack'
 import { SKILL } from './skills'
@@ -1210,7 +1210,14 @@ export function createBattle(parts: BattleParts): Battle {
               const head = grenades.head()
               return head === null
                 ? null
-                : { x: head.x, z: head.z, resting: head.resting }
+                : {
+                    x: head.x,
+                    z: head.z,
+                    resting: head.resting,
+                    // The blast's outer edge — what the dumbest detonation
+                    // window is as wide as (lib/game/grunt.ts).
+                    rim: blastRange(lobOf(head.skill) ?? lobOf(SKILL.GRENADE)!)
+                  }
             })(),
             // …and a PLANTED one: live but not thrown — the newest lob is it,
             // because planting is the only other way a lob gets made.

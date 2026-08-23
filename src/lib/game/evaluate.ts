@@ -93,9 +93,18 @@ export interface Option extends Candidate {
   charge?: number
 }
 
-/** What one hit of `damage` at this pig is WORTH, kill bonus included. */
-export const worthOf = (damage: number, pig: Seen): number =>
-  Math.min(damage, pig.health) + (damage >= pig.health ? KILL_BONUS : 0)
+/**
+ * What one hit of `damage` at this pig is WORTH — and the kill bonus is
+ * WEIGHED BY WITS, because valuing a finished pig above the points it costs
+ * is thinking a turn ahead (docs/ai.md, the HORIZON knob: "shoot now" at the
+ * bottom, futures at the top). Play caught the dumbest brain sniping the
+ * low-hp pig across the field like a veteran: "для такого уровня слишком
+ * разборчиво цель выбрал — вместо ближнего того, у кого хп мало." With the
+ * bonus scaled away, equal damage prices equal and the builders' own
+ * tie-break — the NEARER target — is what a dumb pig shoots.
+ */
+export const worthOf = (damage: number, pig: Seen, wits: number): number =>
+  Math.min(damage, pig.health) + (damage >= pig.health ? KILL_BONUS * wits : 0)
 
 const distance2d = (a: { x: number; z: number }, b: { x: number; z: number }): number =>
   Math.hypot(a.x - b.x, a.z - b.z)
@@ -140,13 +149,13 @@ const blastWorth = (
   const me = world.acting
   let total = 0
   for (const foe of world.foes) {
-    total += worthOf(damage * blastShare(distance2d(foe, landing), range), foe)
+    total += worthOf(damage * blastShare(distance2d(foe, landing), range), foe, world.wits)
   }
   const own: Seen[] = [...world.friends]
   if (!spareSelf) own.push({ x: me.x, y: me.y, z: me.z, health: me.health })
   for (const friend of own) {
     const share = blastShare(distance2d(friend, landing), range)
-    if (share > 0) total -= worthOf(damage * share, friend)
+    if (share > 0) total -= worthOf(damage * share, friend, world.wits)
   }
   return total
 }
@@ -168,7 +177,7 @@ const gunOption = (world: AiWorld, skill: number, note: Note): Option | null => 
   let best: Option | null = null
   for (const foe of world.foes) {
     const away = distance2d(me, foe)
-    const worth = worthOf(damage, foe)
+    const worth = worthOf(damage, foe, world.wits)
     const score = worth - (away > rangeOf(row) * CLOSE_TO ? APPROACH_TAX : 0)
     const option: Option = {
       skill,
@@ -194,7 +203,7 @@ const meleeOption = (world: AiWorld, skill: number, note: Note): Option | null =
   let best: Option | null = null
   for (const foe of world.foes) {
     const away = distance2d(me, foe)
-    const worth = worthOf(blade.damage, foe)
+    const worth = worthOf(blade.damage, foe, world.wits)
     const score = worth - (away > MELEE_NEAR ? APPROACH_TAX : 0)
     const option: Option = {
       skill,

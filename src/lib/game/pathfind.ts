@@ -92,6 +92,11 @@ export const GRID_STEP = 128
  * whole 193×193 world is ~37k, so this is "the map, roughly once". */
 const EXPANDED_CAP = 40000
 
+/** How far ahead the string-pulling looks for a straight leg, in spine
+ * points — 24 cells is ~3000 units of one bearing, plenty to kill the grid's
+ * elbows without paying a quadratic bill on a cross-map route. */
+const PULL = 24
+
 const SIDE = Math.floor((2 * WORLD_LIMIT) / GRID_STEP) + 1
 const HALF = Math.floor(SIDE / 2)
 
@@ -182,10 +187,9 @@ export function route(
     )
   }
 
-  const step = (footY: number, cx: number, cz: number): { foot: number; wade: boolean } | null => {
-    if (!inside(cx, cz)) return null
-    const x = at(cx)
-    const z = at(cz)
+  /** The same landing asked at a POINT rather than a cell — what the
+   * string-pulling below samples a straight leg with. */
+  const landAt = (footY: number, x: number, z: number): { foot: number; wade: boolean } | null => {
     if (props.blocks(x, z, footY, WALL_CLIMB)) return null
     const deck = props.standOn(x, z, footY, WALL_CLIMB)
     let foot: number
@@ -205,6 +209,11 @@ export function route(
     // climb the legs cannot make. Any drop is walked off.
     if (footY - foot > WALL_CLIMB) return null
     return { foot, wade }
+  }
+
+  const step = (footY: number, cx: number, cz: number): { foot: number; wade: boolean } | null => {
+    if (!inside(cx, cz)) return null
+    return landAt(footY, at(cx), at(cz))
   }
 
   const startX = gx(from.x)
@@ -310,23 +319,83 @@ export function route(
     }
   }
 
-  // Walk the parents back from the nearest approach, then merge collinear
-  // runs so the brain gets CORNERS, not every grid point.
+  // Walk the parents back from the nearest approach…
   const spine: { x: number; z: number }[] = []
   for (let k: number | undefined = bestKey; k !== undefined; k = parent.get(k)) {
     spine.push({ x: at(Math.floor(k / SIDE) - HALF), z: at((k % SIDE) - HALF) })
   }
   spine.reverse()
+
+  /**
+   * …then PULL THE STRING through it. A grid path is made of 45° elbows,
+   * and a walk that takes them literally is a pig doing "повернулся — шаг —
+   * повернулся — шаг" the whole way (play watched one stall a whole turn on
+   * it, turn-then-go having made every elbow a full stop). The brain wants
+   * LEGS, not cells: from each point, take the farthest spine point a
+   * straight line reaches — the line sampled at half a cell through the
+   * same landing test the search used, feet carried so the climb envelope
+   * still holds — and a diagonal across open ground comes back as ONE leg
+   * at its true bearing. `PULL` bounds the lookahead so a long route costs
+   * a bounded number of samples.
+   */
+  const walksTo = (
+    fromX: number,
+    fromZ: number,
+    fromFoot: number,
+    to: { x: number; z: number }
+  ): number | null => {
+    // CELL BY CELL, not point by point: the leg is judged in the same
+    // currency the search used — every cell the line crosses passes the
+    // same `step`, diagonals want both shoulders open, and a WADE refuses
+    // the cut outright (a swimmer's detour was priced in TIME, and a
+    // straight line through the bay un-prices it).
+    let cx = gx(fromX)
+    let cz = gx(fromZ)
+    let foot = fromFoot
+    const span = Math.hypot(to.x - fromX, to.z - fromZ)
+    const strides = Math.max(1, Math.ceil(span / (GRID_STEP / 4)))
+    for (let s = 1; s <= strides; s++) {
+      const nx = gx(fromX + ((to.x - fromX) * s) / strides)
+      const nz = gx(fromZ + ((to.z - fromZ) * s) / strides)
+      if (nx === cx && nz === cz) continue
+      if (
+        nx !== cx &&
+        nz !== cz &&
+        (step(foot, cx, nz) === null || step(foot, nx, cz) === null)
+      ) {
+        return null
+      }
+      const landing = step(foot, nx, nz)
+      if (landing === null || landing.wade) return null
+      foot = landing.foot
+      cx = nx
+      cz = nz
+    }
+    return foot
+  }
   const corners: { x: number; z: number }[] = []
-  for (let i = 1; i < spine.length; i++) {
-    const back = spine[i - 1]
-    const here = spine[i]
-    const ahead = spine[i + 1]
-    const straightOn =
-      ahead !== undefined &&
-      ahead.x - here.x === here.x - back.x &&
-      ahead.z - here.z === here.z - back.z
-    if (!straightOn) corners.push(here)
+  let pullX = from.x
+  let pullZ = from.z
+  let pullFoot = startFoot
+  // spine[0] is the START's own cell: not a corner anybody walks to.
+  for (let i = 1; i < spine.length; ) {
+    let take = i
+    let foot: number | null = null
+    for (let j = Math.min(spine.length - 1, i + PULL); j > i; j--) {
+      foot = walksTo(pullX, pullZ, pullFoot, spine[j])
+      if (foot !== null) {
+        take = j
+        break
+      }
+    }
+    // The next spine point is one grid move away and the search itself just
+    // walked it, so falling back to it never loses the path.
+    if (foot === null) foot = feet.get(key(gx(spine[take].x), gx(spine[take].z))) ?? pullFoot
+    corners.push(spine[take])
+    pullX = spine[take].x
+    pullZ = spine[take].z
+    pullFoot = foot
+    i = take + 1
   }
   return corners
 }

@@ -1076,3 +1076,48 @@ decision falls through to the fight — the multi-step plan is emergent, no
 memory added. A plant never detours. Pinned in unit/grunt.spec.ts (errand →
 collected → fire; five seconds left → the shot comes first); the machine
 mission still plays to a verdict.
+
+## The plan holds, the string is pulled, the hands shake (2026-08-24)
+
+The third play session, and play handed over both the bugs and the MODEL.
+The model first, because it reframed the seat: "мир не меняется! свин меняет
+мир своими действиями — его передвижение не меняет его намерений." A
+turn-based world stands still on your own turn, so re-electing a winner
+every mull only ever changed answers by accident. The grunt keeps an INTENT
+now — (kind, skill, target), chosen once and held; dropped exactly when the
+world actually changed: the target gone, the KIT changed (a pickup re-opens
+the election), the plan unplayable. Everything else re-derives EXECUTION
+only. With it, per-turn caches for the rest of the chance: the aim's shake,
+the reachability verdicts (whose full-map best-effort routes re-run every
+mull were the hitch play felt on the enemy's turn — "подвисает ход", and it
+was never the logging).
+
+The bugs, each with its play line:
+
+- **"повернулся — шаг — повернулся — шаг"** — turn-then-go, taken strictly,
+  made every 45° elbow of a grid route a full stop, and a pig stalled a
+  whole turn crossing a diagonal. Two halves: the route is STRING-PULLED now
+  (lib/game/pathfind.ts — cell-by-cell lines through the search's own step
+  test, wade refused so a swimmer's time-priced detour survives, PULL bounds
+  the cost), so a diagonal across open ground is ONE leg at its true
+  bearing; and the actuator walks THROUGH bends inside the REALIGN band,
+  stopping to turn only for real turns.
+- **"слишком разборчиво цель выбрал — вместо ближнего того, у кого хп
+  мало"** — the kill bonus is the HORIZON knob and is weighed by wits in
+  `worthOf`: a dumb pig shoots the nearer target, a veteran values the
+  finish.
+- **"слишком точно стреляет"** — AIM_WOBBLE/CHARGE_WOBBLE, the actuator-
+  noise knob: a per-turn heading error and gauge error, scaled by (1 −
+  wits), rolled once and held (re-rolled they were a pig re-turning to a
+  bearing that would not sit still).
+- **"нажимать взрыв — надо в радиусе свина; чем тупее, тем ближе к краю"** —
+  the detonation window: everybody presses inside the blast radius of a foe,
+  the dumbest at the RIM (`thrown.rim` rides the world now), the sharpest at
+  the CORE; resting still presses at every level.
+
+The machine mission plays to a verdict at 27 shots where exact hands took
+14 — the misses are the point. Pinned across unit/grunt.spec.ts (the window,
+the wits-gated finish, neutral rolls keeping every old expectation) and the
+pathfind specs, which caught two real string-pulling bugs on their synthetic
+grounds: point-sampling missed zero-width walls (now the same cell test the
+search uses) and a straight line through the bay un-priced the swim.

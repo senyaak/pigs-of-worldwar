@@ -85,6 +85,18 @@ export const MISJUDGE = 0.75
  */
 export const ERRAND_SPARE = 12
 
+/**
+ * How far off the SHOT itself lands at the bottom of the wits scale — the
+ * docs/ai.md "actuator noise" knob ("over-turns the aim, over-holds the
+ * gauge"), asked for by play in one line: "слишком сильно точно стреляет".
+ * A heading error in radians and a gauge error as a fraction, both scaled
+ * by (1 − wits) and both rolled ONCE PER TURN like the misjudgment — a
+ * wobble re-rolled every decision is a pig endlessly re-turning to a
+ * bearing that will not sit still. `[deliberate]` — play's dials.
+ */
+export const AIM_WOBBLE = 0.08
+export const CHARGE_WOBBLE = 0.15
+
 /** The nearest DRY ground, by ring search off the crow line: what a pig
  * with no business in the water swims for. An ocean with no shore in reach
  * is watched to its end. */
@@ -133,6 +145,30 @@ export function createGruntBrain(): Brain {
   /** This turn's misjudgments, one factor per (kind, skill) — rolled once,
    * held to the handover, so a bad judgment is a bad PLAN, not a wobble. */
   const judgments = new Map<string, number>()
+  /** This turn's aim — a heading error and a gauge error, rolled once
+   * (AIM_WOBBLE, CHARGE_WOBBLE). Held for the same reason: a bearing that
+   * moved between decisions is a pig re-turning forever. */
+  let shaky: { heading: number; charge: number } | null = null
+  /** This turn's reachability verdicts by target spot: `playable` runs a
+   * whole best-effort route per fresh target, and re-asking it every mull
+   * was a visible hitch on the enemy's turn (play: "подвисает ход"). */
+  const reachable = new Map<string, boolean>()
+  /**
+   * THE PLAN — which (kind, skill, target) this turn is about, chosen once
+   * and HELD. Play named the model: "мир не меняется! свин меняет мир
+   * своими действиями — его передвижение не меняет его намерений." A
+   * turn-based world stands still on your own turn, so re-electing a winner
+   * every mull only ever CHANGES ANSWERS by accident (a tie-break flipping
+   * as the walk shifts the distances). The intent is dropped exactly when
+   * the world actually changed: the target is gone, the KIT changed (a
+   * pickup — new options deserve a fresh election), or the plan stopped
+   * being playable. Everything else re-derives EXECUTION only (the charge
+   * for the current distance, the next corner).
+   */
+  let intent: { kind: string; skill: number; spot: string } | null = null
+  /** What the kit looked like when the plan was made — a pickup or a spent
+   * slot is the pig CHANGING the world, and that re-opens the election. */
+  let kitSign = ''
 
   // Passing takes the hands (SKIP TURN is fired like any skill), and
   // swimming hands are EMPTY — the engine strips them (lib/game/battle.ts)
@@ -172,8 +208,17 @@ export function createGruntBrain(): Brain {
       // full damage, no reason to let it roll away again. Otherwise watch.
       if (world.thrown !== null) {
         const thrown = world.thrown
+        // **THE DETONATION WINDOW IS THE WITS DIAL.** Play's spec, whole:
+        // "нажимать взрыв — тупёж это плохо, надо в радиусе свина нажимать;
+        // тупняк только насколько далеко — на самом краю, что единичку
+        // снесёт, или в центре; чем тупее, тем ближе к краю." So everybody
+        // presses inside the blast's own radius of a foe — the dumbest the
+        // moment it grazes the RIM (a point or two), the sharpest not until
+        // the CORE (full damage). A grenade that never comes near anybody
+        // is still set off the moment it rests, at every level.
+        const trigger = BLAST_CORE + (thrown.rim - BLAST_CORE) * (1 - world.wits)
         const near = world.foes.some(
-          (foe) => Math.hypot(foe.x - thrown.x, foe.z - thrown.z) <= BLAST_CORE
+          (foe) => Math.hypot(foe.x - thrown.x, foe.z - thrown.z) <= trigger
         )
         return thrown.resting || near
           ? say('detonate', { kind: 'fire' })
@@ -218,18 +263,20 @@ export function createGruntBrain(): Brain {
        * Telemetry watched that march cost fifty seconds before this check
        * existed (DEN, `_tmp/ai-session-2026-08-23.log`).
        */
-      const ends = new Map<string, { x: number; z: number }>()
       const playable = (one: Option): boolean => {
         const away = Math.hypot(one.target.x - me.x, one.target.z - me.z)
         if (away <= one.limit) return true
-        const spot = `${one.target.x},${one.target.z}`
-        let end = ends.get(spot)
-        if (!end) {
-          const corners = world.route({ x: one.target.x, z: one.target.z })
-          end = corners && corners.length > 0 ? corners[corners.length - 1] : { x: me.x, z: me.z }
-          ends.set(spot, end)
-        }
-        return Math.hypot(one.target.x - end.x, one.target.z - end.z) <= one.limit
+        // One route per fresh target PER TURN (`reachable`): a full
+        // best-effort search every mull was the hitch play felt.
+        const spot = `${one.target.x},${one.target.z}:${Math.round(one.limit)}`
+        const known = reachable.get(spot)
+        if (known !== undefined) return known
+        const corners = world.route({ x: one.target.x, z: one.target.z })
+        const end =
+          corners && corners.length > 0 ? corners[corners.length - 1] : { x: me.x, z: me.z }
+        const verdict = Math.hypot(one.target.x - end.x, one.target.z - end.z) <= one.limit
+        reachable.set(spot, verdict)
+        return verdict
       }
 
       // The brain's own reading of a score (see MISJUDGE): wide at the
@@ -255,11 +302,34 @@ export function createGruntBrain(): Brain {
         },
         judge
       )
+      // THE PLAN HOLDS (see `intent`): the kit unchanged and the chosen
+      // (kind, skill, target) still on the table, the turn stays about it —
+      // freshly priced (the charge moves with the approach), never
+      // re-elected. A pickup re-opens the election; a vanished target or an
+      // unplayable plan drops it.
+      const spotOf = (one: Option): string => `${one.target.x},${one.target.z}`
+      const sign = world.acting.carrying
+        .map((slot) => `${slot.skill}:${slot.amount}`)
+        .join(',')
+      if (kitSign !== sign) {
+        intent = null
+        kitSign = sign
+      }
+      if (intent !== null) {
+        const held = priced.find(
+          (one) =>
+            one.kind === intent!.kind &&
+            one.skill === intent!.skill &&
+            spotOf(one) === intent!.spot
+        )
+        if (held && held.score > 0 && playable(held)) option = held
+        else intent = null
+      }
       // The winner it CANNOT play is no winner: take the best candidate the
       // ground allows instead, and failing every weapon, a crate is a
       // necessity (lib/game/evaluate.ts, `crateFallback`) — a pig with
       // nothing in reach still has a job.
-      if (option && !playable(option)) {
+      if (option && intent === null && !playable(option)) {
         option =
           priced
             .filter((one) => one.score > 0 && one !== option)
@@ -268,6 +338,7 @@ export function createGruntBrain(): Brain {
           crateFallback(world) ??
           null
       }
+      if (option) intent = { kind: option.kind, skill: option.skill, spot: spotOf(option) }
       told.chose = option
       if (!option) return say('pass-nothing', pass(world))
 
@@ -387,7 +458,17 @@ export function createGruntBrain(): Brain {
         return say('sidestep', { kind: 'walkTo', x: me.x + uz * side, z: me.z - ux * side })
       }
 
-      const bearing = Math.atan2(dx, dz)
+      // THE HANDS SHAKE at the bottom of the wits scale (AIM_WOBBLE,
+      // CHARGE_WOBBLE): the bearing is off by a held per-turn error, the
+      // gauge over- or under-held by another. Rolled lazily, once.
+      if (shaky === null) {
+        const swing = 1 - world.wits
+        shaky = {
+          heading: (2 * world.roll() - 1) * AIM_WOBBLE * swing,
+          charge: (2 * world.roll() - 1) * CHARGE_WOBBLE * swing
+        }
+      }
+      const bearing = Math.atan2(dx, dz) + shaky.heading
       if (Math.abs(shortest(bearing - me.heading)) > FACING) {
         return say('turn', { kind: 'turnTo', heading: bearing })
       }
@@ -407,7 +488,10 @@ export function createGruntBrain(): Brain {
       }
       return say(
         'fire',
-        option.charge === undefined ? { kind: 'fire' } : { kind: 'fire', charge: option.charge }
+        option.charge === undefined
+          ? { kind: 'fire' }
+          : // The solved gauge, over- or under-held by the turn's own shake.
+            { kind: 'fire', charge: Math.max(0, Math.min(1, option.charge * (1 + shaky.charge))) }
       )
     },
     explain: () => thought,
@@ -416,6 +500,10 @@ export function createGruntBrain(): Brain {
       pitched = false
       thought = null
       judgments.clear()
+      shaky = null
+      reachable.clear()
+      intent = null
+      kitSign = ''
     }
   }
 }

@@ -11,6 +11,7 @@ import { test, expect } from '@playwright/test'
 
 import { createGruntBrain, SIDE_STEP, FRIEND_CLEARANCE, PITCH_WITHIN } from '../src/lib/game/grunt'
 import { CLOSE_TO } from '../src/lib/game/evaluate'
+import { BLAST_CORE } from '../src/lib/game/grenade'
 import type { AiWorld, Seen } from '../src/lib/game/ai'
 import { SKILL } from '../src/lib/game/skills'
 import { UNLIMITED } from '../src/lib/game/inventory'
@@ -212,16 +213,26 @@ test('of two foes the NEARER one is the target when the pay is even', { tag: '@n
   expect(order.heading).toBeCloseTo(Math.PI / 2, 5)
 })
 
-test('a foe the shot would FINISH outbids a nearer healthy one', { tag: '@nodata' }, () => {
+test('a foe the shot would FINISH outbids a nearer healthy one — at full wits', { tag: '@nodata' }, () => {
   // The seed of the HP differential (docs/ai.md): a kill takes every future
   // turn with it. The wounded pig stands straight ahead — already faced, so
   // choosing it means FIRING, where the nearer healthy one would mean a
-  // turn to the side.
+  // turn to the side. Valuing that future is the HORIZON knob: the bonus is
+  // weighed by wits (lib/game/evaluate.ts, worthOf), so the pick belongs to
+  // the sharp end — a dumb pig just shoots whoever is nearer.
   const brain = createGruntBrain()
   const nearHealthy = foe({ x: RANGE * 0.3, z: 0, health: 120 })
   const aheadDying = foe({ health: Math.min(1, damageOf(SKILL.RIFLE)) })
-  const order = brain.decide(world({ holding: SKILL.RIFLE, foes: [nearHealthy, aheadDying] }))
+  const order = brain.decide(
+    world({ holding: SKILL.RIFLE, wits: 1, foes: [nearHealthy, aheadDying] })
+  )
   expect(order).toEqual({ kind: 'fire' })
+  // …and the dumbest brain takes the NEAR one instead: equal damage prices
+  // equal without the bonus, and the tie goes to the closer target.
+  const dull = createGruntBrain().decide(
+    world({ holding: SKILL.RIFLE, foes: [nearHealthy, aheadDying] })
+  )
+  expect(dull.kind).toBe('turnTo')
 })
 
 test('a friend on the firing line means a step aside, not a shot through him', { tag: '@nodata' }, () => {
@@ -283,13 +294,21 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
   // Mid-flight, far from anybody: nothing to do this beat.
   expect(
     brain.decide(
-      world({ carrying: kit, holding: SKILL.GRENADE, thrown: { x: 0, z: 300, resting: false } })
+      world({
+        carrying: kit,
+        holding: SKILL.GRENADE,
+        thrown: { x: 0, z: 300, resting: false, rim: 600 }
+      })
     )
   ).toEqual({ kind: 'watch' })
   // Rolled to a stop: the second press, wherever it lies.
   expect(
     brain.decide(
-      world({ carrying: kit, holding: SKILL.GRENADE, thrown: { x: 0, z: 700, resting: true } })
+      world({
+        carrying: kit,
+        holding: SKILL.GRENADE,
+        thrown: { x: 0, z: 700, resting: true, rim: 600 }
+      })
     )
   ).toEqual({ kind: 'fire' })
   // Still moving but INSIDE a foe's core: full damage, no reason to let it
@@ -300,10 +319,28 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
         carrying: kit,
         holding: SKILL.GRENADE,
         foes: [foe({ z: 800 })],
-        thrown: { x: 0, z: 750, resting: false }
+        thrown: { x: 0, z: 750, resting: false, rim: 600 }
       })
     )
   ).toEqual({ kind: 'fire' })
+})
+
+test('the detonation window is the wits dial: the dumb press at the RIM', { tag: '@nodata' }, () => {
+  // Play's spec: "надо в радиусе свина нажимать; тупняк только насколько
+  // далеко — на самом краю, что единичку снесёт, или в центре."
+  const kit = [{ skill: SKILL.GRENADE, amount: 3 }]
+  const rolling = (wits: number): ReturnType<typeof world> =>
+    world({
+      carrying: kit,
+      holding: SKILL.GRENADE,
+      wits,
+      foes: [foe({ z: 800 })],
+      // The grenade grazes the blast's outer edge of the foe: outside the
+      // core, inside the rim.
+      thrown: { x: 0, z: 800 - (BLAST_CORE + 300), resting: false, rim: BLAST_CORE + 400 }
+    })
+  expect(createGruntBrain().decide(rolling(0))).toEqual({ kind: 'fire' })
+  expect(createGruntBrain().decide(rolling(1))).toEqual({ kind: 'watch' })
 })
 
 test('a SWIMMING pig has one thought — the nearest shore', { tag: '@nodata' }, () => {
