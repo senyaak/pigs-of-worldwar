@@ -1366,3 +1366,21 @@ original behind it — kept because the game plays better thrown about — and
 its centre-to-pig line is the engine's only "explosion throws a pig" form,
 the building blast's (PC 0x40, PSX 0x78, both at pitch 0x200). Comments in
 blast.ts/tumble.ts and the todo entry now say so.
+**The contact toss closed the argument (2026-08-24, the same hunt's
+follow-up).** Play would not accept "nothing throws" — "не может быть —
+взрывы откидывают свиней" — and play was right about the PICTURE while the
+reads were right about the blast: the exe has a real "the explosion threw
+me straight up", it just does not live on the blast. It is the CONTACT arm
+for the airstrike/fire-rain sub-munitions (kinds 0x15/0x16): touch one —
+resting included — and it throws 96/frame at 79 degrees along the
+charge-to-pig line AND detonates the same frame, indistinguishable from
+the blast doing it. Gun hits throw along the bullet's flight; a grenade's
+own rigid body can still shove a pig through the ordinary solver, which
+the "Pig falling cos physics is on" trap dresses as a knockdown landing on
+the on-its-behind clip. The grenade family, mines and TNT are inert to
+touch and their blasts move nobody — three passes, both builds. The
+remake's model already matches play's three-case testimony (up from under,
+onto the behind from dead above, flat roll when offset), so nothing in
+code moved; the 79-degree sub-munition pitch is on record in the disasm
+repo if play ever wants the under-the-trotters throw at the exe's own
+angle instead of straight up.
