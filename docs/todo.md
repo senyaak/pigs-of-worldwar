@@ -947,10 +947,13 @@ order:**
    1 Hz mull missing the detonation window as the grenade rolled past the
    foe (`AI_FUSE_SECONDS`) — details in docs/history/weapons.md. Play then
    caught the downward case (a blast above-and-behind froze the pig) and
-   ordered the disasm: the PC exe's blast throws NOBODY — `[pig+0x1B8]` is
-   fatigue, the fling is play's own PSX memory `[play]`, its line the
-   building blast's (0x44050c) — and a line into the ground now shoves
-   FLAT along it (weapons/fire.md in the disasm repo has the full read).
+   ordered the disasm — which went all the way: NEITHER original throws
+   from a weapon blast (PC read exhaustively incl. zero indirect refs and
+   no physics body on the effect; PSX SLES-01041 unpacked and read the
+   same). The fling is `[play]`'s rule outright, its line the building
+   blast's (the engine's only throwing explosion, both builds), and a line
+   into the ground shoves FLAT along it. Full reads: weapons/fire.md and
+   psx/notes.md in the disasm repo.
 2. **The rest of the sound survey** — the P1 trio is wired (damaged/killed/
    shotLanded, commit 640d1df); still unwired, in the survey's priority:
    `broke` (props by bullet/blade), the TURN CLOCK's own S_CLOCK warning

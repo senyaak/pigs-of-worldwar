@@ -91,14 +91,16 @@ export const flingVelocity = (speed: number, bearing: number): Velocity => ({
  * The velocity of a throw ALONG a line — a BLAST's: from the burst point to
  * the body's own centre of gravity.
  *
- * The line is `[play]`'s, twice over, and the whole THROW is: the PC exe's
- * blast damage arm was read to its last instruction (2026-08-23,
- * weapons/notes in the disasm repo) and **throws nobody at all** — what it
- * adds to `[pig+0x1B8]` is FATIGUE, not an impulse — so "мины не
- * отбрасывают" was the PC original's own behaviour and play's memory of
- * being thrown is the PSX's, which overrides. The FORM is still the exe's:
- * the one explosion that does throw — a BUILDING going off (0x44050c) —
- * uses the line from its centre to the pig, which is this line.
+ * The line is `[play]`'s, twice over, and so is the whole THROW: both
+ * originals were read to the last instruction (2026-08-23/24, weapons/
+ * fire.md and psx/notes.md in the disasm repo) and **neither the PC exe
+ * nor the PSX build throws a pig from a weapon blast at all** — the arm
+ * deals damage and FATIGUE and nothing else, on both. The pigs play
+ * remembers flying were projectile hits, building explosions and melee.
+ * The fling here is play's ruling outright, and the FORM is the engine's
+ * own one throwing explosion — a BUILDING going off (PC 0x44050c, PSX
+ * 0x800FAC84) — which throws along the line from its centre to the pig:
+ * this line.
  *
  * Play shaped both ends of the pitch. A charge UNDER the trotters throws
  * the pig straight up ("чтобы свинья летала если граната ниже центра

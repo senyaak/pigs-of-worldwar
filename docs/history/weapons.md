@@ -1349,3 +1349,20 @@ answers the downward leg — play's report above), and a charge dead overhead
 slams straight down. The same sweep found the gun's long-lost DAMAGE
 (row+0x0C, through the Hit-in-BODY arm 0x478710) — noted in the disasm
 repo for the day the bullet tables are next touched.
+**And the day after, both originals answered (2026-08-24).** The PC loose
+ends closed first: the blast effect turns out to own NO physics body at all
+(the r=35 sphere is a dead shape-table row for it; damage arrives by a
+deferred hit-mark timer, `[pig+0x1A2]`, not by contact), and a whole-image
+scan found zero indirect references to any throw primitive — the PC verdict
+hardened from "throws nobody" to "does not even touch". Then the PSX build
+itself was read — play supplied the disc, the exe turned out RNC-packed with
+the game code hidden in overlays disguised as data files (psx/notes.md in
+the disasm repo carries that archaeology) — and its blast arm (0x800B22C4)
+is the same damage-fatigue-smoke-squeal and return: **no original ever threw
+a pig from a weapon blast.** The pigs play remembers flying were projectile
+hits, building explosions and melee, which throw identically in both
+builds. So the remake's blast fling stands as play's own rule with no
+original behind it — kept because the game plays better thrown about — and
+its centre-to-pig line is the engine's only "explosion throws a pig" form,
+the building blast's (PC 0x40, PSX 0x78, both at pitch 0x200). Comments in
+blast.ts/tumble.ts and the todo entry now say so.

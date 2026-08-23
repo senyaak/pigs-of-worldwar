@@ -100,23 +100,28 @@ export interface BlastWorld {
  * standing back saves your footing along with your health.
  *
  * The six, and the cap, are the REMAKE's — and so is the throw itself, which
- * the 2026-08-23 read settled for good: **the PC exe's blast throws nobody.**
- * `Pig::OnHit`'s blast arm (0x477c22) was read to its `ret` — damage through
- * `[vtbl+0x34]`, twice it onto `[pig+0x1b8]` (which is a FATIGUE meter, not a
- * knockback tally: walking feeds it, panting drains it), the smoke counter at
- * `[pig+0x1b4]`, a squeal — and every caller of the two throw primitives
- * (0x4a9100/0x4a9260, 27 sites) is accounted for without it. So "мины не
- * отбрасывают" was the PC original's own behaviour; play remembers the PSX,
- * and play wins (`[play]` — the whole fling exists on that ruling).
+ * the 2026-08-23/24 reads settled for good: **neither original's blast throws
+ * anybody.** The PC arm (0x477c22) was read to its `ret` — damage, twice it
+ * onto `[pig+0x1b8]` (a FATIGUE meter, not a knockback tally), smoke, a
+ * squeal — every caller of the two throw primitives (27 sites) accounted for
+ * without it, the blast effect owning no physics body at all, and zero
+ * indirect references in the whole image. Then the PSX build (SLES-01041,
+ * psx/notes.md in the disasm repo) answered the same: its blast arm
+ * (0x800B22C4) is the same damage-fatigue-smoke-squeal and return. The pigs
+ * play remembers flying were projectile hits, buildings and melee. So the
+ * fling is `[play]`'s rule with no original behind it — kept because the
+ * game plays better thrown about, which is the ruling that started it:
+ * "мины не отбрасывают — как и тнт… это общая проблема."
  *
- * The DIRECTION is the exe's one throwing explosion borrowed: a BUILDING
- * going off (0x44050c) throws every pig around it along the line from its
- * centre to the pig, and `hurlVelocity` (lib/game/tumble.ts) is that line in
- * three dimensions, shaped at both ends by play — straight up from under the
- * trotters, flat along the ground when the line points into it. A first pass
- * threw every victim at the melee's fixed 45° instead, and play called it at
- * once: "граната до сих пор как-то странно отбрасывает"; a second pass let
- * the ground swallow the downward lines, and play called that too.
+ * The DIRECTION is the engine's one throwing explosion borrowed: a BUILDING
+ * going off (PC 0x44050c at 0x40, PSX 0x800FAC84, contact arm 0x78) throws
+ * every pig around it along the line from its centre to the pig, and
+ * `hurlVelocity` (lib/game/tumble.ts) is that line in three dimensions,
+ * shaped at both ends by play — straight up from under the trotters, flat
+ * along the ground when the line points into it. A first pass threw every
+ * victim at the melee's fixed 45° instead, and play called it at once:
+ * "граната до сих пор как-то странно отбрасывает"; a second pass let the
+ * ground swallow the downward lines, and play called that too.
  */
 export const FLING_PER_POINT = 6
 /** …and no harder than the hardest knock in the engine: the cattle prod's. */
