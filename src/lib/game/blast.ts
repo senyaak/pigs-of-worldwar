@@ -115,14 +115,16 @@ export interface BlastWorld {
  *
  * The DIRECTION is the engine's one throwing explosion borrowed: a BUILDING
  * going off (PC 0x44050c at 0x40, PSX 0x800FAC84, contact arm 0x78) throws
- * every pig around it along the line from its centre to the pig, and
- * `hurlVelocity` (lib/game/tumble.ts) is that line in three dimensions with
- * the engine's 45° knock as the pitch FLOOR — the line wins only when it is
- * steeper, up to straight vertical from under the trotters. Three passes of
- * play shaped it: the fixed 45° alone ("странно отбрасывает" — no vertical
- * from below), then a flat shove for downward lines that the landing
- * swallowed whole ("он никуда не сдвинулся"), and the floor is what both
- * originals throw every knock at anyway.
+ * every pig around it along the bearing from its centre to the pig, and
+ * `hurlVelocity` (lib/game/tumble.ts) is that knock — 45°, full speed, the
+ * pitch both originals throw EVERYTHING at — with one exception the size of
+ * the pig's own footprint: a burst under the body goes straight up, one
+ * over it slams straight down. Four passes of play shaped it: the fixed 45°
+ * alone ("странно отбрасывает" — no vertical from below), a flat shove for
+ * downward lines that the landing swallowed whole ("он никуда не
+ * сдвинулся"), a steep-centre-line rule whose vertical window was half a
+ * pig wide ("должно было вверх по горе подвинуть, а он на месте катился"),
+ * and the footprint boundary that answers all three.
  */
 export const FLING_PER_POINT = 6
 /** …and no harder than the hardest knock in the engine: the cattle prod's. */
@@ -164,13 +166,13 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     emit({ kind: 'damaged', at: body, amount, pig: pig.id })
     if (outcome === 'died' || outcome === 'gibbed')
       emit({ kind: 'killed', pig: pig.id, by, gibbed: outcome === 'gibbed' })
-    // …AND IT GOES FLYING. Along the line from the burst to its own centre of
-    // gravity — under the trotters is straight UP, level with the chest is flat
-    // away, overhead is downward (`hurlVelocity` says why that line) — as hard
-    // as the damage it just took (`flingSpeed`), which is what makes standing
-    // back save your footing as well as your health. A corpse flies too: the
-    // exe throws bodies about, and a pig killed by the blast is a body from
-    // that instant.
+    // …AND IT GOES FLYING. Where the burst stood against the body decides —
+    // under the trotters is straight UP, over the head is straight DOWN, and
+    // everything past the footprint is the engine's 45° knock along the flat
+    // bearing (`hurlVelocity` says why) — as hard as the damage it just took
+    // (`flingSpeed`), which is what makes standing back save your footing as
+    // well as your health. A corpse flies too: the exe throws bodies about,
+    // and a pig killed by the blast is a body from that instant.
     world.fling?.(pig, hurlVelocity(flingSpeed(amount), { x: dx, y: dy, z: dz }))
   }
   const standing = world.targets

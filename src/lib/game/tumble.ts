@@ -23,7 +23,7 @@
 
 import { createLocomotion, updateLocomotion } from './locomotion'
 import type { LocomotionState } from './locomotion'
-import { withPigs } from './obstacles'
+import { PIG_RADIUS, withPigs } from './obstacles'
 import type { Obstruction } from './obstacles'
 import { isDead } from './health'
 import type { Pig } from './game'
@@ -88,55 +88,52 @@ export const flingVelocity = (speed: number, bearing: number): Velocity => ({
 })
 
 /**
- * The velocity of a throw ALONG a line — a BLAST's: from the burst point to
- * the body's own centre of gravity.
+ * The velocity of a throw off a BLAST, from where the burst stood against
+ * the body: `along` is the line from the burst point to the body's own
+ * centre of gravity.
  *
- * The line is `[play]`'s, twice over, and so is the whole THROW: both
- * originals were read to the last instruction (2026-08-23/24, weapons/
- * fire.md and psx/notes.md in the disasm repo) and **neither the PC exe
- * nor the PSX build throws a pig from a weapon blast at all** — the arm
- * deals damage and FATIGUE and nothing else, on both. The pigs play
- * remembers flying were projectile hits, building explosions and melee.
- * The fling here is play's ruling outright, and the FORM is the engine's
- * own one throwing explosion — a BUILDING going off (PC 0x44050c, PSX
- * 0x800FAC84) — which throws along the line from its centre to the pig:
- * this line.
+ * The THROW is `[play]`'s outright: both originals were read to the last
+ * instruction (2026-08-23/24, weapons/fire.md and psx/notes.md in the
+ * disasm repo) and **neither the PC exe nor the PSX build throws a pig
+ * from a weapon blast at all** — the arm deals damage and FATIGUE and
+ * nothing else, on both. The pigs play remembers flying were projectile
+ * hits, building explosions and melee.
  *
- * The PITCH has a FLOOR at the engine's own 45° (`PITCH`), and the line
- * only wins when it is STEEPER. Both halves are earned. The steep half is
- * play's spec — a charge UNDER the trotters sends the pig toward vertical:
- * "чтобы свинья летала если граната ниже центра тяжести". The floor is the
- * read AND a bug both: every actual knock in both originals is thrown at
- * 0x200 = 45°, nothing in the engine ever throws flat — and when this
- * remake tried (a "flat shove" for downward lines), the flight hugged the
- * ground, the landing test read a zero NORMAL arrival speed and settled
- * the same frame, and the whole shove vanished — play, twice: "он как
- * стоял так и стоит", then again on uneven ground. A 45° toss with its
- * bounces IS the "откатывает по земле" play remembers.
+ * The SHAPE is three cases, and the boundary between them is the body's
+ * own FOOTPRINT (`PIG_RADIUS`):
  *
- * Two degenerate lines: no direction at all (the charge is inside the
- * body) goes straight up, and straight-down-with-no-flat (a charge dead
- * overhead) slams straight down — the knockdown on the spot, "падает на
- * жопу".
+ * - **Under the body** (the burst inside the trotters' own circle, below
+ *   the centre): straight UP — play's "поставить динамит под свина — он
+ *   улетит вверх".
+ * - **Over the body** (inside the circle, above): straight DOWN — the
+ *   knockdown on the spot, "граната прям над свиньёй — падает на жопу".
+ * - **Anywhere else: the engine's own 45° knock, at FULL speed along the
+ *   flat bearing away from the burst.** Every knock either original ever
+ *   throws is pitch 0x200 = 45° — the melee, the shove, the building
+ *   blast (PC 0x44050c, PSX 0x800FAC84) — and nothing in either engine
+ *   throws steeper. The 45° toss with its bounces and its roll is the
+ *   "сдвинута — ещё и по земле откатывает" of play's spec.
+ *
+ * The first cut of this function interpolated instead — the centre line
+ * won whenever it was STEEPER than 45° — and that window is a hundred
+ * units wide off a centre 100 over the soles: half a pig. A grenade
+ * landing at the trotters, visibly OFFSET, threw at 60..75° with almost
+ * no horizontal, went up, came back down beside its crater and read as
+ * broken — play, on a hillside: "должно было вверх по горе подвинуть, а
+ * он на месте катился". The footprint is the boundary the spec actually
+ * drew: под свином is under the PIG, not under a geometric ray.
  */
 export const hurlVelocity = (speed: number, along: { x: number; y: number; z: number }): Velocity => {
   const span = Math.hypot(along.x, along.y, along.z)
   if (span < 1) return { vx: 0, vy: -speed, vz: 0 }
   const flat = Math.hypot(along.x, along.z)
-  // Y-DOWN: dead overhead — down it goes, and the landing does the rest.
-  if (flat < 1 && along.y > 0) return { vx: 0, vy: speed, vz: 0 }
-  // The rise is how much the line climbs; under 45° (rise < flat, downward
-  // included) the knock's own pitch takes over, along the flat bearing.
-  const rise = -along.y
-  if (rise < flat) {
-    const run = (Math.cos(PITCH) * speed) / flat
-    return { vx: along.x * run, vy: -Math.sin(PITCH) * speed, vz: along.z * run }
+  if (flat < PIG_RADIUS) {
+    // Y-DOWN: `along` runs burst → centre, so a burst BELOW the centre has
+    // along.y < 0 — up it goes; above, down onto its behind.
+    return { vx: 0, vy: along.y < 0 ? -speed : speed, vz: 0 }
   }
-  return {
-    vx: (along.x / span) * speed,
-    vy: (along.y / span) * speed,
-    vz: (along.z / span) * speed
-  }
+  const run = (Math.cos(PITCH) * speed) / flat
+  return { vx: along.x * run, vy: -Math.sin(PITCH) * speed, vz: along.z * run }
 }
 
 export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {

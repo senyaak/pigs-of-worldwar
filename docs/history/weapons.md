@@ -1421,3 +1421,24 @@ exe's own grass numbers. unit/fling.spec.ts pins four ends of it: flat
 flight + roll, knocked downhill always gets away, knocked into a rising
 slope still moves off the spot, and the whole burst-on-a-hillside chain
 throwing the pig 45 degrees down the slope.
+**The vertical window was half a pig wide (2026-08-24, ESTU).** Play, on the
+first mission: "взрыв был так, что его должно было вверх по горе подвинуть —
+а он на месте катился. физика сломана." The probe cleared the terrain and the
+neighbours first — ESTU's pigs spawn 4500+ apart with no obstacle within 800,
+and the same 45-degree uphill fling at the victim's own spot travels 1693
+units through the real flight — so the horizontal died at the LAUNCH. The
+steep-centre-line rule was the culprit: with the centre 100 over the soles,
+any burst within ~100 of the axis threw along the line — 60..75 degrees, all
+lift and no shove — and a grenade landing at the trotters is always within
+that window. Both originals never throw steeper than 0x200 = 45 degrees,
+anywhere. hurlVelocity is now three cases split by the body's own footprint
+(PIG_RADIUS): under the body straight up, over it straight down, everything
+else the full 45-degree knock along the flat bearing — which is the literal
+reading of play's own spec (под свином / прям над / сдвинута).
+unit/blast.spec.ts grew the boundary tests: offset-inside-the-footprint goes
+vertical, just past it takes the full knock, offset-overhead still slams
+down. The same session answered the OTHER report — stuck at ESTU tile 55,10
+"по виду земли можно пройти" — with a read, not a change: the exe clamps the
+playable world to +-0x3000 = 12288 (TryMove step 2, movement/notes.md), and
+tile 55's far edge IS 12288: the outer eight tiles of every map are drawn
+decoration the original refuses too.
