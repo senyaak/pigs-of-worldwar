@@ -74,6 +74,18 @@ const TURN_CATEGORY = 0
 export const TURN_HEALTHY = 25
 export const TURN_HURT = 10
 
+/**
+ * The line numbers a pig DIES on — files **04** and **05**, the two
+ * categories the notes had left unplaced. Read at the state 6 → 7 edge
+ * (0x46f947, right after the dying clip is picked): `0x43AF70(pig, 3,
+ * [squad+6]+1, …)` — category 3, twelve lines, walked in strict rotation on
+ * the squad's OWN byte 6 (wraps past 11 at 0x46f95c), the third counter
+ * beside the shot's and the turn's. A DROWNED pig plays `P_DROWN` instead
+ * and a gassed one `P_SICK` — the phrase is the dry, unpoisoned death's.
+ */
+export const DEATH_LINES = 12
+const DEATH_CATEGORY = 3
+
 /** How many voices ship: Speech/Sku1/Pig01..Pig09. */
 const VOICES = 9
 
@@ -98,6 +110,10 @@ export interface PigVoice {
    * the voice's (audio/battleSound.ts).
    */
   turn(squad: number, health: number): void
+  /** …and the DEATH line, spoken as the dying clip starts (the `dying`
+   * event, lib/game/corpses.ts) — never at the blow, and never for a
+   * drowned pig, whose noise is the gurgle (audio/battleAudio.ts). */
+  death(squad: number): void
   /** Every file played, in order: the only way a spec can hear this. */
   spoken(): string[]
   /** Whether a line is still going. The SHOT waits for it (lib/game/shot.ts). */
@@ -131,6 +147,8 @@ export function createPigVoice(): PigVoice {
   /** …and `[squad+4]`, the TURN line's own, over two. Separate because the exe
    * keeps them in separate bytes: a shot must not step a turn's line on. */
   const turnCounters = new Map<number, number>()
+  /** …and `[squad+6]`, the DEATH line's, over twelve — the third byte. */
+  const deathCounters = new Map<number, number>()
   let disposed = false
 
   /**
@@ -200,6 +218,16 @@ export function createPigVoice(): PigVoice {
       turnCounters.set(squad, at + 1 > TURN_LINES - 1 ? 0 : at + 1)
       const band = health > TURN_HEALTHY ? 0 : health > TURN_HURT ? 2 : 4
       const path = voiceFile(voiceFor(squad), at + 1 + band, TURN_CATEGORY)
+      heard.push(path)
+      saying++
+      if (buffers.has(path)) start(path)
+      else void load(path).then(() => start(path))
+    },
+    death(squad) {
+      if (disposed) return
+      const at = deathCounters.get(squad) ?? 0
+      deathCounters.set(squad, at + 1 > DEATH_LINES - 1 ? 0 : at + 1)
+      const path = voiceFile(voiceFor(squad), at + 1, DEATH_CATEGORY)
       heard.push(path)
       saying++
       if (buffers.has(path)) start(path)

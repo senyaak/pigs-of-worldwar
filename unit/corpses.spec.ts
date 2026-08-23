@@ -73,7 +73,14 @@ test('a death on land: the ride, THEN the clip, then the bang, then the boots', 
   const events: BattleEvent[] = []
   let still = false
   const corpses = createCorpses(
-    { anim, query: terrain(() => 0), tumbling: () => false, cleared: () => still },
+    {
+      anim,
+      query: terrain(() => 0),
+      tumbling: () => false,
+      cleared: () => still,
+      roll: () => 0,
+      sideOf: () => 0
+    },
     (event) => events.push(event)
   )
   const pig = pigAt(0, 0, 0)
@@ -91,13 +98,19 @@ test('a death on land: the ride, THEN the clip, then the bang, then the boots', 
   expect(anim.played).toEqual([])
   expect(events).toEqual([])
   expect(corpses.live()).toBe(1)
-  // The stage clears: the dying starts — one of the three FALLS, by the
-  // pig's own id — and it is announced.
+  // Nobody's dying clip is on yet, so there is nothing for the camera to
+  // watch (the exe's mode 16 starts with the clip).
+  expect(corpses.watching()).toBeNull()
+  // The stage clears: the dying starts — one of the SEVENTEEN falls, rolled
+  // (a roll of 0 is the first) — and it is announced with the side that
+  // fielded the pig, for the death line's voice.
   still = true
   corpses.update(STEP_SECONDS)
-  expect(anim.played).toEqual([ANIM.DEATHS[1 % ANIM.DEATHS.length]])
+  expect(anim.played).toEqual([ANIM.DEATHS[0]])
   expect(events.map((one) => one.kind)).toEqual(['dying'])
-  expect(events[0]).toMatchObject({ pig: 1, wet: false })
+  expect(events[0]).toMatchObject({ pig: 1, player: 0, wet: false })
+  // …and from here the camera has a body to watch, where it lies.
+  expect(corpses.watching()).toEqual({ x: 0, y: 0, z: 0 })
   // Nothing more while the clip runs.
   corpses.update(STEP_SECONDS)
   expect(events.map((one) => one.kind)).toEqual(['dying'])
@@ -110,10 +123,21 @@ test('a death on land: the ride, THEN the clip, then the bang, then the boots', 
   expect(corpses.live()).toBe(0)
 })
 
-test('three pigs take three different falls — the id picks, deterministically', { tag: '@nodata' }, () => {
+test('the falls are ROLLED off the battle stream — seventeen, exe range', { tag: '@nodata' }, () => {
   const anim = stubAnim()
+  // Three rolls, three different bins of the seventeen — the exe's own
+  // `rand() % 0x11 + 0x39`, clips 57..73.
+  const rolls = [0, 0.5, 0.999]
+  let handed = 0
   const corpses = createCorpses(
-    { anim, query: terrain(() => 0), tumbling: () => false, cleared: () => true },
+    {
+      anim,
+      query: terrain(() => 0),
+      tumbling: () => false,
+      cleared: () => true,
+      roll: () => rolls[handed++ % rolls.length],
+      sideOf: () => 0
+    },
     () => {}
   )
   corpses.claim(pigAt(0, 0, 0, 3), false)
@@ -121,6 +145,8 @@ test('three pigs take three different falls — the id picks, deterministically'
   corpses.claim(pigAt(200, 0, 0, 5), false)
   corpses.update(STEP_SECONDS)
   expect(new Set(anim.played).size).toBe(3)
+  expect(anim.played).toContain(57)
+  expect(anim.played).toContain(73)
   for (const clip of anim.played) expect(ANIM.DEATHS).toContain(clip)
 })
 
@@ -128,7 +154,14 @@ test('an overkill skips the clip and the bang — the body simply goes', { tag: 
   const anim = stubAnim()
   const events: BattleEvent[] = []
   const corpses = createCorpses(
-    { anim, query: terrain(() => 0), tumbling: () => false, cleared: () => true },
+    {
+      anim,
+      query: terrain(() => 0),
+      tumbling: () => false,
+      cleared: () => true,
+      roll: () => 0,
+      sideOf: () => 0
+    },
     (event) => events.push(event)
   )
   const pig = pigAt(0, 0, 0)
@@ -150,7 +183,7 @@ test('a death in the water sinks WHILE the clip plays and goes off down there', 
   const anim = stubAnim()
   const events: BattleEvent[] = []
   const corpses = createCorpses(
-    { anim, query, tumbling: () => false, cleared: () => true },
+    { anim, query, tumbling: () => false, cleared: () => true, roll: () => 0, sideOf: () => 0 },
     (event) => events.push(event)
   )
   const pig = pigAt(0, 0, 0)

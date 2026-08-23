@@ -67,6 +67,16 @@ export interface Corpses {
   update(delta: number): void
   /** How many bodies are still playing out — what a spec can wait on. */
   live(): number
+  /**
+   * The body whose DYING is on right now — where it lies THIS step, or null
+   * while nobody's clip plays. The exe's mode 16, WATCHING DYING PIG: the
+   * battle mirrors this onto the aftermath camera every frame, the way it
+   * follows a crate down (lib/game/battle.ts), because a wet death SINKS and
+   * a static point would watch the surface while the body left it. Several
+   * dying at once: the first claimed is the one watched — the exe's own
+   * 0x497760 is singular too, and all the clips run out together anyway.
+   */
+  watching(): { x: number; y: number; z: number } | null
   /** Drop everything: a new battle. */
   clear(): void
 }
@@ -81,6 +91,12 @@ export function createCorpses(
      * swimming for the shore — the battle's word (`stageStill`,
      * lib/game/battle.ts), and the gate the dying clip waits behind. */
     cleared: () => boolean
+    /** The battle's one random stream (lib/game/random.ts) — the dying clip
+     * is ROLLED, seventeen of them, the exe's own `rand() % 0x11 + 0x39`. */
+    roll: () => number
+    /** Which side fields this pig — what the `dying` event carries so the
+     * voice bank can speak with the squad's own voice. */
+    sideOf: (pig: Pig) => number
   },
   emit: Emit
 ): Corpses {
@@ -137,13 +153,16 @@ export function createCorpses(
           // WHERE it ended is what it dies in: a body thrown off a deck
           // drowns in the bay, not on the bridge it was hit on.
           one.wet = inWater(world.query, pig.position.x, pig.position.z, pig.position.y)
-          emit({ kind: 'dying', pig: pig.id, wet: one.wet })
-          // Which of the three falls this pig takes is its own id's pick —
-          // deterministic, so a lockstep battle buries everyone the same way
-          // (lib/game/locomotion.ts, DEATHS).
+          emit({ kind: 'dying', pig: pig.id, player: world.sideOf(pig), wet: one.wet })
+          // Which fall this pig takes is ROLLED off the battle's own stream —
+          // seventeen of them, the exe's `rand() % 0x11 + 0x39` at the same
+          // edge (lib/game/locomotion.ts, DEATHS) — so a lockstep battle
+          // still buries everyone the same way.
           world.anim.playOnce(
             pig,
-            one.wet ? ANIM.DROWNING : ANIM.DEATHS[pig.id % ANIM.DEATHS.length]
+            one.wet
+              ? ANIM.DROWNING
+              : ANIM.DEATHS[Math.floor(world.roll() * ANIM.DEATHS.length) % ANIM.DEATHS.length]
           )
           continue
         }
@@ -164,6 +183,12 @@ export function createCorpses(
     },
 
     live: () => dying.length,
+    watching: () => {
+      const one = dying.find((corpse) => !corpse.riding)
+      return one
+        ? { x: one.pig.position.x, y: one.pig.position.y, z: one.pig.position.z }
+        : null
+    },
     clear: () => {
       dying.length = 0
     }

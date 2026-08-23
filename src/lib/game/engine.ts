@@ -410,7 +410,9 @@ export function createEngine(parts: EngineParts): Engine {
       // The battle is built below and only stepped after it exists, so the
       // late binding is safe; the answer is its `stageStill` — the walk-away's
       // swimmers included — which is what the dying clip waits behind.
-      cleared: () => battle.stageStill()
+      cleared: () => battle.stageStill(),
+      roll: random,
+      sideOf: (pig) => game.players.findIndex((player) => player.pigs.includes(pig))
     },
     bus.emit
   )

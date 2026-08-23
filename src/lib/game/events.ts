@@ -52,8 +52,10 @@ export type BattleEvent =
    * CLIP has started (lib/game/corpses.ts). The moment is the exe's own state
    * 6 → 7 edge: death at `killed` is a state change and a ragdoll, the dying
    * is played out here, later. `wet` is the sink-and-drown arm — what the
-   * audio hangs the drown gurgle on. */
-  | { kind: 'dying'; pig: PigId; wet: boolean }
+   * audio hangs the drown gurgle on. `player` is the side that fielded it:
+   * the DEATH LINE is spoken in the squad's own voice (audio/pigVoice.ts),
+   * and the voice bank is keyed the way `bark`'s is. */
+  | { kind: 'dying'; pig: PigId; player: number; wet: boolean }
   /** …and its body is DONE: the corpse has blown up (or been overkilled away)
    * and what is left on the spot is a pair of boots (lib/game/corpses.ts).
    * `at` is the soles, `heading` the way the pig faced — where and which way

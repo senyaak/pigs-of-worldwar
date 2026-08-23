@@ -109,20 +109,20 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       },
       // A PIG hurting: `pig` is only on the event when the body is one — a
       // dummy takes its points in silence.
+      // …with the SQUEAL, `0x59 + (rand & 1)` — the exe's one pain noise,
+      // played by every damage arm at volume 70 (audio/battle.ts says where
+      // all thirteen sites are). Random between the two like the exe's own,
+      // which is fine out here: sound is presentation, not the battle.
+      // A death adds NOTHING at the blow — the kill's hit still squeals
+      // through this same event, and the words come later, with the clip.
       damaged: ({ pig }) => {
-        if (pig !== undefined) playCue(bank(), BATTLE_SOUNDS.hurt)
-      },
-      // …and a pig going down: the exe's own squeal at the blow — 0x59/0x5A,
-      // `P_SQUEA1`/`P_SQUEA2`, the pig's id picking between them
-      // (audio/battle.ts says where both were read). A DROWNED pig went
-      // quietly — its noise is the drown gurgle below, with its clip.
-      killed: ({ pig, drowned }) => {
-        if (!drowned) playCue(bank(), pig % 2 ? BATTLE_SOUNDS.deathCry2 : BATTLE_SOUNDS.deathCry)
+        if (pig === undefined) return
+        playCue(bank(), Math.random() < 0.5 ? BATTLE_SOUNDS.squeal : BATTLE_SOUNDS.squeal2)
       },
       // The dying CLIP starting — everything at rest, the body about to go
       // down for good (lib/game/corpses.ts). The wet arm is where the drown
-      // sample belongs: it gurgles with the sink, not at the blow that may
-      // have landed half a map away.
+      // sample belongs (0x46f854 plays it exactly here, pitch 90); the dry
+      // one SPEAKS instead — the death line, audio/battleSound.ts.
       dying: ({ wet }) => {
         if (wet) playCue(bank(), BATTLE_SOUNDS.drown)
       },

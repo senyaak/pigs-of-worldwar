@@ -109,8 +109,11 @@ case 7) splits on whose CONTROLLER the acting pig has, `cmp eax,2` at 0x4724e5:
   hear on your own turn is the music; the thing you hear on theirs is a pig.
 
 That also completes the taxonomy: category 01 is the top of a turn, 02/03 is
-firing, 04/05 is getting up after a blast. And there are only FOUR callers of
-0x43AF70 in the whole image.
+firing, **04/05 is the DEATH LINE** — corrected 2026-08-23: the caller at
+0x46f947 sits right after the state 6→7 edge writes the dying clip, twelve
+lines on the squad's byte 6 (wired: audio/pigVoice.ts `death`, off the
+`dying` event). "Getting up after a blast" was a misread of where 0x46f6e9
+lands. And there are only FOUR callers of 0x43AF70 in the whole image.
 
 **GET READY takes a key too early** ✔ — `TURN_START_FLOOR_SECONDS = 1` in
 `lib/game/game.ts`. `beginTurn()` now answers `false` for the beat's first

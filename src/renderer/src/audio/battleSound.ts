@@ -77,9 +77,19 @@ export function createBattleSound(bus: BattleBus): BattleSound {
   const audio = createBattleAudio(() => bank)
   bus.on(audio.listen)
   /** The pigs' own barks. The gun arm of `Pig::Fire` says one every shot,
-   * walking twelve lines in rotation (audio/pigVoice.ts). */
+   * walking twelve lines in rotation (audio/pigVoice.ts) — and a pig DIES on
+   * a line too: the exe speaks category 04/05 the moment the dying clip
+   * starts (0x46f947, the state 6→7 edge — exactly what `dying` announces),
+   * unless it drowned, whose noise is the gurgle (audio/battleAudio.ts). */
   const voice: PigVoice = createPigVoice()
-  bus.on(handling({ bark: ({ player }) => voice.fire(player) }))
+  bus.on(
+    handling({
+      bark: ({ player }) => voice.fire(player),
+      dying: ({ player, wet }) => {
+        if (!wet) voice.death(player)
+      }
+    })
+  )
 
   /** The level's MUSIC — a side's four tracks, one a turn (audio/music.ts). */
   const music: Music = createMusic()

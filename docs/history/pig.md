@@ -389,3 +389,53 @@ already inside. Nothing can be pushed further in by that, because it could not
 be pushed at all. `e2e/002/tumble.spec.ts` throws a body from one unit away and
 fails without the fix.
 
+
+## The death gets its camera, its words and its seventeen falls (2026-08-23)
+
+The same session, play pressing on both open ends of the entry above: "звук —
+там фразы, визг скорее всего при получении урона" and "WATCHING DYING PIG
+давай тоже сразу сделаем". Both were then READ, not guessed — the exe
+disassembled directly at the arms in question — and play was right twice.
+
+**The squeal is the PAIN noise, not the death.** Thirteen sites in the exe
+play `0x59 + (rand & 1)` — `P_SQUEA1`/`P_SQUEA2` — at volume 70: the blast
+arm (0x477d87), the bullet in the body (0x478885), the blade (0x476097), the
+shove, the hard landing. Not one death arm does. So the pair moved onto the
+`damaged` event (random pick, volume 70) and the old `P_MOAN` hurt-groan — a
+name pick with no call site — went with `P_MAD1`.
+
+**A pig dies on a PHRASE.** The two speech categories nobody had placed —
+files 04/05, twelve lines a voice — are the DEATH LINE: 0x46f947 speaks one
+right after the state 6→7 edge picks the dying clip, rotating on the squad's
+own byte 6, suppressed for a drowning (`P_DROWN` instead, pitch 0x5A = 90,
+0x46f854) and a gassed death (`P_SICK`, unbuilt — no gas yet). Wired as
+`PigVoice.death` off the `dying` event, with its own per-squad counter beside
+the shot's and the turn's. The files exist for all nine voices; todo.md's old
+"getting up after a blast" gloss for 04/05 is corrected where it stands.
+
+**The dying clip is one of SEVENTEEN, rolled.** The same edge reads
+`[pig+0x36C] = rand() % 0x11 + 0x39` (0x46f86a) — clips 57..73, of which the
+name table's "Dying #1..#3" (71..73, the +24 drift) are only the tail.
+`ANIM.DEATHS` carries all seventeen now and `corpses.ts` rolls off the
+battle's own stream, so lockstep still buries everyone the same way. The
+fourteen new ones are the exe's word alone — unsurveyed skeletons — so if one
+of them reads wrong in play, it is a clip to look at, not the mechanism.
+
+**And the camera watches.** Mode 16 came almost free: the aftermath beat
+already holds through the whole death (`settling()` counts the corpses) — it
+was just aimed at where the shot landed. A `dying` arm in the battle's own
+bus subscription re-points it at the body (or begins a beat for a death no
+blow announced, a drowning), and `corpses.watching()` is mirrored onto it
+every frame beside the crate's — a wet body SINKS, and the camera follows it
+down. Several dying at once: the first claimed is watched, the rest play out
+beside it — the exe's 0x497760 is singular too. What "camera mode 3" does is
+still an inference (a subject swap onto the ordinary rig, same as the
+ending's tour); the ride rig at the blow-spot's own distance is what stands
+in for it.
+
+Corrections owed to the DISASM repo, found on the way and not yet written
+there (its master is not worked on from here): fire.md's "severity voice
+(<20 pts id 8, <40 id 9)" is a misread — the compare is in 128ths, id 9 is
+unreachable, and the channel is the controller's comment queue (0x499480),
+not audio; and speech/pigs.md can close its "every other caller" open item
+with the four-caller inventory and the 04/05 = death identification.

@@ -823,6 +823,21 @@ export function createBattle(parts: BattleParts): Battle {
       // "выстрел должен держать камеру после попадания".
       shotLanded: ({ at }) => {
         if (!aftermath) aftermath = beginAftermath(at)
+      },
+      // **WATCHING DYING PIG — the exe's mode 16.** The dying clip starting
+      // (lib/game/corpses.ts, the state 6 → 7 edge) is the frame the exe's
+      // 0x497760 re-points the camera at whoever was hurt, and the beat to
+      // show it in already exists: `settling()` counts the corpses, so the
+      // aftermath cannot end under the death — it was just aimed at where
+      // the SHOT landed instead of where the body lies. Re-point it, or
+      // begin one for a death no blow announced (a drowning). The body may
+      // go on moving — the sink — so the per-frame mirror below
+      // (`corpses.watching()`, beside the crate's) keeps following it.
+      dying: ({ pig }) => {
+        const body = everyone().find((one) => one.id === pig)?.position
+        if (!body) return
+        if (aftermath) watchAftermath(aftermath, body)
+        else aftermath = beginAftermath(body)
       }
     })
   )
@@ -1297,6 +1312,10 @@ export function createBattle(parts: BattleParts): Battle {
         // Follow the crate down; a spot with nothing coming stays the spot.
         const crate = airDrops.watching()
         if (crate) watchAftermath(aftermath, crate)
+        // …and a body through its death: a wet one SINKS while its clip
+        // plays, and mode 16 watches the pig, not the spot it was on.
+        const body = corpses.watching()
+        if (body) watchAftermath(aftermath, body)
         // Standing about is only what a pig does once it has finished. Asking
         // for a clip is what CANCELS a committed one, so this line
         // unconditionally was the interruption.

@@ -236,18 +236,20 @@ export const ANIM = {
    */
   WOUNDED: 29,
   /**
-   * Falling over dead — THREE of them, picked per pig (lib/game/corpses.ts).
+   * Falling over dead — SEVENTEEN of them, rolled per death
+   * (lib/game/corpses.ts).
    *
-   * NOT 47/48/49, though the name table calls those "Dying #1..#3": the
-   * table's tail drifts by +24 — proved once by the parachute (named 58,
-   * really 82) — and the SKELETON agrees. Forward kinematics over the
-   * shipped `mcap.mad` (2026-08-23, the death survey): 47..50 never leave a
-   * standing pose, while 71/72/73 — the named indices plus the same +24 —
-   * each start standing, head ~423 over the feet, and end flat on the
-   * floor. Which of the three the exe's own 0x47d080 picks, and on what,
-   * stays unread; the pig's id picks here, deterministically.
+   * The exe's own pick is READ now (2026-08-23, disassembled at the state
+   * 6 → 7 edge): `[pig+0x36C] = rand() % 0x11 + 0x39` at 0x46f86a — a
+   * random one of clips 0x39..0x49, 57 through 73. The three the name
+   * table calls "Dying #1..#3" (47..49 plus the tail's +24 drift = 71..73,
+   * confirmed by the skeleton survey: each starts standing and ends flat)
+   * are only the TAIL of the range; the fourteen before them are unnamed
+   * in the table and unsurveyed here — the exe's word is what puts them
+   * in. NOT 47/48/49 raw: forward kinematics says those never leave a
+   * standing pose.
    */
-  DEATHS: [71, 72, 73] as const,
+  DEATHS: [57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73] as const,
   /** Going under — 74: "Drowning" is named 50, and 50 + the same +24 drift
    * is 74, the ONE clip in the archive that starts lying down and carries
    * the root 648 units straight DOWN over ~2.8 s. The measurement and the
