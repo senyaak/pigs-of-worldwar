@@ -590,14 +590,26 @@ function fly(
     { x: a.vx, y: a.vy, z: a.vz },
     state.bounciness,
     groundMaterial(query.tileType(state.x, state.z), blocked),
-    normal
+    normal,
+    delta
   )
   state.y = floor
   /**
-   * A landing is binary in the original, and the test is the ARRIVAL SPEED and
-   * nothing else: the impact handler compares it with 25 a frame (`cmp di,19h`,
-   * 0x4711d8), sends anything at or over that to the bounce at 0x471247 and
-   * anything under it to `0x471350`, which zeroes the velocity.
+   * A landing is binary in the original, and the test is the ARRIVAL SPEED —
+   * the FULL magnitude, not its vertical part. The impact handler compares
+   * `di` with 25 a frame (`cmp di,19h`, 0x4711d8), sends anything at or over
+   * that to the bounce at 0x471247 and anything under it to `0x471350`, which
+   * zeroes the velocity — and `di` is `[hit+0x14]`, which the sweep fills with
+   * the LENGTH of the relative velocity (0x407a44 → 0x418310, an fsqrt of all
+   * three components; read 2026-08-24). So a pig skimming the ground fast and
+   * flat keeps bouncing — the solver leaves its slope-parallel speed and the
+   * bounce arm only ADDS its upward kick (`0x4a9260` at 0x471305, the add
+   * primitive, not the set) — and that chain of low skips IS the roll along
+   * the ground play remembers ("ещё и по земле откатывает"). Settling on the
+   * NORMAL arrival alone was the bug that ate it: the first touch of a 45°
+   * toss reflects the vertical away, the next frame's normal arrival is a
+   * crawl, and the settle discarded 700+ units a second of horizontal in one
+   * frame — "катится на месте".
    *
    * **Being in a WALL refuses the GETTING UP, and only that** — the stand-up is
    * what `Map::IsBlocked` gates. This used to read it as "never lands at all",
@@ -605,11 +617,15 @@ function fly(
    * цыкл — туда сюда скользит на 1м месте", on a tile whose type byte is 0x85 —
    * a WALL over terrain type 5. Landing on one, the pig kept 99% of its
    * slope-parallel speed off `WALL_MATERIAL`, never settled, and the wedge
-   * counter relaunched it every 25 frames for ever. Now it comes down, and the
-   * counter throws it out downhill from a standstill, which is the exit that was
-   * always meant to be there.
+   * counter relaunched it every 25 frames for ever. So BLOCKED ground keeps the
+   * old normal-arrival test and comes down from a slide — the remake's own
+   * guard, kept deliberately against the exe's reading — and the counter throws
+   * the pig out downhill from a standstill.
    */
-  if (-(a.vx * normal.x + a.vy * normal.y + a.vz * normal.z) >= BOUNCE_CUTOFF) {
+  const arrival = blocked
+    ? -(a.vx * normal.x + a.vy * normal.y + a.vz * normal.z)
+    : Math.hypot(a.vx, a.vy, a.vz)
+  if (arrival >= BOUNCE_CUTOFF) {
     state.airborne = { ...a, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true }
     return
   }

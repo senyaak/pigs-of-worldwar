@@ -1396,3 +1396,28 @@ centre line still wins when STEEPER (under the trotters -> vertical, play's
 spec); dead overhead still slams down on the spot. hurlVelocity carries the
 rule, unit/blast.spec.ts pins seven geometries including the shallow-line
 floor, and the far-pig throw in e2e/002/tumble.spec.ts now asserts the 45°.
+**The roll itself was still missing, and the settle was eating it
+(2026-08-24, the sliding hunt).** Play, after the 45-degree floor: "всё ещё
+нет движения по земле — будто трение слишком большое — катится на месте."
+The bench came first (memory: measure-the-miss): the real flight over flat
+ground carries 1908 units in 1.5 s — the arc was never the problem — and on
+the SECOND touch the normal arrival is a crawl while 717 units a second of
+horizontal remain, and the settle threw all of it away in one frame. The exe
+was re-read at the exact spot and disagrees with the old reading's
+assumption: the impact handler's threshold operand `di` (0x4711d8) is
+`[hit+0x14]`, which the sweep fills with the full LENGTH of the relative
+velocity (0x407a44 -> 0x418310, an fsqrt of all three components) — so a pig
+skimming fast and FLAT keeps bouncing in the original, its slope-parallel
+speed surviving every contact (the bounce arm's kick at 0x4712e0 goes
+through 0x4a9260, the ADD primitive, on top of what the solver left), and
+only a full magnitude under 25 a frame is zeroed. Two changes: `fly()`
+settles on the full arrival speed over open ground (BLOCKED ground keeps the
+normal-arrival test, deliberately — the wall slide-loop play once caught
+must not come back), and `bounceOff` charges friction as a RATE
+(`keep^(delta/EXE_FRAME_SECONDS)`) because our 1/60 contacts came twice as
+often as the exe's solves and a roll died twice as fast. Bench after: 129
+units of visible roll past the touchdown, speed fading 717 -> 357 on the
+exe's own grass numbers. unit/fling.spec.ts pins four ends of it: flat
+flight + roll, knocked downhill always gets away, knocked into a rising
+slope still moves off the spot, and the whole burst-on-a-hillside chain
+throwing the pig 45 degrees down the slope.

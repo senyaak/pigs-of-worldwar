@@ -284,8 +284,23 @@ export interface Velocity {
  *
  * The ground is immovable, so its own coefficients are 1 and the pig's are
  * the product.
+ *
+ * `seconds` is the step this contact stands for. The exe's friction eats its
+ * share once per SOLVE and the exe solves once a frame — a body rolling
+ * along the ground is a contact every frame, so the eating is a RATE. This
+ * engine contacts a rolling body at ITS OWN step (1/60), twice the exe's
+ * frame, and charging the whole share per contact made a roll die twice as
+ * fast as the original's — which was half of play's "трение слишком
+ * большое". The share is raised to `seconds / EXE_FRAME_SECONDS` instead,
+ * exact at the exe's own rate and honest at any other.
  */
-export function bounceOff(v: Velocity, pig: Bounciness, ground: Bounciness, normal: Velocity): Velocity {
+export function bounceOff(
+  v: Velocity,
+  pig: Bounciness,
+  ground: Bounciness,
+  normal: Velocity,
+  seconds: number = EXE_FRAME_SECONDS
+): Velocity {
   // Both coefficients are the PRODUCT of the two bodies' — `fmul [ebx+5ch]`
   // and `fmul [ebx+58h]` at 0x40f690.
   const restitution = pig.restitution * ground.restitution
@@ -308,7 +323,7 @@ export function bounceOff(v: Velocity, pig: Bounciness, ground: Bounciness, norm
   const e = -vn > BOUNCE_CUTOFF && restitution > RESTITUTION_MIN ? restitution : 0
   // Tangential first, then the reflected normal part on top of it. The exe's
   // `>> 3` damping rides on the normal part alone — see bounceSpeed.
-  const keep = Math.max(0, 1 - friction)
+  const keep = Math.max(0, 1 - friction) ** (seconds / EXE_FRAME_SECONDS)
   const along = (c: 'x' | 'y' | 'z'): number => (v[c] - vn * normal[c]) * keep - ((e * vn) / 8) * normal[c]
   return { x: along('x'), y: along('y'), z: along('z') }
 }
