@@ -279,6 +279,42 @@ test('SHELTER is BOUNDED: a far foe is shot from the weapon\'s own mark', { tag:
   )
 })
 
+test('THE RIVER: the walk is costed by the ROUTE, not the crow line', { tag: '@nodata' }, () => {
+  // Play, 2026-08-24: "нельзя подойти к берегу реки и кинуть гранату — он
+  // это не принимает." A foe across water is a stone's throw by the crow
+  // line and a long way round by the legs, and the price list was costing
+  // the crow line — so a walk that wants three turns looked free.
+  //
+  // Two identical worlds, one with an open field between and one with a
+  // river: the same foe, the same weapon, and the route is the only
+  // difference. The far one has to be worth LESS.
+  const far = foe({ z: RANGE * 3 })
+  const kit = [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
+  const open = createGruntBrain()
+  open.decide(world({ holding: SKILL.RIFLE, foes: [far], carrying: kit, timeLeft: 20 }))
+  const straight = open.explain!()!.candidates[0].score
+
+  // …and the same field with the legs sent the long way round: the route
+  // doubles back before it heads out, so the walk is far longer than the
+  // line even though the target has not moved.
+  const round = createGruntBrain()
+  round.decide(
+    world({
+      holding: SKILL.RIFLE,
+      foes: [far],
+      carrying: kit,
+      timeLeft: 20,
+      route: (to) => [
+        { x: -RANGE * 3, z: 0 },
+        { x: -RANGE * 3, z: to.z },
+        to
+      ]
+    })
+  )
+  const detour = round.explain!()!.candidates[0].score
+  expect(detour).toBeLessThan(straight)
+})
+
 test('a friend on the firing line means a step aside, not a shot through him', { tag: '@nodata' }, () => {
   const brain = createGruntBrain()
   const order = brain.decide(

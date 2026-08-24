@@ -218,6 +218,20 @@ export function createGruntBrain(): Brain {
    * was a visible hitch on the enemy's turn (play: "подвисает ход"). */
   const reachable = new Map<string, boolean>()
   /**
+   * …and how far the LEGS actually go to a spot — the route's own length,
+   * memoised the same way and for the same reason (lib/game/evaluate.ts,
+   * `Walked`). The crow line lies wherever the ground does: play's report is
+   * a river, where a foe two tiles off is fifteen tiles of walking round the
+   * head of it, and the price list was costing the two.
+   *
+   * ONE ROUTE PER SPOT PER TURN. The spot is rounded to the grid before it
+   * is asked, because the marks a price list computes are continuous — a
+   * firing mark moves a few units every decision — and an unrounded key
+   * would miss every time and run the pathfinder on every mull, which is the
+   * 130 ms hitch by another door.
+   */
+  const walkedTo = new Map<string, number>()
+  /**
    * THE PLAN — which (kind, skill, target) this turn is about, chosen once
    * and HELD. Play named the model: "мир не меняется! свин меняет мир
    * своими действиями — его передвижение не меняет его намерений." A
@@ -377,13 +391,38 @@ export function createGruntBrain(): Brain {
       }
 
       const priced: Option[] = []
+      /** The route's own length to a spot, memoised per turn (`walkedTo`). */
+      const walked = (to: { x: number; z: number }): number => {
+        const key = `${Math.round(to.x / GRID_STEP)},${Math.round(to.z / GRID_STEP)}`
+        const known = walkedTo.get(key)
+        if (known !== undefined) return known
+        const corners = world.route(to)
+        let length = 0
+        let fromX = me.x
+        let fromZ = me.z
+        for (const corner of corners ?? []) {
+          length += Math.hypot(corner.x - fromX, corner.z - fromZ)
+          fromX = corner.x
+          fromZ = corner.z
+        }
+        // A route that ENDS SHORT — the far bank, the wrong side of a wall —
+        // is not a walk to this spot at all. What is left is charged as walk
+        // too, so an unreachable mark costs its whole crow line and then
+        // some: the option is not refused here (`playable` does that), it is
+        // simply not cheap.
+        length += Math.hypot(to.x - fromX, to.z - fromZ)
+        walkedTo.set(key, length)
+        return length
+      }
+
       let option = priceKit(
         world,
         (one) => {
           told.candidates.push(one)
           priced.push(one)
         },
-        judge
+        judge,
+        walked
       )
       // THE PLAN HOLDS (see `intent`): the kit unchanged and the chosen
       // (kind, skill, target) still on the table, the turn stays about it —
@@ -629,6 +668,7 @@ export function createGruntBrain(): Brain {
       judgments.clear()
       shaky = null
       reachable.clear()
+      walkedTo.clear()
       intent = null
       kitSign = ''
     }

@@ -73,15 +73,33 @@ export const TURN_DISCOUNT = 0.5
 export const BLOW_SPARE = 6
 
 /**
+ * **HOW FAR THE LEGS ACTUALLY GO to reach a spot** — the ROUTE's own length,
+ * not the crow's line.
+ *
+ * The two are different things and the price list needs both: a weapon
+ * reaches in a STRAIGHT line (a bullet does not walk round the bay), while
+ * getting somewhere costs the walk the ground allows. Priced by the crow
+ * line, a foe across a river reads two tiles away when the legs must go
+ * fifteen round the head of it — which is play's report: "нельзя подойти к
+ * берегу реки и кинуть гранату, он это не принимает."
+ *
+ * A port rather than a call, because the pathfinder is expensive and the
+ * memo belongs to whoever knows when a TURN ends (lib/game/grunt.ts holds
+ * one per target per turn — the same bound `playable` already kept, which
+ * is what stops this being the 130 ms hitch again). Absent, the crow line
+ * stands in, and every spec that does not care about ground gets the old
+ * arithmetic.
+ */
+export type Walked = (to: { x: number; z: number }) => number
+
+/**
  * How many EXTRA turns this option costs before it can be struck: 0 when the
  * walk and the blow fit what is left of this one, 1 when it wants one more,
- * and so on. The walk is the crow's line at the walking speed — the route is
- * longer and the brain does not run one per candidate (that was the 130 ms
- * hitch, `WaterMemo`) — so it is a floor, which is the honest side to err on.
+ * and so on. `walk` is the distance the LEGS cover (see `Walked`).
  */
-const turnsAway = (world: AiWorld, away: number, reach: number): number => {
-  if (away <= reach) return 0
-  const seconds = (away - reach) / WALK_SPEED + BLOW_SPARE
+const turnsAway = (world: AiWorld, walk: number): number => {
+  if (walk <= 0) return 0
+  const seconds = walk / WALK_SPEED + BLOW_SPARE
   if (seconds <= world.timeLeft) return 0
   return Math.ceil((seconds - world.timeLeft) / Math.max(1, world.turnSeconds))
 }
@@ -107,10 +125,23 @@ const turnsAway = (world: AiWorld, away: number, reach: number): number => {
  * +2 finish bonus buy a march across the map); it is the conclusion that
  * was one level too crude.
  */
-const trueScore = (world: AiWorld, worth: number, away: number, reach: number): number => {
+const trueScore = (
+  world: AiWorld,
+  worth: number,
+  away: number,
+  reach: number,
+  /** The TARGET — what the route is asked about. Not the firing mark: that
+   * sits ON the way there, so `route length − reach` is the walk, and one
+   * route a target is one route a target however many weapons the kit
+   * holds. A mark of its own per weapon would be nine routes a turn where
+   * this is three, and the pathfinder is the expensive thing here. */
+  target: { x: number; z: number },
+  walked?: Walked
+): number => {
   if (worth <= 0) return worth
-  const turns = turnsAway(world, away, reach)
-  return Math.max(worth * FAR_FLOOR, worth * TURN_DISCOUNT ** turns)
+  // Already in reach: no walk, whatever the ground between looks like.
+  const walk = away <= reach ? 0 : Math.max(0, (walked ? walked(target) : away) - reach)
+  return Math.max(worth * FAR_FLOOR, worth * TURN_DISCOUNT ** turnsAway(world, walk))
 }
 
 /** Where the hand is over the soles when a thing is thrown — the brain's
@@ -289,7 +320,7 @@ const clearShot = (world: AiWorld, a: Seen, b: Seen): boolean => {
   return true
 }
 
-const gunOption = (world: AiWorld, skill: number, note: Note): Option | null => {
+const gunOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): Option | null => {
   const row = projectileOf(skill)
   if (!row) return null
   const damage = damageOf(skill)
@@ -304,7 +335,7 @@ const gunOption = (world: AiWorld, skill: number, note: Note): Option | null => 
     // walk moves the eye and the next decision re-asks. The option is still
     // noted so the telemetry shows the zero.
     const blocked = away <= rangeOf(row) * CLOSE_TO && !clearShot(world, eye, foe)
-    const score = blocked ? 0 : trueScore(world, worth, away, rangeOf(row) * CLOSE_TO)
+    const score = blocked ? 0 : trueScore(world, worth, away, rangeOf(row) * CLOSE_TO, foe, walked)
     const option: Option = {
       skill,
       kind: 'gun',
@@ -322,7 +353,7 @@ const gunOption = (world: AiWorld, skill: number, note: Note): Option | null => 
   return best
 }
 
-const meleeOption = (world: AiWorld, skill: number, note: Note): Option | null => {
+const meleeOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): Option | null => {
   const blade = meleeOf(skill)
   if (!blade) return null
   const me = world.acting
@@ -330,7 +361,7 @@ const meleeOption = (world: AiWorld, skill: number, note: Note): Option | null =
   for (const foe of world.foes) {
     const away = distance2d(me, foe)
     const worth = worthOf(blade.damage, foe, world.wits)
-    const score = trueScore(world, worth, away, MELEE_NEAR)
+    const score = trueScore(world, worth, away, MELEE_NEAR, foe, walked)
     const option: Option = {
       skill,
       kind: 'melee',
@@ -348,7 +379,7 @@ const meleeOption = (world: AiWorld, skill: number, note: Note): Option | null =
   return best
 }
 
-const lobOption = (world: AiWorld, skill: number, note: Note): Option | null => {
+const lobOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): Option | null => {
   const row = lobOf(skill)
   if (!row) return null
   const me = world.acting
@@ -419,7 +450,7 @@ const lobOption = (world: AiWorld, skill: number, note: Note): Option | null => 
       // him — the walk closes the gap and the next decision solves it for
       // real.
       const worth = blastWorth(world, foe, damage, spread)
-      const score = trueScore(world, worth, away, limit * 0.8)
+      const score = trueScore(world, worth, away, limit * 0.8, foe, walked)
       const option: Option = { skill, kind: 'lob', target: foe, score, worth, reach: limit * 0.8, limit }
       note?.(option)
       if (!best || score > best.score) best = option
@@ -456,7 +487,8 @@ const plantOption = (world: AiWorld, skill: number, note: Note): Option | null =
 const crateOption = (
   world: AiWorld,
   crate: { x: number; z: number; skill: number | null; amount: number },
-  note: Note
+  note: Note,
+  walked?: Walked
 ): Option | null => {
   const me = world.acting
   const have = world.acting.carrying.reduce(
@@ -477,7 +509,7 @@ const crateOption = (
   // alive. What keeps the dull pig off DISTANT crates is not this gate any
   // more; it is the judgment (nearness fades with the tiles) and the
   // errand's own worth bar (lib/game/grunt.ts).
-  const score = trueScore(world, gain, away, COLLECT_NEAR)
+  const score = trueScore(world, gain, away, COLLECT_NEAR, crate, walked)
   const option: Option = {
     skill: crate.skill ?? SKILLLESS,
     kind: 'crate',
@@ -517,12 +549,15 @@ export const ERRAND_WORTH = 10
  */
 export function crateErrand(
   world: AiWorld,
-  judge?: (option: Option) => number
+  judge?: (option: Option) => number,
+  /** How far the LEGS go to a spot — the route's own length (`Walked`).
+   * Absent, the crow line stands in. */
+  walked?: Walked
 ): Option | null {
   let best: Option | null = null
   let bestJudged = 0
   for (const crate of world.crates) {
-    const option = crateOption(world, crate, undefined)
+    const option = crateOption(world, crate, undefined, walked)
     if (!option) continue
     const judged = judge ? judge(option) : option.score
     if (judged >= ERRAND_WORTH && judged > bestJudged) {
@@ -582,7 +617,10 @@ export function priceKit(
    * (lib/game/grunt.ts, `MISJUDGE`). The arithmetic above stays exact;
    * what a dumb brain gets wrong is what it makes of the numbers. Absent,
    * the judgment is the truth. */
-  judge?: (option: Option) => number
+  judge?: (option: Option) => number,
+  /** How far the LEGS go to a spot — the route's own length (`Walked`).
+   * Absent, the crow line stands in. */
+  walked?: Walked
 ): Option | null {
   let best: Option | null = null
   let bestJudged = 0
@@ -599,11 +637,11 @@ export function priceKit(
     keep(
       isPlanted(slot.skill)
         ? plantOption(world, slot.skill, note)
-        : (gunOption(world, slot.skill, note) ??
-            lobOption(world, slot.skill, note) ??
+        : (gunOption(world, slot.skill, note, walked) ??
+            lobOption(world, slot.skill, note, walked) ??
             meleeOption(world, slot.skill, note))
     )
   }
-  for (const crate of world.crates) keep(crateOption(world, crate, note))
+  for (const crate of world.crates) keep(crateOption(world, crate, note, walked))
   return best
 }
