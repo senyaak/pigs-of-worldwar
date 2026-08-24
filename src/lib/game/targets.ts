@@ -17,7 +17,7 @@
 // Pure: records in, targets out, plus the reach test the melee shares.
 
 import type { MapObject } from '../formats/pog'
-import { breakableHealth, isStructure } from './breakable'
+import { breakableHealth, isMetal, isStructure } from './breakable'
 import { caught, strikeGap } from './melee'
 import type { Point } from './melee'
 import { HEIGHT_SCALE } from './terrain'
@@ -62,6 +62,9 @@ export interface Target {
   /** A piece of a building set — the only broken thing whose damage prints
    * a floating number (lib/game/breakable.ts, `isStructure`). */
   structure: boolean
+  /** …and whether it is METAL, which is what a blast on it SOUNDS like
+   * (lib/game/breakable.ts, `isMetal`). */
+  metal: boolean
 }
 
 /**
@@ -84,7 +87,8 @@ export function targetsOf(objects: MapObject[]): Target[] {
       y: -object.y * HEIGHT_SCALE,
       z: object.z,
       health: ownHealth(object) ?? fromTable,
-      structure: isStructure(object.name)
+      structure: isStructure(object.name),
+      metal: isMetal(object.name)
     })
   }
   return out

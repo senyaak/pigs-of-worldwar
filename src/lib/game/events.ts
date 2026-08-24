@@ -46,7 +46,16 @@ export type BattleEvent =
   /** Something took points here — the number that floats off it. `pig` is
    * present when the body is a PIG — the hurt noise is his; a dummy or a
    * prop takes its points in silence (audio/battleAudio.ts). */
-  | { kind: 'damaged'; at: Point; amount: number; pig?: PigId; structure?: boolean }
+  | {
+      kind: 'damaged'
+      at: Point
+      amount: number
+      pig?: PigId
+      structure?: boolean
+      /** A METAL thing took it — a gun, a machine, a drum — which is what
+       * `I_METAL` is (play: "взрыв по танку, пушке и прочему"). */
+      metal?: boolean
+    }
   /** This pig has just gone down. `by` is the pig whose weapon did it — the
    * bullet's firer, the lob's thrower, the blade's swinger — the same attacker
    * the exe's damage handler tallies kills against (0x467c30, 0x467E11).

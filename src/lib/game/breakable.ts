@@ -170,3 +170,30 @@ export const BREAKABLE_COUNT = HEALTH.size
  */
 export const isStructure = (name: string): boolean =>
   /^(S1|ST|BR|M1|SN|CA|W1)[FRWS]/.test(name.toUpperCase())
+
+/**
+ * …and whether it is MADE OF METAL — a gun, a machine, a drum, a gate.
+ *
+ * `I_METAL` had been written up as "a blast inside a bunker", which made it
+ * unplayable: nothing can ask whether a burst went off indoors. **Play read
+ * the sample the other way, 2026-08-24 — "взрыв по танку, пушке и прочему"
+ * — and that is a question the engine can answer**, because what a blast
+ * hits is a named model. `[play]` for the reading, and the list is a name
+ * pick like the rest of the bank: correct it by ear.
+ *
+ * The TANK and the BIG GUN themselves are not here, and cannot be yet: they
+ * are the BUILDING class (0x4bc5d0, body type 0x1359, its own OnHit) and
+ * nothing in the remake breaks one. They join the day that class does.
+ */
+// Every name here must also be in the health table above — a metal name
+// that nothing builds a target for is a sound that can never play, which
+// `unit/breakable.spec.ts` checks so nobody has to remember. (`DRUM` was in
+// this list for a minute and is not breakable at all.)
+const METAL = new Set([
+  'BARREL', 'IRONGATE', 'GATE', 'GATES', 'MACHI', 'PIST', 'RADAR', 'RADAR1',
+  'TV', 'WATSTA', 'WATWHE', 'WINDM', 'MONO', 'LAMP', 'CHECKB', 'CHECKP', 'MAST',
+  'BARBWIRE', 'BARBWIR2', 'SWILLARM', 'SW2ARM', 'TUN'
+])
+
+/** Whether a blast on this model rings — `I_METAL` (audio/battle.ts). */
+export const isMetal = (name: string): boolean => METAL.has(name.toUpperCase())

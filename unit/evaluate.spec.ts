@@ -11,6 +11,7 @@ import { priceKit } from '../src/lib/game/evaluate'
 import type { AiWorld, Seen } from '../src/lib/game/ai'
 import { SKILL } from '../src/lib/game/skills'
 import { UNLIMITED } from '../src/lib/game/inventory'
+import { damageOf } from '../src/lib/game/projectile'
 
 const foe = (over: Partial<Seen> = {}): Seen => ({ x: 0, y: 0, z: 800, health: 50, ...over })
 
@@ -23,8 +24,9 @@ const world = (over: {
   wits?: number
   wet?: AiWorld['wet']
   groundAt?: AiWorld['groundAt']
+  timeLeft?: number
 }): AiWorld => ({
-  timeLeft: 45,
+  timeLeft: over.timeLeft ?? 45,
   wits: over.wits ?? 0,
   // Neutral: the price list is tested on its own arithmetic — the
   // misjudgment is the BRAIN's and pinned in unit/grunt.spec.ts.
@@ -259,6 +261,40 @@ test('distance never argues the ONLY weapon out of existence', { tag: '@nodata' 
   expect(option).not.toBeNull()
   expect(option!.kind).toBe('gun')
   expect(option!.score).toBeGreaterThan(0)
+})
+
+test('DISTANCE is the DUMB pig\'s problem, and the CLOCK is the smart one\'s', { tag: '@nodata' }, () => {
+  // Play's rule, 2026-08-24: "тупые смотрят на ближайшую цель; а умные
+  // оценивают лучший результат независимо от расстояния и учитывают
+  // таймер." So the same far foe is priced two different ways.
+  const kit = [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
+  const far = foe({ z: 12_000 })
+  const worth = damageOf(SKILL.RIFLE)
+  // At the TOP of the dial, with the whole clock: the toll is gone and the
+  // option is worth what the shot is worth.
+  const sharp = priceKit(world({ carrying: kit, foes: [far], wits: 1, timeLeft: 90 }))!
+  expect(sharp.score).toBeCloseTo(worth, 5)
+  // At the BOTTOM, the same option is taxed for every tile of the hike.
+  const dull = priceKit(world({ carrying: kit, foes: [far], wits: 0, timeLeft: 90 }))!
+  expect(dull.score).toBeLessThan(sharp.score)
+  // …and the smart pig's own brake is the TIMER, not the distance: the same
+  // far foe with seconds on the clock is discounted, where the dumb pig —
+  // who cannot read a clock — prices it exactly as before.
+  const hurried = priceKit(world({ carrying: kit, foes: [far], wits: 1, timeLeft: 3 }))!
+  expect(hurried.score).toBeLessThan(sharp.score)
+  const dullHurried = priceKit(world({ carrying: kit, foes: [far], wits: 0, timeLeft: 3 }))!
+  expect(dullHurried.score).toBeCloseTo(dull.score, 5)
+})
+
+test('a foe already in REACH is never discounted for the clock', { tag: '@nodata' }, () => {
+  // The clock is asked about the WALK. A pig standing in range with three
+  // seconds left does what it can with them, and a brain that discounted
+  // that would talk itself out of the only move on the board.
+  const kit = [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
+  const near = foe({ z: 800 })
+  const whole = priceKit(world({ carrying: kit, foes: [near], wits: 1, timeLeft: 90 }))!
+  const hurried = priceKit(world({ carrying: kit, foes: [near], wits: 1, timeLeft: 3 }))!
+  expect(hurried.score).toBeCloseTo(whole.score, 5)
 })
 
 test('a shot the ground would swallow scores nothing, and the grenade takes over', { tag: '@nodata' }, () => {

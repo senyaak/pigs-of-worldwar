@@ -158,14 +158,15 @@ export interface Cue {
  * `BATT_L1..3`/`BATT_S1..3`/`AMB_1D`/`AMB_2D` as the war beyond the map's
  * edge (audio/ambience.ts).
  *
- * STILL PLACED AND UNPLAYED, and each for a reason rather than for want of
- * a line: `I_METAL` — a blast INSIDE a building — because nothing can ask
- * whether a burst went off indoors (`Indoors` tests a PIG, not a point:
- * lib/game/indoors.ts), and inventing that seam for a sound is the wrong
- * order of work; `EN_BIP`, the AIRSHIPS, which is a missing PROP before it
- * is a missing sound; and the weapon reports for weapons we do not field
- * yet (`L_ARTIL`, `L_MORT`, `L_ROC`, `L_SHOTG`, `L_HVYMG`, `L_MGUN`,
- * `L_FLAME`), one line each the day their weapon lands. See `docs/todo.md`.
+ * `I_METAL` too, once play re-read it: not "a blast inside a bunker" — a
+ * blast ON METAL, "по танку, пушке и прочему" — which is a question the
+ * engine can answer, where the other was not.
+ *
+ * STILL PLACED AND UNPLAYED: `EN_BIP`, the AIRSHIPS, which is a missing
+ * PROP before it is a missing sound; and the weapon reports for weapons we
+ * do not field yet (`L_ARTIL`, `L_MORT`, `L_ROC`, `L_SHOTG`, `L_HVYMG`,
+ * `L_MGUN`, `L_FLAME`), one line each the day their weapon lands. See
+ * `docs/todo.md`.
  */
 /**
  * **WHAT IS ALREADY PLACED** — by ear, by wiring, or by the exe's own table.
@@ -376,6 +377,18 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    */
   hitFlesh: { sound: 'I_BULIT1', volume: 100, pitch: 100 },
   hitHard: { sound: 'I_BUILD', volume: 80, pitch: 100, jitter: 15 },
+  /**
+   * **SOMETHING METAL TAKING IT** — a gun, a machine, a drum, an iron gate.
+   *
+   * `I_METAL` had been written up as "a blast inside a bunker", which is a
+   * question nothing in the engine can answer. Play read the sample the
+   * other way — "взрыв по танку, пушке и прочему" — and that one the engine
+   * answers easily, because what a blow lands on is a named model
+   * (lib/game/breakable.ts, `isMetal`). The TANK and the BIG GUN themselves
+   * arrive with the building class; everything metal that already breaks
+   * rings now.
+   */
+  metal: { sound: 'I_METAL', volume: 90, pitch: 100, jitter: 15 },
   /**
    * **A PIG TAKING POINTS — the squeal — and a pig GOING DOWN, which is a
    * PHRASE, not a cue.** All read now, and play called both halves first

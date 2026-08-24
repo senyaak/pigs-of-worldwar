@@ -130,7 +130,7 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
     const dummy = standing[at]
     const amount = damageOf(skill)
     hurt(dummy, amount, false)
-    emit({ kind: 'damaged', at: dummy, amount, structure: dummy.structure })
+    emit({ kind: 'damaged', at: dummy, amount, structure: dummy.structure, metal: dummy.metal })
     if (isDead(dummy)) {
       standing.splice(at, 1)
       emit({ kind: 'broke', target: dummy.id, at: { x: dummy.x, y: dummy.y, z: dummy.z } })

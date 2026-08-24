@@ -122,8 +122,14 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       // which is fine out here: sound is presentation, not the battle.
       // A death adds NOTHING at the blow — the kill's hit still squeals
       // through this same event, and the words come later, with the clip.
-      damaged: ({ pig }) => {
-        if (pig === undefined) return
+      damaged: ({ pig, metal }) => {
+        // …and a thing of METAL rings instead of squealing: a gun, a
+        // machine, a drum (lib/game/breakable.ts, `isMetal`). Play's own
+        // reading of I_METAL — "взрыв по танку, пушке и прочему".
+        if (pig === undefined) {
+          if (metal) playCue(bank(), BATTLE_SOUNDS.metal)
+          return
+        }
         playCue(bank(), Math.random() < 0.5 ? BATTLE_SOUNDS.squeal : BATTLE_SOUNDS.squeal2)
       },
       // The dying CLIP starting — everything at rest, the body about to go

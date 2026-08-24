@@ -304,11 +304,13 @@ doing:
   problem, the silence was.
 - ~~**`I_BUILD` against `I_BULIT1`/`I_STAB`**~~ **WIRED** — `shotLanded`
   carries the verdict and `hitHard`/`hitFlesh` answer it.
-- **`I_METAL`** — a blast inside a bunker, a tank, a stationary machine.
-  **The blocker is not the sound, it is the QUESTION**: nothing can ask
-  whether a burst went off indoors — `Indoors` tests a PIG, not a point
-  (lib/game/indoors.ts) — and inventing that seam for one cue is the wrong
-  order of work. It comes free the day a building has a volume.
+- ~~**`I_METAL`** — a blast inside a bunker~~ **WIRED 2026-08-24, once play
+  re-read the sample**: it is not "inside" anything, it is a blast **ON
+  METAL** — "взрыв по танку, пушке и прочему" — which the engine can answer
+  where the other reading could not, because what a blow lands on is a
+  named model (`isMetal`, lib/game/breakable.ts). The TANK and the BIG GUN
+  themselves still wait on the BUILDING class (0x4bc5d0), which nothing in
+  the remake breaks; everything metal that already breaks rings now.
 - ~~**`I_SWMISS`** is a swing that MISSED~~ **WIRED 2026-08-24** —
   `swungWide` off lib/game/strikes.ts, beside the throw's own whoosh; two
   moments, one sample, at slightly different pitches.
@@ -1102,12 +1104,22 @@ Non-AI bugs from the same session, queued after the AI:
    The log acquitted the kill bonus — it is already wits-scaled and gave
    GINGER only +2 (`s22` vs `s20`) — and convicted the FLAT approach tax:
    ten points for a 500-unit stroll and the same ten for the 11 800-unit
-   march, so +2 won it. The toll is PER TILE now (`TAX_PER_TILE`,
+   march, so +2 won it. The toll went PER TILE (`TAX_PER_TILE`,
    `approachTax` in evaluate.ts), with `FAR_FLOOR` keeping a sliver of any
    positive worth so distance ranks options without arguing the only
-   weapon out of existence. Pinned: the GINGER case both ways (dumb takes
-   the near healthy foe, wits 1 still crosses for the kill) in
-   unit/evaluate.spec.ts.
+   weapon out of existence.
+   **CORRECTED 2026-08-24 EVENING — the toll belongs to the DUMB pig
+   alone, and this entry had it as a rule for everybody.** Play, on
+   reading it back: "я просил? нет — я говорил что тупые смотрят на
+   ближайшую цель, а умные оценивают лучший результат независимо от
+   расстояния и учитывают таймер." So the tax now scales by `1 − wits` —
+   full at the bottom, where it pairs with the DUMB EYE below to make the
+   nearest thing the target, and GONE at the top — and what brakes a
+   smart pig instead is the CLOCK (`LATE_DISCOUNT`, `BLOW_SPARE`): an
+   option whose WALK cannot be finished this turn is worth less to it.
+   The clock is asked about the walk and never about the blow alone, or a
+   pig in range with three seconds left would talk itself out of the only
+   move on the board. Pinned both ways in unit/evaluate.spec.ts.
    **And play named the better model the same day** — "я тупой = что ближе
    всего — ящик/свин — это моя цель; вижу цель — стреляю; чем умнее — тем
    больше свин думает" — built as THE DUMB EYE (`NEAR_POINTS` in grunt.ts):

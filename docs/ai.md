@@ -105,6 +105,7 @@ No stat bonuses, no damage scaling, no extra hp — one brain with knobs:
 | ---- | --------- | ----------- |
 | candidates weighed per think | 2–3 obvious | dozens of position × weapon × target |
 | estimate error (range, charge, arc) | large | shrinks toward the tremor floor |
+| **what DISTANCE means** (`judgedScore`, corrected 2026-08-24) | impatience: every tile of the walk costs, so the NEAREST thing is the target | nothing: an option is worth what it is worth however far off — and the CLOCK is what says no |
 | horizon | shoot now | where do I STAND after, who reaches me |
 | ally-splash accounting | line-of-fire only | full blast radius |
 | clumping penalty | near zero | high — spread out, deny the grenade |
@@ -116,11 +117,16 @@ No stat bonuses, no damage scaling, no extra hp — one brain with knobs:
 Low-level misses look ALIVE for free: the pig genuinely aimed with a bad
 estimate and shaky hands, it did not roll a die and shoot at nothing.
 
-**The ramp is per MAP, smoothly** `[play]` — every campaign position a
-little smarter, even though the turn TIMER steps per island (`turns.ts`
-keeps its own table). The scale is 26ths (`lib/game/wits.ts`): the first
-fight thinks at 1/26 — a little, never zero `[play]` — and the campaign's
-own final, Team Lard, at 25/26, because **the full 1 is RESERVED**:
+**The ramp is per ISLAND: it CREEPS across one and JUMPS at the next**
+`[play]`, 2026-08-24 — "важно чтобы тупые умнели постепенно; я б брал:
+каждый остров растёт медленно, а новый остров — буст". Every map is still
+a little smarter than the one before (`[play]`'s earlier "чуть чуть
+поумнее"); the islands are what shape the little, and they are the same
+islands the turn TIMER steps on. One knob, `ISLAND_STEP` — a new island is
+worth four ordinary maps. The scale is 26ths (`lib/game/wits.ts`): the
+first fight thinks at 1/26 — a little, never zero `[play]` — and the
+campaign's own final, Team Lard, at 25/26, because **the full 1 is
+RESERVED**:
 `[play]`, after the campaign is beaten it is played AGAIN against the
 secret PURPLE faction, and those are the smartest enemies in the game.
 That second pass is not built yet; the reservation is. Arenas take a

@@ -182,7 +182,7 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     const amount = took(dummy.x - at.x, dummy.y - at.y, dummy.z - at.z)
     if (amount <= 0) continue
     hurt(dummy, amount, false)
-    emit({ kind: 'damaged', at: dummy, amount, structure: dummy.structure })
+    emit({ kind: 'damaged', at: dummy, amount, structure: dummy.structure, metal: dummy.metal })
     if (isDead(dummy)) {
       standing.splice(i, 1)
       emit({ kind: 'broke', target: dummy.id, at: { x: dummy.x, y: dummy.y, z: dummy.z } })
