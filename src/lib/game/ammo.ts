@@ -35,7 +35,13 @@
  * here — a list of everything in the AMMO run would load 55 models for the two
  * that are used.
  */
-export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ']
+export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ', 'BOOTS']
+
+/** What a finished death leaves on the spot (three/remains.ts). In every map's
+ * own .MAD and in no .POG — exactly the case this list exists for: without the
+ * entry the geometry was never parsed, `spawn('BOOTS')` answered null, and the
+ * boots silently never appeared (play, 2026-08-23: "сапогов не осталось"). */
+export const REMAINS_MODEL = 'BOOTS'
 
 /**
  * The model a SKILL's projectile wears, by the same table — or null when the

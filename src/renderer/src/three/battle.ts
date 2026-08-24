@@ -336,6 +336,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     return y - query.surface(x, z) > 100
   })
 
+  /** The pig whose DYING the camera is on — set by the `dying` event, cleared
+   * by its `remains`. One at a time, like the engine's own watch
+   * (lib/game/corpses.ts, `watching`). */
+  let dyingWatch: number | null = null
+
   /**
    * The SCENE's subscription: everything the engine announces that has to be
    * SHOWN, and nothing that has to be remembered.
@@ -358,10 +363,19 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       // on landing — a pig falling free has even more to be scared of.
       dropCut: ({ pig }) => dropInArt.cut(pig),
       dropLanded: ({ pig }) => faces.calm(pig),
+      // A DYING has begun: the camera comes to the pig's FACE for the length
+      // of the clip — play's word on the original ("камера на свинью С ЛИЦА,
+      // и она умирает"). The exe re-points its subject the same way (mode 16,
+      // WATCHING DYING PIG); the FRAMING is play's, on the rig the canopy
+      // already uses. The frame loop reads this id (see `watch`).
+      dying: ({ pig }) => {
+        dyingWatch = pig
+      },
       // A death has finished playing out: the body comes off the scene for
       // good and the boots go down where it lay (lib/game/corpses.ts). The
       // blast that goes with it arrives as an ordinary `blasted`.
       remains: ({ pig, at, heading }) => {
+        if (dyingWatch === pig) dyingWatch = null
         squad.bury(pig)
         remainsArt.leave(at, heading)
       },
@@ -516,6 +530,25 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       else chase.watch(at)
       soldier.node.visible = true
       lastView = thrown ? 'pursue' : 'watch'
+      return
+    }
+    // A DYING pig is looked in the FACE for the length of its clip — before
+    // the aftermath's ride, because the engine keeps the aftermath alive
+    // under a death and play wants the face, not the point ("камера на
+    // свинью С ЛИЦА"). The rig is the canopy's own face view (three/chase.ts).
+    if (soldier.pig.id === dyingWatch) {
+      chase.follow(
+        drawnStance(soldier),
+        soldier.node.position.y,
+        dropInArt.riseOver(soldier.pig.id),
+        delta,
+        'face',
+        0,
+        0,
+        null
+      )
+      soldier.node.visible = true
+      lastView = 'face'
       return
     }
     // …and so does what the blow left behind. Mode 0 on the crate, which is
@@ -811,7 +844,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // exe's END OF GAME walks the survivors, one every two seconds, and hands
     // each to the camera as its subject (lib/game/endOfGame.ts). Which pig is the
     // engine's to say; all this does is point the ordinary chase at it.
-    watch((now.ending ? squad.of(now.ending.watching) : null) ?? active, delta)
+    watch(
+      (now.ending ? squad.of(now.ending.watching) : null) ??
+        // …and under a DYING the subject is the dying pig itself — the exe's
+        // mode 16 subject swap. `remains` buries it and hands the camera back.
+        (dyingWatch !== null ? squad.of(dyingWatch) : null) ??
+        active,
+      delta
+    )
   }
 
 
@@ -1035,6 +1075,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     mineMarkers: () => mineArt.shown(),
     map: () => ({ eye: eye(), blips: blips() }),
     minesTripped: () => mineArt.tripped(),
+    // How many pairs of boots are DRAWN — the renderer's own count, not the
+    // engine's `remains` event. It exists because the two disagreed silently:
+    // the event fired and `spawn('BOOTS')` answered null (lib/game/ammo.ts).
+    remains: () => remainsArt.standing(),
     charging: () => battle.charging(),
     firing: () => battle.view().firing?.phase ?? null,
 

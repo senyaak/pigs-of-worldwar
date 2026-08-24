@@ -8,12 +8,10 @@
 // converted root.
 
 import * as THREE from 'three'
+import { REMAINS_MODEL } from '../../../lib/game/ammo'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { PIG_HEADING_OFFSET } from '../../../lib/game/skeleton'
 import type { SpawnModel } from './mineArt'
-
-/** The model's name in every map's archive. */
-const BOOTS_MODEL = 'BOOTS'
 
 export interface RemainsArt {
   /** Stand a pair on this spot — `at.y` is the dead pig's SOLES, `heading`
@@ -37,8 +35,11 @@ export function createRemainsArt(root: THREE.Object3D, spawn: SpawnModel): Remai
     leave(at, heading) {
       // A map whose archive had no BOOTS after all simply leaves nothing —
       // a stand-in from another archive is the thing three/mineArt.ts just
-      // stopped doing.
-      const mesh = spawn(BOOTS_MODEL)
+      // stopped doing. The name is SPAWNED_MODELS' (lib/game/ammo.ts): the
+      // loader only parses what that list names, and this module spawning a
+      // name the loader was never told about is exactly how the boots went
+      // missing for three days.
+      const mesh = spawn(REMAINS_MODEL)
       if (!mesh) return
       if (lift === null) {
         const geometry = mesh.geometry

@@ -43,6 +43,19 @@ import type { TerrainQuery } from './terrain'
  */
 export const SINK_SPEED = 160
 
+/**
+ * The QUIET the dying waits out once the stage is still — play's own beat:
+ * "в оригинале сначала заканчиваются все анимации, потом секунда … и она
+ * умирает". Without it the release was the same STEP the stage went still
+ * in — a plain rifle kill mid-turn had nothing in flight by the time the
+ * damage landed, so the dying started at the blow ("умирание происходит
+ * сразу же после попадания"). The second is `[play]`'s; the exe's own hold
+ * between its modes is the fifteen-quiet-frames wait every beat runs
+ * (0x415420, lib/game/aftermath.ts), and any interruption — a late tumble,
+ * a swimmer — starts the count afresh, exactly as that counter resets.
+ */
+export const DEATH_QUIET = 1
+
 interface Corpse {
   pig: Pig
   /** Whether it is DYING in the water — the sink-and-drown arm. Decided at
@@ -53,6 +66,9 @@ interface Corpse {
    * started; the body wears the WOUNDED pose and the world has yet to
    * settle. */
   riding: boolean
+  /** Seconds of stage-still quiet still owed before the dying starts
+   * (DEATH_QUIET). Reset whenever anything moves again. */
+  quiet: number
 }
 
 export interface Corpses {
@@ -67,6 +83,15 @@ export interface Corpses {
   update(delta: number): void
   /** How many bodies are still playing out — what a spec can wait on. */
   live(): number
+  /**
+   * How many of those have their DYING actually ON — riding corpses excluded.
+   * The distinction is what breaks the deadlock between the death and the
+   * turn's wind-down: a RIDING corpse is motionless by definition and must
+   * not hold the beats that lead to the stillness it is itself waiting for
+   * (`settling`, lib/game/battle.ts), while a PLAYING one holds them exactly
+   * the way the exe's mode 16 does.
+   */
+  playing(): number
   /**
    * The body whose DYING is on right now — where it lies THIS step, or null
    * while nobody's clip plays. The exe's mode 16, WATCHING DYING PIG: the
@@ -138,7 +163,7 @@ export function createCorpses(
       // blow does to it in the WOUNDED pose (the exe's state 6, clip 29),
       // and the dying starts in `update`, once the stage is still.
       world.anim.setClip(pig, ANIM.WOUNDED)
-      dying.push({ pig, wet: false, riding: true })
+      dying.push({ pig, wet: false, riding: true, quiet: DEATH_QUIET })
     },
 
     update(delta) {
@@ -147,8 +172,16 @@ export function createCorpses(
         const { pig } = one
         if (one.riding) {
           // Still the blow's business — its own flight first, then the rest
-          // of the world: the swimmers ashore, everything at rest.
-          if (world.tumbling(pig) || !world.cleared()) continue
+          // of the world: the swimmers ashore, everything at rest. Anything
+          // still moving starts the quiet over.
+          if (world.tumbling(pig) || !world.cleared()) {
+            one.quiet = DEATH_QUIET
+            continue
+          }
+          // …and then the beat of QUIET on top of the stillness, which is
+          // what separates the blow from the dying (DEATH_QUIET above).
+          one.quiet -= delta
+          if (one.quiet > 0) continue
           one.riding = false
           // WHERE it ended is what it dies in: a body thrown off a deck
           // drowns in the bay, not on the bridge it was hit on.
@@ -183,6 +216,7 @@ export function createCorpses(
     },
 
     live: () => dying.length,
+    playing: () => dying.reduce((count, one) => count + (one.riding ? 0 : 1), 0),
     watching: () => {
       const one = dying.find((corpse) => !corpse.riding)
       return one

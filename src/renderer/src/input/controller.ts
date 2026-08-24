@@ -239,6 +239,9 @@ export interface DebugHooks {
   /** How many buried mines are being DRAWN for the side whose turn it is — a
    * marker only a nearby pig of the right class gets (three/mineArt.ts). */
   mineMarkers(): number
+  /** How many pairs of BOOTS are drawn — the renderer's word that a `remains`
+   * event became art (three/remains.ts). */
+  remains(): number
   /** How full the power gauge is, 0..1, or null when nothing is charging
    * (lib/game/gauge.ts). */
   charging(): number | null

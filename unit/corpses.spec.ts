@@ -11,7 +11,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { createCorpses, SINK_SPEED } from '../src/lib/game/corpses'
+import { createCorpses, DEATH_QUIET, SINK_SPEED } from '../src/lib/game/corpses'
 import { ANIM } from '../src/lib/game/locomotion'
 import { BLAST_EFFECT } from '../src/lib/game/effects'
 import { NO_BODY } from '../src/lib/game/body'
@@ -51,6 +51,10 @@ function stubAnim(): Anim & {
   }
   return stub
 }
+
+/** How many engine steps the DEATH_QUIET is — the last of them releases the
+ * dying (quiet reaches exactly zero). */
+const QUIET_STEPS = Math.round(DEATH_QUIET / STEP_SECONDS)
 
 const pigAt = (x: number, y: number, z: number, id = 1): Pig =>
   ({
@@ -101,10 +105,23 @@ test('a death on land: the ride, THEN the clip, then the bang, then the boots', 
   // Nobody's dying clip is on yet, so there is nothing for the camera to
   // watch (the exe's mode 16 starts with the clip).
   expect(corpses.watching()).toBeNull()
-  // The stage clears: the dying starts — one of the SEVENTEEN falls, rolled
-  // (a roll of 0 is the first) — and it is announced with the side that
-  // fielded the pig, for the death line's voice.
+  // The stage clears — and the dying still does NOT start: a beat of QUIET
+  // sits between the stillness and the clip ("потом секунда"), so the first
+  // still step plays nothing.
   still = true
+  corpses.update(STEP_SECONDS)
+  expect(anim.played).toEqual([])
+  // …and an INTERRUPTION starts the count over: half the quiet in, something
+  // moves again, and the seconds already counted are forfeit.
+  for (let step = 0; step < QUIET_STEPS / 2; step++) corpses.update(STEP_SECONDS)
+  still = false
+  corpses.update(STEP_SECONDS)
+  still = true
+  for (let step = 0; step < QUIET_STEPS - 1; step++) corpses.update(STEP_SECONDS)
+  expect(anim.played).toEqual([])
+  // The full quiet, uninterrupted: the dying starts — one of the SEVENTEEN
+  // falls, rolled (a roll of 0 is the first) — and it is announced with the
+  // side that fielded the pig, for the death line's voice.
   corpses.update(STEP_SECONDS)
   expect(anim.played).toEqual([ANIM.DEATHS[0]])
   expect(events.map((one) => one.kind)).toEqual(['dying'])
@@ -143,7 +160,7 @@ test('the falls are ROLLED off the battle stream — seventeen, exe range', { ta
   corpses.claim(pigAt(0, 0, 0, 3), false)
   corpses.claim(pigAt(100, 0, 0, 4), false)
   corpses.claim(pigAt(200, 0, 0, 5), false)
-  corpses.update(STEP_SECONDS)
+  for (let step = 0; step < QUIET_STEPS; step++) corpses.update(STEP_SECONDS)
   expect(new Set(anim.played).size).toBe(3)
   expect(anim.played).toContain(57)
   expect(anim.played).toContain(73)
@@ -189,8 +206,8 @@ test('a death in the water sinks WHILE the clip plays and goes off down there', 
   const pig = pigAt(0, 0, 0)
   corpses.claim(pig, false)
   // Where the body ENDED is what it dies in — the wet arm is decided when
-  // the dying starts, not at the blow.
-  corpses.update(STEP_SECONDS)
+  // the dying starts, not at the blow — after the quiet the death owes.
+  for (let step = 0; step < QUIET_STEPS; step++) corpses.update(STEP_SECONDS)
   expect(anim.played).toEqual([ANIM.DROWNING])
   expect(events.map((one) => one.kind)).toEqual(['dying'])
   expect(events[0]).toMatchObject({ wet: true })

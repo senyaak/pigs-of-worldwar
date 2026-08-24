@@ -92,6 +92,10 @@ export interface DebugParts {
    * (lib/game/ammo.ts).
    */
   minesTripped: () => number
+  /** How many pairs of BOOTS are drawn — the renderer's word that a `remains`
+   * event became art (three/remains.ts). The engine's event fired for days
+   * while nothing was drawn, which is what this counter is for. */
+  remains: () => number
   /** How full the power gauge is, 0..1, or null when nothing charges. */
   charging: () => number | null
   /** Where the shot SEQUENCE has got to: the fuse, the flight, or nothing at
@@ -298,6 +302,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       mineMarkers: () => parts.mineMarkers(),
       map: () => parts.map(),
       minesTripped: () => parts.minesTripped(),
+      remains: () => parts.remains(),
       charging: () => parts.charging(),
       /** Where the shot sequence is: 'fuse' while the ten frames run down,
        * 'flight' while the camera rides the bullet, null when the pig is its

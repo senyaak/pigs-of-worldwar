@@ -1121,3 +1121,33 @@ the wits-gated finish, neutral rolls keeping every old expectation) and the
 pathfind specs, which caught two real string-pulling bugs on their synthetic
 grounds: point-sampling missed zero-width walls (now the same cell test the
 search uses) and a straight line through the bay un-priced the swim.
+
+
+## 2026-08-24 — the death waits its SECOND, the camera comes to the face, and the boots exist
+
+Play's second-session report ("умирание происходит сразу же после
+попадания… потом секунда, камера на свинью С ЛИЦА") closed in one pass,
+and the diagnosis in todo.md held up with one addition — the deadlock.
+`stageStill()` was true in the very step of a plain hit because nothing in
+it counted the blow's own theatre; but the fix could not simply wait for
+the wind-down, because `settling()` counted EVERY corpse, so the aftermath
+beat, the spent turn and the walk-away were all held hostage by a corpse
+that was itself waiting for them. The knot: `corpses.playing()` — a RIDING
+corpse (motionless by definition) holds nothing, a PLAYING one holds
+everything, and the walk-away beat alone holds for both so it cannot hand
+the turn over in the step the dying is due. On top of the stillness the
+corpse waits out DEATH_QUIET = 1 s, reset by any interruption. Order now:
+blow → wind-down begins → stillness → a second → dying (camera to the
+FACE, the canopy's rig, `dyingWatch` in three/battle.ts) → bang → boots →
+the beat's own quiet → handover.
+
+The BOOTS were the fourth "debug read is not a paint check" case in as
+many weeks, with a twist: the event fired, the placement code was right,
+and `spawn('BOOTS')` answered null — the model is named by no POG record
+and was not in SPAWNED_MODELS, so the loader never parsed it. One name in
+lib/game/ammo.ts; `pow.debug.remains()` counts the drawn pairs now.
+
+And the turn's end HOLSTERS: `endTurnBeat` empties the hand (aim overlay
+down with it), announces `holstered`, S_UNHOLS plays on it — play:
+"оружие не убирается после выстрела". The exe's own after-shot
+`Pig::HoldWeapon(0)` call site is unread; the moment is the remake's.

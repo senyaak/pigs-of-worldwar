@@ -520,11 +520,16 @@ export function createBattle(parts: BattleParts): Battle {
     // fuse runs out inside the beat that ends the turn, and a beat that does not
     // wait for the flight hands the turn on before the pig has moved a unit.
     tumbles.live() > 0 ||
-    // …and a DEATH still playing out — the dying clip, the sink, the boots
-    // (lib/game/corpses.ts). The exe's list asks the same (`0x47D800`, no pig
-    // still busy), and it is what keeps the camera on a kill until the body
-    // has finished coming apart.
-    corpses.live() > 0 ||
+    // …and a DEATH whose dying is actually PLAYING — the clip, the sink, the
+    // boots (lib/game/corpses.ts). The exe's list asks the same (`0x47D800`,
+    // no pig still busy), and it is what keeps the camera on a kill until the
+    // body has finished coming apart. A RIDING corpse is deliberately NOT in
+    // it: it is motionless, and counting it here held the turn's wind-down —
+    // the aftermath beat, the spent turn, the WALK AWAY — hostage to a death
+    // that was itself waiting for the wind-down to finish. That circle is
+    // exactly why the dying used to start at the blow: the wind-down could
+    // only run AFTER the death, so the death could not wait for it.
+    corpses.playing() > 0 ||
     loco.airborne !== null ||
     // …and a pig part-way through climbing INTO a building: the clip runs 17
     // frames and the turn must not be handed over on top of it
@@ -543,11 +548,15 @@ export function createBattle(parts: BattleParts): Battle {
    * WATCHING DYING PIG (0x4d72b0; the state-6 arm at 0x46f4ef rides the
    * physics body until then).
    *
-   * NOT `settling`: that list waits on the corpses themselves
-   * (`corpses.live()`), and a death that waited on it would deadlock the
-   * beat. This is the same list LESS the deaths and the theatre — the smoke
-   * and the floating numbers are pictures, not motion, and the exe's own
-   * hold is `0x47D800`, a walk over the PIGS.
+   * NOT `settling`: that list waits on the deaths that are PLAYING
+   * (`corpses.playing()`), and a death that waited on it would deadlock the
+   * beat. This is the same list LESS the deaths and the PICTURES — the smoke
+   * and the floating numbers are not motion, and the exe's own hold is
+   * `0x47D800`, a walk over the PIGS. The blow's own theatre — the swing,
+   * the firing clip, the crate a broken thing still owes — IS in it, since
+   * play's second report: with none of it counted a plain shot's stage read
+   * still in the step of the hit. On top of the stillness the corpse then
+   * waits out DEATH_QUIET (lib/game/corpses.ts) — the "потом секунда".
    */
   const stageStill = (): boolean =>
     shots.live().length === 0 &&
@@ -557,6 +566,15 @@ export function createBattle(parts: BattleParts): Battle {
     loco.airborne === null &&
     climbing === null &&
     airDrops.falling() === 0 &&
+    // …nor while the blow's own theatre is still on — the swing's arc, the
+    // firing clip on the acting pig, a crate still owed to a broken thing.
+    // Play's second report said why these belong here: a plain shot mid-turn
+    // had NOTHING in the list above by the time the damage landed, so the
+    // stage read still in the very step of the hit ("умирание происходит
+    // сразу же после попадания").
+    !swings.running() &&
+    !anim.animating(game.currentPig) &&
+    pending === null &&
     (walkAway === null || walkAway.swimming() === 0)
 
   /**
@@ -603,6 +621,21 @@ export function createBattle(parts: BattleParts): Battle {
    * (lib/game/walkAway.ts).
    */
   const endTurnBeat = (): void => {
+    // **THE WEAPON GOES AWAY WITH THE TURN.** Play's report: "оружие не
+    // убирается после выстрела — винтовка (и граната) остаётся в руке до
+    // следующего хода." The exe's holster proper is `Pig::HoldWeapon(0)`
+    // (0x469090); WHERE its after-the-shot call sits has not been read, so
+    // the moment is the turn's own end — the shot and its whole beat are
+    // over by here, and nobody walks away still shouldering a rifle. The
+    // event is the sound's (S_UNHOLS, audio/battle.ts).
+    if (game.currentPig.holding !== null && !isDead(game.currentPig)) {
+      game.currentPig.holding = null
+      // …and the AIMING ARMS come down with it: the overlay is written by the
+      // driving frame (see `holdingUp` below), which this beat never reaches,
+      // so left alone the pig walked into the next turn still sighting.
+      anim.overlay(game.currentPig, -1, 0)
+      emit({ kind: 'holstered', pig: game.currentPig.id })
+    }
     // Nobody is being driven from here on, so nobody is mid-stride. Play: "когда
     // таймер кончился — анимация свина не возвращается обратно в идл" — the walk
     // cycle the pig was wearing when the clock ran out played on through the whole
@@ -1015,7 +1048,14 @@ export function createBattle(parts: BattleParts): Battle {
       // …and it holds for an unpaid script step too, so the turn cannot be handed
       // over on top of one. `focus` clears the debt, which is right for a warp and
       // fatal here.
-      const done = walkAway.update(delta, settling() || pending !== null)
+      // A corpse holds this beat WHOLE — riding or playing — where `settling`
+      // deliberately counts only the playing ones. The riding corpse must not
+      // block the beat from STARTING (that was the deadlock, see `settling`),
+      // but once the beat runs it may not END under one either: the corpse's
+      // own DEATH_QUIET and this beat's quiet are the same second counted
+      // from the same stillness, and a beat that could finish first would
+      // hand the turn over in the very step the dying was due to start.
+      const done = walkAway.update(delta, settling() || pending !== null || corpses.live() > 0)
       // A pig thrown by the charge it planted is still in the air, and the beat is
       // waiting for it (`settling`). Its flight owns its position for as long as it
       // lasts; the walk home is what the beat does with pigs on the ground.
