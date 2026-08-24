@@ -114,11 +114,15 @@ const LAYOUT = {
     survival: 225,
     none: 260,
     special: 305,
-    // The step fits the 32-wide spinning token with a hair of air (it was
-    // 26 for the 24-wide coin).
-    specialRow: { y: 330, step: 36 }
+    // The step fits the 48-wide spinning token with a hair of air.
+    specialRow: { y: 330, step: 54 }
   },
-  token: { beside: 60, lift: 2 }
+  // BIG and UNDER THE TEXT — play, twice: first "медали под текстом", then,
+  // against a 32-px token beside the line, "нифига не видно — они должны
+  // быть большие и под текстом". `drop` is how far under the line's y the
+  // token's top sits; `size` is its drawn edge (the strip renders at twice
+  // it, three/tokenArt.ts).
+  token: { drop: 16, size: 48 }
 }
 
 const TICK_MS = EXE_FRAME_SECONDS * 1000
@@ -234,13 +238,23 @@ export function initDebrief(handlers: {
     y: number
   ): void => font.draw(context, text, centredAt(font, text, centre), y)
 
-  const token = (context: CanvasRenderingContext2D, x: number, y: number, greyed: boolean): void => {
+  /** One token, CENTRED on `centre` with its top at `top` — under the text
+   * line that earned it, at the layout's own size. */
+  const token = (
+    context: CanvasRenderingContext2D,
+    centre: number,
+    top: number,
+    greyed: boolean
+  ): void => {
+    const size = layout.token.size
+    const x = Math.round(centre - size / 2)
     if (greyed) context.globalAlpha = 0.35
     if (spinner) {
       const at = (spin % TOKEN_FRAMES) * TOKEN_SIZE
-      context.drawImage(spinner, at, 0, TOKEN_SIZE, TOKEN_SIZE, x, y, TOKEN_SIZE, TOKEN_SIZE)
+      context.drawImage(spinner, at, 0, TOKEN_SIZE, TOKEN_SIZE, x, top, size, size)
     } else if (coin) {
-      context.drawImage(coin.get(TOKEN).image, x, y)
+      const sprite = coin.get(TOKEN)
+      context.drawImage(sprite.image, Math.round(centre - sprite.width / 2), top)
     }
     context.globalAlpha = 1
   }
@@ -326,16 +340,11 @@ export function initDebrief(handlers: {
       const pays = paysPoints(save.position)
       write(context, small, gameText(COMPLETE_TEXT), centre, layout.column.complete)
       if (pays) {
-        token(
-          context,
-          centre + layout.token.beside,
-          layout.column.complete - layout.token.lift,
-          false
-        )
+        token(context, centre, layout.column.complete + layout.token.drop, false)
       }
       write(context, small, gameText(SURVIVAL_TEXT), centre, layout.column.survival)
       if (pays && survivalBonus(save.position, losses)) {
-        token(context, centre + layout.token.beside, layout.column.survival - layout.token.lift, false)
+        token(context, centre, layout.column.survival + layout.token.drop, false)
       } else {
         write(context, small, gameText(NONE_TEXT), centre, layout.column.none)
       }
@@ -348,11 +357,12 @@ export function initDebrief(handlers: {
       const available = Math.max(bonusPoints(save.position), earned)
       if (available > 0) {
         write(context, small, gameText(SPECIAL_TEXT), centre, layout.column.special)
-        const width = layout.column.specialRow.step * available
+        const step = layout.column.specialRow.step
         for (let i = 0; i < available; i++) {
+          // Centres spread about the column's own middle, `step` apart.
           token(
             context,
-            Math.round(centre - width / 2 + layout.column.specialRow.step * i),
+            Math.round(centre + step * (i - (available - 1) / 2)),
             layout.column.specialRow.y,
             i >= earned
           )

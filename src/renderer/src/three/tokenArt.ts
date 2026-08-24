@@ -18,8 +18,11 @@ import * as THREE from 'three'
 import { buildModelGeometry, buildTextureMaterials, disposeMesh } from './modelMesh'
 import type { Model, Texture } from '../api'
 
-/** One square frame's edge, pixels. */
-export const TOKEN_SIZE = 32
+/** One square frame's edge, pixels — rendered at twice the size the debrief
+ * draws it (`token.size` there), so the scale-down antialiases. The first
+ * cut rendered AND drew at 32 and play could not see it: "медальки вроде
+ * были но нифига не видно". */
+export const TOKEN_SIZE = 96
 /** How many yaw steps the strip holds — a full turn. */
 export const TOKEN_FRAMES = 16
 
