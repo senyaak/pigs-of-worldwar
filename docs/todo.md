@@ -1043,29 +1043,38 @@ The AI package (one session's worth, each with the log's evidence):
 
 Non-AI bugs from the same session, queued after the AI:
 
-7. **The death STILL starts at the blow, and the boots went missing.** Play:
-   "умирание происходит сразу же после попадания… в оригинале сначала
-   заканчиваются все анимации, потом секунда, камера на свинью С ЛИЦА, и
-   она умирает… анимация всё ещё не та + сапогов не осталось." Diagnosis so
-   far: `stageStill()` is true almost immediately after a plain shot
-   mid-turn (no walk-away yet, nothing in flight), so the dying clip starts
-   a beat after the hit — the gate must wait for the TURN's own wind-down
-   (the end-turn beat, walk-away done, plus ~a second of quiet), not merely
-   "nothing moving this instant". The camera should come to the pig's FACE
-   (the exe's mode-3 subject swap; we ride the aftermath point instead).
-   "Анимация не та" may be the WOUNDED pose (clip 29) reading as an instant
-   death — it goes up in the damage frame by design; with the real wait in
-   front of it, re-judge. The missing BOOTS need a measurement first
-   (`Measure the miss`): DEN's corpse DID bang (21:01:47 blast at his spot),
-   so `remains` fired — check the renderer's boots placement, not the
-   engine.
-8. **The weapon is not holstered after firing** — a rifle (and a grenade)
-   stays in hand until next turn. The exe holsters after the shot
-   (S_UNHOLS is even waiting in the sound survey, item 2 above).
-9. **A rifle shot does not SHOVE the pig it hits** — play: "тут даже
-   выстрелы имеют сдвиг". Needs the disasm read: HitByProjectile
-   (0x478710) plays the squeal and likely kicks; read what it writes to
-   the body before building.
+7. ~~**The death STILL starts at the blow, and the boots went missing.**~~
+   **BOTH BUILT 2026-08-24.** The gate: `stageStill()` now counts the blow's
+   own theatre (the swing, the firing clip on the acting pig, a pending
+   crate), a riding corpse no longer holds `settling()` hostage — which was
+   the deadlock that had forced the death BEFORE the wind-down — and the
+   corpse waits out `DEATH_QUIET` (1 s, `[play]`'s "потом секунда") of
+   uninterrupted stillness on top; the walk-away beat holds for any corpse,
+   riding or playing, so the order is the exe's mode 13 → still → 16 →
+   handover. The camera comes to the dying pig's FACE (the canopy's own
+   face rig, `dyingWatch` in three/battle.ts) for the length of the clip.
+   The BOOTS were never a placement bug: `spawn('BOOTS')` answered null
+   because the model was in no POG and not in `SPAWNED_MODELS`
+   (lib/game/ammo.ts) — one name added, plus `pow.debug.remains()` so a
+   drawn pair is countable. "Анимация не та" is for play to RE-JUDGE now
+   that the real wait sits in front of the WOUNDED pose. A wet death's
+   boots still land where the SUNK body ended — below the bed — noted in
+   the recon, unruled.
+8. ~~**The weapon is not holstered after firing**~~ **BUILT 2026-08-24** —
+   `endTurnBeat` holsters whatever is still in hand (aim overlay down with
+   it), announces `holstered`, and S_UNHOLS is wired to it
+   (audio/battleAudio.ts). WHERE the exe's own `Pig::HoldWeapon(0)` call
+   sits after a shot is unread; the turn's end is the remake's moment.
+9. ~~**A rifle shot does not SHOVE the pig it hits**~~ **READ AND BUILT
+   2026-08-24** — 0x478710 read to its last arm (weapons/fire.md, the
+   2026-08-24 section): every bullet path ends in `0x4A9260(0x30, pitch,
+   bearing, 0)` — ADD 48 units/frame along the bullet's own line, a literal
+   with no table field — plus state 5 and clip 39 BOUNCE unless already
+   falling; the one gate is the body being gone (state 8). Built as
+   `SHOT_SHOVE` (lib/game/bullets.ts) through the ordinary fling seam,
+   pinned in unit/bullets.spec.ts. Read and NOT built (nothing fields
+   them): the MG burst cap (edi=5, first round ×5), the stagger counter
+   raise, the medic dart HEAL (kind 0x24), kind 0x36's flag.
 10. **No WOUNDED bearing on a hurt pig** — the original stands a hurt pig
     differently and walks it SLOWER. Clip 29 is in `ANIM` now (WOUNDED);
     the stance/speed thresholds need reading or ruling.

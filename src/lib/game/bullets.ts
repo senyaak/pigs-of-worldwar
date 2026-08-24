@@ -16,6 +16,8 @@ import { advanceShot, damageOf, fireShot, projectileOf, spentShot } from './proj
 import type { Shot } from './projectile'
 import { PIG_RADIUS } from './obstacles'
 import type { Obstruction } from './obstacles'
+import { fromExeSpeed } from './ballistics'
+import type { Velocity } from './tumble'
 import { hurt, isDead } from './health'
 import { originY } from './body'
 import { HAND_BONE } from './pose'
@@ -57,6 +59,23 @@ const MUZZLE: Record<number, Point> = {
 const HIT_RADIUS = PIG_RADIUS
 const HIT_RISE = 320
 
+/**
+ * **A bullet SHOVES the body it hits — read, not ruled.** `Pig::HitByProjectile`
+ * (0x478710, disassembled to its last arm 2026-08-24) ends every bullet path
+ * in `0x4A9260(0x30, [proj+0x90], [proj+0x94], 0)` at 0x478AA1 — the ADD
+ * primitive, 48 units a frame along the projectile's OWN pitch and bearing.
+ * The 0x30 is a literal in the instruction stream, not a weapon-table field
+ * (the row's only field read there is the damage at +0x0C); the one exception
+ * is projectile kind 0x12 — the flame family, not fielded here — which pushes
+ * 6. It is the same 0x30 the jump's own push uses (`JUMP_PUSH`).
+ *
+ * And the body is KNOCKED DOWN with it: unless it is already falling, 0x478AB2
+ * calls 0x470C70 — movement state 5 — and 0x478AC4 plays clip 39, "Bouncing on
+ * B-Hind", which is exactly the BOUNCE arm `tumbles.fling` wears without the
+ * `ejected` flag (the melee's clip 38 is the flag's).
+ */
+export const SHOT_SHOVE = fromExeSpeed(0x30)
+
 /** The world a bullet flies through. */
 export interface BulletWorld {
   /** Everyone who can be shot — asked for each frame, because a squad outlives
@@ -76,6 +95,9 @@ export interface BulletWorld {
   training: boolean
   /** Where the muzzle is (lib/game/pose.ts). */
   pose: Pose
+  /** Throw the struck pig (SHOT_SHOVE above). OPTIONAL the way `BlastWorld`'s
+   * is: a spec about the flight or the damage alone needs no thrower. */
+  fling?: (pig: Pig, velocity: Velocity) => void
 }
 
 export interface Bullets {
@@ -170,6 +192,20 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       emit({ kind: 'damaged', at: body, amount, pig: pig.id })
       if (outcome === 'died' || outcome === 'gibbed') {
         emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })
+      }
+      // …and the SHOVE, along the bullet's own line (SHOT_SHOVE above). After
+      // the kill is announced, because the exe's one gate on it is the body
+      // being GONE (state 8, 0x4789EF) — a fresh corpse is thrown as happily
+      // as a live pig, and an overkill's body has already left the world.
+      if (!pig.gone) {
+        const span = Math.hypot(shot.vx, shot.vy, shot.vz)
+        if (span > 0) {
+          world.fling?.(pig, {
+            vx: (shot.vx / span) * SHOT_SHOVE,
+            vy: (shot.vy / span) * SHOT_SHOVE,
+            vz: (shot.vz / span) * SHOT_SHOVE
+          })
+        }
       }
       return 'flesh'
     }

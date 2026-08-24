@@ -385,7 +385,18 @@ export function createEngine(parts: EngineParts): Engine {
   /** What a GUN does: the flight, the substepping and every verdict about what
    * was hit (lib/game/bullets.ts). */
   const shots = createBullets(
-    { pigs, targets, present, query, obstacles, training, pose },
+    {
+      pigs,
+      targets,
+      present,
+      query,
+      obstacles,
+      training,
+      pose,
+      // A bullet shoves the body it hits (SHOT_SHOVE, lib/game/bullets.ts),
+      // through the same seam every other throw takes.
+      fling: (pig, velocity) => fling(pig, velocity)
+    },
     bus.emit
   )
   /**

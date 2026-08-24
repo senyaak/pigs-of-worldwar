@@ -1459,3 +1459,20 @@ the drop keep their own painters), pow.debug grew nodeAt (the DRAWN node) and
 flingOther (the trigger), and e2e/002/flungmesh.spec.ts is the paint check —
 run against the reintroduced bug it fails on the node that never moved, and
 with the fix it watches the mesh travel 400+ in the live scene.
+
+## 2026-08-24 — a bullet SHOVES: HitByProjectile read to its last arm
+
+Play: "тут даже выстрелы имеют сдвиг" — and the read agreed before
+anything was invented. 0x478710 ends every bullet path in
+`0x4A9260(0x30, [proj+0x90], [proj+0x94], 0)`: ADD 48 units a frame along
+the bullet's own pitch and bearing, a literal in the instruction stream
+(the weapon row contributes only its damage; kind 0x12, the flame family,
+pushes 6), then state 5 and clip 39 "Bouncing on B-Hind" unless the body
+is already falling; the one gate is state 8, gone. Built as SHOT_SHOVE
+(lib/game/bullets.ts) through the ordinary fling seam — bounce clip, not
+the melee's flying 38 — with the gone-gate as `pig.gone`, so a fresh
+corpse is thrown and an overkill's body is not. unit/bullets.spec.ts pins
+magnitude, line, the corpse case and the gate. Read and not built: the MG
+burst cap (edi 5, first round ×5 then ×1 to five rounds), the stagger
+counter, the medic dart heal, kind 0x36. Full read appended to the disasm
+repo's weapons/fire.md.
