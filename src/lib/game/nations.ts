@@ -32,6 +32,27 @@ const SKIN_OF = [0, 2, 1, 4, 5, 3, 6] as const
 export const skinOf = (nation: number): number => SKIN_OF[nation] ?? LARD
 
 /**
+ * What a skin SPEAKS — the rows of 0x4c2988, which the pig-voice path pastes
+ * into every file name (audio/pigVoice.ts). `[slot+3]`, the byte that picks
+ * one, is written as `Team::SkinOf(nation)` at the roster roll (0x482520's
+ * tail; the read is `speech/pigs.md`), so this table IS in skin order.
+ *
+ * **Team Lard's `TL` ships no files at all** and the exe never selects it:
+ * its pigs carry an ORIGIN nation of their own (the 20-row table at
+ * 0x4D33A0) and speak that. Our roster has no origins, so Lard falls back to
+ * English — `[deliberate]`, and the one thing here that is not the exe's.
+ *
+ * The install is not consistent about CASE — `Pig01` ships `01fr…`/`01ge…`
+ * lower-case where `Pig03` ships `03FR…` — which Windows does not care about
+ * and a case-sensitive filesystem would. Left as the exe writes it.
+ */
+export const SKIN_SPEECH: readonly string[] = ['EN', 'AM', 'FR', 'GE', 'RU', 'JA', 'EN']
+
+/** What this NATION speaks: its skin's row. */
+export const speechOf = (nation: number): string =>
+  SKIN_SPEECH[skinOf(nation)] ?? SKIN_SPEECH[0]
+
+/**
  * The uniform archives, **indexed by SKIN** — the exe's own pointer table at
  * 0x4D51F0, whose one reader is 0x4861D5.
  *

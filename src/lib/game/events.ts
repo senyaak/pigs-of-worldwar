@@ -56,10 +56,10 @@ export type BattleEvent =
    * CLIP has started (lib/game/corpses.ts). The moment is the exe's own state
    * 6 → 7 edge: death at `killed` is a state change and a ragdoll, the dying
    * is played out here, later. `wet` is the sink-and-drown arm — what the
-   * audio hangs the drown gurgle on. `player` is the side that fielded it:
-   * the DEATH LINE is spoken in the squad's own voice (audio/pigVoice.ts),
-   * and the voice bank is keyed the way `bark`'s is. */
-  | { kind: 'dying'; pig: PigId; player: number; wet: boolean }
+   * audio hangs the drown gurgle on. The DEATH LINE is the pig's OWN
+   * (`voice`), spoken in the tongue `player` picks — the same pair `bark`
+   * carries (audio/pigVoice.ts). */
+  | { kind: 'dying'; pig: PigId; player: number; voice: number; wet: boolean }
   /** …and its body is DONE: the corpse has blown up (or been overkilled away)
    * and what is left on the spot is a pair of boots (lib/game/corpses.ts).
    * `at` is the soles, `heading` the way the pig faced — where and which way
@@ -185,8 +185,9 @@ export type BattleEvent =
   /** …and something came OUT of it, into the pig's hands. The training
    * ground's script counts these (lib/game/tutorial.ts). */
   | { kind: 'chose'; skill: number }
-  /** The acting pig says a firing line, per squad. */
-  | { kind: 'bark'; player: number }
+  /** The acting pig says a firing line — in ITS OWN voice (`voice`, 1..9)
+   * and its side's tongue, which `player` picks (audio/pigVoice.ts). */
+  | { kind: 'bark'; player: number; voice: number }
   /**
    * THE SERGEANT SAYS SOMETHING — a section and a line of
    * `Speech/Sku1/Sarge/` (lib/game/sergeant.ts).
@@ -208,7 +209,7 @@ export type BattleEvent =
    * `computer` is that split — whoever is not on the keyboard this turn — and
    * `health` is the acting pig's, which is what chooses the line.
    */
-  | { kind: 'turnBegan'; player: number; computer: boolean; health: number }
+  | { kind: 'turnBegan'; player: number; computer: boolean; health: number; voice: number }
   /**
    * THE MACHINE DECIDED SOMETHING — the AI seat's one announcement, made per
    * decision (about once a second, lib/game/battle.ts's machine block).

@@ -215,8 +215,9 @@ test('a level plays MUSIC, and the TURN is what asks for it', async ({ app }) =>
   // arm the local human's controller takes: `clip = counter + 4·set`, volume
   // 0x46, and then the counter steps 0..3. So a side owns four tracks, they
   // come one A TURN, and a track running out is followed by quiet
-  // (audio/music.ts). Which SET a side owns is `[CHECK — remake]`; the
-  // arithmetic around it is the exe's, and that is what this pins.
+  // (audio/music.ts). Which SET a side owns was READ 2026-08-24 — the byte
+  // is the pig's LANGUAGE, `Team::SkinOf(nation)` — so the whole arithmetic
+  // is the exe's now, and that is what this pins.
   const { page } = app
   await startGame(page)
   await expect(page.locator('#battle')).toBeVisible()

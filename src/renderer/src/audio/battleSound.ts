@@ -25,7 +25,7 @@ import { BATTLE_SOUNDS, playCue } from './battle'
 import type { Cue } from './battle'
 import { handling } from '../../../lib/game/events'
 import type { BattleBus } from '../../../lib/game/events'
-import { skinOf } from '../../../lib/game/nations'
+import { skinOf, speechOf } from '../../../lib/game/nations'
 import type { SceneSound } from '../contracts/sound'
 
 /** The battle's sound bank — 99 numbered effects (lib/formats/srl.ts). */
@@ -83,11 +83,15 @@ export function createBattleSound(bus: BattleBus, nations: number[] = []): Battl
    * starts (0x46f947, the state 6→7 edge — exactly what `dying` announces),
    * unless it drowned, whose noise is the gurgle (audio/battleAudio.ts). */
   const voice: PigVoice = createPigVoice()
+  /** What this side SPEAKS — its nation's skin's row, read 2026-08-24
+   * (lib/game/nations.ts, `SKIN_SPEECH`). A battle with no nations handed in
+   * (a console swap, a spec) is British throughout. */
+  const tongue = (player: number): string => speechOf(nations[player] ?? player)
   bus.on(
     handling({
-      bark: ({ player }) => voice.fire(player),
-      dying: ({ player, wet }) => {
-        if (!wet) voice.death(player)
+      bark: ({ player, voice: who }) => voice.fire(who, tongue(player)),
+      dying: ({ player, voice: who, wet }) => {
+        if (!wet) voice.death(who, tongue(player))
       }
     })
   )
@@ -125,9 +129,9 @@ export function createBattleSound(bus: BattleBus, nations: number[] = []): Battl
    */
   bus.on(
     handling({
-      turnBegan: ({ player, computer, health }) => {
+      turnBegan: ({ player, computer, health, voice: who }) => {
         if (computer) {
-          voice.turn(player, health)
+          voice.turn(who, health, tongue(player))
           return
         }
         cue(BATTLE_SOUNDS.ready)

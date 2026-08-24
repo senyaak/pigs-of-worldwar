@@ -186,7 +186,13 @@ export function createCorpses(
           // WHERE it ended is what it dies in: a body thrown off a deck
           // drowns in the bay, not on the bridge it was hit on.
           one.wet = inWater(world.query, pig.position.x, pig.position.z, pig.position.y)
-          emit({ kind: 'dying', pig: pig.id, player: world.sideOf(pig), wet: one.wet })
+          emit({
+            kind: 'dying',
+            pig: pig.id,
+            player: world.sideOf(pig),
+            voice: pig.voice,
+            wet: one.wet
+          })
           // Which fall this pig takes is ROLLED off the battle's own stream —
           // seventeen of them, the exe's `rand() % 0x11 + 0x39` at the same
           // edge (lib/game/locomotion.ts, DEATHS) — so a lockstep battle

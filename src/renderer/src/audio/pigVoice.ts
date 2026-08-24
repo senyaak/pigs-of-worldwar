@@ -7,10 +7,23 @@
 //
 //     Speech/Sku1/Pig{NN}/{NN}{LANG}{CC}{VV}.wav
 //
-// with **NN the SQUAD's** voice, not the pig's — `[pig+0x1e8] = [squad+2]`
-// and `[pig+0x1e9] = [squad+3]`, the language, set together at 0x466b1a. Nine
-// voices ship, six languages apiece (the rows of 0x4c2988: EN AM FR GE RU JA
-// TL), five categories of six lines.
+// with **NN the PIG's OWN** voice — read 2026-08-24 and corrected: the record
+// `[pig+0x3CC]` points at is not a squad's but the pig's own 64-byte ROSTER
+// SLOT (all four spawn sites hand the constructor `&team.slot[n]`), so
+// `[pig+0x1e8] = [slot+2]` is the pig's IDENTITY and `[pig+0x1e9] =
+// [slot+3]` its LANGUAGE. The one writer is the identity roller 0x482520:
+// the voice is the NAME-TABLE ROW's own identity — name k always speaks
+// Pig{k+1} — and the language is `Team::SkinOf(nation)`
+// (lib/game/nations.ts, `SKIN_SPEECH`). The whole chain is `speech/pigs.md`.
+//
+// Nine voices ship, six languages apiece (the rows of 0x4c2988: EN AM FR GE
+// RU JA TL, of which TL ships nothing), five categories of six lines.
+//
+// **And every rotation is PER PIG**, not per side — three counters in three
+// bytes of that one slot — which is why two pigs of a side say consecutive
+// lines rather than the same one. The exe even carries them between missions,
+// the save being the team record dumped whole; ours start fresh each battle
+// (`[gap]`, and nobody can hear it).
 //
 // ## Which line, and the counter that picks it
 //
@@ -32,9 +45,10 @@
 // The remake keeps the rotation in the same place, per squad.
 
 import { context, speechOut, wakeAudio } from './bank'
+import { SKIN_SPEECH } from '../../../lib/game/nations'
 
-/** The languages, the rows of 0x4c2988. Only EN is used until something asks. */
-const LANGUAGE = 'EN'
+/** What a pig speaks where nothing says otherwise — the British row. */
+const DEFAULT_LANGUAGE = SKIN_SPEECH[0]
 /** Six variants a category, five categories — the shipped layout. */
 const VARIANTS = 6
 
@@ -87,20 +101,20 @@ export const DEATH_LINES = 12
 const DEATH_CATEGORY = 3
 
 /** How many voices ship: Speech/Sku1/Pig01..Pig09. */
-const VOICES = 9
+export const VOICES = 9
 
 /**
- * Which of the nine a squad speaks with.
- *
- * The exe reads it out of the squad record (`[squad+2]`, copied into every
- * pig at 0x466b1a) and where THAT comes from is not decoded, so the remake
- * gives squad n voice n and wraps. Play will say if a nation sounds wrong.
+ * A pig's IDENTITY into the folder number — the exe's own `Pig{k+1}` for
+ * name row k (0x48263f writes `[row+8]` and the shipped rows are
+ * `{k,k,k,nation}`). Wrapped, because a DRAFT pig has no name row and falls
+ * back on its slot (lib/game/muster.ts).
  */
-export const voiceFor = (squad: number): number => (Math.max(0, squad) % VOICES) + 1
+export const voiceFor = (identity: number): number => (Math.max(0, identity) % VOICES) + 1
 
 export interface PigVoice {
-  /** Say the next firing line for this squad, 0-based. */
-  fire(squad: number): void
+  /** Say this pig's next firing line. `voice` is its own 1..9 (the battle
+   * carries it, lib/game/game.ts) and `language` its side's row. */
+  fire(voice: number, language?: string): void
   /**
    * …and the line at the TOP OF A TURN, which the pig's own health picks.
    *
@@ -109,11 +123,11 @@ export interface PigVoice {
    * pig gets a plain grunt instead, which is the bank's business rather than
    * the voice's (audio/battleSound.ts).
    */
-  turn(squad: number, health: number): void
+  turn(voice: number, health: number, language?: string): void
   /** …and the DEATH line, spoken as the dying clip starts (the `dying`
    * event, lib/game/corpses.ts) — never at the blow, and never for a
    * drowned pig, whose noise is the gurgle (audio/battleAudio.ts). */
-  death(squad: number): void
+  death(voice: number, language?: string): void
   /** Every file played, in order: the only way a spec can hear this. */
   spoken(): string[]
   /** Whether a line is still going. The SHOT waits for it (lib/game/shot.ts). */
@@ -124,7 +138,12 @@ export interface PigVoice {
 /**
  * A line number into a file name, the builder's own arithmetic (0x43b215).
  */
-export function voiceFile(voice: number, line: number, category = FIRE_CATEGORY): string {
+export function voiceFile(
+  voice: number,
+  line: number,
+  category = FIRE_CATEGORY,
+  language: string = DEFAULT_LANGUAGE
+): string {
   let step = line
   let group = category
   if (step > VARIANTS) {
@@ -136,19 +155,22 @@ export function voiceFile(voice: number, line: number, category = FIRE_CATEGORY)
   const nn = String(voice).padStart(2, '0')
   const cc = String(group).padStart(2, '0')
   const vv = String(step).padStart(2, '0')
-  return `Speech/Sku1/Pig${nn}/${nn}${LANGUAGE}${cc}${vv}.wav`
+  return `Speech/Sku1/Pig${nn}/${nn}${language}${cc}${vv}.wav`
 }
 
 export function createPigVoice(): PigVoice {
   const buffers = new Map<string, AudioBuffer | null>()
   const heard: string[] = []
-  /** `[squad+5]`, one a squad: 0..11 and round again. */
-  const counters = new Map<number, number>()
-  /** …and `[squad+4]`, the TURN line's own, over two. Separate because the exe
+  /** `[slot+5]`, one a PIG: 0..11 and round again. Keyed by voice AND
+   * language, which is one pig: a side's identities are unique (the roller
+   * re-rolls a taken one, 0x4825bf) and two sides in the same tongue are two
+   * nations of one skin, which cannot happen. */
+  const counters = new Map<string, number>()
+  /** …and `[slot+4]`, the TURN line's own, over two. Separate because the exe
    * keeps them in separate bytes: a shot must not step a turn's line on. */
-  const turnCounters = new Map<number, number>()
-  /** …and `[squad+6]`, the DEATH line's, over twelve — the third byte. */
-  const deathCounters = new Map<number, number>()
+  const turnCounters = new Map<string, number>()
+  /** …and `[slot+6]`, the DEATH line's, over twelve — the third byte. */
+  const deathCounters = new Map<string, number>()
   let disposed = false
 
   /**
@@ -201,37 +223,36 @@ export function createPigVoice(): PigVoice {
     }
   }
 
+  /** Ask for one file: counted as speech from the ASK, loaded if new. */
+  const speak = (path: string): void => {
+    heard.push(path)
+    saying++
+    if (buffers.has(path)) start(path)
+    else void load(path).then(() => start(path))
+  }
+
   return {
-    fire(squad) {
+    fire(voice, language = DEFAULT_LANGUAGE) {
       if (disposed) return
-      const at = counters.get(squad) ?? 0
-      counters.set(squad, at + 1 > FIRE_LINES - 1 ? 0 : at + 1)
-      const path = voiceFile(voiceFor(squad), at + 1)
-      heard.push(path)
-      saying++
-      if (buffers.has(path)) start(path)
-      else void load(path).then(() => start(path))
+      const who = `${voice}${language}`
+      const at = counters.get(who) ?? 0
+      counters.set(who, at + 1 > FIRE_LINES - 1 ? 0 : at + 1)
+      speak(voiceFile(voice, at + 1, FIRE_CATEGORY, language))
     },
-    turn(squad, health) {
+    turn(voice, health, language = DEFAULT_LANGUAGE) {
       if (disposed) return
-      const at = turnCounters.get(squad) ?? 0
-      turnCounters.set(squad, at + 1 > TURN_LINES - 1 ? 0 : at + 1)
+      const who = `${voice}${language}`
+      const at = turnCounters.get(who) ?? 0
+      turnCounters.set(who, at + 1 > TURN_LINES - 1 ? 0 : at + 1)
       const band = health > TURN_HEALTHY ? 0 : health > TURN_HURT ? 2 : 4
-      const path = voiceFile(voiceFor(squad), at + 1 + band, TURN_CATEGORY)
-      heard.push(path)
-      saying++
-      if (buffers.has(path)) start(path)
-      else void load(path).then(() => start(path))
+      speak(voiceFile(voice, at + 1 + band, TURN_CATEGORY, language))
     },
-    death(squad) {
+    death(voice, language = DEFAULT_LANGUAGE) {
       if (disposed) return
-      const at = deathCounters.get(squad) ?? 0
-      deathCounters.set(squad, at + 1 > DEATH_LINES - 1 ? 0 : at + 1)
-      const path = voiceFile(voiceFor(squad), at + 1, DEATH_CATEGORY)
-      heard.push(path)
-      saying++
-      if (buffers.has(path)) start(path)
-      else void load(path).then(() => start(path))
+      const who = `${voice}${language}`
+      const at = deathCounters.get(who) ?? 0
+      deathCounters.set(who, at + 1 > DEATH_LINES - 1 ? 0 : at + 1)
+      speak(voiceFile(voice, at + 1, DEATH_CATEGORY, language))
     },
     spoken: () => [...heard],
     saying: () => saying > 0,

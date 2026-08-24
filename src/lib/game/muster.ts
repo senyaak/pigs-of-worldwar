@@ -35,8 +35,21 @@ export interface Squad {
    * turns into a skin. The MAP does not decide it: the player's is the one
    * chosen at SELECT TEAM and the enemy's is the campaign's own schedule. */
   nation: number
+  /** Each pig's VOICE, 1..9 — its place in the NATION'S OWN NAME LIST, which
+   * is the exe's name-table identity (`[slot+2]`, 0x48263f): a name always
+   * sounds the same, whoever is fielding it. A drafted pig, whose name is no
+   * row of the table, falls back on its slot. `speech/pigs.md`. */
+  pigVoices: number[]
   spawns: PigSpawn[]
 }
+
+/** Where this name sits in its nation's nine — the identity, 1-based; the
+ * slot's own number when the name is nobody's (a DRAFT). */
+const voicesFor = (names: readonly string[], team: Team | undefined): number[] =>
+  names.map((name, slot) => {
+    const row = team ? team.pigNames.findIndex((one) => one === name) : -1
+    return ((row >= 0 ? row : slot) % 9) + 1
+  })
 
 /**
  * The campaign's own side, fielded from the SAVE rather than from `fetext`:
@@ -121,10 +134,14 @@ export function mapSquads(
       // whichever is shorter — one on the training ground, three at ESTU,
       // five from then on (lib/game/missions.ts, `fieldedAt`).
       const pigs = side.slice(0, own.pigs.length)
+      const names = own.pigs.slice(0, pigs.length).map((pig) => pig.name)
       return {
         name: own.name,
         nation,
-        pigNames: own.pigs.slice(0, pigs.length).map((pig) => pig.name),
+        pigNames: names,
+        // The ROSTER's names came out of this same nation's list at NEW GAME,
+        // so a campaign pig keeps the voice its name has always had.
+        pigVoices: voicesFor(names, teams[nation] ?? teams[index]),
         spawns: pigs.map((at, slot) => ({
           x: at.x,
           z: at.z,
@@ -138,10 +155,12 @@ export function mapSquads(
     }
     const team = teams[nation] ?? teams[index] ?? teams[0]
     const pigs = side.slice(0, team.pigNames.length)
+    const names = team.pigNames.slice(0, pigs.length)
     return {
       name: team.name,
       nation,
-      pigNames: team.pigNames.slice(0, pigs.length),
+      pigNames: names,
+      pigVoices: voicesFor(names, team),
       spawns: pigs.map((at) => ({
         x: at.x,
         z: at.z,
@@ -182,7 +201,8 @@ export function musterGame(parts: MusterParts): Game {
     players: squads.map((squad) => ({
       name: squad.name,
       nation: squad.nation,
-      pigNames: squad.pigNames
+      pigNames: squad.pigNames,
+      pigVoices: squad.pigVoices
     })),
     spawns: squads.flatMap((squad) =>
       squad.spawns.map((at) => ({

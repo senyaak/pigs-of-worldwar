@@ -326,7 +326,12 @@ export function createBattle(parts: BattleParts): Battle {
     sights,
     anim,
     clips: parts.clips,
-    bark: () => emit({ kind: 'bark', player: game.players.indexOf(game.currentPlayer) })
+    bark: () =>
+      emit({
+        kind: 'bark',
+        player: game.players.indexOf(game.currentPlayer),
+        voice: game.currentPig.voice
+      })
   })
   /**
    * The FIRE button's one write, shared by the player's verb (`setFiring`)
@@ -716,7 +721,8 @@ export function createBattle(parts: BattleParts): Battle {
       // The exe splits on whose CONTROLLER the pig has (`cmp eax,2` at
       // 0x4724e5), and this is that split: whoever is not on the keyboard.
       computer: computerTurn(),
-      health: game.currentPig.health
+      health: game.currentPig.health,
+      voice: game.currentPig.voice
     })
     // …and the SERGEANT's own remark on the top of somebody else's turn
     // (0x497F80): the goad when they are behind, the challenge when they are

@@ -50,6 +50,13 @@ export interface Pig {
   /** Index into the player's squad. */
   index: number
   /**
+   * WHICH OF THE NINE VOICES this pig speaks with, 1..9 — the exe's
+   * `[slot+2]`, its identity out of the nation's own name table, so a name
+   * always sounds the same (audio/pigVoice.ts, `speech/pigs.md`). It is the
+   * pig's, not the side's: two pigs of one squad never share it.
+   */
+  voice: number
+  /**
    * Points, and its CLASS says how many it started with — a grunt fifty, a
    * heavy a hundred and twenty (lib/game/health.ts). At or below zero the pig
    * is dead; nothing here caps it above, because the original's heal does
@@ -118,12 +125,25 @@ export interface GameConfig {
    * behind it gets, and what every spec that does not care about uniforms
    * wants.
    */
-  players: { name: string; nation?: number; pigNames: string[] }[]
+  players: {
+    name: string
+    nation?: number
+    pigNames: string[]
+    /** Each pig's VOICE identity, 1..9 (lib/game/muster.ts works them out of
+     * the nation's name table). Short or absent, a pig takes its slot's —
+     * which is what a battle assembled without a campaign gets. */
+    pigVoices?: number[]
+  }[]
   /** One spawn per pig, in player order then squad order. */
   spawns: PigSpawn[]
   /** Seconds a player has per turn (the original's turn clock). */
   turnSeconds?: number
 }
+
+/** How many voices ship (Speech/Sku1/Pig01..09) — the wrap a pig with no
+ * name row falls back on. The names are audio's business; the COUNT is the
+ * rules', because a pig carries its voice. */
+const VOICE_COUNT = 9
 
 /**
  * A turn's length where the map does not say otherwise — `turnSecondsFor`
@@ -209,6 +229,7 @@ export class Game {
             id: id++,
             name,
             index,
+            voice: player.pigVoices?.[index] ?? (index % VOICE_COUNT) + 1,
             health: maxHealthFor(pigClass),
             carrying: outfit(pigClass),
             holding: null,
