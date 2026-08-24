@@ -52,12 +52,43 @@ export interface SaveGame {
    * record 39, PLAY TRAINING MISSION?); declining steps past it, so this flag
    * is what says the tutorial was finished rather than skipped. */
   tutorial: boolean
+  /**
+   * The PROPOINT pickups taken at each COMPLETED position, indexed by
+   * position — the record MISSION SELECT replays against (`[play]`,
+   * 2026-08-24: "при прохождении если число больше того что было —
+   * сохраняется новое и добавляются PP"). The remake's own field: the
+   * original has no replay and keeps no such record. Sparse holes read as
+   * zero (`bestAt`).
+   */
+  best: number[]
   /** ISO 8601, for the LOAD GAME list to sort and label by. */
   savedAt: string
 }
 
 /** A campaign that has been played to the end. */
 export const isComplete = (save: SaveGame): boolean => save.position >= CAMPAIGN_LENGTH
+
+/** The PROPOINT record at a position — a hole is an honest zero (a mission
+ * finished before the field existed, or with nothing picked up). */
+export const bestAt = (save: SaveGame, position: number): number => save.best[position] ?? 0
+
+/**
+ * A REPLAY came back with `points` pickups: worth banking only past the
+ * record, and worth exactly the difference — the points already banked were
+ * paid when they were first earned. Null when the record stands.
+ */
+export function bankReplay(
+  save: SaveGame,
+  position: number,
+  points: number,
+  now: string
+): SaveGame | null {
+  const stood = bestAt(save, position)
+  if (points <= stood) return null
+  const best = save.best.slice()
+  best[position] = points
+  return { ...save, best, tokens: save.tokens + (points - stood), savedAt: now }
+}
 
 /** The map the next mission opens, or null for a finished campaign. */
 export const nextMap = (save: SaveGame): string | null => mapAt(save.position)
@@ -82,6 +113,7 @@ export function newGame(
     drafts: 0,
     tokens: 0,
     tutorial: false,
+    best: [],
     savedAt: now
   }
 }
@@ -137,11 +169,16 @@ export function finishMission(
   squad: Pig[],
   enemy: number,
   tokens: number,
-  now: string
+  now: string,
+  /** PROPOINT pickups taken on the field — the record MISSION SELECT
+   * replays against (`best`). */
+  pickups = 0
 ): SaveGame {
   const { squad: next, drafts } = regroup(squad, save.drafts)
   const enemies = save.enemies.slice()
   enemies[save.position] = enemy
+  const best = save.best.slice()
+  best[save.position] = Math.max(bestAt(save, save.position), pickups)
   return {
     ...save,
     position: Math.min(save.position + 1, CAMPAIGN_LENGTH),
@@ -149,6 +186,7 @@ export function finishMission(
     squad: next,
     drafts,
     tokens,
+    best,
     savedAt: now
   }
 }
@@ -187,6 +225,12 @@ export function parse(text: string): SaveGame | null {
   // `tutorial` arrived after the shape shipped; a file without it is from
   // before the question existed, and the honest answer for it is "not played".
   if (typeof save.tutorial !== 'boolean') save.tutorial = false
+  // `best` arrived with MISSION SELECT (2026-08-24); a file without it is
+  // from before replays existed, and every record it would hold is zero.
+  // Normalised element-wise rather than rejected whole: a sparse write
+  // serialises its holes as JSON nulls, and one null must not cost the
+  // other twenty-five records.
+  save.best = Array.isArray(save.best) ? save.best.map((one) => (isCount(one) ? one : 0)) : []
   /**
    * A SHORT ENEMY TABLE IS FILLED IN HERE, at the door, because nothing
    * downstream can cope with one and everything downstream believes it.

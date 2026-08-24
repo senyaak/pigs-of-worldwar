@@ -18,6 +18,7 @@
 // `pending` and only `acceptMission` writes it over the live save.
 
 import {
+  bankReplay,
   finishMission,
   missionReward,
   newGame,
@@ -118,7 +119,10 @@ export function missionWonResult(kills: readonly number[] = [], points = 0): Sav
     credit(save.squad, fieldedAt(save.position), kills),
     save.enemies[save.position] ?? bootCampEnemy(save.nation),
     save.tokens + missionReward(save.position, losses, points),
-    new Date().toISOString()
+    new Date().toISOString(),
+    // …and the pickup count goes on the RECORD, which is what MISSION
+    // SELECT replays against (lib/game/save.ts, `best`).
+    points
   )
   // Winning the training ground is what sets the tutorial flag.
   pending = save.position === 0 ? { ...won, tutorial: true } : won
@@ -141,6 +145,25 @@ export async function acceptMission(): Promise<SaveGame | null> {
 export const discardMission = (): void => {
   pending = null
   if (save) save = { ...save, squad: save.squad.map((pig) => ({ ...pig, fell: -1 })) }
+}
+
+/**
+ * A MISSION SELECT replay came back won with `points` pickups: the roster is
+ * put back the way the mission found it — a replay is consequence-free, no
+ * deaths, no battles-and-kills credit, no campaign step — and what it can
+ * WIN is the record: past the position's `best`, the difference lands on the
+ * tokens and the record moves (`bankReplay`, lib/game/save.ts). `[play]`:
+ * "при прохождении если число больше того что было — сохраняется новое и
+ * добавляются PP". Returns the save, banked or not.
+ */
+export async function bankReplayResult(position: number, points: number): Promise<SaveGame | null> {
+  discardMission()
+  if (!save) return null
+  const banked = bankReplay(save, position, points, new Date().toISOString())
+  if (!banked) return save
+  save = banked
+  await write()
+  return save
 }
 
 /**

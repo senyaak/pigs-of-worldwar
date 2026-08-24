@@ -10,6 +10,8 @@ import { test, expect } from '@playwright/test'
 import { CAMPAIGN, CAMPAIGN_LENGTH, MAP_NAMES, mapAt, mapId, missionNameIndex } from '../src/lib/game/missions'
 import { RETURNING, SQUAD_SIZE, fall, newSquad, regroup, standing, standingCount } from '../src/lib/game/roster'
 import {
+  bankReplay,
+  bestAt,
   finishMission,
   isComplete,
   missionReward,
@@ -261,3 +263,34 @@ test('the table is filled where it is short, and kept where it is not', { tag: '
   expect(fillEnemies(2, whole, rand)).toBe(whole)
 })
 
+
+
+test('the PP record: finishMission writes it, bankReplay pays only the difference', { tag: '@nodata' }, () => {
+  let save = newGame('PIGS', 0, squadOf(), '2026-08-24T00:00:00Z')
+  save = { ...save, position: 3, tokens: 10 }
+  // Finishing a mission records the pickups at the PLAYED position.
+  const won = finishMission(save, save.squad, 1, 12, '2026-08-24T00:01:00Z', 2)
+  expect(bestAt(won, 3)).toBe(2)
+  expect(won.position).toBe(4)
+  // A replay past the record banks the DIFFERENCE and moves the record...
+  const banked = bankReplay(won, 3, 5, '2026-08-24T00:02:00Z')!
+  expect(banked).not.toBeNull()
+  expect(bestAt(banked, 3)).toBe(5)
+  expect(banked.tokens).toBe(won.tokens + 3)
+  // ...and a replay at or under it banks nothing at all.
+  expect(bankReplay(banked, 3, 5, '2026-08-24T00:03:00Z')).toBeNull()
+  expect(bankReplay(banked, 3, 1, '2026-08-24T00:03:00Z')).toBeNull()
+})
+
+test('a save from before the record reads back with an empty one', { tag: '@nodata' }, () => {
+  const save = newGame('PIGS', 0, squadOf(), '2026-08-24T00:00:00Z')
+  const old = JSON.parse(serialise(save))
+  delete old.best
+  const read = parse(JSON.stringify(old))
+  expect(read).not.toBeNull()
+  expect(read!.best).toEqual([])
+  // ...and a sparse write's JSON nulls become zeros, not a lost record.
+  const holed = JSON.parse(serialise(save))
+  holed.best = [null, null, 3]
+  expect(parse(JSON.stringify(holed))!.best).toEqual([0, 0, 3])
+})
