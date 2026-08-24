@@ -127,6 +127,13 @@ export function newGame(
  *   field, plus 5 on every fifth position. The training ground never sees
  *   the debrief and pays ZERO.
  *
+ * The +5 is the ISLAND bonus in spirit — play: "+5 медалей за закрытие
+ * острова вроде" — and the mechanism is literally `% 5`, which is the same
+ * thing on the first four islands (5 missions each) and NOT on the tail:
+ * the fifth island is four missions and closes UNPAID at position 24, and
+ * FINAL (25, an island of its own on the map) pays. `[exe]` for the `% 5`;
+ * the naming is play's.
+ *
  * `pickups` waits on the PROPOINT crate being built (`[gap]`); the manual's
  * "hidden bonus points" are exactly those pickups, and the per-position
  * count of them (0x4D3560) is only ever shown, never awarded.
