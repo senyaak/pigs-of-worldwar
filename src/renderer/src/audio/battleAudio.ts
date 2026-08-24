@@ -101,6 +101,8 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
         if (weapon) playCue(bank(), BATTLE_SOUNDS[weapon.impact])
       },
       blasted: () => playCue(bank(), BATTLE_SOUNDS.blast),
+      // The weapon going away with the turn (lib/game/battle.ts, endTurnBeat).
+      holstered: () => playCue(bank(), BATTLE_SOUNDS.holster),
       // A round ARRIVING: meat and masonry sound different, thin air is
       // nothing at all (lib/game/bullets.ts carries the verdict).
       shotLanded: ({ hit }) => {

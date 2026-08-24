@@ -32,6 +32,10 @@ export type BattleEvent =
   // ——— weapons ———
   /** A gun went off: the report is per weapon. */
   | { kind: 'fired'; skill: number }
+  /** The weapon went AWAY — the turn's end holsters whatever was still in
+   * hand (lib/game/battle.ts, `endTurnBeat`). The sound is S_UNHOLS
+   * (audio/battle.ts). */
+  | { kind: 'holstered'; pig: PigId }
   /** A blade going through the air, before it reaches anything. */
   | { kind: 'whoosh' }
   /** …and it landed on a body: the weapon's own impact noise and its rings. */

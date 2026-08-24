@@ -93,7 +93,7 @@ export interface Cue {
  * 95 S_CLOCK  1.06  the TURN CLOCK starting to run out
  * 96 S_OPEN   0.83  (wired: the weapon menu)
  * 97 S_SELECT 0.46  (wired: a skill used)
- * 98 S_UNHOLS 0.60  putting a weapon AWAY
+ * 98 S_UNHOLS 0.60  (wired: the turn's end puts the weapon away)
  * ```
  *
  * **AND THE PIG'S OWN FORTY-ONE**, walked the same evening. Eight were already
@@ -153,7 +153,7 @@ export interface Cue {
  * The rest of this is a work list rather than a table: nine of these are
  * placed by ear and wired to nothing — the turn clock's own warning, a round
  * hitting a wall against a round hitting meat, the blast inside a building,
- * the swing that missed, holstering, the battle ambience, the two birds, and
+ * the swing that missed, the battle ambience, the two birds, and
  * the airships nothing on our maps flies. See `docs/todo.md`.
  */
 /**
@@ -230,6 +230,11 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
   /** Going into the water, and coming out of it. A NAME pick — the mix is
    * the nominal one, which is what most of the binary asks for. */
   splash: { sound: 'I_SPLASH', volume: 100, pitch: 100 },
+  /** Putting the weapon AWAY — the turn's end holsters whatever was still in
+   * hand (`holstered`, lib/game/battle.ts). A NAME pick off the ear survey
+   * ("S_UNHOLS 0.60 putting a weapon AWAY"); the exe's own call site for it
+   * is unread, so the mix is the nominal one. */
+  holster: { sound: 'S_UNHOLS', volume: 100, pitch: 100 },
   /**
    * **A BURNING CHARGE MAKES THREE NOISES**, and play named all three: "звук
    * горения фитиля + таймер + звук когда кончается таймер". None of them is
