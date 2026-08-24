@@ -90,6 +90,25 @@ anything that touches the brain; it is the cheapest honest reading there is.
    is still felt, the lever is the flood's budget (`PLAN_TURNS`), not the
    price list.
 
+### PLAY'S REPORT, 2026-08-25: **THE BOUNDS OF THE FIRST MAP LOOK WRONG**
+
+Written down at play's request and NOT investigated — "зы запиши — похоже
+границы на первой карте не верны". Nothing here is a diagnosis.
+
+The one thing already on the record that may or may not belong to it: in
+that session's log both crates the machine walked to sit hard on the edge
+of the search grid — DEN's plan goes to `12032,12032` and NOBBY's to
+`11072,-12032`, against a `WORLD_LIMIT` that puts the grid's own corner at
+about ±12350 (`GRID_STEP` 128 × 193 cells a side, lib/game/pathgrid.ts).
+Whether that is the MAP being bigger than the remake thinks, the grid being
+smaller than the map, or simply where ESTU's crates honestly are, nobody
+has looked.
+
+Where to start when it is picked up: `WORLD_LIMIT` in lib/game/terrain.ts
+against the PMG's own block count, and `Map::Load`'s bounds in the exe. A
+pig walking off the end of the world, or refused at a line the original
+lets it cross, is the symptom to reproduce first.
+
 ### The AMBIENCE, from the same session — STILL OPEN
 
 Play: "орлы и стрельба — это реально фон, но играл он странно, очень друг
