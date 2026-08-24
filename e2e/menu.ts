@@ -18,6 +18,7 @@ export type Screen =
   | 'menu'
   | 'onePlayer'
   | 'loadScreen'
+  | 'missionSelect'
   | 'askTraining'
   | 'debrief'
   | 'teamScreen'

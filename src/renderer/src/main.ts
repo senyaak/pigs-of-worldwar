@@ -8,6 +8,7 @@ import { initWelcome } from './ui/welcome'
 import { initMenu } from './ui/menu'
 import { initOnePlayer } from './ui/onePlayer'
 import { initLoadScreen } from './ui/loadScreen'
+import { initMissionSelect } from './ui/missionSelect'
 import { initAskTraining } from './ui/askTraining'
 import { initPigMap } from './ui/pigMap'
 import { initBriefing } from './ui/briefing'
@@ -41,6 +42,7 @@ type View =
   | 'menu'
   | 'oneplayer'
   | 'load'
+  | 'missions'
   | 'ask'
   | 'pigmap'
   | 'briefing'
@@ -60,6 +62,7 @@ const panels: Record<View, HTMLElement[]> = {
   menu: [byId('menu')],
   oneplayer: [byId('oneplayer')],
   load: [byId('load')],
+  missions: [byId('missions')],
   ask: [byId('ask')],
   pigmap: [byId('pigmap')],
   briefing: [byId('briefing')],
@@ -151,6 +154,21 @@ const NO_CAMPAIGN_MAP = 'CAMP'
 let campaignBattle = false
 
 /**
+ * The position MISSION SELECT is replaying, or null for the ordinary
+ * campaign battle. A replay never moves the campaign: the debrief reads
+ * this position, CONTINUE banks the record's difference
+ * (`campaign.bankReplayResult`) instead of accepting a step, and the
+ * roster stands back up untouched.
+ */
+let replaying: number | null = null
+/** The replay's pickup count, held from the battle's exit to the debrief's
+ * CONTINUE. */
+let replayPoints = 0
+/** Points newly landed on the team — the squad screen's coin fly-in takes
+ * them the next time it stands up (`playerScreen.award`). */
+let pendingAward = 0
+
+/**
  * Which MAP the squad screen's board names while START MISSION is lit. Null
  * once the campaign has run out of missions.
  *
@@ -176,6 +194,13 @@ function toSquad(): void {
   }
   playerScreen.show(save.squad, save.name, save.tokens, nextMission(save))
   show('player')
+  // Points earned since the squad last stood: the coins fly in (the exe's
+  // own award animation, ui/playerScreen.ts). After `show`, which carries
+  // the new total — the chain takes the award back off the number first.
+  if (pendingAward > 0) {
+    playerScreen.award(pendingAward)
+    pendingAward = 0
+  }
   void playerScreen.load()
 }
 
@@ -189,6 +214,7 @@ function toSquad(): void {
 function startMission(): void {
   const save = campaign.current()
   campaignBattle = true
+  replaying = null
   if (!save || save.position === 0) {
     toBriefing()
     return
@@ -197,17 +223,29 @@ function startMission(): void {
   void pigMap.show(save.position, save.enemies, save.nation)
 }
 
-/** The briefing page up, and the battle loading UNDER it. */
-function toBriefing(): void {
+/**
+ * MISSION SELECT chose a completed position: the replay goes straight to
+ * the briefing — the world map is the campaign's own march, and this is
+ * not one (`[deliberate]`).
+ */
+function replayMission(position: number): void {
+  campaignBattle = true
+  replaying = position
+  toBriefing(position)
+}
+
+/** The briefing page up, and the battle loading UNDER it. `replayAt` is
+ * MISSION SELECT's position — absent, the campaign's own. */
+function toBriefing(replayAt?: number): void {
   const save = campaign.current()
-  const position = save?.position ?? 0
-  const enemy = save ? (save.enemies[save.position] ?? bootCampEnemy(save.nation)) : null
+  const position = replayAt ?? save?.position ?? 0
+  const enemy = save ? (save.enemies[position] ?? bootCampEnemy(save.nation)) : null
   show('briefing')
   // …and the same pair dresses the two squads: the player's own nation and
   // whoever this mission is against. The MAP says only where the pigs stand
   // (lib/game/nations.ts, lib/game/spawns.ts).
   const wearing = save && enemy !== null ? [save.nation, enemy] : undefined
-  const level = (save && nextMap(save)) || NO_CAMPAIGN_MAP
+  const level = (save && mapAt(position)) || NO_CAMPAIGN_MAP
   // WHO takes the field is the SAVE's: the first `fieldedAt` of the roster,
   // under the team's own name — one pig on the training ground, three at
   // ESTU, five from then on. The roster is packed standing-first by
@@ -253,6 +291,10 @@ const battle = initBattle((exit, fallen, kills, points) => {
     return
   }
   if (exit === 'aborted') {
+    if (replaying !== null) {
+      replaying = null
+      campaign.discardMission()
+    }
     toSquad()
     return
   }
@@ -267,6 +309,17 @@ const battle = initBattle((exit, fallen, kills, points) => {
   // Never written to disk here: CONTINUE settles it through `acceptMission`,
   // and every other way out stands the squad back up (`discardMission`).
   for (const slot of fallen) fall(save.squad, slot)
+  if (replaying !== null) {
+    // A REPLAY: nothing is settled — no step, no reward, no roster change.
+    // What it may win is the RECORD, and that waits for CONTINUE the same
+    // way a campaign result does. The debrief reads the REPLAYED position,
+    // so its bonus row and fielded count are that mission's own.
+    replayPoints = points
+    debrief.show(exit === 'won', { ...save, position: replaying }, points)
+    show('debrief')
+    void debrief.load()
+    return
+  }
   if (exit === 'won') campaign.missionWonResult(kills, points)
   // The debrief reads the save AS THE MISSION FOUND IT — the position still
   // naming the played mission, the squad carrying its fell marks; the settled
@@ -286,8 +339,25 @@ const battle = initBattle((exit, fallen, kills, points) => {
 // EDIT SQUAD, which walks away to the squad with the mission still waiting.
 const debrief = initDebrief({
   onContinue: () => {
+    // A REPLAY's CONTINUE banks the record instead of accepting a step:
+    // past the position's best, the difference lands on the tokens — and
+    // flies in as coins when the squad stands up.
+    if (replaying !== null) {
+      const position = replaying
+      replaying = null
+      const before = campaign.current()
+      void campaign.bankReplayResult(position, replayPoints).then((after) => {
+        if (before && after) pendingAward = after.tokens - before.tokens
+        toSquad()
+      })
+      return
+    }
     const before = campaign.current()
     void campaign.acceptMission().then((after) => {
+      // The mission's tokens fly onto the squad screen's pile as coins —
+      // the exe's own award flag, set by the debrief's accept and consumed
+      // when the squad stands (ui/playerScreen.ts, `award`).
+      if (before && after) pendingAward = Math.max(0, after.tokens - before.tokens)
       if (before && after && before.position > 0 && after.position > before.position) {
         // Of the pigs that actually FOUGHT — one on the training ground,
         // three at ESTU, five from then on — how many came back.
@@ -307,10 +377,15 @@ const debrief = initDebrief({
   },
   onRetry: () => {
     campaign.discardMission()
+    if (replaying !== null) {
+      replayMission(replaying)
+      return
+    }
     startMission()
   },
   onEditSquad: () => {
     campaign.discardMission()
+    replaying = null
     toSquad()
   }
 })
@@ -364,6 +439,13 @@ const loadScreen = initLoadScreen({
     toSquad()
   },
   onBack: () => show('oneplayer')
+})
+
+// MISSION SELECT: replay a completed mission for its PROPOINT record
+// (ui/missionSelect.ts). Reached from the squad screen; BACK is the squad.
+const missionSelect = initMissionSelect({
+  onPick: (position) => replayMission(position),
+  onBack: () => toSquad()
 })
 
 // The army chosen carries on to PLEASE NAME YOUR TEAM — record 15, the
@@ -426,6 +508,10 @@ const playerScreen = initPlayerScreen({
       return
     }
     startMission()
+  },
+  onSelectMission: () => {
+    show('missions')
+    void missionSelect.load()
   },
   // **BACK is the MAIN MENU**, `[play]`: "если на экране отряда нажать esc надо
   // возвращаться на главное меню." It used to hand over to the NAME screen —
@@ -497,6 +583,7 @@ const screens = {
   menu,
   oneplayer: onePlayer,
   load: loadScreen,
+  missions: missionSelect,
   ask,
   team: teamScreen,
   name: nameScreen,
@@ -550,6 +637,7 @@ if (window.pow) {
   window.pow.menu = view(menu)
   window.pow.onePlayer = view(onePlayer)
   window.pow.loadScreen = view(loadScreen)
+  window.pow.missionSelect = view(missionSelect)
   window.pow.askTraining = view(ask)
   // The map chain is not a bar screen: what a spec needs is which phase the
   // map stands in and whether the briefing would take a key.

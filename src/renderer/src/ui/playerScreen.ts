@@ -325,8 +325,10 @@ const LAYOUT = {
      * sixteen ("слишком высоко поднято, надо ниже сам элемент"), then the rest
      * of the way, measured live in the console. The number the arm folds to is
      * kept in this comment rather than in the field, since the fold itself is
-     * the suspect part (see the note above). */
-    rows: [385],
+     * the suspect part (see the note above). The SECOND row is MISSION
+     * SELECT's plate, a plate's own pitch under the first — the remake's
+     * row, so the 36 is `[CHECK — remake]`. */
+    rows: [385, 421],
     /**
      * How far the words sit off the plate's own MIDDLE — zero is centred, and
      * that is what this is now.
@@ -407,7 +409,18 @@ export interface PlayerScreen {
    * rule: the board draws nothing at all off a multiplayer record (0x428AA7).
    */
   show(squad: Pig[], teamName: string, tokens: number, mission?: string | null): void
-  /** Which of the nine places is lit: 0..7 a pig, 8 START MISSION. */
+  /**
+   * Newly EARNED points: the coins fly in from above onto the board's pile,
+   * one every five frames, the counter climbing a point per landing — the
+   * exe's own award animation (the read is at the coin block below). Call
+   * AFTER `show` (which carries the new total): the chain first takes the
+   * award back off the number, then pays it in coin by coin.
+   */
+  award(points: number): void
+  /** How many coins are in the air — what a spec waits on. */
+  coins(): number
+  /** Which of the ten places is lit: 0..7 a pig, 8 START MISSION,
+   * 9 MISSION SELECT. */
   selected(): number
   labels(): string[]
   values(): (string | null)[]
@@ -424,13 +437,22 @@ export interface PlayerScreen {
   layout: PlayerLayout
 }
 
-/** The one action lives past the eight pigs, the way the name entry's keys
+/** The actions live past the eight pigs, the way the name entry's keys
  * live past its letters. */
 export const START = SQUAD_SIZE
-const PLACES = SQUAD_SIZE + 1
+/** MISSION SELECT — the replay screen's door (`[deliberate]`, the remake's
+ * own; play asked for it beside START MISSION, 2026-08-24). */
+export const MISSIONS = SQUAD_SIZE + 1
+const PLACES = SQUAD_SIZE + 2
+
+/** The replay row's label — a literal: no fetext names a replay (151 is
+ * "CHEAT LEVEL SELECT", and this is not the cheat). `[deliberate]`. */
+const MISSIONS_LABEL = 'SELECT MISSION'
 
 export function initPlayerScreen(handlers: {
   onStart: () => void
+  /** The MISSION SELECT row — the replay list opens. */
+  onSelectMission: () => void
   onBack: () => void
   /** PROMOTE on the pig menu — the composition root holds the save and
    * answers what happened; the menu picks the sound and whether to stay. */
@@ -472,9 +494,10 @@ export function initPlayerScreen(handlers: {
   const columnRow = [0, 0]
 
   const driveOn = drive(ENTERS_FROM)
-  /** START MISSION's own lamp, which blinks while the row is lit and rests on
-   * the dark frame while it is not — the rack's script, one screen over. */
-  const startLamp = widget(0)
+  /** The action lamps — one per plate row — blinking while their row is lit
+   * and resting on the dark frame while it is not: the rack's script, one
+   * screen over. */
+  const actionLamps = LAYOUT.options.rows.map(() => widget(0))
   let leaving: (() => void) | null = null
 
   /** SWAP POSITION's armed pig, or −1 — the exe's `[0x4C0C58]`, and the one
@@ -494,6 +517,109 @@ export function initPlayerScreen(handlers: {
   /** The promotion flag's arrival — `[0x512C70]`, walked 0 → 23. */
   let flagFly = 0
 
+  /**
+   * THE FLYING TOKENS — the exe's own coin system, read 2026-08-24
+   * (0x4196E0/0x419800/0x4197D0/0x419950, notes in the disasm repo). Newly
+   * AWARDED points fly IN from above the screen onto the `pigpro` board's
+   * pile; a promotion's SPEND flies OFF the bottom from the same pile. One
+   * coin every five frames; each axis is a jittered damped spring — +/-5 a
+   * frame² toward the target, velocity ×100/128 with ±6 of jitter, snapped
+   * inside 6. The COUNTER is part of the show: the whole award is taken off
+   * the displayed number when the chain starts and every landing coin puts
+   * ONE back, so the board climbs coin by coin — the exe's `team+0x50`
+   * arithmetic exactly. `y` runs in the exe's HALF-VERTICAL space and is
+   * doubled at the draw, as its blitter does. The landing is COINFLIP, the
+   * spend's exit COINDROP (FESounds ids 23/22, both at 0x419xxx call
+   * sites). The exe draws an untextured 40×40 quad; ours wears the `vp`
+   * coin at the same 40×40, which is `[CHECK — remake]` — what the quad
+   * SHOWS on a real screen was not read. The sparkle trail is read
+   * (0x419580) and not built.
+   */
+  interface Coin {
+    x: number
+    y: number
+    vx: number
+    vy: number
+    /** 0 an award arriving, 1 a spend leaving — the exe's `+0x18`. */
+    kind: 0 | 1
+    age: number
+  }
+  /** The pile on the board — the exe's landing spot (323, 189 half-res). */
+  const COIN_REST = { x: 323, y: 189 }
+  /** A spend coin dies past this (half-res) — off the bottom. */
+  const COIN_GONE = 300
+  const COIN_STAGGER = 5
+  const COIN_SIZE = 40
+  let coins: Coin[] = []
+  /** Coins still owed to each chain — the exe's `[0x511784]`, split by kind. */
+  let owedIn = 0
+  let owedOut = 0
+  /** An award announced before the screen ARRIVED — the exe consumes its
+   * flag only once the slide-in is done (`[0x512E48]`), and so does this. */
+  let awardPending = 0
+
+  const spawnCoin = (kind: 0 | 1): void => {
+    coins.push(
+      kind === 0
+        ? { x: 320 + Math.floor(Math.random() * 200), y: -20, vx: 0, vy: 0, kind, age: 0 }
+        : { x: COIN_REST.x, y: COIN_REST.y, vx: 0, vy: 0, kind, age: 0 }
+    )
+  }
+
+  /** One axis of the exe's glide (0x4199D0): accelerate at 5 toward the
+   * target, damp ×100/128 with ±6 of jitter, snap inside 6. */
+  const glide = (pos: number, vel: number, target: number): [number, number] => {
+    let at = pos + vel
+    let speed = vel + (at < target ? 5 : -5)
+    speed = Math.trunc(((speed + Math.floor(Math.random() * 13) - 6) * 100) / 128)
+    if (Math.abs(at - target) < 6) at = target
+    return [at, speed]
+  }
+
+  const tickCoins = (): void => {
+    if (awardPending > 0 && driveOn.phase() === 'here') {
+      // The chain starts: the whole award leaves the number at once and
+      // comes back a coin at a time (the exe's ctor does `-= count` here).
+      tokens -= awardPending
+      owedIn += awardPending - 1
+      awardPending = 0
+      spawnCoin(0)
+    }
+    for (let i = coins.length - 1; i >= 0; i--) {
+      const coin = coins[i]
+      coin.age++
+      // Each coin spawns its successor at age five — the exe's stagger.
+      if (coin.age === COIN_STAGGER) {
+        if (coin.kind === 0 && owedIn > 0) {
+          owedIn--
+          spawnCoin(0)
+        } else if (coin.kind === 1 && owedOut > 0) {
+          owedOut--
+          spawnCoin(1)
+        }
+      }
+      const target = coin.kind === 0 ? COIN_REST : { x: 320, y: 320 }
+      ;[coin.x, coin.vx] = glide(coin.x, coin.vx, target.x)
+      ;[coin.y, coin.vy] = glide(coin.y, coin.vy, target.y)
+      if (coin.kind === 0 && coin.x === COIN_REST.x && coin.y === COIN_REST.y) {
+        tokens++
+        bank.play('COINFLIP', { gain: 1 })
+        coins.splice(i, 1)
+      } else if (coin.kind === 1 && coin.y > COIN_GONE) {
+        bank.play('COINDROP', { gain: 1 })
+        coins.splice(i, 1)
+      }
+    }
+  }
+
+  /** A promotion PAID: the cost flies off the pile and out the bottom —
+   * the exe's promote arms spawn exactly this (0x42BE12/0x42C6A2). */
+  const spendCoins = (cost: number): void => {
+    if (cost <= 0) return
+    owedOut += cost - 1
+    spawnCoin(1)
+  }
+
   const menu = initPigMenu({
     promote: (slot) => handlers.promote(slot),
     onSwap: (slot) => {
@@ -502,6 +628,7 @@ export function initPlayerScreen(handlers: {
     onRename: (slot) => handlers.rename(slot),
     onSpent: (cost) => {
       spent = { cost, ticks: SPENT.ticks }
+      spendCoins(cost)
     },
     onCareer: (slot) => career.open(slot)
   })
@@ -509,6 +636,7 @@ export function initPlayerScreen(handlers: {
     pick: (slot, to) => handlers.careerPick(slot, to),
     onSpent: (cost) => {
       spent = { cost, ticks: SPENT.ticks }
+      spendCoins(cost)
     },
     onClosed: () => {}
   })
@@ -563,9 +691,15 @@ export function initPlayerScreen(handlers: {
       menu.open(selection, squad[selection].rank)
       return
     }
-    if (selection !== START) return
-    leaving = handlers.onStart
-    driveOn.leave()
+    if (selection === START) {
+      leaving = handlers.onStart
+      driveOn.leave()
+      return
+    }
+    if (selection === MISSIONS) {
+      leaving = handlers.onSelectMission
+      driveOn.leave()
+    }
   }
 
   const navigate = (go: () => void): void => queueMicrotask(go)
@@ -620,12 +754,12 @@ export function initPlayerScreen(handlers: {
       })
       return [
         ...places,
-        {
+        ...layout.options.rows.map((rowY) => ({
           x: layout.options.x,
-          y: layout.options.rows[0] + offset,
+          y: rowY + offset,
           width: plate.width,
           height: plate.height
-        }
+        }))
       ]
     },
     (row) => {
@@ -824,23 +958,24 @@ export function initPlayerScreen(handlers: {
     // action that never answers ("Старт меню не загорается когда выбрано —
     // должны лампочки загораться зелёным").
     const options = layout.options
-    put('sqoptsf', options.x, options.rows[0])
-    const lamp = LAMPS[Math.min(startLamp.frame(), LAMPS.length - 1)] ?? LAMPS[0]
-    options.lamp.x.forEach((x) => put(lamp, x, options.rows[0] + options.lamp.drop))
-    const startLabel = feText(START_TEXT)
-    const startFont = selection === START ? light : dark
-    // Centred in the plate rather than dropped from its top edge, with
-    // `options.text` a nudge off that centre (see the layout).
     const plate = sprites.get('sqoptsf')
-    startFont.draw(
-      context,
-      startLabel,
-      centred(startFont, startLabel, options.x, options.width),
-      options.rows[0] +
-        Math.round((plate.height - startFont.height) / 2) +
-        options.text +
-        offset
-    )
+    const rowLabels = [feText(START_TEXT), MISSIONS_LABEL]
+    options.rows.forEach((rowY, row) => {
+      put('sqoptsf', options.x, rowY)
+      const lampWidget = actionLamps[row]
+      const lamp = LAMPS[Math.min(lampWidget?.frame() ?? 0, LAMPS.length - 1)] ?? LAMPS[0]
+      options.lamp.x.forEach((x) => put(lamp, x, rowY + options.lamp.drop))
+      const label = rowLabels[row] ?? ''
+      const font = selection === SQUAD_SIZE + row ? light : dark
+      // Centred in the plate rather than dropped from its top edge, with
+      // `options.text` a nudge off that centre (see the layout).
+      font.draw(
+        context,
+        label,
+        centred(font, label, options.x, options.width),
+        rowY + Math.round((plate.height - font.height) / 2) + options.text + offset
+      )
+    })
 
     // The team's own name across the top, which is what the player just typed.
     if (teamName) {
@@ -864,6 +999,14 @@ export function initPlayerScreen(handlers: {
     // The floating spend — the number of points a promotion just took,
     // pinned where the exe pins its popup.
     if (spent) light.draw(context, String(spent.cost), SPENT.x, SPENT.y)
+
+    // The FLYING TOKENS, over everything — the exe draws its coins after the
+    // whole frontend (0x418892). Half-res y doubled, 40×40, the `vp` coin
+    // standing in for the exe's untextured quad (see the read above).
+    for (const coin of coins) {
+      const face = sprites.get('vp')
+      context.drawImage(face.image, coin.x - 10, (coin.y - 10) * 2, COIN_SIZE, COIN_SIZE)
+    }
   }
 
   /** One line of the board: pieces laid out left to right and centred as a
@@ -1004,12 +1147,15 @@ export function initPlayerScreen(handlers: {
       else step(hovered > selection ? 1 : -1)
     }
     pulse += PULSE_STEP
-    // The action's lamp: blinking while its row is lit, dark otherwise.
-    if (selection === START) {
-      if (!startLamp.walking()) startLamp.play(LAMP_BLINK)
-    } else if (startLamp.frame() !== 0) startLamp.goTo(0)
-    startLamp.tick()
+    // Each action's lamp: blinking while its row is lit, dark otherwise.
+    actionLamps.forEach((lamp, row) => {
+      if (selection === SQUAD_SIZE + row) {
+        if (!lamp.walking()) lamp.play(LAMP_BLINK)
+      } else if (lamp.frame() !== 0) lamp.goTo(0)
+      lamp.tick()
+    })
     if (driveOn.phase() === 'here' && flagFly < layout.flag.fly) flagFly++
+    tickCoins()
     menu.tick()
     if (career.state() === 'open') career.tick()
     dim = Math.max(0, Math.min(DIM_TICKS, dim + (overlaid() ? 1 : -1)))
@@ -1078,6 +1224,10 @@ export function initPlayerScreen(handlers: {
       dim = 0
       spent = null
       flagFly = 0
+      coins = []
+      owedIn = 0
+      owedOut = 0
+      awardPending = 0
       menu.reset()
       career.reset()
       draw()
@@ -1089,10 +1239,15 @@ export function initPlayerScreen(handlers: {
       tokens = unspent
       mission = next
     },
+    award(points) {
+      if (points > 0) awardPending += points
+    },
+    coins: () => coins.length,
     selected: () => selection,
-    labels: () => squad.map((pig) => pig.name).concat([feText(START_TEXT)]),
+    labels: () => squad.map((pig) => pig.name).concat([feText(START_TEXT), MISSIONS_LABEL]),
     values: (): (string | null)[] => [
       ...squad.map((pig) => feText(rankText(pig.rank))),
+      null,
       null
     ],
     flipping: () => driveOn.phase() !== 'here',

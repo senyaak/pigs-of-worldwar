@@ -27,11 +27,12 @@ test('the squad arrives with eight named pigs, all GRUNTs', async ({ app }) => {
 
   // TOMMY'S TROTTERS' own nine, of which a squad takes eight — fetext 167
   // onwards (lib/game/teams.ts).
-  // START MISSION alone past the pigs — SAVE TEAM went with the autosave
-  // (docs/todo.md: SAVE ARMY is deliberately never built).
+  // START MISSION and SELECT MISSION past the pigs — SAVE TEAM went with the
+  // autosave (docs/todo.md: SAVE ARMY is deliberately never built), and the
+  // replay door arrived 2026-08-24 (ui/missionSelect.ts).
   await expect.poll(() => labels(page, 'playerScreen')).toEqual([
     'NOBBY', 'GINGER', 'DEN', 'MONTY', 'BASIL', 'PONSONBY', 'PERCY', 'SMITH',
-    'START MISSION'
+    'START MISSION', 'SELECT MISSION'
   ])
 
   // Everyone starts a GRUNT — the manual says so and the tree agrees, class 0

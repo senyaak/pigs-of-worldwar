@@ -23,10 +23,11 @@ test('a saved campaign is listed and loads back to its squad', async ({ app }) =
   await nameTeam(page, TEST_TEAM)
   await expect(page.locator('#player')).toBeVisible()
 
-  // …walk all the way out…
+  // …walk out — BACK off the squad is the MAIN MENU, play's rule (main.ts) —
+  // and come round to ONE PLAYER again…
   await tap(page, 'menuBack')
-  await tap(page, 'menuBack')
-  await tap(page, 'menuBack')
+  await expect(page.locator('#menu')).toBeVisible()
+  await choose(page, 'ONE PLAYER')
   await expect(page.locator('#oneplayer')).toBeVisible()
 
   // …and LOAD GAME lists it: the team's name on the bar, the campaign's
@@ -43,7 +44,8 @@ test('a saved campaign is listed and loads back to its squad', async ({ app }) =
   await expect(page.locator('#player')).toBeVisible()
   await expect.poll(() => labels(page, 'playerScreen')).toContain('START MISSION')
 
+  // BACK off the squad is the MAIN MENU — play's rule (main.ts, onBack).
   await tap(page, 'menuBack')
-  await expect(page.locator('#name')).toBeVisible()
+  await expect(page.locator('#menu')).toBeVisible()
   expect(app.errors()).toEqual([])
 })

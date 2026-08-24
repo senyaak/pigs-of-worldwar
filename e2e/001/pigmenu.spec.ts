@@ -58,7 +58,9 @@ test('the pig menu opens on a pig, refuses a broke promotion, and renames', asyn
   const { page } = app
   await toFreshSquad(page)
 
-  // Down from START MISSION is the first pig — the list wraps.
+  // Down from START MISSION is SELECT MISSION, then the first pig — the
+  // list wraps through the two actions.
+  await tap(page, 'menuDown')
   await tap(page, 'menuDown')
   expect(await selection(page, 'playerScreen')).toBe(0)
   await tap(page, 'menuSelect')
@@ -87,8 +89,9 @@ test('the pig menu opens on a pig, refuses a broke promotion, and renames', asyn
   // Seven is the grid's own limit — the eighth letter never went in.
   await expect.poll(() => labels(page, 'playerScreen')).toContain('NAPOLEO')
 
+  // BACK off the squad is the MAIN MENU — play's rule (main.ts, onBack).
   await tap(page, 'menuBack')
-  await expect(page.locator('#name')).toBeVisible()
+  await expect(page.locator('#menu')).toBeVisible()
   expect(app.errors()).toEqual([])
 })
 
@@ -97,7 +100,8 @@ test('swap position moves the whole pig, and back disarms', async ({ app }) => {
   await toFreshSquad(page)
   const before = (await labels(page, 'playerScreen')).slice(0, 8)
 
-  // Arm a swap on the first pig…
+  // Arm a swap on the first pig — two down, through SELECT MISSION.
+  await tap(page, 'menuDown')
   await tap(page, 'menuDown')
   await tap(page, 'menuSelect')
   await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(true)
@@ -125,8 +129,9 @@ test('swap position moves the whole pig, and back disarms', async ({ app }) => {
   await tap(page, 'menuBack')
   await expect(page.locator('#player')).toBeVisible()
 
+  // BACK off the squad is the MAIN MENU — play's rule (main.ts, onBack).
   await tap(page, 'menuBack')
-  await expect(page.locator('#name')).toBeVisible()
+  await expect(page.locator('#menu')).toBeVisible()
   expect(app.errors()).toEqual([])
 })
 
@@ -162,6 +167,8 @@ test('a token walks a grunt down the career path, and the next step costs two', 
   await settled(page, 'playerScreen')
 
   // PROMOTE on a GRUNT opens CAREER PATH — four careers, the tree's order.
+  // Two down: START MISSION → SELECT MISSION → the first pig.
+  await tap(page, 'menuDown')
   await tap(page, 'menuDown')
   await tap(page, 'menuSelect')
   await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(true)
@@ -199,7 +206,8 @@ test('a token walks a grunt down the career path, and the next step costs two', 
   await tap(page, 'menuBack')
   await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(false)
 
+  // BACK off the squad is the MAIN MENU — play's rule (main.ts, onBack).
   await tap(page, 'menuBack')
-  await expect(page.locator('#name')).toBeVisible()
+  await expect(page.locator('#menu')).toBeVisible()
   expect(app.errors()).toEqual([])
 })

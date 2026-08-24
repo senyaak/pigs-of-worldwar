@@ -394,6 +394,9 @@ declare global {
       onePlayer?: BarScreenView
       /** LOAD GAME — the eight slots (ui/loadScreen.ts). */
       loadScreen?: BarScreenView
+      /** MISSION SELECT — the completed missions and their PP records
+       * (ui/missionSelect.ts). */
+      missionSelect?: BarScreenView
       /** PLAY TRAINING MISSION? — YES over NO (ui/askTraining.ts). */
       askTraining?: BarScreenView
       /** The PIG MAP — which of the chain's phases is up (ui/pigMap.ts):
