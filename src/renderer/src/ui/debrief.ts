@@ -73,8 +73,16 @@ const DEBRIEF_ART = [
   ...UNIFORMS
 ]
 
-/** The token — `chars\propoint.mad` spinning in the exe, the `vp` coin here. */
-const TOKEN = 'vp'
+/**
+ * The token — `chars\propoint.mad` spinning in the exe, and the frontend's
+ * MEDAL here. Play's report (2026-08-23): "медали под текстом — the medal
+ * art, not the promotion-point icons" — the page wore the `vp` coin and it
+ * read wrong. `pcmedal` (FEBMP.MAD, 52×24, a medal on its ribbon) is the
+ * frontend's own; which art the ORIGINAL page really shows is still unread
+ * (`[CHECK — remake]`), so this is play's word until the exe's debrief
+ * draw arm is.
+ */
+const TOKEN = 'pcmedal'
 
 /**
  * Where everything lands — the exe's own numbers (0x4849A7..0x484D1A): five
@@ -102,7 +110,9 @@ const LAYOUT = {
     survival: 225,
     none: 260,
     special: 305,
-    specialRow: { y: 330, step: 26 }
+    // The step fits the 52-wide medal with a hair of air; it was 26 when the
+    // token was the 24-wide coin.
+    specialRow: { y: 330, step: 54 }
   },
   token: { beside: 60, lift: 2 }
 }
