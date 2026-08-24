@@ -1075,11 +1075,22 @@ Non-AI bugs from the same session, queued after the AI:
    pinned in unit/bullets.spec.ts. Read and NOT built (nothing fields
    them): the MG burst cap (edi=5, first round ×5), the stagger counter
    raise, the medic dart HEAL (kind 0x24), kind 0x36's flag.
-10. **No WOUNDED bearing on a hurt pig** — the original stands a hurt pig
-    differently and walks it SLOWER. Clip 29 is in `ANIM` now (WOUNDED);
-    the stance/speed thresholds need reading or ruling.
-11. **The debrief should show MEDALS under the text** — the medal art, not
-    the promotion-point icons.
+10. ~~**No WOUNDED bearing on a hurt pig**~~ **READ AND BUILT 2026-08-24**
+    — the bands are ABSOLUTE points, not a fraction of max (0x3B8 has no
+    movement reader): over 25 untouched; 10–25 walk ×2/3 and run clip 1;
+    at/under 10 walk ×1/3, run clip 2, and the UNARMED idle is clip 29 —
+    a drawn weapon overrides the stance (idle test 3 before test 8).
+    Backwards, water and wall speeds exempt. `woundBand` (health.ts),
+    `WOUND_SPEED` + clip picks (locomotion.ts), pinned in
+    unit/locomotion.spec.ts; full read in movement/notes.md "The WOUND",
+    which also corrects the old 0x467EC0 claim. Read and not built: the
+    exertion counter (clip 29 doubles as "winded" at 250+), the gas
+    bypass, the distance-driven anim cursor (flat 25 fps stays `[play]`).
+11. ~~**The debrief should show MEDALS under the text**~~ **BUILT
+    2026-08-24** — the token is `pcmedal` (FEBMP.MAD, 52×24) instead of the
+    `vp` coin, SPECIAL BONUS row steps 54 to fit. Which art the ORIGINAL
+    page shows is still unread (the exe spins `chars\propoint.mad`); the
+    medal is play's word, `[CHECK — remake]` at the token.
 
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens

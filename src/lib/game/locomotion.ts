@@ -45,6 +45,17 @@ import type { Obstruction } from './obstacles'
  */
 export const SWIM_SPEED = fromExeSpeed(16)
 /**
+ * What a WOUND does to the forward stride, by band (`woundBand`,
+ * lib/game/health.ts): `Pig::Walk` scales the step it just computed —
+ * over 25 points untouched, over 10 ×2/3, at or under 10 ×1/3 (0x46AD38,
+ * exact fractions where the exe truncates integer thirds). FORWARD ONLY:
+ * the health block is jumped over for a negative request (0x46AD21), and
+ * it runs before the water and wall caps, so the swim is never slowed —
+ * which the cap's own placement here reproduces, `speed` picking the swim
+ * before it ever looks at the wound.
+ */
+export const WOUND_SPEED = [1, 2 / 3, 1 / 3] as const
+/**
  * Turning, radians a second. The input handler ramps an accumulator at
  * pig+0x304 by 4 a frame up to a cap of 0x20 (0x4929de sets the step,
  * 0x492bf5 the cap) and `Pig::Turn` (0x46af30) scales it by nothing, so the
@@ -184,6 +195,14 @@ export const SIDESTEP_SPEED = fromExeSpeed(8)
  */
 export const ANIM = {
   RUN: 0,
+  /**
+   * The HURT run cycles — clips 1 and 2, picked by ABSOLUTE health at
+   * 0x46C4A5 in `Pig::UpdateMovement`: over 25 points clip 0, over 10 clip
+   * 1 ("Run cycle (wounded)"), at or under 10 clip 2 ("more wounded"). The
+   * same bands scale the stride (`WOUND_SPEED`).
+   */
+  RUN_WOUNDED: 1,
+  RUN_HURT: 2,
   WALK_BACK: 3,
   TURN: 4,
   SWIM: 5,
@@ -350,6 +369,21 @@ export interface LocomotionState {
    * bank read the same one.
    */
   swimming: boolean
+  /**
+   * The wound band — 0 sound, 1 hobbled, 2 crippled (`woundBand`,
+   * lib/game/health.ts) — WRITTEN BY THE DRIVER each frame, because this
+   * state knows no pig. It scales the forward stride (`WOUND_SPEED`), picks
+   * the hurt run cycles, and at 2 stands an UNARMED pig in the wounded
+   * stance. All read out of the exe 2026-08-24 (0x46AD38 / 0x46C4A5 /
+   * 0x472040 test 8).
+   */
+  wounded: 0 | 1 | 2
+  /**
+   * Whether a weapon is DRAWN — the idle picker's test 3 precedes its
+   * health test 8, so an armed pig stands its ordinary stand at any health.
+   * Written by the driver beside `wounded`.
+   */
+  armed: boolean
 }
 
 /**
@@ -455,7 +489,9 @@ export function createLocomotion(
     // …and a pig on a deck over water is not in the water, on the frame the
     // turn starts as much as on any other (`inWater`, and the whole of the bug
     // above is this question asked in a second place).
-    swimming: inWater(query, x, z, y)
+    swimming: inWater(query, x, z, y),
+    wounded: 0,
+    armed: false
   }
 }
 
@@ -708,7 +744,13 @@ function ground(
   // Backwards is half as fast on land and the same in water, because the
   // exe's clamp lands differently either side of it: -32 scaled by the class
   // is 26 walking, and the water cap of 16 swallows both directions.
-  const speed = swimming ? SWIM_SPEED : intent.walk < 0 ? WALK_BACK_SPEED : WALK_SPEED
+  // Forward alone carries the wound (`WOUND_SPEED` — backwards and the swim
+  // are the exe's own exemptions).
+  const speed = swimming
+    ? SWIM_SPEED
+    : intent.walk < 0
+      ? WALK_BACK_SPEED
+      : WALK_SPEED * WOUND_SPEED[state.wounded]
   const forwardX = Math.sin(state.heading)
   const forwardZ = Math.cos(state.heading)
 
@@ -789,7 +831,13 @@ function ground(
         sidestep(state, query, obstruction, footY, speed * delta * intent.walk, delta)
         pressing = true
       }
-      state.clip = swimming ? ANIM.SWIM : intent.walk > 0 ? ANIM.RUN : ANIM.WALK_BACK
+      state.clip = swimming
+        ? ANIM.SWIM
+        : intent.walk > 0
+          ? // A hurt pig runs a hurt cycle — clips 1 and 2 by the same bands
+            // that slowed the stride (0x46C4A5).
+            [ANIM.RUN, ANIM.RUN_WOUNDED, ANIM.RUN_HURT][state.wounded]
+          : ANIM.WALK_BACK
       // The wall scrabble. The exe has NO clip of its own here — its wedge
       // branch (0x46fe83) only counts frames and eases the material, and
       // nothing but the eject (0x470c70) changes the animation — but a pig
@@ -802,7 +850,12 @@ function ground(
       }
     }
   } else {
-    state.clip = swimming ? ANIM.SWIM : intent.turn !== 0 ? ANIM.TURN : ANIM.IDLE
+    // A CRIPPLED pig stands in the wounded stance — the idle picker's test 8
+    // (0x472040, health at or under ten points) — unless a weapon is drawn:
+    // test 3 precedes it, so an armed pig stands its ordinary stand at any
+    // health.
+    const stand = state.wounded === 2 && !state.armed ? ANIM.WOUNDED : ANIM.IDLE
+    state.clip = swimming ? ANIM.SWIM : intent.turn !== 0 ? ANIM.TURN : stand
   }
   // The ground, or an object's top where one is close enough under the pig
   // to be stepped onto — the same envelope that decides whether the object

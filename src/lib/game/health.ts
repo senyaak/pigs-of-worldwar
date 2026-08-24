@@ -118,3 +118,20 @@ export function heal(body: Body, amount: number): void {
 /** Whether a body is out of it — under one whole point, which is the exe's own
  * `<= 0x7f` (see `DEAD_BELOW`). */
 export const isDead = (body: Body): boolean => body.health < DEAD_BELOW
+
+/**
+ * The WOUND bands — the exe's own, read 2026-08-24 out of `Pig::Walk`
+ * (0x46AD38: over 0xC80 untouched, over 0x500 the step ×2/3, at or under
+ * ×1/3) and the run-cycle picker (0x46C4A5, same two compares → clips
+ * 0/1/2) and the idle picker (0x472040 test 8: at or under 0x500 the
+ * WOUNDED stance). **ABSOLUTE points, not a fraction of the class
+ * maximum** — `[pig+0x3B8]` is read by nothing in the movement or anim
+ * code — so 25 and 10 are the numbers whatever the pig started with.
+ */
+export const HOBBLED_AT = 25
+export const CRIPPLED_AT = 10
+
+/** 0 sound, 1 hobbled (10..25], 2 crippled (≤10). What the stride, the run
+ * cycle and the unarmed idle all key on (lib/game/locomotion.ts). */
+export const woundBand = (health: number): 0 | 1 | 2 =>
+  health <= CRIPPLED_AT ? 2 : health <= HOBBLED_AT ? 1 : 0

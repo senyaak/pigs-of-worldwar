@@ -433,3 +433,49 @@ test('walking off a drop keeps 1.5x the walking speed and hands over to ballisti
   expect(s.airborne!.vz).toBeCloseTo(WALK_SPEED * 1.5)
   expect(s.clip).toBe(ANIM.JUMP_MIDDLE)
 })
+
+
+test('a wound slows the stride and swaps the run cycle - the exe bands', { tag: '@nodata' }, () => {
+  // Read 2026-08-24: Pig::Walk scales the forward step by absolute health
+  // (0x46AD38 - over 25 pts whole, over 10 x2/3, at or under 10 x1/3) and
+  // the run-cycle picker (0x46C4A5) swaps clips 0/1/2 on the same compares.
+  const flat = terrain(() => 0)
+  const second = 1
+  const gone = (band: 0 | 1 | 2): { z: number; clip: number } => {
+    const s = createLocomotion(flat, 0, 0, NORTH)
+    s.wounded = band
+    run(s, flat, { walk: 1 }, second)
+    return { z: s.z, clip: s.clip }
+  }
+  const sound = gone(0)
+  const hobbled = gone(1)
+  const crippled = gone(2)
+  expect(sound.clip).toBe(ANIM.RUN)
+  expect(hobbled.clip).toBe(ANIM.RUN_WOUNDED)
+  expect(crippled.clip).toBe(ANIM.RUN_HURT)
+  expect(hobbled.z / sound.z).toBeCloseTo(2 / 3, 2)
+  expect(crippled.z / sound.z).toBeCloseTo(1 / 3, 2)
+  // Backwards is the exe's own exemption (0x46AD21 skips the health block).
+  const back = createLocomotion(flat, 0, 0, NORTH)
+  back.wounded = 2
+  run(back, flat, { walk: -1 }, second)
+  expect(-back.z).toBeCloseTo(WALK_BACK_SPEED * second, 0)
+})
+
+test('a crippled pig STANDS wounded - unless a weapon is drawn', { tag: '@nodata' }, () => {
+  // The idle picker's test 8 (0x472040, health at or under ten points), and
+  // its test 3 - a drawn weapon - precedes it.
+  const flat = terrain(() => 0)
+  const s = createLocomotion(flat, 0, 0, NORTH)
+  s.wounded = 2
+  run(s, flat, {}, 0.2)
+  expect(s.clip).toBe(ANIM.WOUNDED)
+  s.armed = true
+  run(s, flat, {}, 0.2)
+  expect(s.clip).toBe(ANIM.IDLE)
+  // Hobbled is not crippled: the stance waits for the last band.
+  s.armed = false
+  s.wounded = 1
+  run(s, flat, {}, 0.2)
+  expect(s.clip).toBe(ANIM.IDLE)
+})

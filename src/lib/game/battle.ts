@@ -19,7 +19,7 @@ import { advanceCarry, carryIn, carryOut, doorwayStart } from './doorway'
 import type { Carry } from './doorway'
 import type { LocomotionState } from './locomotion'
 import { withPigs } from './obstacles'
-import { isDead } from './health'
+import { isDead, woundBand } from './health'
 import { aimPhase, aimRadians, scrubsPose } from './aim'
 import { weaponOf } from './weapons'
 import type { Firing } from './shot'
@@ -646,7 +646,9 @@ export function createBattle(parts: BattleParts): Battle {
       // the beat waits for it (`settling`).
       if (isDead(pig) || tumbles.has(pig)) continue
       if (pig === game.currentPig && loco.airborne !== null) continue
-      anim.setClip(pig, ANIM.IDLE)
+      // The wounded stand for the crippled here too — the hand was emptied
+      // at the top of this beat, so the armed exemption cannot apply.
+      anim.setClip(pig, woundBand(pig.health) === 2 ? ANIM.WOUNDED : ANIM.IDLE)
     }
     // **AND THE CAMERA GOES TO THE CHARGE.** Play: "камера должна перемещаться
     // на динамит - а она остаётся на свине." It goes at the END of the turn and
@@ -1324,7 +1326,10 @@ export function createBattle(parts: BattleParts): Battle {
       // this loop took it straight back off, once a frame, for the whole flight
       // and through the get-up as well (lib/game/tumble.ts).
       if (tumbles.has(pig)) continue
-      anim.setClip(pig, ANIM.IDLE)
+      // A CRIPPLED bystander stands in the wounded stance — the idle
+      // picker's own health test (0x472040 test 8, ≤ 10 points), and nobody
+      // but the acting pig has a weapon drawn to override it.
+      anim.setClip(pig, woundBand(pig.health) === 2 ? ANIM.WOUNDED : ANIM.IDLE)
       // Only the pig being driven holds its weapon up; the rest stand.
       anim.overlay(pig, -1, 0)
     }
@@ -1601,6 +1606,11 @@ export function createBattle(parts: BattleParts): Battle {
     loco.x = acting.position.x
     loco.z = acting.position.z
     loco.heading = acting.heading + aimRadians(swung)
+    // The WOUND rides the drive: the stride, the run cycle and the unarmed
+    // stand all key on it (lib/game/locomotion.ts, WOUND_SPEED). Written
+    // every frame because a mine can move the band mid-walk.
+    loco.wounded = woundBand(acting.health)
+    loco.armed = holding !== null
     updateLocomotion(
       loco,
       query,

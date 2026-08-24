@@ -439,3 +439,28 @@ there (its master is not worked on from here): fire.md's "severity voice
 unreachable, and the channel is the controller's comment queue (0x499480),
 not audio; and speech/pigs.md can close its "every other caller" open item
 with the four-caller inventory and the 04/05 = death identification.
+
+
+## 2026-08-24 — the WOUNDED bearing: slower, a hurt run cycle, and a stance
+
+Play's report ("the original stands a hurt pig differently and walks it
+SLOWER") read out of the exe whole before building. The bands are
+ABSOLUTE health — nothing in movement or anim reads the class maximum —
+and there are three customers: Pig::Walk scales the forward step (over
+25 pts whole, over 10 x2/3, at/under 10 x1/3, backwards and the
+water/wall caps exempt), the run-cycle picker swaps clips 0/1/2 on the
+same compares, and the idle picker stands an UNARMED pig at ten points
+or less in clip 29 — a drawn weapon precedes the test, so an armed pig
+never shows it. Built as woundBand (health.ts) + WOUND_SPEED and the
+clip picks (locomotion.ts) with the band written by the driver each
+frame; bystanders get the stance in the two idle-dressing loops.
+Pinned in unit/locomotion.spec.ts.
+
+Read and not built: the exertion counter [pig+0x1B8] (clip 29 is also
+the "winded" idle at 250+, and the corpse ride - three lives for one
+clip), the gas-status bypass, and the exe's distance-driven animation
+cursor (D = 64/36/15 per cycle) - our flat 25 fps playback is a
+standing [play] divergence, though the exe's way would slow the hurt
+legs to the stride for free. The read also corrected a stale note: the
+"picker at 0x467EC0 by injury band" never picked run clips - its cases
+fold to a random Brushoff - and both notes files now say so.
