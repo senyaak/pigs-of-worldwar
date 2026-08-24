@@ -29,6 +29,7 @@ import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
 import { loadDebriefSprites, loadSprites } from './sprites'
 import type { SpriteSet } from './sprites'
+import { TOKEN_FRAMES, TOKEN_SIZE, renderTokenStrip } from '../three/tokenArt'
 import { skinOf } from '../../../lib/game/nations'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { RETURNING, SQUAD_SIZE, standingCount } from '../../../lib/game/roster'
@@ -74,15 +75,18 @@ const DEBRIEF_ART = [
 ]
 
 /**
- * The token — `chars\propoint.mad` spinning in the exe, and the frontend's
- * MEDAL here. Play's report (2026-08-23): "медали под текстом — the medal
- * art, not the promotion-point icons" — the page wore the `vp` coin and it
- * read wrong. `pcmedal` (FEBMP.MAD, 52×24, a medal on its ribbon) is the
- * frontend's own; which art the ORIGINAL page really shows is still unread
- * (`[CHECK — remake]`), so this is play's word until the exe's debrief
- * draw arm is.
+ * The token — `chars\propoint.mad` spinning in the exe, and the SAME MODEL
+ * here, rendered once into a strip of yaw frames (three/tokenArt.ts) and
+ * blitted spinning. Two of play's rulings converged on it: first "медали
+ * под текстом, не иконки очков" (the `vp` coin went), then, against the
+ * frontend's `pcmedal`, "это медаль класса герой — там прям сам объект с
+ * карты стоять должен". The FRAMING is the remake's (`[CHECK — remake]`,
+ * tokenArt.ts); `pcmedal` stays only as the fallback for an install whose
+ * model would not load.
  */
 const TOKEN = 'pcmedal'
+const TOKEN_ARCHIVE = 'Chars/PROPOINT.MAD'
+const TOKEN_MODEL = 'propoint'
 
 /**
  * Where everything lands — the exe's own numbers (0x4849A7..0x484D1A): five
@@ -110,9 +114,9 @@ const LAYOUT = {
     survival: 225,
     none: 260,
     special: 305,
-    // The step fits the 52-wide medal with a hair of air; it was 26 when the
-    // token was the 24-wide coin.
-    specialRow: { y: 330, step: 54 }
+    // The step fits the 32-wide spinning token with a hair of air (it was
+    // 26 for the 24-wide coin).
+    specialRow: { y: 330, step: 36 }
   },
   token: { beside: 60, lift: 2 }
 }
@@ -179,6 +183,12 @@ export function initDebrief(handlers: {
 
   let art: SpriteSet | null = null
   let coin: SpriteSet | null = null
+  /** The PROPOINT model's spin, as a strip of yaw frames (three/tokenArt.ts)
+   * — null falls back on the `pcmedal` sprite. */
+  let spinner: HTMLCanvasElement | null = null
+  /** Which yaw frame the spin stands at — stepped once per drawn tick, so
+   * the pause freezes it with everything else. */
+  let spin = 0
   let big: Font | null = null
   let small: Font | null = null
   let strings: string[] = []
@@ -225,10 +235,13 @@ export function initDebrief(handlers: {
   ): void => font.draw(context, text, centredAt(font, text, centre), y)
 
   const token = (context: CanvasRenderingContext2D, x: number, y: number, greyed: boolean): void => {
-    if (!coin) return
-    const sprite = coin.get(TOKEN)
     if (greyed) context.globalAlpha = 0.35
-    context.drawImage(sprite.image, x, y)
+    if (spinner) {
+      const at = (spin % TOKEN_FRAMES) * TOKEN_SIZE
+      context.drawImage(spinner, at, 0, TOKEN_SIZE, TOKEN_SIZE, x, y, TOKEN_SIZE, TOKEN_SIZE)
+    } else if (coin) {
+      context.drawImage(coin.get(TOKEN).image, x, y)
+    }
     context.globalAlpha = 1
   }
 
@@ -361,6 +374,10 @@ export function initDebrief(handlers: {
     const due = Math.floor((now - ticked) / TICK_MS)
     if (due <= 0) return
     ticked += Math.min(due, MOST_TICKS) * TICK_MS
+    // The token turns one yaw frame per drawn tick — a full turn in
+    // TOKEN_FRAMES of the exe's own frame rate. `[CHECK — remake]`: the
+    // exe's spin rate is unread.
+    spin++
     draw()
   }
   const run = (on: boolean): void => {
@@ -391,6 +408,11 @@ export function initDebrief(handlers: {
         small = smallFont
         if (text.ok) strings = text.strings
         else console.warn(`debrief: gtext would not load (${text.error})`)
+        // The REAL token: the map's own PROPOINT model, rendered once into
+        // a spin strip. Failing that the medal sprite above stands in.
+        const propoint = await window.api.loadModel(TOKEN_ARCHIVE, TOKEN_MODEL)
+        if (propoint.ok) spinner = renderTokenStrip(propoint.model, propoint.textures)
+        else console.warn(`debrief: PROPOINT would not load (${propoint.error})`)
       } catch (error) {
         console.warn(String(error))
         return
