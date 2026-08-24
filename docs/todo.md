@@ -1259,30 +1259,36 @@ landed (929026b and the music commit):**
    and unbuilt: **Track31 is the END-OF-MISSION music** (training gets the
    sergeant instead), **Track27-30 is a random sting on a supply drop and
    on reinforcements due**, Track32 has no caller at all.
-2. **The SECOND pig opens its walk with a wasted micro-leg** — play:
-   "второй свин всегда начинает свой путь как-то странно". Triaged: from
-   GINGER's ESTU spawn the route's first corner is a 405-unit leg 38° off
-   the target bearing, reversed by a 40° elbow one leg later —
-   deterministic, byte-identical across sessions. The string-pull
-   (pathfind.ts, `PULL`) fails its line-of-walk past three cells there and
-   keeps an A* stair corner the pull should have eaten. The fix is in the
-   pull (or a post-pass merging near-collinear corners), not in `walkThe`'s
-   64-unit skip.
-3. **MISSION SELECT — wants play's word before building.** Play:
-   "селект мишн показывается только после прохождения миссии — стоит там
-   все миссии показывать, но те что не закрыты — серые". Today the map
-   chain runs from position 1 on (the exe's own gate: the training ground
-   briefs straight off `level0.bmp`). Open questions written here so the
-   build starts right: (a) show the WORLD MAP from position 0 too, before
-   anything is won? (b) "все миссии серые" — is this the REGION page's
-   poles (grey flag on a mission not yet reached — which touches the
-   2026-08-19 ruling that every stand flies its holder's colour), or a
-   proper MISSION LIST screen (the exe's only one is the NAUGHTY PIGS
-   cheat, record 44)? (c) is a CLOSED mission clickable — replay — or
-   display only?
-4. **Watch next session**: the `[lob] doused` line (was GERARD's vanished
+2. ~~**The SECOND pig opens its walk with a wasted micro-leg**~~ **FIXED
+   2026-08-24 (0cb609e)** — the cause was the pull's HORIZON, not its
+   line test: `PULL` bounds the spine lookahead at 24 cells, so the
+   3400-unit straight leg was never even tried against the 405-unit
+   stair corner. A second pull pass runs over the CORNERS (few, cheap,
+   unbounded per pair) and eats any corner whose neighbours see each
+   other straight.
+3. ~~**MISSION SELECT — wants play's word before building.**~~ **The
+   screen already EXISTED (built 2026-08-24 earlier the same day) and
+   play's reports are all in (0cb609e)**: boot camp is no longer a row
+   ("тренировку туда не пихай"); EVERY real mission 1..25 is listed and
+   a locked one wears the frontend's own OFF grey, carries no pair and
+   refuses the choice; the record counts completion + survival + pickups
+   now (`missionScore` — the old pickup-only records get their
+   completion point floored in at `parse`), printed over
+   `2 + bonusPoints`; and the MOUSE works — `#missions` was missing from
+   the panel CSS rule, so the canvas geometry never matched
+   `mouseRows`'s hit test. The replay flow banks the same composition.
+4. **The detonator became a PLAN the same evening (0cb609e)** — play on
+   the SETTLED fix: "разбор до нажатия — траектория уже должна быть у
+   мозга, и каждый кадр рассчитывать всё это по пизде пойдёт с
+   кластерной гранатой". Right: the dry run's own flight time now rides
+   the option (`flight`), the brain stamps the press at FIRE — wobble
+   scaled in once, `PRESS_GRACE` on top — and the thrown arm is a clock
+   plus the near-a-foe window. `resting`/`SETTLED` remain only as the
+   fallback for an unplanned throw.
+5. **Watch next session**: the `[lob] doused` line (was GERARD's vanished
    throw a water landing?), the `[turn]` handover lines, the 2-second
-   collapse flush, and whether the detonator now fires on the crawl.
+   collapse flush, whether the press lands on the plan, and GINGER's
+   opening leg now going straight.
 
 **The frontend's OTHER particles — READ WHOLE 2026-08-24, not built.** Play
 asked whether the coin framework might be the battle's blast smoke — no
