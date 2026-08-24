@@ -13,11 +13,9 @@ import {
   createGruntBrain,
   SIDE_STEP,
   FRIEND_CLEARANCE,
-  PITCH_WITHIN,
-  SHELTER_FROM,
-  SHELTER_NEAR
+  PITCH_WITHIN
 } from '../src/lib/game/grunt'
-import { CLOSE_TO } from '../src/lib/game/evaluate'
+import { CLOSE_TO, SHELTER_FROM, SHELTER_NEAR, STAND_RINGS } from '../src/lib/game/evaluate'
 import { BLAST_CORE } from '../src/lib/game/grenade'
 import type { AiWorld, Seen } from '../src/lib/game/ai'
 import { SKILL } from '../src/lib/game/skills'
@@ -27,6 +25,37 @@ import { damageOf, projectileOf, rangeOf } from '../src/lib/game/projectile'
 const RANGE = rangeOf(projectileOf(SKILL.RIFLE)!)
 
 const foe = (over: Partial<Seen> = {}): Seen => ({ x: 0, y: 0, z: RANGE * 0.5, health: 50, ...over })
+
+/** The spec's stand-in for the battle's FLOOD (lib/game/pathfind.ts): the
+ * walk's own length measured along whatever route the world hands out, from
+ * the acting pig at the origin. So a world with a bending route costs the
+ * bend, exactly as the real one does. */
+const legsFrom = (
+  at: { x: number; z: number },
+  route: (to: { x: number; z: number }) => { x: number; z: number }[] | null
+): AiWorld['reach'] =>
+  () => ({
+    walk: (to) => {
+      const corners = route(to)
+      // `route`'s own contract: EMPTY is "as close as the ground allows",
+      // so a goal still far off is one the legs do not reach at all.
+      if (corners === null) return Infinity
+      if (corners.length === 0 && Math.hypot(to.x - at.x, to.z - at.z) > 128) return Infinity
+      let length = 0
+      let from = at
+      for (const corner of corners) {
+        length += Math.hypot(corner.x - from.x, corner.z - from.z)
+        from = corner
+      }
+      return length + Math.hypot(to.x - from.x, to.z - from.z)
+    },
+    corners: (to) => {
+      const corners = route(to)
+      if (corners === null) return null
+      return corners.length === 0 && Math.hypot(to.x - at.x, to.z - at.z) > 128 ? null : corners
+    },
+    cells: 0
+  })
 
 const world = (over: {
   holding?: number | null
@@ -46,7 +75,10 @@ const world = (over: {
   wits?: number
   roll?: AiWorld['roll']
   timeLeft?: number
-}): AiWorld => ({
+}): AiWorld => {
+  // An open field unless a test says otherwise: the route is the goal.
+  const legs = over.route ?? ((to: { x: number; z: number }) => [to])
+  return ({
   timeLeft: over.timeLeft ?? 45,
   turnSeconds: 45,
   wits: over.wits ?? 0,
@@ -66,8 +98,8 @@ const world = (over: {
   },
   foes: over.foes ?? [foe()],
   friends: over.friends ?? [],
-  // An open field unless a test says otherwise: the route is the goal.
-  route: over.route ?? ((to) => [to]),
+  route: legs,
+  reach: legsFrom({ x: 0, z: 0 }, legs),
   groundAt: () => 0,
   wet: over.wet ?? (() => false),
   swimming: over.swimming ?? false,
@@ -76,6 +108,7 @@ const world = (over: {
   planted: over.planted ?? null,
   crates: over.crates ?? []
 })
+}
 
 test('no gun is the stub game: SKIP TURN in hand, then the pass', { tag: '@nodata' }, () => {
   const brain = createGruntBrain()
@@ -165,9 +198,11 @@ test('too far: walk at the target, stopping shy of the range', { tag: '@nodata' 
   const order = brain.decide(world({ holding: SKILL.RIFLE, foes: [distant] }))
   expect(order.kind).toBe('walkTo')
   if (order.kind !== 'walkTo') return
-  // On the line to the foe, and short of it by CLOSE_TO's own shy margin.
+  // On the line to the foe, and short of it by the outermost ring the
+  // firing-mark search looks on (lib/game/evaluate.ts, STAND_RINGS) — over
+  // open ground the nearest mark is the one straight back toward the pig.
   expect(order.x).toBeCloseTo(0, 5)
-  expect(distant.z - order.z).toBeCloseTo(RANGE * CLOSE_TO * 0.8, 5)
+  expect(distant.z - order.z).toBeCloseTo(RANGE * CLOSE_TO * STAND_RINGS[0], 5)
 })
 
 test('a bending route is walked by its NEXT corner, not the crow line', { tag: '@nodata' }, () => {
@@ -551,24 +586,26 @@ test('an unarmed pig with no foes walks onto the crate that arms it', { tag: '@n
 })
 
 test('blocked in range: shoot from where it stands', { tag: '@nodata' }, () => {
+  // ONE refusal drops the plan and tries again — a body steps aside where a
+  // wall does not, and the second plan is made from where the pig now
+  // stands. TWO is the world saying no: stop closing in and fire.
   const brain = createGruntBrain()
-  const order = brain.decide(
-    world({ holding: SKILL.RIFLE, previous: 'blocked', foes: [foe({ z: RANGE * 0.9 })] })
-  )
+  const near = [foe({ z: RANGE * 0.9 })]
+  brain.decide(world({ holding: SKILL.RIFLE, previous: 'blocked', foes: near }))
+  const order = brain.decide(world({ holding: SKILL.RIFLE, previous: 'blocked', foes: near }))
   expect(order).toEqual({ kind: 'fire' })
 })
-
 test('blocked and out of reach: a pass, not a blind volley', { tag: '@nodata' }, () => {
   const brain = createGruntBrain()
-  const order = brain.decide(
-    world({ holding: SKILL.RIFLE, previous: 'blocked', foes: [foe({ z: RANGE * 2 })] })
-  )
+  const distant = [foe({ z: RANGE * 2 })]
+  brain.decide(world({ holding: SKILL.RIFLE, previous: 'blocked', foes: distant }))
+  const order = brain.decide(world({ holding: SKILL.RIFLE, previous: 'blocked', foes: distant }))
   expect(order).toEqual({ kind: 'hold', skill: SKILL.SKIP_TURN })
 })
-
 test('blocked is REMEMBERED for the turn, and a reset forgets it', { tag: '@nodata' }, () => {
   const brain = createGruntBrain()
   const distant = [foe({ z: RANGE * 2 })]
+  brain.decide(world({ holding: SKILL.RIFLE, previous: 'blocked', foes: distant }))
   brain.decide(world({ holding: SKILL.RIFLE, previous: 'blocked', foes: distant }))
   // Asked again with no fresh refusal, it still does not try to walk.
   expect(brain.decide(world({ holding: SKILL.RIFLE, foes: distant }))).toEqual({
@@ -578,8 +615,6 @@ test('blocked is REMEMBERED for the turn, and a reset forgets it', { tag: '@noda
   brain.reset()
   expect(brain.decide(world({ holding: SKILL.RIFLE, foes: distant })).kind).toBe('walkTo')
 })
-
-
 test('THE DUMB EYE: at wits 0 the nearest thing is the target, at wits 1 the arithmetic is', { tag: '@nodata' }, () => {
   // Play's model, 2026-08-24: "я тупой = что ближе всего - ящик/свин - это
   // моя цель; чем умнее - тем больше свин думает." The near healthy foe
@@ -596,22 +631,24 @@ test('THE DUMB EYE: at wits 0 the nearest thing is the target, at wits 1 the ari
   expect(sharp.explain?.()?.chose?.target).toBe(far)
 })
 
-test('a crate at the trotters IS the dumb target, over a foe further off', { tag: '@nodata' }, () => {
-  // "ящик/свин - что ближе": at wits 0 the adjacent crate wins the election
-  // outright WHATEVER it holds - five points of health here, deliberately
-  // too little for any judgment to want. The same world at wits 1 goes for
-  // the foe: the sharp pig weighs the crate at face, finds five points
-  // under the shot, and shoots. (A crate actually WORTH the detour is the
-  // sharp pig's too - "ящик конечно же важнее всего для самого умного" -
-  // which is why the discriminator has to be a poor one.)
+test('a crate at the trotters is fetched ON THE WAY: the errand, not the election', { tag: '@nodata' }, () => {
+  // "ящик/свин - что ближе": a crate never wins the election any more (a
+  // pickup and a blow are not alternatives — lib/game/evaluate.ts), so what
+  // play's rule actually asks for is the ERRAND. At wits 0 the dumb eye
+  // wants the thing at its trotters and the plan collects it first; at wits
+  // 1 five points of health are read at face, fall under the errand's own
+  // bar, and the sharp pig walks straight at the foe.
   const scene = {
     foes: [foe({ z: 6000 })],
     crates: [{ x: 0, z: 200, skill: null, amount: 5 }]
   }
   const dumb = createGruntBrain()
-  dumb.decide(world({ ...scene, wits: 0 }))
-  expect(dumb.explain?.()?.chose?.kind).toBe('crate')
+  expect(dumb.decide(world({ ...scene, wits: 0 }))).toEqual({ kind: 'walkTo', x: 0, z: 200 })
+  expect(dumb.explain?.()?.plan?.errand).toBe(true)
   const sharp = createGruntBrain()
-  sharp.decide(world({ ...scene, wits: 1 }))
-  expect(sharp.explain?.()?.chose?.kind).toBe('gun')
+  const order = sharp.decide(world({ ...scene, wits: 1 }))
+  expect(sharp.explain?.()?.plan?.errand).toBe(false)
+  expect(order.kind).toBe('walkTo')
+  if (order.kind !== 'walkTo') return
+  expect(order.z).toBeGreaterThan(200)
 })

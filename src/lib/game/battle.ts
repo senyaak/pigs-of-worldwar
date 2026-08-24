@@ -14,7 +14,8 @@
 // Game space (Y-down) throughout.
 
 import { ANIM, copyLocomotion, createLocomotion, inWater, updateLocomotion } from './locomotion'
-import { createWaterMemo, route } from './pathfind'
+import { createWaterMemo, flood, route } from './pathfind'
+import type { RouteAsk } from './pathfind'
 import { advanceCarry, carryIn, carryOut, doorwayStart } from './doorway'
 import type { Carry } from './doorway'
 import type { LocomotionState } from './locomotion'
@@ -1199,11 +1200,14 @@ export function createBattle(parts: BattleParts): Battle {
         const actingSide = game.players.indexOf(game.currentPlayer)
         const seen = (
           pig: Pig
-        ): { x: number; y: number; z: number; health: number; name: string } => ({
+        ): { x: number; y: number; z: number; health: number; id: number; name: string } => ({
           x: pig.position.x,
           y: pig.position.y,
           z: pig.position.z,
           health: pig.health,
+          // WHICH pig — what a turn's plan is held on (lib/game/plan.ts):
+          // a plan about a SPOT quietly transfers to whoever walks onto it.
+          id: pig.id,
           // For the telemetry line alone — the brain never reads a name
           // (lib/game/ai.ts, `Seen`).
           name: pig.name
@@ -1212,6 +1216,39 @@ export function createBattle(parts: BattleParts): Battle {
         // telemetry's story must be the same reading.
         const previous = actuator.outcome()
         const refusal = actuator.refusal()
+        /** Where the acting pig stands, feet and all — the start of every
+         * route and of the turn's one flood. */
+        const here = (): { x: number; z: number; y: number } => ({
+          x: acting.position.x,
+          z: acting.position.z,
+          y: acting.position.y
+        })
+        /**
+         * What the searches ask of the world (lib/game/pathgrid.ts): the
+         * props are both the walls and the WALKWAYS — a bridge deck is
+         * stood on the way the walk stands on it — and `swims` is the pig's
+         * CLASS (lib/game/drowning.ts), so a swimmer's route may cross
+         * water, priced at the swim's own slowness, where a grunt's never
+         * does.
+         *
+         * **THE SQUAD IS IN IT.** Play watched what leaving it out costs:
+         * "он не обходит свина, а толкается в него". Only OUR OWN pigs,
+         * though — a foe is what the walk is aimed AT, and a body you mean
+         * to reach cannot be a wall — and the actuator's `blocked` still
+         * guards the difference between the plan and the ground truth.
+         */
+        const ground = (): RouteAsk => ({
+          ground: query,
+          obstruction: scenery.obstacles,
+          swims: !drowns(acting.pigClass),
+          // The battle's one water memo: the probes that made the turn's
+          // first decision a 130 ms hitch run once a cell per BATTLE now
+          // (lib/game/pathgrid.ts, WaterMemo).
+          water: waterMemo,
+          bodies: game.currentPlayer.pigs
+            .filter((pig) => pig !== acting && !isDead(pig))
+            .map((pig) => ({ x: pig.position.x, z: pig.position.z }))
+        })
         const decided = brain.decide({
             timeLeft: game.timeLeft,
             // …and how long a whole turn is here, so the price list can cost
@@ -1247,20 +1284,13 @@ export function createBattle(parts: BattleParts): Battle {
             // cross water — priced at the swim's own slowness, so only
             // when crossing is QUICKER than walking round — a grunt's
             // never does.
-            route: (to) =>
-              route(
-                {
-                  ground: query,
-                  obstruction: scenery.obstacles,
-                  swims: !drowns(acting.pigClass),
-                  // The battle's one water memo: the probes that made the
-                  // turn's first decision a 130 ms hitch run once a cell per
-                  // BATTLE now (lib/game/pathfind.ts, WaterMemo).
-                  water: waterMemo
-                },
-                { x: acting.position.x, z: acting.position.z, y: acting.position.y },
-                to
-              ),
+            route: (to) => route(ground(), here(), to),
+            // …and THE GROUND FLOODED ONCE (lib/game/pathfind.ts): the
+            // turn's plan asks a ring of firing marks round every target
+            // what the legs pay to reach it, and one flood answers all of
+            // them (lib/game/plan.ts). Fifteen A* searches a turn is what
+            // the `[perf]` frames were.
+            reach: (budget) => flood(ground(), here(), budget),
             // What a dry-run throw lands against: over water that is the
             // SURFACE, not the seabed under it — the engine douses a lob at
             // the waterline (lib/game/grenade.ts), and a dry run that flew

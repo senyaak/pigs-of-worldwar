@@ -1,28 +1,16 @@
-// The route round the world: A* on a coarse grid, for brains to walk by.
+// The route round the world: the searches brains walk by, on the grid model
+// in lib/game/pathgrid.ts.
 //
-// The cost model is the engine's own, which is to say it is TIME and the
-// land has one speed (docs/ai.md): a step costs its distance on any slope,
-// because the walk is one speed everywhere. The ONE exception is the
-// engine's own too: a swimmer's stroke is a quarter of a stride
-// (`SWIM_COST` below — play: "через воду намного медленнее"), so a wet
-// step costs its distance times that, and the water is crossed exactly
-// when crossing SAVES TIME, never merely distance. Otherwise the world is
-// BINARY — walkable, forbidden (wall, void, known mine), lethal (water for
-// a non-swimmer) — with one real subtlety: the graph is DIRECTED. A drop
-// of any height is walked off; the way back up is capped by the climb
-// envelope (`WALL_CLIMB`), so an edge down is not an edge up.
+// TWO of them, and the difference is what the caller is asking:
 //
-// THE GROUND IS NOT ALWAYS THE LANDSCAPE. A bridge deck or a ramp is a
-// walkway the OBSTRUCTION world holds over the terrain (lib/game/
-// obstacles.ts, `standOn`), and the route stands on it exactly the way the
-// walk does: the support underfoot is asked for first, within the same
-// climb envelope, and only failing that does the landscape answer. On a
-// deck the terrain's own verdicts do not apply — water under a bridge is
-// scenery, not a grave. What this build carries as a simplification: a cell
-// keeps ONE footing per search (whichever the route reached it at), so
-// "under the bridge" and "on the bridge" cannot both pass through the same
-// cell in one route. At a quarter-tile grid that has not mattered yet; the
-// day it does, the node key grows a layer.
+//   route()  — A* to ONE goal. What a walk somewhere is made of, and the
+//              cheaper answer when only one point matters.
+//   flood()  — Dijkstra out of ONE START, to a budget. What EVERY point
+//              within a turn's walking costs, in one search: the plan asks
+//              "where can I shoot him from" of thirty-odd marks at once
+//              (lib/game/plan.ts), and thirty A* runs a turn is the hitch
+//              play felt ("подвисает ход", the [perf] frames of
+//              `_tmp/telemetry-2026-08-24T21-00-24.log`).
 //
 // BEST EFFORT by design: when the goal cannot be reached — enclosed, over
 // water, out of the world — the route returned is to the reachable point
@@ -34,98 +22,80 @@
 //
 // Deterministic: fixed neighbour order, no chance, pure over its inputs.
 
-import { WORLD_LIMIT } from './terrain'
-import { SWIM_SPEED, WALL_CLIMB } from './locomotion'
-import { WALK_SPEED } from './movement'
-import { WATER_PROBE } from './actuator'
+import { makeGrid, GRID_STEP, SWIM_COST, WAYS } from './pathgrid'
+import type { Grid, RouteAsk } from './pathgrid'
 
-/**
- * What one swum unit costs in walked ones — the engine's own two speeds,
- * nothing tuned: the walk covers ~4.3 units in the time a stroke covers one
- * (`WALK_SPEED`, `SWIM_SPEED`). This is what makes the water a SHORTCUT
- * only when it truly is one: a swimmer crosses when the dry way round costs
- * more time, and walks round when it does not.
- */
-export const SWIM_COST = WALK_SPEED / SWIM_SPEED
-
-/** What the route asks of the landscape — the shape `TerrainQuery` already
- * has, and a spec fakes in ten lines. */
-export interface Ground {
-  walkable(x: number, z: number): boolean
-  height(x: number, z: number): number
-  isWater(x: number, z: number): boolean
-  hasMine(x: number, z: number): boolean
-  /** The WATERLINE at a wet point — where a swimmer's feet actually ride
-   * (`TerrainQuery.surface`). Without it a wet cell stands on the SEABED,
-   * and climbing out of any real bay reads as a cliff the legs refuse:
-   * the swimmer routes in and never out. Optional only for the synthetic
-   * grounds whose water has no depth. */
-  surface?(x: number, z: number): number
-}
-
-/** …and of the prop world: the walkways and the walls
- * (lib/game/obstacles.ts, `Obstruction` — this is its own subset). */
-export interface Standing {
-  /** The deck underfoot at (x, z) reachable from `footY`, or null. */
-  standOn(x: number, z: number, footY: number, reach: number): number | null
-  /** Something solid in the way of a body standing at `footY`. */
-  blocks(x: number, z: number, footY: number, reach: number): boolean
-}
-
-const NOTHING: Standing = { standOn: () => null, blocks: () => false }
-
-/**
- * A battle-long memo of each CELL's water verdicts — bit 1 wade, bit 2
- * refused-to-a-non-swimmer. Water never changes during a battle, and the
- * thirteen texel probes per cell (`wetted` + `guarded`) are what a
- * cross-map search spends its time on: the turn's first decision measured
- * 130 ms cold (2026-08-24, play's "пролаги пока свин думает"). One memo
- * per battle, shared by every route; without one the probes run direct and
- * nothing changes but the bill.
- */
-export type WaterMemo = Map<number, number>
-export const createWaterMemo = (): WaterMemo => new Map()
-
-export interface RouteAsk {
-  ground: Ground
-  /** The props — walkways to stand on, walls to refuse. None assumed. */
-  obstruction?: Standing
-  /** Whether water is a road or a grave (docs/ai.md: only the swimming
-   * classes cross) — and a SLOW road at that: a wet step costs `SWIM_COST`
-   * of a dry one. */
-  swims?: boolean
-  /** The battle's water memo (`createWaterMemo`) — optional, cache only. */
-  water?: WaterMemo
-}
-
-/** The grid's pitch, world units — a quarter tile: fine enough to thread a
- * gap one prop wide, coarse enough that a whole-map search stays cheap. */
-export const GRID_STEP = 128
+// The grid model's own surface, re-exported: a caller that routes should not
+// have to know the model lives next door.
+export {
+  BODY_CLEAR,
+  BODY_EXEMPT,
+  GRID_STEP,
+  SWIM_COST,
+  createWaterMemo,
+  makeGrid
+} from './pathgrid'
+export type { Ground, RouteAsk, Standing, WaterMemo } from './pathgrid'
 
 /** The search gives up after this many nodes taken off the open list — a
  * whole 193×193 world is ~37k, so this is "the map, roughly once". */
 const EXPANDED_CAP = 40000
 
-/** How far ahead the string-pulling looks for a straight leg, in spine
- * points — 24 cells is ~3000 units of one bearing, plenty to kill the grid's
- * elbows without paying a quadratic bill on a cross-map route. */
-const PULL = 24
+/** A small binary heap on f — the open list of both searches. */
+const makeHeap = (): {
+  push(k: number, f: number): void
+  pop(): { k: number; f: number }
+  size(): number
+} => {
+  const heap: { k: number; f: number }[] = []
+  return {
+    size: () => heap.length,
+    push(k, f) {
+      heap.push({ k, f })
+      let i = heap.length - 1
+      while (i > 0) {
+        const up = (i - 1) >> 1
+        if (heap[up].f <= heap[i].f) break
+        ;[heap[up], heap[i]] = [heap[i], heap[up]]
+        i = up
+      }
+    },
+    pop() {
+      const top = heap[0]
+      const last = heap.pop()!
+      if (heap.length > 0) {
+        heap[0] = last
+        let i = 0
+        for (;;) {
+          const a = i * 2 + 1
+          const b = a + 1
+          let least = i
+          if (a < heap.length && heap[a].f < heap[least].f) least = a
+          if (b < heap.length && heap[b].f < heap[least].f) least = b
+          if (least === i) break
+          ;[heap[least], heap[i]] = [heap[i], heap[least]]
+          i = least
+        }
+      }
+      return top
+    }
+  }
+}
 
-const SIDE = Math.floor((2 * WORLD_LIMIT) / GRID_STEP) + 1
-const HALF = Math.floor(SIDE / 2)
-
-/** Eight ways out of a node, straight before diagonal, order FIXED — the
- * tie-break is part of determinism. */
-const WAYS = [
-  { dx: 1, dz: 0 },
-  { dx: -1, dz: 0 },
-  { dx: 0, dz: 1 },
-  { dx: 0, dz: -1 },
-  { dx: 1, dz: 1 },
-  { dx: 1, dz: -1 },
-  { dx: -1, dz: 1 },
-  { dx: -1, dz: -1 }
-]
+/** The chain of cells back from a settled one, as world points, start first
+ * — what the string-pulling is handed. */
+const spineOf = (
+  grid: Grid,
+  parent: Map<number, number>,
+  end: number
+): { x: number; z: number }[] => {
+  const spine: { x: number; z: number }[] = []
+  for (let k: number | undefined = end; k !== undefined; k = parent.get(k)) {
+    spine.push({ x: grid.at(grid.cellX(k)), z: grid.at(grid.cellZ(k)) })
+  }
+  spine.reverse()
+  return spine
+}
 
 /**
  * The route from `from` to `to`, as the corners of a walk — grid points
@@ -139,128 +109,12 @@ export function route(
   from: { x: number; z: number; y?: number },
   to: { x: number; z: number }
 ): { x: number; z: number }[] | null {
-  const ground = ask.ground
-  const props = ask.obstruction ?? NOTHING
-  const swims = ask.swims ?? false
-
-  const gx = (x: number): number => Math.round(x / GRID_STEP)
-  const at = (g: number): number => g * GRID_STEP
-  const inside = (cx: number, cz: number): boolean =>
-    cx >= -HALF && cx <= HALF && cz >= -HALF && cz <= HALF
-  const key = (cx: number, cz: number): number => (cx + HALF) * SIDE + (cz + HALF)
-
-  /**
-   * One step onto (cx, cz) arriving with the feet at `footY`: where the feet
-   * land there, or null for refused. The walk's own order: a walkway within
-   * the climb envelope first, the landscape second — and the landscape's
-   * verdicts (void, water, mine) are only asked when the landscape is what
-   * is stood on. Y-DOWN throughout: higher ground is the SMALLER height.
-   */
-  /** Water is asked at the CENTRE and at four shoulders half a cell out —
-   * the mask is finer than the grid, and a margin thinner than a cell once
-   * let a route thread a "dry" corridor straight through the bay (the
-   * actuator's own water guard caught the pig at the line, and the search
-   * then stood there shooting across for a simulated hour). The grid has to
-   * see the water the way the LEGS do. */
-  const wetted = (x: number, z: number): boolean => {
-    const half = GRID_STEP / 2
-    return (
-      ground.isWater(x, z) ||
-      ground.isWater(x + half, z) ||
-      ground.isWater(x - half, z) ||
-      ground.isWater(x, z + half) ||
-      ground.isWater(x, z - half)
-    )
-  }
-
-  /**
-   * …and for a NON-SWIMMER the margin grows to the LEGS' OWN GUARD: the
-   * actuator refuses a stride with water `WATER_PROBE` ahead of the feet
-   * (lib/game/actuator.ts), so a cell the route hands out must hold that
-   * probe from anywhere inside it — centre offset plus probe, an eight-point
-   * ring. Without this the two disagreed on the seam and the disagreement
-   * was a LOOP: telemetry watched a grunt walk the same corner into
-   * `blocked(water)` three turns running, passing each time, until it died
-   * on the spot (`_tmp/ai-session-2026-08-23.log`, DEN). The route either
-   * goes AROUND now or honestly ends short; the swimmer's half-cell `wetted`
-   * above is untouched — for it water is a road, priced, not a grave.
-   */
-  const guarded = (x: number, z: number): boolean => {
-    if (wetted(x, z)) return true
-    const reach = WATER_PROBE + GRID_STEP / 2
-    const diag = reach * Math.SQRT1_2
-    return (
-      ground.isWater(x + reach, z) ||
-      ground.isWater(x - reach, z) ||
-      ground.isWater(x, z + reach) ||
-      ground.isWater(x, z - reach) ||
-      ground.isWater(x + diag, z + diag) ||
-      ground.isWater(x + diag, z - diag) ||
-      ground.isWater(x - diag, z + diag) ||
-      ground.isWater(x - diag, z - diag)
-    )
-  }
-
-  /** The same landing asked at a POINT rather than a cell — what the
-   * string-pulling below samples a straight leg with. `water` carries a
-   * cell's memoed verdicts when the caller has them; a point sample runs
-   * the probes direct. */
-  const landAt = (
-    footY: number,
-    x: number,
-    z: number,
-    water?: { wade: boolean; refused: boolean }
-  ): { foot: number; wade: boolean } | null => {
-    if (props.blocks(x, z, footY, WALL_CLIMB)) return null
-    const deck = props.standOn(x, z, footY, WALL_CLIMB)
-    let foot: number
-    let wade = false
-    if (deck !== null) {
-      foot = deck
-    } else {
-      if (!ground.walkable(x, z)) return null
-      wade = water ? water.wade : wetted(x, z)
-      if (!swims && (water ? water.refused : wade || guarded(x, z))) return null
-      if (ground.hasMine(x, z)) return null
-      // A swimmer's feet ride the WATERLINE, not the seabed — measured off
-      // the bed, climbing out of a real bay reads as a cliff.
-      foot = wade ? (ground.surface?.(x, z) ?? ground.height(x, z)) : ground.height(x, z)
-    }
-    // The DIRECTED half: landing higher than the envelope reaches is a
-    // climb the legs cannot make. Any drop is walked off.
-    if (footY - foot > WALL_CLIMB) return null
-    return { foot, wade }
-  }
-
-  /** A cell's water verdicts, through the battle's memo when there is one
-   * (`WaterMemo` above) — the A* expansion is where the probes multiply. */
-  const cellWater = (cx: number, cz: number): { wade: boolean; refused: boolean } => {
-    const k = key(cx, cz)
-    let bits = ask.water?.get(k)
-    if (bits === undefined) {
-      const x = at(cx)
-      const z = at(cz)
-      const wade = wetted(x, z)
-      bits = (wade ? 1 : 0) | (wade || guarded(x, z) ? 2 : 0)
-      ask.water?.set(k, bits)
-    }
-    return { wade: (bits & 1) !== 0, refused: (bits & 2) !== 0 }
-  }
-
-  const step = (footY: number, cx: number, cz: number): { foot: number; wade: boolean } | null => {
-    if (!inside(cx, cz)) return null
-    return landAt(footY, at(cx), at(cz), cellWater(cx, cz))
-  }
-
-  const startX = gx(from.x)
-  const startZ = gx(from.z)
-  const goalX = gx(to.x)
-  const goalZ = gx(to.z)
-  if (!inside(startX, startZ)) return null
-  const startFoot =
-    from.y ??
-    props.standOn(from.x, from.z, ground.height(from.x, from.z), WALL_CLIMB) ??
-    ground.height(from.x, from.z)
+  const grid = makeGrid(ask, from)
+  const startX = grid.gx(from.x)
+  const startZ = grid.gx(from.z)
+  const goalX = grid.gx(to.x)
+  const goalZ = grid.gx(to.z)
+  if (!grid.inside(startX, startZ)) return null
 
   const heuristic = (cx: number, cz: number): number =>
     Math.hypot(cx - goalX, cz - goalZ) * GRID_STEP
@@ -270,53 +124,24 @@ export function route(
   const gScore = new Map<number, number>()
   const feet = new Map<number, number>()
   const parent = new Map<number, number>()
-  const heap: { k: number; f: number }[] = []
-  const push = (k: number, f: number): void => {
-    heap.push({ k, f })
-    let i = heap.length - 1
-    while (i > 0) {
-      const up = (i - 1) >> 1
-      if (heap[up].f <= heap[i].f) break
-      ;[heap[up], heap[i]] = [heap[i], heap[up]]
-      i = up
-    }
-  }
-  const pop = (): { k: number; f: number } => {
-    const top = heap[0]
-    const last = heap.pop()!
-    if (heap.length > 0) {
-      heap[0] = last
-      let i = 0
-      for (;;) {
-        const a = i * 2 + 1
-        const b = a + 1
-        let least = i
-        if (a < heap.length && heap[a].f < heap[least].f) least = a
-        if (b < heap.length && heap[b].f < heap[least].f) least = b
-        if (least === i) break
-        ;[heap[least], heap[i]] = [heap[i], heap[least]]
-        i = least
-      }
-    }
-    return top
-  }
+  const heap = makeHeap()
 
-  const startKey = key(startX, startZ)
+  const startKey = grid.key(startX, startZ)
   gScore.set(startKey, 0)
-  feet.set(startKey, startFoot)
-  push(startKey, heuristic(startX, startZ))
+  feet.set(startKey, grid.startFoot)
+  heap.push(startKey, heuristic(startX, startZ))
 
   /** The nearest approach so far — what best-effort hands back. */
   let bestKey = startKey
   let bestNear = heuristic(startX, startZ)
   let expanded = 0
 
-  while (heap.length > 0 && expanded < EXPANDED_CAP) {
-    const { k } = pop()
+  while (heap.size() > 0 && expanded < EXPANDED_CAP) {
+    const { k } = heap.pop()
     const g = gScore.get(k)!
     const foot = feet.get(k)!
-    const cx = Math.floor(k / SIDE) - HALF
-    const cz = (k % SIDE) - HALF
+    const cx = grid.cellX(k)
+    const cz = grid.cellZ(k)
     expanded++
 
     const near = heuristic(cx, cz)
@@ -329,18 +154,18 @@ export function route(
     for (const way of WAYS) {
       const nx = cx + way.dx
       const nz = cz + way.dz
-      const landing = step(foot, nx, nz)
+      const landing = grid.step(foot, nx, nz)
       if (landing === null) continue
       // No cutting corners: a diagonal wants BOTH its orthogonal shoulders
       // open, or the walk it stands for brushes through the refused cell.
       if (
         way.dx !== 0 &&
         way.dz !== 0 &&
-        (step(foot, cx, nz) === null || step(foot, nx, cz) === null)
+        (grid.step(foot, cx, nz) === null || grid.step(foot, nx, cz) === null)
       ) {
         continue
       }
-      const nk = key(nx, nz)
+      const nk = grid.key(nx, nz)
       // The stride's TIME: its length, times the swim's slowness when the
       // landing is wet. The heuristic below prices every unit at the walk's
       // 1, which stays admissible — no step is ever cheaper than that.
@@ -351,109 +176,132 @@ export function route(
       gScore.set(nk, cost)
       feet.set(nk, landing.foot)
       parent.set(nk, k)
-      push(nk, cost + heuristic(nx, nz))
+      heap.push(nk, cost + heuristic(nx, nz))
     }
   }
 
-  // Walk the parents back from the nearest approach…
-  const spine: { x: number; z: number }[] = []
-  for (let k: number | undefined = bestKey; k !== undefined; k = parent.get(k)) {
-    spine.push({ x: at(Math.floor(k / SIDE) - HALF), z: at((k % SIDE) - HALF) })
-  }
-  spine.reverse()
+  return grid.pull(spineOf(grid, parent, bestKey), (point) =>
+    feet.get(grid.key(grid.gx(point.x), grid.gx(point.z)))
+  )
+}
 
+/**
+ * **WHAT EVERY POINT WITHIN A BUDGET COSTS TO WALK TO** — one search, asked
+ * as many times as the plan likes.
+ *
+ * The turn's plan searches for a place to shoot FROM (play's correction:
+ * "точка стрельбы лежит по дороге к цели — это неверно… надо идти от
+ * обратного: найти цель, выбрать оружие, найти позицию откуда можно
+ * стрелять"), and a ring of marks round each of three foes is thirty-odd
+ * questions. Asked of `route` that is thirty A* searches; asked of this it
+ * is one flood and thirty map lookups.
+ */
+export interface Reach {
   /**
-   * …then PULL THE STRING through it. A grid path is made of 45° elbows,
-   * and a walk that takes them literally is a pig doing "повернулся — шаг —
-   * повернулся — шаг" the whole way (play watched one stall a whole turn on
-   * it, turn-then-go having made every elbow a full stop). The brain wants
-   * LEGS, not cells: from each point, take the farthest spine point a
-   * straight line reaches — the line sampled at half a cell through the
-   * same landing test the search used, feet carried so the climb envelope
-   * still holds — and a diagonal across open ground comes back as ONE leg
-   * at its true bearing. `PULL` bounds the lookahead so a long route costs
-   * a bounded number of samples.
+   * How far the LEGS go to a point — the walk's own length in world units,
+   * the water's slowness priced in (`SWIM_COST`), or **Infinity** when the
+   * ground does not go there inside the budget. Not the crow line, and not
+   * a best effort either: this one answers the question honestly, because
+   * "can I even stand there" is exactly what the plan is asking.
    */
-  const walksTo = (
-    fromX: number,
-    fromZ: number,
-    fromFoot: number,
-    to: { x: number; z: number }
-  ): number | null => {
-    // CELL BY CELL, not point by point: the leg is judged in the same
-    // currency the search used — every cell the line crosses passes the
-    // same `step`, diagonals want both shoulders open, and a WADE refuses
-    // the cut outright (a swimmer's detour was priced in TIME, and a
-    // straight line through the bay un-prices it).
-    let cx = gx(fromX)
-    let cz = gx(fromZ)
-    let foot = fromFoot
-    const span = Math.hypot(to.x - fromX, to.z - fromZ)
-    const strides = Math.max(1, Math.ceil(span / (GRID_STEP / 4)))
-    for (let s = 1; s <= strides; s++) {
-      const nx = gx(fromX + ((to.x - fromX) * s) / strides)
-      const nz = gx(fromZ + ((to.z - fromZ) * s) / strides)
-      if (nx === cx && nz === cz) continue
+  walk(to: { x: number; z: number }): number
+  /** The corners of the walk to a point, or null when it is out of reach —
+   * the same legs `route` hands back, pulled the same way. */
+  corners(to: { x: number; z: number }): { x: number; z: number }[] | null
+  /** How many cells the flood settled — what a `[perf]` line is read
+   * against. */
+  cells: number
+}
+
+/**
+ * The flood out of `from`, settling every cell reachable within `budget`
+ * walked units. Cheaper than it looks: the budget is a turn's walking, not
+ * the map, and the battle's water memo means the second flood of a battle
+ * pays for arithmetic only.
+ */
+export function flood(
+  ask: RouteAsk,
+  from: { x: number; z: number; y?: number },
+  budget: number
+): Reach | null {
+  const grid = makeGrid(ask, from)
+  const startX = grid.gx(from.x)
+  const startZ = grid.gx(from.z)
+  if (!grid.inside(startX, startZ)) return null
+
+  const gScore = new Map<number, number>()
+  const feet = new Map<number, number>()
+  const parent = new Map<number, number>()
+  const heap = makeHeap()
+
+  const startKey = grid.key(startX, startZ)
+  gScore.set(startKey, 0)
+  feet.set(startKey, grid.startFoot)
+  heap.push(startKey, 0)
+  let expanded = 0
+
+  while (heap.size() > 0 && expanded < EXPANDED_CAP) {
+    const { k, f } = heap.pop()
+    const g = gScore.get(k)!
+    // A stale heap entry: this cell has been settled cheaper since.
+    if (f > g) continue
+    if (g > budget) break
+    const foot = feet.get(k)!
+    const cx = grid.cellX(k)
+    const cz = grid.cellZ(k)
+    expanded++
+
+    for (const way of WAYS) {
+      const nx = cx + way.dx
+      const nz = cz + way.dz
+      const landing = grid.step(foot, nx, nz)
+      if (landing === null) continue
       if (
-        nx !== cx &&
-        nz !== cz &&
-        (step(foot, cx, nz) === null || step(foot, nx, cz) === null)
+        way.dx !== 0 &&
+        way.dz !== 0 &&
+        (grid.step(foot, cx, nz) === null || grid.step(foot, nx, cz) === null)
       ) {
-        return null
+        continue
       }
-      const landing = step(foot, nx, nz)
-      if (landing === null || landing.wade) return null
-      foot = landing.foot
-      cx = nx
-      cz = nz
+      const stride = way.dx !== 0 && way.dz !== 0 ? GRID_STEP * Math.SQRT2 : GRID_STEP
+      const cost = g + stride * (landing.wade ? SWIM_COST : 1)
+      if (cost > budget) continue
+      const nk = grid.key(nx, nz)
+      const known = gScore.get(nk)
+      if (known !== undefined && known <= cost) continue
+      gScore.set(nk, cost)
+      feet.set(nk, landing.foot)
+      parent.set(nk, k)
+      heap.push(nk, cost)
     }
-    return foot
   }
-  const corners: { x: number; z: number }[] = []
-  const cornerFeet: number[] = []
-  let pullX = from.x
-  let pullZ = from.z
-  let pullFoot = startFoot
-  // spine[0] is the START's own cell: not a corner anybody walks to.
-  for (let i = 1; i < spine.length; ) {
-    let take = i
-    let foot: number | null = null
-    for (let j = Math.min(spine.length - 1, i + PULL); j > i; j--) {
-      foot = walksTo(pullX, pullZ, pullFoot, spine[j])
-      if (foot !== null) {
-        take = j
-        break
-      }
+
+  /** The settled cell a point falls in, or null. */
+  const cellKey = (to: { x: number; z: number }): number | null => {
+    const cx = grid.gx(to.x)
+    const cz = grid.gx(to.z)
+    if (!grid.inside(cx, cz)) return null
+    const k = grid.key(cx, cz)
+    return gScore.has(k) ? k : null
+  }
+
+  return {
+    cells: gScore.size,
+    walk(to) {
+      const k = cellKey(to)
+      if (k === null) return Infinity
+      // The cell's own cost, plus the last stride from its centre to the
+      // asked point — under half a cell, but a mark is a mark.
+      const cx = grid.at(grid.cellX(k))
+      const cz = grid.at(grid.cellZ(k))
+      return gScore.get(k)! + Math.hypot(to.x - cx, to.z - cz)
+    },
+    corners(to) {
+      const k = cellKey(to)
+      if (k === null) return null
+      return grid.pull(spineOf(grid, parent, k), (point) =>
+        feet.get(grid.key(grid.gx(point.x), grid.gx(point.z)))
+      )
     }
-    // The next spine point is one grid move away and the search itself just
-    // walked it, so falling back to it never loses the path.
-    if (foot === null) foot = feet.get(key(gx(spine[take].x), gx(spine[take].z))) ?? pullFoot
-    corners.push(spine[take])
-    cornerFeet.push(foot)
-    pullX = spine[take].x
-    pullZ = spine[take].z
-    pullFoot = foot
-    i = take + 1
   }
-  // …and PULL ONCE MORE, over the CORNERS. `PULL` bounds the spine lookahead,
-  // so a straight leg LONGER than PULL cells is invisible until the corners
-  // exist: GINGER's opening was a 405-unit micro-leg 38° off the bearing,
-  // reversed by the very next 3400-unit leg — the direct line was never even
-  // tested, 27 cells being past the horizon (telemetry, 2026-08-24, "второй
-  // свин всегда начинает свой путь как-то странно"). Corners are few and a
-  // removal re-tries the same slot, so the pass stays cheap.
-  for (let i = 0; i + 1 < corners.length; ) {
-    const prevX = i === 0 ? from.x : corners[i - 1].x
-    const prevZ = i === 0 ? from.z : corners[i - 1].z
-    const prevFoot = i === 0 ? startFoot : cornerFeet[i - 1]
-    const foot = walksTo(prevX, prevZ, prevFoot, corners[i + 1])
-    if (foot === null) {
-      i++
-      continue
-    }
-    corners.splice(i, 1)
-    cornerFeet.splice(i, 1)
-    cornerFeet[i] = foot
-  }
-  return corners
 }

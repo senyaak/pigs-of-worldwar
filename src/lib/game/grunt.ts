@@ -1,27 +1,34 @@
 // The GRUNT: the first real brain, and the bottom of the ladder docs/ai.md
 // climbs. One thought at a time, nothing clever on purpose.
 //
-// The CHOOSING is not here any more: the price list is
-// (lib/game/evaluate.ts — every carried thing against every target, one
-// currency, class-blind). What is here is the CARRYING OUT, re-derived on
-// every decision from the world it is shown (almost stateless — "the
-// walking has failed me" and "I have set my pitch" are the only memories):
+// THE CHOOSING IS NOT HERE, and since 2026-08-24 neither is the DECIDING.
+// The price list weighs every carried thing against every target and finds
+// the mark each could be struck from (lib/game/evaluate.ts); the PLAN takes
+// that and decides the whole turn before a step is taken — target, weapon,
+// mark, route, and the crate worth collecting on the way (lib/game/plan.ts).
+// What is left here is the CARRYING OUT:
 //
-//   1. nothing priceable — pass, the stub's old game (SKIP TURN, fire).
-//   2. the winning option's weapon not in hand — take it out.
-//   3. too far for it — ROUTE to its reach (world.route) and walk the next
-//      corner.
+//   1. no plan the world still supports — make one; none to be made, pass.
+//   2. corners left on the plan's route — walk the next one.
+//   3. the plan's weapon not in hand — take it out.
 //   4. a friend on a GUN's firing line — step aside instead of shooting
 //      through him. A lob arcs over friends and a blade never reaches one:
 //      their own risks are already in the price.
 //   5. facing off — turn onto the bearing.
 //   6. a GUN pitches at the target once — soles to soles, which is chest to
 //      chest; what the clamp refuses stays refused. A lob keeps its 45°
-//      come-up: the CHARGE is the aim, solved by the price list.
+//      come-up unless the price list tuned one: the CHARGE is the aim.
 //   7. fire, at the option's own charge.
 //
-// A `blocked` walk — or a route already walked to its best end — flips the
-// one bit of memory: stop trying to close in, shoot if the option still
+// **THE PLAN IS DROPPED, NEVER EDITED.** Play's model: "мир не меняется!
+// свин меняет мир своими действиями — его передвижение не меняет его
+// намерений." So a mull is not a re-election. The plan goes when the world
+// actually moved under it — the target died, the kit changed (a pickup is
+// the pig changing the world), the legs were refused — and a fresh one is
+// made from where the pig now stands.
+//
+// A `blocked` walk twice over — or a route already walked to its end — flips
+// the one bit of memory: stop trying to close in, shoot if the option still
 // reaches, pass otherwise. Better a poor shot than a pig grinding a wall
 // until the clock takes the turn away.
 
@@ -29,11 +36,11 @@ import type { AiWorld, Brain, Seen, Thought } from './ai'
 import type { Order } from './orders'
 import { shortest } from './actuator'
 import { AIM_UNITS } from './aim'
-import { crateErrand, crateFallback, priceKit } from './evaluate'
 import type { Option } from './evaluate'
-import { WALK_SPEED } from './movement'
 import { BLAST_CORE } from './grenade'
 import { GRID_STEP } from './pathfind'
+import type { Plan } from './plan'
+import { makePlan, stillStands } from './plan'
 import { SKILL } from './skills'
 import { TILE_STEP } from '../formats/pmg'
 
@@ -56,34 +63,6 @@ export const PITCH_WITHIN = 12
  * worrying — TNT's own rim is ~1700 (lib/game/grenade.ts, `blastReach`),
  * and the margin is a stride. `[deliberate]`. */
 export const FLEE_CLEAR = 1900
-
-/**
- * From this wits up a pig SHELTERS BEHIND THE ENEMY — it closes right up to
- * the pig it is shooting, so that a blast answering it would catch one of
- * theirs. Play's ruling on self-preservation, 2026-08-24, and the same half
- * of the scale the pitch tuning takes (lib/game/evaluate.ts,
- * `TUNE_PITCH_WITS`). `[play]` for the behaviour, `[deliberate]` for the
- * number.
- */
-export const SHELTER_WITS = 0.5
-
-/** …and how close "beside" is, in world units. A pig's own body is 160
- * across (`PIG_RADIUS`), so this is a body's width off — shoulder to
- * shoulder without standing inside him. `[CHECK — remake]`. */
-export const SHELTER_NEAR = 240
-
-/**
- * …and how far a pig will WALK to shelter that way: four tiles, no more.
- *
- * The bound is the point. Hugging without one turns every smart shot into a
- * march across the map, which is the very thing the approach tax was built
- * to stop ("пошёл через всю карту к тому кто почти умер", the fourth AI
- * session) — the two rules would be pulling against each other. So this is
- * about where a turn ENDS rather than about how it is spent: a pig already
- * near its target finishes shoulder to shoulder with it, and one across the
- * field fires from its weapon's own mark like anybody else. `[deliberate]`.
- */
-export const SHELTER_FROM = 4 * 512
 
 /** Under this speed (units/s) a thrown grenade counts as DOWN to the brain
  * and the detonator is pressed — four exe-units a frame, a crawl. The
@@ -117,17 +96,6 @@ export const PRESS_GRACE = 0.2
 export const MISJUDGE = 0.75
 
 /**
- * The seconds an errand must LEAVE ON THE CLOCK past its own walking — the
- * turning, the pitch, the gauge and the mulls of the shot that has to come
- * after the crate ("взять ящик И ударить после" — the second half is the
- * point). The walking itself is priced over crow distances at the UNSCALED
- * `WALK_SPEED` — the legs actually go `WALK_SCALE` faster — so the speed's
- * own slack covers the crow line's optimism about the path.
- * `[deliberate]` — play's dial.
- */
-export const ERRAND_SPARE = 12
-
-/**
  * How far off the SHOT itself lands at the bottom of the wits scale — the
  * docs/ai.md "actuator noise" knob ("over-turns the aim, over-holds the
  * gauge"), asked for by play in one line: "слишком сильно точно стреляет".
@@ -156,6 +124,11 @@ export const CHARGE_WOBBLE = 0.15
  * the kit can price.
  */
 export const NEAR_POINTS = 60
+
+/** How many refusals in a row before the grunt stops trying to close in. A
+ * body steps aside, a wall does not, and one re-plan is what tells them
+ * apart (play: "он не обходит свина, а толкается в него"). `[deliberate]`. */
+export const REFUSALS_BEFORE_GROUNDED = 2
 
 /** The nearest DRY ground, by ring search off the crow line: what a pig
  * with no business in the water swims for. An ocean with no shore in reach
@@ -196,14 +169,16 @@ const inTheWay = (
 }
 
 export function createGruntBrain(): Brain {
-  /** Walking has been refused: stop trying to close in. */
+  /** Walking has been refused for good: stop trying to close in. */
   let grounded = false
+  /** …and how many refusals it has taken so far this turn. */
+  let refusals = 0
   /** The pitch has been set (or refused by the clamp): do not chase it. */
   let pitched = false
   /** The PLANNED press: seconds after the release the priced throw comes
    * down (the dry-run's own clock, wobble applied), or null for a throw
    * fired without a plan. */
-  let plan: number | null = null
+  let press: number | null = null
   /** The last decision explained — telemetry's copy, never read back. */
   let thought: Thought | null = null
   /** This turn's misjudgments, one factor per (kind, skill) — rolled once,
@@ -213,37 +188,14 @@ export function createGruntBrain(): Brain {
    * (AIM_WOBBLE, CHARGE_WOBBLE). Held for the same reason: a bearing that
    * moved between decisions is a pig re-turning forever. */
   let shaky: { heading: number; charge: number } | null = null
-  /** This turn's reachability verdicts by target spot: `playable` runs a
-   * whole best-effort route per fresh target, and re-asking it every mull
-   * was a visible hitch on the enemy's turn (play: "подвисает ход"). */
-  const reachable = new Map<string, boolean>()
-  /**
-   * …and how far the LEGS actually go to a spot — the route's own length,
-   * memoised the same way and for the same reason (lib/game/evaluate.ts,
-   * `Walked`). The crow line lies wherever the ground does: play's report is
-   * a river, where a foe two tiles off is fifteen tiles of walking round the
-   * head of it, and the price list was costing the two.
-   *
-   * ONE ROUTE PER SPOT PER TURN. The spot is rounded to the grid before it
-   * is asked, because the marks a price list computes are continuous — a
-   * firing mark moves a few units every decision — and an unrounded key
-   * would miss every time and run the pathfinder on every mull, which is the
-   * 130 ms hitch by another door.
-   */
-  const walkedTo = new Map<string, number>()
-  /**
-   * THE PLAN — which (kind, skill, target) this turn is about, chosen once
-   * and HELD. Play named the model: "мир не меняется! свин меняет мир
-   * своими действиями — его передвижение не меняет его намерений." A
-   * turn-based world stands still on your own turn, so re-electing a winner
-   * every mull only ever CHANGES ANSWERS by accident (a tie-break flipping
-   * as the walk shifts the distances). The intent is dropped exactly when
-   * the world actually changed: the target is gone, the KIT changed (a
-   * pickup — new options deserve a fresh election), or the plan stopped
-   * being playable. Everything else re-derives EXECUTION only (the charge
-   * for the current distance, the next corner).
-   */
-  let intent: { kind: string; skill: number; spot: string } | null = null
+  /** **THE TURN'S PLAN** (lib/game/plan.ts) and how much of its route is
+   * already behind us. Made once, dropped whole, never edited. */
+  let plan: Plan | null = null
+  let leg = 0
+  /** The crates this turn walked onto and could not collect — struck off so
+   * the next plan does not send the pig back to the same one (see the crate
+   * rung below). */
+  const tried = new Set<string>()
   /** What the kit looked like when the plan was made — a pickup or a spent
    * slot is the pig CHANGING the world, and that re-opens the election. */
   let kitSign = ''
@@ -258,6 +210,9 @@ export function createGruntBrain(): Brain {
         ? { kind: 'fire' }
         : { kind: 'hold', skill: SKILL.SKIP_TURN }
 
+  const signOf = (world: AiWorld): string =>
+    world.acting.carrying.map((slot) => `${slot.skill}:${slot.amount}`).join(',')
+
   return {
     decide(world) {
       // The account of THIS decision, filled as the ladder runs: `say` stamps
@@ -269,7 +224,14 @@ export function createGruntBrain(): Brain {
         return order
       }
 
-      if (world.previous === 'blocked') grounded = true
+      // A REFUSAL is the world saying no. The first one drops the plan — the
+      // ground is not what the route thought it was, or a body is standing
+      // in it — and the second gives up on closing in altogether.
+      if (world.previous === 'blocked') {
+        refusals++
+        plan = null
+        if (refusals >= REFUSALS_BEFORE_GROUNDED) grounded = true
+      }
 
       // IN THE WATER a non-swimmer has exactly one thought: THE SHORE.
       // Water kills it by degrees, the engine strips the weapon from
@@ -306,8 +268,8 @@ export function createGruntBrain(): Brain {
         // (`resting`, SETTLED) stay only for a throw that never carried a
         // plan.
         const due =
-          plan !== null
-            ? thrown.age >= plan + PRESS_GRACE
+          press !== null
+            ? thrown.age >= press + PRESS_GRACE
             : thrown.resting || thrown.speed < SETTLED
         return due || near
           ? say('detonate', { kind: 'fire' })
@@ -315,15 +277,6 @@ export function createGruntBrain(): Brain {
       }
 
       const me = world.acting
-
-      /** The next corner of the route to a goal, or null standing there. */
-      const walkThe = (goal: { x: number; z: number }): Order | null => {
-        const corners = world.route(goal)
-        const next = corners?.find(
-          (corner) => Math.hypot(corner.x - me.x, corner.z - me.z) > GRID_STEP / 2
-        )
-        return next ? { kind: 'walkTo', x: next.x, z: next.z } : null
-      }
 
       // A charge of OURS is armed in the ground: BE SOMEWHERE ELSE. Run out
       // of its rim — away from it, or straight backwards when it lies at
@@ -336,36 +289,14 @@ export function createGruntBrain(): Brain {
         if (away >= FLEE_CLEAR) return say('fled', { kind: 'watch' })
         const dirX = away < 1 ? -Math.sin(me.heading) : (me.x - charge.x) / away
         const dirZ = away < 1 ? -Math.cos(me.heading) : (me.z - charge.z) / away
-        return say(
-          'flee',
-          walkThe({ x: charge.x + dirX * FLEE_CLEAR, z: charge.z + dirZ * FLEE_CLEAR }) ?? {
-            kind: 'watch'
-          }
+        const corners = world.route({
+          x: charge.x + dirX * FLEE_CLEAR,
+          z: charge.z + dirZ * FLEE_CLEAR
+        })
+        const next = corners?.find(
+          (corner) => Math.hypot(corner.x - me.x, corner.z - me.z) > GRID_STEP / 2
         )
-      }
-
-      /**
-       * Whether an option can ever be FIRED — from here, or from where the
-       * route actually ENDS. The route is best effort (lib/game/pathfind.ts):
-       * against a bay it stops at the shore, and an option whose target
-       * stays outside its own limit from there is a march to a pass.
-       * Telemetry watched that march cost fifty seconds before this check
-       * existed (DEN, `_tmp/ai-session-2026-08-23.log`).
-       */
-      const playable = (one: Option): boolean => {
-        const away = Math.hypot(one.target.x - me.x, one.target.z - me.z)
-        if (away <= one.limit) return true
-        // One route per fresh target PER TURN (`reachable`): a full
-        // best-effort search every mull was the hitch play felt.
-        const spot = `${one.target.x},${one.target.z}:${Math.round(one.limit)}`
-        const known = reachable.get(spot)
-        if (known !== undefined) return known
-        const corners = world.route({ x: one.target.x, z: one.target.z })
-        const end =
-          corners && corners.length > 0 ? corners[corners.length - 1] : { x: me.x, z: me.z }
-        const verdict = Math.hypot(one.target.x - end.x, one.target.z - end.z) <= one.limit
-        reachable.set(spot, verdict)
-        return verdict
+        return say('flee', next ? { kind: 'walkTo', x: next.x, z: next.z } : { kind: 'watch' })
       }
 
       // The brain's own reading of a score (see MISJUDGE): wide at the
@@ -390,139 +321,57 @@ export function createGruntBrain(): Brain {
         return one.judged
       }
 
-      const priced: Option[] = []
-      /** The route's own length to a spot, memoised per turn (`walkedTo`). */
-      const walked = (to: { x: number; z: number }): number => {
-        const key = `${Math.round(to.x / GRID_STEP)},${Math.round(to.z / GRID_STEP)}`
-        const known = walkedTo.get(key)
-        if (known !== undefined) return known
-        const corners = world.route(to)
-        let length = 0
-        let fromX = me.x
-        let fromZ = me.z
-        for (const corner of corners ?? []) {
-          length += Math.hypot(corner.x - fromX, corner.z - fromZ)
-          fromX = corner.x
-          fromZ = corner.z
-        }
-        // A route that ENDS SHORT — the far bank, the wrong side of a wall —
-        // is not a walk to this spot at all. What is left is charged as walk
-        // too, so an unreachable mark costs its whole crow line and then
-        // some: the option is not refused here (`playable` does that), it is
-        // simply not cheap.
-        length += Math.hypot(to.x - fromX, to.z - fromZ)
-        walkedTo.set(key, length)
-        return length
-      }
-
-      let option = priceKit(
-        world,
-        (one) => {
-          told.candidates.push(one)
-          priced.push(one)
-        },
-        judge,
-        walked
-      )
-      // THE PLAN HOLDS (see `intent`): the kit unchanged and the chosen
-      // (kind, skill, target) still on the table, the turn stays about it —
-      // freshly priced (the charge moves with the approach), never
-      // re-elected. A pickup re-opens the election; a vanished target or an
-      // unplayable plan drops it.
-      const spotOf = (one: Option): string => `${one.target.x},${one.target.z}`
-      const sign = world.acting.carrying
-        .map((slot) => `${slot.skill}:${slot.amount}`)
-        .join(',')
+      // **THE PLAN.** Kept while the world it was made about still stands;
+      // a pickup or a spent slot is the pig having CHANGED that world, and
+      // re-opens the election on the kit it now holds.
+      const sign = signOf(world)
       if (kitSign !== sign) {
-        intent = null
+        plan = null
         kitSign = sign
       }
-      if (intent !== null) {
-        const held = priced.find(
-          (one) =>
-            one.kind === intent!.kind &&
-            one.skill === intent!.skill &&
-            spotOf(one) === intent!.spot
+      if (plan !== null && !stillStands(plan, world)) plan = null
+      if (plan === null) {
+        plan = makePlan(
+          world,
+          judge,
+          (one) => told.candidates.push(one),
+          (crate) => tried.has(`${crate.x},${crate.z}`)
         )
-        if (held && held.score > 0 && playable(held)) {
-          option = held
-          told.held = true
-        } else intent = null
+        leg = 0
+      } else {
+        // The plan HOLDS, and `candidates` stays EMPTY on purpose: the price
+        // list is what a turn spends its time on, and re-running it to fill
+        // a log is the bill the plan was made to stop paying. The kit line
+        // was written the decision the plan was made.
+        told.held = true
       }
-      // The winner it CANNOT play is no winner: take the best candidate the
-      // ground allows instead, and failing every weapon, a crate is a
-      // necessity (lib/game/evaluate.ts, `crateFallback`) — a pig with
-      // nothing in reach still has a job.
-      if (option && intent === null && !playable(option)) {
-        option =
-          priced
-            .filter((one) => one.score > 0 && one !== option)
-            .sort((a, b) => b.score - a.score)
-            .find(playable) ??
-          crateFallback(world) ??
-          null
-      }
-      if (option) intent = { kind: option.kind, skill: option.skill, spot: spotOf(option) }
-      told.chose = option
-      if (!option) return say('pass-nothing', pass(world))
+      told.chose = plan?.option ?? null
+      if (plan === null) return say('pass-nothing', pass(world))
 
+      const option = plan.option
       const target = option.target
       const dx = target.x - me.x
       const dz = target.z - me.z
       const distance = Math.hypot(dx, dz)
 
-      /**
-       * **HOW FAR OFF TO STAND — and a SMART pig stands right beside its
-       * target.** Play's ruling on self-preservation (2026-08-24): the
-       * answer is not to run away, it is to be so close to one of THEIRS
-       * that shelling you costs them their own pig — "встать к нашему свину
-       * — так это только умные должны делать". So it is a wits behaviour
-       * like the crate appetite and the detonation window: below
-       * `SHELTER_WITS` a pig fires from wherever its weapon reaches and dies
-       * where it stood (telemetry, 2026-08-24: four of six AI pigs killed by
-       * counter-blast at the exact coordinates they had lobbed from for
-       * turns), above it a pig closes to `SHELTER_NEAR`.
-       *
-       * **GUNS ONLY.** A lob at arm's length catches the thrower, and the
-       * price list already scores that below zero (lib/game/evaluate.ts,
-       * `blastWorth` counts the self term), so hugging with a grenade would
-       * be walking into a plan the brain has itself priced as a loss. A
-       * blade already stands closer than this. And it is BOUNDED by
-       * `SHELTER_FROM`: a pig already near its target ends its turn beside
-       * it, one across the map fires from its own mark — otherwise this
-       * rule and the approach tax would be arguing (see the constant).
-       */
-      const standOff =
-        option.kind === 'gun' && world.wits >= SHELTER_WITS && distance <= SHELTER_FROM
-          ? Math.min(option.reach, SHELTER_NEAR)
-          : option.reach
-
-      /** The DRY point to fight from: the shy mark inside the stand-off
-       * when the ground there is dry, else pressed on toward the target
-       * until it is. A firing spot in the water is no spot at all —
-       * swimming hands are empty — and standing closer than the shy mark
-       * only ever helps the shot. The last resort is the target's own feet,
-       * wet or not: best effort, same as the route's. */
-      const dryApproach = (): { x: number; z: number } => {
-        for (const back of [0.8, 0.6, 0.4, 0.2, 0]) {
-          const x = target.x - (dx / distance) * standOff * back
-          const z = target.z - (dz / distance) * standOff * back
-          if (!world.wet(x, z)) return { x, z }
-        }
-        return { x: target.x, z: target.z }
+      // **WALK THE PLAN'S OWN ROUTE**, corner to corner. The corners were
+      // pulled into long legs ONCE (lib/game/pathgrid.ts) and they are not
+      // re-derived: re-routing from the pig's new spot every mull is what
+      // made the first leg one cell long over and over — "1 шажочек вперёд,
+      // 1 поворот, и так зациклено".
+      while (
+        leg < plan.route.length &&
+        Math.hypot(plan.route[leg].x - me.x, plan.route[leg].z - me.z) <= GRID_STEP / 2
+      ) {
+        leg++
       }
-
-      // A CRATE is walked onto — the hand-over is the walk itself
-      // (lib/game/scenery.ts), so there is nothing to hold, face or fire.
-      if (option.kind === 'crate') {
-        if (!grounded && distance > option.reach) {
-          const step = walkThe({ x: target.x, z: target.z })
-          if (step) return say('crate', step)
-          grounded = true
-        }
-        // Standing on it (it hands over next step), or unable to get there:
-        // either way the next decision sees a different world.
-        return grounded ? say('pass-crate', pass(world)) : say('crate-wait', { kind: 'watch' })
+      const walking = !grounded && leg < plan.route.length
+      told.plan = {
+        goal: plan.goal,
+        walk: plan.errand ? plan.errand.walk : plan.option.walk,
+        legs: plan.route.length - leg,
+        errand: plan.errand !== null,
+        cells: plan.cells
       }
 
       // A SWIMMER mid-crossing: TRANSIT ONLY. Nothing is done IN the water
@@ -532,36 +381,39 @@ export function createGruntBrain(): Brain {
       // time cost: a stroke is SWIM_COST of a stride). Play's rule: "в
       // воде делать нечего — максимум сократить путь."
       if (world.swimming) {
-        const step = grounded ? null : walkThe(dryApproach())
-        return step ? say('transit', step) : say('shore', shore(world))
+        return walking
+          ? say('transit', { kind: 'walkTo', x: plan.route[leg].x, z: plan.route[leg].z })
+          : say('shore', shore(world))
       }
 
-      // **THE ERRAND — the crate comes FIRST when the clock affords both.**
-      // Play's rule, given at the top of the wits scale: "если хватает
-      // времени взять ящик и ударить после — ящик конечно же важнее всего
-      // для самого умного." A pickup spends no turn — the WEAPON does — so
-      // a crate worth having is collected on the way to the fight, and the
-      // attack follows in the same turn. Worth having is the same judged
-      // appetite as everything else (crateErrand): the dumbest brain rarely
-      // believes a crate is worth the walk, the sharpest always does. The
-      // clock's question: the walk there, the walk onward to the option's
-      // own reach, and ERRAND_SPARE for the shot still have to fit. Once
-      // collected the crate leaves `world.crates` and the next decision
-      // falls straight through to the fight — no memory needed. A PLANT
-      // never detours: a foe is standing in the blast.
-      if (!grounded && option.kind !== 'plant') {
-        const errand = crateErrand(world, judge)
-        if (errand) {
-          const toCrate = Math.hypot(errand.target.x - me.x, errand.target.z - me.z)
-          const onward = Math.max(
-            0,
-            Math.hypot(target.x - errand.target.x, target.z - errand.target.z) - option.reach
-          )
-          if ((toCrate + onward) / WALK_SPEED + ERRAND_SPARE <= world.timeLeft) {
-            const step = walkThe({ x: errand.target.x, z: errand.target.z })
-            if (step) return say('errand', step)
-          }
-        }
+      if (walking) {
+        // The ERRAND leg and the fighting leg are the same walk to the
+        // hands; the rung is named apart only so a log reads as a story.
+        return say(plan.errand ? 'errand' : 'walk', {
+          kind: 'walkTo',
+          x: plan.route[leg].x,
+          z: plan.route[leg].z
+        })
+      }
+
+      // AT THE CRATE. The hand-over is the walk itself (lib/game/scenery.ts),
+      // so there is nothing to hold, face or fire: the pickup changes the
+      // kit and the next decision re-plans on the richer one. Standing on
+      // one that never arrived (somebody else took it, or the legs ended
+      // short) is a plan the world no longer supports — drop it and think
+      // again on the next beat.
+      if (plan.errand !== null || option.kind === 'crate') {
+        const errand = plan.errand ?? option
+        // The legs are done with it and the kit did not change — it is not
+        // a crate this pig can use (a health crate at full health), or
+        // somebody else took it first, or the walk honestly ended short.
+        // Struck off for the rest of the turn so the next plan does not walk
+        // straight back to it, and the plan is dropped: there is a whole
+        // other turn to spend.
+        tried.add(`${errand.target.x},${errand.target.z}`)
+        const rung = plan.errand ? 'errand-done' : 'crate-done'
+        plan = null
+        return say(rung, { kind: 'watch' })
       }
 
       // Only a GUN's shot travels the flat line a friend can stand in; a lob
@@ -569,14 +421,13 @@ export function createGruntBrain(): Brain {
       // a blade never reaches past arm's length.
       const friend = option.kind === 'gun' ? inTheWay(me, target, world.friends) : null
 
-      // Grounded and hopeless — past the option's whole limit, or a friend
-      // in the way with nowhere left to step — is a pass, and it is asked
-      // BEFORE the hands: asked after, a grounded pig flip-flopped forever
-      // between taking the option's weapon and taking SKIP TURN to pass
-      // (measured: 249 hold decisions in one battle, rifle-skip-rifle-skip).
-      const hopeless = (): boolean =>
-        grounded && (distance > option.limit || friend !== null)
-      if (hopeless()) return say('pass-hopeless', pass(world))
+      // Past the option's whole limit with no walking left, or a friend in
+      // the way with nowhere to step, is a pass — and it is asked BEFORE the
+      // hands: asked after, a grounded pig flip-flopped forever between
+      // taking the option's weapon and taking SKIP TURN to pass (measured:
+      // 249 hold decisions in one battle, rifle-skip-rifle-skip).
+      const hopeless = distance > option.limit || (friend !== null && grounded)
+      if (hopeless) return say('pass-hopeless', pass(world))
 
       if (me.holding !== option.skill) return say('hold', { kind: 'hold', skill: option.skill })
 
@@ -584,23 +435,7 @@ export function createGruntBrain(): Brain {
       // above takes over next decision.
       if (option.kind === 'plant') return say('plant', { kind: 'fire' })
 
-      if (distance > standOff && !grounded) {
-        // Stop short of the stand-off mark, so arrival lands INSIDE it — at the
-        // DRY approach, and by the ROUTE, not the crow's line: the next
-        // corner of the best path round the walls, the water and the known
-        // mines. A route with no corner left to walk means this is as close
-        // as the ground allows, and the grunt is grounded the same as a
-        // refused step.
-        const step = walkThe(dryApproach())
-        if (step) return say('walk', step)
-        grounded = true
-      }
-
-      // The walk above may have GROUNDED us: ask hopeless once more before
-      // stepping around friends or firing.
-      if (hopeless()) return say('pass-hopeless', pass(world))
-
-      if (friend !== null && !grounded) {
+      if (friend !== null) {
         // Step off the line the OTHER way from where the friend leans.
         const ux = dx / distance
         const uz = dz / distance
@@ -649,7 +484,7 @@ export function createGruntBrain(): Brain {
       // time of flight scales with the launch speed, so the wobble is
       // accounted once, not sensed later.
       if (option.kind === 'lob' && option.flight !== undefined) {
-        plan = option.flight * (1 + shaky.charge)
+        press = option.flight * (1 + shaky.charge)
       }
       return say(
         'fire',
@@ -662,14 +497,15 @@ export function createGruntBrain(): Brain {
     explain: () => thought,
     reset() {
       grounded = false
+      refusals = 0
       pitched = false
-      plan = null
+      press = null
       thought = null
       judgments.clear()
       shaky = null
-      reachable.clear()
-      walkedTo.clear()
-      intent = null
+      plan = null
+      leg = 0
+      tried.clear()
       kitSign = ''
     }
   }

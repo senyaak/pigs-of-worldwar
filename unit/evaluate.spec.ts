@@ -7,13 +7,53 @@
 
 import { test, expect } from '@playwright/test'
 
-import { priceKit, CRATE_APPETITE, FAR_FLOOR, TURN_DISCOUNT } from '../src/lib/game/evaluate'
+import {
+  priceKit,
+  crateErrand,
+  crateFallback,
+  BLOW_SPARE,
+  CRATE_APPETITE,
+  FAR_FLOOR,
+  TURN_DISCOUNT
+} from '../src/lib/game/evaluate'
+import { WALK_SPEED } from '../src/lib/game/movement'
 import type { AiWorld, Seen } from '../src/lib/game/ai'
 import { SKILL } from '../src/lib/game/skills'
 import { UNLIMITED } from '../src/lib/game/inventory'
 import { damageOf } from '../src/lib/game/projectile'
 
 const foe = (over: Partial<Seen> = {}): Seen => ({ x: 0, y: 0, z: 800, health: 50, ...over })
+
+/** The spec's stand-in for the battle's FLOOD (lib/game/pathfind.ts): the
+ * walk's own length measured along whatever route the world hands out, from
+ * the acting pig at the origin. So a world with a bending route costs the
+ * bend, exactly as the real one does. */
+const legsFrom = (
+  at: { x: number; z: number },
+  route: (to: { x: number; z: number }) => { x: number; z: number }[] | null
+): AiWorld['reach'] =>
+  () => ({
+    walk: (to) => {
+      const corners = route(to)
+      // `route`'s own contract: EMPTY is "as close as the ground allows",
+      // so a goal still far off is one the legs do not reach at all.
+      if (corners === null) return Infinity
+      if (corners.length === 0 && Math.hypot(to.x - at.x, to.z - at.z) > 128) return Infinity
+      let length = 0
+      let from = at
+      for (const corner of corners) {
+        length += Math.hypot(corner.x - from.x, corner.z - from.z)
+        from = corner
+      }
+      return length + Math.hypot(to.x - from.x, to.z - from.z)
+    },
+    corners: (to) => {
+      const corners = route(to)
+      if (corners === null) return null
+      return corners.length === 0 && Math.hypot(to.x - at.x, to.z - at.z) > 128 ? null : corners
+    },
+    cells: 0
+  })
 
 const world = (over: {
   carrying?: { skill: number; amount: number }[]
@@ -25,9 +65,10 @@ const world = (over: {
   wet?: AiWorld['wet']
   groundAt?: AiWorld['groundAt']
   timeLeft?: number
+  turnSeconds?: number
 }): AiWorld => ({
   timeLeft: over.timeLeft ?? 45,
-  turnSeconds: 45,
+  turnSeconds: over.turnSeconds ?? 45,
   wits: over.wits ?? 0,
   // Neutral: the price list is tested on its own arithmetic — the
   // misjudgment is the BRAIN's and pinned in unit/grunt.spec.ts.
@@ -46,6 +87,7 @@ const world = (over: {
   foes: over.foes ?? [foe()],
   friends: over.friends ?? [],
   route: (to) => [to],
+  reach: legsFrom({ x: 0, z: 0 }, (to) => [to]),
   // Flat ground at zero: the dry-run throw lands when it falls back to it.
   groundAt: over.groundAt ?? (() => 0),
   wet: over.wet ?? (() => false),
@@ -178,17 +220,21 @@ test('an ARMED pig barely feels a crate: the greed knob', { tag: '@nodata' }, ()
 })
 
 test('an UNARMED pig fetches a weapon crate at full worth: necessity is not greed', { tag: '@nodata' }, () => {
-  const option = priceKit(
-    world({ carrying: [], crates: [{ x: 0, z: 2000, skill: SKILL.BAZOOKA, amount: 2 }] })
-  )!
-  expect(option.kind).toBe('crate')
+  // A crate is no longer a CANDIDATE in the election (see the header): it is
+  // an errand on the way to the fight, or the whole job when there is no
+  // fight to be had. An unarmed pig is the second case and the appetite does
+  // not apply to it — the errand wants it outright.
+  const scene = world({ carrying: [], crates: [{ x: 0, z: 2000, skill: SKILL.RIFLE, amount: 2 }] })
+  expect(priceKit(scene)).toBeNull()
+  const errand = crateErrand(scene)!
+  expect(errand.kind).toBe('crate')
+  expect(errand.worth).toBeCloseTo(damageOf(SKILL.RIFLE), 5)
 })
 
 test('with nobody left to shoot, a health crate is worth the stroll', { tag: '@nodata' }, () => {
-  const option = priceKit(
-    world({ foes: [], crates: [{ x: 0, z: 1000, skill: null, amount: 50 }] })
-  )!
-  expect(option.kind).toBe('crate')
+  const scene = world({ foes: [], crates: [{ x: 0, z: 1000, skill: null, amount: 50 }] })
+  expect(priceKit(scene)).toBeNull()
+  expect(crateFallback(scene)!.kind).toBe('crate')
 })
 
 test('TNT is PLANTED when a foe stands in its blast, never thrown', { tag: '@nodata' }, () => {
@@ -208,30 +254,27 @@ test('TNT stays in the kit when nobody is near: no walking about with a lit bomb
 })
 
 test('the WITS dial turns the appetite: the dull pig barely values the crate the sharp one prizes', { tag: '@nodata' }, () => {
-  // The same sniper upgrade, nobody left to shoot. This test used to expect
-  // the dull pig to price it to NOTHING and pass — superseded by two of
-  // play's later rulings: a pig with nothing else to do takes the job
-  // (crateFallback's lesson), and "что ближе — это моя цель" needs a near
-  // crate ALIVE in the list (FAR_FLOOR reaches crates now). What the dial
-  // still turns is the VALUE: a quarter of the gain at the bottom, all of
-  // it at the top — which is what keeps a dull pig off crates whenever any
-  // weapon scores at all.
+  // Read through the ERRAND now, which is where a crate is weighed at all
+  // (the election never sees one). What the dial turns is the VALUE: a
+  // quarter of the gain at the bottom, all of it at the top.
   const upgrade = {
     foes: [] as Seen[],
-    crates: [{ x: 0, z: 1000, skill: SKILL.SNIPER_RIFLE, amount: 2 }]
+    crates: [{ x: 0, z: 1000, skill: null, amount: 200 }]
   }
-  const dull = priceKit(world({ ...upgrade, wits: 0 }))!
+  const dull = crateErrand(world({ ...upgrade, wits: 0 }))!
+  const sharp = crateErrand(world({ ...upgrade, wits: 1 }))!
   expect(dull.kind).toBe('crate')
-  const sharp = priceKit(world({ ...upgrade, wits: 1 }))!
   expect(sharp.kind).toBe('crate')
-  // The appetite is the whole difference: CRATE_APPETITE of the gain
-  // against the lot. (It used to be a tenth of this, because a flat
-  // approach tax ate the rest — that tax is gone: distance costs TURNS
-  // now, and a crate two tiles off costs none.)
   expect(dull.score).toBeCloseTo(sharp.score * CRATE_APPETITE, 5)
   expect(sharp.score).toBeGreaterThan(dull.score * 3)
+  // The first cut of the toll ran a lone rifle below zero across the map
+  // and the brain passed forever; a sliver of the worth survives any walk
+  // (FAR_FLOOR).
+  const option = priceKit(world({ foes: [foe({ z: 20000 })] }))
+  expect(option).not.toBeNull()
+  expect(option!.kind).toBe('gun')
+  expect(option!.score).toBeGreaterThan(0)
 })
-
 test('the solved charge GROWS with the throw', { tag: '@nodata' }, () => {
   // Both stand clear of the thrower's own rim (~1100) — closer throws are
   // rightly refused as self-harm and price to nothing.
@@ -268,30 +311,43 @@ test('distance never argues the ONLY weapon out of existence', { tag: '@nodata' 
   expect(option!.score).toBeGreaterThan(0)
 })
 
-test('DISTANCE is priced in TURNS, and the price list has no opinion about wits', { tag: '@nodata' }, () => {
-  // Play's model, 2026-08-24: "надо просто симуляцию всех вариантов и
-  // выбирать наилучший; чем умнее — тем правильнее выбирает." So this
-  // function answers only what the WORLD would do; the dumb pig's
-  // near-sightedness is made downstream (unit/grunt.spec.ts, the dumb eye).
+test('DISTANCE is priced in TURNS, CONTINUOUSLY, and the price list has no opinion about wits', { tag: '@nodata' }, () => {
+  // Play's correction, 2026-08-24: the cost used to be counted in WHOLE
+  // turns, so any walk that fit inside the clock was free — and on the first
+  // maps the clock is 99 seconds, which at WALK_SPEED is most of an island.
+  // It is a FRACTION of a turn now: a walk that eats 80 % of one costs 0.8.
   const kit = [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
   const worth = damageOf(SKILL.RIFLE)
-  // In reach and this turn: the whole worth, whoever is asking.
-  const near = foe({ z: 800 })
+  // In reach: no walk at all, and the whole worth, whoever is asking. The
+  // foe is inside SHELTER_NEAR, so the smart pig's hugging rule has nothing
+  // to add either — the mark it wants is where the pig already stands.
+  const near = foe({ z: 200 })
   for (const wits of [0, 0.5, 1]) {
-    expect(priceKit(world({ carrying: kit, foes: [near], wits }))!.score).toBeCloseTo(worth, 5)
+    const priced = priceKit(world({ carrying: kit, foes: [near], wits }))!
+    expect(priced.walk).toBe(0)
+    expect(priced.score).toBeCloseTo(worth, 5)
   }
-  // A walk that will not fit the turn costs ONE turn — half — and the same
-  // walk against a turn twice as long costs none.
+  // A walk is charged the fraction of a turn it spends — the option carries
+  // the walk the search actually found, so the arithmetic is checkable.
   const far = foe({ z: 12_000 })
+  const priced = priceKit(world({ carrying: kit, foes: [far] }))!
+  expect(priced.walk).toBeGreaterThan(0)
+  const turns = (walk: number, seconds: number): number =>
+    (walk / WALK_SPEED + BLOW_SPARE) / seconds
+  expect(priced.score).toBeCloseTo(worth * TURN_DISCOUNT ** turns(priced.walk, 45), 5)
+  // The CLOCK no longer speaks: what is left of this turn changes when a
+  // blow lands, not what it is worth.
   const hurried = priceKit(world({ carrying: kit, foes: [far], timeLeft: 5 }))!
-  expect(hurried.score).toBeCloseTo(worth * TURN_DISCOUNT, 5)
-  const roomy = priceKit(world({ carrying: kit, foes: [far], timeLeft: 200 }))!
-  expect(roomy.score).toBeCloseTo(worth, 5)
+  expect(hurried.score).toBeCloseTo(priced.score, 5)
+  // …but the turn's LENGTH does: the same walk is a smaller slice of a
+  // longer turn.
+  const roomy = priceKit(world({ carrying: kit, foes: [far], turnSeconds: 200 }))!
+  expect(roomy.score).toBeGreaterThan(priced.score)
+  expect(roomy.score).toBeCloseTo(worth * TURN_DISCOUNT ** turns(roomy.walk, 200), 5)
   // …and the wits change none of it.
-  const sharp = priceKit(world({ carrying: kit, foes: [far], wits: 1, timeLeft: 5 }))!
-  expect(sharp.score).toBeCloseTo(hurried.score, 5)
+  const sharp = priceKit(world({ carrying: kit, foes: [far], wits: 1 }))!
+  expect(sharp.score).toBeCloseTo(priced.score, 5)
 })
-
 test('a foe already in REACH is never charged for the clock', { tag: '@nodata' }, () => {
   // The turns are counted for the WALK. A pig standing in range with three
   // seconds left does what it can with them, and a brain that discounted
@@ -313,45 +369,60 @@ test('a foe MANY turns off keeps a sliver, so a lone weapon is never argued away
   expect(option.score).toBeGreaterThan(0)
 })
 
-test('a shot the ground would swallow scores nothing, and the grenade takes over', { tag: '@nodata' }, () => {
+test('a shot the ground would swallow is taken from SOMEWHERE ELSE', { tag: '@nodata' }, () => {
   // Play: "третий свин стрельнул через гору - пуля попала в землю". A hill
   // between the pigs (Y-DOWN: the ground ABOVE them is a smaller y) blanks
-  // the rifle; the grenade lobs over it and wins the election.
+  // the straight line — and play's later correction says what to do about
+  // it: the firing mark is SEARCHED FOR, so the answer is a different spot,
+  // not a lower score. The grenade still wins the election, because it lobs
+  // over the hill from where the pig already stands and costs no walk.
   const hill: AiWorld['groundAt'] = (_x, z) => (z > 500 && z < 1000 ? -800 : 0)
   const kit = [
     { skill: SKILL.RIFLE, amount: UNLIMITED },
     { skill: SKILL.GRENADE, amount: 3 }
   ]
+  // Whatever the kit picks, it does NOT strike from where the pig stands:
+  // the straight line is blocked and the 45° arc dies on the hill's near
+  // face, so both families have to move first. (Before the search existed
+  // the lob won here by pricing a throw AS IF it landed on the foe — an
+  // optimism the walk was assumed to fix.)
   const option = priceKit(world({ carrying: kit, foes: [foe({ z: 1500 })], groundAt: hill }))!
-  expect(option.kind).toBe('lob')
-  expect(option.skill).toBe(SKILL.GRENADE)
-  // …and with only the rifle, the blocked shot is not taken at all.
+  expect(option.walk).toBeGreaterThan(0)
+  // …and with only the rifle the shot is still taken — from off the line,
+  // at the price of the walk round.
   const rifled = priceKit(
     world({ carrying: [{ skill: SKILL.RIFLE, amount: UNLIMITED }], foes: [foe({ z: 1500 })], groundAt: hill })
-  )
-  expect(rifled).toBeNull()
+  )!
+  expect(rifled.kind).toBe('gun')
+  expect(rifled.walk).toBeGreaterThan(0)
+  // The mark is beside the hill, not on the crow line through it.
+  expect(Math.abs(rifled.stand.x)).toBeGreaterThan(0)
+  expect(rifled.score).toBeLessThan(damageOf(SKILL.RIFLE))
 })
-
-test('a RIDGE in the arc: the smart pig pitches over it, the dumb one cannot throw', { tag: '@nodata' }, () => {
+test('a RIDGE in the arc: the smart pig pitches over it, the dumb one WALKS round', { tag: '@nodata' }, () => {
   // Play's order (2026-08-24): pitch tuning for the smart alone. A
-  // 1200-high ridge across z 1000..2000 kills the 45° arc on its near face
-  // (the full flat-out throw dies at ~z 1000), so at wits 0 the foe at
-  // z 3000 is out of the arc — no charge, walk closer. At wits 1 the
-  // ladder finds a steeper come-up whose arc clears the ridge and lands on
-  // him: the option carries the tuned aim and its solved charge.
+  // 1200-high ridge across z 1000..2000 kills the 45° arc on its near face,
+  // so at wits 0 the foe at z 3000 is out of the throw's whole reach — and
+  // the dumb pig now does the dumb thing that WORKS: it walks past the ridge
+  // to a mark it can throw from, and throws from there with a solved charge.
+  // At wits 1 the ladder finds a steeper come-up whose arc clears the ridge
+  // from where the pig stands, so the sharp one never moves.
   const ridge: AiWorld['groundAt'] = (_x, z) => (z > 1000 && z < 2000 ? -1200 : 0)
   const kit = [{ skill: SKILL.GRENADE, amount: 3 }]
   const target = foe({ z: 3000 })
   const sharp = priceKit(world({ carrying: kit, foes: [target], wits: 1, groundAt: ridge }))!
   expect(sharp.kind).toBe('lob')
+  expect(sharp.walk).toBe(0)
   expect(sharp.aim).toBeGreaterThan(512)
   expect(sharp.charge).toBeDefined()
   const dull = priceKit(world({ carrying: kit, foes: [target], wits: 0, groundAt: ridge }))!
   expect(dull.kind).toBe('lob')
   expect(dull.aim).toBeUndefined()
-  expect(dull.charge).toBeUndefined()
+  expect(dull.walk).toBeGreaterThan(0)
+  // Past the ridge, and near enough to the foe to throw at him.
+  expect(dull.stand.z).toBeGreaterThan(2000)
+  expect(dull.charge).toBeDefined()
 })
-
 test('flat ground needs no tuning: a smart lob keeps the 45° start', { tag: '@nodata' }, () => {
   // The ladder stops at the first rung that lands within the slack, so an
   // unobstructed throw never climbs and the option carries no aim at all.

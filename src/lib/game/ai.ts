@@ -36,6 +36,12 @@ export interface Seen {
   y: number
   z: number
   health: number
+  /** WHICH pig — the battle's own id. The brain never compares one to
+   * another; it holds ONE (lib/game/plan.ts, the turn's plan), and a plan
+   * about "the pig at 7424,-8000" is a plan that quietly transfers to
+   * whoever walks onto that spot. Absent only in the specs that do not
+   * care. */
+  id?: number
   name?: string
 }
 
@@ -75,10 +81,21 @@ export interface Thought {
    * scored above zero. */
   chose: Candidate | null
   /** True when the winner was not ELECTED this decision but HELD from the
-   * turn's standing plan (lib/game/grunt.ts, `intent`) — the telemetry
-   * prints it, because a held plan under a better-believed row reads as a
-   * wrong election otherwise (the GINGER triage, 2026-08-24). */
+   * turn's standing plan (lib/game/plan.ts) — and then `candidates` is
+   * EMPTY on purpose: the price list is the expensive thing in a turn and
+   * re-running it to fill a log is the very bill the plan was made to stop
+   * paying. The kit line is written where the plan was made. */
   held?: boolean
+  /** The plan's shape, for the telemetry: where the legs are going, how far
+   * that is, how many corners are left, and how much ground the turn's one
+   * flood had to settle to find it (the `[perf]` line's other half). */
+  plan?: {
+    goal: { x: number; z: number }
+    walk: number
+    legs: number
+    errand: boolean
+    cells: number
+  }
 }
 
 /** What the brain is shown: the read-only face of the battle. It GROWS with
@@ -128,6 +145,27 @@ export interface AiWorld {
    * outside the world. Empty when standing as close as the ground allows.
    */
   route(to: { x: number; z: number }): { x: number; z: number }[] | null
+  /**
+   * **THE GROUND FLOODED ONCE** — what every point within `budget` walked
+   * units costs to reach, and the corners of the walk there
+   * (lib/game/pathfind.ts, `flood`).
+   *
+   * The plan asks "where could I shoot him FROM" of a ring of marks round
+   * every target it is weighing (lib/game/plan.ts), and asked of `route`
+   * that is thirty A* searches a turn — the [perf] frames play saw
+   * ("подвисает ход"). Asked of one flood it is thirty lookups. Null when
+   * the pig stands outside the grid's world; then the crow line stands in
+   * and `route` answers the one walk that matters.
+   */
+  reach(budget: number): {
+    /** The walk's own length to a point, or Infinity — the legs do not go
+     * there, or not inside the budget. */
+    walk(to: { x: number; z: number }): number
+    /** Its corners, or null when it is out of reach. */
+    corners(to: { x: number; z: number }): { x: number; z: number }[] | null
+    /** How many cells settled — the telemetry's own cost line. */
+    cells: number
+  } | null
   /** The collision ground at a point, Y-DOWN — what a dry-run throw lands
    * against (lib/game/evaluate.ts). Over water this is the SURFACE, not the
    * seabed: the engine douses a lob at the waterline, and a dry run that

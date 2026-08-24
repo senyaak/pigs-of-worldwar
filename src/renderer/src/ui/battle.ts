@@ -924,6 +924,20 @@ export function initBattle(
           aiHeldSince = Date.now()
           console.log(head)
           window.api.logTelemetry(head)
+          // **THE PLAN**, once, the decision it was made (lib/game/plan.ts):
+          // where this whole turn is going, what the legs pay for it, and
+          // how much ground the turn's ONE flood had to settle — which is
+          // the other half of a `[perf]` frame. A HELD plan prints nothing:
+          // the turn has not changed its mind, and a line a beat is noise.
+          if (thought?.plan && !thought.held) {
+            const shape = thought.plan
+            const line =
+              `[ai:plan] ${name} -> ${spot(shape.goal)}` +
+              `${shape.errand ? ' (errand)' : ''} walk ${Math.round(shape.walk)}` +
+              ` legs ${shape.legs} cells ${shape.cells}`
+            console.log(line)
+            window.api.logTelemetry(line)
+          }
           if (!thought || thought.candidates.length === 0) return
           // Sorted by the TRUE score — NOT the belief: `judged` exists only
           // on each slot's own winner (evaluate.ts prices one option per
