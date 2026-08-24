@@ -30,7 +30,7 @@ import type { SpriteSet } from './sprites'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { current } from '../campaign'
 import { bestAt } from '../../../lib/game/save'
-import { bonusPoints, mapAt, missionNameIndex } from '../../../lib/game/missions'
+import { bonusPoints, CAMPAIGN_LENGTH, mapAt, missionNameIndex } from '../../../lib/game/missions'
 
 /** The screen's own title — a literal, because no fetext names a replay
  * (151 is "CHEAT LEVEL SELECT" and this is not the cheat). `[deliberate]`. */
@@ -121,11 +121,15 @@ export function initMissionSelect(handlers: {
   let art: SpriteSet | null = null
   let lit: Font | null = null
   let plain: Font | null = null
+  let off: Font | null = null
   let gtext: string[] = []
   let loaded = false
   let visible = false
 
-  /** The completed positions, campaign order, refreshed on enter. */
+  /** EVERY real mission, campaign order — the training ground is deliberately
+   * not a row (play: "тренировку туда не пихай — буткэмп"). A row past the
+   * campaign's position is LOCKED: grey, browsable, and it refuses the
+   * choice (play: "серым — текст не белый а серый, и его незя выбрать"). */
   let positions: number[] = []
   /** Which of `positions` the cursor stands on, and where the window starts. */
   let selection = 0
@@ -138,9 +142,13 @@ export function initMissionSelect(handlers: {
   const panel: Widget = widget(0)
   const plates: Widget[] = Array.from({ length: WINDOW }, () => widget(2))
 
+  /** A row past the record is locked — never chosen, only read. */
+  const locked = (position: number): boolean => position >= (current()?.position ?? 0)
+
   const refresh = (): void => {
-    const save = current()
-    positions = save ? Array.from({ length: save.position }, (_, i) => i) : []
+    positions = current()
+      ? Array.from({ length: CAMPAIGN_LENGTH - 1 }, (_, i) => i + 1)
+      : []
     if (selection >= positions.length) selection = Math.max(0, positions.length - 1)
     scrollTo(selection)
   }
@@ -167,6 +175,8 @@ export function initMissionSelect(handlers: {
       goBack()
       return
     }
+    // A locked row refuses in silence, like the family's other refusals.
+    if (locked(position)) return
     leavingTo = () => handlers.onPick(position)
     phase = 'leaving'
   }
@@ -239,13 +249,16 @@ export function initMissionSelect(handlers: {
   }
 
   /** A row's two halves: the name off gtext's own mission table, and the
-   * record over the table's promise — never under what was actually taken. */
+   * record over what a mission can PAY — one for finishing, one for coming
+   * through without a death, plus the map's own specials (play caught the
+   * pair counting only specials: "the war foundation показывает 0/0").
+   * Never under what was actually taken. */
   const rowOf = (position: number): { name: string; taken: number; available: number } => {
     const save = current()
     const map = mapAt(position)
     const name = (map && gtext[missionNameIndex(map)]) || map || '?'
     const taken = save ? bestAt(save, position) : 0
-    return { name, taken, available: Math.max(bonusPoints(position), taken) }
+    return { name, taken, available: Math.max(2 + bonusPoints(position), taken) }
   }
 
   const centred = (font: Font, text: string, left: number, width: number): number =>
@@ -274,15 +287,21 @@ export function initMissionSelect(handlers: {
     )
 
     // The rows: name LEFT — play's spec, not centred — and the PP pair flush
-    // right: the `vp` token, a gap, `taken/available`.
+    // right: the `vp` token, a gap, `taken/available`. A LOCKED mission is
+    // written whole in the OFF shade — the frontend's own grey for a bar
+    // that refuses — and carries no pair: nothing was earned and the count
+    // is the map's to keep.
     const coin = sprites.get('vp')
     for (let i = 0; i < WINDOW; i++) {
       const at = windowTop + i
       if (at >= positions.length) break
-      const row = rowOf(positions[at])
-      const font = at === selection ? litFont : plainFont
+      const position = positions[at]
+      const row = rowOf(position)
+      const shut = locked(position)
+      const font = shut ? (off ?? plainFont) : at === selection ? litFont : plainFont
       const top = layout.rows.y[i] + yOff
       font.draw(context, row.name, layout.rows.x + wordsOff, top)
+      if (shut) continue
       const pair = `${row.taken}/${row.available}`
       const pairX = layout.rows.x + layout.rows.width - font.measure(pair)
       font.draw(context, pair, pairX + wordsOff, top)
@@ -345,6 +364,7 @@ export function initMissionSelect(handlers: {
         ])
         lit = shared.lit
         plain = shared.plain
+        off = shared.off
         art = sprites
         if (text.ok) gtext = text.strings
       } catch (error) {
@@ -377,6 +397,7 @@ export function initMissionSelect(handlers: {
       positions.slice(windowTop, windowTop + WINDOW).map((position) => rowOf(position).name),
     values: () =>
       positions.slice(windowTop, windowTop + WINDOW).map((position) => {
+        if (locked(position)) return null
         const row = rowOf(position)
         return `${row.taken}/${row.available}`
       }),

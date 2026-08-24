@@ -297,7 +297,7 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
       world({
         carrying: kit,
         holding: SKILL.GRENADE,
-        thrown: { x: 0, z: 300, resting: false, rim: 600, speed: 2000 }
+        thrown: { x: 0, z: 300, resting: false, rim: 600, speed: 2000, age: 0.5 }
       })
     )
   ).toEqual({ kind: 'watch' })
@@ -307,7 +307,7 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
       world({
         carrying: kit,
         holding: SKILL.GRENADE,
-        thrown: { x: 0, z: 700, resting: true, rim: 600, speed: 0 }
+        thrown: { x: 0, z: 700, resting: true, rim: 600, speed: 0, age: 2 }
       })
     )
   ).toEqual({ kind: 'fire' })
@@ -319,7 +319,7 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
         carrying: kit,
         holding: SKILL.GRENADE,
         foes: [foe({ z: 800 })],
-        thrown: { x: 0, z: 750, resting: false, rim: 600, speed: 2000 }
+        thrown: { x: 0, z: 750, resting: false, rim: 600, speed: 2000, age: 1 }
       })
     )
   ).toEqual({ kind: 'fire' })
@@ -331,10 +331,33 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
       world({
         carrying: kit,
         holding: SKILL.GRENADE,
-        thrown: { x: 0, z: 5000, resting: false, rim: 600, speed: 30 }
+        thrown: { x: 0, z: 5000, resting: false, rim: 600, speed: 30, age: 3 }
       })
     )
   ).toEqual({ kind: 'fire' })
+})
+
+test('a PRICED throw is pressed on the PLAN, not the sensors', { tag: '@nodata' }, () => {
+  // Play: "разбор до нажатия броска идёт — траектория уже должна быть у
+  // мозга и он точно должен знать когда нажать." The same brain that fires
+  // the throw carries its dry-run flight; the press is a clock.
+  const brain = createGruntBrain()
+  const kit = [{ skill: SKILL.GRENADE, amount: 3 }]
+  // Held, faced, in the arc: the decision is the throw itself.
+  const armed = brain.decide(world({ carrying: kit, holding: SKILL.GRENADE, foes: [foe({ z: 1500 })] }))
+  expect(armed.kind).toBe('fire')
+  // Young and fast and far from the foe: the plan says not yet.
+  const flying = (age: number): ReturnType<typeof world> =>
+    world({
+      carrying: kit,
+      holding: SKILL.GRENADE,
+      foes: [foe({ z: 1500 })],
+      thrown: { x: 0, z: 4000, resting: false, rim: 600, speed: 2000, age }
+    })
+  expect(brain.decide(flying(0.5))).toEqual({ kind: 'watch' })
+  // Past the planned landing (a ~1500-unit lob flies about 1.2 s): press,
+  // still rolling or not.
+  expect(brain.decide(flying(3))).toEqual({ kind: 'fire' })
 })
 
 test('the detonation window is the wits dial: the dumb press at the RIM', { tag: '@nodata' }, () => {
@@ -349,7 +372,7 @@ test('the detonation window is the wits dial: the dumb press at the RIM', { tag:
       foes: [foe({ z: 800 })],
       // The grenade grazes the blast's outer edge of the foe: outside the
       // core, inside the rim.
-      thrown: { x: 0, z: 800 - (BLAST_CORE + 300), resting: false, rim: BLAST_CORE + 400, speed: 2000 }
+      thrown: { x: 0, z: 800 - (BLAST_CORE + 300), resting: false, rim: BLAST_CORE + 400, speed: 2000, age: 1 }
     })
   expect(createGruntBrain().decide(rolling(0))).toEqual({ kind: 'fire' })
   expect(createGruntBrain().decide(rolling(1))).toEqual({ kind: 'watch' })

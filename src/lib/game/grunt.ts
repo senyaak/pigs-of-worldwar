@@ -60,8 +60,15 @@ export const FLEE_CLEAR = 1900
 /** Under this speed (units/s) a thrown grenade counts as DOWN to the brain
  * and the detonator is pressed — four exe-units a frame, a crawl. The
  * renderer's own `resting` bar is 1/frame, low enough that a missed throw
- * rolled until its fuse beat the press (see the thrown arm). `[deliberate]`. */
+ * rolled until its fuse beat the press (see the thrown arm). `[deliberate]`.
+ * The FALLBACK bar: a priced throw carries a PLAN instead (`flight`). */
 export const SETTLED = 60
+
+/** How long past the PLANNED landing the press waits, seconds — the dry run
+ * lands on its first ground contact and the real throw's charge is wobbled,
+ * so pressing dead on the plan can burst in the air short of the spot. A
+ * beat late is a landed grenade; early is a wasted one. `[deliberate]`. */
+export const PRESS_GRACE = 0.2
 
 /**
  * How badly the DUMBEST brain misjudges what a thing is worth — the
@@ -165,6 +172,10 @@ export function createGruntBrain(): Brain {
   let grounded = false
   /** The pitch has been set (or refused by the clamp): do not chase it. */
   let pitched = false
+  /** The PLANNED press: seconds after the release the priced throw comes
+   * down (the dry-run's own clock, wobble applied), or null for a throw
+   * fired without a plan. */
+  let plan: number | null = null
   /** The last decision explained — telemetry's copy, never read back. */
   let thought: Thought | null = null
   /** This turn's misjudgments, one factor per (kind, skill) — rolled once,
@@ -245,12 +256,18 @@ export function createGruntBrain(): Brain {
         const near = world.foes.some(
           (foe) => Math.hypot(foe.x - thrown.x, foe.z - thrown.z) <= trigger
         )
-        // "Stops" is the BRAIN's own bar, not the renderer's: `resting` is
-        // set at a crawl so low (15 u/s) that a missed throw rolled about
-        // until its own fuse blew it six seconds late — telemetry, GINGER
-        // 2026-08-24, one watch and then nothing. A grenade creeping under
-        // SETTLED is not rolling anywhere useful; press. `[deliberate]`.
-        return thrown.resting || thrown.speed < SETTLED || near
+        // THE PLAN, not the sensors (play: "траектория уже должна быть у
+        // мозга и он точно должен знать когда нажать"): the dry run that
+        // priced the throw already flew it, so the press is a CLOCK — the
+        // planned flight, wobble applied, plus PRESS_GRACE — with the
+        // near-a-foe window still allowed to fire it early. The sensors
+        // (`resting`, SETTLED) stay only for a throw that never carried a
+        // plan.
+        const due =
+          plan !== null
+            ? thrown.age >= plan + PRESS_GRACE
+            : thrown.resting || thrown.speed < SETTLED
+        return due || near
           ? say('detonate', { kind: 'fire' })
           : say('fuse', { kind: 'watch' })
       }
@@ -534,6 +551,13 @@ export function createGruntBrain(): Brain {
           return say('pitch', { kind: 'aimTo', angle: option.aim })
         }
       }
+      // A lob's press is PLANNED here, before the button goes down: the
+      // dry-run's flight, stretched by the same shake the charge takes —
+      // time of flight scales with the launch speed, so the wobble is
+      // accounted once, not sensed later.
+      if (option.kind === 'lob' && option.flight !== undefined) {
+        plan = option.flight * (1 + shaky.charge)
+      }
       return say(
         'fire',
         option.charge === undefined
@@ -546,6 +570,7 @@ export function createGruntBrain(): Brain {
     reset() {
       grounded = false
       pitched = false
+      plan = null
       thought = null
       judgments.clear()
       shaky = null

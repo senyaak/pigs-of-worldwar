@@ -1268,6 +1268,7 @@ export function createBattle(parts: BattleParts): Battle {
                     // is so low a missed throw rolled until its fuse blew it
                     // (telemetry, GINGER 2026-08-24).
                     speed: Math.hypot(head.vx, head.vy, head.vz),
+                    age: head.age,
                     // The blast's outer edge — what the dumbest detonation
                     // window is as wide as (lib/game/grunt.ts).
                     rim: blastRange(lobOf(head.skill) ?? lobOf(SKILL.GRENADE)!)

@@ -310,6 +310,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
     update(delta) {
       for (let i = flying.length - 1; i >= 0; i--) {
         const shot = flying[i]
+        shot.age += delta
         // DOUSED: it is under the water and on its way down. Nothing steps it but
         // the sink — not the fuse, not the ground, not a bounce — and when its
         // couple of seconds are up it is simply gone. The engine's quiet flag is

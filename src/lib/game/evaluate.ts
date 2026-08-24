@@ -144,6 +144,12 @@ export interface Option extends Candidate {
   /** For a lob: the come-up to take before firing, in aim units — present
    * only when a TUNED pitch beat the 45° start (TUNE_PITCH_WITS). */
   aim?: number
+  /** For a lob: how long the dry-run flew before it came down, seconds —
+   * the PLAN the detonator is pressed on (lib/game/grunt.ts): the brain
+   * knew the whole trajectory before the throw, so WHEN to press is known
+   * before the button goes down, not sensed frame by frame (play: "разбор
+   * до нажатия броска идёт — траектория уже должна быть у мозга"). */
+  flight?: number
 }
 
 /**
@@ -172,7 +178,7 @@ const flight = (
   heading: number,
   charge: number,
   aim = AIM_LOB
-): { x: number; z: number } => {
+): { x: number; z: number; seconds: number } => {
   const me = world.acting
   const shot = lob(
     skill,
@@ -182,12 +188,13 @@ const flight = (
     charge,
     () => 0
   )!
-  for (let seconds = 0; seconds < SIM_SECONDS; seconds += SIM_STEP) {
+  let seconds = 0
+  for (; seconds < SIM_SECONDS; seconds += SIM_STEP) {
     if (advanceLob(shot, SIM_STEP)) break
     // Y-DOWN: at or below the ground when y has grown past it.
     if (shot.y >= world.groundAt(shot.x, shot.z)) break
   }
-  return { x: shot.x, z: shot.z }
+  return { x: shot.x, z: shot.z, seconds }
 }
 
 /** The blast at `landing`, priced over EVERYONE: foes positive, friends and
@@ -327,8 +334,12 @@ const lobOption = (world: AiWorld, skill: number, note: Note): Option | null => 
   for (const foe of world.foes) {
     const away = distance2d(me, foe)
     const heading = Math.atan2(foe.x - me.x, foe.z - me.z)
-    let solved: { aim: number; charge: number; landing: { x: number; z: number }; miss: number } | null =
-      null
+    let solved: {
+      aim: number
+      charge: number
+      landing: { x: number; z: number; seconds: number }
+      miss: number
+    } | null = null
     let limit = 0
     for (const aim of aims) {
       const farthest = flight(world, skill, heading, GAUGE_FULL, aim)
@@ -368,6 +379,7 @@ const lobOption = (world: AiWorld, skill: number, note: Note): Option | null => 
         reach: away,
         limit,
         charge: solved.charge / GAUGE_FULL,
+        flight: landing.seconds,
         ...(solved.aim === AIM_LOB ? {} : { aim: solved.aim })
       }
       note?.(option)

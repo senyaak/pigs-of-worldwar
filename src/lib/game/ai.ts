@@ -147,7 +147,16 @@ export interface AiWorld {
    * (lib/game/grenade.ts, `blastRange` of the thrown skill) — the dumbest
    * brain presses the moment a foe is merely inside it
    * (lib/game/grunt.ts, the detonation window). */
-  thrown: { x: number; z: number; resting: boolean; rim: number; speed: number } | null
+  thrown: {
+    x: number
+    z: number
+    resting: boolean
+    rim: number
+    speed: number
+    /** Seconds since the throw left the hand — what the PLANNED press is
+     * measured against (lib/game/grunt.ts). */
+    age: number
+  } | null
   /** A charge PLANTED and armed — the brain's business is being somewhere
    * else when it goes off (lib/game/grunt.ts, the flee). */
   planted: { x: number; z: number } | null

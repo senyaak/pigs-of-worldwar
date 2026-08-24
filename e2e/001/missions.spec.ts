@@ -59,15 +59,17 @@ test('the completed missions are listed, name left and record right', async ({ a
   await tap(page, 'menuSelect')
   await expect(page.locator('#missions')).toBeVisible()
 
-  // Three completed positions: boot camp and the first two missions, named
-  // off gtext's own mission table, each with its taken/available pair —
-  // position 1's record of one, the others' honest zeroes (bonusPoints is 0
-  // this early, so available follows the record).
-  await expect.poll(() => labels(page, 'missionSelect')).toHaveLength(3)
+  // EVERY real mission is a row and boot camp is not one (play: "тренировку
+  // туда не пихай"); the window shows the first eight. The two the campaign
+  // is past carry their pair — completion + survival is what a map with no
+  // specials can pay, and the parse floor gives the old pickup-only records
+  // their completion point — and every locked row is grey: no pair at all.
+  await expect.poll(() => labels(page, 'missionSelect')).toHaveLength(8)
   const names = await labels(page, 'missionSelect')
-  expect(names[0]).toContain('BOOT CAMP')
+  expect(names[0]).toContain('THE WAR FOUNDATION')
+  expect(names.join(' ')).not.toContain('BOOT CAMP')
   const pairs = await values(page, 'missionSelect')
-  expect(pairs).toEqual(['0/0', '1/1', '0/0'])
+  expect(pairs).toEqual(['1/2', '1/2', null, null, null, null, null, null])
 
   // …and it is PAINTED, not only computed (CLAUDE.md's rule).
   const distinctColors = (): Promise<number> =>

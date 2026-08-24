@@ -410,6 +410,7 @@ export function route(
     return foot
   }
   const corners: { x: number; z: number }[] = []
+  const cornerFeet: number[] = []
   let pullX = from.x
   let pullZ = from.z
   let pullFoot = startFoot
@@ -428,10 +429,31 @@ export function route(
     // walked it, so falling back to it never loses the path.
     if (foot === null) foot = feet.get(key(gx(spine[take].x), gx(spine[take].z))) ?? pullFoot
     corners.push(spine[take])
+    cornerFeet.push(foot)
     pullX = spine[take].x
     pullZ = spine[take].z
     pullFoot = foot
     i = take + 1
+  }
+  // …and PULL ONCE MORE, over the CORNERS. `PULL` bounds the spine lookahead,
+  // so a straight leg LONGER than PULL cells is invisible until the corners
+  // exist: GINGER's opening was a 405-unit micro-leg 38° off the bearing,
+  // reversed by the very next 3400-unit leg — the direct line was never even
+  // tested, 27 cells being past the horizon (telemetry, 2026-08-24, "второй
+  // свин всегда начинает свой путь как-то странно"). Corners are few and a
+  // removal re-tries the same slot, so the pass stays cheap.
+  for (let i = 0; i + 1 < corners.length; ) {
+    const prevX = i === 0 ? from.x : corners[i - 1].x
+    const prevZ = i === 0 ? from.z : corners[i - 1].z
+    const prevFoot = i === 0 ? startFoot : cornerFeet[i - 1]
+    const foot = walksTo(prevX, prevZ, prevFoot, corners[i + 1])
+    if (foot === null) {
+      i++
+      continue
+    }
+    corners.splice(i, 1)
+    cornerFeet.splice(i, 1)
+    cornerFeet[i] = foot
   }
   return corners
 }

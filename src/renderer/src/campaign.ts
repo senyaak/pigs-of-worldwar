@@ -21,6 +21,7 @@ import {
   bankReplay,
   finishMission,
   missionReward,
+  missionScore,
   newGame,
   parse,
   serialise,
@@ -120,9 +121,10 @@ export function missionWonResult(kills: readonly number[] = [], points = 0): Sav
     save.enemies[save.position] ?? bootCampEnemy(save.nation),
     save.tokens + missionReward(save.position, losses, points),
     new Date().toISOString(),
-    // …and the pickup count goes on the RECORD, which is what MISSION
-    // SELECT replays against (lib/game/save.ts, `best`).
-    points
+    // …and the mission's whole score goes on the RECORD — completion,
+    // survival and pickups, the same composition MISSION SELECT prints
+    // (lib/game/save.ts, `missionScore`).
+    missionScore(save.position, losses, points)
   )
   // Winning the training ground is what sets the tutorial flag.
   pending = save.position === 0 ? { ...won, tutorial: true } : won

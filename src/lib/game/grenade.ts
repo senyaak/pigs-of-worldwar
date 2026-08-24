@@ -388,6 +388,9 @@ export interface Lobbed {
   /** Seconds left. It runs from the THROW and nothing resets it on landing:
    * state 1 is entered three frames in and only ever leaves for state 6. */
   fuse: number
+  /** Seconds since the throw — what the brain's PLANNED press is measured
+   * against (lib/game/grunt.ts). */
+  age: number
   /** Whether it has stopped moving. Only for what draws it; the fuse does not
    * care. */
   resting: boolean
@@ -438,6 +441,7 @@ export function lob(
     vy: -Math.sin(pitch) * speed,
     vz: Math.cos(heading) * flat,
     fuse: fuseSeconds(row, random),
+    age: 0,
     resting: false,
     doused: false,
     sinking: 0

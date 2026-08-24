@@ -30,7 +30,7 @@ import { sharedBank } from './audio/bank'
 import { GAME_SOUNDS } from './audio/battleSound'
 import { fall, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
 import { fieldedAt, mapAt, mapId } from '../../lib/game/missions'
-import { nextMap } from '../../lib/game/save'
+import { missionScore, nextMap } from '../../lib/game/save'
 import { isTrainingGround } from '../../lib/game/tutorial'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
@@ -313,8 +313,10 @@ const battle = initBattle((exit, fallen, kills, points) => {
     // A REPLAY: nothing is settled — no step, no reward, no roster change.
     // What it may win is the RECORD, and that waits for CONTINUE the same
     // way a campaign result does. The debrief reads the REPLAYED position,
-    // so its bonus row and fielded count are that mission's own.
-    replayPoints = points
+    // so its bonus row and fielded count are that mission's own. The record
+    // is the mission's WHOLE score — completion, survival, pickups — the
+    // same composition the first win banked (lib/game/save.ts).
+    replayPoints = exit === 'won' ? missionScore(replaying, fallen.length, points) : 0
     debrief.show(exit === 'won', { ...save, position: replaying }, points)
     show('debrief')
     void debrief.load()

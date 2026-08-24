@@ -134,7 +134,20 @@ export function newGame(
 export function missionReward(position: number, losses: number, pickups = 0): number {
   if (position === 0) return 0
   const fifth = position > 1 && position % 5 === 0 ? 5 : 0
-  return 1 + (survivalBonus(position, losses) ? 1 : 0) + pickups + fifth
+  return missionScore(position, losses, pickups) + fifth
+}
+
+/**
+ * The MISSION'S OWN score — the reward less the every-fifth bounty, which
+ * belongs to the campaign's march rather than to the mission. This is what
+ * the RECORD keeps and what MISSION SELECT prints over `2 + bonusPoints`:
+ * play caught the record counting pickups alone ("the war foundation
+ * показывает 0/0 — не учитываются за прохождение уровня и за прохождение
+ * без смертей").
+ */
+export function missionScore(position: number, losses: number, pickups = 0): number {
+  if (position === 0) return 0
+  return 1 + (survivalBonus(position, losses) ? 1 : 0) + pickups
 }
 
 /**
@@ -170,15 +183,15 @@ export function finishMission(
   enemy: number,
   tokens: number,
   now: string,
-  /** PROPOINT pickups taken on the field — the record MISSION SELECT
+  /** The mission's own score (`missionScore`) — the record MISSION SELECT
    * replays against (`best`). */
-  pickups = 0
+  earned = 0
 ): SaveGame {
   const { squad: next, drafts } = regroup(squad, save.drafts)
   const enemies = save.enemies.slice()
   enemies[save.position] = enemy
   const best = save.best.slice()
-  best[save.position] = Math.max(bestAt(save, save.position), pickups)
+  best[save.position] = Math.max(bestAt(save, save.position), earned)
   return {
     ...save,
     position: Math.min(save.position + 1, CAMPAIGN_LENGTH),
@@ -231,6 +244,11 @@ export function parse(text: string): SaveGame | null {
   // serialises its holes as JSON nulls, and one null must not cost the
   // other twenty-five records.
   save.best = Array.isArray(save.best) ? save.best.map((one) => (isCount(one) ? one : 0)) : []
+  // …and a record UNDER what completion alone pays is from the days `best`
+  // counted pickups only: a position the campaign is PAST was finished, and
+  // finishing is a point, so the floor is 1. The survival point cannot be
+  // recovered — a replay re-earns it. Pure: seeded off the save itself.
+  for (let p = 1; p < save.position; p++) save.best[p] = Math.max(save.best[p] ?? 0, 1)
   /**
    * A SHORT ENEMY TABLE IS FILLED IN HERE, at the door, because nothing
    * downstream can cope with one and everything downstream believes it.
