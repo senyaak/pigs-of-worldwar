@@ -75,6 +75,7 @@ const world = (over: {
   wits?: number
   roll?: AiWorld['roll']
   timeLeft?: number
+  maxHealth?: number
 }): AiWorld => {
   // An open field unless a test says otherwise: the route is the goal.
   const legs = over.route ?? ((to: { x: number; z: number }) => [to])
@@ -93,6 +94,8 @@ const world = (over: {
     heading: over.heading ?? 0,
     aim: over.aim ?? 0,
     health: 50,
+    // Room to heal: what a health crate is worth is what it PUTS BACK.
+    maxHealth: over.maxHealth ?? 500,
     holding: over.holding ?? null,
     carrying: over.carrying ?? [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
   },
@@ -631,24 +634,57 @@ test('THE DUMB EYE: at wits 0 the nearest thing is the target, at wits 1 the ari
   expect(sharp.explain?.()?.chose?.target).toBe(far)
 })
 
-test('a crate at the trotters is fetched ON THE WAY: the errand, not the election', { tag: '@nodata' }, () => {
-  // "ящик/свин - что ближе": a crate never wins the election any more (a
-  // pickup and a blow are not alternatives — lib/game/evaluate.ts), so what
-  // play's rule actually asks for is the ERRAND. At wits 0 the dumb eye
-  // wants the thing at its trotters and the plan collects it first; at wits
-  // 1 five points of health are read at face, fall under the errand's own
-  // bar, and the sharp pig walks straight at the foe.
+test('NOTHING IN REACH is when a crate stands for election — and the dumb pig takes it', { tag: '@nodata' }, () => {
+  // Play's rule, 2026-08-25: "когда нет цели рядом или цели слишком далеко —
+  // тогда [ящик]. чем тупее тем больше вероятность тупого выбора ящик. а
+  // умные всегда оценивают бенефиты." The foe is 6000 off, so nothing can be
+  // struck from where the pig stands and the crate is a fair alternative:
+  // the dumb eye pulls the wits-0 pig onto the thing at its trotters, while
+  // the wits-1 pig reads five points of health at face, finds them under the
+  // shot, and walks at the foe.
   const scene = {
     foes: [foe({ z: 6000 })],
     crates: [{ x: 0, z: 200, skill: null, amount: 5 }]
   }
   const dumb = createGruntBrain()
   expect(dumb.decide(world({ ...scene, wits: 0 }))).toEqual({ kind: 'walkTo', x: 0, z: 200 })
-  expect(dumb.explain?.()?.plan?.errand).toBe(true)
+  expect(dumb.explain?.()?.chose?.kind).toBe('crate')
   const sharp = createGruntBrain()
   const order = sharp.decide(world({ ...scene, wits: 1 }))
-  expect(sharp.explain?.()?.plan?.errand).toBe(false)
+  expect(sharp.explain?.()?.chose?.kind).toBe('gun')
   expect(order.kind).toBe('walkTo')
   if (order.kind !== 'walkTo') return
   expect(order.z).toBeGreaterThan(200)
+})
+
+test('A BLOW IN HAND BEATS ANY CRATE, at every level of wits', { tag: '@nodata' }, () => {
+  // The other half of the same rule — "вижу цель — стреляю". A foe inside
+  // the rifle's own reach is struck from where the pig stands, and no
+  // pickup outbids that however near it lies or however dull the pig is.
+  const scene = {
+    foes: [foe({ z: RANGE * 0.4 })],
+    crates: [{ x: 0, z: 120, skill: null, amount: 50 }]
+  }
+  for (const wits of [0, 1]) {
+    const brain = createGruntBrain()
+    brain.decide(world({ ...scene, wits, holding: SKILL.RIFLE }))
+    expect(brain.explain?.()?.chose?.kind).toBe('gun')
+  }
+})
+
+test('A HEALTH CRATE IS WORTH WHAT IT PUTS BACK: a topped-up pig walks past one', { tag: '@nodata' }, () => {
+  // Play watched DEN take a crate at hp50, then cross the whole island for a
+  // second at hp100 and a third after that. The engine has no ceiling and
+  // that stands (lib/game/health.ts); what was wrong is the BRAIN pricing a
+  // crate at its face value to a pig with nothing to heal.
+  const scene = {
+    foes: [foe({ z: 6000 })],
+    crates: [{ x: 0, z: 200, skill: null, amount: 50 }]
+  }
+  const hurt = createGruntBrain()
+  hurt.decide(world({ ...scene, wits: 0, maxHealth: 500 }))
+  expect(hurt.explain?.()?.chose?.kind).toBe('crate')
+  const topped = createGruntBrain()
+  topped.decide(world({ ...scene, wits: 0, maxHealth: 50 }))
+  expect(topped.explain?.()?.chose?.kind).toBe('gun')
 })

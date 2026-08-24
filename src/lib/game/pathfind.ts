@@ -90,7 +90,19 @@ const spineOf = (
   end: number
 ): { x: number; z: number }[] => {
   const spine: { x: number; z: number }[] = []
+  // **THE WALK BACK IS GUARDED AGAINST A CYCLE, and the reason is not
+  // theoretical.** A cell here is not a node with one cost: the search
+  // carries the FEET's height into every step, so the same cell can be
+  // settled again, cheaper, after it has already been expanded — which is
+  // exactly what makes a walkway or a ramp work. That breaks the invariant
+  // that keeps a parent chain acyclic, and a chain that closes on itself is
+  // not a wrong route, it is a HANG: this loop would run until the array ate
+  // the process. Play met one ("а в конце щас игра тупо зависла",
+  // 2026-08-25) and this is the only unbounded loop on the path.
+  const seen = new Set<number>()
   for (let k: number | undefined = end; k !== undefined; k = parent.get(k)) {
+    if (seen.has(k)) break
+    seen.add(k)
     spine.push({ x: grid.at(grid.cellX(k)), z: grid.at(grid.cellZ(k)) })
   }
   spine.reverse()

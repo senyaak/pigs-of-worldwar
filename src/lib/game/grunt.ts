@@ -125,6 +125,15 @@ export const CHARGE_WOBBLE = 0.15
  */
 export const NEAR_POINTS = 60
 
+/**
+ * How near a corner the NEXT one is taken up — a stride and a half, which is
+ * about what the legs cover while the turn rate swings them a quarter of a
+ * circle. Small enough that the cut never leaves the corridor the route
+ * threaded, big enough that the pig rounds a bend instead of arriving at it,
+ * stopping and turning. `[deliberate]` — play's dial.
+ */
+export const TURN_IN = 384
+
 /** How many refusals in a row before the grunt stops trying to close in. A
  * body steps aside, a wall does not, and one re-plan is what tells them
  * apart (play: "он не обходит свина, а толкается в него"). `[deliberate]`. */
@@ -361,7 +370,14 @@ export function createGruntBrain(): Brain {
       // 1 поворот, и так зациклено".
       while (
         leg < plan.route.length &&
-        Math.hypot(plan.route[leg].x - me.x, plan.route[leg].z - me.z) <= GRID_STEP / 2
+        Math.hypot(plan.route[leg].x - me.x, plan.route[leg].z - me.z) <=
+          // A corner with another behind it is handed over a stride EARLY
+          // (TURN_IN), so the swing onto the next leg starts before the
+          // corner instead of at it — play: "надо чтобы по дороге можно
+          // было выворачивать на них". The LAST corner is the mark the blow
+          // is struck from and gets no such licence: arriving at it is the
+          // point.
+          (leg + 1 < plan.route.length ? TURN_IN : GRID_STEP / 2)
       ) {
         leg++
       }

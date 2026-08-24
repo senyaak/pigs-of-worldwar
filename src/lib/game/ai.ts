@@ -131,6 +131,14 @@ export interface AiWorld {
     /** Its own health bar — the blast pricing counts the thrower among the
      * bodies a bad throw costs (lib/game/evaluate.ts). */
     health: number
+    /** …and what its class STARTS at (lib/game/health.ts, `maxHealthFor`).
+     * There is no ceiling in the engine — a 50-point crate on a 50-point
+     * grunt leaves it at a hundred and the original allows it — so this is
+     * not a clamp. It is what the brain calls TOPPED UP: a pig at or above
+     * it gains nothing it can name from another health crate, which is what
+     * stopped DEN crossing the map for a second one at hp100 (play,
+     * 2026-08-25). */
+    maxHealth: number
     holding: number | null
     carrying: Slot[]
   }

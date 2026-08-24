@@ -20,7 +20,7 @@ import { advanceCarry, carryIn, carryOut, doorwayStart } from './doorway'
 import type { Carry } from './doorway'
 import type { LocomotionState } from './locomotion'
 import { withPigs } from './obstacles'
-import { isDead, woundBand } from './health'
+import { isDead, maxHealthFor, woundBand } from './health'
 import { aimPhase, aimRadians, scrubsPose } from './aim'
 import { weaponOf } from './weapons'
 import type { Firing } from './shot'
@@ -1266,6 +1266,7 @@ export function createBattle(parts: BattleParts): Battle {
               heading: acting.heading,
               aim: sights.angle(),
               health: acting.health,
+              maxHealth: maxHealthFor(acting.pigClass),
               holding: acting.holding,
               carrying: acting.carrying.map((slot) => ({ ...slot }))
             },

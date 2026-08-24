@@ -32,7 +32,16 @@
 import type { AiWorld, Candidate, Seen } from './ai'
 import { damageOf, projectileOf, rangeOf } from './projectile'
 import { meleeOf } from './melee'
-import { advanceLob, blastRange, blastShare, isPlanted, lob, lobOf } from './grenade'
+import {
+  advanceLob,
+  blastRange,
+  blastShare,
+  isPlanted,
+  lob,
+  lobOf,
+  skipOffWater,
+  skipsOnWater
+} from './grenade'
 import { GAUGE_FULL } from './gauge'
 import { AIM_LOB } from './aim'
 import { WALK_SPEED } from './movement'
@@ -237,6 +246,11 @@ export const COLLECT_NEAR = 40
 const SIM_STEP = 1 / 30
 const SIM_SECONDS = 6
 
+/** How many hops off the water the dry run will follow. Each one spends a
+ * fifth of the travel, so five is already past the point where the next
+ * contact douses it — this is a guard, not a rule. */
+const SKIP_LIMIT = 8
+
 /** One choice, priced. `score` is what the selection compares — worth less
  * the approach tax; `worth` is the undiscounted HP differential. A
  * `Candidate` (lib/game/ai.ts) plus what the carrying-out needs. */
@@ -313,7 +327,7 @@ const flight = (
   heading: number,
   charge: number,
   aim = AIM_LOB
-): { x: number; z: number; seconds: number } => {
+): { x: number; z: number; seconds: number; doused: boolean } => {
   const shot = lob(
     skill,
     { x: from.x, y: from.y - THROW_RISE, z: from.z },
@@ -323,12 +337,36 @@ const flight = (
     () => 0
   )!
   let seconds = 0
+  let doused = false
+  let skips = 0
   for (; seconds < SIM_SECONDS; seconds += SIM_STEP) {
     if (advanceLob(shot, SIM_STEP)) break
-    // Y-DOWN: at or below the ground when y has grown past it.
-    if (shot.y >= world.groundAt(shot.x, shot.z)) break
+    // Y-DOWN: at or below the ground when y has grown past it. Over water
+    // `groundAt` is the SURFACE, so this is the water contact too.
+    if (shot.y < world.groundAt(shot.x, shot.z)) continue
+    if (!world.wet(shot.x, shot.z)) break
+    // **THE SKIP OFF WATER.** Play asked whether the brain knows about it —
+    // "можно параллельно воде пустить прожектайл гранаты или базуки и он
+    // проскачет" — and it did not: the dry run stopped at the waterline and
+    // priced every throw over water as drowned. The engine's own rule is
+    // right here (lib/game/grenade.ts, read out of `Projectile::OnHitLandscape`
+    // at 0x437c74: fast and GRAZING is kicked a fifth of its travel straight
+    // up, steep or slow goes in and never goes off), so the lookahead asks
+    // it rather than guessing.
+    //
+    // What the dry run leaves out is the tile's own material — `bounceLob`,
+    // which the engine resolves before the kick. On a flat skim the normal
+    // approach is a fraction of the travel and the pair costs about two per
+    // cent a hop, so the prediction runs a little long and never short.
+    if (skips < SKIP_LIMIT && skipsOnWater(shot)) {
+      skipOffWater(shot)
+      skips++
+      continue
+    }
+    doused = true
+    break
   }
-  return { x: shot.x, z: shot.z, seconds }
+  return { x: shot.x, z: shot.z, seconds, doused }
 }
 
 /** The blast at `landing`, priced over EVERYONE: foes positive, friends and
@@ -613,7 +651,7 @@ const lobOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): 
     let solved: {
       aim: number
       charge: number
-      landing: { x: number; z: number; seconds: number }
+      landing: { x: number; z: number; seconds: number; doused: boolean }
       miss: number
     } | null = null
     for (const aim of aims) {
@@ -640,12 +678,13 @@ const lobOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): 
       dead(throwAway)
       continue
     }
-    // A lob that comes down ON WATER is worth nothing at all: the engine
-    // DOUSES it at the surface (lib/game/grenade.ts) and there is no blast
-    // to price. Without this line a doused throw scored like a dry one, and
-    // a brain repeated it every turn forever.
+    // A lob the water DOUSED is worth nothing at all — no blast, no damage,
+    // the engine sets the quiet flag and it never goes off. But a throw that
+    // SKIMMED is worth wherever it finally came down, which may be the far
+    // bank: the dry run above follows the hops, so the test is what the
+    // flight actually ended in and not merely whether the last spot is wet.
     const { landing } = solved
-    const worth = world.wet(landing.x, landing.z)
+    const worth = landing.doused
       ? 0
       : blastWorth(world, landing, damage, spread, false, stand)
     const score = trueScore(world, worth, stand.walk)
@@ -708,9 +747,18 @@ const crateOption = (
     0
   )
   const appetite = appetiteOf(world)
+  // **A HEALTH CRATE IS WORTH WHAT IT PUTS BACK, not what it holds.** The
+  // engine has no ceiling — `Pig::Heal` adds and stops, so 50 points on a
+  // 50-point grunt leaves it at a hundred and that stands (lib/game/
+  // health.ts) — but a pig already at its class's own starting health has
+  // nothing it can NAME to gain, and play watched what pricing the crate's
+  // face value instead does: DEN took one at hp50, then crossed the whole
+  // map (24 931 units, the plan line says so) for a second at hp100, then a
+  // third. "Побежал за аптечкой… а потом за второй побежал."
+  const missing = Math.max(0, me.maxHealth - me.health)
   const gain =
     crate.skill === null
-      ? crate.amount * appetite
+      ? Math.min(crate.amount, missing) * appetite
       : have === 0
         ? weaponPoints(crate.skill)
         : Math.max(0, weaponPoints(crate.skill) - have) * appetite
@@ -877,7 +925,20 @@ export function priceKit(
             meleeOption(world, slot.skill, note))
     )
   }
-  // Priced and REPORTED, never elected (see above).
-  for (const crate of world.crates) crateOption(world, crate, note, walked)
+  // **A CRATE STANDS FOR ELECTION ONLY WHEN THERE IS NOTHING TO HIT.** Play's
+  // ruling, 2026-08-25: "когда нет цели рядом или цели слишком далеко —
+  // тогда." A blow that can be struck from where the pig STANDS is the whole
+  // answer at every level of wits — "вижу цель — стреляю" — and no pickup
+  // outbids it. Once the pig has to walk anyway the crate is a fair
+  // alternative, and which way it goes is the JUDGMENT's business: the dumb
+  // eye pulls hard toward whatever is nearest, so "чем тупее — тем больше
+  // вероятность тупого выбора ящик", while at the top of the scale the
+  // appetite is 1, the near bonus is 0 and only the arithmetic speaks —
+  // "умные всегда оценивают бенефиты".
+  const inHand = best !== null && (best as Option).walk === 0
+  for (const crate of world.crates) {
+    const option = crateOption(world, crate, note, walked)
+    if (!inHand) keep(option)
+  }
   return best
 }

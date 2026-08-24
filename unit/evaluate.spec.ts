@@ -60,6 +60,7 @@ const world = (over: {
   foes?: Seen[]
   friends?: Seen[]
   health?: number
+  maxHealth?: number
   crates?: AiWorld['crates']
   wits?: number
   wet?: AiWorld['wet']
@@ -81,6 +82,8 @@ const world = (over: {
     heading: 0,
     aim: 0,
     health: over.health ?? 50,
+    // Room to heal: what a health crate is worth is what it PUTS BACK.
+    maxHealth: over.maxHealth ?? 500,
     holding: null,
     carrying: over.carrying ?? [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
   },
@@ -225,15 +228,14 @@ test('an UNARMED pig fetches a weapon crate at full worth: necessity is not gree
   // fight to be had. An unarmed pig is the second case and the appetite does
   // not apply to it — the errand wants it outright.
   const scene = world({ carrying: [], crates: [{ x: 0, z: 2000, skill: SKILL.RIFLE, amount: 2 }] })
-  expect(priceKit(scene)).toBeNull()
-  const errand = crateErrand(scene)!
-  expect(errand.kind).toBe('crate')
-  expect(errand.worth).toBeCloseTo(damageOf(SKILL.RIFLE), 5)
+  const option = priceKit(scene)!
+  expect(option.kind).toBe('crate')
+  expect(option.worth).toBeCloseTo(damageOf(SKILL.RIFLE), 5)
 })
 
 test('with nobody left to shoot, a health crate is worth the stroll', { tag: '@nodata' }, () => {
   const scene = world({ foes: [], crates: [{ x: 0, z: 1000, skill: null, amount: 50 }] })
-  expect(priceKit(scene)).toBeNull()
+  expect(priceKit(scene)!.kind).toBe('crate')
   expect(crateFallback(scene)!.kind).toBe('crate')
 })
 

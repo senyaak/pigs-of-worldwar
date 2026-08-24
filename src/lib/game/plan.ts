@@ -38,6 +38,28 @@ import { WALK_SPEED } from './movement'
 export const ERRAND_SPARE = 12
 
 /**
+ * **AND THE ERRAND HAS TO BE ON THE WAY.** The clock alone is not a bound:
+ * a first-map turn is 99 seconds and `WALK_SPEED` covers four maps in one,
+ * so "does it fit" said yes to everything. Play watched the result on
+ * 2026-08-25 — DEN's own plan line reads `-> -1792,5376 (errand) walk
+ * 24931`, which is the whole island for one health crate, and NOBBY ran
+ * 4496 for another rather than shoot: "третий побежал за аптечкой — хотя
+ * мог гранату кинуть во врага; тупой так и должен был сделать."
+ *
+ * So the DETOUR is what is measured — the walk to the crate plus the walk
+ * onward, LESS the walk the turn was going to make anyway — and it may add
+ * no more than this fraction of the direct walk, plus `ERRAND_REACH` so a
+ * crate at the trotters is always worth the step. `[deliberate]`.
+ */
+export const ERRAND_DETOUR = 0.25
+
+/** …and the detour every errand is allowed whatever the walk, in world
+ * units — four tiles, near enough to be genuinely on the way. Without it a
+ * blow that needs NO walk would allow no detour at all, and a crate a stride
+ * away would be stepped over. `[deliberate]`. */
+export const ERRAND_REACH = 4 * 512
+
+/**
  * How far ahead the plan floods the ground: this turn's walking and one
  * more turn's. A plan may honestly want a walk that outlasts the clock —
  * the pig carries it on next turn — but nothing beyond that is a plan, it
@@ -147,15 +169,20 @@ export function makePlan(
   if (option.kind !== 'plant' && option.kind !== 'crate') {
     const found = crateErrand(world, judge, walked, skip)
     if (found) {
-      // The clock's question: the walk there, the walk ONWARD to the blow's
-      // own mark, and the spare the blow itself wants. The onward leg is
-      // the crow line — one flood is one start, and the slack in
-      // `ERRAND_SPARE` is what covers its optimism.
+      // The onward leg is the crow line — one flood is one start, and the
+      // slack in `ERRAND_SPARE` is what covers its optimism.
       const onward = Math.hypot(
         option.stand.x - found.target.x,
         option.stand.z - found.target.z
       )
-      if ((found.walk + onward) / WALK_SPEED + ERRAND_SPARE <= world.timeLeft) errand = found
+      const together = found.walk + onward
+      // ON THE WAY (ERRAND_DETOUR), and then IN THE CLOCK: the walk there,
+      // the walk onward, and the spare the blow itself wants.
+      const detour = together - option.walk
+      const allowed = option.walk * ERRAND_DETOUR + ERRAND_REACH
+      if (detour <= allowed && together / WALK_SPEED + ERRAND_SPARE <= world.timeLeft) {
+        errand = found
+      }
     }
   }
 

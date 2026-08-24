@@ -102,16 +102,32 @@ const AIM_STUCK_SECONDS = 0.5
 
 /**
  * A walk is TURN FIRST, THEN GO — play's own spec ("надо сделать повороты и
- * хождение полностью отдельными"), refined by play once more after the
- * strict version shipped: taken literally it made EVERY small elbow of a
- * grid route a full stop ("повернулся — шаг — повернулся — шаг… тупил, пока
- * время не кончилось"). So the rule is about BIG turns: outside this band
- * the pig stops and turns on the spot; inside it, it walks and steers the
- * small correction through — no wide curved approaches, no stuttering at
- * bends. The route's own string-pulling (lib/game/pathfind.ts) keeps legs
- * long and straight, so the band is rarely consulted mid-leg at all.
+ * хождение полностью отдельными") — but the band that decides WHICH turns
+ * get a full stop has now been set twice by play, in opposite directions,
+ * and the second reading is the one that stands.
+ *
+ * It began strict, and every small elbow of a grid route became a full stop
+ * ("повернулся — шаг — повернулся — шаг… тупил, пока время не кончилось").
+ * It was softened to an eighth of a turn, and play watched a pig stop dead
+ * at every corner of its route anyway. The correction, 2026-08-25: "поиск
+ * пути ищет путь по точкам — но надо чтобы по дороге можно было выворачивать
+ * на них; то что я говорил про повороты во время ходьбы касалось тупого
+ * чередования и зависания." So the complaint was never about STEERING while
+ * walking — it was about the alternation, one step then one turn then one
+ * step, which is a route rebuilt under the pig rather than a bend taken on
+ * the move (that half is fixed in lib/game/plan.ts).
+ *
+ * So the band goes to SIXTY DEGREES, and no further, and the geometry is
+ * what sets the ceiling rather than taste: the legs cover 1040 units a
+ * second and the turn rate is 32/4096 of a circle a frame, which is 42° a
+ * second, so a bend taken on the move carves an arc about 1400 units
+ * across. At 60° that is a wide corner; at 90° it is a loop that would miss
+ * whatever the corner was there to avoid. Sharper than 60° is a reversal
+ * and is still taken on the spot. The brain hands the next corner over a
+ * stride early (lib/game/grunt.ts, `TURN_IN`) so the swing begins before the
+ * corner rather than at it.
  */
-const REALIGN = Math.PI / 8
+const REALIGN = Math.PI / 3
 
 /** The shortest way round: (-π, π]. Brains borrow it (lib/game/grunt.ts). */
 export const shortest = (angle: number): number => {
