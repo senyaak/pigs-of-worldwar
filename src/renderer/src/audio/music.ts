@@ -76,6 +76,23 @@ export const trackFor = (clip: number): string =>
 export const setFor = (skin: number): number =>
   Math.max(0, Math.trunc(skin)) % Math.floor(MUSIC_CLIPS / SET_SIZE)
 
+/**
+ * The EVENT set — clips 24..27, i.e. Track27..Track30, the seventh set that
+ * no side owns. The exe rolls one with `rand()&3 + 24` at exactly two sites:
+ * a SUPPLY CRATE coming down (0x496c25) and hidden REINFORCEMENTS falling
+ * due (0x49742f). `speech/pigs.md`, 2026-08-24.
+ */
+export const EVENT_SET = 6
+export const eventClip = (roll: number): number =>
+  EVENT_SET * SET_SIZE + Math.min(SET_SIZE - 1, Math.max(0, Math.floor(roll * SET_SIZE)))
+
+/**
+ * The END OF MISSION clip — 28, i.e. **Track31**, played at 0x48fb08 where
+ * the training ground plays the sergeant instead. Clip 29 (Track32) has no
+ * caller anywhere in the image.
+ */
+export const END_CLIP = 28
+
 export interface Music {
   /**
    * A turn has begun for this side: play the next of its four. `skin` picks

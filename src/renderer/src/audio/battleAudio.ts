@@ -96,6 +96,11 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
         if (barrel) playCue(bank(), BATTLE_SOUNDS[barrel])
       },
       whoosh: () => playCue(bank(), BATTLE_SOUNDS.whoosh),
+      // A blade that caught nothing (lib/game/strikes.ts) — the sample's own
+      // moment, which it had never been played at.
+      swungWide: () => playCue(bank(), BATTLE_SOUNDS.swingWide),
+      // …and the CLOCK crossing its hurry mark, once a turn.
+      clockLow: () => playCue(bank(), BATTLE_SOUNDS.clockLow),
       struck: ({ skill }) => {
         const weapon = meleeOf(skill)
         if (weapon) playCue(bank(), BATTLE_SOUNDS[weapon.impact])

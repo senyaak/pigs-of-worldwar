@@ -780,6 +780,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       now.lobs.filter((one) => isPlanted(one.skill) && one.fuse >= 0).map((one) => one.fuse),
       delta
     )
+    // …and the war beyond the map's edge, which nothing on the field causes
+    // and so nothing announces (audio/ambience.ts). It stops with the world:
+    // `show` runs on a delta of zero under a pause.
+    sounds.ambient(delta, !now.over)
     const active = squad.of(now.acting)
     if (!active) return
     if (!now.dropping && !now.starting && !now.over) {

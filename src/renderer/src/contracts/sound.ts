@@ -37,6 +37,16 @@ export interface SceneSound {
    */
   fuseBurning(remaining: readonly number[], delta: number): void
   /**
+   * The war going on somewhere ELSE — the distant battle and the birds
+   * (audio/ambience.ts).
+   *
+   * A poll for the plainest reason of all: nothing in the battle causes it,
+   * so there is no event to hang it on; it needs a clock and this is the
+   * clock the scene already has. `running` false stops it dead, which is
+   * what a pause is.
+   */
+  ambient(delta: number, running: boolean): void
+  /**
    * What a SPEC listens to: the cues played, and the lines the pigs have
    * spoken. A sound is a file being decoded and nothing an assertion can hear,
    * so the debug window reads these instead (three/debug.ts).

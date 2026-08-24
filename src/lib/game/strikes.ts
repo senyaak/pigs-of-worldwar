@@ -206,6 +206,13 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
         emit({ kind: 'broke', target: dummy.id, at: { x: dummy.x, y: dummy.y, z: dummy.z } })
       }
     }
+
+    // **AND A SWING THAT CAUGHT NOTHING SAYS SO.** `I_SWMISS` is the sample
+    // play placed as the miss (docs/todo.md P2) and it had been wired to the
+    // grenade's whoosh alone. Two moments, one sound; this is the other one.
+    if (report.candidates.every((one) => !one.hit) && report.dummies.every((one) => !one.hit)) {
+      emit({ kind: 'swungWide', at: from })
+    }
   }
 
   return {

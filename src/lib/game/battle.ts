@@ -26,6 +26,7 @@ import type { Firing } from './shot'
 import { advanceAftermath, beginAftermath, watchAftermath } from './aftermath'
 import type { Aftermath } from './aftermath'
 import { AI_FUSE_SECONDS, AI_MULL_SECONDS, AI_START_SECONDS } from './ai'
+import { CLOCK_WARNING } from './turns'
 import { createActuator } from './actuator'
 import type { Order } from './orders'
 import { createGruntBrain } from './grunt'
@@ -1122,7 +1123,17 @@ export function createBattle(parts: BattleParts): Battle {
       aftermath !== null ||
       swings.running() ||
       grenades.thrown() > 0
+    const wasLeft = game.timeLeft
     const ranOut = !blowInProgress && game.tick(delta)
+    // **THE CLOCK STARTING TO RUN OUT** — S_CLOCK is what the ear placed it
+    // as, and nothing had ever asked for it (docs/todo.md P2). Announced on
+    // the CROSSING, once a turn: the clock only runs down, and a turn that
+    // begins already inside the window (a hurried one, lib/game/spend.ts)
+    // still gets it, because the beat at the top holds the clock above the
+    // mark until it starts.
+    if (wasLeft > CLOCK_WARNING && game.timeLeft <= CLOCK_WARNING && game.timeLeft > 0) {
+      emit({ kind: 'clockLow', secondsLeft: game.timeLeft })
+    }
     if (!blowInProgress && (ranOut || isDead(game.currentPig))) {
       // **THE TURN NOBODY DID ANYTHING WITH.** The exe says a line about it, in
       // this exact block and on this exact condition (0x4900A2): the clock ran

@@ -8,7 +8,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { TURN_SECONDS_BY_POSITION, turnSecondsFor } from '../src/lib/game/turns'
+import { CLOCK_WARNING, TURN_SECONDS_BY_POSITION, turnSecondsFor } from '../src/lib/game/turns'
 import { CAMPAIGN } from '../src/lib/game/missions'
 import { DEFAULT_TURN_SECONDS } from '../src/lib/game/game'
 
@@ -40,4 +40,14 @@ test('an arena is in neither table and falls back on the default', { tag: '@noda
 test('every campaign position has a turn length, plus the unreachable 27th', { tag: '@nodata' }, () => {
   expect(CAMPAIGN).toHaveLength(26)
   expect(TURN_SECONDS_BY_POSITION).toHaveLength(27)
+})
+
+test('the HURRY mark sits inside every turn the campaign gives', { tag: '@nodata' }, () => {
+  // S_CLOCK rides this (audio/battle.ts, `clockLow`), so a mark at or above
+  // the shortest turn would sound the moment that turn began — and the
+  // tightest the campaign gets is Hamburger Hill's fifteen seconds, which is
+  // also the floor the exe's own late-turn window needs (0x4915E9).
+  expect(CLOCK_WARNING).toBeLessThan(Math.min(...TURN_SECONDS_BY_POSITION))
+  expect(CLOCK_WARNING).toBeLessThan(turnSecondsFor('FOOT'))
+  expect(CLOCK_WARNING).toBeGreaterThan(0)
 })

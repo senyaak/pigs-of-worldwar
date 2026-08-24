@@ -779,9 +779,14 @@ export function initBattle(
     // being separable — which is what `npm run boundaries` checks.
     sound?.dispose()
     const bus = createBus()
-    // The sides' NATIONS ride along for the music: a turn's theme is the
-    // acting side's own set, keyed by skin (audio/music.ts, `setFor`).
-    sound = createBattleSound(bus, squads.map((squad) => squad.nation))
+    // The sides' NATIONS ride along for the music and the voices — a turn's
+    // theme and a pig's tongue are its own side's (audio/music.ts,
+    // audio/pigVoice.ts) — and the training ground says so, because its end
+    // of mission is the sergeant's rather than the closing track.
+    sound = createBattleSound(bus, {
+      nations: squads.map((squad) => squad.nation),
+      training: isTrainingGround(name)
+    })
     // The AI tap's repeat squeeze: a live grenade is watched EVERY FRAME
     // (AI_FUSE_SECONDS = 0), which wrote 110 identical `watch` lines into one
     // throw's two seconds. An identical decision counts up silently and the

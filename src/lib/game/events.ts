@@ -40,6 +40,9 @@ export type BattleEvent =
   | { kind: 'whoosh' }
   /** …and it landed on a body: the weapon's own impact noise and its rings. */
   | { kind: 'struck'; skill: number; at: Point }
+  /** …and a swing that caught NOTHING — the blade's own miss, which is what
+   * `I_SWMISS` is (audio/battle.ts). `at` is where the swinger stands. */
+  | { kind: 'swungWide'; at: { x: number; z: number } }
   /** Something took points here — the number that floats off it. `pig` is
    * present when the body is a PIG — the hurt noise is his; a dummy or a
    * prop takes its points in silence (audio/battleAudio.ts). */
@@ -162,6 +165,9 @@ export type BattleEvent =
    * (lib/game/tutorial.ts). Only where there is a script to say it.
    */
   | { kind: 'turnWasted' }
+  /** The turn clock has crossed its HURRY mark (lib/game/turns.ts,
+   * `CLOCK_WARNING`) — once a turn, and what S_CLOCK sounds on. */
+  | { kind: 'clockLow'; secondsLeft: number }
   /**
    * THE MISSION IS OVER — asked at the handover and nowhere else, which is where
    * the exe asks it (lib/game/endOfGame.ts). `turns` is how many were played, and

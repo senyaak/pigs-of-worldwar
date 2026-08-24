@@ -50,3 +50,16 @@ const BY_MAP: Record<string, number> = Object.fromEntries(
 /** Seconds on the clock for a map, by its archive name (`CAMP`, `LIBERATE`). */
 export const turnSecondsFor = (map: string): number =>
   BY_MAP[map.toUpperCase()] ?? DEFAULT_TURN_SECONDS
+
+/**
+ * When the clock says HURRY — the mark `clockLow` crosses, and what S_CLOCK
+ * sounds at (audio/battle.ts; play placed the sample by ear, "также когда
+ * время кончаться начинает вроде").
+ *
+ * Ten seconds, and it is not arbitrary: the exe's own late-turn window — the
+ * sergeant's tick-tock lines, MULTIPLAYER only — opens at ten seconds left
+ * and closes at six, on a limit over fifteen (0x4915E9, docs/todo.md P1).
+ * The same mark, since the moment is the same one. `[exe]` for the ten;
+ * that a SOUND rides it is the remake's own reading of play's ear.
+ */
+export const CLOCK_WARNING = 10

@@ -150,11 +150,22 @@ export interface Cue {
  * `BG_GAS`, `hiss1` and `hiss2`, all three of them placed elsewhere. So the
  * charge's burn is its TIMER, and that is an answer rather than a gap.
  *
- * The rest of this is a work list rather than a table: nine of these are
- * placed by ear and wired to nothing — the turn clock's own warning, a round
- * hitting a wall against a round hitting meat, the blast inside a building,
- * the swing that missed, the battle ambience, the two birds, and
- * the airships nothing on our maps flies. See `docs/todo.md`.
+ * The work list that used to sit here is nearly spent. WIRED since:
+ * `I_BUILD`/`I_BULIT1` (a round on a wall against a round in meat,
+ * `shotLanded`), `S_UNHOLS` (the turn's end holsters), `S_CLOCK` at the turn
+ * clock's own warning as well as a fuse (`clockLow`), `I_SWMISS` at the
+ * blade's own miss as well as the throw's whoosh (`swungWide`), and
+ * `BATT_L1..3`/`BATT_S1..3`/`AMB_1D`/`AMB_2D` as the war beyond the map's
+ * edge (audio/ambience.ts).
+ *
+ * STILL PLACED AND UNPLAYED, and each for a reason rather than for want of
+ * a line: `I_METAL` — a blast INSIDE a building — because nothing can ask
+ * whether a burst went off indoors (`Indoors` tests a PIG, not a point:
+ * lib/game/indoors.ts), and inventing that seam for a sound is the wrong
+ * order of work; `EN_BIP`, the AIRSHIPS, which is a missing PROP before it
+ * is a missing sound; and the weapon reports for weapons we do not field
+ * yet (`L_ARTIL`, `L_MORT`, `L_ROC`, `L_SHOTG`, `L_HVYMG`, `L_MGUN`,
+ * `L_FLAME`), one line each the day their weapon lands. See `docs/todo.md`.
  */
 /**
  * **WHAT IS ALREADY PLACED** — by ear, by wiring, or by the exe's own table.
@@ -263,6 +274,15 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * comes just before the blast. */
   fuseOut: { sound: 'L_MINETR', volume: 100, pitch: 100 },
   /**
+   * **THE TURN CLOCK STARTING TO RUN OUT** — the same sample, and the moment
+   * play actually named it for: "также когда время кончаться начинает
+   * вроде". It had been playing for a charge's fuse and nowhere for the
+   * clock itself. Once a turn, on the crossing (lib/game/turns.ts,
+   * `CLOCK_WARNING`); louder than the fuse's, because it is about the player
+   * rather than about a thing on the field.
+   */
+  clockLow: { sound: 'S_CLOCK', volume: 100, pitch: 100 },
+  /**
    * A thrown thing being DOUSED by water. DECODED, mix and all: the projectile's
    * water arm plays index **25** at volume **0x50** with a pitch of
    * `0x5F + (rand & 0x1F)` (0x437cf3), and index 25 of `Audio/sfxday.srl` is
@@ -339,6 +359,11 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * immediates and have not been chased; the nominal mix stands in.
    */
   whoosh: { sound: 'I_SWMISS', volume: 100, pitch: 100 },
+  /** …and the SWING'S OWN MISS, which is what the sample was placed as
+   * ("I_SWMISS 0.30 a swing that MISSED") and which was going unplayed while
+   * the throw's whoosh borrowed it. Two moments, one sound — the blade's
+   * comes off `swungWide` (lib/game/strikes.ts). */
+  swingWide: { sound: 'I_SWMISS', volume: 100, pitch: 95, jitter: 15 },
   stab: { sound: 'I_STAB', volume: 100, pitch: 100 },
   sword: { sound: 'I_SWORD', volume: 100, pitch: 100 },
   punch: { sound: 'P_PUNCH', volume: 100, pitch: 100 },

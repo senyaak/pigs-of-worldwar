@@ -19,7 +19,8 @@ import { sarge as theSarge } from './sarge'
 import type { Sarge } from './sarge'
 import type { PigVoice } from './pigVoice'
 import { createSoundConsole } from './console'
-import { createMusic, trackFor } from './music'
+import { createAmbience } from './ambience'
+import { createMusic, eventClip, trackFor, END_CLIP } from './music'
 import type { Music } from './music'
 import { BATTLE_SOUNDS, playCue } from './battle'
 import type { Cue } from './battle'
@@ -45,7 +46,18 @@ export interface BattleSound extends SceneSound {
  * nothing that draws is needed to build it.
  *
  */
-export function createBattleSound(bus: BattleBus, nations: number[] = []): BattleSound {
+export function createBattleSound(
+  bus: BattleBus,
+  parts: {
+    /** Which NATION each side wears — what picks its music set and its
+     * tongue (audio/music.ts, audio/pigVoice.ts). */
+    nations?: number[]
+    /** Whether this is the TRAINING GROUND, where the exe plays the
+     * sergeant's sign-off instead of the end-of-mission track (0x48fb08). */
+    training?: boolean
+  } = {}
+): BattleSound {
+  const nations = parts.nations ?? []
   let bank: Bank = SILENT
   let sounds: BattleSounds = createBattleSounds(bank)
   /**
@@ -77,6 +89,9 @@ export function createBattleSound(bus: BattleBus, nations: number[] = []): Battl
 
   const audio = createBattleAudio(() => bank)
   bus.on(audio.listen)
+  /** …and the war beyond the map's edge, which is a CLOCK rather than a
+   * listener: nothing on the field causes it (audio/ambience.ts). */
+  const ambience = createAmbience(() => bank)
   /** The pigs' own barks. The gun arm of `Pig::Fire` says one every shot,
    * walking twelve lines in rotation (audio/pigVoice.ts) — and a pig DIES on
    * a line too: the exe speaks category 04/05 the moment the dying clip
@@ -139,6 +154,17 @@ export function createBattleSound(bus: BattleBus, nations: number[] = []): Battl
         // (audio/music.ts, `setFor`): the theme YOUR turn opens on is your
         // own nation's.
         music.turn(player, skinOf(nations[player] ?? player))
+      },
+      // **A SUPPLY CRATE COMING DOWN takes the seventh set** — the four
+      // tracks no side owns, rolled `rand()&3` (0x496c25). Reinforcements
+      // are the other site and the remake has none yet. The roll is the
+      // WALL CLOCK's, not the battle's stream: music is not simulation and
+      // must never touch the lockstep rng (docs/ai.md).
+      crateSent: () => music.play(eventClip(Math.random())),
+      // …and the MISSION'S OWN end: Track31, where the training ground
+      // plays the sergeant's sign-off instead (0x48fb08, ui/battle.ts).
+      missionOver: () => {
+        if (!parts.training) music.play(END_CLIP)
       }
     })
   )
@@ -163,6 +189,7 @@ export function createBattleSound(bus: BattleBus, nations: number[] = []): Battl
     reset: () => sounds.reset(),
     chuteOverhead: audio.chuteOverhead,
     fuseBurning: audio.fuseBurning,
+    ambient: (delta, running) => ambience.update(delta, running),
     played: () => bank.played(),
     spoken: () => voice.spoken(),
     sargeSaying: () => sarge.saying(),
