@@ -1082,3 +1082,32 @@ units — the letters in the plate's own scale, the outline in screen pixels —
 which is what lets them move apart: smaller letters inside an outline that does
 not shrink with them is more black around each glyph, which is what the pair of
 requests adds up to.
+
+
+## 2026-08-24 — MISSION SELECT, and the award flies in as coins
+
+Play ordered both in one line: a replay door on the squad screen wearing
+LOAD GAME's interface, and the points "прям прилетают с анимацией -
+дизасм надо". The disasm delivered a whole little system nobody had seen:
+a frontend particle framework at 0x419190-0x4199D0 whose token class
+flies 40x40 quads from above the screen (x 320..519, y -20 in half-res)
+onto the pigpro pile at (323,189), one every five frames, each axis a
+jittered damped spring (accel 5, damping x100/128, jitter +/-6, snap
+inside 6); the whole award is subtracted from team+0x50 when the chain
+starts and every landing coin adds one back, so the board's number
+climbs on screen; the landing plays FESounds 23 COINFLIP. The two
+promote arms run the same class with type 1 - coins off the pile and out
+the bottom to 22 COINDROP. The trigger is a one-shot flag at team+0x29E
+written only by the debrief's award. It also closed two old questions:
+0x4287CB is the arm that writes the pigpro board (the "no arm seen"
+note), and "sergeant category 22 over the award animation" was a
+mis-mapping - 22 is COINDROP's bank id.
+
+Built as read (ui/playerScreen.ts, the coin block): same numbers, same
+counter arithmetic, same sounds, the vp coin standing in for the exe's
+untextured quad and the sparkle trail unbuilt. MISSION SELECT itself is
+the remake's own screen (ui/missionSelect.ts) on loadScreen's furniture;
+the record and the banking are lib/game/save.ts `best`/`bankReplay`,
+the flow main.ts `replaying`. The e2e/001 phase also got four stale
+specs walked forward to the 2026-08-21 BACK-to-menu rule - the phase
+had not been run against a fresh build since.

@@ -1147,6 +1147,22 @@ Non-AI bugs from the same session, queued after the AI:
    on the page's own tick; `pcmedal` stays only as the fallback for a
    failed load. Framing/spin rate `[CHECK — remake]`.
 
+**MISSION SELECT and the coin fly-in — BUILT 2026-08-24 (play's order of the
+same afternoon).** The squad screen carries a second plate, SELECT MISSION,
+opening the replay list on LOAD GAME's furniture: completed missions only,
+name LEFT, the `vp` token and `taken/available` PP on the right, scrolling
+past eight. A replay goes straight to the briefing, never moves the
+campaign, and its CONTINUE banks only what beats the position's record
+(`best` in lib/game/save.ts — parse repairs older files). And the AWARD is
+the exe's own COIN SHOW, read the same day (0x4196E0 family, notes in the
+disasm repo): points fly onto the `pigpro` pile one coin per five frames on
+a jittered damped spring, the counter climbing one per landing to COINFLIP;
+a promotion's spend runs it backwards to COINDROP. `[CHECK — remake]`: the
+`vp` art over the exe's untextured quad, the sparkle trail unbuilt, the
+second plate's y. The 2026-08-21 BACK-to-menu change had left four e2e/001
+specs walking the old chain — caught here because nobody had run the phase
+on a fresh build since; they walk the current rules now.
+
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens
 (`bonusPoints(1)` is 0 — the first mission pays none), the empty power-gauge
