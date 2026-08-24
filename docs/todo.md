@@ -1092,6 +1092,45 @@ Non-AI bugs from the same session, queued after the AI:
     page shows is still unread (the exe spins `chars\propoint.mad`); the
     medal is play's word, `[CHECK — remake]` at the token.
 
+**Play's reports from the fourth AI session (2026-08-24, `_tmp/telemetry.log`
+12:00–12:09) — ALL FOUR ANSWERED the same day:**
+
+1. ~~"Всё ещё сильно умный: пошёл через всю карту к тому кто почти умер."~~
+   The log acquitted the kill bonus — it is already wits-scaled and gave
+   GINGER only +2 (`s22` vs `s20`) — and convicted the FLAT approach tax:
+   ten points for a 500-unit stroll and the same ten for the 11 800-unit
+   march, so +2 won it. The toll is PER TILE now (`TAX_PER_TILE`,
+   `approachTax` in evaluate.ts), with `FAR_FLOOR` keeping a sliver of any
+   positive worth so distance ranks options without arguing the only
+   weapon out of existence. Pinned: the GINGER case both ways (dumb takes
+   the near healthy foe, wits 1 still crosses for the kill) in
+   unit/evaluate.spec.ts. Machine mission now reaches a verdict at ~170 s
+   where it took ~480.
+2. ~~"Пролаги пока свин думает — выгрузить в нод процесс?"~~ MEASURED
+   first (headless, per-frame): average 0.13 ms, ONE frame at 130 ms — the
+   turn's first `[hold]` decision, and the cost was the pathfinder's
+   thirteen water-texel probes per cell over a cross-map A*. A battle-long
+   per-cell WATER MEMO (pathfind.ts, `WaterMemo`) cut the worst frame to
+   27 ms with zero over 40; a `[perf]` line now lands in the telemetry for
+   any engine frame over 40 ms, so the next report is a number. A NODE
+   PROCESS is deliberately NOT taken: it buys nothing at 27 ms, and the
+   lockstep-clean way to free the brain from the frame — if it is ever
+   needed — is "the brain is a PLAYER": its ORDERS become inputs on the
+   net's own input path, decided by the machine's owner and broadcast, so
+   the brain need not be deterministic at all. Written down for the `net`
+   worktree's day.
+3. ~~"Третий свин стрельнул через гору — пуля попала в землю."~~ The gun's
+   pricing never asked the terrain. `clearShot` (evaluate.ts) samples the
+   line every 128 units at the exe-ish muzzle height; a blocked shot
+   scores 0 — visible in `[ai:kit]` — and the grenade (whose dry-run
+   already flies over hills) takes the election. Pinned in
+   unit/evaluate.spec.ts, both with and without a grenade to fall back on.
+4. ~~"Медаль не та — там прям сам объект с карты стоять должен."~~ The
+   debrief's token is the map's own PROPOINT model now, rendered once into
+   a strip of sixteen yaw frames (three/tokenArt.ts) and blitted SPINNING
+   on the page's own tick; `pcmedal` stays only as the fallback for a
+   failed load. Framing/spin rate `[CHECK — remake]`.
+
 Not blockers for mission 1, though the lists carry them: the pillbox's two
 weapons and the vehicle (section C), skill 63 MAP VIEW, the PROPOINT tokens
 (`bonusPoints(1)` is 0 — the first mission pays none), the empty power-gauge

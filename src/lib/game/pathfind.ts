@@ -74,6 +74,18 @@ export interface Standing {
 
 const NOTHING: Standing = { standOn: () => null, blocks: () => false }
 
+/**
+ * A battle-long memo of each CELL's water verdicts — bit 1 wade, bit 2
+ * refused-to-a-non-swimmer. Water never changes during a battle, and the
+ * thirteen texel probes per cell (`wetted` + `guarded`) are what a
+ * cross-map search spends its time on: the turn's first decision measured
+ * 130 ms cold (2026-08-24, play's "пролаги пока свин думает"). One memo
+ * per battle, shared by every route; without one the probes run direct and
+ * nothing changes but the bill.
+ */
+export type WaterMemo = Map<number, number>
+export const createWaterMemo = (): WaterMemo => new Map()
+
 export interface RouteAsk {
   ground: Ground
   /** The props — walkways to stand on, walls to refuse. None assumed. */
@@ -82,6 +94,8 @@ export interface RouteAsk {
    * classes cross) — and a SLOW road at that: a wet step costs `SWIM_COST`
    * of a dry one. */
   swims?: boolean
+  /** The battle's water memo (`createWaterMemo`) — optional, cache only. */
+  water?: WaterMemo
 }
 
 /** The grid's pitch, world units — a quarter tile: fine enough to thread a
@@ -188,8 +202,15 @@ export function route(
   }
 
   /** The same landing asked at a POINT rather than a cell — what the
-   * string-pulling below samples a straight leg with. */
-  const landAt = (footY: number, x: number, z: number): { foot: number; wade: boolean } | null => {
+   * string-pulling below samples a straight leg with. `water` carries a
+   * cell's memoed verdicts when the caller has them; a point sample runs
+   * the probes direct. */
+  const landAt = (
+    footY: number,
+    x: number,
+    z: number,
+    water?: { wade: boolean; refused: boolean }
+  ): { foot: number; wade: boolean } | null => {
     if (props.blocks(x, z, footY, WALL_CLIMB)) return null
     const deck = props.standOn(x, z, footY, WALL_CLIMB)
     let foot: number
@@ -198,8 +219,8 @@ export function route(
       foot = deck
     } else {
       if (!ground.walkable(x, z)) return null
-      wade = wetted(x, z)
-      if (!swims && (wade || guarded(x, z))) return null
+      wade = water ? water.wade : wetted(x, z)
+      if (!swims && (water ? water.refused : wade || guarded(x, z))) return null
       if (ground.hasMine(x, z)) return null
       // A swimmer's feet ride the WATERLINE, not the seabed — measured off
       // the bed, climbing out of a real bay reads as a cliff.
@@ -211,9 +232,24 @@ export function route(
     return { foot, wade }
   }
 
+  /** A cell's water verdicts, through the battle's memo when there is one
+   * (`WaterMemo` above) — the A* expansion is where the probes multiply. */
+  const cellWater = (cx: number, cz: number): { wade: boolean; refused: boolean } => {
+    const k = key(cx, cz)
+    let bits = ask.water?.get(k)
+    if (bits === undefined) {
+      const x = at(cx)
+      const z = at(cz)
+      const wade = wetted(x, z)
+      bits = (wade ? 1 : 0) | (wade || guarded(x, z) ? 2 : 0)
+      ask.water?.set(k, bits)
+    }
+    return { wade: (bits & 1) !== 0, refused: (bits & 2) !== 0 }
+  }
+
   const step = (footY: number, cx: number, cz: number): { foot: number; wade: boolean } | null => {
     if (!inside(cx, cz)) return null
-    return landAt(footY, at(cx), at(cz))
+    return landAt(footY, at(cx), at(cz), cellWater(cx, cz))
   }
 
   const startX = gx(from.x)

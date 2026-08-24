@@ -17,11 +17,11 @@
 //           friends and the thrower subtracted at full weight. This is where
 //           "thirty into two pigs beats forty into one" becomes arithmetic.
 //
-// What an option that needs WALKING pays: APPROACH_TAX, a flat few points —
-// the walk spends the turn's clock and stands the pig somewhere new, and
-// without the tax a bayonet (10) three tiles away would outbid nothing and
-// a grenade (30) would always be worth a hike. `[deliberate]` — a brain
-// weight, not an engine fact, and a knob the levels will turn.
+// What an option that needs WALKING pays: APPROACH_TAX flat plus
+// TAX_PER_TILE for the length of the hike — the walk spends the turn's
+// clock and stands the pig somewhere new, and without the toll a +2 finish
+// bonus bought a march across the whole map (`approachTax`). `[deliberate]`
+// — brain weights, not engine facts, and knobs the levels will turn.
 //
 // Deterministic: the dry-run's rng is a CONSTANT — the fuse it jitters is
 // not read — so the battle's own stream is never touched (docs/ai.md).
@@ -31,6 +31,7 @@ import { damageOf, projectileOf, rangeOf } from './projectile'
 import { meleeOf } from './melee'
 import { advanceLob, blastRange, blastShare, isPlanted, lob, lobOf } from './grenade'
 import { GAUGE_FULL } from './gauge'
+import { TILE_STEP } from '../formats/pmg'
 
 /** What FINISHING a pig is worth on top of the health it takes — the kill
  * bonus docs/ai.md prices whole turns at. In health points, so a kill
@@ -46,9 +47,40 @@ export const CLOSE_TO = 0.6
  * it. `[deliberate]`. */
 export const MELEE_NEAR = 180
 
-/** What having to WALK first costs an option, in points. `[deliberate]` —
- * the level knob for patience. */
+/** What having to WALK first costs an option, in points — the flat half:
+ * spending the clock on an approach at all. `[deliberate]` — the level knob
+ * for patience. */
 export const APPROACH_TAX = 10
+
+/**
+ * …and the toll PER TILE of that walk, because a flat tax is distance-blind
+ * and the telemetry caught what that buys (GINGER, 2026-08-24): a +2 finish
+ * bonus on a nearly-dead foe 23 tiles away outbid a healthy foe 4 tiles
+ * away, both walks costing the same ten — "пошёл через всю карту к тому кто
+ * почти умер". Linear keeps both ends of the wits dial honest: the dumb
+ * pig's ~+2 bonus never pays for a march, the sharp pig's KILL_BONUS ~+50
+ * still does — and crossing a map to make a kill PERMANENT is the sharp
+ * play. `[deliberate]`.
+ */
+export const TAX_PER_TILE = 0.5
+
+/** The whole cost of getting `away` down to `reach`: nothing when already
+ * there, the flat tax plus the per-tile toll when not. */
+const approachTax = (away: number, reach: number): number =>
+  away <= reach ? 0 : APPROACH_TAX + ((away - reach) / TILE_STEP) * TAX_PER_TILE
+
+/**
+ * What distance may NOT do to a weapon: argue it out of existence. The toll
+ * ranks a far option under a near one; a sliver of the worth survives it, so
+ * a pig whose ONLY foe is across the map still goes to fight rather than
+ * passing forever — the first cut let the tax run a lone rifle below zero
+ * and the brain sat down. Crates deliberately keep the hard tax: they have
+ * their own two lanes (the errand and the necessity fallback).
+ */
+export const FAR_FLOOR = 0.05
+
+const taxedScore = (worth: number, away: number, reach: number): number =>
+  worth <= 0 ? worth : Math.max(worth * FAR_FLOOR, worth - approachTax(away, reach))
 
 /** Where the hand is over the soles when a thing is thrown — the brain's
  * own model of the throw height, not the engine's bone. `[deliberate]`. */
@@ -169,16 +201,50 @@ const weaponPoints = (skill: number): number =>
  * the losers are the whole point (lib/game/ai.ts, `Candidate`). */
 type Note = ((option: Option) => void) | undefined
 
+/** Eye and chest over the soles for the line-of-sight test — roughly the
+ * muzzle's height, in game units. `[deliberate]` — the brain's own model,
+ * not the engine's bone. */
+const SIGHT_RISE = 160
+/** How often the sight line samples the ground — a quarter tile misses no
+ * hill a bullet would meet. */
+const LOS_STEP = 128
+
+/**
+ * Whether a straight shot from `a` to `b` clears the GROUND — play watched
+ * what pricing without it does: "третий свин стрельнул через гору —
+ * соответственно пуля попала в землю". The engine's bullet already stops at
+ * terrain (lib/game/bullets.ts); this is the brain knowing it. Y-DOWN: a
+ * sample at or below the ground is `y >= groundAt`, the dry-run's own test.
+ */
+const clearShot = (world: AiWorld, a: Seen, b: Seen): boolean => {
+  const span = distance2d(a, b)
+  const steps = Math.ceil(span / LOS_STEP)
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps
+    const x = a.x + (b.x - a.x) * t
+    const z = a.z + (b.z - a.z) * t
+    const y = a.y - SIGHT_RISE + (b.y - a.y) * t
+    if (y >= world.groundAt(x, z)) return false
+  }
+  return true
+}
+
 const gunOption = (world: AiWorld, skill: number, note: Note): Option | null => {
   const row = projectileOf(skill)
   if (!row) return null
   const damage = damageOf(skill)
   const me = world.acting
+  const eye: Seen = { x: me.x, y: me.y, z: me.z, health: me.health }
   let best: Option | null = null
   for (const foe of world.foes) {
     const away = distance2d(me, foe)
     const worth = worthOf(damage, foe, world.wits)
-    const score = worth - (away > rangeOf(row) * CLOSE_TO ? APPROACH_TAX : 0)
+    // A shot the ground would swallow scores NOTHING — only judged where
+    // the pig would actually fire from (inside its reach); beyond it the
+    // walk moves the eye and the next decision re-asks. The option is still
+    // noted so the telemetry shows the zero.
+    const blocked = away <= rangeOf(row) * CLOSE_TO && !clearShot(world, eye, foe)
+    const score = blocked ? 0 : taxedScore(worth, away, rangeOf(row) * CLOSE_TO)
     const option: Option = {
       skill,
       kind: 'gun',
@@ -204,7 +270,7 @@ const meleeOption = (world: AiWorld, skill: number, note: Note): Option | null =
   for (const foe of world.foes) {
     const away = distance2d(me, foe)
     const worth = worthOf(blade.damage, foe, world.wits)
-    const score = worth - (away > MELEE_NEAR ? APPROACH_TAX : 0)
+    const score = taxedScore(worth, away, MELEE_NEAR)
     const option: Option = {
       skill,
       kind: 'melee',
@@ -269,7 +335,7 @@ const lobOption = (world: AiWorld, skill: number, note: Note): Option | null => 
       // Out of the arc: price the throw AS IF it lands on him — the walk
       // closes the gap and the next decision solves it for real.
       const worth = blastWorth(world, foe, damage, spread)
-      const score = worth - APPROACH_TAX
+      const score = taxedScore(worth, away, arc * 0.8)
       const option: Option = { skill, kind: 'lob', target: foe, score, worth, reach: arc * 0.8, limit: arc }
       note?.(option)
       if (!best || score > best.score) best = option
@@ -321,7 +387,7 @@ const crateOption = (
         ? weaponPoints(crate.skill)
         : Math.max(0, weaponPoints(crate.skill) - have) * appetite
   const away = distance2d(me, crate)
-  const score = gain - (away > COLLECT_NEAR ? APPROACH_TAX : 0)
+  const score = gain - approachTax(away, COLLECT_NEAR)
   const option: Option = {
     skill: crate.skill ?? SKILLLESS,
     kind: 'crate',

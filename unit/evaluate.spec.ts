@@ -22,6 +22,7 @@ const world = (over: {
   crates?: AiWorld['crates']
   wits?: number
   wet?: AiWorld['wet']
+  groundAt?: AiWorld['groundAt']
 }): AiWorld => ({
   timeLeft: 45,
   wits: over.wits ?? 0,
@@ -43,7 +44,7 @@ const world = (over: {
   friends: over.friends ?? [],
   route: (to) => [to],
   // Flat ground at zero: the dry-run throw lands when it falls back to it.
-  groundAt: () => 0,
+  groundAt: over.groundAt ?? (() => 0),
   wet: over.wet ?? (() => false),
   swimming: false,
   swims: false,
@@ -224,4 +225,48 @@ test('the solved charge GROWS with the throw', { tag: '@nodata' }, () => {
   expect(near.charge).toBeDefined()
   expect(far.charge).toBeDefined()
   expect(far.charge!).toBeGreaterThan(near.charge!)
+})
+
+
+test('the walk is TOLLED: a near healthy foe outbids a far nearly-dead one at dumb wits', { tag: '@nodata' }, () => {
+  // GINGER, telemetry 2026-08-24: with a flat tax the +2 wits-scaled finish
+  // bonus bought a 23-tile march. The toll is per tile now, so the near foe
+  // wins the dumb election - and at wits 1 the full KILL_BONUS still pays
+  // for the same march, which is the sharp play.
+  const near = foe({ z: 2000, health: 50 })
+  const far = foe({ z: 12000, health: 10 })
+  const kit = [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
+  const dumb = priceKit(world({ carrying: kit, foes: [near, far], wits: 0 }))!
+  expect(dumb.target).toBe(near)
+  const sharp = priceKit(world({ carrying: kit, foes: [near, far], wits: 1 }))!
+  expect(sharp.target).toBe(far)
+})
+
+test('distance never argues the ONLY weapon out of existence', { tag: '@nodata' }, () => {
+  // The first cut of the toll ran a lone rifle below zero across the map
+  // and the brain passed forever; a sliver of the worth survives any walk
+  // (FAR_FLOOR).
+  const option = priceKit(world({ foes: [foe({ z: 20000 })] }))
+  expect(option).not.toBeNull()
+  expect(option!.kind).toBe('gun')
+  expect(option!.score).toBeGreaterThan(0)
+})
+
+test('a shot the ground would swallow scores nothing, and the grenade takes over', { tag: '@nodata' }, () => {
+  // Play: "третий свин стрельнул через гору - пуля попала в землю". A hill
+  // between the pigs (Y-DOWN: the ground ABOVE them is a smaller y) blanks
+  // the rifle; the grenade lobs over it and wins the election.
+  const hill: AiWorld['groundAt'] = (_x, z) => (z > 500 && z < 1000 ? -800 : 0)
+  const kit = [
+    { skill: SKILL.RIFLE, amount: UNLIMITED },
+    { skill: SKILL.GRENADE, amount: 3 }
+  ]
+  const option = priceKit(world({ carrying: kit, foes: [foe({ z: 1500 })], groundAt: hill }))!
+  expect(option.kind).toBe('lob')
+  expect(option.skill).toBe(SKILL.GRENADE)
+  // …and with only the rifle, the blocked shot is not taken at all.
+  const rifled = priceKit(
+    world({ carrying: [{ skill: SKILL.RIFLE, amount: UNLIMITED }], foes: [foe({ z: 1500 })], groundAt: hill })
+  )
+  expect(rifled).toBeNull()
 })

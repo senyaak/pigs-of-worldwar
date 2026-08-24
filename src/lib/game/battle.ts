@@ -14,7 +14,7 @@
 // Game space (Y-down) throughout.
 
 import { ANIM, copyLocomotion, createLocomotion, inWater, updateLocomotion } from './locomotion'
-import { route } from './pathfind'
+import { createWaterMemo, route } from './pathfind'
 import { advanceCarry, carryIn, carryOut, doorwayStart } from './doorway'
 import type { Carry } from './doorway'
 import type { LocomotionState } from './locomotion'
@@ -389,6 +389,9 @@ export function createBattle(parts: BattleParts): Battle {
   let wasDropping = true
   /** The beat after a kill: the clock stops, the camera stays on the spot. */
   let aftermath: Aftermath | null = null
+  /** The battle's one water memo for the machine's routes — water never
+   * changes inside a battle (lib/game/pathfind.ts, `WaterMemo`). */
+  const waterMemo = createWaterMemo()
   /** …and the beat at the END of a turn: the exe's mode 13, WALK AWAY. Nobody
    * is driving and anyone in the water is swimming out (lib/game/walkAway.ts). */
   let walkAway: WalkAway | null = null
@@ -1229,7 +1232,11 @@ export function createBattle(parts: BattleParts): Battle {
                 {
                   ground: query,
                   obstruction: scenery.obstacles,
-                  swims: !drowns(acting.pigClass)
+                  swims: !drowns(acting.pigClass),
+                  // The battle's one water memo: the probes that made the
+                  // turn's first decision a 130 ms hitch run once a cell per
+                  // BATTLE now (lib/game/pathfind.ts, WaterMemo).
+                  water: waterMemo
                 },
                 { x: acting.position.x, z: acting.position.z, y: acting.position.y },
                 to

@@ -962,10 +962,22 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // with it, the engine's own business from end to end. A step that is about
     // to run leaves behind where the pig stood, which is what the picture is
     // drawn from (lib/game/engine.ts).
+    const updateBegan = performance.now()
     const steps = engine.update(delta, () => {
       before = stanceNow()
       tween.from(marks())
     })
+    // **THE HITCH MEASURED, not guessed.** Play keeps feeling stalls while
+    // the machine thinks ("пролаги пока свин думает"); a frame whose ENGINE
+    // half ran long is logged with what it cost, so the next report points
+    // at a number. 40 ms is over two whole frames at 60 — a real hiccup,
+    // not noise.
+    const updateMs = performance.now() - updateBegan
+    if (updateMs > 40) {
+      window.api.logTelemetry(
+        `[perf] engine.update ${updateMs.toFixed(0)}ms (${steps} steps, delta ${(delta * 1000).toFixed(0)}ms)`
+      )
+    }
     // ONE reading of the battle, and everything below draws from it
     // (lib/game/snapshot.ts).
     now = engine.snapshot()
