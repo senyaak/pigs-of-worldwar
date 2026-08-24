@@ -1141,14 +1141,15 @@ Non-AI bugs from the same session, queued after the AI:
 ~27 min AFTER be9e659) and a FIFTH session (`telemetry.log`, 15:03–15:09 on
 the 24th) — both triaged 2026-08-24, and the triage found real work:**
 
-First, a fact about the evidence itself: **`src/main/telemetry.ts` TRUNCATES
-`_tmp/telemetry.log` at every app start**, so the fourth session's 12:00–12:09
-lines cited above are GONE from disk — the reasoning survives here, the log
-does not. Either the tap rolls a file per session or every future citation
-dies the same way. And the tap never records the map, the mission or the two
-nations — both sessions had to be identified by matching raw spawn
-coordinates; one line at session start fixes that (and round the raw
-`hp23.9765625` while in there).
+~~First, a fact about the evidence itself: `src/main/telemetry.ts` TRUNCATES
+`_tmp/telemetry.log` at every app start~~ **FIXED 2026-08-24 (play's order:
+"каждая сессия свой файл")** — the tap writes `_tmp/telemetry-<stamp>.log`,
+one file per app start, nothing ever truncated. The fourth session's
+12:00–12:09 lines were already gone when this was found — the reasoning
+survives above, the log does not. Every battle now opens with a `[battle]`
+line naming the map, the mission title and both squads with their pigs
+(ui/battle.ts), because both sessions had to be identified by matching raw
+spawn coordinates; and `hp` prints rounded.
 
 The AI package holds where it was tested — telemetry collapse works in both
 logs, zero `blocked(...)` anywhere (the water seam is closed), no decision
@@ -1182,17 +1183,38 @@ are worth doing:
    across the two sessions died by counter-blast at the EXACT coordinates
    they had been lobbing from for turns on end; GINGER kept throwing at
    hp10 from a square already shelled. There is no displacement and no
-   self-preservation term anywhere in the kit. Needs play's word on what
-   the original's AI does before inventing one.
-5. **The grenade outranges the map, which moots the approach tax.**
-   Measured throws run 6 000–8 000 units — 12–16 tiles — so a pig walks
-   3 500 units and then lobs 8 235 across the map anyway: the walk is
-   decoration, and report #1's per-tile tax cannot stop what the range
-   allows. Wants a play ruling on grenade range before any more tuning.
-6. **The plan-B branch is still untested in play.** `crateFallback` /
-   `pass-hopeless` / `pass-crate` never fired in either session, and the
-   one crate on the map priced `s0` every time and was never a plan.
-   Small residue on item 3's chaining too: corners still emit an
+   self-preservation term anywhere in the kit. **Play ruled the shape of
+   the fix (2026-08-24): self-preservation is a WITS behaviour, and the
+   move is not "run away" — it is standing NEXT TO an enemy pig, so a
+   shell at you risks their own** ("встать к нашему свину — так это
+   только умные должны делать"). So a dumb pig keeps dying where it
+   stands, and the wits scale buys hugging the enemy, not cowering.
+   Goes on the wits-knob list beside estimate error and actuator noise.
+5. ~~**The grenade outranges the map, which moots the approach tax.**~~
+   **ANSWERED 2026-08-24 — the range is the exe's own, and the pitch
+   already matters.** Play asked "зависит от наклона — щас вроде верно
+   кидается?" and the read says yes: the throw is `[exe]` end to end —
+   `speed = row.speed·charge >> 12` (300/frame at full), plain gravity 10
+   a frame², pitch splitting the speed (grenade.ts `lob()`), so
+   `R = v²·sin(2θ)/g` and a full 45° throw carries **9 000 units ≈ 17.6
+   tiles** — frame-rate cancels, and it equals the rifle's 9 000 exactly,
+   which reads as the original's own design. The measured 6 000–8 000 is
+   UNDER that ceiling because the AI solves CHARGE to the target's
+   distance — demand-limited, not inflated. The player aims the pitch
+   freely (start 0x200 = 45°, clamp ±1023, grenades not floored) and gets
+   the whole `sin(2θ)` curve. **The one remake-own piece is the AI's
+   fixed 45°** (evaluate.ts dry-run hardcodes aim 512; only guns get
+   `aimTo`) — the original's grenade AI is not in the disasm at all. A
+   pitch-aware AI (high arc over a hill, both 30° and 60° land the same
+   distance) is possible work, not a bug; the ballistics are not to be
+   touched.
+6. ~~**The plan-B branch is still untested in play.**~~ **ANSWERED by play
+   2026-08-24 — not a bug**: the branch never fired because a weapon was
+   always playable ("потому что бежал стрелять всегда — я ж не могу
+   заставить ящик идти поднимать"), which is exactly the ladder's design:
+   the crate is a NECESSITY, not a preference, and a session where
+   nothing reaches is what would exercise it. Stays a watch item, not
+   work. Small residue on item 3's chaining still stands: corners emit an
    occasional sub-tile leg (384 units) wedged between two long ones,
    each costing a full decision.
 

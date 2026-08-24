@@ -677,6 +677,17 @@ export function initBattle(
     const squads = mapSquads(objects, teams, wearing, own)
     if (squads.length === 0) return refuse(`${name} carries no spawn markers — nothing to field`)
 
+    // Who is fighting where, at the top of every battle's telemetry — the
+    // fifth AI session had to be identified by matching raw spawn
+    // coordinates against the fourth's, because nothing in the log named
+    // the map or the sides.
+    window.api.logTelemetry(
+      `[battle] ${name}${title ? ` "${title}"` : ''} — ` +
+        squads
+          .map((squad) => `${squad.name}(${teams[squad.nation]?.name ?? squad.nation}): ${squad.pigNames.join(', ')}`)
+          .join(' vs ')
+    )
+
     // Which models to load is only known once the squads are: a map fields
     // the classes its own markers name — and now one set PER NATION fielded,
     // since two sides in different uniforms share the same geometry and must
@@ -864,7 +875,7 @@ export function initBattle(
             }
           })()
           const head =
-            `[ai] ${name} hp${health} @${at.x.toFixed(0)},${at.z.toFixed(0)}` +
+            `[ai] ${name} hp${Math.round(health)} @${at.x.toFixed(0)},${at.z.toFixed(0)}` +
             (previous === null ? '' : ` prev=${previous}${refusal ? `(${refusal})` : ''}`) +
             ` [${thought?.rung ?? '-'}] -> ${said}`
           if (head === aiSaid) {

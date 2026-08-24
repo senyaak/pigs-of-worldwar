@@ -5,8 +5,10 @@
 //
 // The folder follows the saves' rule (src/main/saves.ts): the CHECKOUT's own
 // `_tmp/` in development — the project's scratch space, gitignored — and
-// beside the executable in a packaged build. One file, appended, truncated at
-// each app start so it is always the LAST session.
+// beside the executable in a packaged build. ONE FILE PER SESSION, named by
+// its start time, and nothing is ever truncated — the single always-truncated
+// `telemetry.log` destroyed the fourth AI session's evidence the moment the
+// fifth was played (play: "каждая сессия свой файл").
 
 import { app } from 'electron'
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -19,7 +21,8 @@ function telemetryFile(): string {
   const root = app.isPackaged ? path.dirname(app.getPath('exe')) : app.getAppPath()
   const dir = path.join(root, '_tmp')
   mkdirSync(dir, { recursive: true })
-  file = path.join(dir, 'telemetry.log')
+  const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+  file = path.join(dir, `telemetry-${stamp}.log`)
   writeFileSync(file, `# session ${new Date().toISOString()}\n`)
   return file
 }
