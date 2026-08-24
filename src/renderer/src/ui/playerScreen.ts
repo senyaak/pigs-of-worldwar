@@ -530,10 +530,15 @@ export function initPlayerScreen(handlers: {
    * arithmetic exactly. `y` runs in the exe's HALF-VERTICAL space and is
    * doubled at the draw, as its blitter does. The landing is COINFLIP, the
    * spend's exit COINDROP (FESounds ids 23/22, both at 0x419xxx call
-   * sites). The exe draws an untextured 40×40 quad; ours wears the `vp`
-   * coin at the same 40×40, which is `[CHECK — remake]` — what the quad
-   * SHOWS on a real screen was not read. The sparkle trail is read
-   * (0x419580) and not built.
+   * sites). The exe's quad is **80×80, TEXTURED and additive** — half
+   * extents 0x28 centred at (x−10, (y−10)·2), texture entry base+1 of an
+   * archive index the code never names (the second pass corrected the
+   * first read's "untextured 40×40") — so WHICH art the original shows is
+   * unrecoverable from code and ours wears the `vp` coin at the exe's own
+   * size, `[CHECK — remake]`. The sparkle trail and the frontend's other
+   * two classes (the menu's steam clouds, the machinery's sparks) are
+   * read in full and not built — the disasm repo's frontend notes carry
+   * every table.
    */
   interface Coin {
     x: number
@@ -549,7 +554,8 @@ export function initPlayerScreen(handlers: {
   /** A spend coin dies past this (half-res) — off the bottom. */
   const COIN_GONE = 300
   const COIN_STAGGER = 5
-  const COIN_SIZE = 40
+  /** The exe's own quad: half-extents 0x28 → 80 px, CENTRED on the point. */
+  const COIN_SIZE = 80
   let coins: Coin[] = []
   /** Coins still owed to each chain — the exe's `[0x511784]`, split by kind. */
   let owedIn = 0
@@ -1001,11 +1007,18 @@ export function initPlayerScreen(handlers: {
     if (spent) light.draw(context, String(spent.cost), SPENT.x, SPENT.y)
 
     // The FLYING TOKENS, over everything — the exe draws its coins after the
-    // whole frontend (0x418892). Half-res y doubled, 40×40, the `vp` coin
-    // standing in for the exe's untextured quad (see the read above).
+    // whole frontend (0x418892). Half-res y doubled, the exe's own 80×80
+    // CENTRED on the point, the `vp` coin standing in for art the code
+    // never names (see the read above).
     for (const coin of coins) {
       const face = sprites.get('vp')
-      context.drawImage(face.image, coin.x - 10, (coin.y - 10) * 2, COIN_SIZE, COIN_SIZE)
+      context.drawImage(
+        face.image,
+        coin.x - 10 - COIN_SIZE / 2,
+        (coin.y - 10) * 2 - COIN_SIZE / 2,
+        COIN_SIZE,
+        COIN_SIZE
+      )
     }
   }
 
