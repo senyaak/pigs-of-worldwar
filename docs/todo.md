@@ -996,50 +996,40 @@ order:**
    for `turnTo` alternating bearings in `[ai]`.
 
 **Play's reports from the second AI session (2026-08-23, evening) — the
-session log is `_tmp/ai-session-2026-08-23.log`, and every AI item below is
-DIAGNOSED from it, not guessed. Order of work: AI first (play's call).**
+session log is `_tmp/ai-session-2026-08-23.log`, and every AI item below was
+DIAGNOSED from it, not guessed. ALL SIX BUILT the same evening (be9e659,
+"The first telemetry-diagnosed AI package"); the record is in
+`docs/history/turns.md`.**
 
-The AI package (one session's worth, each with the log's evidence):
-
-1. **Turning and walking must be fully separate.** Play's own spec: "надо
-   сделать повороты и хождение полностью отдельными — не надо ходить и
-   поворачиваться сразу". The actuator's `walkTo` drives `intent(walk, turn)`
-   together inside `WALK_CONE`. Wanted: align first (turn only), then walk
-   STRAIGHT (turn 0), re-aligning only when the bearing drifts wide — two
-   thresholds so it cannot oscillate at one boundary (lib/game/actuator.ts).
-2. **The seat keeps deciding after the weapon spent the turn.** Log: NOBBY
-   detonates at 20:52:27, and at :28 decides `turnTo 2.59` — re-aiming a
-   throw it can never make; the pig visibly spins on the spot until the
-   handover ("крутился на месте"). GINGER's double `fire @0.90` (20:53:44
-   and :47) is the same hole from the other side: the first fire order ran
-   while the bark still had the trigger locked, finished `done` having
-   thrown nothing, and the seat re-decided. The machine block needs a gate:
-   no new decisions once the blow has spent the turn — while keeping the
-   DETONATOR alive (a live thrown grenade still needs the fire key).
-3. **The mull between ROUTE CORNERS is a stutter, not a thought.** Log: DEN
-   walks eleven `walkTo` legs 20:56:06..20:57:05, one second of standing
-   between each — play saw "ходил рывками". A `walkTo` that finished `done`
-   with the plan unfinished should chain into the next corner with no mull.
-4. **The pathfinder and the water guard disagree, and the pig loops on the
-   seam.** Log, three turns running: DEN walks toward 11392,1024, gets
-   `blocked(water)`, passes; next turn the route hands him THE SAME corner,
-   `blocked(water)` inside a second, pass; and again (20:57:09 / 20:58:41 /
-   21:00:55 — then he died standing there). The grid samples cell CENTRES
-   (lib/game/pathfind.ts) and the guard probes `WATER_PROBE` = 150 ahead
-   (lib/game/actuator.ts), so a route leg can graze water the grid never
-   saw. A non-swimmer's route needs the water inflated by the probe's
-   reach, so the route either goes AROUND or honestly ends short.
-5. **"Hopeless" needs a plan B before the pass.** Same DEN turns: from the
-   water's edge nothing in the kit reached (`pass-hopeless`), and the crates
-   on the map priced under zero at mission-1 wits (appetite 0.29), so he
-   skipped three turns straight with things to do — play: "это не тупость —
-   это идиотизм". Wanted: when the best option's route cannot END within its
-   own limit, try the next candidates; when NO weapon is playable, a crate
-   is a NECESSITY (full worth, the same exemption a weaponless pig already
-   gets); only then pass.
-6. Telemetry housekeeping: the fuse watch logs ~50 identical `watch` lines a
-   second (AI_FUSE_SECONDS = 0 decides every frame — 110 lines in NOBBY's
-   one throw). Collapse consecutive identical decisions in the ui tap.
+1. ~~**Turning and walking must be fully separate.**~~ **BUILT 2026-08-23,
+   then DELIBERATELY SOFTENED 2026-08-24 (388dd84, play's call).** The strict
+   align-then-walk-straight version (two thresholds, `REALIGN` = π/8) read
+   as a stutter in play — "повернулся — шаг — повернулся — шаг… тупил, пока
+   время не кончилось" — so big turns happen on the spot and small elbows
+   are steered THROUGH while walking. The why is written in the header of
+   lib/game/actuator.ts; do not "fix" it back to the spec above.
+2. ~~**The seat keeps deciding after the weapon spent the turn.**~~ **BUILT
+   2026-08-23** — the seat stops asking the brain once `spent` is set
+   (battle.ts, the NOBBY "крутился на месте" case is cited at the gate),
+   with a live thrown grenade the one exception so the DETONATOR's fire key
+   stays owed.
+3. ~~**The mull between ROUTE CORNERS is a stutter, not a thought.**~~
+   **BUILT 2026-08-23** — the mull threshold is 0 when the last order was a
+   `walkTo` that finished `done`, so DEN's eleven legs chain corner to
+   corner with no standing.
+4. ~~**The pathfinder and the water guard disagree, and the pig loops on
+   the seam.**~~ **BUILT 2026-08-23** — `guarded()` in pathfind.ts probes an
+   eight-point ring at `WATER_PROBE + GRID_STEP/2` for a non-swimmer, so
+   the grid refuses every cell the guard would; a swimmer keeps the plain
+   half-cell test. The DEN `blocked(water)`→pass loop is the doc comment.
+5. ~~**"Hopeless" needs a plan B before the pass.**~~ **BUILT 2026-08-23** —
+   an unplayable winner falls back to the best playable candidate
+   (grunt.ts, `playable` runs the route and asks reach from where it
+   actually ENDS), then to `crateFallback` (evaluate.ts — nearest crate at
+   full worth, no appetite discount, no limit), and only then `pass-nothing`.
+6. ~~Telemetry housekeeping~~ **BUILT 2026-08-23** — the ui tap collapses
+   consecutive identical decisions into "…the same, N more times"
+   (ui/battle.ts); NOBBY's 110 `watch` lines are one line and a count.
 
 Non-AI bugs from the same session, queued after the AI:
 
@@ -1146,6 +1136,65 @@ Non-AI bugs from the same session, queued after the AI:
    a strip of sixteen yaw frames (three/tokenArt.ts) and blitted SPINNING
    on the page's own tick; `pcmedal` stays only as the fallback for a
    failed load. Framing/spin rate `[CHECK — remake]`.
+
+**The THIRD session's log (`_tmp/ai-session-2026-08-23b.log`, 23:43–23:47,
+~27 min AFTER be9e659) and a FIFTH session (`telemetry.log`, 15:03–15:09 on
+the 24th) — both triaged 2026-08-24, and the triage found real work:**
+
+First, a fact about the evidence itself: **`src/main/telemetry.ts` TRUNCATES
+`_tmp/telemetry.log` at every app start**, so the fourth session's 12:00–12:09
+lines cited above are GONE from disk — the reasoning survives here, the log
+does not. Either the tap rolls a file per session or every future citation
+dies the same way. And the tap never records the map, the mission or the two
+nations — both sessions had to be identified by matching raw spawn
+coordinates; one line at session start fixes that (and round the raw
+`hp23.9765625` while in there).
+
+The AI package holds where it was tested — telemetry collapse works in both
+logs, zero `blocked(...)` anywhere (the water seam is closed), no decision
+thrash — but the logs put SIX new things on the list, in the order they
+are worth doing:
+
+1. **A full-power throw VANISHES, twice — the spent-turn gate is not
+   complete.** Once per session, on the pig's HIGHEST-powered throw of the
+   turn: GERARD `fire @1.00` (23rd) — no `[fuse]`, no `[detonate]`, the
+   grenade unaccounted for; GINGER `fire @0.82` (24th) — exactly one
+   `[fuse]→watch`, then silence, and the grenade expired on its own fuse
+   6 s later with no detonate order and no fling. Every OTHER throw fits
+   `distance ≈ 7500·power²` within 4%, so these two flew and were
+   abandoned. Suspect: the `world.thrown` gate / `thrown.resting` arm in
+   lib/game/grunt.ts — the detonator that item 2 above deliberately kept
+   alive is not being pressed.
+2. **`[perf]` reopens the WaterMemo verdict.** The fourth session's "zero
+   over 40 ms" does not hold: the fifth logs SIX frames over 40 (41, 43,
+   56, 76, 97, 107 ms), clustering on the long cross-map marches and
+   landing on `[walk]` re-decisions as well as the turn's first `[hold]` —
+   cost still scales with route length. And the >100 ms whole-frame GAP
+   detector never fired once, not even beside the 107 ms engine frame —
+   check it is actually wired before trusting its silence.
+3. **The elected option is not the top-believed one for a whole turn.**
+   GINGER's 13:05:29 turn, all four decisions: the `*` (chose) sits on
+   row TWO of the kit while row one out-believes it. Either a target
+   commitment silently overrides the election — then the tap should SAY so
+   — or the choice is stale by one decision. Every other turn in both logs
+   elects row one.
+4. **Nobody moves after firing, and it kills them.** Four of six AI pigs
+   across the two sessions died by counter-blast at the EXACT coordinates
+   they had been lobbing from for turns on end; GINGER kept throwing at
+   hp10 from a square already shelled. There is no displacement and no
+   self-preservation term anywhere in the kit. Needs play's word on what
+   the original's AI does before inventing one.
+5. **The grenade outranges the map, which moots the approach tax.**
+   Measured throws run 6 000–8 000 units — 12–16 tiles — so a pig walks
+   3 500 units and then lobs 8 235 across the map anyway: the walk is
+   decoration, and report #1's per-tile tax cannot stop what the range
+   allows. Wants a play ruling on grenade range before any more tuning.
+6. **The plan-B branch is still untested in play.** `crateFallback` /
+   `pass-hopeless` / `pass-crate` never fired in either session, and the
+   one crate on the map priced `s0` every time and was never a plan.
+   Small residue on item 3's chaining too: corners still emit an
+   occasional sub-tile leg (384 units) wedged between two long ones,
+   each costing a full decision.
 
 **The frontend's OTHER particles — READ WHOLE 2026-08-24, not built.** Play
 asked whether the coin framework might be the battle's blast smoke — no
