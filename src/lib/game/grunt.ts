@@ -57,6 +57,34 @@ export const PITCH_WITHIN = 12
  * and the margin is a stride. `[deliberate]`. */
 export const FLEE_CLEAR = 1900
 
+/**
+ * From this wits up a pig SHELTERS BEHIND THE ENEMY — it closes right up to
+ * the pig it is shooting, so that a blast answering it would catch one of
+ * theirs. Play's ruling on self-preservation, 2026-08-24, and the same half
+ * of the scale the pitch tuning takes (lib/game/evaluate.ts,
+ * `TUNE_PITCH_WITS`). `[play]` for the behaviour, `[deliberate]` for the
+ * number.
+ */
+export const SHELTER_WITS = 0.5
+
+/** …and how close "beside" is, in world units. A pig's own body is 160
+ * across (`PIG_RADIUS`), so this is a body's width off — shoulder to
+ * shoulder without standing inside him. `[CHECK — remake]`. */
+export const SHELTER_NEAR = 240
+
+/**
+ * …and how far a pig will WALK to shelter that way: four tiles, no more.
+ *
+ * The bound is the point. Hugging without one turns every smart shot into a
+ * march across the map, which is the very thing the approach tax was built
+ * to stop ("пошёл через всю карту к тому кто почти умер", the fourth AI
+ * session) — the two rules would be pulling against each other. So this is
+ * about where a turn ENDS rather than about how it is spent: a pig already
+ * near its target finishes shoulder to shoulder with it, and one across the
+ * field fires from its weapon's own mark like anybody else. `[deliberate]`.
+ */
+export const SHELTER_FROM = 4 * 512
+
 /** Under this speed (units/s) a thrown grenade counts as DOWN to the brain
  * and the detonator is pressed — four exe-units a frame, a crawl. The
  * renderer's own `resting` bar is 1/frame, low enough that a missed throw
@@ -404,16 +432,42 @@ export function createGruntBrain(): Brain {
       const dz = target.z - me.z
       const distance = Math.hypot(dx, dz)
 
-      /** The DRY point to fight from: the shy mark inside the option's
-       * reach when the ground there is dry, else pressed on toward the
-       * target until it is. A firing spot in the water is no spot at all —
+      /**
+       * **HOW FAR OFF TO STAND — and a SMART pig stands right beside its
+       * target.** Play's ruling on self-preservation (2026-08-24): the
+       * answer is not to run away, it is to be so close to one of THEIRS
+       * that shelling you costs them their own pig — "встать к нашему свину
+       * — так это только умные должны делать". So it is a wits behaviour
+       * like the crate appetite and the detonation window: below
+       * `SHELTER_WITS` a pig fires from wherever its weapon reaches and dies
+       * where it stood (telemetry, 2026-08-24: four of six AI pigs killed by
+       * counter-blast at the exact coordinates they had lobbed from for
+       * turns), above it a pig closes to `SHELTER_NEAR`.
+       *
+       * **GUNS ONLY.** A lob at arm's length catches the thrower, and the
+       * price list already scores that below zero (lib/game/evaluate.ts,
+       * `blastWorth` counts the self term), so hugging with a grenade would
+       * be walking into a plan the brain has itself priced as a loss. A
+       * blade already stands closer than this. And it is BOUNDED by
+       * `SHELTER_FROM`: a pig already near its target ends its turn beside
+       * it, one across the map fires from its own mark — otherwise this
+       * rule and the approach tax would be arguing (see the constant).
+       */
+      const standOff =
+        option.kind === 'gun' && world.wits >= SHELTER_WITS && distance <= SHELTER_FROM
+          ? Math.min(option.reach, SHELTER_NEAR)
+          : option.reach
+
+      /** The DRY point to fight from: the shy mark inside the stand-off
+       * when the ground there is dry, else pressed on toward the target
+       * until it is. A firing spot in the water is no spot at all —
        * swimming hands are empty — and standing closer than the shy mark
        * only ever helps the shot. The last resort is the target's own feet,
        * wet or not: best effort, same as the route's. */
       const dryApproach = (): { x: number; z: number } => {
         for (const back of [0.8, 0.6, 0.4, 0.2, 0]) {
-          const x = target.x - (dx / distance) * option.reach * back
-          const z = target.z - (dz / distance) * option.reach * back
+          const x = target.x - (dx / distance) * standOff * back
+          const z = target.z - (dz / distance) * standOff * back
           if (!world.wet(x, z)) return { x, z }
         }
         return { x: target.x, z: target.z }
@@ -491,8 +545,8 @@ export function createGruntBrain(): Brain {
       // above takes over next decision.
       if (option.kind === 'plant') return say('plant', { kind: 'fire' })
 
-      if (distance > option.reach && !grounded) {
-        // Stop short of the reach mark, so arrival lands INSIDE it — at the
+      if (distance > standOff && !grounded) {
+        // Stop short of the stand-off mark, so arrival lands INSIDE it — at the
         // DRY approach, and by the ROUTE, not the crow's line: the next
         // corner of the best path round the walls, the water and the known
         // mines. A route with no corner left to walk means this is as close

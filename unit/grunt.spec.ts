@@ -9,7 +9,14 @@
 
 import { test, expect } from '@playwright/test'
 
-import { createGruntBrain, SIDE_STEP, FRIEND_CLEARANCE, PITCH_WITHIN } from '../src/lib/game/grunt'
+import {
+  createGruntBrain,
+  SIDE_STEP,
+  FRIEND_CLEARANCE,
+  PITCH_WITHIN,
+  SHELTER_FROM,
+  SHELTER_NEAR
+} from '../src/lib/game/grunt'
 import { CLOSE_TO } from '../src/lib/game/evaluate'
 import { BLAST_CORE } from '../src/lib/game/grenade'
 import type { AiWorld, Seen } from '../src/lib/game/ai'
@@ -233,6 +240,42 @@ test('a foe the shot would FINISH outbids a nearer healthy one — at full wits'
     world({ holding: SKILL.RIFLE, foes: [nearHealthy, aheadDying] })
   )
   expect(dull.kind).toBe('turnTo')
+})
+
+test('SHELTER: a smart pig ends its turn shoulder to shoulder, a dumb one fires where it stands', { tag: '@nodata' }, () => {
+  // Play's ruling on self-preservation (2026-08-24): the move is not to run
+  // away, it is to stand so close to one of THEIRS that shelling you costs
+  // them their own — "встать к нашему свину — так это только умные должны
+  // делать". A foe two tiles off, well inside the rifle's range: the dumb
+  // pig simply fires, the smart one closes first.
+  const near = foe({ z: 2 * 512 })
+  const dull = createGruntBrain().decide(world({ holding: SKILL.RIFLE, foes: [near] }))
+  expect(dull.kind).toBe('fire')
+
+  const sharp = createGruntBrain().decide(
+    world({ holding: SKILL.RIFLE, wits: 1, foes: [near] })
+  )
+  expect(sharp.kind).toBe('walkTo')
+  if (sharp.kind !== 'walkTo') return
+  // …to a spot beside him, not on top of him: SHELTER_NEAR off, and the
+  // approach's own shy fraction inside that.
+  const gap = Math.hypot(sharp.x - near.x, sharp.z - near.z)
+  expect(gap).toBeLessThanOrEqual(SHELTER_NEAR)
+  expect(gap).toBeGreaterThan(0)
+})
+
+test('SHELTER is BOUNDED: a far foe is shot from the weapon\'s own mark', { tag: '@nodata' }, () => {
+  // Unbounded, the rule would march a smart pig across the map — which is
+  // what the approach tax exists to stop, so the two would be pulling
+  // against each other (SHELTER_FROM).
+  // Past the shelter bound but well inside the rifle's own reach: the
+  // sharpest brain there is shoots from where it stands rather than walking
+  // three tiles to hug him.
+  const far = foe({ z: SHELTER_FROM + 1000 })
+  expect(far.z).toBeLessThan(RANGE * CLOSE_TO)
+  expect(createGruntBrain().decide(world({ holding: SKILL.RIFLE, wits: 1, foes: [far] })).kind).toBe(
+    'fire'
+  )
 })
 
 test('a friend on the firing line means a step aside, not a shot through him', { tag: '@nodata' }, () => {

@@ -297,23 +297,28 @@ a shortlist. `pow.sfx.set('fuseTimer', 'NAME')` rebinds a moment live.
 **What is placed and wired to nothing**, roughly in the order it would be worth
 doing:
 
-- **`S_CLOCK` is the TURN CLOCK starting to run out** — "также когда время
-  кончаться начинает вроде". We play it for the charge's timer and nowhere for
-  the clock itself, which is the thing it is actually for. One listener on the
-  turn clock crossing its warning mark.
-- **`I_BUILD` against `I_BULIT1`/`I_STAB`**: a round hitting a WALL against a
-  round hitting MEAT. The engine already knows which it hit (lib/game/bullets.ts)
-  and plays neither.
-- **`I_METAL`** — a blast inside a bunker, a tank, a stationary machine. The
-  engine knows a pig is indoors (lib/game/indoors.ts).
-- **`I_SWMISS`** is a swing that MISSED, and it is currently wired as the
-  grenade's `whoosh`. Two moments, one sound; the swing's own miss is decided
-  in lib/game/strikes.ts.
-- **`S_UNHOLS`** — putting a weapon away, which the last bayonet and every
-  weapon swap already do.
-- **`BATT_L1..3` and `BATT_S1..3`** — the battle going on somewhere else, three
-  long and three short. Ambience nothing schedules.
-- **`AMB_1D`/`AMB_2D`** — a falcon and another bird.
+- ~~**`S_CLOCK` is the TURN CLOCK starting to run out**~~ **WIRED
+  2026-08-24** — `clockLow`, emitted on the crossing of `CLOCK_WARNING`
+  (10 s, lib/game/turns.ts — the same mark the exe's own late-turn window
+  opens on). It still plays for a charge's timer too; that was never the
+  problem, the silence was.
+- ~~**`I_BUILD` against `I_BULIT1`/`I_STAB`**~~ **WIRED** — `shotLanded`
+  carries the verdict and `hitHard`/`hitFlesh` answer it.
+- **`I_METAL`** — a blast inside a bunker, a tank, a stationary machine.
+  **The blocker is not the sound, it is the QUESTION**: nothing can ask
+  whether a burst went off indoors — `Indoors` tests a PIG, not a point
+  (lib/game/indoors.ts) — and inventing that seam for one cue is the wrong
+  order of work. It comes free the day a building has a volume.
+- ~~**`I_SWMISS`** is a swing that MISSED~~ **WIRED 2026-08-24** —
+  `swungWide` off lib/game/strikes.ts, beside the throw's own whoosh; two
+  moments, one sample, at slightly different pitches.
+- ~~**`S_UNHOLS`**~~ **WIRED** — the turn's end holsters what is in hand.
+- ~~**`BATT_L1..3` and `BATT_S1..3`**~~ and ~~**`AMB_1D`/`AMB_2D`**~~
+  **BUILT 2026-08-24** — `audio/ambience.ts`, a CLOCK rather than a
+  listener, because nothing on the field causes them: one distant round
+  every 9–22 s and a bird every 14–40 s, both stopped dead by a pause. The
+  cadence and the volumes are `[CHECK — remake]` — the samples are play's
+  ear, but how often the ORIGINAL fires one has not been looked for.
 - **`EN_BIP`** — the AIRSHIPS that fly over a map, and **play notes we have
   none**: "дережабли летают на картах - их кстати щас нет вроде". That is a
   missing PROP before it is a missing sound.
@@ -982,12 +987,16 @@ order:**
    into the ground shoves FLAT along it. Full reads: weapons/fire.md and
    psx/notes.md in the disasm repo.
 2. **The rest of the sound survey** — the P1 trio is wired (damaged/killed/
-   shotLanded, commit 640d1df); still unwired, in the survey's priority:
-   `broke` (props by bullet/blade), the TURN CLOCK's own S_CLOCK warning
-   (needs an event), `chose`/holster S_UNHOLS, `promotionPoint`, the
-   parachute trio (`dropOpened`/`dropCut`/`canopiesCut` — P_CHUTE1 is the
-   tear), `wentIn`/`cameOut` I_METAL, `remains`, grenade BOUNCE (no event),
-   battle ambience BATT_* and the two birds AMB_*.
+   shotLanded, commit 640d1df), and the 2026-08-24 pass took the TURN
+   CLOCK's S_CLOCK warning, the blade's own I_SWMISS miss, the S_UNHOLS
+   holster and the battle AMBIENCE with its two birds (audio/ambience.ts).
+   **What is left is a list of NAME PICKS, not of wiring**: `broke` (props
+   by bullet or blade), `chose`, `promotionPoint`, the parachute trio
+   (`dropOpened`/`dropCut`/`canopiesCut` — P_CHUTE1 is the tear),
+   `wentIn`/`cameOut`, `remains`, and the grenade's BOUNCE, which has no
+   event yet. Each wants an ear on the bank before a line of code, which
+   is why they sit here rather than in a commit. `I_METAL` is the odd one
+   and waits on a question instead — see P2.
 3. The ARENA wits picker (`ARENA_WITS` is a flat 0.5 until arenas grow a
    difficulty choice). Diagnosis has a real tap now (2026-08-23): every
    decision is announced on the bus as `aiDecided` — the ladder rung, the
@@ -1194,17 +1203,18 @@ are worth doing:
    now, belief still after the tilde. (b) A held plan (`intent`,
    deliberately never re-elected) looked identical to a fresh election —
    the kit line says `(plan held)` now, `Thought.held`.
-4. **Nobody moves after firing, and it kills them.** Four of six AI pigs
-   across the two sessions died by counter-blast at the EXACT coordinates
-   they had been lobbing from for turns on end; GINGER kept throwing at
-   hp10 from a square already shelled. There is no displacement and no
-   self-preservation term anywhere in the kit. **Play ruled the shape of
-   the fix (2026-08-24): self-preservation is a WITS behaviour, and the
-   move is not "run away" — it is standing NEXT TO an enemy pig, so a
-   shell at you risks their own** ("встать к нашему свину — так это
-   только умные должны делать"). So a dumb pig keeps dying where it
-   stands, and the wits scale buys hugging the enemy, not cowering.
-   Goes on the wits-knob list beside estimate error and actuator noise.
+4. ~~**Nobody moves after firing, and it kills them.**~~ **BUILT
+   2026-08-24** — play ruled the shape and it is the ruling that made it
+   small: self-preservation is a WITS behaviour, and the move is not "run
+   away" but standing NEXT TO an enemy pig so a shell at you risks their
+   own ("встать к нашему свину — так это только умные должны делать").
+   `SHELTER_WITS` (0.5) and `SHELTER_NEAR` (240) in lib/game/grunt.ts: a
+   smart pig's stand-off mark becomes a body's width off its target
+   instead of the weapon's own shy fraction. GUNS only — the price list
+   already scores a lob at arm's length below zero — and BOUNDED by
+   `SHELTER_FROM` (four tiles), because unbounded it would march a pig
+   across the map and be arguing with the approach tax. Pinned both ways
+   in unit/grunt.spec.ts; the knob is on ai.md's table.
 5. ~~**The grenade outranges the map, which moots the approach tax.**~~
    **ANSWERED 2026-08-24 — the range is the exe's own, and the pitch
    already matters.** Play asked "зависит от наклона — щас вроде верно
@@ -1245,20 +1255,23 @@ are worth doing:
 **Play's batch, 2026-08-24 evening — the rest of it, after the fixes above
 landed (929026b and the music commit):**
 
-1. **PIG VOICES are read end to end and wait to be BUILT** — the research
-   that closed the music also closed the voice `[CHECK — remake]`
-   (`speech/pigs.md`, the 2026-08-24 section): the squad record is the
-   pig's own 64-byte ROSTER SLOT; `[slot+2]` (voice) is the pig's NAME-ROW
-   identity — name k always speaks Pig{k+1} — and `[slot+3]` (language) is
-   `Team::SkinOf(nation)`, so a side barks in its own tongue out of the
-   EN/AM/FR/GE/RU/JA speech sets (TL ships no files and is never picked;
-   Lard pigs speak their ORIGIN language, which our roster does not carry
-   yet). The build: `voiceFor`/language in audio/pigVoice.ts go per-PIG
-   (identity off the roster/name row) instead of per-side, rotation
-   counters per pig — the exe even SAVES them with the campaign. Also new
-   and unbuilt: **Track31 is the END-OF-MISSION music** (training gets the
-   sergeant instead), **Track27-30 is a random sting on a supply drop and
-   on reinforcements due**, Track32 has no caller at all.
+1. ~~**PIG VOICES are read end to end and wait to be BUILT**~~ **BUILT
+   2026-08-24**, and with them both music tails. The voice is the pig's
+   NAME-ROW identity — name k always speaks Pig{k+1} — and the language
+   is `Team::SkinOf(nation)`, so a side barks in its own tongue out of
+   the EN/AM/FR/GE/RU/JA sets: a pig carries its voice from muster (its
+   place in the nation's nine; a DRAFT falls back on its slot), the
+   bark/dying/turnBegan events carry it, and all three rotations are per
+   PIG as the exe keeps them. Lard falls back to English — TL ships no
+   files and our roster has no origin nations — `[deliberate]`.
+   **Track31 plays at the end of a mission** (the training ground gets
+   the sergeant's sign-off instead, 0x48fb08) and **Track27-30 stings a
+   supply crate down**; the sting's other site, reinforcements falling
+   due, has nothing in the remake to fire it, and Track32 has no caller
+   anywhere. `unit/pigVoice.spec.ts`.
+   Still not carried, and nobody can hear it: the exe SAVES a pig's place
+   in its rotations with the campaign, so a mission opens where the last
+   one left off. Ours start fresh each battle (`[gap]`).
 2. ~~**The SECOND pig opens its walk with a wasted micro-leg**~~ **FIXED
    2026-08-24 (0cb609e)** — the cause was the pull's HORIZON, not its
    line test: `PULL` bounds the spine lookahead at 24 cells, so the

@@ -111,6 +111,7 @@ No stat bonuses, no damage scaling, no extra hp — one brain with knobs:
 | memory of hidden pigs | forgets | remembers the spot |
 | actuator noise | over-turns the aim, over-holds the gauge | near clean |
 | lob pitch (`TUNE_PITCH_WITS`, built 2026-08-24) | always the 45° start | tunes the come-up: a steeper arc over a hill, solved for the exact landing |
+| self-preservation (`SHELTER_WITS`, built 2026-08-24) | fires from wherever the weapon reaches, and dies where it stood | ends its turn SHOULDER TO SHOULDER with an enemy, so a blast answering it costs them one of their own — guns only, and bounded to four tiles of walk |
 
 Low-level misses look ALIVE for free: the pig genuinely aimed with a bad
 estimate and shaky hands, it did not roll a die and shoot at nothing.
