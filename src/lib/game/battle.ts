@@ -1263,6 +1263,11 @@ export function createBattle(parts: BattleParts): Battle {
                     x: head.x,
                     z: head.z,
                     resting: head.resting,
+                    // How fast it still moves: the brain's own "it is down"
+                    // bar (lib/game/grunt.ts, SETTLED) — the draw flag's bar
+                    // is so low a missed throw rolled until its fuse blew it
+                    // (telemetry, GINGER 2026-08-24).
+                    speed: Math.hypot(head.vx, head.vy, head.vz),
                     // The blast's outer edge — what the dumbest detonation
                     // window is as wide as (lib/game/grunt.ts).
                     rim: blastRange(lobOf(head.skill) ?? lobOf(SKILL.GRENADE)!)

@@ -57,6 +57,12 @@ export const PITCH_WITHIN = 12
  * and the margin is a stride. `[deliberate]`. */
 export const FLEE_CLEAR = 1900
 
+/** Under this speed (units/s) a thrown grenade counts as DOWN to the brain
+ * and the detonator is pressed — four exe-units a frame, a crawl. The
+ * renderer's own `resting` bar is 1/frame, low enough that a missed throw
+ * rolled until its fuse beat the press (see the thrown arm). `[deliberate]`. */
+export const SETTLED = 60
+
 /**
  * How badly the DUMBEST brain misjudges what a thing is worth — the
  * docs/ai.md knob table's "estimate error", applied to the JUDGMENT: the
@@ -239,7 +245,12 @@ export function createGruntBrain(): Brain {
         const near = world.foes.some(
           (foe) => Math.hypot(foe.x - thrown.x, foe.z - thrown.z) <= trigger
         )
-        return thrown.resting || near
+        // "Stops" is the BRAIN's own bar, not the renderer's: `resting` is
+        // set at a crawl so low (15 u/s) that a missed throw rolled about
+        // until its own fuse blew it six seconds late — telemetry, GINGER
+        // 2026-08-24, one watch and then nothing. A grenade creeping under
+        // SETTLED is not rolling anywhere useful; press. `[deliberate]`.
+        return thrown.resting || thrown.speed < SETTLED || near
           ? say('detonate', { kind: 'fire' })
           : say('fuse', { kind: 'watch' })
       }
@@ -349,8 +360,10 @@ export function createGruntBrain(): Brain {
             one.skill === intent!.skill &&
             spotOf(one) === intent!.spot
         )
-        if (held && held.score > 0 && playable(held)) option = held
-        else intent = null
+        if (held && held.score > 0 && playable(held)) {
+          option = held
+          told.held = true
+        } else intent = null
       }
       // The winner it CANNOT play is no winner: take the best candidate the
       // ground allows instead, and failing every weapon, a crate is a

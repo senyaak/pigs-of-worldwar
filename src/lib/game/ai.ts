@@ -74,6 +74,11 @@ export interface Thought {
   /** The winner, by reference one of `candidates`, or null when nothing
    * scored above zero. */
   chose: Candidate | null
+  /** True when the winner was not ELECTED this decision but HELD from the
+   * turn's standing plan (lib/game/grunt.ts, `intent`) — the telemetry
+   * prints it, because a held plan under a better-believed row reads as a
+   * wrong election otherwise (the GINGER triage, 2026-08-24). */
+  held?: boolean
 }
 
 /** What the brain is shown: the read-only face of the battle. It GROWS with
@@ -142,7 +147,7 @@ export interface AiWorld {
    * (lib/game/grenade.ts, `blastRange` of the thrown skill) — the dumbest
    * brain presses the moment a foe is merely inside it
    * (lib/game/grunt.ts, the detonation window). */
-  thrown: { x: number; z: number; resting: boolean; rim: number } | null
+  thrown: { x: number; z: number; resting: boolean; rim: number; speed: number } | null
   /** A charge PLANTED and armed — the brain's business is being somewhere
    * else when it goes off (lib/game/grunt.ts, the flee). */
   planted: { x: number; z: number } | null

@@ -114,15 +114,19 @@ const LAYOUT = {
     survival: 225,
     none: 260,
     special: 305,
-    // The step fits the 48-wide spinning token with a hair of air.
-    specialRow: { y: 330, step: 54 }
+    // The step fits the 96-wide spinning token with a hair of air. Five
+    // tokens at this step overspill the page's edges; no shipped map pays
+    // five, and the row centres, so the middle ones stay on.
+    specialRow: { y: 330, step: 102 }
   },
   // BIG and UNDER THE TEXT — play, twice: first "медали под текстом", then,
   // against a 32-px token beside the line, "нифига не видно — они должны
   // быть большие и под текстом". `drop` is how far under the line's y the
   // token's top sits; `size` is its drawn edge (the strip renders at twice
   // it, three/tokenArt.ts).
-  token: { drop: 16, size: 48 }
+  // …and `size` doubled 48 → 96 on play's word: "надо побольше сделать их
+  // раза в 2".
+  token: { drop: 16, size: 96 }
 }
 
 const TICK_MS = EXE_FRAME_SECONDS * 1000

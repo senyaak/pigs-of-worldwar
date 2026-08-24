@@ -294,7 +294,14 @@ export function createEngine(parts: EngineParts): Engine {
       // The effect field and the floating damage are the ENGINE's — the beat
       // after a blow waits on both (lib/game/effectField.ts, damage.ts) — so
       // they are started here and not by whoever happens to be drawing.
-      damaged: ({ at, amount }) => numbers.show(at, amount),
+      // The floating number prints over PIGS and BUILDING pieces only —
+      // play: "дамаг земли показывает урон — надо показывать урон только
+      // по свинам и строениям и машинам куда можно залезть." A bush, a
+      // fir or a bridge takes its points in silence; a vehicle joins the
+      // `structure` flag the day one is enterable. `[play]`
+      damaged: ({ at, amount, pig, structure }) => {
+        if (pig !== undefined || structure) numbers.show(at, amount)
+      },
       // A heal shows the same number a hit does — one spawner, one style
       // argument apart (lib/game/scenery.ts).
       healed: ({ at, amount }) => numbers.show(at, amount, 'heal'),

@@ -21,8 +21,9 @@ import type { Model, Texture } from '../api'
 /** One square frame's edge, pixels — rendered at twice the size the debrief
  * draws it (`token.size` there), so the scale-down antialiases. The first
  * cut rendered AND drew at 32 and play could not see it: "медальки вроде
- * были но нифига не видно". */
-export const TOKEN_SIZE = 96
+ * были но нифига не видно" — and the second cut's 48 was still half what
+ * play wanted ("надо побольше сделать их раза в 2"). */
+export const TOKEN_SIZE = 192
 /** How many yaw steps the strip holds — a full turn. */
 export const TOKEN_FRAMES = 16
 
@@ -32,7 +33,10 @@ export const TOKEN_FRAMES = 16
  */
 export function renderTokenStrip(model: Model, textures: Texture[]): HTMLCanvasElement {
   const geometry = buildModelGeometry(model, textures)
-  const materials = buildTextureMaterials(model, textures)
+  // UNLIT, and it has to be said: the builder's default is a LIT material,
+  // and this scene carries no light at all — the first cut drew the token
+  // as a black silhouette (play: "медали чёрные — света нет?").
+  const materials = buildTextureMaterials(model, textures, { lit: false })
   const mesh = new THREE.Mesh(geometry, materials)
 
   // Game space is Y-DOWN; the one conversion the whole engine uses is a

@@ -199,7 +199,7 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
       if (!reached(blade, from, dummy)) continue
       // One point, so anything at all flattens it (lib/game/targets.ts).
       hurt(dummy, weapon.damage, false)
-      emit({ kind: 'damaged', at: dummy, amount: weapon.damage })
+      emit({ kind: 'damaged', at: dummy, amount: weapon.damage, structure: dummy.structure })
       emit({ kind: 'struck', skill, at: dummy })
       if (isDead(dummy)) {
         standing.splice(i, 1)

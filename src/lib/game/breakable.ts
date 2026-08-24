@@ -157,3 +157,16 @@ export const breakableHealth = (name: string): number | null =>
 /** How many models the table names — what a spec counts to know the whole of it
  * was transcribed. */
 export const BREAKABLE_COUNT = HEALTH.size
+
+/**
+ * Whether this model is a piece of a BUILDING — one of the seven building
+ * sets' floors (F), roofs (R), walls (W) or stairs (S). The sets share a
+ * two-letter prefix and the piece letter follows it, and the pattern is
+ * exact over the whole table: STUMP1, SNOWB, CACTUS and BRIDGE_S all fail
+ * the piece letter. What it is FOR: play ruled the floating damage number
+ * prints only over pigs, buildings and enterable vehicles — not over every
+ * bush and fir the blast catches ("дамаг земли показывает урон — надо
+ * показывать урон только по свинам и строениям"). `[play]`
+ */
+export const isStructure = (name: string): boolean =>
+  /^(S1|ST|BR|M1|SN|CA|W1)[FRWS]/.test(name.toUpperCase())

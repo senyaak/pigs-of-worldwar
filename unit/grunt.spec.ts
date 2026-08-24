@@ -297,7 +297,7 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
       world({
         carrying: kit,
         holding: SKILL.GRENADE,
-        thrown: { x: 0, z: 300, resting: false, rim: 600 }
+        thrown: { x: 0, z: 300, resting: false, rim: 600, speed: 2000 }
       })
     )
   ).toEqual({ kind: 'watch' })
@@ -307,7 +307,7 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
       world({
         carrying: kit,
         holding: SKILL.GRENADE,
-        thrown: { x: 0, z: 700, resting: true, rim: 600 }
+        thrown: { x: 0, z: 700, resting: true, rim: 600, speed: 0 }
       })
     )
   ).toEqual({ kind: 'fire' })
@@ -319,7 +319,19 @@ test('a grenade in flight is WATCHED; landed or on a foe, DETONATED', { tag: '@n
         carrying: kit,
         holding: SKILL.GRENADE,
         foes: [foe({ z: 800 })],
-        thrown: { x: 0, z: 750, resting: false, rim: 600 }
+        thrown: { x: 0, z: 750, resting: false, rim: 600, speed: 2000 }
+      })
+    )
+  ).toEqual({ kind: 'fire' })
+  // CREEPING far from anybody — under the brain's own SETTLED bar though
+  // the draw flag never set: press, don't let the fuse beat you to it
+  // (telemetry, GINGER 2026-08-24 — a missed throw rolled six seconds).
+  expect(
+    brain.decide(
+      world({
+        carrying: kit,
+        holding: SKILL.GRENADE,
+        thrown: { x: 0, z: 5000, resting: false, rim: 600, speed: 30 }
       })
     )
   ).toEqual({ kind: 'fire' })
@@ -337,7 +349,7 @@ test('the detonation window is the wits dial: the dumb press at the RIM', { tag:
       foes: [foe({ z: 800 })],
       // The grenade grazes the blast's outer edge of the foe: outside the
       // core, inside the rim.
-      thrown: { x: 0, z: 800 - (BLAST_CORE + 300), resting: false, rim: BLAST_CORE + 400 }
+      thrown: { x: 0, z: 800 - (BLAST_CORE + 300), resting: false, rim: BLAST_CORE + 400, speed: 2000 }
     })
   expect(createGruntBrain().decide(rolling(0))).toEqual({ kind: 'fire' })
   expect(createGruntBrain().decide(rolling(1))).toEqual({ kind: 'watch' })

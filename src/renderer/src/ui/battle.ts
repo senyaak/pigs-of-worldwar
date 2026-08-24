@@ -786,6 +786,12 @@ export function initBattle(
     // count is flushed when something new happens.
     let aiSaid = ''
     let aiAgain = 0
+    // …and the squeeze is FLUSHED on a clock too: a turn whose every
+    // decision was the same `watch` used to leave NOTHING in the log — the
+    // count only printed when something new happened, and the turn ended
+    // first. Six silent seconds read as "the seat died" (the GINGER triage)
+    // when it was deciding every frame.
+    let aiHeldSince = 0
     // The instructor is a listener like any other. A crate the SCRIPT has just
     // put on the map is the half of the tutorial that says where to go next,
     // and it comes straight off the bus rather than through the scene — the
@@ -815,6 +821,18 @@ export function initBattle(
           const line = `[blast] at ${at.x.toFixed(0)},${at.y.toFixed(0)},${at.z.toFixed(0)} effect 0x${effect.toString(16)}`
           console.log(line)
           window.api.logTelemetry(line)
+        },
+        // A DOUSED throw sinks silently — no blast, no fuse, nothing. In
+        // the log that read as "the grenade vanished" (GERARD, the third
+        // session's triage); one line makes the water's verdict visible.
+        doused: ({ at }) => {
+          window.api.logTelemetry(`[lob] doused at ${at.x.toFixed(0)},${at.z.toFixed(0)}`)
+        },
+        // …and the HANDOVER: without it a player's 56-second turn reads as
+        // the machine hanging, and every "did the AI stall" question in the
+        // triage had to be answered by matching fling coordinates.
+        turnBegan: ({ player, computer }) => {
+          window.api.logTelemetry(`[turn] side ${player}${computer ? ' (machine)' : ''}`)
         },
         flung: ({ pig, at, vx, vy, vz }) => {
           const line =
@@ -880,6 +898,13 @@ export function initBattle(
             ` [${thought?.rung ?? '-'}] -> ${said}`
           if (head === aiSaid) {
             aiAgain++
+            if (Date.now() - aiHeldSince >= 2000) {
+              const again = `[ai] …the same, ${aiAgain} more times`
+              console.log(again)
+              window.api.logTelemetry(again)
+              aiAgain = 0
+              aiHeldSince = Date.now()
+            }
             return
           }
           if (aiAgain > 0) {
@@ -889,15 +914,17 @@ export function initBattle(
           }
           aiSaid = head
           aiAgain = 0
+          aiHeldSince = Date.now()
           console.log(head)
           window.api.logTelemetry(head)
           if (!thought || thought.candidates.length === 0) return
-          // Sorted by what the brain BELIEVED (the misjudged score, where one
-          // was made), because that is the order it chose in; the true score
-          // prints first and the belief after a tilde.
-          const rows = [...thought.candidates].sort(
-            (a, b) => (b.judged ?? b.score) - (a.judged ?? a.score)
-          )
+          // Sorted by the TRUE score — NOT the belief: `judged` exists only
+          // on each slot's own winner (evaluate.ts prices one option per
+          // slot through `judge`), so a belief-sorted list ranked judged
+          // rows against raw ones and put the star under a row that was
+          // never in the election (the GINGER triage, 2026-08-24). The
+          // belief still prints after the tilde, and a HELD plan says so.
+          const rows = [...thought.candidates].sort((a, b) => b.score - a.score)
           const shown = rows
             .slice(0, 6)
             .map(
@@ -909,7 +936,7 @@ export function initBattle(
                   : '')
             )
           const more = rows.length > 6 ? ` +${rows.length - 6} more` : ''
-          const kit = `[ai:kit] ${name} ${shown.join(' | ')}${more}`
+          const kit = `[ai:kit] ${name}${thought.held ? ' (plan held)' : ''} ${shown.join(' | ')}${more}`
           console.log(kit)
           window.api.logTelemetry(kit)
         },
