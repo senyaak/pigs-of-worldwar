@@ -31,6 +31,7 @@ import { damageOf, projectileOf, rangeOf } from './projectile'
 import { meleeOf } from './melee'
 import { advanceLob, blastRange, blastShare, isPlanted, lob, lobOf } from './grenade'
 import { GAUGE_FULL } from './gauge'
+import { AIM_LOB } from './aim'
 import { TILE_STEP } from '../formats/pmg'
 
 /** What FINISHING a pig is worth on top of the health it takes — the kill
@@ -90,6 +91,23 @@ export const THROW_RISE = 120
  * its own boots. `[deliberate]`. */
 export const LEAST_CHARGE = 0.15
 
+/** From this wits up a pig TUNES the throw's pitch — play's order, and
+ * play's boundary: "для умных — подстраивание для точного попадания — но
+ * только для умных". Below it the come-up stays the exe's 45° start and
+ * only the charge is played. The original's grenade AI is undecoded, so
+ * the whole tune is `[deliberate]` — a level knob like CRATE_APPETITE. */
+export const TUNE_PITCH_WITS = 0.5
+
+/** The come-ups a tuning pig tries, flattest first: 45° (the range
+ * maximum, everyone's start), then 56.25°, 67.5° and 78.75° in the aim's
+ * own 4096-a-turn units. The steeper rungs trade reach for CLEARANCE —
+ * both arcs of one range land the same spot, and the high one is the one
+ * that goes over a hill. The ladder stops at the first landing within
+ * PITCH_SLACK of the foe, so flat ground never climbs past 45° and the
+ * dumb pig's cost is exactly what it was. */
+const LOB_AIMS = [AIM_LOB, 640, 768, 896]
+const PITCH_SLACK = 64
+
 /** How much of a crate's gain the DUMBEST brain feels — the grunt barely
  * bothers with pickups, by request: "он должен очень в редких случаях
  * тогда брать ящики". The WITS dial slides it from here to a full 1
@@ -123,6 +141,9 @@ export interface Option extends Candidate {
   /** For a lob: the gauge fraction to hold (0..1), solved for the throw —
    * present only when the target is already inside the arc. */
   charge?: number
+  /** For a lob: the come-up to take before firing, in aim units — present
+   * only when a TUNED pitch beat the 45° start (TUNE_PITCH_WITS). */
+  aim?: number
 }
 
 /**
@@ -142,20 +163,22 @@ const distance2d = (a: { x: number; z: number }, b: { x: number; z: number }): n
   Math.hypot(a.x - b.x, a.z - b.z)
 
 /** The flight of one throw from `from` at `charge` (gauge units), along
- * `heading`, at the weapon's own 45° come-up: where it comes down. The
- * ground is the world's; the rng is constant — the fuse is not read. */
+ * `heading` at `aim` — the weapon's own 45° come-up unless a tuned pitch
+ * asks otherwise: where it comes down. The ground is the world's; the rng
+ * is constant — the fuse is not read. */
 const flight = (
   world: AiWorld,
   skill: number,
   heading: number,
-  charge: number
+  charge: number,
+  aim = AIM_LOB
 ): { x: number; z: number } => {
   const me = world.acting
   const shot = lob(
     skill,
     { x: me.x, y: me.y - THROW_RISE, z: me.z },
     heading,
-    512,
+    aim,
     charge,
     () => 0
   )!
@@ -296,28 +319,45 @@ const lobOption = (world: AiWorld, skill: number, note: Note): Option | null => 
   const spread = blastRange(row)
   // The whole arc, measured by throwing FLAT OUT at each foe's bearing —
   // near enough for "can I reach him at all", and re-derived every decision.
+  // A SMART pig walks a ladder of come-ups (LOB_AIMS): where the 45° arc
+  // dies on a hillside, a steeper pitch clears it — and its shorter arc can
+  // REACH a foe the flat one cannot.
+  const aims = world.wits >= TUNE_PITCH_WITS ? LOB_AIMS : [AIM_LOB]
   let best: Option | null = null
   for (const foe of world.foes) {
     const away = distance2d(me, foe)
     const heading = Math.atan2(foe.x - me.x, foe.z - me.z)
-    const farthest = flight(world, skill, heading, GAUGE_FULL)
-    const arc = distance2d(me, farthest)
-    if (away <= arc) {
+    let solved: { aim: number; charge: number; landing: { x: number; z: number }; miss: number } | null =
+      null
+    let limit = 0
+    for (const aim of aims) {
+      const farthest = flight(world, skill, heading, GAUGE_FULL, aim)
+      const arc = distance2d(me, farthest)
+      if (arc > limit) limit = arc
+      if (away > arc) continue
       // In the arc: SOLVE the gauge — the landing grows with the charge, so
       // halve the interval on which side of the foe it comes down.
       let low = LEAST_CHARGE * GAUGE_FULL
       let high = GAUGE_FULL
       for (let i = 0; i < 14; i++) {
         const mid = (low + high) / 2
-        if (distance2d(me, flight(world, skill, heading, mid)) < away) low = mid
+        if (distance2d(me, flight(world, skill, heading, mid, aim)) < away) low = mid
         else high = mid
       }
       const charge = (low + high) / 2
-      const landing = flight(world, skill, heading, charge)
+      const landing = flight(world, skill, heading, charge, aim)
+      const miss = distance2d(landing, foe)
+      if (!solved || miss < solved.miss) solved = { aim, charge, landing, miss }
+      // Near enough is done: flat ground stops on the first rung, so the
+      // ladder only costs where the ground actually interferes.
+      if (solved.miss <= PITCH_SLACK) break
+    }
+    if (solved) {
       // A lob that comes down ON WATER is worth nothing at all: the engine
       // DOUSES it at the surface (lib/game/grenade.ts) and there is no
       // blast to price. Without this line a doused throw scored like a dry
       // one, and a brain repeated it every turn forever.
+      const { landing } = solved
       const worth = world.wet(landing.x, landing.z) ? 0 : blastWorth(world, landing, damage, spread)
       const option: Option = {
         skill,
@@ -326,17 +366,19 @@ const lobOption = (world: AiWorld, skill: number, note: Note): Option | null => 
         score: worth,
         worth,
         reach: away,
-        limit: arc,
-        charge: charge / GAUGE_FULL
+        limit,
+        charge: solved.charge / GAUGE_FULL,
+        ...(solved.aim === AIM_LOB ? {} : { aim: solved.aim })
       }
       note?.(option)
       if (!best || worth > best.score) best = option
     } else {
-      // Out of the arc: price the throw AS IF it lands on him — the walk
-      // closes the gap and the next decision solves it for real.
+      // Out of the arc at every pitch: price the throw AS IF it lands on
+      // him — the walk closes the gap and the next decision solves it for
+      // real.
       const worth = blastWorth(world, foe, damage, spread)
-      const score = taxedScore(worth, away, arc * 0.8)
-      const option: Option = { skill, kind: 'lob', target: foe, score, worth, reach: arc * 0.8, limit: arc }
+      const score = taxedScore(worth, away, limit * 0.8)
+      const option: Option = { skill, kind: 'lob', target: foe, score, worth, reach: limit * 0.8, limit }
       note?.(option)
       if (!best || score > best.score) best = option
     }

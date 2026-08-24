@@ -279,3 +279,34 @@ test('a shot the ground would swallow scores nothing, and the grenade takes over
   )
   expect(rifled).toBeNull()
 })
+
+test('a RIDGE in the arc: the smart pig pitches over it, the dumb one cannot throw', { tag: '@nodata' }, () => {
+  // Play's order (2026-08-24): pitch tuning for the smart alone. A
+  // 1200-high ridge across z 1000..2000 kills the 45° arc on its near face
+  // (the full flat-out throw dies at ~z 1000), so at wits 0 the foe at
+  // z 3000 is out of the arc — no charge, walk closer. At wits 1 the
+  // ladder finds a steeper come-up whose arc clears the ridge and lands on
+  // him: the option carries the tuned aim and its solved charge.
+  const ridge: AiWorld['groundAt'] = (_x, z) => (z > 1000 && z < 2000 ? -1200 : 0)
+  const kit = [{ skill: SKILL.GRENADE, amount: 3 }]
+  const target = foe({ z: 3000 })
+  const sharp = priceKit(world({ carrying: kit, foes: [target], wits: 1, groundAt: ridge }))!
+  expect(sharp.kind).toBe('lob')
+  expect(sharp.aim).toBeGreaterThan(512)
+  expect(sharp.charge).toBeDefined()
+  const dull = priceKit(world({ carrying: kit, foes: [target], wits: 0, groundAt: ridge }))!
+  expect(dull.kind).toBe('lob')
+  expect(dull.aim).toBeUndefined()
+  expect(dull.charge).toBeUndefined()
+})
+
+test('flat ground needs no tuning: a smart lob keeps the 45° start', { tag: '@nodata' }, () => {
+  // The ladder stops at the first rung that lands within the slack, so an
+  // unobstructed throw never climbs and the option carries no aim at all.
+  const sharp = priceKit(
+    world({ carrying: [{ skill: SKILL.GRENADE, amount: 3 }], foes: [foe({ z: 1500 })], wits: 1 })
+  )!
+  expect(sharp.kind).toBe('lob')
+  expect(sharp.aim).toBeUndefined()
+  expect(sharp.charge).toBeDefined()
+})

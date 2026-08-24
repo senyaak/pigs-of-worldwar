@@ -503,7 +503,9 @@ export function createGruntBrain(): Brain {
       // The pitch, GUNS only: Y-DOWN, so standing ABOVE the target means my
       // y is the smaller and the barrel goes DOWN — atan2 of the drop over
       // the reach, in the aim's own 4096-a-turn units. Once. A lob's pitch
-      // is its 45° come-up; its aim is the charge.
+      // is its 45° come-up and its aim is the charge — UNLESS the price
+      // list tuned one (evaluate.ts, TUNE_PITCH_WITS): a smart pig's throw
+      // over a hill carries the come-up its charge was solved at.
       if (option.kind === 'gun' && !pitched) {
         const wanted = Math.round(
           (Math.atan2(me.y - target.y, distance) / (2 * Math.PI)) * AIM_UNITS
@@ -511,6 +513,12 @@ export function createGruntBrain(): Brain {
         if (Math.abs(wanted - me.aim) > PITCH_WITHIN) {
           pitched = true
           return say('pitch', { kind: 'aimTo', angle: wanted })
+        }
+      }
+      if (option.kind === 'lob' && option.aim !== undefined && !pitched) {
+        if (Math.abs(option.aim - me.aim) > PITCH_WITHIN) {
+          pitched = true
+          return say('pitch', { kind: 'aimTo', angle: option.aim })
         }
       }
       return say(

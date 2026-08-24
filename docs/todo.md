@@ -1203,11 +1203,20 @@ are worth doing:
    distance — demand-limited, not inflated. The player aims the pitch
    freely (start 0x200 = 45°, clamp ±1023, grenades not floored) and gets
    the whole `sin(2θ)` curve. **The one remake-own piece is the AI's
-   fixed 45°** (evaluate.ts dry-run hardcodes aim 512; only guns get
-   `aimTo`) — the original's grenade AI is not in the disasm at all. A
-   pitch-aware AI (high arc over a hill, both 30° and 60° land the same
-   distance) is possible work, not a bug; the ballistics are not to be
-   touched.
+   fixed 45°** (evaluate.ts dry-run hardcodes aim 512; only guns got
+   `aimTo`) — the original's grenade AI is not in the disasm at all.
+   **And the pitch-aware AI is BUILT the same day, play's order: "для
+   умных — подстраивание для точного попадания — но только для умных".**
+   From `TUNE_PITCH_WITS` (0.5) up, the dry-run walks a ladder of
+   come-ups — 45°, 56.25°, 67.5°, 78.75° — re-solving the charge per
+   rung and keeping the one that lands nearest the foe; the ladder stops
+   at the first landing within 64 units, so flat ground never climbs past
+   45° and a dumb pig's cost is unchanged. A steeper arc both CLEARS a
+   ridge the flat one dies on and REACHES a foe behind it the flat arc
+   priced as out-of-arc. The option carries `aim`, the grunt takes it
+   with the guns' own `aimTo` seam, the ballistics untouched. Pinned both
+   ways (ridge and flat) in unit/evaluate.spec.ts; the knob is on
+   ai.md's difficulty table.
 6. ~~**The plan-B branch is still untested in play.**~~ **ANSWERED by play
    2026-08-24 — not a bug**: the branch never fired because a weapon was
    always playable ("потому что бежал стрелять всегда — я ж не могу

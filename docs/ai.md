@@ -110,6 +110,7 @@ No stat bonuses, no damage scaling, no extra hp — one brain with knobs:
 | clumping penalty | near zero | high — spread out, deny the grenade |
 | memory of hidden pigs | forgets | remembers the spot |
 | actuator noise | over-turns the aim, over-holds the gauge | near clean |
+| lob pitch (`TUNE_PITCH_WITS`, built 2026-08-24) | always the 45° start | tunes the come-up: a steeper arc over a hill, solved for the exact landing |
 
 Low-level misses look ALIVE for free: the pig genuinely aimed with a bad
 estimate and shaky hands, it did not roll a die and shoot at nothing.
