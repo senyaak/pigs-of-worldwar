@@ -1214,6 +1214,9 @@ export function createBattle(parts: BattleParts): Battle {
         const refusal = actuator.refusal()
         const decided = brain.decide({
             timeLeft: game.timeLeft,
+            // …and how long a whole turn is here, so the price list can cost
+            // a walk in TURNS rather than in an opinion (evaluate.ts).
+            turnSeconds: game.turnSeconds,
             wits: parts.wits ?? 0,
             // The battle's one stream: the brain's misjudgment rolls from
             // it, so lockstep stays lockstep (lib/game/grunt.ts, MISJUDGE).

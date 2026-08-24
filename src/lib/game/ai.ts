@@ -86,6 +86,10 @@ export interface Thought {
 export interface AiWorld {
   /** The turn clock, seconds. */
   timeLeft: number
+  /** …and how long a WHOLE turn is on this map (lib/game/turns.ts) — what
+   * the price list costs a walk in: an option two turns away is worth what
+   * it does two turns from now (lib/game/evaluate.ts, `turnsAway`). */
+  turnSeconds: number
   /** How well this machine THINKS, 0..1 — the campaign ramp's dial
    * (lib/game/wits.ts). It slides weights (the crate appetite, the
    * misjudgment); it never picks behaviours. */

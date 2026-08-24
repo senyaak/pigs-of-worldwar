@@ -48,6 +48,7 @@ const world = (over: {
   timeLeft?: number
 }): AiWorld => ({
   timeLeft: over.timeLeft ?? 45,
+  turnSeconds: 45,
   wits: over.wits ?? 0,
   // 0.5 is the NEUTRAL roll: a misjudgment factor of exactly 1, so every
   // spec below reads the price list's own arithmetic unless it rigs one.

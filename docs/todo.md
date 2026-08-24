@@ -1108,18 +1108,23 @@ Non-AI bugs from the same session, queued after the AI:
    `approachTax` in evaluate.ts), with `FAR_FLOOR` keeping a sliver of any
    positive worth so distance ranks options without arguing the only
    weapon out of existence.
-   **CORRECTED 2026-08-24 EVENING — the toll belongs to the DUMB pig
-   alone, and this entry had it as a rule for everybody.** Play, on
-   reading it back: "я просил? нет — я говорил что тупые смотрят на
-   ближайшую цель, а умные оценивают лучший результат независимо от
-   расстояния и учитывают таймер." So the tax now scales by `1 − wits` —
-   full at the bottom, where it pairs with the DUMB EYE below to make the
-   nearest thing the target, and GONE at the top — and what brakes a
-   smart pig instead is the CLOCK (`LATE_DISCOUNT`, `BLOW_SPARE`): an
-   option whose WALK cannot be finished this turn is worth less to it.
-   The clock is asked about the walk and never about the blow alone, or a
-   pig in range with three seconds left would talk itself out of the only
-   move on the board. Pinned both ways in unit/evaluate.spec.ts.
+   **CORRECTED TWICE THE SAME EVENING, and the second one is the model.**
+   First: the toll was never play's ask — "я просил? нет — я говорил что
+   тупые смотрят на ближайшую цель, а умные оценивают лучший результат
+   независимо от расстояния и учитывают таймер" — so it was scaled by
+   `1 − wits` and a clock discount added for the sharp end. Then play named
+   the shape underneath: **"надо просто симуляцию всех вариантов и выбирать
+   наилучший; чем умнее — тем правильнее выбирает; также чем умнее — тем
+   лучше целится и стреляет."** Right, and the wits-scaled toll was the
+   same fact said twice: walking costs TURNS. So the price list now costs a
+   walk in turns and nothing else (`trueScore`, `TURN_DISCOUNT`,
+   `turnsAway`, and `AiWorld.turnSeconds` handed in for it) — **no wits in
+   the simulation at all**. Every difference between a clever pig and a
+   stupid one is downstream and was already built: `MISJUDGE` and the DUMB
+   EYE for how well it SEES the number, `AIM_WOBBLE`/`CHARGE_WOBBLE` for
+   how well it then aims and holds the gauge. The three-place rule is
+   written at the top of ai.md's difficulty section so a fourth is not
+   invented again. Pinned in unit/evaluate.spec.ts.
    **And play named the better model the same day** — "я тупой = что ближе
    всего — ящик/свин — это моя цель; вижу цель — стреляю; чем умнее — тем
    больше свин думает" — built as THE DUMB EYE (`NEAR_POINTS` in grunt.ts):

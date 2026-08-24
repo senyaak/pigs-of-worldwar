@@ -7,7 +7,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { priceKit } from '../src/lib/game/evaluate'
+import { priceKit, CRATE_APPETITE, FAR_FLOOR, TURN_DISCOUNT } from '../src/lib/game/evaluate'
 import type { AiWorld, Seen } from '../src/lib/game/ai'
 import { SKILL } from '../src/lib/game/skills'
 import { UNLIMITED } from '../src/lib/game/inventory'
@@ -27,6 +27,7 @@ const world = (over: {
   timeLeft?: number
 }): AiWorld => ({
   timeLeft: over.timeLeft ?? 45,
+  turnSeconds: 45,
   wits: over.wits ?? 0,
   // Neutral: the price list is tested on its own arithmetic — the
   // misjudgment is the BRAIN's and pinned in unit/grunt.spec.ts.
@@ -166,9 +167,9 @@ test('a blade prices like everything else and wins when it is all there is', { t
 })
 
 test('an ARMED pig barely feels a crate: the greed knob', { tag: '@nodata' }, () => {
-  // A sniper upgrade two tiles away: (40−20) × appetite 0.25 = 5 does not
-  // cover the walk's tax of 10 — the rifle in hand keeps winning. "Самый
-  // тупой комп очень редко берёт ящики."
+  // A sniper upgrade two tiles away: (40−20) × appetite 0.25 = 5, against
+  // the rifle already in hand at 20 — the gun keeps winning. "Самый тупой
+  // комп очень редко берёт ящики."
   const option = priceKit(
     world({ crates: [{ x: 0, z: 1000, skill: SKILL.SNIPER_RIFLE, amount: 2 }] })
   )!
@@ -212,9 +213,9 @@ test('the WITS dial turns the appetite: the dull pig barely values the crate the
   // play's later rulings: a pig with nothing else to do takes the job
   // (crateFallback's lesson), and "что ближе — это моя цель" needs a near
   // crate ALIVE in the list (FAR_FLOOR reaches crates now). What the dial
-  // still turns is the VALUE: a sliver at the bottom, the taxed gain at the
-  // top — which is what keeps a dull pig off crates whenever any weapon
-  // scores at all.
+  // still turns is the VALUE: a quarter of the gain at the bottom, all of
+  // it at the top — which is what keeps a dull pig off crates whenever any
+  // weapon scores at all.
   const upgrade = {
     foes: [] as Seen[],
     crates: [{ x: 0, z: 1000, skill: SKILL.SNIPER_RIFLE, amount: 2 }]
@@ -223,8 +224,12 @@ test('the WITS dial turns the appetite: the dull pig barely values the crate the
   expect(dull.kind).toBe('crate')
   const sharp = priceKit(world({ ...upgrade, wits: 1 }))!
   expect(sharp.kind).toBe('crate')
-  expect(dull.score).toBeLessThan(2)
-  expect(sharp.score).toBeGreaterThan(dull.score * 5)
+  // The appetite is the whole difference: CRATE_APPETITE of the gain
+  // against the lot. (It used to be a tenth of this, because a flat
+  // approach tax ate the rest — that tax is gone: distance costs TURNS
+  // now, and a crate two tiles off costs none.)
+  expect(dull.score).toBeCloseTo(sharp.score * CRATE_APPETITE, 5)
+  expect(sharp.score).toBeGreaterThan(dull.score * 3)
 })
 
 test('the solved charge GROWS with the throw', { tag: '@nodata' }, () => {
@@ -263,38 +268,49 @@ test('distance never argues the ONLY weapon out of existence', { tag: '@nodata' 
   expect(option!.score).toBeGreaterThan(0)
 })
 
-test('DISTANCE is the DUMB pig\'s problem, and the CLOCK is the smart one\'s', { tag: '@nodata' }, () => {
-  // Play's rule, 2026-08-24: "тупые смотрят на ближайшую цель; а умные
-  // оценивают лучший результат независимо от расстояния и учитывают
-  // таймер." So the same far foe is priced two different ways.
+test('DISTANCE is priced in TURNS, and the price list has no opinion about wits', { tag: '@nodata' }, () => {
+  // Play's model, 2026-08-24: "надо просто симуляцию всех вариантов и
+  // выбирать наилучший; чем умнее — тем правильнее выбирает." So this
+  // function answers only what the WORLD would do; the dumb pig's
+  // near-sightedness is made downstream (unit/grunt.spec.ts, the dumb eye).
   const kit = [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
-  const far = foe({ z: 12_000 })
   const worth = damageOf(SKILL.RIFLE)
-  // At the TOP of the dial, with the whole clock: the toll is gone and the
-  // option is worth what the shot is worth.
-  const sharp = priceKit(world({ carrying: kit, foes: [far], wits: 1, timeLeft: 90 }))!
-  expect(sharp.score).toBeCloseTo(worth, 5)
-  // At the BOTTOM, the same option is taxed for every tile of the hike.
-  const dull = priceKit(world({ carrying: kit, foes: [far], wits: 0, timeLeft: 90 }))!
-  expect(dull.score).toBeLessThan(sharp.score)
-  // …and the smart pig's own brake is the TIMER, not the distance: the same
-  // far foe with seconds on the clock is discounted, where the dumb pig —
-  // who cannot read a clock — prices it exactly as before.
-  const hurried = priceKit(world({ carrying: kit, foes: [far], wits: 1, timeLeft: 3 }))!
-  expect(hurried.score).toBeLessThan(sharp.score)
-  const dullHurried = priceKit(world({ carrying: kit, foes: [far], wits: 0, timeLeft: 3 }))!
-  expect(dullHurried.score).toBeCloseTo(dull.score, 5)
+  // In reach and this turn: the whole worth, whoever is asking.
+  const near = foe({ z: 800 })
+  for (const wits of [0, 0.5, 1]) {
+    expect(priceKit(world({ carrying: kit, foes: [near], wits }))!.score).toBeCloseTo(worth, 5)
+  }
+  // A walk that will not fit the turn costs ONE turn — half — and the same
+  // walk against a turn twice as long costs none.
+  const far = foe({ z: 12_000 })
+  const hurried = priceKit(world({ carrying: kit, foes: [far], timeLeft: 5 }))!
+  expect(hurried.score).toBeCloseTo(worth * TURN_DISCOUNT, 5)
+  const roomy = priceKit(world({ carrying: kit, foes: [far], timeLeft: 200 }))!
+  expect(roomy.score).toBeCloseTo(worth, 5)
+  // …and the wits change none of it.
+  const sharp = priceKit(world({ carrying: kit, foes: [far], wits: 1, timeLeft: 5 }))!
+  expect(sharp.score).toBeCloseTo(hurried.score, 5)
 })
 
-test('a foe already in REACH is never discounted for the clock', { tag: '@nodata' }, () => {
-  // The clock is asked about the WALK. A pig standing in range with three
+test('a foe already in REACH is never charged for the clock', { tag: '@nodata' }, () => {
+  // The turns are counted for the WALK. A pig standing in range with three
   // seconds left does what it can with them, and a brain that discounted
   // that would talk itself out of the only move on the board.
   const kit = [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
   const near = foe({ z: 800 })
-  const whole = priceKit(world({ carrying: kit, foes: [near], wits: 1, timeLeft: 90 }))!
-  const hurried = priceKit(world({ carrying: kit, foes: [near], wits: 1, timeLeft: 3 }))!
+  const whole = priceKit(world({ carrying: kit, foes: [near], timeLeft: 90 }))!
+  const hurried = priceKit(world({ carrying: kit, foes: [near], timeLeft: 3 }))!
   expect(hurried.score).toBeCloseTo(whole.score, 5)
+})
+
+test('a foe MANY turns off keeps a sliver, so a lone weapon is never argued away', { tag: '@nodata' }, () => {
+  // The floor exists because the first cut let the toll run a lone rifle
+  // below zero and the brain sat down for the rest of the battle.
+  const kit = [{ skill: SKILL.RIFLE, amount: UNLIMITED }]
+  const miles = foe({ z: 300_000 })
+  const option = priceKit(world({ carrying: kit, foes: [miles], timeLeft: 5 }))!
+  expect(option.score).toBeCloseTo(damageOf(SKILL.RIFLE) * FAR_FLOOR, 5)
+  expect(option.score).toBeGreaterThan(0)
 })
 
 test('a shot the ground would swallow scores nothing, and the grenade takes over', { tag: '@nodata' }, () => {

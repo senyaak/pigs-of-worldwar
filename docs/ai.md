@@ -99,13 +99,38 @@ score: enumerate pairs of **(kit item × target or point)** and take the best
 
 ## Difficulty: how well it thinks, never what it gets
 
-No stat bonuses, no damage scaling, no extra hp — one brain with knobs:
+No stat bonuses, no damage scaling, no extra hp — one brain with knobs.
+
+**And the SHAPE of it is play's, 2026-08-24**: "надо просто симуляцию всех
+вариантов и выбирать наилучший — чем умнее, тем правильнее выбирает; также
+чем умнее, тем лучше целится и стреляет." So there are exactly three places
+a level can live, and a fourth is a mistake:
+
+1. **The simulation** (`lib/game/evaluate.ts`) answers what the WORLD would
+   do — the damage, the blast over everyone, the terrain in the way, the
+   turns the walk costs. **No wits in it anywhere.** One truth.
+2. **Seeing it** — `judge` and the DUMB EYE (`MISJUDGE`, `NEAR_POINTS`,
+   lib/game/grunt.ts): a stupid pig misreads that number and is drawn to
+   whatever is nearest. That is where "чем умнее — тем правильнее выбирает"
+   lives.
+3. **Doing it** — `AIM_WOBBLE`, `CHARGE_WOBBLE`: the hands shake, so the
+   bearing is off and the gauge over-held. That is "чем умнее — тем лучше
+   целится и стреляет", and it means a low-level miss looks ALIVE for free:
+   the pig genuinely aimed badly, it did not roll a die and shoot at
+   nothing.
+
+The mistake to keep out is a fourth: a rule that scores the world
+DIFFERENTLY for a dumb pig. One was built and removed the same day (a
+per-tile "impatience" toll that faded with the wits) — it double-counted
+what the turn cost already says and made the price list argue with itself.
+
+The knobs, then:
 
 | knob | grunt end | veteran end |
 | ---- | --------- | ----------- |
 | candidates weighed per think | 2–3 obvious | dozens of position × weapon × target |
 | estimate error (range, charge, arc) | large | shrinks toward the tremor floor |
-| **what DISTANCE means** (`judgedScore`, corrected 2026-08-24) | impatience: every tile of the walk costs, so the NEAREST thing is the target | nothing: an option is worth what it is worth however far off — and the CLOCK is what says no |
+| what DISTANCE means | — | **not a knob at all**: the price list costs a walk in TURNS for everybody (`trueScore`), and the dumb pig's near-sightedness is the eye below |
 | horizon | shoot now | where do I STAND after, who reaches me |
 | ally-splash accounting | line-of-fire only | full blast radius |
 | clumping penalty | near zero | high — spread out, deny the grenade |
@@ -113,9 +138,6 @@ No stat bonuses, no damage scaling, no extra hp — one brain with knobs:
 | actuator noise | over-turns the aim, over-holds the gauge | near clean |
 | lob pitch (`TUNE_PITCH_WITS`, built 2026-08-24) | always the 45° start | tunes the come-up: a steeper arc over a hill, solved for the exact landing |
 | self-preservation (`SHELTER_WITS`, built 2026-08-24) | fires from wherever the weapon reaches, and dies where it stood | ends its turn SHOULDER TO SHOULDER with an enemy, so a blast answering it costs them one of their own — guns only, and bounded to four tiles of walk |
-
-Low-level misses look ALIVE for free: the pig genuinely aimed with a bad
-estimate and shaky hands, it did not roll a die and shoot at nothing.
 
 **The ramp is per ISLAND: it CREEPS across one and JUMPS at the next**
 `[play]`, 2026-08-24 — "важно чтобы тупые умнели постепенно; я б брал:

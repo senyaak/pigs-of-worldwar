@@ -17,11 +17,14 @@
 //           friends and the thrower subtracted at full weight. This is where
 //           "thirty into two pigs beats forty into one" becomes arithmetic.
 //
-// What an option that needs WALKING pays depends on WHO IS ASKING, and that
-// is play's own rule: a dumb pig is impatient and takes the nearest thing, a
-// smart one judges the outcome whatever the distance and asks the CLOCK
-// instead. Both halves live in `judgedScore`. `[deliberate]` — brain
-// weights, not engine facts, and knobs the levels turn.
+// What an option that needs WALKING pays is TURNS, and nothing else: the
+// walk and the blow either fit what is left of this turn or they want
+// another, and a blow a turn away is worth half (`trueScore`). There is no
+// wits in that arithmetic on purpose — play's model, "симуляция всех
+// вариантов, а чем умнее тем правильнее выбирает": the price list answers
+// what the world would do, and every difference between a clever pig and a
+// stupid one is made downstream, in what it MAKES of that number
+// (lib/game/grunt.ts) and how steady its hands are.
 //
 // Deterministic: the dry-run's rng is a CONSTANT — the fuse it jitters is
 // not read — so the battle's own stream is never touched (docs/ai.md).
@@ -33,7 +36,6 @@ import { advanceLob, blastRange, blastShare, isPlanted, lob, lobOf } from './gre
 import { GAUGE_FULL } from './gauge'
 import { AIM_LOB } from './aim'
 import { WALK_SPEED } from './movement'
-import { TILE_STEP } from '../formats/pmg'
 
 /** What FINISHING a pig is worth on top of the health it takes — the kill
  * bonus docs/ai.md prices whole turns at. In health points, so a kill
@@ -49,82 +51,66 @@ export const CLOSE_TO = 0.6
  * it. `[deliberate]`. */
 export const MELEE_NEAR = 180
 
-/** What having to WALK first costs an option, in points — the flat half:
- * spending the clock on an approach at all. `[deliberate]` — the level knob
- * for patience. **It is the DUMB pig's, and it fades as the wits rise**;
- * see `judgedScore`. */
-export const APPROACH_TAX = 10
-
 /**
- * …and the toll PER TILE of that walk, because a flat tax is distance-blind
- * and the telemetry caught what that buys (GINGER, 2026-08-24): a +2 finish
- * bonus on a nearly-dead foe 23 tiles away outbid a healthy foe 4 tiles
- * away, both walks costing the same ten — "пошёл через всю карту к тому кто
- * почти умер". Linear keeps both ends of the wits dial honest: the dumb
- * pig's ~+2 bonus never pays for a march, the sharp pig's KILL_BONUS ~+50
- * still does — and crossing a map to make a kill PERMANENT is the sharp
- * play. `[deliberate]`.
- */
-export const TAX_PER_TILE = 0.5
-
-/** The whole cost of getting `away` down to `reach`: nothing when already
- * there, the flat tax plus the per-tile toll when not. */
-const approachTax = (away: number, reach: number): number =>
-  away <= reach ? 0 : APPROACH_TAX + ((away - reach) / TILE_STEP) * TAX_PER_TILE
-
-/**
- * What distance may NOT do to a weapon: argue it out of existence. The toll
- * ranks a far option under a near one; a sliver of the worth survives it, so
- * a pig whose ONLY foe is across the map still goes to fight rather than
- * passing forever — the first cut let the tax run a lone rifle below zero
- * and the brain sat down. Crates deliberately keep the hard tax: they have
- * their own two lanes (the errand and the necessity fallback).
+ * A sliver of any positive worth survives whatever the distance costs, so a
+ * pig whose ONLY foe is across the map still sets off rather than passing
+ * for ever. The first cut let the toll run a lone rifle below zero and the
+ * brain simply sat down.
  */
 export const FAR_FLOOR = 0.05
 
 /**
- * How much of an option's worth a SMART pig gives up when the walk cannot
- * be finished this turn. Not a refusal — a foe worth crossing the map for
- * is still worth setting off toward, and the next turn carries on — but it
- * sits under anything that can be done NOW. `[deliberate]`.
+ * What ONE TURN of walking costs an option: half. A turn spent walking is a
+ * turn the other side also acts in, the target moves, and the shot you were
+ * going to take may not be there — so a blow two turns out is worth a
+ * quarter of the same blow now. `[deliberate]`, and the one number this
+ * whole model has.
  */
-export const LATE_DISCOUNT = 0.5
+export const TURN_DISCOUNT = 0.5
 
-/** Seconds a blow wants after the walk, for the clock's own question — the
- * turn to face, the gauge to fill, the line to be spoken. `[deliberate]`. */
+/** Seconds a blow wants after the walk — the turn to face, the gauge to
+ * fill, the line to be spoken. `[deliberate]`. */
 export const BLOW_SPARE = 6
 
 /**
- * **HOW DISTANCE IS JUDGED, and it is TWO different things at the two ends
- * of the wits dial** — play's rule, 2026-08-24, correcting what this file
- * had built:
- *
- * > "тупые смотрят на ближайшую цель; а умные оценивают лучший результат
- * > независимо от расстояния и учитывают таймер"
- *
- * So the per-tile toll is the DUMB pig's impatience and nothing else: it is
- * full at wits 0 — where it pairs with the dumb eye (`NEAR_POINTS`,
- * lib/game/grunt.ts) to make the nearest thing the target — and it is GONE
- * at wits 1, where an option is worth what it is worth however far off it
- * stands. What replaces it at the top is the CLOCK: a smart pig discounts
- * what it cannot finish this turn, which is the same judgement made in the
- * currency that actually matters.
- *
- * The earlier note here said the toll was play's ask. It was not — it came
- * out of a telemetry reading of GINGER marching across the map, and the
- * marching is better answered by the clock. The reading stands; the
- * conclusion drawn from it was one level too crude.
+ * How many EXTRA turns this option costs before it can be struck: 0 when the
+ * walk and the blow fit what is left of this one, 1 when it wants one more,
+ * and so on. The walk is the crow's line at the walking speed — the route is
+ * longer and the brain does not run one per candidate (that was the 130 ms
+ * hitch, `WaterMemo`) — so it is a floor, which is the honest side to err on.
  */
-const judgedScore = (world: AiWorld, worth: number, away: number, reach: number): number => {
+const turnsAway = (world: AiWorld, away: number, reach: number): number => {
+  if (away <= reach) return 0
+  const seconds = (away - reach) / WALK_SPEED + BLOW_SPARE
+  if (seconds <= world.timeLeft) return 0
+  return Math.ceil((seconds - world.timeLeft) / Math.max(1, world.turnSeconds))
+}
+
+/**
+ * **WHAT AN OPTION IS ACTUALLY WORTH — one simulation, one number, and NO
+ * WITS IN IT AT ALL.**
+ *
+ * Play's model, 2026-08-24: "надо просто симуляцию всех вариантов и
+ * выбирать наилучший; чем умнее — тем правильнее выбирает". So this answers
+ * only the question the world can answer — what would this do, and when —
+ * and every difference between a clever pig and a stupid one is made
+ * downstream, in how well the pig SEES this number (`judge` and the dumb
+ * eye, lib/game/grunt.ts) and how well it then aims and holds the gauge
+ * (`AIM_WOBBLE`, `CHARGE_WOBBLE`). One scoring function, one brain, turned
+ * up.
+ *
+ * That replaces a pair of hand-cut penalties — a per-tile "impatience" toll
+ * that faded with the wits, and a separate late discount that only the
+ * sharp end felt. Both were the same fact said twice and badly: **walking
+ * costs TURNS**. Priced in turns, distance needs no opinion about it. The
+ * telemetry reading that produced the toll still stands (a flat tax let a
+ * +2 finish bonus buy a march across the map); it is the conclusion that
+ * was one level too crude.
+ */
+const trueScore = (world: AiWorld, worth: number, away: number, reach: number): number => {
   if (worth <= 0) return worth
-  const impatience = approachTax(away, reach) * (1 - world.wits)
-  // THE CLOCK IS ASKED ABOUT THE WALK, never about the blow on its own: a
-  // pig already standing in reach does what it can with the seconds it has,
-  // and discounting that would have the brain talk itself out of the only
-  // move left in the last few seconds of a turn.
-  const walk = (away - reach) / WALK_SPEED
-  const late = away <= reach || walk + BLOW_SPARE <= world.timeLeft
-  return Math.max(worth * FAR_FLOOR, (worth - impatience) * (late ? 1 : 1 - world.wits * LATE_DISCOUNT))
+  const turns = turnsAway(world, away, reach)
+  return Math.max(worth * FAR_FLOOR, worth * TURN_DISCOUNT ** turns)
 }
 
 /** Where the hand is over the soles when a thing is thrown — the brain's
@@ -318,7 +304,7 @@ const gunOption = (world: AiWorld, skill: number, note: Note): Option | null => 
     // walk moves the eye and the next decision re-asks. The option is still
     // noted so the telemetry shows the zero.
     const blocked = away <= rangeOf(row) * CLOSE_TO && !clearShot(world, eye, foe)
-    const score = blocked ? 0 : judgedScore(world, worth, away, rangeOf(row) * CLOSE_TO)
+    const score = blocked ? 0 : trueScore(world, worth, away, rangeOf(row) * CLOSE_TO)
     const option: Option = {
       skill,
       kind: 'gun',
@@ -344,7 +330,7 @@ const meleeOption = (world: AiWorld, skill: number, note: Note): Option | null =
   for (const foe of world.foes) {
     const away = distance2d(me, foe)
     const worth = worthOf(blade.damage, foe, world.wits)
-    const score = judgedScore(world, worth, away, MELEE_NEAR)
+    const score = trueScore(world, worth, away, MELEE_NEAR)
     const option: Option = {
       skill,
       kind: 'melee',
@@ -433,7 +419,7 @@ const lobOption = (world: AiWorld, skill: number, note: Note): Option | null => 
       // him — the walk closes the gap and the next decision solves it for
       // real.
       const worth = blastWorth(world, foe, damage, spread)
-      const score = judgedScore(world, worth, away, limit * 0.8)
+      const score = trueScore(world, worth, away, limit * 0.8)
       const option: Option = { skill, kind: 'lob', target: foe, score, worth, reach: limit * 0.8, limit }
       note?.(option)
       if (!best || score > best.score) best = option
@@ -491,7 +477,7 @@ const crateOption = (
   // alive. What keeps the dull pig off DISTANT crates is not this gate any
   // more; it is the judgment (nearness fades with the tiles) and the
   // errand's own worth bar (lib/game/grunt.ts).
-  const score = judgedScore(world, gain, away, COLLECT_NEAR)
+  const score = trueScore(world, gain, away, COLLECT_NEAR)
   const option: Option = {
     skill: crate.skill ?? SKILLLESS,
     kind: 'crate',
