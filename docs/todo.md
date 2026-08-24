@@ -9,6 +9,113 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 
 ---
 
+## P0. THE AI IS BROKEN, AND THE FIX IS A REWRITE OF HOW A TURN IS DECIDED
+
+**Written 2026-08-24 evening, straight after a play session. This is the
+next thing to do and nothing else in this file comes before it.** Play's
+words, and they are a verdict on the day's work: "ии полностью сломан, и ты
+делаешь не так, как я сказал."
+
+### What play watched, in order
+
+- **The second pig walked past a pile of pigs to take a HEALTH CRATE**, then
+  ran past more pigs across half the map for a SECOND crate, then took a
+  bayonet and crossed half the map again to knife a pig. Play's rule, said
+  twice now: **"самый тупой ВСЕГДА берёт ближнее"** — and specifically, a
+  pig standing next to a crate is what a dumb brain hits, not the crate.
+- **The third pig ran for a crate and the pathfinder swung it back and
+  forth**: "1 шажочек вперёд, 1 поворот, и так зациклено" — the exact
+  stutter that was fixed once and is BACK. It also ran past one crate to
+  fetch another, and at the end took a rifle and never got there.
+- **It re-thinks every few seconds and "выглядит как дебил".** Play's model,
+  in one line: **"оценить весь ход ДО того, как идти."**
+- **Lags were visible again** (the `[perf]` frames).
+- **A pig does not go ROUND another pig** — it pushes into it until the
+  shove slides it past.
+
+**THE SESSION IS LOGGED**: `_tmp/telemetry-2026-08-24T21-00-24.log`, ESTU,
+mission 01, 186 lines — 65 `[ai]` decisions and **40 `[perf]` frames**. Play:
+"я отыграл катку — всё в логе." Read it BEFORE touching anything: every
+report above is in there with its own timestamp, the kit lines say what each
+decision was weighed against, and the perf lines say where the stalls were.
+The tap now writes one file per app start (nothing overwrites it) and each
+battle opens with a `[battle]` line naming the map and both squads.
+
+### What is measured, so the next session does not re-derive it
+
+The regression is mine and it is `trueScore` (lib/game/evaluate.ts). It
+discounts by WHOLE turns, so **any walk that fits inside one turn is FREE**
+— and a turn on the first maps is 99 seconds, which at `WALK_SPEED` is most
+of a map. A probe of a first-mission brain (wits 1/26, a crate one tile off,
+three foes at 2–4 tiles, a second crate 39 tiles away):
+
+```
+ *gun/7   2.0t  score=20 judged=39      <- chosen
+  crate  1.0t  score=7  judged=36      <- one bad roll from winning
+  melee  2.0t  score=10 judged=29
+  gun/7   3.0t  score=20 judged=20
+  crate 39.1t  score=7  judged=8       <- HALF A MAP AWAY, still worth 7
+```
+
+Two things fall out. The far crate keeps its whole worth because the walk
+costs nothing, and the near crate sits one `MISJUDGE` roll under the near
+foe — which is what play watched happen. The per-tile toll that used to
+stop this was removed the same day for a good reason (it was wits-scaled
+and double-counted the turn cost); what replaced it is too coarse.
+
+### The rewrite, in play's own order
+
+1. **DECIDE THE WHOLE TURN BEFORE MOVING.** One plan a turn: target,
+   weapon, the position to shoot from, the route to it. Carry it out; do
+   not re-price every mull. Re-plan only when the world CHANGES the plan
+   (the target dies, the route is refused, the kit changes). This is the
+   root of "думает каждые несколько секунд" and probably of the back-and-
+   forth too.
+2. **SEARCH FOR THE FIRING POSITION — do not derive it.** Play corrected
+   the shortcut this file's route costing rests on: "точка стрельбы лежит
+   по дороге к цели — это неверно; препятствия и вода могут исказить это.
+   Надо идти от обратного: найти цель, выбрать оружие, найти позицию
+   откуда можно стрелять; если нет — пару орудий попробовать; потом другая
+   цель." So: candidate positions round the target at the weapon's own
+   reach, kept if the route reaches them AND the shot is clear, and the
+   walk costed to the position that was actually found. `standAt` and the
+   "the mark sits on the way there" note in `trueScore` are the thing being
+   replaced.
+3. **DISTANCE MUST COST AGAIN, without a wits knob.** The turn cost is the
+   right currency and the right shape; make it CONTINUOUS rather than
+   whole-turn (a walk that eats 80 % of a turn costs 0.8 of a turn), so a
+   march across the map is priced against a shot at the trotters for
+   everybody. Then re-check the dumb end against play's rule: nearest
+   first, and a pig beside a crate beats the crate.
+4. **THE STUTTER.** "1 шаг — 1 поворот" is the actuator or the corner
+   chaining, and it is a REGRESSION: both were fixed (388dd84, the corner
+   pull, the mull chaining). Reproduce it from a session log before
+   touching either — `[ai]` prints every order and its outcome.
+5. **PIGS ARE OBSTACLES.** The route deliberately leaves the squad out
+   (lib/game/battle.ts, `route`) because pigs move between the plan and the
+   walk. Play has now seen what that costs. Wanted: the route avoids
+   bodies, and the actuator's `blocked` still guards the difference.
+6. **THE LAGS come back with all of this**, so measure before and after:
+   the `[perf]` lines are in the telemetry and the route calls are the
+   suspect. Whatever the position search costs, it is paid ONCE a turn if
+   item 1 lands first — which is the argument for doing item 1 first.
+
+### The AMBIENCE, from the same session
+
+Play: "орлы и стрельба — это реально фон, но играл он странно, очень друг
+за другом и будто в лицо… после русской музыки играет стрельба и сокол, и
+непонятно, часть это музыки или нет."
+
+So `audio/ambience.ts` is right about WHAT it plays and wrong about how:
+it needs to sound OFF-SCREEN and it must not read as the tail of the
+music. Wanted: quieter, spaced further apart, never two families in a row,
+and given some distance — a stereo offset, a low-pass, a touch of
+reverb — so it plainly sits behind the battle rather than in the player's
+ear. Its knobs are all in one place (`DISTANT`, `BIRDS`, `DISTANT_GAP`,
+`BIRD_GAP`) and everything about the cadence is `[CHECK — remake]`.
+
+---
+
 ## P0. PLAY'S LIST, 2026-08-20 evening — **ALL SIX DONE 2026-08-20**
 
 Written down at play's request to survive the chat ending. Everything below is
