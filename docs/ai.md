@@ -97,6 +97,49 @@ score: enumerate pairs of **(kit item × target or point)** and take the best
   33 MEDICINE BALL) have no effect in the engine yet — `heal()` is only
   called by crate pickups. The mechanic lands first, then the brain prices it.
 
+## THE TURN IS ONE DECISION, and the mark is SEARCHED FOR
+
+Play's model, and the shape the brain took on 2026-08-24: **"оценить весь
+ход ДО того, как идти."** A turn-based world stands still on your own turn —
+"мир не меняется! свин меняет мир своими действиями" — so re-electing a
+winner between strides can only ever change the answer by accident, and it
+did: a tie-break flipping as the walk shifted the distances reads as a pig
+changing its mind every few seconds.
+
+So a turn is ONE plan (`lib/game/plan.ts`): the target, the weapon, the
+MARK to strike from, the route to it, and the crate worth collecting on the
+way. It is dropped, never edited, and only when the world moved under it —
+the target died, the kit changed (a pickup is the pig changing the world),
+the legs were refused. Everything a mull re-derives after that is
+EXECUTION: the next corner, the charge for the distance actually reached.
+
+**The mark is a search result, not a point on the way there.** Play's
+correction of the shortcut the price list used to rest on: "точка стрельбы
+лежит по дороге к цели — это неверно; препятствия и вода могут исказить
+это. Надо идти от обратного: найти цель, выбрать оружие, найти позицию
+откуда можно стрелять; если нет — пару орудий попробовать; потом другая
+цель." `standFor` (lib/game/evaluate.ts) puts rings of marks round the
+target at the weapon's own reach and keeps the ones that are dry, that the
+legs actually reach, and that the shot from them is clear; cheapest walk
+wins, and null is the honest "this weapon cannot be brought to bear on this
+pig".
+
+That is what pays for the second search. Asked of `route`, a ring of marks
+round each of three foes is thirty A* runs a turn; asked of `flood` — one
+Dijkstra out of the pig, to a budget — it is thirty lookups, and the corners
+of the winning walk come back off the same parents.
+
+**WALKING COSTS A FRACTION OF A TURN**, continuously (`trueScore`). It used
+to count whole turns, which on a 99-second first-map turn made every walk on
+the island free. The clock itself is deliberately not read: what is left of
+a turn changes when a blow lands, not what it is worth. Whether the clock
+affords an ERRAND before the blow is a different question, asked in the plan.
+
+**A CRATE IS NOT AN ALTERNATIVE TO A BLOW.** A pickup spends no turn — the
+weapon does — so a crate is a PREFIX to the attack (`crateErrand`, collected
+on the way) or the whole job when there is no attack to be had
+(`crateFallback`). It never enters the election.
+
 ## Difficulty: how well it thinks, never what it gets
 
 No stat bonuses, no damage scaling, no extra hp — one brain with knobs.
@@ -166,7 +209,8 @@ and works worse against a veteran, exactly like against a human.
 
 ## The pathfinder: ours, coarse, verified by the walk
 
-There is none today and the original's is unread. The plan: a coarse A* on
+**Built** (`lib/game/pathgrid.ts` for the grid model, `lib/game/pathfind.ts`
+for the two searches); the original's is unread. A coarse A* on
 `walkable`/`standOn` — and the cost model is the engine's own: TIME, with
 one speed on land. A step costs its distance on any slope (`WALK_SPEED` is
 flat; only a wounded pig slows, and that is the pig's property, not the
@@ -193,5 +237,7 @@ tiles and the turn clock bounds the search.
    spread-out penalty. The evaluation stays one function; passes only
    re-weight it.
 
-`unit/ai.spec.ts` pins the brain headlessly (feed a world, assert orders);
-`e2e/002/battle.spec.ts` watches a machine turn end to end.
+`unit/grunt.spec.ts` pins the brain headlessly (feed a world, assert
+orders), `unit/evaluate.spec.ts` the price list, and
+`e2e/002/machine-mission.spec.ts` plays a whole mission machine against
+machine in plain Node — the one that says whether any of it works.

@@ -9,98 +9,88 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 
 ---
 
-## P0. THE AI IS BROKEN, AND THE FIX IS A REWRITE OF HOW A TURN IS DECIDED
+## P0. THE AI IS BROKEN — **THE REWRITE IS BUILT, 2026-08-24 night. PLAY IT.**
 
-**Written 2026-08-24 evening, straight after a play session. This is the
-next thing to do and nothing else in this file comes before it.** Play's
-words, and they are a verdict on the day's work: "ии полностью сломан, и ты
-делаешь не так, как я сказал."
+**Written 2026-08-24 evening straight after a play session; answered the
+same night.** Play's words, and they were a verdict on the day's work: "ии
+полностью сломан, и ты делаешь не так, как я сказал." What follows is what
+was reported, what it turned out to be, and what is left — which is a play
+session and two named gaps, nothing else.
 
-### What play watched, in order
+### The measurement that settles it
 
-- **The second pig walked past a pile of pigs to take a HEALTH CRATE**, then
-  ran past more pigs across half the map for a SECOND crate, then took a
-  bayonet and crossed half the map again to knife a pig. Play's rule, said
-  twice now: **"самый тупой ВСЕГДА берёт ближнее"** — and specifically, a
-  pig standing next to a crate is what a dumb brain hits, not the crate.
-- **The third pig ran for a crate and the pathfinder swung it back and
-  forth**: "1 шажочек вперёд, 1 поворот, и так зациклено" — the exact
-  stutter that was fixed once and is BACK. It also ran past one crate to
-  fetch another, and at the end took a rifle and never got there.
-- **It re-thinks every few seconds and "выглядит как дебил".** Play's model,
-  in one line: **"оценить весь ход ДО того, как идти."**
-- **Lags were visible again** (the `[perf]` frames).
-- **A pig does not go ROUND another pig** — it pushes into it until the
-  shove slides it past.
-
-**THE SESSION IS LOGGED**: `_tmp/telemetry-2026-08-24T21-00-24.log`, ESTU,
-mission 01, 186 lines — 65 `[ai]` decisions and **40 `[perf]` frames**. Play:
-"я отыграл катку — всё в логе." Read it BEFORE touching anything: every
-report above is in there with its own timestamp, the kit lines say what each
-decision was weighed against, and the perf lines say where the stalls were.
-The tap now writes one file per app start (nothing overwrites it) and each
-battle opens with a `[battle]` line naming the map and both squads.
-
-### What is measured, so the next session does not re-derive it
-
-The regression is mine and it is `trueScore` (lib/game/evaluate.ts). It
-discounts by WHOLE turns, so **any walk that fits inside one turn is FREE**
-— and a turn on the first maps is 99 seconds, which at `WALK_SPEED` is most
-of a map. A probe of a first-mission brain (wits 1/26, a crate one tile off,
-three foes at 2–4 tiles, a second crate 39 tiles away):
+`e2e/002/machine-mission.spec.ts` plays mission 1 machine against machine in
+plain Node. **It was RED on master and nobody had run it**: the brain could
+not reach a verdict inside 54 000 frames — 3600 simulated seconds, both
+squads still standing, 40 s of wall clock spent on it. After the rewrite:
 
 ```
- *gun/7   2.0t  score=20 judged=39      <- chosen
-  crate  1.0t  score=7  judged=36      <- one bad roll from winning
-  melee  2.0t  score=10 judged=29
-  gun/7   3.0t  score=20 judged=20
-  crate 39.1t  score=7  judged=8       <- HALF A MAP AWAY, still worth 7
+verdict at ~721s of battle; kills=5; fired=27; survivors=1v0     (6.0s wall)
 ```
 
-Two things fall out. The far crate keeps its whole worth because the walk
-costs nothing, and the near crate sits one `MISJUDGE` roll under the near
-foe — which is what play watched happen. The per-tile toll that used to
-stop this was removed the same day for a good reason (it was wits-scaled
-and double-counted the turn cost); what replaced it is too coarse.
+So the report was not a matter of taste. Run that spec before and after
+anything that touches the brain; it is the cheapest honest reading there is.
 
-### The rewrite, in play's own order
+### What play watched, and what each one was
 
-1. **DECIDE THE WHOLE TURN BEFORE MOVING.** One plan a turn: target,
-   weapon, the position to shoot from, the route to it. Carry it out; do
-   not re-price every mull. Re-plan only when the world CHANGES the plan
-   (the target dies, the route is refused, the kit changes). This is the
-   root of "думает каждые несколько секунд" and probably of the back-and-
-   forth too.
-2. **SEARCH FOR THE FIRING POSITION — do not derive it.** Play corrected
-   the shortcut this file's route costing rests on: "точка стрельбы лежит
-   по дороге к цели — это неверно; препятствия и вода могут исказить это.
-   Надо идти от обратного: найти цель, выбрать оружие, найти позицию
-   откуда можно стрелять; если нет — пару орудий попробовать; потом другая
-   цель." So: candidate positions round the target at the weapon's own
-   reach, kept if the route reaches them AND the shot is clear, and the
-   walk costed to the position that was actually found. `standAt` and the
-   "the mark sits on the way there" note in `trueScore` are the thing being
-   replaced.
-3. **DISTANCE MUST COST AGAIN, without a wits knob.** The turn cost is the
-   right currency and the right shape; make it CONTINUOUS rather than
-   whole-turn (a walk that eats 80 % of a turn costs 0.8 of a turn), so a
-   march across the map is priced against a shot at the trotters for
-   everybody. Then re-check the dumb end against play's rule: nearest
-   first, and a pig beside a crate beats the crate.
-4. **THE STUTTER.** "1 шаг — 1 поворот" is the actuator or the corner
-   chaining, and it is a REGRESSION: both were fixed (388dd84, the corner
-   pull, the mull chaining). Reproduce it from a session log before
-   touching either — `[ai]` prints every order and its outcome.
-5. **PIGS ARE OBSTACLES.** The route deliberately leaves the squad out
-   (lib/game/battle.ts, `route`) because pigs move between the plan and the
-   walk. Play has now seen what that costs. Wanted: the route avoids
-   bodies, and the actuator's `blocked` still guards the difference.
-6. **THE LAGS come back with all of this**, so measure before and after:
-   the `[perf]` lines are in the telemetry and the route calls are the
-   suspect. Whatever the position search costs, it is paid ONCE a turn if
-   item 1 lands first — which is the argument for doing item 1 first.
+- **"Второй свин прошёл мимо кучи свиней за аптечкой"**, then across half
+  the map for a second one. — `priceKit` still ELECTED crates while the
+  doc beside it said a pickup and a blow are not alternatives. A crate is
+  now an errand on the way (`crateErrand`) or the whole job when there is
+  no blow to be had (`crateFallback`), and it never wins an election.
+- **"1 шажочек вперёд, 1 поворот, и так зациклено"** — the route was
+  rebuilt from the pig's new spot every mull, and the string-pull's first
+  leg out of a fresh start is often one cell. The log has it plainly: DEN
+  at 1920,8712 ordered to 2048,8704, which is 128 units. A route is decided
+  ONCE now and walked corner to corner.
+- **"Думает каждые несколько секунд… выглядит как дебил"** — the whole
+  election ran on every corner, and a tie-break flipping as the distances
+  shifted is GINGER going 11520,2816 → 11776,-1408 → back, three decisions
+  running. `lib/game/plan.ts` decides the turn whole and DROPS the plan
+  rather than editing it: the target dies, the kit changes, the legs are
+  refused.
+- **The lags** — fifteen `priceKit` runs and ~21 A\* searches a turn became
+  one plan and ONE Dijkstra flood (`lib/game/pathfind.ts`, `flood`).
+- **"Он не обходит свина, а толкается в него"** — the squad is in the
+  route's world now (`RouteAsk.bodies`). **Own pigs only**: a foe is what
+  the walk is aimed AT, and a body you mean to reach cannot be a wall.
 
-### The AMBIENCE, from the same session
+### And the two corrections that were the real work
+
+- **THE FIRING MARK IS SEARCHED FOR** (`evaluate.ts`, `standFor`). "Точка
+  стрельбы лежит по дороге к цели — это неверно; препятствия и вода могут
+  исказить это. Надо идти от обратного." Rings of marks round the target at
+  the weapon's own reach, kept if dry, if the legs reach them and if the
+  shot from them is clear; cheapest walk wins, and null means this weapon
+  cannot be brought to bear on this pig at all. A lob's parabola is solved
+  FROM the mark, so the landing, the water under it and the blast over the
+  squad are priced where the throw is really made.
+- **DISTANCE COSTS CONTINUOUSLY.** `turnsAway` counted WHOLE turns, so any
+  walk that fit the clock was free — and a first-map turn is 99 s, which at
+  `WALK_SPEED` is four times across the map. It is a fraction of a turn now,
+  and `timeLeft` is not read at all: what is left of a turn changes when a
+  blow lands, not what it is worth. Whether the clock affords an ERRAND
+  before the blow is still asked, in `plan.ts` where it belongs.
+
+### WHAT IS LEFT
+
+1. **PLAY IT.** Everything above is arithmetic and one headless mission;
+   none of it is play's eye. The telemetry now writes an `[ai:plan]` line
+   the decision a plan is made — goal, walk, legs, and how many cells the
+   turn's flood settled — so the next report can be read against the plan
+   that produced it rather than against a wall of re-elections.
+2. **A FOE is still not an obstacle.** Only the squad is. If play sees a
+   pig shove an ENEMY rather than go round, the fix is a per-target
+   exemption in the flood, not a bigger `BODY_CLEAR` — a blade's mark is
+   180 units off a body and the grid step is 128, so blocking foes at a
+   body's width makes melee unreachable. That is why it is written this way.
+3. **The lags are measured but not TUNED.** One flood a turn on a 193×193
+   grid is still the dearest thing a turn does, and the `cells` figure on
+   the plan line is what a `[perf]` frame should now be read against. If it
+   is still felt, the lever is the flood's budget (`PLAN_TURNS`), not the
+   price list.
+
+### The AMBIENCE, from the same session — STILL OPEN
 
 Play: "орлы и стрельба — это реально фон, но играл он странно, очень друг
 за другом и будто в лицо… после русской музыки играет стрельба и сокол, и
