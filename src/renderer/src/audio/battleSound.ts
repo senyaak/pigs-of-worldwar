@@ -25,6 +25,7 @@ import { BATTLE_SOUNDS, playCue } from './battle'
 import type { Cue } from './battle'
 import { handling } from '../../../lib/game/events'
 import type { BattleBus } from '../../../lib/game/events'
+import { skinOf } from '../../../lib/game/nations'
 import type { SceneSound } from '../contracts/sound'
 
 /** The battle's sound bank — 99 numbered effects (lib/formats/srl.ts). */
@@ -44,7 +45,7 @@ export interface BattleSound extends SceneSound {
  * nothing that draws is needed to build it.
  *
  */
-export function createBattleSound(bus: BattleBus): BattleSound {
+export function createBattleSound(bus: BattleBus, nations: number[] = []): BattleSound {
   let bank: Bank = SILENT
   let sounds: BattleSounds = createBattleSounds(bank)
   /**
@@ -130,7 +131,10 @@ export function createBattleSound(bus: BattleBus): BattleSound {
           return
         }
         cue(BATTLE_SOUNDS.ready)
-        music.turn(player)
+        // The side's set is its nation's SKIN — read 2026-08-24
+        // (audio/music.ts, `setFor`): the theme YOUR turn opens on is your
+        // own nation's.
+        music.turn(player, skinOf(nations[player] ?? player))
       }
     })
   )

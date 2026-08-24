@@ -62,24 +62,30 @@ export const trackFor = (clip: number): string =>
   `MUSIC/Track${String(Math.max(0, Math.min(MUSIC_CLIPS - 1, clip)) + 3).padStart(2, '0')}.ogg`
 
 /**
- * Which SET a side plays, out of the byte it is given.
- *
- * `[CHECK — remake]`: the exe takes it off the squad record and nothing has
- * read what fills that record, so the remake hands a side its own index — the
- * same stand-in `voiceFor` makes out of the same unread byte
- * (audio/pigVoice.ts). Wrapped so no side can ask past the thirty clips.
+ * Which SET this SKIN plays — READ 2026-08-24, and the `[CHECK — remake]`
+ * closes: the byte the exe multiplies by four is the pig's LANGUAGE, written
+ * at the roster roll as `Team::SkinOf(nation)` (0x482520 tail, 0x48264c;
+ * `speech/pigs.md`). So the sets run in SKIN order — British Track03-06,
+ * American 07-10, French 11-14, German 15-18, Russian 19-22, Japanese
+ * 23-26 — and set 6 (Track27-30) is never a side's: it is the EVENT sting
+ * (`rand&3 + 24` on a supply drop and on reinforcements, 0x496c25/0x49742f).
+ * A remake LARD side lands on it through the wrap because our roster gives
+ * Lard pigs no origin nation, where the exe's do carry one — `[deliberate]`
+ * until origins exist. Wrapped so no ask reaches past the thirty clips.
  */
-export const setFor = (side: number): number =>
-  Math.max(0, Math.trunc(side)) % Math.floor(MUSIC_CLIPS / SET_SIZE)
+export const setFor = (skin: number): number =>
+  Math.max(0, Math.trunc(skin)) % Math.floor(MUSIC_CLIPS / SET_SIZE)
 
 export interface Music {
   /**
-   * A turn has begun for this side: play the next of its four.
+   * A turn has begun for this side: play the next of its four. `skin` picks
+   * the SET (`setFor`); absent, the side's own index stands in — the old
+   * stand-in, kept so the console's bare `pow.music.turn(n)` still sounds.
    *
    * The exe plays the counter's clip and THEN steps it, so a side's first turn
    * opens on the first of its set.
    */
-  turn(side: number): void
+  turn(side: number, skin?: number): void
   /** Play one clip and stop at its end — the console's door. */
   play(clip: number): void
   /** Cut the track. */
@@ -169,10 +175,10 @@ export function createMusic(): Music {
   }
 
   return {
-    turn(side) {
+    turn(side, skin) {
       const at = counters.get(side) ?? 0
       counters.set(side, (at + 1) % SET_SIZE)
-      play(setFor(side) * SET_SIZE + at)
+      play(setFor(skin ?? side) * SET_SIZE + at)
     },
     play,
     stop,

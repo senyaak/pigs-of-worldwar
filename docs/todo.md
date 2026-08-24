@@ -155,8 +155,12 @@ so where the change is.
 Nothing to build. Three things want play's EAR or EYE:
 
 - the plate at 0.75 — softness, and whether 0.5 reads better;
-- which set of four the music should play (`pow.music.play(0..29)`), the one
-  thing about it nobody has read;
+- ~~which set of four the music should play — the one thing about it nobody
+  has read~~ **READ 2026-08-24 and BUILT**: the byte is the pig's LANGUAGE
+  = `Team::SkinOf(nation)` (0x482520's tail; `speech/pigs.md`), so the sets
+  run in skin order — British Track03-06 … Japanese 23-26 — and set 6
+  (Track27-30) is the EVENT sting, not a side's. `setFor` takes the skin
+  now and the turn hands it the side's nation (audio/battleSound.ts);
 - the SQUAD screen's right column — the badge rows and the name box, neither
   of which play measured.
 
@@ -1156,29 +1160,40 @@ logs, zero `blocked(...)` anywhere (the water seam is closed), no decision
 thrash — but the logs put SIX new things on the list, in the order they
 are worth doing:
 
-1. **A full-power throw VANISHES, twice — the spent-turn gate is not
-   complete.** Once per session, on the pig's HIGHEST-powered throw of the
-   turn: GERARD `fire @1.00` (23rd) — no `[fuse]`, no `[detonate]`, the
-   grenade unaccounted for; GINGER `fire @0.82` (24th) — exactly one
-   `[fuse]→watch`, then silence, and the grenade expired on its own fuse
-   6 s later with no detonate order and no fling. Every OTHER throw fits
-   `distance ≈ 7500·power²` within 4%, so these two flew and were
-   abandoned. Suspect: the `world.thrown` gate / `thrown.resting` arm in
-   lib/game/grunt.ts — the detonator that item 2 above deliberately kept
-   alive is not being pressed.
-2. **`[perf]` reopens the WaterMemo verdict.** The fourth session's "zero
-   over 40 ms" does not hold: the fifth logs SIX frames over 40 (41, 43,
-   56, 76, 97, 107 ms), clustering on the long cross-map marches and
-   landing on `[walk]` re-decisions as well as the turn's first `[hold]` —
-   cost still scales with route length. And the >100 ms whole-frame GAP
-   detector never fired once, not even beside the 107 ms engine frame —
-   check it is actually wired before trusting its silence.
-3. **The elected option is not the top-believed one for a whole turn.**
-   GINGER's 13:05:29 turn, all four decisions: the `*` (chose) sits on
-   row TWO of the kit while row one out-believes it. Either a target
-   commitment silently overrides the election — then the tap should SAY so
-   — or the choice is stale by one decision. Every other turn in both logs
-   elects row one.
+1. ~~**A full-power throw VANISHES, twice — the spent-turn gate is not
+   complete.**~~ **DIAGNOSED AND FIXED 2026-08-24 (929026b), and the seat
+   was never guilty.** The sixth session's triage showed the brain DID
+   decide every frame — all identical `watch`, silently collapsed, and the
+   turn ended before the flush. What failed was the RESTING bar: it is the
+   renderer's (15 u/s, "never quite stops rolling"), so a missed throw
+   crept about until its own fuse beat the press. The brain has its own
+   bar now — `SETTLED` = 60 u/s (grunt.ts), `world.thrown` carries the
+   speed — a creeping grenade is down, press. GERARD's other case (no
+   watch at all) is likely a DOUSED throw: the water's verdict now writes
+   a `[lob] doused` line, so the next log says so instead of "vanished".
+2. ~~**`[perf]` reopens the WaterMemo verdict.**~~ **SETTLED 2026-08-24 —
+   and the ARCHITECTURE is chosen.** The sixth session (two walk orders)
+   logged zero `[perf]` lines; all six spikes sit on `decide()`'s own
+   `route()` calls, so the cost is per-plan, not per-frame. Play chose
+   the road: "выложить в НОД процесс — как раз хорошо для сетевой игры,
+   что НПС будет ходить на хосте и думать там" — which is exactly the
+   "brain is a PLAYER" design already written down at the fourth
+   session's item 2: the brain runs OFF the engine's step (worker or
+   host process), its ORDERS become inputs on the net's own input path,
+   so it need not be deterministic at all. **That lands with the `net`
+   worktree's input layer, not before** — in-process cost today is a
+   ≤107 ms hitch once per long march, not worth a lockstep hole. The
+   >100 ms frame-GAP detector never firing beside a 107 ms engine frame
+   still wants a look when next in three/battle.ts.
+3. ~~**The elected option is not the top-believed one for a whole
+   turn.**~~ **DIAGNOSED AND FIXED 2026-08-24 (929026b) — the election
+   was honest, the DISPLAY lied twice.** The head order provably carried
+   out the starred row (the blast landed on its target). (a) The kit
+   sorted on `judged ?? score`, but `judge` runs only on each slot's own
+   winner, so judged rows ranked against raw ones — sorted by TRUE score
+   now, belief still after the tilde. (b) A held plan (`intent`,
+   deliberately never re-elected) looked identical to a fresh election —
+   the kit line says `(plan held)` now, `Thought.held`.
 4. **Nobody moves after firing, and it kills them.** Four of six AI pigs
    across the two sessions died by counter-blast at the EXACT coordinates
    they had been lobbing from for turns on end; GINGER kept throwing at
@@ -1226,6 +1241,48 @@ are worth doing:
    work. Small residue on item 3's chaining still stands: corners emit an
    occasional sub-tile leg (384 units) wedged between two long ones,
    each costing a full decision.
+
+**Play's batch, 2026-08-24 evening — the rest of it, after the fixes above
+landed (929026b and the music commit):**
+
+1. **PIG VOICES are read end to end and wait to be BUILT** — the research
+   that closed the music also closed the voice `[CHECK — remake]`
+   (`speech/pigs.md`, the 2026-08-24 section): the squad record is the
+   pig's own 64-byte ROSTER SLOT; `[slot+2]` (voice) is the pig's NAME-ROW
+   identity — name k always speaks Pig{k+1} — and `[slot+3]` (language) is
+   `Team::SkinOf(nation)`, so a side barks in its own tongue out of the
+   EN/AM/FR/GE/RU/JA speech sets (TL ships no files and is never picked;
+   Lard pigs speak their ORIGIN language, which our roster does not carry
+   yet). The build: `voiceFor`/language in audio/pigVoice.ts go per-PIG
+   (identity off the roster/name row) instead of per-side, rotation
+   counters per pig — the exe even SAVES them with the campaign. Also new
+   and unbuilt: **Track31 is the END-OF-MISSION music** (training gets the
+   sergeant instead), **Track27-30 is a random sting on a supply drop and
+   on reinforcements due**, Track32 has no caller at all.
+2. **The SECOND pig opens its walk with a wasted micro-leg** — play:
+   "второй свин всегда начинает свой путь как-то странно". Triaged: from
+   GINGER's ESTU spawn the route's first corner is a 405-unit leg 38° off
+   the target bearing, reversed by a 40° elbow one leg later —
+   deterministic, byte-identical across sessions. The string-pull
+   (pathfind.ts, `PULL`) fails its line-of-walk past three cells there and
+   keeps an A* stair corner the pull should have eaten. The fix is in the
+   pull (or a post-pass merging near-collinear corners), not in `walkThe`'s
+   64-unit skip.
+3. **MISSION SELECT — wants play's word before building.** Play:
+   "селект мишн показывается только после прохождения миссии — стоит там
+   все миссии показывать, но те что не закрыты — серые". Today the map
+   chain runs from position 1 on (the exe's own gate: the training ground
+   briefs straight off `level0.bmp`). Open questions written here so the
+   build starts right: (a) show the WORLD MAP from position 0 too, before
+   anything is won? (b) "все миссии серые" — is this the REGION page's
+   poles (grey flag on a mission not yet reached — which touches the
+   2026-08-19 ruling that every stand flies its holder's colour), or a
+   proper MISSION LIST screen (the exe's only one is the NAUGHTY PIGS
+   cheat, record 44)? (c) is a CLOSED mission clickable — replay — or
+   display only?
+4. **Watch next session**: the `[lob] doused` line (was GERARD's vanished
+   throw a water landing?), the `[turn]` handover lines, the 2-second
+   collapse flush, and whether the detonator now fires on the crawl.
 
 **The frontend's OTHER particles — READ WHOLE 2026-08-24, not built.** Play
 asked whether the coin framework might be the battle's blast smoke — no
