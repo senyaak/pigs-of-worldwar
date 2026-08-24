@@ -204,16 +204,25 @@ test('TNT stays in the kit when nobody is near: no walking about with a lit bomb
   ).toBeNull()
 })
 
-test('the WITS dial turns the appetite: the sharp machine fetches what the dull one skips', { tag: '@nodata' }, () => {
-  // The same sniper upgrade, nobody left to shoot. At wits 0 a quarter of
-  // the 20-point gain does not cover the walk; at wits 1 the full gain does.
+test('the WITS dial turns the appetite: the dull pig barely values the crate the sharp one prizes', { tag: '@nodata' }, () => {
+  // The same sniper upgrade, nobody left to shoot. This test used to expect
+  // the dull pig to price it to NOTHING and pass — superseded by two of
+  // play's later rulings: a pig with nothing else to do takes the job
+  // (crateFallback's lesson), and "что ближе — это моя цель" needs a near
+  // crate ALIVE in the list (FAR_FLOOR reaches crates now). What the dial
+  // still turns is the VALUE: a sliver at the bottom, the taxed gain at the
+  // top — which is what keeps a dull pig off crates whenever any weapon
+  // scores at all.
   const upgrade = {
     foes: [] as Seen[],
     crates: [{ x: 0, z: 1000, skill: SKILL.SNIPER_RIFLE, amount: 2 }]
   }
-  expect(priceKit(world({ ...upgrade, wits: 0 }))).toBeNull()
+  const dull = priceKit(world({ ...upgrade, wits: 0 }))!
+  expect(dull.kind).toBe('crate')
   const sharp = priceKit(world({ ...upgrade, wits: 1 }))!
   expect(sharp.kind).toBe('crate')
+  expect(dull.score).toBeLessThan(2)
+  expect(sharp.score).toBeGreaterThan(dull.score * 5)
 })
 
 test('the solved charge GROWS with the throw', { tag: '@nodata' }, () => {

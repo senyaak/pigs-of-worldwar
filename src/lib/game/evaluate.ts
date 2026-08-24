@@ -387,7 +387,13 @@ const crateOption = (
         ? weaponPoints(crate.skill)
         : Math.max(0, weaponPoints(crate.skill) - have) * appetite
   const away = distance2d(me, crate)
-  const score = gain - approachTax(away, COLLECT_NEAR)
+  // The floor reaches crates too (2026-08-24): with the hard tax a crate AT
+  // THE TROTTERS priced under zero and died before the brain's dumb eye
+  // could ever see it — and "ящик/свин — что ближе — это моя цель" needs it
+  // alive. What keeps the dull pig off DISTANT crates is not this gate any
+  // more; it is the judgment (nearness fades with the tiles) and the
+  // errand's own worth bar (lib/game/grunt.ts).
+  const score = taxedScore(gain, away, COLLECT_NEAR)
   const option: Option = {
     skill: crate.skill ?? SKILLLESS,
     kind: 'crate',

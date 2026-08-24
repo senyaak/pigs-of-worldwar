@@ -1104,15 +1104,31 @@ Non-AI bugs from the same session, queued after the AI:
    positive worth so distance ranks options without arguing the only
    weapon out of existence. Pinned: the GINGER case both ways (dumb takes
    the near healthy foe, wits 1 still crosses for the kill) in
-   unit/evaluate.spec.ts. Machine mission now reaches a verdict at ~170 s
-   where it took ~480.
+   unit/evaluate.spec.ts.
+   **And play named the better model the same day** — "я тупой = что ближе
+   всего — ящик/свин — это моя цель; вижу цель — стреляю; чем умнее — тем
+   больше свин думает" — built as THE DUMB EYE (`NEAR_POINTS` in grunt.ts):
+   the judgment ADDS `(1−wits)·60/(1+tiles)` to every live option, so at
+   wits 0 the nearest interesting thing dominates the election (crates
+   included — `FAR_FLOOR` reaches them now, a crate at the trotters used to
+   die of its own flat tax before the eye could see it) while the kit still
+   sorts by damage at one target, and at wits 1 only the arithmetic speaks.
+   One superseded pin rewritten (the dull pig "skipping" a crate with
+   nothing else to do was the old model). Pinned both ways in
+   unit/grunt.spec.ts.
 2. ~~"Пролаги пока свин думает — выгрузить в нод процесс?"~~ MEASURED
    first (headless, per-frame): average 0.13 ms, ONE frame at 130 ms — the
    turn's first `[hold]` decision, and the cost was the pathfinder's
    thirteen water-texel probes per cell over a cross-map A*. A battle-long
    per-cell WATER MEMO (pathfind.ts, `WaterMemo`) cut the worst frame to
-   27 ms with zero over 40; a `[perf]` line now lands in the telemetry for
-   any engine frame over 40 ms, so the next report is a number. A NODE
+   27 ms with zero over 40; TWO `[perf]` lines land in the telemetry now —
+   `engine.update` over 40 ms, and any whole-frame GAP over 100 ms — so
+   the next report says WHERE the stall was, engine or elsewhere
+   (render/GC/IPC). Play's caution stands until a session shows clean:
+   "не факт что пасфайндинг сам по себе — совокупность факторов?" — the
+   half-second he saw was plausibly SEVERAL routes in one frame (the
+   playable-fallback can run one per candidate), which the memo also
+   collapses, but the tap is what settles it. A NODE
    PROCESS is deliberately NOT taken: it buys nothing at 27 ms, and the
    lockstep-clean way to free the brain from the frame — if it is ever
    needed — is "the brain is a PLAYER": its ORDERS become inputs on the

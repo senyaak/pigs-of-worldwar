@@ -35,6 +35,7 @@ import { WALK_SPEED } from './movement'
 import { BLAST_CORE } from './grenade'
 import { GRID_STEP } from './pathfind'
 import { SKILL } from './skills'
+import { TILE_STEP } from '../formats/pmg'
 
 /** Close enough on the heading to trust the shot — under two turn steps. */
 export const FACING = 0.02
@@ -96,6 +97,24 @@ export const ERRAND_SPARE = 12
  */
 export const AIM_WOBBLE = 0.08
 export const CHARGE_WOBBLE = 0.15
+
+/**
+ * THE DUMB EYE: what standing NEAR a thing adds to its judgment, at the
+ * bottom of the wits scale. Play's model, in play's words (2026-08-24): "я
+ * тупой = что ближе всего — ящик/свин — это моя цель. вижу цель — стреляю.
+ * чем умнее — тем больше свин думает." So the judgment blends TWO
+ * currencies: the price list's points, and a proximity bonus of
+ * `(1 − wits) · NEAR_POINTS / (1 + tiles away)` — at wits 0 the nearest
+ * interesting thing dominates the election almost regardless of worth, at
+ * wits 1 the bonus is zero and only the arithmetic speaks. It is a bonus
+ * ADDED, not a replacement, so at ONE target the kit still sorts by damage
+ * (the dumb pig shoots the near one with its better gun). An option the
+ * price list killed (a blocked shot's 0, a doused lob) earns no bonus —
+ * nearness must never resurrect the unplayable. `[deliberate]` — play's
+ * dial, sized so adjacency (~NEAR_POINTS) outbids any single-kill worth
+ * the kit can price.
+ */
+export const NEAR_POINTS = 60
 
 /** The nearest DRY ground, by ring search off the crow line: what a pig
  * with no business in the water swims for. An ocean with no shore in reach
@@ -289,7 +308,15 @@ export function createGruntBrain(): Brain {
           factor = 1 + spread * (2 * world.roll() - 1)
           judgments.set(key, factor)
         }
-        one.judged = one.score * factor
+        // The dumb eye (NEAR_POINTS above): the nearest thing pulls the
+        // judgment toward itself, harder the lower the wits — and not at
+        // all for an option the price list already killed.
+        const near =
+          one.score <= 0
+            ? 0
+            : ((1 - world.wits) * NEAR_POINTS) /
+              (1 + Math.hypot(one.target.x - me.x, one.target.z - me.z) / TILE_STEP)
+        one.judged = (one.score + near) * factor
         return one.judged
       }
 

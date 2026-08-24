@@ -463,3 +463,40 @@ test('blocked is REMEMBERED for the turn, and a reset forgets it', { tag: '@noda
   brain.reset()
   expect(brain.decide(world({ holding: SKILL.RIFLE, foes: distant })).kind).toBe('walkTo')
 })
+
+
+test('THE DUMB EYE: at wits 0 the nearest thing is the target, at wits 1 the arithmetic is', { tag: '@nodata' }, () => {
+  // Play's model, 2026-08-24: "я тупой = что ближе всего - ящик/свин - это
+  // моя цель; чем умнее - тем больше свин думает." The near healthy foe
+  // outbids the far nearly-dead one at the bottom of the dial (the finish
+  // bonus reads ~0 there anyway); at the top the KILL_BONUS pays for the
+  // march and the far one wins.
+  const near = foe({ z: 2000, health: 50 })
+  const far = foe({ z: 12000, health: 10 })
+  const dumb = createGruntBrain()
+  dumb.decide(world({ foes: [near, far], wits: 0 }))
+  expect(dumb.explain?.()?.chose?.target).toBe(near)
+  const sharp = createGruntBrain()
+  sharp.decide(world({ foes: [near, far], wits: 1 }))
+  expect(sharp.explain?.()?.chose?.target).toBe(far)
+})
+
+test('a crate at the trotters IS the dumb target, over a foe further off', { tag: '@nodata' }, () => {
+  // "ящик/свин - что ближе": at wits 0 the adjacent crate wins the election
+  // outright WHATEVER it holds - five points of health here, deliberately
+  // too little for any judgment to want. The same world at wits 1 goes for
+  // the foe: the sharp pig weighs the crate at face, finds five points
+  // under the shot, and shoots. (A crate actually WORTH the detour is the
+  // sharp pig's too - "ящик конечно же важнее всего для самого умного" -
+  // which is why the discriminator has to be a poor one.)
+  const scene = {
+    foes: [foe({ z: 6000 })],
+    crates: [{ x: 0, z: 200, skill: null, amount: 5 }]
+  }
+  const dumb = createGruntBrain()
+  dumb.decide(world({ ...scene, wits: 0 }))
+  expect(dumb.explain?.()?.chose?.kind).toBe('crate')
+  const sharp = createGruntBrain()
+  sharp.decide(world({ ...scene, wits: 1 }))
+  expect(sharp.explain?.()?.chose?.kind).toBe('gun')
+})

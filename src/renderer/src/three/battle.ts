@@ -951,6 +951,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     flying = false
     time += delta
     lastFrame = delta
+    // A GAP between two frames says a stall happened SOMEWHERE — render,
+    // GC, IPC, the engine — where the engine.update line below says how
+    // much of it was the engine's. The two together are what play's
+    // "секунда-полсекунды пролага" needs to be attributed instead of
+    // guessed: a fat gap over a thin update points OUTSIDE the engine.
+    if (delta > 0.1) {
+      window.api.logTelemetry(`[perf] frame gap ${(delta * 1000).toFixed(0)}ms`)
+    }
     // **THE LINE COMES BEFORE THE SHOT**, so the rules are told whether the pig
     // is still talking before they step (play's rule, lib/game/shot.ts). Ahead
     // of `engine.update`, like every other input.
