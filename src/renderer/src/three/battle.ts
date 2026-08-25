@@ -368,7 +368,21 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * that will not end must not take the turn's camera with it for ever.
    */
   let flungWatch: { pig: number; x: number; z: number; still: number; age: number } | null = null
+  /**
+   * Whether THIS blow threw somebody. The aftermath ride is the camera going
+   * back to where the blow happened (mode 0 on the crate), and when a body
+   * flew there is nothing there any more — an empty crater after the thing
+   * worth watching has already landed. Cleared when the aftermath is.
+   */
+  let sawFling = false
   const FLUNG_SETTLE = 0.4
+  /**
+   * …and how long the camera STAYS on the body after it has stopped moving.
+   * Play, 2026-08-25: "ты показываешь место взрыва гранаты после того, как
+   * свинки перестали летать — лучше задерживай камеру на секунду на свине и
+   * потом иди дальше, без возвращения к месту взрыва пустому."
+   */
+  const FLUNG_LINGER = 1
   const FLUNG_LIMIT = 6
   /** How far a body may drift in a second and still count as settled — under
    * the bleed the engine calls a stop (lib/game/tumble.ts). */
@@ -412,7 +426,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       // the last one it reached, which is the one still moving.
       flung: ({ pig, at }) => {
         if (pig === dyingWatch) return
-        flungWatch = { pig, x: at.x, z: at.z, still: 0, age: 0 }
+          flungWatch = { pig, x: at.x, z: at.z, still: 0, age: 0 }
+        sawFling = true
       },
       // A death has finished playing out: the body comes off the scene for
       // good and the boots go down where it lay (lib/game/corpses.ts). The
@@ -616,7 +631,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // …and so does what the blow left behind. Mode 0 on the crate, which is
     // the ordinary chase rig with something other than a pig in it
     // (0x4661c2).
-    if (now.aftermath && acting) {
+    if (now.aftermath && acting && !sawFling) {
       chase.ride(drawnAt('aftermath', now.aftermath.at), soldier.pig.heading, delta)
       soldier.node.visible = true
       lastView = 'ride'
@@ -914,6 +929,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // (`flungWatch`). Measured off the snapshot, which is where a thrown pig's
     // position honestly is (the engine writes it every step), and in the
     // FRAME's own time so a pause holds the shot instead of ending it.
+    // The blow is over: the next one gets its aftermath back.
+    if (!now.aftermath) sawFling = false
     if (flungWatch) {
       const body = now.pigs.find((one) => one.id === flungWatch?.pig)
       const step = delta ?? 0
@@ -924,7 +941,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         flungWatch.z = body.z
         flungWatch.age += step
         flungWatch.still = moved > FLUNG_CREEP * step ? 0 : flungWatch.still + step
-        if (flungWatch.still >= FLUNG_SETTLE || flungWatch.age >= FLUNG_LIMIT) flungWatch = null
+        // The settle is the flight ending; the LINGER on top is play's second
+        // (FLUNG_LINGER), and the camera holds the body through it.
+        if (flungWatch.still >= FLUNG_SETTLE + FLUNG_LINGER || flungWatch.age >= FLUNG_LIMIT) {
+          flungWatch = null
+        }
       }
     }
     watch(

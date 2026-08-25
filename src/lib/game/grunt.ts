@@ -468,7 +468,15 @@ export function createGruntBrain(): Brain {
           ? TURN_IN
           : plan.errand !== null || plan.option.kind === 'crate'
             ? ARRIVE_WITHIN
-            : GRID_STEP / 2
+            : // …and a BLOW's mark is only as loose as the weapon's own slack:
+              // `limit − reach` is how much further than the mark the pig may
+              // stand and still land the blow, which for a BLADE is nothing at
+              // all (both are MELEE_NEAR). Half a cell would put the target
+              // out of reach, which is what `close-in` below had to catch.
+              Math.min(
+                GRID_STEP / 2,
+                Math.max(ARRIVE_WITHIN, plan.option.limit - plan.option.reach)
+              )
       const walking = !grounded && leg < plan.route.length
       told.plan = {
         goal: plan.goal,
@@ -536,7 +544,30 @@ export function createGruntBrain(): Brain {
       // hands: asked after, a grounded pig flip-flopped forever between
       // taking the option's weapon and taking SKIP TURN to pass (measured:
       // 249 hold decisions in one battle, rifle-skip-rifle-skip).
-      const hopeless = distance > option.limit || (friend !== null && grounded)
+      // **OUT OF REACH IS NOT A PASS WHILE THE LEGS STILL WORK — STEP IN.**
+      // Play, 2026-08-25: "третий свин подбежал вплотную к моему свину и
+      // пропустил ход, это тупо." The log has it (DEN, 21:03:11): ten
+      // thousand units walked to a mark, the route walked out sixty units
+      // short of it, and a pass. A BLADE is why sixty units matter — its mark
+      // and its limit are the same MELEE_NEAR, so a hair short of the mark is
+      // already past the limit — but the case is general: a mark missed by
+      // the width of the arrival zone must be closed, not given up on.
+      //
+      // Straight at the target, stopping INSIDE the reach rather than on it,
+      // and only while the pig is not grounded: a walk that gets refused
+      // counts its refusals like any other, so two of them still end in the
+      // pass below rather than in a pig shuffling at a wall.
+      const outOfReach = distance > option.limit
+      if (outOfReach && !grounded && Number.isFinite(option.reach)) {
+        const stop = Math.max(0, option.reach - ARRIVE_WITHIN)
+        return say('close-in', {
+          kind: 'walkTo',
+          x: target.x - (dx / distance) * stop,
+          z: target.z - (dz / distance) * stop,
+          within: ARRIVE_WITHIN
+        })
+      }
+      const hopeless = outOfReach || (friend !== null && grounded)
       if (hopeless) return say('pass-hopeless', pass(world))
 
       if (me.holding !== option.skill) return say('hold', { kind: 'hold', skill: option.skill })

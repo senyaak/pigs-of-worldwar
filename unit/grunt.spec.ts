@@ -17,7 +17,7 @@ import {
   TURN_IN
 } from '../src/lib/game/grunt'
 import { ARRIVE_WITHIN } from '../src/lib/game/actuator'
-import { CLOSE_TO, SHELTER_FROM, SHELTER_NEAR, STAND_RINGS } from '../src/lib/game/evaluate'
+import { CLOSE_TO, MELEE_NEAR, SHELTER_FROM, SHELTER_NEAR, STAND_RINGS } from '../src/lib/game/evaluate'
 import { BLAST_CORE } from '../src/lib/game/grenade'
 import type { AiWorld, Seen } from '../src/lib/game/ai'
 import { SKILL } from '../src/lib/game/skills'
@@ -738,4 +738,37 @@ test('A HEALTH CRATE IS WORTH WHAT IT PUTS BACK: a topped-up pig walks past one'
   const topped = createGruntBrain()
   topped.decide(world({ ...scene, wits: 0, maxHealth: 50 }))
   expect(topped.explain?.()?.plan?.errand).toBe(false)
+})
+
+test('a mark missed by a hair is CLOSED, never passed', { tag: '@nodata' }, () => {
+  // Play, 2026-08-25: "третий свин подбежал вплотную к моему свину и пропустил
+  // ход))) это тупо." The log had DEN walk ten thousand units to its mark,
+  // stop sixty short of it and pass.
+  //
+  // A BLADE is why sixty units decide it: `MELEE_NEAR` is both where the brain
+  // means to stand AND the whole of what the blow can reach
+  // (lib/game/evaluate.ts), so any shortfall at all puts the target past the
+  // limit. The route is EMPTY here — the legs are done, which is exactly the
+  // state the pass used to fire in.
+  const brain = createGruntBrain()
+  const order = brain.decide(
+    world({
+      holding: SKILL.BAYONET,
+      carrying: [{ skill: SKILL.BAYONET, amount: UNLIMITED }],
+      foes: [foe({ x: 0, z: MELEE_NEAR + 60 })],
+      route: () => []
+    })
+  )
+  // Not a pass: a walk that ends INSIDE the blade's reach rather than on its
+  // edge, and aimed into the tightest zone there is — a blade's own slack is
+  // `limit − reach`, which is zero, so the arrival floor is all it gets.
+  expect(order.kind).toBe('walkTo')
+  if (order.kind !== 'walkTo') return
+  expect(order.within).toBe(ARRIVE_WITHIN)
+  const left = Math.hypot(order.x - 0, order.z - (MELEE_NEAR + 60))
+  expect(left).toBeLessThanOrEqual(MELEE_NEAR)
+  // And the guard BEHIND that, for the arrival zone the floor still allows:
+  // out of reach with the route walked out orders `close-in`, never a pass
+  // (lib/game/grunt.ts). That half is what play's report was.
+  expect(brain.explain?.()?.rung).not.toBe('pass-hopeless')
 })

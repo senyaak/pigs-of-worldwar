@@ -1289,3 +1289,32 @@ does not. The old chord test is that same rule at zone zero.
 `machine-mission` after it: **~269 s, five kills over sixteen shots** — the
 walk-cost line of the batch is 1357 → 508 → 343 → 269, and every step of that
 is time the machine used to spend not arriving.
+
+## 2026-08-25, the fourth pass — a mark missed by a hair is CLOSED, not passed
+
+Play: "третий свин подбежал вплотную к моему свину и пропустил ход))) это
+тупо." The log (DEN, 21:03:11) is unambiguous: a plan worth 10 827 units of
+walking, nine legs of it walked, the pig standing at 6567,-7892 against a mark
+at 6534,-7946 — sixty-three units short — and then `pass-hopeless`.
+
+**A BLADE is why sixty units decide anything.** `MELEE_NEAR` is both where the
+brain means to stand and the whole of what the blow can reach
+(lib/game/evaluate.ts: `reach: MELEE_NEAR, limit: MELEE_NEAR`), so there is no
+slack at all — arriving a hair short of the mark is already past the limit,
+and `hopeless` fired on a pig that was standing next to its target with a
+bayonet in its trotters.
+
+Two halves, and the second is the one that matters:
+
+- **The last leg's zone is the WEAPON's own slack** — `limit − reach`, floored
+  at one stride and capped at half a cell. A gun has hundreds of units of it
+  and gets the cap; a blade has none and gets the floor. That alone cannot be
+  enough, because the floor is a stride and a blade's slack is zero.
+- **So out of reach is not a pass while the legs still work.** With the route
+  walked out and the target past the limit, the grunt orders `close-in`:
+  straight at the target, stopping INSIDE the reach rather than on it. A
+  refused close-in counts its refusals like any other walk, so two of them
+  still end in the old pass rather than in a pig shuffling at a wall.
+
+Pinned in `unit/grunt.spec.ts` ("a mark missed by a hair is CLOSED, never
+passed"). `machine-mission` after it: ~331 s, four kills over eighteen shots.

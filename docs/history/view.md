@@ -313,3 +313,18 @@ mode left it and turns to keep the subject in frame, like a man watching a
 ball. The flung subject takes that branch now, and the `chase.hold` park goes
 back to what it was, because nothing is following any more and there is
 nothing to park.
+
+## 2026-08-25 — the camera stays on the body, and never goes back to the crater
+
+Play: "ты показываешь место взрыва гранаты после того, как свинки перестали
+летать — лучше задерживай камеру на секунду на свине и потом иди дальше, без
+возвращения к месту взрыва пустому."
+
+Both halves were the aftermath ride. The scene watched the thrown body, let it
+go the moment it settled, and then `now.aftermath` — the blow's own point,
+mode 0 on the crate — took the camera back to a crater with nothing in it.
+
+So the flung latch now holds for `FLUNG_LINGER` (one second) of stillness on
+top of the settle, and a blow that threw somebody suppresses its own aftermath
+ride (`sawFling`, cleared when the aftermath is). The camera watches the body
+land, holds it a beat, and hands over to whatever comes next.
