@@ -30,7 +30,7 @@ import { sharedBank } from './audio/bank'
 import { GAME_SOUNDS } from './audio/battleSound'
 import { fall, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
 import { fieldedAt, mapAt, mapId } from '../../lib/game/missions'
-import { missionScore, nextMap } from '../../lib/game/save'
+import { foughtAt, missionScore, nextMap } from '../../lib/game/save'
 import { isTrainingGround } from '../../lib/game/tutorial'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
@@ -250,12 +250,19 @@ function toBriefing(replayAt?: number): void {
   // under the team's own name — one pig on the training ground, three at
   // ESTU, five from then on. The roster is packed standing-first by
   // `regroup`, so the front slots are the front line (lib/game/roster.ts).
+  //
+  // A REPLAY fields the squad that FINISHED the mission instead — the save's
+  // own record (`fought`), with the ranks they wore then. `[play]`,
+  // 2026-08-26: "переигрывать именно тем составом". The live roster stands
+  // in only for a record the save never wrote.
+  const fought = save && replayAt !== undefined ? foughtAt(save, replayAt) : null
   const own = save
     ? {
         name: save.name,
-        pigs: save.squad
-          .slice(0, fieldedAt(position))
-          .map((pig) => ({ name: pig.name, pigClass: pig.rank }))
+        pigs: (fought ?? save.squad.slice(0, fieldedAt(position))).map((pig) => ({
+          name: pig.name,
+          pigClass: pig.rank
+        }))
       }
     : undefined
   briefing.show(position, enemy, battle.open(level, wearing, own))
@@ -303,12 +310,6 @@ const battle = initBattle((exit, fallen, kills, points) => {
     show('menu')
     return
   }
-  // The battle's dead land on the ROSTER first, in the order they went down —
-  // the original writes `pig+0x2C` on the live team the same way — so the
-  // debrief's fates and `missionWonResult`'s losses both read the truth.
-  // Never written to disk here: CONTINUE settles it through `acceptMission`,
-  // and every other way out stands the squad back up (`discardMission`).
-  for (const slot of fallen) fall(save.squad, slot)
   if (replaying !== null) {
     // A REPLAY: nothing is settled — no step, no reward, no roster change.
     // What it may win is the RECORD, and that waits for CONTINUE the same
@@ -316,12 +317,32 @@ const battle = initBattle((exit, fallen, kills, points) => {
     // so its bonus row and fielded count are that mission's own. The record
     // is the mission's WHOLE score — completion, survival, pickups — the
     // same composition the first win banked (lib/game/save.ts).
+    //
+    // The pigs on its page are the RECORDED squad the replay fielded
+    // (`fought`), stood up as display pigs with the battle's fall marks —
+    // the LIVE roster is never stamped: the fallen slots name the record's
+    // pigs, not whoever holds those slots today.
+    const fielded = foughtAt(save, replaying) ?? save.squad.slice(0, fieldedAt(replaying))
+    const squad = Array.from({ length: SQUAD_SIZE }, (_, slot) => {
+      const pig = fielded[slot]
+      return pig
+        ? { name: pig.name, identity: pig.identity, rank: pig.rank,
+            missions: 0, score: 0, fell: -1, deaths: 0 }
+        : { name: '', identity: slot, rank: 0, missions: 0, score: 0, fell: -1, deaths: 0 }
+    })
+    for (const slot of fallen) fall(squad, slot)
     replayPoints = exit === 'won' ? missionScore(replaying, fallen.length, points) : 0
-    debrief.show(exit === 'won', { ...save, position: replaying }, points)
+    debrief.show(exit === 'won', { ...save, position: replaying, squad }, points)
     show('debrief')
     void debrief.load()
     return
   }
+  // The battle's dead land on the ROSTER first, in the order they went down —
+  // the original writes `pig+0x2C` on the live team the same way — so the
+  // debrief's fates and `missionWonResult`'s losses both read the truth.
+  // Never written to disk here: CONTINUE settles it through `acceptMission`,
+  // and every other way out stands the squad back up (`discardMission`).
+  for (const slot of fallen) fall(save.squad, slot)
   if (exit === 'won') campaign.missionWonResult(kills, points)
   // The debrief reads the save AS THE MISSION FOUND IT — the position still
   // naming the played mission, the squad carrying its fell marks; the settled

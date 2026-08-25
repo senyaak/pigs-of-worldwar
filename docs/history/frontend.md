@@ -1201,3 +1201,32 @@ failed on the VEIL, not the words: the dim ramps 10 ticks of 40 ms, both
 captures landed mid-ramp, and every pixel of the two frames read ×2/3 apart
 — measured by a full-canvas pixel diff before touching the code. The helper
 now reads ~150 ms apart by the page's own frames until two reads agree.
+
+## 2026-08-26 — a replay fields the squad that FINISHED the mission
+
+Play: "надо запоминать каким составом миссия завершилась и переигрывать
+именно тем составом." MISSION SELECT had been fielding the LIVE roster's
+front line, which by then may carry different pigs at different ranks than
+the mission was actually won with.
+
+The save records it now: `fought` on the shape (lib/game/save.ts), indexed
+by position like `best` — the fielded pigs as the battle left them (name,
+identity, rank), written by `finishMission` off the pre-regroup squad so the
+fallen are still themselves and the ranks are the ones the mission was
+fought at. `foughtAt` answers null for a hole or an empty list, and the
+briefing falls back on the live roster only then. A replay's own result
+never rewrites the record — the same pigs fought it.
+
+Old files are repaired at the parser, the repo's standing rule, and play's
+own instruction for them ("возьми активных первых трёх свиней в запись"):
+every completed position without a record gets the first fielded-count of
+the standing squad — three at ESTU, five after. Boot camp is never offered
+as a replay and gets no invented record.
+
+The replay's DEBRIEF shows the recorded squad too: main.ts stands the
+record up as display pigs and stamps the battle's fall marks on THEM — the
+live roster is no longer touched on a replay's exit, since the fallen slots
+name the record's pigs, not whoever holds those slots today.
+
+Pinned in unit/save.spec.ts: the record survives a promotion and a file
+round trip, and the parser repair fills exactly the finished positions.

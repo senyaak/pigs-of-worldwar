@@ -18,12 +18,20 @@
 // a mission ends.
 
 import { fillEnemies } from './enemies'
-import { CAMPAIGN_LENGTH, mapAt } from './missions'
+import { CAMPAIGN_LENGTH, fieldedAt, mapAt } from './missions'
 import { seeded } from './random'
-import { regroup, SQUAD_SIZE, type Pig } from './roster'
+import { regroup, SQUAD_SIZE, standing, type Pig } from './roster'
 
 /** Bumped when the shape changes in a way an older file cannot be read as. */
 export const SAVE_VERSION = 1
+
+/** One fielded pig as a finished mission recorded it — enough to stand the
+ * same squad up again for a replay and to draw its debrief row. */
+export interface FoughtPig {
+  name: string
+  identity: number
+  rank: number
+}
 
 export interface SaveGame {
   version: number
@@ -61,6 +69,16 @@ export interface SaveGame {
    * zero (`bestAt`).
    */
   best: number[]
+  /**
+   * WHO finished each completed position, indexed by position — the fielded
+   * pigs as the mission ended, with the ranks they wore then. A REPLAY
+   * fields exactly this squad (`[play]`, 2026-08-26: "надо запоминать каким
+   * составом миссия завершилась и переигрывать именно тем составом"), not
+   * the live roster, which may have marched on. The remake's own field, like
+   * `best`: the original has no replay. Sparse holes read as null
+   * (`foughtAt`) and the briefing falls back on the live roster.
+   */
+  fought: FoughtPig[][]
   /** ISO 8601, for the LOAD GAME list to sort and label by. */
   savedAt: string
 }
@@ -71,6 +89,13 @@ export const isComplete = (save: SaveGame): boolean => save.position >= CAMPAIGN
 /** The PROPOINT record at a position — a hole is an honest zero (a mission
  * finished before the field existed, or with nothing picked up). */
 export const bestAt = (save: SaveGame, position: number): number => save.best[position] ?? 0
+
+/** The squad that finished a position, or null where no record stands — a
+ * hole and an empty list both mean "no record", never "field nobody". */
+export const foughtAt = (save: SaveGame, position: number): FoughtPig[] | null => {
+  const fought = save.fought[position]
+  return fought && fought.length > 0 ? fought : null
+}
 
 /**
  * A REPLAY came back with `points` pickups: worth banking only past the
@@ -114,6 +139,7 @@ export function newGame(
     tokens: 0,
     tutorial: false,
     best: [],
+    fought: [],
     savedAt: now
   }
 }
@@ -199,6 +225,13 @@ export function finishMission(
   enemies[save.position] = enemy
   const best = save.best.slice()
   best[save.position] = Math.max(bestAt(save, save.position), earned)
+  // WHO finished it goes on the record too, off the squad as the battle left
+  // it — before the regroup, so the fallen are still themselves and the
+  // ranks are the ones the mission was fought at. A replay fields this.
+  const fought = save.fought.slice()
+  fought[save.position] = squad
+    .slice(0, fieldedAt(save.position))
+    .map(({ name, identity, rank }) => ({ name, identity, rank }))
   return {
     ...save,
     position: Math.min(save.position + 1, CAMPAIGN_LENGTH),
@@ -207,6 +240,7 @@ export function finishMission(
     drafts,
     tokens,
     best,
+    fought,
     savedAt: now
   }
 }
@@ -256,6 +290,26 @@ export function parse(text: string): SaveGame | null {
   // finishing is a point, so the floor is 1. The survival point cannot be
   // recovered — a replay re-earns it. Pure: seeded off the save itself.
   for (let p = 1; p < save.position; p++) save.best[p] = Math.max(save.best[p] ?? 0, 1)
+  // `fought` arrived when replays began fielding the squad that FINISHED the
+  // mission (2026-08-26); a file from before it fielded replays off the live
+  // roster. Normalised element-wise like `best`, then every completed
+  // position without a record gets one — play's own instruction for the old
+  // files ("возьми активных первых трёх свиней в запись"): the first
+  // fielded-count of the STANDING squad stands in. Position 0 is the boot
+  // camp, which MISSION SELECT never offers, and gets no record invented.
+  const recorded = Array.isArray(save.fought) ? save.fought : []
+  save.fought = recorded.map((one) =>
+    Array.isArray(one) && one.every(isFoughtPig)
+      ? one.map(({ name, identity, rank }) => ({ name, identity, rank }))
+      : []
+  )
+  for (let p = 1; p < save.position; p++) {
+    if (save.fought[p]?.length) continue
+    save.fought[p] = save.squad
+      .filter(standing)
+      .slice(0, fieldedAt(p))
+      .map(({ name, identity, rank }) => ({ name, identity, rank }))
+  }
   /**
    * A SHORT ENEMY TABLE IS FILLED IN HERE, at the door, because nothing
    * downstream can cope with one and everything downstream believes it.
@@ -284,6 +338,12 @@ function seedOf(name: string, nation: number): number {
 
 const isCount = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0
+
+function isFoughtPig(value: unknown): value is FoughtPig {
+  if (typeof value !== 'object' || value === null) return false
+  const pig = value as Partial<FoughtPig>
+  return typeof pig.name === 'string' && isCount(pig.identity) && isCount(pig.rank)
+}
 
 function isPig(value: unknown): value is Pig {
   if (typeof value !== 'object' || value === null) return false

@@ -13,6 +13,7 @@ import {
   bankReplay,
   bestAt,
   finishMission,
+  foughtAt,
   isComplete,
   missionReward,
   paysPoints,
@@ -293,4 +294,44 @@ test('a save from before the record reads back with an empty one', { tag: '@noda
   const holed = JSON.parse(serialise(save))
   holed.best = [null, null, 3]
   expect(parse(JSON.stringify(holed))!.best).toEqual([0, 0, 3])
+})
+
+test('finishMission records WHO fought, with the ranks they wore', { tag: '@nodata' }, () => {
+  let save = newGame('PIGS', 0, squadOf(), '2026-08-26T00:00:00Z')
+  // ESTU fields three; the second wears a rank the roster may later outgrow.
+  save = { ...save, position: 1 }
+  save.squad[1].rank = 5
+  const squad = save.squad.map((pig) => ({ ...pig }))
+  fall(squad, 2)
+  const won = finishMission(save, squad, 1, 0, '2026-08-26T00:01:00Z')
+  // The record is the FIELDED three as the battle left them — the fallen one
+  // included, because it fought — and it survives the pig's own promotion.
+  expect(foughtAt(won, 1)).toEqual([
+    { name: 'JONES', identity: 8, rank: 0 },
+    { name: 'DEN', identity: 2, rank: 5 },
+    { name: 'BASIL', identity: 4, rank: 0 }
+  ])
+  // A position never finished has no record to field.
+  expect(foughtAt(won, 2)).toBeNull()
+  // …and the record reads the same off a round trip through the file.
+  expect(foughtAt(parse(serialise(won))!, 1)).toEqual(foughtAt(won, 1))
+})
+
+test('a save from before `fought` gets each finished mission a squad', { tag: '@nodata' }, () => {
+  const save = newGame('PIGS', 0, squadOf(), '2026-08-26T00:00:00Z')
+  const old = JSON.parse(serialise({ ...save, position: 3 }))
+  delete old.fought
+  const read = parse(JSON.stringify(old))!
+  // Play's own repair for the old files: the first fielded-count of the
+  // standing squad stands in — three at ESTU, five at position 2.
+  expect(foughtAt(read, 1)).toEqual([
+    { name: 'JONES', identity: 8, rank: 0 },
+    { name: 'DEN', identity: 2, rank: 0 },
+    { name: 'BASIL', identity: 4, rank: 0 }
+  ])
+  expect(foughtAt(read, 2)).toHaveLength(5)
+  // The boot camp is never offered as a replay and gets no invented record;
+  // neither does the mission still ahead.
+  expect(foughtAt(read, 0)).toBeNull()
+  expect(foughtAt(read, 3)).toBeNull()
 })
