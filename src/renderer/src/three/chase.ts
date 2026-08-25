@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import type { Pig } from '../../../lib/game/game'
 import { SWIM_SINK } from '../../../lib/game/locomotion'
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import { PIG_HEIGHT } from '../../../lib/game/obstacles'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { clearHeading } from '../../../lib/game/sightline'
@@ -471,6 +472,51 @@ const FLIGHT_LOCKED = (0x10 / 4096) * 2 * Math.PI
 const FLIGHT_CLOSE = 2 / 3
 /** `cmp eax,2710h` at 0x4a3d71. */
 const FLIGHT_FAR = 10000
+/**
+ * **THE LENS KEEPS ITS DISTANCE, AND IT KEEPS IT UPWARDS.** `[play]`,
+ * 2026-08-25: "давай сделаем у нас пару метров дистанцию — пусть вверх тупо
+ * камера уходит."
+ *
+ * The original has NOTHING of this, and that was read to be sure of it
+ * (docs/history/view.md): its chase distance is a symmetric spring with a
+ * five-unit dead zone, the whole camera module contains no collision query at
+ * all, and its one obstacle test walks GROUND samples and raises the pitch —
+ * the camera climbs a ridge and never steps aside. So a body thrown into the
+ * lens is a case with no original behind it, and this is the remake's own
+ * answer to it.
+ *
+ * A couple of metres in the only scale this game has is a couple of PIGS: the
+ * body is 320 units tall (lib/game/obstacles.ts), so the lens keeps 640 and
+ * buys the shortfall by RISING — straight up, exactly as asked, rather than
+ * backing off, which would fight every rig's own framing.
+ *
+ * **It guards the views a subject can come AT, and only those**: `watch` (a
+ * thrown body, a bullet), `pursue` (a grenade in flight) and `ride`. A rig's
+ * own standing distance is left alone — the melee view is decoded at 581 units
+ * off the pig, inside this keep on purpose, and lifting it would be inventing
+ * a framing over a read one.
+ */
+export const NEAR_KEEP = 2 * PIG_HEIGHT
+
+/**
+ * **THE SHAKE, and it is the exe's own** (0x4A0520 + 0x49FEA0, called from the
+ * blast at 0x43AE06): the amplitude falls QUADRATICALLY with the distance from
+ * the camera to the bang and is nothing at all past `SHAKE_REACH`, and every
+ * frame jitters all three axes by up to ±amplitude and takes `SHAKE_DECAY` off
+ * it. `amp = (10000 − min(d²/26844, 10000)) / 100`, then `Shake(max(amp/2, 1),
+ * 2)` — and `Shake` doubles what it is handed, so the amplitude really is that
+ * 0..100.
+ *
+ * The decay is two a frame at the exe's own thirtieth, written as a rate so it
+ * does not change with ours. The jitter is drawn with `Math.random`, which is
+ * allowed HERE and nowhere the rules can see it: a camera is not part of the
+ * battle and lockstep never has to agree about one (CLAUDE.md).
+ */
+export const SHAKE_REACH = 16384
+const SHAKE_FALL = 26844
+const SHAKE_TOP = 10000
+const SHAKE_DECAY = 2 / EXE_FRAME_SECONDS
+
 /** What the yaw spring gets through in a frame. The family's own third
  * (0x4BD6C8, 0x4BD6D0); `0x4A0870`'s own arithmetic is not transcribed. */
 const FLIGHT_TURN = 1 / 3
@@ -673,7 +719,17 @@ export interface Chase {
    * something like it and found to have nothing. Of course it has nothing —
    * with the camera standing still there is no ride to dodge with.
    */
-  watch(at: { x: number; y: number; z: number }): void
+  watch(
+    at: { x: number; y: number; z: number },
+    /** The frame, for the shake's decay — absent, the rattle simply does not
+     * wear off this frame. */
+    delta?: number | null
+  ): void
+  /**
+   * A BLAST went off at `at` (game space): shake the lens. The exe's own
+   * reaction to an explosion and the only one it has (`SHAKE_REACH`).
+   */
+  shake(at: { x: number; y: number; z: number }): void
   /**
    * **PURSUE a thrown thing: swing in behind it, then ride round it.** The
    * exe's mode 0x0D, which is what asking for 0x0B gets you — the constants
@@ -737,6 +793,34 @@ export function createChase(
   /** How much of `FLIGHT_ROOM` the flight's camera has taken so far — 1 at the
    * throw, easing out while it rides (see FLIGHT_ROOM). */
   let room = 1
+  /** How hard the lens is still shaking, world units (`SHAKE_REACH`). */
+  let shaking = 0
+
+  /**
+   * **KEEP THE LENS OFF THE SUBJECT, BY GOING UP** (`NEAR_KEEP`). Applied to
+   * the WANTED position, so the ordinary easing carries the rise and it is a
+   * lift rather than a jump; the flat distance is never touched, so a rig's
+   * own framing survives it. Both vectors are three-space.
+   */
+  const keepClear = (position: THREE.Vector3, target: THREE.Vector3): void => {
+    const flat = Math.hypot(position.x - target.x, position.z - target.z)
+    if (flat >= NEAR_KEEP) return
+    const over = target.y + Math.sqrt(NEAR_KEEP * NEAR_KEEP - flat * flat)
+    if (position.y < over) position.y = over
+  }
+
+  /**
+   * One frame of the SHAKE: jitter where the camera has already been put and
+   * take the decay off. Called after the position is written and before the
+   * look, so the subject stays centred while the world rattles round it.
+   */
+  const rattle = (delta: number | null): void => {
+    if (shaking <= 0) return
+    camera.position.x += (Math.random() * 2 - 1) * shaking
+    camera.position.y += (Math.random() * 2 - 1) * shaking
+    camera.position.z += (Math.random() * 2 - 1) * shaking
+    shaking = Math.max(0, shaking - SHAKE_DECAY * (delta ?? 0))
+  }
   /** To ±π, which is the exe's `& 0xFFF` read as a signed turn. */
   const wrapAngle = (a: number): number =>
     a - Math.PI * 2 * Math.round(a / (Math.PI * 2))
@@ -854,6 +938,10 @@ export function createChase(
         : target.y + lift,
       -behindZ
     )
+    // NOT `keepClear` here: a rig's own distance is a decoded number and the
+    // melee view really does stand 581 units off the pig, inside the keep. The
+    // minimum is for a subject that comes AT the lens on its own — a thrown
+    // body, a grenade in flight — so it lives in `watch`, `pursue` and `ride`.
     return { position, target }
   }
 
@@ -870,14 +958,26 @@ export function createChase(
         at.lerp(position, 1 - Math.exp(-6 * delta))
       }
       camera.position.copy(at)
+      rattle(delta)
       camera.lookAt(target)
     },
-    watch(point) {
+    watch(point, delta = null) {
       chasing = false
       // Mode 1 in full: the position is left alone — `at` is not touched, so
       // whatever view the throw was made from is still standing there and the
       // next `follow` carries on from it — and only the aim moves.
-      camera.lookAt(new THREE.Vector3(point.x, -point.y, -point.z))
+      //
+      // **Except when the subject comes at the lens.** `[play]`, and the exe
+      // has no answer of its own (`NEAR_KEEP`): a body thrown at a camera that
+      // never moves would end up inside it, so the one thing this mode does
+      // with its position is RISE. It never comes back down here — the next
+      // `follow` eases it home, which is the mode's own "carry on from where
+      // it stands".
+      const look = new THREE.Vector3(point.x, -point.y, -point.z)
+      keepClear(at, look)
+      camera.position.copy(at)
+      rattle(delta)
+      camera.lookAt(look)
     },
     pursue(point, heading, delta) {
       // Where the camera stands round the thing, and how far. `bearing` runs
@@ -929,10 +1029,13 @@ export function createChase(
       // The common tail still holds it off the ground — mode 0x12 is the one
       // view exempt from that and this is not it.
       position.y = Math.max(position.y, -query.surface(position.x, -position.z) + CLEARANCE)
+      const eye = new THREE.Vector3(point.x, -point.y, -point.z)
+      keepClear(position, eye)
       at.copy(position)
       snapped = true
       camera.position.copy(at)
-      camera.lookAt(new THREE.Vector3(point.x, -point.y, -point.z))
+      rattle(delta)
+      camera.lookAt(eye)
     },
     ride(point, heading, delta) {
       chasing = false
@@ -953,6 +1056,7 @@ export function createChase(
       // camera inside it.
       const floor = -query.surface(position.x, -position.z) + CLEARANCE
       position.y = Math.max(position.y, floor)
+      keepClear(position, target)
       if (delta === null || !snapped) {
         at.copy(position)
         snapped = true
@@ -960,7 +1064,24 @@ export function createChase(
         at.lerp(position, 1 - Math.exp(-6 * delta))
       }
       camera.position.copy(at)
+      rattle(delta)
       camera.lookAt(target)
+    },
+    /**
+     * A BANG at `at` (game space): shake the lens by what the exe would
+     * (`SHAKE_REACH`). The loudest one wins — a second blast inside the first
+     * one's ring does not add to it, which is the exe's own write rather than
+     * an accumulation.
+     */
+    shake(at) {
+      const d = Math.hypot(
+        camera.position.x - at.x,
+        camera.position.y + at.y,
+        camera.position.z + at.z
+      )
+      const fall = Math.min((d * d) / SHAKE_FALL, SHAKE_TOP)
+      const amp = (SHAKE_TOP - fall) / 100
+      if (amp > shaking) shaking = amp
     },
     hold(flung, driving, delta) {
       if (flung) wait = CHASE_DELAY

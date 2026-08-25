@@ -437,6 +437,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         squad.bury(pig)
         remainsArt.leave(at, heading)
       },
+      // A BANG SHAKES THE LENS, and this is the exe's own reaction to an
+      // explosion — the only one it has (three/chase.ts, `SHAKE_REACH`).
+      blasted: ({ at }) => chase.shake(at),
       crateSent: ({ id }) => airDropArt.open(id),
       crateLanded: ({ id }) => airDropArt.land(id),
       canopiesCut: () => airDropArt.cutAll(),
@@ -585,7 +588,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       const at = drawnAt(`${now.bullets.length > 0 ? 'shot' : 'lob'}:${bullet.id}`, bullet)
       const thrown = weaponLayer(pigShot(soldier.pig.id)?.holding ?? null) === 'lob'
       if (thrown) chase.pursue(at, Math.atan2(bullet.vx, bullet.vz), delta)
-      else chase.watch(at)
+      else chase.watch(at, delta)
       soldier.node.visible = true
       lastView = thrown ? 'pursue' : 'watch'
       return
@@ -623,7 +626,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // reading of "камера к нему прицепляется" and it was the wrong half of
     // the sentence — the camera attaches its GAZE, not its feet.
     if (flungWatch !== null && soldier.pig.id === flungWatch.pig) {
-      chase.watch(drawnStance(soldier))
+      chase.watch(drawnStance(soldier), delta)
       soldier.node.visible = true
       lastView = 'watch'
       return

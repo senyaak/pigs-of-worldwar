@@ -372,3 +372,40 @@ Mode table 0x4D9528 as shipped, distance/ceiling/third:
 4:(1500,2000,0) 7:(11000,1024,0) 9:(15000,50,3072) 0x0A:(5000,512,3584)
 0x0D:(3000,824,0) 0x0E:(2048,1024,0) 0x11:(2048,924,0) 0x12:(1600,1024,0)
 0x13:(1700,924,652)`.
+
+## 2026-08-25 — the lens keeps two pigs' distance by RISING, and a bang SHAKES it
+
+Play, on the read above: "давай сделаем у нас пару метров дистанцию — пусть
+вверх тупо камера уходит — и шатание камеры тоже хорошо."
+
+**The keep is the remake's own** and the read is why it can be: the original
+has no minimum distance and no dodge at all, so there is nothing to be
+faithful to. `NEAR_KEEP` is two pig-heights, 640 units — a couple of metres in
+the only scale this game has — and the shortfall is bought by going straight
+UP rather than backing off, which is what play asked for and also the only
+answer that does not fight a rig's framing: the flat distance is never
+touched, the lens simply rises until it is 640 from the subject in three
+dimensions.
+
+**It guards the views a subject can come AT, and only those** — `watch` (a
+thrown body, a bullet), `pursue` (a grenade in flight), `ride`. A rig's own
+standing distance is left alone on purpose: the melee view is decoded at 581
+units off the pig, inside the keep, and lifting that would be inventing a
+framing over a read one. In `watch` it is the one thing that mode ever does to
+its own position — the exe's mode 1 writes none at all — and it never comes
+back down there; the next `follow` eases it home.
+
+**The shake is the exe's, numbers and all.** `Camera::Shake` (0x4A0520) stores
+double what it is handed and `Camera::Update` (0x49FEA0) jitters all three axes
+by up to ±that, taking the decay off every frame; the blast's own caller
+(0x43AE06) computes `amp = (10000 − min(d²/26844, 10000)) / 100` and asks for
+`Shake(max(amp/2, 1), 2)`. So the amplitude is 0..100 world units, falls
+quadratically, is nothing past **16 384**, and the decay of two a frame at the
+exe's thirtieth is written here as a rate so our sixtieth does not change it.
+The loudest bang wins rather than adding, which is the exe's own write. The
+jitter is drawn with `Math.random`, which is allowed in the scene and nowhere
+the rules can see it.
+
+Wired to the `blasted` event, so every explosion the engine announces — a
+grenade, a mine, a charge, and now a corpse going off — rattles the picture.
+`e2e/002/camera.spec.ts` and `camera-smooth.spec.ts` still pass.
