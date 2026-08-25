@@ -307,6 +307,19 @@ export interface Airborne {
   pushIn: number | null
   /** Thrown out of a wall — wears the EJECTED clip until it lands. */
   ejected?: boolean
+  /**
+   * Whether this flight has already HIT something. It is what tells the two
+   * impact clips apart: 38 is the body FLYING (the exe puts a struck pig
+   * through 0x470c70 and that arm asks for it, 0x470cf5) and 39 is "Bouncing
+   * on B-Hind", which the IMPACT handler plays (0x478AC4) — so a pig is
+   * flying until the ground says otherwise and bouncing after.
+   *
+   * Play, 2026-08-25: "в полёте нет анимации полёта — как стояли, так и
+   * летят." The bounce clip was worn for the whole arc, launch included, and
+   * a body rolling on its behind through the air reads as no animation at
+   * all.
+   */
+  touched?: boolean
 }
 
 export interface Intent {
@@ -574,7 +587,14 @@ function fly(
   const a = state.airborne as Airborne
   // Nothing in the air is in the water, whatever is under it.
   state.swimming = false
-  state.clip = a.ejected ? ANIM.EJECTED : a.bouncing ? ANIM.BOUNCE : ANIM.JUMP_MIDDLE
+  // FLYING until it has hit something, BOUNCING after (`Airborne.touched`);
+  // an eject flies the whole way, which is what it was already doing.
+  state.clip =
+    a.ejected || (a.bouncing && !a.touched)
+      ? ANIM.EJECTED
+      : a.bouncing
+        ? ANIM.BOUNCE
+        : ANIM.JUMP_MIDDLE
   // Flight clips cycle; only the landing below commits to one.
   state.commit = false
   // The jump's forward half, three frames in.
@@ -674,7 +694,7 @@ function fly(
     ? -(a.vx * normal.x + a.vy * normal.y + a.vz * normal.z)
     : Math.hypot(a.vx, a.vy, a.vz)
   if (arrival >= BOUNCE_CUTOFF) {
-    state.airborne = { ...a, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true }
+    state.airborne = { ...a, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true, touched: true }
     return
   }
   state.airborne = null

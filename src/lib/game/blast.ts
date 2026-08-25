@@ -67,6 +67,14 @@ export interface BlastWorld {
    * damage have no bodies to move and no ground to land on.
    */
   fling?: (pig: Pig, velocity: Velocity) => void
+  /**
+   * The unit normal of the ground under a point (`TerrainQuery.normal`, game
+   * space). Only the footprint case reads it — a burst under the trotters
+   * throws along the slope rather than straight up (`hurlVelocity`) — and a
+   * world without one keeps the flat answer, which is what the pure damage
+   * specs want.
+   */
+  groundNormal?: (x: number, z: number) => { x: number; y: number; z: number }
 }
 
 /**
@@ -167,13 +175,21 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     if (outcome === 'died' || outcome === 'gibbed')
       emit({ kind: 'killed', pig: pig.id, by, gibbed: outcome === 'gibbed' })
     // …AND IT GOES FLYING. Where the burst stood against the body decides —
-    // under the trotters is straight UP, over the head is straight DOWN, and
+    // under the trotters is along the GROUND'S OWN NORMAL (straight up on the
+    // flat, down the hill on a slope), over the head is straight DOWN, and
     // everything past the footprint is the engine's 45° knock along the flat
     // bearing (`hurlVelocity` says why) — as hard as the damage it just took
     // (`flingSpeed`), which is what makes standing back save your footing as
     // well as your health. A corpse flies too: the exe throws bodies about,
     // and a pig killed by the blast is a body from that instant.
-    world.fling?.(pig, hurlVelocity(flingSpeed(amount), { x: dx, y: dy, z: dz }))
+    world.fling?.(
+      pig,
+      hurlVelocity(
+        flingSpeed(amount),
+        { x: dx, y: dy, z: dz },
+        world.groundNormal?.(pig.position.x, pig.position.z)
+      )
+    )
   }
   const standing = world.targets
   for (let i = standing.length - 1; i >= 0; i--) {

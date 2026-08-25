@@ -1502,3 +1502,62 @@ still in the air.
 It changes the shape of a battle rather than a number: the machine's mission-1
 run went from twenty-seven shots to thirty and from ~721 s to ~1357 s, because
 both squads now run out of grenades and finish with rifles.
+
+## 2026-08-25 — the corpse's bang is a REAL blast, and a charge under the trotters follows the SLOPE
+
+Two of play's, one settled by a read and one by geometry.
+
+### "Взрыв свина не дамажит никого?"
+
+No, it did not — `corpses.ts` emitted a `blasted` picture and nothing else.
+The exe was read to settle it and the answer is that it damages, generously.
+`0x4680E0(kind)` is the death dispatcher, reached from the state-7 arm
+(`0x46fb88`) for an ordinary death and from `0x467d10` for an overkill; each
+of its four arms allocates an effect and calls
+`0x487AD0(x, z, id, RANGE, 1, ?, DAMAGE)`:
+
+| death | site | id | range | damage |
+| ----- | ---- | -- | ----- | ------ |
+| on land | 0x4688ad | 0x56 | 0x400 | 0xA00 — **twenty points** |
+| in water (tile 4) | 0x468927 | 0x5B | 0x800 | 0x500 — ten |
+| in water (tile 0x0B) | 0x4689a3 | 0x42 | 0x800 | 0x500 |
+| GIBBED | 0x468a5f | 0x56 | 0x800 | 0x500 |
+
+The ID is what makes it hurt: `Effect::Init`'s shared tail (`0x489493`) gates
+on `0x41 <= id <= 0x63` and only inside that window writes the damage, the
+range and the phantom collision sphere; `Pig::OnHitObject`'s effect arm
+(`0x4778ae` → `0x477c22`) then runs the ordinary falloff and calls
+`TakeDamage(amount, 0)`. Kind **0**, so a corpse's blast can carry the next
+pig past the gib threshold and blow IT apart in turn. It cannot touch the
+dead — `TakeDamage` returns at once for states 6, 7 and 8 (`0x467ac9`) — which
+is the same rule `burst` already had in `isDead`.
+
+Two things stay the remake's. The exe's corpse blast **throws nobody**: a full
+scan of the two velocity primitives (`0x4A9260` ADD, seven sites; `0x4A9100`
+SET, twenty) puts none of them inside `0x4680E0..0x468B70` or in the blast
+arm. In this engine every blast throws, which is `[play]`'s own override
+(above), so this one does too. And the PICTURE is still the grenade's row —
+0x56 reads parameter row 7 and 0x5B row 8, neither transcribed.
+
+Built as a port: `CorpseWorld.blast` hands the charge to the same `burst`
+every grenade uses, so falloff, fling, kill credit and picture are one path.
+Also closed on the way: the gib arm's "what its scatterer spawns is not read"
+— it spawns that blast.
+
+The measurement, `machine-mission`: **~343 s, five kills over eighteen shots,
+1v0** — against ~508 s and thirty-three shots an hour before. Corpses finishing
+each other off is most of that.
+
+### "От динамита застрял свин на склоне, а не улетел"
+
+The log has the launch: `v 0,-3000,0 flat 0`, and a landing 185 units away.
+That is the footprint case in `hurlVelocity` — a burst inside the pig's own
+radius throws it straight UP — and on a hillside the same hillside catches it
+coming down, which reads as stuck.
+
+A body resting on a slope is held by that slope, so a charge under it throws
+along the GROUND'S OWN NORMAL: `TerrainQuery.normal` is exact (the half-tile
+is a plane), flat ground still gives (0,−1,0) so the straight-up case is
+untouched, and a thirty-degree face throws the pig thirty degrees down the
+hill. The normal arrives as an optional port on `BlastWorld` (`groundNormal`),
+so the pure damage specs keep their flat world.

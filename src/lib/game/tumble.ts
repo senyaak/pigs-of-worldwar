@@ -123,13 +123,37 @@ export const flingVelocity = (speed: number, bearing: number): Velocity => ({
  * он на месте катился". The footprint is the boundary the spec actually
  * drew: под свином is under the PIG, not under a geometric ray.
  */
-export const hurlVelocity = (speed: number, along: { x: number; y: number; z: number }): Velocity => {
+export const hurlVelocity = (
+  speed: number,
+  along: { x: number; y: number; z: number },
+  /**
+   * The unit normal of the ground under the body, game space
+   * (`TerrainQuery.normal` — up is NEGATIVE y). Read only when the burst is
+   * inside the footprint, and only then because that is the case where the
+   * line itself says nothing about which way to go.
+   */
+  ground?: { x: number; y: number; z: number }
+): Velocity => {
   const span = Math.hypot(along.x, along.y, along.z)
   if (span < 1) return { vx: 0, vy: -speed, vz: 0 }
   const flat = Math.hypot(along.x, along.z)
   if (flat < PIG_RADIUS) {
     // Y-DOWN: `along` runs burst → centre, so a burst BELOW the centre has
     // along.y < 0 — up it goes; above, down onto its behind.
+    //
+    // **AND ON A SLOPE, "UP" IS THE HILL'S UP.** Play, 2026-08-25: "от
+    // динамита застрял свин на склоне, а не улетел." The log has the launch:
+    // `v 0,-3000,0 flat 0`, and the landing 185 units later — a charge laid
+    // under the trotters threw the pig straight into the sky and the same
+    // hillside caught it on the way down, which reads as stuck. A body
+    // resting on a slope is held by that slope, so what a charge under it
+    // does is throw it along the GROUND'S OWN NORMAL: flat ground still
+    // gives (0,-1,0) and the straight-up case is untouched, a thirty-degree
+    // face throws it thirty degrees down the hill, and the steeper the
+    // ground the further it goes.
+    if (ground && along.y < 0) {
+      return { vx: ground.x * speed, vy: ground.y * speed, vz: ground.z * speed }
+    }
     return { vx: 0, vy: along.y < 0 ? -speed : speed, vz: 0 }
   }
   const run = (Math.cos(PITCH) * speed) / flat

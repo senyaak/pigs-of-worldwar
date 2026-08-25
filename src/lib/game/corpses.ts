@@ -21,12 +21,34 @@
 // renderer's (three/remains.ts).
 
 import { ANIM, inWater } from './locomotion'
-import { BLAST_EFFECT } from './effects'
+import { blastReach } from './grenade'
 import { originY } from './body'
+import type { Charge } from './blast'
+import type { Point } from './pose'
 import type { Anim } from './anim'
 import type { Emit } from './events'
 import type { Pig } from './game'
 import type { TerrainQuery } from './terrain'
+
+/**
+ * **THE CORPSE'S OWN BLAST**, out of the death dispatcher's four arms
+ * (`finish` carries the whole read and the addresses). A land death is the
+ * hard one — twenty points at a tight range — and the water death and the
+ * gib are both half that over twice the ground.
+ *
+ * Damage is in 128ths like every other charge (lib/game/health.ts); the
+ * ranges are `[effect+0x60]` and go through `blastReach`, which is the exe's
+ * own `+ collider − 512` divisor.
+ */
+export const LAND_DEATH_DAMAGE = 0xa00
+export const LAND_DEATH_RANGE = 0x400
+export const WET_DEATH_DAMAGE = 0x500
+export const WET_DEATH_RANGE = 0x800
+/** The effect ids the arms name: 0x56 on land and for a gib (parameter row
+ * 7), 0x5B in the water (row 8). Neither row is transcribed, so the picture
+ * falls back on the grenade's (lib/game/effectField.ts). */
+export const DEATH_EFFECT = 0x56
+export const WET_DEATH_EFFECT = 0x5b
 
 /**
  * How fast a dead pig goes under, game units a second. `[CHECK — remake]`:
@@ -122,23 +144,73 @@ export function createCorpses(
     /** Which side fields this pig — what the `dying` event carries so the
      * voice bank can speak with the squad's own voice. */
     sideOf: (pig: Pig) => number
+    /**
+     * Set the corpse's own bang off — a REAL blast, damage and all
+     * (lib/game/blast.ts, `burst`, which emits the picture itself).
+     *
+     * It is a port rather than a call because a corpse knows nothing about
+     * who else is standing about; the engine hands it the same blast world
+     * every grenade uses.
+     */
+    blast: (at: Point, charge: Charge) => void
   },
   emit: Emit
 ): Corpses {
   const dying: Corpse[] = []
 
-  /** The end of it: the bang (unless overkilled away), the boots, and the pig
-   * is off the map for good. */
-  const finish = (pig: Pig, blast: boolean): void => {
-    if (blast) {
-      // The corpse's own explosion — the ordinary blast picture and noise,
-      // centred on the body rather than its soles. Underwater it goes off
+  /**
+   * The end of it: the bang, the boots, and the pig is off the map for good.
+   *
+   * **THE CORPSE'S BANG IS A REAL BLAST** — read out of the exe 2026-08-25
+   * after play asked "взрыв свина не дамажит никого?", because it did not.
+   * The death dispatcher is `0x4680E0(kind)`, reached for an ordinary death
+   * from the state-7 arm at `0x46fb88` and for an overkill from `0x467d10`,
+   * and every kind allocates an effect and calls
+   * `0x487AD0(x, z, id, RANGE, 1, ?, DAMAGE)`:
+   *
+   * | death | id | range | damage |
+   * | ----- | -- | ----- | ------ |
+   * | on land (`0x4688ad`) | 0x56 | 0x400 | 0xA00 — twenty points |
+   * | in water (`0x468927`) | 0x5B | 0x800 | 0x500 — ten |
+   * | GIBBED (`0x468a5f`) | 0x56 | 0x800 | 0x500 — ten |
+   *
+   * The id is what makes it hurt: Effect::Init's tail (`0x489493`) gates on
+   * `0x41 <= id <= 0x63` and only then writes the damage, the range and the
+   * phantom collision sphere — and `Pig::OnHitObject`'s effect arm
+   * (`0x4778ae` → `0x477c22`) runs the ordinary falloff and calls
+   * `TakeDamage(amount, 0)`. Kind 0, so a corpse's blast can overkill the
+   * next pig and GIB it in turn. It cannot touch the dead: `TakeDamage`
+   * returns at once for states 6, 7 and 8 (`0x467ac9`), and `burst` skips
+   * `isDead` for the same reason.
+   *
+   * Two things are NOT the exe's and both are already this engine's rule.
+   * The exe's corpse blast writes no impulse at all — neither velocity
+   * primitive is called anywhere in `0x4680E0..0x468B70` or in the blast arm
+   * — but in this remake every blast throws, which is `[play]`'s own
+   * override (lib/game/blast.ts says where it came from). And the PICTURE
+   * stays the grenade's row: 0x56 reads parameter row 7 and 0x5B row 8,
+   * neither transcribed, so `effectField` falls back on row 0.
+   */
+  const finish = (pig: Pig, how: 'land' | 'water' | 'gibbed' | null): void => {
+    if (how !== null) {
+      // Centred on the body rather than its soles. Underwater it goes off
       // underwater, which the see-through sheet shows (three/terrain.ts).
-      emit({
-        kind: 'blasted',
-        at: { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z },
-        effect: BLAST_EFFECT.id
-      })
+      const at: Point = {
+        x: pig.position.x,
+        y: originY(pig.position.y, pig.body),
+        z: pig.position.z
+      }
+      const charge: Charge =
+        how === 'land'
+          ? { damage: LAND_DEATH_DAMAGE, reach: blastReach(LAND_DEATH_RANGE), effect: DEATH_EFFECT }
+          : how === 'water'
+            ? {
+                damage: WET_DEATH_DAMAGE,
+                reach: blastReach(WET_DEATH_RANGE),
+                effect: WET_DEATH_EFFECT
+              }
+            : { damage: WET_DEATH_DAMAGE, reach: blastReach(WET_DEATH_RANGE), effect: DEATH_EFFECT }
+      world.blast(at, charge)
     }
     pig.gone = true
     emit({ kind: 'remains', pig: pig.id, at: { ...pig.position }, heading: pig.heading })
@@ -148,11 +220,13 @@ export function createCorpses(
     claim(pig, gibbed) {
       if (pig.gone || dying.some((one) => one.pig === pig)) return
       if (gibbed) {
-        // Overkill: the body comes apart on the spot — no dying clip, no
-        // second bang. The exe's own gib branch (0x467cb1 → 0x4680E0(3));
-        // what its scatterer spawns is not read, and play asks only for the
-        // boots.
-        finish(pig, false)
+        // Overkill: the body comes apart on the spot — no dying clip, and
+        // the bang is the GIB's own, which is a wider and weaker one than a
+        // whole body's (0x467d10 → 0x4680E0(3) → 0x468a5f: id 0x56 at range
+        // 0x800 for 0x500, ten points over twice a grenade's reach). That
+        // arm used to be written off as "what its scatterer spawns is not
+        // read"; it is read now, and the blast is the readable half.
+        finish(pig, 'gibbed')
         return
       }
       // The aiming ARMS come down with the pig: the weapon overlay owns the
@@ -215,8 +289,9 @@ export function createCorpses(
         // finishes before its death does.
         if (world.anim.animating(pig) || world.tumbling(pig)) continue
         // The bang, where the body ENDED — under the surface for a drowned
-        // one, which the see-through sheet shows.
-        finish(pig, true)
+        // one, which the see-through sheet shows, and the exe gives that one
+        // its own weaker-but-wider charge (see `finish`).
+        finish(pig, one.wet ? 'water' : 'land')
         dying.splice(i, 1)
       }
     },

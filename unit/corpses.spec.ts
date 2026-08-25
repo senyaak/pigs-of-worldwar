@@ -11,9 +11,21 @@
 
 import { test, expect } from '@playwright/test'
 
-import { createCorpses, DEATH_QUIET, SINK_SPEED } from '../src/lib/game/corpses'
+import {
+  createCorpses,
+  DEATH_EFFECT,
+  DEATH_QUIET,
+  LAND_DEATH_DAMAGE,
+  LAND_DEATH_RANGE,
+  SINK_SPEED,
+  WET_DEATH_DAMAGE,
+  WET_DEATH_EFFECT,
+  WET_DEATH_RANGE
+} from '../src/lib/game/corpses'
+import { burst } from '../src/lib/game/blast'
+import { blastReach } from '../src/lib/game/grenade'
+import type { Charge } from '../src/lib/game/blast'
 import { ANIM } from '../src/lib/game/locomotion'
-import { BLAST_EFFECT } from '../src/lib/game/effects'
 import { NO_BODY } from '../src/lib/game/body'
 import { STEP_SECONDS } from '../src/lib/game/engine'
 import type { Anim } from '../src/lib/game/anim'
@@ -72,9 +84,31 @@ const pigAt = (x: number, y: number, z: number, id = 1): Pig =>
     parachutes: false
   }) as unknown as Pig
 
+/**
+ * The corpse's blast port, wired to the REAL `burst` over an empty world —
+ * so the `blasted` picture still comes out of the code that draws it, and the
+ * CHARGE the death asked for is recorded beside it. The exe's own numbers are
+ * in lib/game/corpses.ts with the addresses they came from.
+ */
+const blaster = (
+  events: BattleEvent[]
+): { charges: Charge[]; blast: (at: { x: number; y: number; z: number }, charge: Charge) => void } => {
+  const charges: Charge[] = []
+  return {
+    charges,
+    blast: (at, charge) => {
+      charges.push(charge)
+      burst(at, charge, { pigs: () => [], targets: [], present: () => true, training: false }, (event) =>
+        events.push(event)
+      )
+    }
+  }
+}
+
 test('a death on land: the ride, THEN the clip, then the bang, then the boots', { tag: '@nodata' }, () => {
   const anim = stubAnim()
   const events: BattleEvent[] = []
+  const bang = blaster(events)
   let still = false
   const corpses = createCorpses(
     {
@@ -83,7 +117,8 @@ test('a death on land: the ride, THEN the clip, then the bang, then the boots', 
       tumbling: () => false,
       cleared: () => still,
       roll: () => 0,
-      sideOf: () => 0
+      sideOf: () => 0,
+      blast: bang.blast
     },
     (event) => events.push(event)
   )
@@ -134,7 +169,14 @@ test('a death on land: the ride, THEN the clip, then the bang, then the boots', 
   anim.busy = false
   corpses.update(STEP_SECONDS)
   expect(events.map((one) => one.kind)).toEqual(['dying', 'blasted', 'remains'])
-  expect(events[1]).toMatchObject({ effect: BLAST_EFFECT.id })
+  // …and the bang is a REAL one — twenty points at the exe's own range
+  // (0x4688ad), not a picture (lib/game/corpses.ts).
+  expect(bang.charges).toEqual([
+    { damage: LAND_DEATH_DAMAGE, reach: blastReach(LAND_DEATH_RANGE), effect: DEATH_EFFECT }
+  ])
+  // The picture carries the DEATH's own effect id — 0x56, whose parameter row
+  // (7) is not transcribed, so the field falls back on the grenade's row 0.
+  expect(events[1]).toMatchObject({ effect: DEATH_EFFECT })
   expect(events[2]).toMatchObject({ pig: 1, at: { x: 0, y: 0, z: 0 }, heading: 0.5 })
   expect(pig.gone).toBe(true)
   expect(corpses.live()).toBe(0)
@@ -153,7 +195,8 @@ test('the falls are ROLLED off the battle stream — seventeen, exe range', { ta
       tumbling: () => false,
       cleared: () => true,
       roll: () => rolls[handed++ % rolls.length],
-      sideOf: () => 0
+      sideOf: () => 0,
+      blast: () => {}
     },
     () => {}
   )
@@ -167,9 +210,10 @@ test('the falls are ROLLED off the battle stream — seventeen, exe range', { ta
   for (const clip of anim.played) expect(ANIM.DEATHS).toContain(clip)
 })
 
-test('an overkill skips the clip and the bang — the body simply goes', { tag: '@nodata' }, () => {
+test('an overkill skips the CLIP — and its bang is wider and weaker', { tag: '@nodata' }, () => {
   const anim = stubAnim()
   const events: BattleEvent[] = []
+  const bang = blaster(events)
   const corpses = createCorpses(
     {
       anim,
@@ -177,7 +221,8 @@ test('an overkill skips the clip and the bang — the body simply goes', { tag: 
       tumbling: () => false,
       cleared: () => true,
       roll: () => 0,
-      sideOf: () => 0
+      sideOf: () => 0,
+      blast: bang.blast
     },
     (event) => events.push(event)
   )
@@ -185,7 +230,12 @@ test('an overkill skips the clip and the bang — the body simply goes', { tag: 
   corpses.claim(pig, true)
   expect(anim.played).toEqual([])
   expect(anim.worn).toEqual([])
-  expect(events.map((one) => one.kind)).toEqual(['remains'])
+  // No dying clip, and the body goes at once — but the GIB has a blast of its
+  // own (0x468a5f), half a whole body's damage over twice its reach.
+  expect(events.map((one) => one.kind)).toEqual(['blasted', 'remains'])
+  expect(bang.charges).toEqual([
+    { damage: WET_DEATH_DAMAGE, reach: blastReach(WET_DEATH_RANGE), effect: DEATH_EFFECT }
+  ])
   expect(pig.gone).toBe(true)
 })
 
@@ -199,8 +249,17 @@ test('a death in the water sinks WHILE the clip plays and goes off down there', 
   )
   const anim = stubAnim()
   const events: BattleEvent[] = []
+  const bang = blaster(events)
   const corpses = createCorpses(
-    { anim, query, tumbling: () => false, cleared: () => true, roll: () => 0, sideOf: () => 0 },
+    {
+      anim,
+      query,
+      tumbling: () => false,
+      cleared: () => true,
+      roll: () => 0,
+      sideOf: () => 0,
+      blast: bang.blast
+    },
     (event) => events.push(event)
   )
   const pig = pigAt(0, 0, 0)
@@ -224,5 +283,10 @@ test('a death in the water sinks WHILE the clip plays and goes off down there', 
   expect(events.map((one) => one.kind)).toEqual(['dying', 'blasted', 'remains'])
   const blasted = events[1] as Extract<BattleEvent, { kind: 'blasted' }>
   expect(blasted.at.y).toBeGreaterThan(0)
+  // A drowned body's bang is the weaker, wider one (0x468927) and wears its
+  // own effect id.
+  expect(bang.charges).toEqual([
+    { damage: WET_DEATH_DAMAGE, reach: blastReach(WET_DEATH_RANGE), effect: WET_DEATH_EFFECT }
+  ])
   expect(pig.gone).toBe(true)
 })

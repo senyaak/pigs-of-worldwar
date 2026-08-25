@@ -464,3 +464,20 @@ standing [play] divergence, though the exe's way would slow the hurt
 legs to the stride for free. The read also corrected a stale note: the
 "picker at 0x467EC0 by injury band" never picked run clips - its cases
 fold to a random Brushoff - and both notes files now say so.
+## 2026-08-25 — a thrown pig FLIES, and only bounces once it has hit something
+
+Play: "в полёте нет анимации полёта — как стояли, так и летят."
+
+The engine was setting a clip all along (`fly()` in lib/game/locomotion.ts,
+measured on the bench: clip 39 from the first frame of the arc to the last),
+and the idle loops that used to strip it off a flying pig were already
+exempting one. What was wrong was WHICH clip. 39 is "Bouncing on B-Hind" and
+the exe plays it from the IMPACT handler (`0x478AC4`); the clip a body wears
+while it is in the air is 38, which the exe puts a struck pig into through
+`0x470c70` → `0x470cf5` and which this engine already calls `ANIM.EJECTED`
+because a pig thrown out of a wall gets it. So the whole arc — launch, rise
+and fall — was played in a bounce-on-the-behind pose, which from a distance
+is a pig not animating at all.
+
+`Airborne` carries a `touched` flag now: flying until the ground says
+otherwise, bouncing after, and an eject still flies the whole way.

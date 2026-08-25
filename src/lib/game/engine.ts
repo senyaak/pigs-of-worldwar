@@ -41,6 +41,7 @@ import type { Mines } from './mines'
 import { createTumbles } from './tumble'
 import type { Tumbles, Velocity } from './tumble'
 import { createCorpses } from './corpses'
+import { burst } from './blast'
 import { createEffectField } from './effectField'
 import type { EffectField } from './effectField'
 import { createDamageNumbers } from './damage'
@@ -415,6 +416,10 @@ export function createEngine(parts: EngineParts): Engine {
    * inside a step, by which time it exists.
    */
   const tumbles = createTumbles({ query, pigs, obstacles }, bus.emit)
+  // What a blast under a pig's trotters throws ALONG — the slope's own up
+  // rather than the sky's (lib/game/tumble.ts, `hurlVelocity`).
+  const groundNormal = (x: number, z: number): { x: number; y: number; z: number } =>
+    query.normal(x, z)
   const fling = (pig: Pig, velocity: Velocity, ejected?: boolean): void =>
     battle.fling(pig, velocity, ejected)
   /** What becomes of a body once it is killed: the dying clip, the corpse
@@ -430,17 +435,27 @@ export function createEngine(parts: EngineParts): Engine {
       // swimmers included — which is what the dying clip waits behind.
       cleared: () => battle.stageStill(),
       roll: random,
-      sideOf: (pig) => game.players.findIndex((player) => player.pigs.includes(pig))
+      sideOf: (pig) => game.players.findIndex((player) => player.pigs.includes(pig)),
+      // The corpse's bang is a REAL blast — the exe's own damage and range
+      // (lib/game/corpses.ts carries the read). It goes through the same
+      // `burst` a grenade does, so the falloff, the fling and the picture
+      // are one path; nobody is credited with the kill, because the exe
+      // credits nobody either.
+      blast: (at, charge) =>
+        burst(at, charge, { pigs, targets, present, training, fling, groundNormal }, bus.emit)
     },
     bus.emit
   )
   /** What is already buried in the ground: the map's MINEFIELDS, which are a bit
    * in a tile rather than anything anybody put there (lib/game/mines.ts). Before
    * the grenades, because a thrown thing sets one off the same way a foot does. */
-  const mines = createMines({ pigs, targets, present, query, training, random, fling }, bus.emit)
+  const mines = createMines(
+    { pigs, targets, present, query, training, random, fling, groundNormal },
+    bus.emit
+  )
   /** …and what a GRENADE does, which is a parabola rather than a line. */
   const grenades = createLobs(
-    { pigs, targets, present, query, obstacles, training, pose, random, mines, fling },
+    { pigs, targets, present, query, obstacles, training, pose, random, mines, fling, groundNormal },
     bus.emit
   )
 
