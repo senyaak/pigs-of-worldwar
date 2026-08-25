@@ -9,7 +9,7 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 
 ---
 
-## P0. THE AI IS BROKEN — **THE REWRITE IS BUILT, 2026-08-24 night. PLAY IT.**
+## P0. THE AI — **REWRITTEN 2026-08-24 night, PLAYED AND CORRECTED 2026-08-25. PLAY IT AGAIN.**
 
 **Written 2026-08-24 evening straight after a play session; answered the
 same night.** Play's words, and they were a verdict on the day's work: "ии
@@ -72,23 +72,71 @@ anything that touches the brain; it is the cheapest honest reading there is.
   blow lands, not what it is worth. Whether the clock affords an ERRAND
   before the blow is still asked, in `plan.ts` where it belongs.
 
+### THE SESSION THAT FOLLOWED, 2026-08-25 — five reports, all answered
+
+Play played the rewrite the same night. The log is
+`_tmp/telemetry-2026-08-24T21-57-52.log` (96 lines) and the new `[ai:plan]`
+lines name every fault in it, which is what they were for.
+
+- **"Тупой побежал сразу к аптечке — это для него слишком умно"**, and the
+  third pig ran for one "хотя мог гранату кинуть во врага". Two causes, both
+  in the log: a health crate was priced at FACE (DEN took one at hp50, then
+  crossed the whole island for a second at hp100 — his plan line reads `->
+  -1792,5376 (errand) walk 24931`), and the ERRAND was bounded only by the
+  clock, which on a 99-second turn says yes to anything. Now a health crate
+  is worth what it PUTS BACK (`acting.maxHealth`, the class's starting
+  health — the engine still has no ceiling and that stands), and an errand
+  must be a real DETOUR: a quarter of the walk the turn was making anyway,
+  plus four tiles.
+- **The crate rule took THREE readings and the first two were wrong.** "Вижу
+  стреляю" was built first as "a crate never stands for election", then as
+  "a blow in hand prices every crate to nothing". Play's ruling: "ум 0 —
+  это не верно. он должен ВИДЕТЬ ящик… он должен играть как трёхлетний
+  ребёнок", and "я б сделал своего рода рандом — тупой может и ящик взять,
+  может и тупо стрельнуть", and "50 очков, но тупой это не различает."
+  Nothing suppresses a crate now: the dumb eye SWAMPS the arithmetic at the
+  bottom of the scale and `MISJUDGE` makes the outcome a toss.
+  **MEASURED AND THROWN OUT**: taking the worth out of the dumb judgment
+  altogether reads exactly like play's sentence and leaves the machine
+  unable to finish mission 1 — no verdict in 3600 s against 402 with the
+  worth in. The note is in the dumb eye so it is not tried a third time.
+- **"Поиск пути ищет путь по точкам — но надо чтобы по дороге можно было
+  выворачивать на них"**, and the earlier turn complaint was about the
+  ALTERNATION, not about steering. The realign band goes 22.5° → 60° (the
+  ceiling is geometry: 1040 units a second against 42° a second is an arc
+  1400 across, wide at 60° and a loop at 90°), and the brain hands the next
+  corner over a stride early (`TURN_IN`).
+- **The FROG EFFECT** — "можно параллельно воде пустить прожектайл и он
+  проскачет". It is in the exe and in the engine; it was NOT in the brain,
+  whose dry run stopped at the waterline and priced every throw over water
+  as drowned. It follows the hops now. The two places the ENGINE still
+  disagrees with the exe are their own entry below.
+
 ### WHAT IS LEFT
 
-1. **PLAY IT.** Everything above is arithmetic and one headless mission;
-   none of it is play's eye. The telemetry now writes an `[ai:plan]` line
-   the decision a plan is made — goal, walk, legs, and how many cells the
-   turn's flood settled — so the next report can be read against the plan
-   that produced it rather than against a wall of re-elections.
-2. **A FOE is still not an obstacle.** Only the squad is. If play sees a
-   pig shove an ENEMY rather than go round, the fix is a per-target
-   exemption in the flood, not a bigger `BODY_CLEAR` — a blade's mark is
-   180 units off a body and the grid step is 128, so blocking foes at a
-   body's width makes melee unreachable. That is why it is written this way.
-3. **The lags are measured but not TUNED.** One flood a turn on a 193×193
-   grid is still the dearest thing a turn does, and the `cells` figure on
-   the plan line is what a `[perf]` frame should now be read against. If it
-   is still felt, the lever is the flood's budget (`PLAN_TURNS`), not the
-   price list.
+1. **PLAY IT AGAIN.** Nothing since the 2026-08-25 session has been in front
+   of play's eyes: the crate rules, the toss, the bounded errand, health by
+   need, the 60° band and the corner lookahead, the water skip in the dry
+   run. The headless mission says only that a battle finishes (402 s, three
+   kills, one squad wiped); it says nothing about whether a pig LOOKS stupid.
+2. **THE FREEZE IS NOT DIAGNOSED.** Play met one — "а в конце щас игра тупо
+   зависла" — and the log ends on DEN firing a sniper rifle with no `[turn]`
+   after it. What was done is INSURANCE, not a fix: the parent walk in
+   `pathfind.ts` was the only unbounded loop on that path and it can close on
+   itself for a real reason (a cell carries the FEET's height, so it can be
+   re-settled cheaper after being expanded — which is what makes a ramp work
+   and what breaks the invariant keeping a parent chain acyclic). If it hangs
+   again, what is wanted is what was on screen at the moment.
+3. **A FOE is still not an obstacle.** Only the squad is. If play sees a pig
+   shove an ENEMY rather than go round, the fix is a per-target exemption in
+   the flood, not a bigger `BODY_CLEAR` — a blade's mark is 180 units off a
+   body and the grid step is 128, so blocking foes at a body's width makes
+   melee unreachable. That is why it is written this way.
+4. **The lags are measured but not TUNED.** The plan lines say `cells 24891`
+   — the whole map — at about 400 ms a plan, once a turn instead of the
+   fifteen searches it was. If it is still felt, the lever is the flood's
+   budget (`PLAN_TURNS`), not the price list.
+5. **THE BOUNDS OF THE FIRST MAP** — play's own report, its own entry below.
 
 ### THE WATER SKIP: two places the engine and the exe still disagree
 
