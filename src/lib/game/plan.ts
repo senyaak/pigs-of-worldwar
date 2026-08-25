@@ -26,7 +26,7 @@
 
 import type { AiWorld, Seen } from './ai'
 import type { Option, Walked } from './evaluate'
-import { crateErrand, crateFallback, elect, ERRAND_WORTH } from './evaluate'
+import { crateErrand, crateFallback, elect } from './evaluate'
 import { WALK_SPEED } from './movement'
 
 /**
@@ -200,22 +200,9 @@ export function makePlan(
     // be taken on the way becomes the turn's own goal, and then the blow is
     // what is given up.
     const beats = crate !== null && (crate.judged ?? crate.score) > (blow.judged ?? blow.score)
-    // **A BLOW IN HAND ENDS THE DUMB PIG'S THINKING, HERE TOO.** With the
-    // blow needing no walk at all, the only crate that may still be picked
-    // up on the way is the one the ELECTION weighed — and that one is
-    // already scaled by the wits (lib/game/evaluate.ts, `elect`), so at the
-    // bottom of the scale it reads as nothing and the pig simply shoots
-    // ("вижу стреляю"), while at the top it detours and strikes after
-    // ("взять ящик И ударить после"). A pig that has to walk anyway is a
-    // different case and picks up whatever is genuinely on its way, at any
-    // wits.
-    const wanted = beats
-      ? crate
-      : blow.walk === 0
-        ? crate !== null && (crate.judged ?? crate.score) >= ERRAND_WORTH
-          ? crate
-          : null
-        : crateErrand(world, judge, walked, skip)
+    // The crate that WON goes first; failing that, whatever else is worth
+    // picking up on the way (`crateErrand` and its own worth bar).
+    const wanted = beats ? crate : crateErrand(world, judge, walked, skip)
     if (wanted && onTheWay(wanted, blow)) {
       option = blow
       errand = wanted

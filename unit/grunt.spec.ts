@@ -655,29 +655,29 @@ test('NOTHING IN REACH: the dumb pig goes for the crate, and the sharp one weigh
   if (order.kind !== 'walkTo') return
   expect(order.z).toBeGreaterThan(200)
 })
-test('A BLOW IN HAND IS THE WHOLE ANSWER FOR A DUMB PIG — the smart one still thinks', { tag: '@nodata' }, () => {
-  // The two ends are not one rule turned up, they are different rules, and
-  // play said so twice. The DUMB end is a reflex ladder: "тупой должен —
-  // вижу стреляю", so a foe inside the rifle's own reach is shot and the
-  // crate at its trotters is not weighed at all. The SMART end THINKS —
-  // "чем умнее тем больше думает" — and it does not have to CHOOSE: a
-  // pickup spends no turn, so it walks through the crate and strikes after.
+test('A THREE-YEAR-OLD GRABS THE NEAREST THING; the sharp pig weighs it and shoots', { tag: '@nodata' }, () => {
+  // Play's ruling, 2026-08-25, after two readings of "вижу стреляю" that
+  // were both too literal: "ум 0 — это не верно. он должен ВИДЕТЬ ящик; если
+  // ящик ближе чем враг или ещё как — он МОЖЕТ пойти и взять ящик. но это
+  // тупой свин — он должен играть как трёхлетний ребёнок."
+  //
+  // So nothing suppresses a crate. The crate here is deliberately POOR —
+  // five points of health against a shot worth twenty — and the foe is
+  // inside the rifle's own reach. The wits-0 pig walks to the crate anyway,
+  // because it is nearer and that is the whole of its reasoning; the wits-1
+  // pig reads five points at face, finds them under the shot, and fires.
   const scene = {
     foes: [foe({ z: RANGE * 0.4 })],
-    crates: [{ x: 0, z: 120, skill: null, amount: 50 }]
+    crates: [{ x: 0, z: 120, skill: null, amount: 5 }]
   }
   const dumb = createGruntBrain()
-  expect(dumb.decide(world({ ...scene, wits: 0, holding: SKILL.RIFLE }))).toEqual({ kind: 'fire' })
-  expect(dumb.explain?.()?.plan?.errand).toBe(false)
-  const sharp = createGruntBrain()
-  expect(sharp.decide(world({ ...scene, wits: 1, holding: SKILL.RIFLE }))).toEqual({
+  expect(dumb.decide(world({ ...scene, wits: 0, holding: SKILL.RIFLE }))).toEqual({
     kind: 'walkTo',
     x: 0,
     z: 120
   })
-  expect(sharp.explain?.()?.plan?.errand).toBe(true)
-  // …and the blow the turn is FOR is still the shot: the crate is a prefix.
-  expect(sharp.explain?.()?.chose?.kind).toBe('gun')
+  const sharp = createGruntBrain()
+  expect(sharp.decide(world({ ...scene, wits: 1, holding: SKILL.RIFLE }))).toEqual({ kind: 'fire' })
 })
 test('A HEALTH CRATE IS WORTH WHAT IT PUTS BACK: a topped-up pig walks past one', { tag: '@nodata' }, () => {
   // Play watched DEN take a crate at hp50, then cross the whole island for a

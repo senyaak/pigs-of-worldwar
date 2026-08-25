@@ -887,21 +887,24 @@ export function crateFallback(
  * which it is this time (lib/game/plan.ts). What is decided HERE is only
  * what each half is worth.
  *
- * **WHEN A BLOW IS IN HAND, A CRATE IS ONLY THE SMART PIG'S BUSINESS.**
- * Play's rule, 2026-08-25, and the correction that followed it the same
- * evening. The DUMB end is a reflex ladder and nothing else: "тупой должен —
- * вижу стреляю; не вижу — вижу ящик — беру ящик." The SMART end is not the
- * same rule turned up, it is a different thing entirely — "чем умнее тем
- * больше думает" — so a pig that could shoot may still decide the crate is
- * worth more, and it is allowed to.
+ * **NOTHING SUPPRESSES A CRATE, AT ANY LEVEL OF WITS**, and that took three
+ * readings to get right. "Вижу стреляю" was read here as a gate — a blow in
+ * hand pricing every crate to nothing — and play threw it out: "ум 0 — это
+ * не верно. он должен ВИДЕТЬ ящик; если ящик ближе чем враг или ещё как — он
+ * МОЖЕТ пойти и взять ящик. но это тупой свин — он должен играть как
+ * трёхлетний ребёнок."
  *
- * One number says both. A blow that can be struck from where the pig STANDS
- * scales every crate by the wits: at 0 the crate prices to nothing and the
- * reflex is absolute, at 1 it competes at face and only the arithmetic
- * speaks. With NOTHING in reach the scaling is off and the crate stands
- * whole — which is where the dumb eye takes over, pulling hard toward
- * whatever is nearest, so "чем тупее — тем больше вероятность тупого выбора
- * ящик". Not a die: the same world gives the same answer twice.
+ * A three-year-old does not weigh a pickup against a shot and decline it. It
+ * grabs whatever is NEAREST, crate or pig, and that is already built and did
+ * not need help: the dumb eye (lib/game/grunt.ts, `NEAR_POINTS`) adds
+ * `(1 − wits) · 60 / (1 + tiles)` to every judgment, which at the bottom of
+ * the scale swamps any worth the kit can price and falls away to nothing
+ * across the map. So the near crate wins and the far one does not, without a
+ * rule saying so.
+ *
+ * What the wits actually turn is the OTHER end, and only that: at 1 the
+ * bonus is zero, the appetite is 1, and a crate is taken exactly when it is
+ * worth more than the blow. "Чем умнее тем больше думает."
  */
 export function elect(
   world: AiWorld,
@@ -938,15 +941,8 @@ export function elect(
             meleeOption(world, slot.skill, note))
     )
   }
-  const inHand = blow.best !== null && blow.best.walk === 0
   const crate = { best: null as Option | null, judged: 0 }
-  for (const one of world.crates) {
-    const option = crateOption(world, one, undefined, walked)
-    if (!option) continue
-    if (inHand) option.score *= world.wits
-    note?.(option)
-    rank(crate, option)
-  }
+  for (const one of world.crates) rank(crate, crateOption(world, one, note, walked))
   return { blow: blow.best, crate: crate.best }
 }
 
