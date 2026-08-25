@@ -1173,3 +1173,31 @@ and blessed a half-ramped veil; the reads are 150 ms apart now. The strip was
 proved right by a pixel diff of full-canvas dumps in both states (zero
 differing pixels in the strip, the plaque held) before the sampling was
 fixed.
+
+## 2026-08-26 — corrected the same day: the WINDOW was the board, not the plaque
+
+Play, on the fix above: "не верно - до этого то что было было верно но не
+скрывался текст просто - ты другую панель взял зачемто." The plaque-hold was
+the wrong reading of the same symptom. The pig menu's launch WAS the
+original's behaviour; CAREER PATH stands on the squad's `pigpro` BOARD — the
+board is the "window" play meant — and the one thing missing was the board
+CLEARING ITS OWN LINES while the career screen writes on its face. So the
+holding phase, dismiss/resume and the career-first input routing are all
+backed out of ui/pigMenu.ts and ui/playerScreen.ts (the furniture split in
+the menu's draw stays — it is the bare-return-trap shape regardless), and
+the whole fix is two guards: `writeBoard` and `boardText` answer nothing
+while `career.state()` is 'open'.
+
+Play also ruled the carousel's keys: "кнопки в лево в право должны работать
+- а не в верх в низ" — menuLeft/menuRight walk the four careers now, not
+up/down (ui/careerPath.ts; the exe's kind-13 rows read up/down, `[play]`
+overrides).
+
+The spec's paint check changed shape with it: a hash of the board band
+between the career title and the career name (y 356..371, x 240..420),
+captured with CAREER PATH open on TWO different grunts, must be identical —
+a leaked board line carries the pig's own name and differs. Its first run
+failed on the VEIL, not the words: the dim ramps 10 ticks of 40 ms, both
+captures landed mid-ramp, and every pixel of the two frames read ×2/3 apart
+— measured by a full-canvas pixel diff before touching the code. The helper
+now reads ~150 ms apart by the page's own frames until two reads agree.

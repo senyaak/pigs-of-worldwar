@@ -652,9 +652,7 @@ export function initPlayerScreen(handlers: {
       spent = { cost, ticks: SPENT.ticks }
       spendCoins(cost)
     },
-    // The plaque CAREER PATH stood on is the pig menu's: chosen, it leaves
-    // for the squad; backed out, the menu's rows come back onto it.
-    onClosed: (chosen) => (chosen ? menu.dismiss() : menu.resume())
+    onClosed: () => {}
   })
   /** Whether either overlay holds the screen — input goes to it and the
    * squad dims under it. */
@@ -722,14 +720,13 @@ export function initPlayerScreen(handlers: {
 
   controller.onAction((action) => {
     if (!visible) return
-    // An overlay holds the screen while it is up — CAREER PATH first, since
-    // the pig menu stands under it, holding its plaque and taking no input.
-    if (career.state() === 'open') {
-      career.handle(action)
-      return
-    }
+    // An overlay holds the screen while it is up.
     if (menu.state() !== 'closed') {
       menu.handle(action)
+      return
+    }
+    if (career.state() === 'open') {
+      career.handle(action)
       return
     }
     if (action === 'menuUp') vertical(-1)
@@ -1088,8 +1085,10 @@ export function initPlayerScreen(handlers: {
   }
 
   /** …the same board as WORDS, for a spec. The tokens line first, whatever is
-   * lit, because they are the TEAM's rather than any pig's. */
+   * lit, because they are the TEAM's rather than any pig's. Empty while
+   * CAREER PATH stands on the board, exactly as `writeBoard` leaves it. */
   const boardText = (): string[] => {
+    if (career.state() === 'open') return []
     const subject = boardSubject()
     const rows = [String(tokens)]
     if (!subject) return rows
@@ -1113,6 +1112,11 @@ export function initPlayerScreen(handlers: {
     sprites: SpriteSet,
     font: Font
   ): void => {
+    // CAREER PATH writes ON this board — its title, the career name and the
+    // four icons land on the board's face — so the board's own lines make way
+    // while it is up. Leaving them was the bug play reported: the lit pig's
+    // stale lines standing under the career words. `[play]`, 2026-08-26.
+    if (career.state() === 'open') return
     const lines = layout.board.lines
     const gap = layout.board.gap
     // The TOKENS are the TEAM's line, not a pig's, so they stand whatever is

@@ -34,23 +34,46 @@ async function settled(page: Page, screen: 'playerScreen' | 'pigMenu'): Promise<
 }
 
 /**
- * A hash of the pixels where the pig menu's plaque stands and NOTHING else
- * does — left of the squad's `pigpro` board (x 232+) and the medallion
- * (x 230+), clear of both overlays' words and icons. CAREER PATH has no
- * backdrop of its own: the plaque must HOLD under it, and this strip is the
- * paint check that it did. A debug read is not a paint check (CLAUDE.md) —
- * the bug this pins showed the board's stale lines through the career words
- * while every state read answered correctly.
+ * A hash of the board band where only the squad's `pigpro` lines would paint
+ * while CAREER PATH is up — between the career title (ends y 355) and the
+ * career name (starts y 373), across the board's face. The career screen has
+ * no backdrop of its own: it writes ON the board, and the board's own lines
+ * make way while it is up. A debug read is not a paint check (CLAUDE.md) —
+ * the bug this pins showed the lit pig's stale lines under the career words
+ * while every state read answered correctly. Two grunts' career screens must
+ * paint this band IDENTICALLY: a leaked board line carries the pig's own
+ * name and differs.
+ *
+ * The helper waits for the picture to SETTLE before answering — the dim veil
+ * ramps 10 ticks of 40 ms after an overlay opens, and a hash taken mid-ramp
+ * measures the veil, not the words (it cost a run: two career screens read
+ * ×2/3 apart, every pixel, nothing but the shade). Reads ~150 ms apart, by
+ * the page's own frames, until two agree; the ramp is monotonic, so agreeing
+ * means done.
  */
-const plaqueStrip = (page: Page): Promise<number> =>
-  page.evaluate(() => {
+const boardStrip = (page: Page): Promise<number> =>
+  page.evaluate(async () => {
     const canvas = document.getElementById('player-screen') as HTMLCanvasElement | null
     const context = canvas?.getContext('2d')
     if (!canvas || !context) return -1
-    const pixels = context.getImageData(190, 430, 35, 30).data
-    let hash = 0
-    for (let i = 0; i < pixels.length; i++) hash = (hash * 31 + pixels[i]) | 0
-    return hash
+    const read = (): number => {
+      const pixels = context.getImageData(240, 356, 180, 15).data
+      let hash = 0
+      for (let i = 0; i < pixels.length; i++) hash = (hash * 31 + pixels[i]) | 0
+      return hash
+    }
+    const frames = async (): Promise<void> => {
+      const start = performance.now()
+      while (performance.now() - start < 150) await new Promise(requestAnimationFrame)
+    }
+    let last = read()
+    for (let round = 0; round < 20; round++) {
+      await frames()
+      const now = read()
+      if (now === last) return now
+      last = now
+    }
+    return last
   })
 
 const menuOpen = (page: Page, which: 'pigMenu' | 'careerPath'): Promise<boolean> =>
@@ -192,23 +215,6 @@ test('a token walks a grunt down the career path, and the next step costs two', 
   await tap(page, 'menuDown')
   await tap(page, 'menuSelect')
   await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(true)
-  await settled(page, 'pigMenu')
-  // The plaque at rest, dim and all — two reads 150 ms apart agreeing. The
-  // spacing is the point: expect.poll's first turn is immediate, and two
-  // reads off one frame agree about anything, ramping veil included.
-  let plaque = await plaqueStrip(page)
-  await expect
-    .poll(
-      async () => {
-        await page.waitForTimeout(150)
-        const now = await plaqueStrip(page)
-        const same = now === plaque
-        plaque = now
-        return same
-      },
-      { message: 'the plaque never settled' }
-    )
-    .toBe(true)
   await tap(page, 'menuSelect')
   await expect.poll(() => menuOpen(page, 'careerPath')).toBe(true)
   expect(await labels(page, 'careerPath')).toEqual([
@@ -217,30 +223,37 @@ test('a token walks a grunt down the career path, and the next step costs two', 
     'ESPIONAGE',
     'MEDIC'
   ])
-  // The PAINT check: the career words stand on the pig menu's own plaque,
-  // which held — not on the squad's board showing through a veil.
-  await expect
-    .poll(() => plaqueStrip(page), { message: 'the plaque left with the menu' })
-    .toBe(plaque)
+  const jones = await boardStrip(page)
 
-  // BACK hands the plaque back to the pig menu, rows and all — then PROMOTE
-  // opens the career path again.
+  // BACK closes to the squad. The SECOND grunt's career screen must paint
+  // the board band identically — the board's own lines carry the pig's NAME,
+  // so a leaked line differs between JONES and DEN. This is the paint check:
+  // the board makes way while CAREER PATH stands on it.
   await tap(page, 'menuBack')
   await expect.poll(() => menuOpen(page, 'careerPath')).toBe(false)
-  expect(await menuOpen(page, 'pigMenu')).toBe(true)
-  expect(await selection(page, 'pigMenu')).toBe(0)
+  await tap(page, 'menuDown')
+  await tap(page, 'menuSelect')
+  await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(true)
+  await tap(page, 'menuSelect')
+  await expect.poll(() => menuOpen(page, 'careerPath')).toBe(true)
+  expect(await boardStrip(page), 'the board leaked under the career words').toBe(jones)
+  await tap(page, 'menuBack')
+  await expect.poll(() => menuOpen(page, 'careerPath')).toBe(false)
+
+  // Back to the first pig for the promotion itself.
+  await tap(page, 'menuUp')
+  await tap(page, 'menuSelect')
+  await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(true)
   await tap(page, 'menuSelect')
   await expect.poll(() => menuOpen(page, 'careerPath')).toBe(true)
 
-  // ENGINEER's first step is the SAPPER, for the one token.
-  await tap(page, 'menuDown')
+  // ENGINEER's first step is the SAPPER, for the one token — the carousel
+  // walks RIGHT, play's rule: "кнопки в лево в право, а не в верх в низ".
+  await tap(page, 'menuRight')
   expect(await selection(page, 'careerPath')).toBe(1)
   await tap(page, 'menuSelect')
   await expect.poll(() => menuOpen(page, 'careerPath')).toBe(false)
   await expect.poll(async () => (await values(page, 'playerScreen'))[0]).toBe('SAPPER')
-  // The plaque the career screen stood on leaves AFTER the choice — wait it
-  // out, or the next select lands on a leaving menu and is swallowed.
-  await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(false)
 
   // The same pig's next step is single — no career screen, two tokens, paid
   // on the spot.

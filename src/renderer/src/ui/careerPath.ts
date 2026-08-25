@@ -3,14 +3,20 @@
 // The exe draws it as a CAROUSEL, not a list (`frontend/notes.md`,
 // 2026-08-18): the title, ONE career name in one box under it — the four take
 // turns there as the cursor moves — and four career icons in a row at the
-// bottom, the chosen one blinking. It plays NO entrance: kinds 0/5/6/13 are
-// one family and the enter arm skips everything inside it.
+// bottom, the chosen one blinking. It floats over the dimmed squad screen the
+// way the pig menu does, and plays NO entrance: kinds 0/5/6/13 are one family
+// and the enter arm skips everything inside it.
 //
-// It has no backdrop of its own: it is drawn ON the pig menu's plaque, which
-// HOLDS, bare, while this screen is up — both word boxes and the icon row
-// land inside the plaque's footprint. Closing hands the plaque back through
-// `onClosed(chosen)`: chosen, the plaque leaves for the squad; backed out,
-// the menu's rows come back onto it.
+// Its backdrop is the squad's own `pigpro` BOARD — the pig menu's plaque has
+// launched away by the time this opens, and the career words land on the
+// board's face. The board CLEARS its own lines while this screen is up
+// (`writeBoard` in ui/playerScreen.ts asks `career.state()`): `[play]`,
+// 2026-08-26 — the stale pig lines showing through under the career words
+// were the bug, not the board being the backdrop.
+//
+// The carousel is walked LEFT and RIGHT — `[play]`, same day: "кнопки в лево
+// в право должны работать - а не в верх в низ" — which is also the shape of
+// the thing: one name box with the four taking turns, not a column.
 //
 // The gate ran before this screen opened — the pig menu refuses a GRUNT with
 // no point — so choosing a row pays without a second test (0x42C631), which
@@ -66,10 +72,8 @@ export function initCareerPath(handlers: {
   /** The chosen way, off the GRUNT's own four. True is written and paid. */
   pick: (slot: number, to: number) => boolean
   onSpent: (cost: number) => void
-  /** The screen closed. `chosen` says which way: a career was picked (the
-   * held plaque should leave), or the player backed out (the pig menu's rows
-   * should come back onto it). */
-  onClosed: (chosen: boolean) => void
+  /** The screen closed — chosen or backed out — and the squad stands alone. */
+  onClosed: () => void
 }): CareerPath {
   let bank: Bank = SILENT
   let slot = 0
@@ -79,11 +83,11 @@ export function initCareerPath(handlers: {
    * is hidden on alternate ticks. */
   let blink = false
 
-  const close = (chosen: boolean): void => {
+  const close = (): void => {
     // No leave sound is read for kind 13 — the close is silent
     // (`[CHECK — remake]`), the choice having already paid with `Promo`.
     open = false
-    handlers.onClosed(chosen)
+    handlers.onClosed()
   }
 
   return {
@@ -99,10 +103,10 @@ export function initCareerPath(handlers: {
     state: () => (open ? 'open' : 'closed'),
     handle(action) {
       if (!open) return
-      if (action === 'menuUp') {
+      if (action === 'menuLeft') {
         selection = (selection + 3) % 4
         bank.play(MOVE.name, { gain: MOVE.gain })
-      } else if (action === 'menuDown') {
+      } else if (action === 'menuRight') {
         selection = (selection + 1) % 4
         bank.play(MOVE.name, { gain: MOVE.gain })
       } else if (action === 'menuSelect') {
@@ -114,8 +118,8 @@ export function initCareerPath(handlers: {
         }
         bank.play(PROMO.name, { gain: PROMO.gain })
         handlers.onSpent(way.cost)
-        close(true)
-      } else if (action === 'menuBack') close(false)
+        close()
+      } else if (action === 'menuBack') close()
     },
     tick() {
       blink = !blink
