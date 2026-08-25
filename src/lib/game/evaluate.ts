@@ -826,7 +826,12 @@ export function crateErrand(
     const option = crateOption(world, crate, undefined, walked)
     if (!option) continue
     const judged = judge ? judge(option) : option.score
-    if (judged >= ERRAND_WORTH && judged > bestJudged) {
+    // **THE BAR IS THE BELIEF, THE RANKING IS THE WANT** (lib/game/ai.ts,
+    // `believed`). Nearness decides which crate a dumb pig goes for; it must
+    // not decide whether one is worth a detour, or the eye clears every bar
+    // there is and the rare errand becomes every turn.
+    const worthIt = option.believed ?? judged
+    if (worthIt >= ERRAND_WORTH && judged > bestJudged) {
       best = option
       bestJudged = judged
     }
@@ -895,12 +900,15 @@ export function crateFallback(
  * трёхлетний ребёнок."
  *
  * A three-year-old does not weigh a pickup against a shot and decline it. It
- * grabs whatever is NEAREST, crate or pig, and that is already built and did
- * not need help: the dumb eye (lib/game/grunt.ts, `NEAR_POINTS`) adds
- * `(1 − wits) · 60 / (1 + tiles)` to every judgment, which at the bottom of
- * the scale swamps any worth the kit can price and falls away to nothing
- * across the map. So the near crate wins and the far one does not, without a
- * rule saying so.
+ * grabs whatever is NEAREST, crate or pig, and that is the dumb eye's job
+ * (lib/game/grunt.ts, `NEAR_POINTS`): it adds
+ * `(1 − wits) · 240 / (1 + tiles / 8)` to every judgment, which at the bottom
+ * of the scale swamps any worth the kit can price and falls away across the
+ * map. So the near crate wins and the far one does not, without a rule saying
+ * so. Both numbers were resized after a play session on 2026-08-25 — at the
+ * first sizing the pull was already spent one tile out, which let the
+ * misjudgment toss send a pig across the whole map; the reasoning is written
+ * out at `NEAR_POINTS`.
  *
  * What the wits actually turn is the OTHER end, and only that: at 1 the
  * bonus is zero, the appetite is 1, and a crate is taken exactly when it is

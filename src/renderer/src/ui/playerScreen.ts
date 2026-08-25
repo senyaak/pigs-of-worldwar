@@ -445,9 +445,17 @@ export const START = SQUAD_SIZE
 export const MISSIONS = SQUAD_SIZE + 1
 const PLACES = SQUAD_SIZE + 2
 
-/** The replay row's label — a literal: no fetext names a replay (151 is
- * "CHEAT LEVEL SELECT", and this is not the cheat). `[deliberate]`. */
-const MISSIONS_LABEL = 'SELECT MISSION'
+/**
+ * The replay row's label — a literal: no fetext names a replay (151 is
+ * "CHEAT LEVEL SELECT", and this is not the cheat). `[deliberate]`.
+ *
+ * It says REPLAY and not SELECT because "SELECT MISSION" read as the door to
+ * the NEXT one — `[play]`, 2026-08-25: "пусть стоит что-то типа (replay prev
+ * missions)". Keep any rewording inside the plate: `LAYOUT.options.width` is
+ * 200 pixels of `sqoptsf` and the line is centred across it, so this is about
+ * as long as CHARS2 fits there.
+ */
+const MISSIONS_LABEL = 'REPLAY MISSIONS'
 
 export function initPlayerScreen(handlers: {
   onStart: () => void
@@ -1054,11 +1062,19 @@ export function initPlayerScreen(handlers: {
    *
    * **START MISSION lit means the MISSION**, `[play]`: "когда наводится на
    * старт мишн на экране отряда, там показывается что следующая миссия
-   * называется такто". Anything else means the pig that was last lit — the
-   * board never goes blank.
+   * называется такто". A PIG lit means that pig — and the board holds it while
+   * the light sits on START MISSION, because that row's own subject is the
+   * mission and the pig underneath is what a player was just reading.
+   *
+   * **REPLAY MISSIONS lit means NOTHING**, and that is play's own report:
+   * "селект мишн кнопка показывает в инфе первого свина". The row has no
+   * subject — it opens a list — and falling through to `boardPig` printed
+   * whichever pig happened to be lit last, which on a freshly entered screen
+   * is slot 0. So the board goes to its tokens line alone.
    */
   type BoardSubject = { kind: 'mission'; name: string } | { kind: 'pig'; pig: Pig }
   const boardSubject = (): BoardSubject | null => {
+    if (selection === MISSIONS) return null
     if (selection === START) {
       const id = mission ? mapId(mission) : -1
       if (id < 0) return null

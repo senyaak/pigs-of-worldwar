@@ -1111,3 +1111,31 @@ the record and the banking are lib/game/save.ts `best`/`bankReplay`,
 the flow main.ts `replaying`. The e2e/001 phase also got four stale
 specs walked forward to the 2026-08-21 BACK-to-menu rule - the phase
 had not been run against a fresh build since.
+## 2026-08-25 — the replay row names itself, and PRESS ANY KEY moves into the bar
+
+Two of play's, both small and both a wrong READING of a screen rather than a
+wrong pixel.
+
+**THE SQUAD SCREEN'S SECOND ACTION READ AS THE DOOR TO THE NEXT MISSION.**
+Play: "селект мишн кнопка показывает в инфе первого свина — пусть стоит
+что-то типа (replay prev missions)." Two faults in one row. The label said
+SELECT MISSION beside START MISSION, which is two ways of saying the same
+thing; it is `REPLAY MISSIONS` now, a literal still (no fetext names a replay
+— 151 is the cheat's own CHEAT LEVEL SELECT) and about as long as CHARS2 fits
+across the 200-wide `sqoptsf` plate.
+
+And the board under it was printing the FIRST PIG. `boardSubject` gave START
+MISSION a subject of its own — the next mission's name, play's own earlier ask
+— and let everything else fall through to "the pig that was last lit", which
+on a freshly entered screen is slot 0. The replay row has no subject: it opens
+a list. It answers null now, and the board keeps only its tokens line, which
+`writeBoard` already drew before the subject was consulted.
+
+**THE LOADING BAR AND ITS WORDS WANTED THE SAME PLACE, NOT TWO.** Play: "press
+any key выше чем полоса загрузки, а должен быть внутри как бы, + полоса
+загрузки исчезает когда полностью загружено." The creep's start (the bar's own
+line) and its 2 px a frame are the exe's (0x45D2E0); where it STOPS never was,
+and 432 put the line clear above the bar. Both numbers come off `BAR` now —
+up from under its bottom edge, resting centred on its rectangle — and the bar
+is gone the frame the load is in. So the bar fills the place while there is
+something to wait for and the words take it over when there is not.

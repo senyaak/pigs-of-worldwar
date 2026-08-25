@@ -65,6 +65,20 @@ export interface Candidate {
    * `MISJUDGE`; the per-target losers keep their exact arithmetic). What
    * the telemetry prints beside the true score. */
   judged?: number
+  /**
+   * …and the same belief with the DUMB EYE left out (lib/game/grunt.ts,
+   * `NEAR_POINTS`): what the pig thinks the thing is WORTH, as against how
+   * much it WANTS it.
+   *
+   * The two are different questions and only one of them is nearness. An
+   * election is "which of these do I go for", and a three-year-old answers it
+   * with whatever is closest — that is `judged`. A BAR is "is this worth a
+   * detour at all" (`ERRAND_WORTH`), and nearness must not clear one: with
+   * the eye in the number every crate within a few tiles cleared every bar,
+   * and play's rule for the dumb end is the opposite — "он должен очень в
+   * редких случаях тогда брать ящики".
+   */
+  believed?: number
 }
 
 /**

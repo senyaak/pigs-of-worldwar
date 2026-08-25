@@ -112,13 +112,37 @@ lines name every fault in it, which is what they were for.
   as drowned. It follows the hops now. The two places the ENGINE still
   disagrees with the exe are their own entry below.
 
+### THE EVENING SESSION, 2026-08-25 — played, and the batch that came out of it
+
+Play played it again the same evening (log
+`_tmp/telemetry-2026-08-25T17-03-25.log`) and reported seven things across the
+game, not only the brain. **All seven are built**; the record is in
+docs/history/turns.md, weapons.md, view.md and frontend.md, and only the two
+AI ones are worth carrying here because they change the model:
+
+- **The dumb eye was arithmetically absent outside spitting distance** —
+  `60 / (1 + tiles)` against a ±72 % misjudgment, on a map fifty tiles
+  across. Resized to `240 / (1 + tiles / 8)`. The kill bonus was acquitted:
+  it is `KILL_BONUS · wits`, under two points at mission one, and a hurt foe
+  scores LOWER because a blow is capped at its target's health.
+- **A judgment now carries two numbers** (`judged` with the eye, `believed`
+  without): an ELECTION compares the want, a BAR (`ERRAND_WORTH`) tests the
+  worth. Sizing the eye up without this turned the rare crate errand into
+  every turn.
+- **The circling was the turning circle**, not the pathfinder: a point closer
+  than `2R·sin|off|` cannot be reached by a pig that walks and steers at
+  once. `actuator.ts` asks the geometry before the stride now.
+
+The reading after: `machine-mission` finishes at ~1357 s, four kills, 2v0
+(against ~721 s, five kills, 1v0). Slower and explained — both sides now spend
+their grenades for real and finish with rifles.
+
 ### WHAT IS LEFT
 
-1. **PLAY IT AGAIN.** Nothing since the 2026-08-25 session has been in front
-   of play's eyes: the crate rules, the toss, the bounded errand, health by
-   need, the 60° band and the corner lookahead, the water skip in the dry
-   run. The headless mission says only that a battle finishes (402 s, three
-   kills, one squad wiped); it says nothing about whether a pig LOOKS stupid.
+1. **PLAY THE BATCH ABOVE.** Seven changes went in unseen: the nearest-first
+   eye, the turn-on-the-spot geometry, ammo actually running out, the
+   sergeant only over our own turn, the camera following a thrown body,
+   the throw's room and the death's drift.
 2. **THE FREEZE IS NOT DIAGNOSED.** Play met one — "а в конце щас игра тупо
    зависла" — and the log ends on DEN firing a sniper rifle with no `[turn]`
    after it. What was done is INSURANCE, not a fix: the parent walk in

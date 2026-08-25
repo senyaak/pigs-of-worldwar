@@ -97,27 +97,30 @@ test('…and commiserates a loss only from BEHIND', { tag: '@nodata' }, () => {
   expect(sargeAfterTurn({ kills: 1, losses: 0 }, 1, counters)?.line).toBe(1)
 })
 
-test('…and he GOADS you over the top of the enemy turn', { tag: '@nodata' }, () => {
+test('…and he GOADS you over the top of YOUR OWN turn', { tag: '@nodata' }, () => {
   const counters = new Map<number, number>()
   const always = (): number => 0
   const never = (): number => 1 / SARGE_GOAD_ODDS
 
-  // The enemy strictly BEHIND: "will you really let these amateurs beat you?"
+  // The value is the ACTING side's, and the acting side is ours now (`[play]`,
+  // lib/game/sergeant.ts). US strictly BEHIND is the enemy strictly ahead:
+  // the hole you would have to climb out of.
   expect(sargeAtTurnStart(true, -1, always, counters)).toEqual({
-    section: SARGE_BEHIND,
+    section: SARGE_AHEAD,
     line: 1
   })
-  // …strictly AHEAD: the hole you would have to climb out of.
+  // …and US strictly AHEAD is "will you really let these amateurs beat you?"
   expect(sargeAtTurnStart(true, 1, always, counters)).toEqual({
-    section: SARGE_AHEAD,
+    section: SARGE_BEHIND,
     line: 1
   })
   // Level either way is silence, the same as the end-of-turn pair.
   expect(sargeAtTurnStart(true, 0, always, counters)).toBe(null)
   expect(sargeAtTurnStart(true, 2, always, counters)).toBe(null)
 
-  // **It is not YOUR turn he says these on** (0x497F80 wants the acting
-  // controller to be somebody other than the local human).
+  // **It is not the MACHINE's turn he says these on.** The exe's own arm wants
+  // exactly that turn (0x497F80) and play overruled it — he is the player's
+  // sergeant, not the enemy's.
   expect(sargeAtTurnStart(false, -1, always, counters)).toBe(null)
 
   // One turn in FOUR — and the roll is drawn only once the section is

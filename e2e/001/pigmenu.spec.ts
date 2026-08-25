@@ -58,7 +58,7 @@ test('the pig menu opens on a pig, refuses a broke promotion, and renames', asyn
   const { page } = app
   await toFreshSquad(page)
 
-  // Down from START MISSION is SELECT MISSION, then the first pig — the
+  // Down from START MISSION is REPLAY MISSIONS, then the first pig — the
   // list wraps through the two actions.
   await tap(page, 'menuDown')
   await tap(page, 'menuDown')
@@ -100,7 +100,7 @@ test('swap position moves the whole pig, and back disarms', async ({ app }) => {
   await toFreshSquad(page)
   const before = (await labels(page, 'playerScreen')).slice(0, 8)
 
-  // Arm a swap on the first pig — two down, through SELECT MISSION.
+  // Arm a swap on the first pig — two down, through REPLAY MISSIONS.
   await tap(page, 'menuDown')
   await tap(page, 'menuDown')
   await tap(page, 'menuSelect')
@@ -167,7 +167,7 @@ test('a token walks a grunt down the career path, and the next step costs two', 
   await settled(page, 'playerScreen')
 
   // PROMOTE on a GRUNT opens CAREER PATH — four careers, the tree's order.
-  // Two down: START MISSION → SELECT MISSION → the first pig.
+  // Two down: START MISSION → REPLAY MISSIONS → the first pig.
   await tap(page, 'menuDown')
   await tap(page, 'menuDown')
   await tap(page, 'menuSelect')

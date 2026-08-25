@@ -726,11 +726,15 @@ export function createBattle(parts: BattleParts): Battle {
       health: game.currentPig.health,
       voice: game.currentPig.voice
     })
-    // …and the SERGEANT's own remark on the top of somebody else's turn
-    // (0x497F80): the goad when they are behind, the challenge when they are
-    // ahead, one turn in four. It holds nothing up — unlike the end-of-turn
-    // remark there is no state 13 here, the line simply plays over the card.
-    const goad = sargeAtTurnStart(computerTurn(), standing(), parts.random, sargeLines)
+    // …and the SERGEANT's own remark on the top of a turn (0x497F80): the goad
+    // when the enemy is behind, the challenge when they are ahead, one turn in
+    // four. It holds nothing up — unlike the end-of-turn remark there is no
+    // state 13 here, the line simply plays over the card.
+    //
+    // **Only over OUR turn.** `[play]` — he is the player's sergeant, and the
+    // exe's own moment (the top of the enemy's) had him talking to the machine.
+    // The words turn over with the moment, in lib/game/sergeant.ts.
+    const goad = sargeAtTurnStart(!computerTurn(), standing(), parts.random, sargeLines)
     if (goad) emit({ kind: 'sergeant', section: goad.section, line: goad.line })
   }
 
@@ -764,6 +768,12 @@ export function createBattle(parts: BattleParts): Battle {
     const said = sargeAfterTurn(tally, standing(), sargeLines)
     tally = noTally()
     if (!said) return false
+    // **He speaks to the PLAYER and to nobody else** — `[play]`, the same rule
+    // that moved the turn-start goad. This remark reads the ACTING side's own
+    // tally, so on the machine's turn it congratulated the enemy for killing
+    // one of ours. The tally above is still cleared, because that happens at
+    // every turn's start whoever took it (0x48FD92).
+    if (computerTurn()) return false
     sarge = { floor: SARGE_FLOOR }
     // The camera comes off the blow and back to the pig that made it — which is
     // what `focus` would do at the handover anyway, only the remark happens

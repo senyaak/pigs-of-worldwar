@@ -255,9 +255,33 @@ export function createAttack(parts: AttackParts): Attack {
             ? grenades.throwOne(acting, sights.angle(), thrownWith)
             : shots.fire(acting, sights.angle())
           if (!away) firing = null
-          // `Pig::Attack` puts the weapon's own attack clip on at the same
-          // moment (0x46971a), the way a swing's does.
-          else if (firearm.attackClip >= 0) anim.playOnce(acting, firearm.attackClip)
+          else {
+            // **THE ROUND IS SPENT AS IT LEAVES THE HAND** — play, 2026-08-25:
+            // "оружия не отнимаются когда стреляешь — 3 было гранаты, 3 и
+            // осталось." The swing has always spent one (lib/game/strikes.ts)
+            // and so has the planted charge above; the loosed branch — every
+            // gun and every lob — never did, so a pig threw its three grenades
+            // and kept three. The exe spends where the clip goes on
+            // (`Pig::Attack`, 0x46975e), which is this moment, and only what
+            // actually LEFT the trotters is charged: `away` false is a refusal,
+            // not a shot.
+            //
+            // `holding` is the skill the whole branch above already fired with
+            // — the same one `weaponOf` and the clip took — so the round comes
+            // off the slot the shot really came out of. Unlimited slots never
+            // run down (lib/game/inventory.ts).
+            //
+            // NO HOLSTER HERE, unlike the melee's: every skill that reaches
+            // this branch ends the turn (lib/game/spend.ts — the exceptions are
+            // the planted family and the tools), so `endTurnBeat` puts the
+            // weapon away a beat later. Emptying the hand at this instant would
+            // take the DETONATOR's fire key with it while the grenade is still
+            // in the air.
+            spend(acting.carrying, holding ?? -1)
+            // `Pig::Attack` puts the weapon's own attack clip on at the same
+            // moment (0x46971a), the way a swing's does.
+            if (firearm.attackClip >= 0) anim.playOnce(acting, firearm.attackClip)
+          }
         }
       }
     },

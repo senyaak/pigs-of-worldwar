@@ -137,12 +137,37 @@ export const CHARGE_WOBBLE = 0.15
  *     toss, and the same world still answers the same way twice — which
  *     lockstep needs and a die would break.
  *
- * The bonus is `(1 − wits) · NEAR_POINTS / (1 + tiles away)`. An option the
- * price list KILLED (a blocked shot's 0, a doused lob) earns no bonus —
- * nearness must never resurrect the unplayable, and that is the one thing
- * the dumbest pig still tells apart. `[deliberate]` — play's dial.
+ * The bonus is `(1 − wits) · NEAR_POINTS / (1 + tiles / NEAR_HALF)`. An
+ * option the price list KILLED (a blocked shot's 0, a doused lob) earns no
+ * bonus — nearness must never resurrect the unplayable, and that is the one
+ * thing the dumbest pig still tells apart. `[deliberate]` — play's dial.
+ *
+ * **BOTH NUMBERS WERE RESIZED 2026-08-25 off a play session, and the old ones
+ * are why the eye did nothing.** Play: "второй свин побежал мимо двух которые
+ * ближе, к третьему у которого хп поменьше — я ж говорил, просто ближайшего
+ * тупой берёт, откуда у него мысли про добивания?" The log
+ * (`_tmp/telemetry-2026-08-25T17-03-25.log`) says it was never a thought about
+ * finishing anybody off — the kill bonus is `KILL_BONUS · wits`, under two
+ * points at mission one — and it was not arithmetic either. It was that the
+ * eye had no weight left at map range: GINGER's three grenade options scored
+ * 28, 28 and 27, every foe about thirty tiles off across the bay, and
+ * `60 / (1 + 30)` is under two points of separation between the nearest and
+ * the furthest. What actually chose was `MISJUDGE`, whose spread at these wits
+ * is ±72 per cent — a toss, over a field where nearness was noise.
+ *
+ * So the eye is sized against the SCORE SCALE rather than against nothing (a
+ * shot is worth about twenty and a health crate fifty), and it FALLS OFF on
+ * the map's own scale rather than the tile's: `NEAR_HALF` is the distance at
+ * which the pull is halved, eight tiles, so an option ten tiles off still
+ * outbids one thirty tiles off by fifty-odd points instead of by three. The
+ * old `1 + tiles` had halved it at a single tile, which on a map fifty tiles
+ * across meant every option outside spitting distance looked equally far.
  */
-export const NEAR_POINTS = 60
+export const NEAR_POINTS = 240
+
+/** Where the dumb eye's pull is HALVED, in tiles — the map's scale, not the
+ * tile's (see NEAR_POINTS). `[deliberate]` — play's dial. */
+export const NEAR_HALF = 8
 
 /**
  * How near a corner the NEXT one is taken up — a stride and a half, which is
@@ -344,7 +369,8 @@ export function createGruntBrain(): Brain {
           one.score <= 0
             ? 0
             : ((1 - world.wits) * NEAR_POINTS) /
-              (1 + Math.hypot(one.target.x - me.x, one.target.z - me.z) / TILE_STEP)
+              (1 + Math.hypot(one.target.x - me.x, one.target.z - me.z) / TILE_STEP / NEAR_HALF)
+        one.believed = one.score * factor
         one.judged = (one.score + near) * factor
         return one.judged
       }

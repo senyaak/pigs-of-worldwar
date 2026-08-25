@@ -263,3 +263,39 @@ sheet and the weather where the old single-pass ghosts already sat; putting a
 record back solid restores `renderOrder = id`, which is the house-corner
 flicker fix. The seethrough specs count faded records and never see any of
 this; whether the stand reads right is play's to say.
+
+## 2026-08-25 — the camera goes with the body, gives the throw room, and backs out of a death
+
+Three of play's, all framing, none of them the exe's.
+
+**A BLOW THAT MOVES A PIG TAKES THE CAMERA WITH IT.** "Если атака как-то
+передвигает свина — камера к нему прицепляется." Two things were in the way.
+The subject is the ACTING pig, so a grenade that threw somebody down the beach
+was watched from the thrower; and when the acting pig itself was flung, the
+rig was deliberately PARKED — `chase.hold` sets `CHASE_DELAY` on every frame a
+body is bouncing, which is why the view only turned after it and glided back
+half a second late. `three/battle.ts` now latches the `flung` event as a
+camera subject of its own, ranked under the ending and the death and over the
+acting pig, and the park stands down while that latch is up. Nothing
+announces a landing, so the settle is measured where it belongs — in the
+scene, off the snapshot's own positions: still for `FLUNG_SETTLE`, and never
+held past `FLUNG_LIMIT` whatever the body is doing.
+
+**A THROW GETS A LITTLE ROOM.** "У гранаты камера отдаляется чутка при полёте,
+чтобы лучше было видно." The exe's mode 0x0D locks its orbit at whatever
+separation the camera happened to be standing at when the grenade left, which
+is usually right over the thrower's shoulder. `FLIGHT_ROOM` widens the ride by
+a quarter and eases there rather than stepping. The number is bounded by its
+own feedback and the comment says so: the radius is re-floored every frame at
+`separation × FLIGHT_CLOSE`, and the separation is measured from where the
+room already put the camera, so `room × ⅔` has to stay under 1 — at 1.25 it is
+0.83 and the floor never bites, at 1.5 the camera would walk itself out to
+`FLIGHT_FAR`. The widening is applied to the ORBIT only: in the swing-in phase
+the reach IS the live separation, and multiplying that compounds every frame.
+
+**AND A DEATH IS WATCHED FROM FURTHER AND FURTHER BACK.** "При смерти камера
+отъезжает назад потихоньку." The face view had no clock of its own — it was
+one `dyingWatch` id and a rig — so `follow` takes a `pull` that multiplies the
+view's distance and nothing else, and the death ramps it (`DYING_DRIFT`,
+`DYING_DRIFT_MAX`). The height and the gaze point stay the face view's, so the
+pig keeps its place in the frame while the world opens up around it.

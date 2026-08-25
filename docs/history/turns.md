@@ -1151,3 +1151,70 @@ And the turn's end HOLSTERS: `endTurnBeat` empties the hand (aim overlay
 down with it), announces `holstered`, S_UNHOLS plays on it — play:
 "оружие не убирается после выстрела". The exe's own after-shot
 `Pig::HoldWeapon(0)` call site is unread; the moment is the remake's.
+## 2026-08-25 evening — the play batch: the dumb eye had no weight, the walk could not close, and the sergeant was coaching the enemy
+
+The session log is `_tmp/telemetry-2026-08-25T17-03-25.log`, ESTU, and every
+item below was diagnosed out of it rather than guessed at.
+
+**THE DUMB EYE WAS NOISE AT MAP RANGE.** Play: "второй свин побежал мимо двух
+которые ближе, к третьему у которого хп поменьше — я ж говорил, просто
+ближайшего тупой берёт, откуда у него мысли про добивания?" The log acquits
+the kill bonus twice over: it is `KILL_BONUS · wits`, which at mission one is
+under two points, and `worthOf` caps a blow at the target's own health, so a
+hurt foe scores LOWER rather than higher. What actually chose was the toss.
+GINGER's three grenade options priced 28, 28 and 27 with every foe about
+thirty tiles away across the bay, and the eye's old shape —
+`(1 − wits) · 60 / (1 + tiles)` — was worth 1.9 points at that range against
+a `MISJUDGE` spread of ±72 per cent. So the "nearest thing wins" rule was
+arithmetically absent from every decision made outside spitting distance.
+
+It is sized against the score scale now and falls off on the MAP's scale:
+`(1 − wits) · 240 / (1 + tiles / 8)`, `NEAR_POINTS` and `NEAR_HALF` in
+lib/game/grunt.ts. Ten tiles out beats thirty by fifty-odd points instead of
+by three.
+
+That resizing broke a rule elsewhere and the fix is the interesting half.
+`crateErrand`'s worth bar (`ERRAND_WORTH`) was reading the same judgment, so
+an eye big enough to matter cleared every bar there was and the rare detour
+became every turn — the opposite of play's own "он должен очень в редких
+случаях тогда брать ящики". A judgment now carries TWO numbers
+(lib/game/ai.ts): `judged`, the belief with the eye's pull in it, which is
+what an ELECTION compares, and `believed`, the same belief without it, which
+is what a BAR is tested against. Nearness decides which crate you go for; it
+does not decide whether a crate is worth walking for.
+
+**A WALK COULD NOT CLOSE ON A POINT INSIDE ITS OWN TURNING CIRCLE.** Play:
+"третий свин круги нарезал на месте — он похоже хочет в точку прийти, но не
+может из-за того что идёт и поворачивает одновременно." That is the exact
+mechanism. The legs cover 1040 units a second and the swing is 42° a second,
+so a pig walking and steering rides a circle about 1400 across; a target
+closer than the chord `2R·sin|off|` lies inside it, and the bearing then runs
+away exactly as fast as the pig can turn onto it. The realign band could not
+catch it either — the orbit holds a steady bearing error well inside 60°.
+What ended it was the stall timer, after which the brain ordered the same leg
+again and the circle started over: "круги на месте", once a second, until the
+clock ran out.
+
+`lib/game/actuator.ts` now asks the geometry BEFORE the stride (`TURN_CHORD`):
+inside the circle is a turn on the spot, exactly as a big bend is, and the
+walk resumes the moment the chord fits. Turning on the spot never stalls, so
+the order finishes instead of dying on the timer.
+
+**THE SERGEANT WAS TALKING TO THE MACHINE.** Play: "генерал говорит с нпс в
+начале хода — такого не должно быть, говорит только игрокам." The exe really
+does put the goad at the top of somebody ELSE's turn (0x497F80 wants the
+acting controller to be a machine with a local human beside it) and play
+overrode it: he is the player's sergeant. Both of his moments move to our own
+turn — the turn-start goad in lib/game/sergeant.ts and the end-of-turn remark
+in `beginSarge` — and the goad's section mapping turns over with the moment,
+because that value is the ACTING side's health standing and the acting side
+is now ours. Us ahead is the enemy behind, which is file 02's "will you
+really let these amateurs beat you"; us behind is file 04's climb.
+
+**The reading after, from `e2e/002/machine-mission.spec.ts`:** a verdict at
+~1357 s of battle, four kills over thirty shots, 2v0 — against ~721 s, five
+kills over twenty-seven, 1v0 before the batch. Slower and still convergent,
+and the slowdown is explained rather than mysterious: both sides now spend
+their three grenades for real (see docs/history/weapons.md) and fall back on
+rifles, and at ESTU's 1/26 wits both squads chase the nearest thing rather
+than the best one.

@@ -475,6 +475,41 @@ const FLIGHT_FAR = 10000
  * (0x4BD6C8, 0x4BD6D0); `0x4A0870`'s own arithmetic is not transcribed. */
 const FLIGHT_TURN = 1 / 3
 
+/**
+ * **THE FLIGHT IS WATCHED FROM A LITTLE FURTHER OUT than the exe watches it.**
+ * `[play]`, 2026-08-25: "у гранаты камера отдаляется чутка при полёте, чтобы
+ * лучше было видно." The orbit's own radius is the separation the camera
+ * locked at, which is however close it happened to be standing when the throw
+ * left the hand — often right over the thrower's shoulder, where the grenade
+ * fills the frame and the ground it is falling towards does not.
+ *
+ * So the ride widens by a quarter, and it EASES there rather than stepping:
+ * `FLIGHT_ROOM_RATE` is how much of the remaining widening is taken a second,
+ * so the pull-back reads as the camera giving way to the throw.
+ *
+ * It is stable against its own feedback, which is why the number cannot be
+ * anything: the radius is re-floored every frame at `separation ×
+ * FLIGHT_CLOSE`, and the separation is measured from where this room already
+ * put the camera. `FLIGHT_ROOM × FLIGHT_CLOSE` must stay under 1 — at 1.25 ×
+ * ⅔ it is 0.83 and the floor never bites, at 1.5 it would walk the camera out
+ * to `FLIGHT_FAR` over a few seconds.
+ */
+const FLIGHT_ROOM = 1.25
+const FLIGHT_ROOM_RATE = 4
+
+/**
+ * **THE DEATH DRIFTS BACK.** `[play]`, 2026-08-25: "при смерти камера отъезжает
+ * назад потихоньку." The camera still arrives at the dying pig's face (the
+ * `face` rig, three/battle.ts's `dyingWatch`); what it does then is give the
+ * body room, a fraction of the view's own distance a second, up to a ceiling
+ * so a long death does not end up watching from the next hill.
+ *
+ * Both are the remake's own — `[CHECK — remake]`, and the exe's mode 16 does
+ * not move at all.
+ */
+export const DYING_DRIFT = 0.5
+export const DYING_DRIFT_MAX = 2.2
+
 /** Where a pig is being drawn, and which way it faces. Not the pig itself: the
  * rig frames what is on SCREEN (three/tween.ts). */
 export interface Stance {
@@ -592,7 +627,16 @@ export interface Chase {
     /** Where the scope's eye is: the world point the pig's HAND bone puts
      * `SCOPE_MOUNT` at, handed in because only the scene can pose a
      * skeleton. Game space, Y-down. Ignored by every other view. */
-    eye?: { x: number; y: number; z: number } | null
+    eye?: { x: number; y: number; z: number } | null,
+    /**
+     * How much of the view's own distance to stand off, 1 being the rig's own.
+     * The DEATH view is the one caller that moves it (`DYING_DRIFT`): the
+     * camera comes to the face and then walks slowly backwards out of it,
+     * which is play's word — "при смерти камера отъезжает назад потихоньку".
+     * It multiplies the distance and nothing else, so the height and the gaze
+     * point stay the view's own.
+     */
+    pull?: number
   ): void
   /**
    * **WATCH a bullet — the camera does NOT go with it**, and only the weapons
@@ -690,6 +734,9 @@ export function createChase(
   let bearing = 0
   let origin = 0
   let radius = 0
+  /** How much of `FLIGHT_ROOM` the flight's camera has taken so far — 1 at the
+   * throw, easing out while it rides (see FLIGHT_ROOM). */
+  let room = 1
   /** To ±π, which is the exe's `& 0xFFF` read as a signed turn. */
   const wrapAngle = (a: number): number =>
     a - Math.PI * 2 * Math.round(a / (Math.PI * 2))
@@ -740,7 +787,8 @@ export function createChase(
     view: View,
     aim: number,
     yaw: number,
-    eye: { x: number; y: number; z: number } | null
+    eye: { x: number; y: number; z: number } | null,
+    pull: number
   ): { position: THREE.Vector3; target: THREE.Vector3 } => {
     if (view === 'scope' && eye) {
       // Game space is Y-DOWN and the rig is Y-up, hence the negations. WHERE
@@ -786,7 +834,9 @@ export function createChase(
     // rig is built round a pig, so anything three times its height (a
     // canopy) needs the frame saying so rather than being cropped off.
     const back = face ? BACK : BACK + rise / (2 * Math.tan((camera.fov * Math.PI) / 360))
-    const reach = back * stand.close
+    // `pull` stands the rig further off without touching what it looks at —
+    // the death's slow drift out of the face (see `follow`).
+    const reach = back * stand.close * pull
     // A view with an ELEVATION is placed by angle, the way the exe's own spring
     // places it: how high it stands follows how far out it is. Both are
     // measured against what it LOOKS at rather than against the pig — for the
@@ -808,9 +858,9 @@ export function createChase(
   }
 
   return {
-    follow(stance, nodeY, rise, delta, view, aim = 0, yaw = 0, eye = null) {
+    follow(stance, nodeY, rise, delta, view, aim = 0, yaw = 0, eye = null, pull = 1) {
       chasing = false
-      const { position, target } = want(stance, nodeY, rise, view, aim, yaw, eye)
+      const { position, target } = want(stance, nodeY, rise, view, aim, yaw, eye, pull)
       // The scope SNAPS. Easing a first-person view is motion sickness: the
       // whole point of it is that the barrel and the frame are the same thing.
       if (delta === null || !snapped || view === 'scope') {
@@ -843,6 +893,7 @@ export function createChase(
         orbiting = false
         bearing = away
         radius = separation
+        room = 1
       }
       if (!orbiting) {
         // Phase one: swing round to behind the flight, a third of what is left
@@ -853,6 +904,9 @@ export function createChase(
           orbiting = true
           origin = bearing
           radius = separation
+          // The widening starts where the lock leaves the camera, so it is a
+          // drift out of the ride and never a step into it.
+          room = 1
         }
       } else {
         // …and phase two rides round, one way, held inside its window.
@@ -860,8 +914,13 @@ export function createChase(
         const swung = wrapAngle(bearing - origin)
         if (Math.abs(swung) > FLIGHT_SWING) bearing = origin + Math.sign(swung) * FLIGHT_SWING
         radius = Math.min(FLIGHT_FAR, Math.max(radius, separation * FLIGHT_CLOSE))
+        // …and gives the throw its room while it does (FLIGHT_ROOM).
+        room += (FLIGHT_ROOM - room) * (1 - Math.exp(-FLIGHT_ROOM_RATE * (delta ?? 0)))
       }
-      const reach = orbiting ? radius : separation
+      // Only the ORBIT is widened: in the swing phase the reach IS the live
+      // separation, and multiplying that would measure the next frame from a
+      // camera this one had already pushed out — the distance would run away.
+      const reach = orbiting ? radius * room : separation
       const position = new THREE.Vector3(
         point.x + Math.sin(bearing) * reach,
         -point.y + reach * Math.tan(elevationOf(FLIGHT_CEILING)),

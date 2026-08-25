@@ -31,16 +31,24 @@ const BAR = { x: 152, y: 451, width: 330, height: 15, steps: 17 }
  * runs underneath — `[CHECK — remake]`. */
 const WALK_MS = 2500
 
-/** gtext 257, and where it starts creeping from — the bar's own line, up 2
- * px a frame (0x45D2E0). */
+/** gtext 257, creeping up 2 px a frame (0x45D2E0). */
 const PRESS_TEXT = 257
-const PRESS_FROM = 451
 const PRESS_STEP = 2
-/** Where the creep STOPS. Play took it down twelve — "чуть ниже надо" — so
- * the line rests just over the bar instead of climbing into the briefing's
- * own words; the 420 the exe's own creep would reach is `[CHECK — remake]`
- * either way, since only its start and its step were read. */
-const PRESS_TOP = 432
+/**
+ * WHERE THE LINE RESTS: **inside the bar's own rectangle**, and the bar is
+ * gone by the time it is read. `[play]`, 2026-08-25 — "press any key выше
+ * чем полоса загрузки, а должен быть внутри как бы + полоса загрузки
+ * исчезает когда полностью загружено." So the two share one place on the
+ * page: the bar fills it while the load runs, and the words take it over
+ * when the load is in.
+ *
+ * Both numbers are the BAR's, not taste: the line comes up from under its
+ * bottom edge and stops centred on it — CHARS2 is 16 tall against the bar's
+ * 15, so the centre rounds one pixel high. Only the creep's start and its
+ * step were ever read out of the exe (0x45D2E0); where it stops is play's.
+ */
+const PRESS_FROM = BAR.y + BAR.height
+const PRESS_TOP = BAR.y + Math.round((BAR.height - 16) / 2)
 
 /** The enemy portrait's paste point on the level-1 page (0x45C530). */
 const PORTRAIT = { x: 342, y: 190 }
@@ -109,8 +117,11 @@ export function initBriefing(handlers: {
 
     // The bar walks its 17 steps on the clock and holds one short until the
     // load really is in; the art is stretched over the exe's own rectangle.
+    // It is GONE the moment the load is in — `[play]`: the bar says "wait",
+    // and there is nothing left to wait for, so the rectangle it was filling
+    // goes to the words instead (PRESS_TOP above).
     const walked = Math.min(BAR.steps - 1, Math.floor(((now - began) / WALK_MS) * BAR.steps))
-    const steps = ready() ? BAR.steps : walked
+    const steps = ready() ? 0 : walked
     if (bar && steps > 0) {
       const fraction = steps / BAR.steps
       context.drawImage(

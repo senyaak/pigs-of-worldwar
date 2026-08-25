@@ -27,7 +27,14 @@ import { buildWeather } from './weather'
 import { skyFogFor } from '../../../lib/game/sky'
 import { fieldSquad } from './squad'
 import type { Soldier, SoldierArt } from './squad'
-import { SCOPE_BONE, SCOPE_MAGNIFY, SCOPE_MOUNT, createChase } from './chase'
+import {
+  DYING_DRIFT,
+  DYING_DRIFT_MAX,
+  SCOPE_BONE,
+  SCOPE_MAGNIFY,
+  SCOPE_MOUNT,
+  createChase
+} from './chase'
 import type { View } from './chase'
 import { createDropInArt } from './dropIn'
 import { createFaces } from './faces'
@@ -340,6 +347,32 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * by its `remains`. One at a time, like the engine's own watch
    * (lib/game/corpses.ts, `watching`). */
   let dyingWatch: number | null = null
+  /** …and how long it has been on it, seconds: the death view walks BACKWARDS
+   * out of the face while the clip runs (three/chase.ts, `DYING_DRIFT`). */
+  let dyingFor = 0
+
+  /**
+   * The pig an ATTACK has just thrown, and how long it has been still since.
+   *
+   * **The camera goes with a body a blow moves** — `[play]`, 2026-08-25: "если
+   * атака как-то передвигает свина — камера к нему прицепляется." That is not
+   * where the camera was: the subject is the ACTING pig, so a grenade that
+   * threw somebody across the beach was watched from the thrower, and the
+   * acting pig's own fling was watched from a rig deliberately PARKED for half
+   * a second (`chase.hold`).
+   *
+   * The engine announces the throw (`flung`) and nothing announces the
+   * landing, so the settle is measured here, where it is a camera question
+   * rather than a rule: the body is followed until it has held still for
+   * `FLUNG_SETTLE`, and never past `FLUNG_LIMIT` whatever it is doing — a roll
+   * that will not end must not take the turn's camera with it for ever.
+   */
+  let flungWatch: { pig: number; x: number; z: number; still: number; age: number } | null = null
+  const FLUNG_SETTLE = 0.4
+  const FLUNG_LIMIT = 6
+  /** How far a body may drift in a second and still count as settled — under
+   * the bleed the engine calls a stop (lib/game/tumble.ts). */
+  const FLUNG_CREEP = 40
 
   /**
    * The SCENE's subscription: everything the engine announces that has to be
@@ -370,6 +403,16 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       // already uses. The frame loop reads this id (see `watch`).
       dying: ({ pig }) => {
         dyingWatch = pig
+        dyingFor = 0
+        // A death outranks a fling, and a dying pig is usually both.
+        flungWatch = null
+      },
+      // A BLOW HAS THROWN A BODY: the camera goes with it (see `flungWatch`).
+      // The newest throw wins — a blast that catches two pigs is watched on
+      // the last one it reached, which is the one still moving.
+      flung: ({ pig, at }) => {
+        if (pig === dyingWatch) return
+        flungWatch = { pig, x: at.x, z: at.z, still: 0, age: 0 }
       },
       // A death has finished playing out: the body comes off the scene for
       // good and the boots go down where it lay (lib/game/corpses.ts). The
@@ -537,6 +580,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // under a death and play wants the face, not the point ("камера на
     // свинью С ЛИЦА"). The rig is the canopy's own face view (three/chase.ts).
     if (soldier.pig.id === dyingWatch) {
+      // …and it BACKS AWAY while it watches — play's rule, the numbers and the
+      // reasoning in three/chase.ts (`DYING_DRIFT`).
+      dyingFor += delta ?? 0
       chase.follow(
         drawnStance(soldier),
         soldier.node.position.y,
@@ -545,7 +591,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         'face',
         0,
         0,
-        null
+        null,
+        Math.min(DYING_DRIFT_MAX, 1 + DYING_DRIFT * dyingFor)
       )
       soldier.node.visible = true
       lastView = 'face'
@@ -789,8 +836,13 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     if (!now.dropping && !now.starting && !now.over) {
       // The acting pig stands where the locomotion state says, and the camera
       // stops holding the moment the player drives (three/chase.ts).
+      // …**unless a BLOW is what put it in the air**, in which case the camera
+      // goes with it (`flungWatch`): the park exists so a pig that trips or is
+      // ejected off a wall does not swing the view about, and play asked for
+      // the opposite behaviour on the one case that is a blow's doing.
       chase.hold(
-        now.loco.airborne?.bouncing === true || now.loco.airborne?.ejected === true,
+        flungWatch === null &&
+          (now.loco.airborne?.bouncing === true || now.loco.airborne?.ejected === true),
         now.driving,
         delta
       )
@@ -848,11 +900,30 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // exe's END OF GAME walks the survivors, one every two seconds, and hands
     // each to the camera as its subject (lib/game/endOfGame.ts). Which pig is the
     // engine's to say; all this does is point the ordinary chase at it.
+    // A BODY A BLOW THREW settles, and the camera lets it go when it does
+    // (`flungWatch`). Measured off the snapshot, which is where a thrown pig's
+    // position honestly is (the engine writes it every step), and in the
+    // FRAME's own time so a pause holds the shot instead of ending it.
+    if (flungWatch) {
+      const body = now.pigs.find((one) => one.id === flungWatch?.pig)
+      const step = delta ?? 0
+      if (!body) flungWatch = null
+      else {
+        const moved = Math.hypot(body.x - flungWatch.x, body.z - flungWatch.z)
+        flungWatch.x = body.x
+        flungWatch.z = body.z
+        flungWatch.age += step
+        flungWatch.still = moved > FLUNG_CREEP * step ? 0 : flungWatch.still + step
+        if (flungWatch.still >= FLUNG_SETTLE || flungWatch.age >= FLUNG_LIMIT) flungWatch = null
+      }
+    }
     watch(
       (now.ending ? squad.of(now.ending.watching) : null) ??
         // …and under a DYING the subject is the dying pig itself — the exe's
         // mode 16 subject swap. `remains` buries it and hands the camera back.
         (dyingWatch !== null ? squad.of(dyingWatch) : null) ??
+        // …under a FLING, the body in the air — play's rule, above.
+        (flungWatch !== null ? squad.of(flungWatch.pig) : null) ??
         active,
       delta
     )

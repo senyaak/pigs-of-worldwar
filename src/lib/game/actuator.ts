@@ -16,6 +16,7 @@
 
 import type { Order } from './orders'
 import { TURN_SPEED } from './locomotion'
+import { WALK_SPEED } from './movement'
 
 /** How an order ended: carried out, or the world refused it. */
 export type Outcome = 'done' | 'blocked'
@@ -129,6 +130,25 @@ const AIM_STUCK_SECONDS = 0.5
  */
 const REALIGN = Math.PI / 3
 
+/**
+ * The circle a pig walking flat out and turning flat out travels: the legs
+ * over the swing, `WALK_SPEED / TURN_SPEED`, about 1400 units — the same arc
+ * the band above is reasoned from, written down instead of quoted.
+ */
+export const TURN_RADIUS = WALK_SPEED / TURN_SPEED
+
+/**
+ * …and its CHORD, which is the number the walk actually asks with.
+ *
+ * A target `d` away at a bearing error `off` sits outside the turning circle
+ * — and so can be reached by riding it round — exactly when
+ * `d ≥ 2·TURN_RADIUS·sin|off|`. (The turn centre is `R` off the beam, so the
+ * distance from it to the target is `√(d² + R² − 2dR·sin|off|)`, and that is
+ * `≥ R` precisely when the chord fits.) Inside it, no amount of steering
+ * closes the gap: the pig orbits.
+ */
+export const TURN_CHORD = 2 * TURN_RADIUS
+
 /** The shortest way round: (-π, π]. Brains borrow it (lib/game/grunt.ts). */
 export const shortest = (angle: number): number => {
   const turn = 2 * Math.PI
@@ -202,7 +222,23 @@ export function createActuator(rig: Rig): Actuator {
         // the spot, but a bend inside the band is steered THROUGH while
         // walking ("повернулся — шаг — повернулся — шаг" was the strict
         // version taking every small elbow as a full stop).
-        if (Math.abs(off) <= REALIGN) aligned = true
+        // …and the SECOND question, which is the one that had a pig walking
+        // in circles: CAN the arc get there at all? A pig that walks and
+        // turns at once travels a circle of `TURN_RADIUS`, and a point closer
+        // than the chord `2R·sin|off|` lies INSIDE that circle — the legs
+        // carry it round the target for ever, never closing, because the
+        // bearing runs away exactly as fast as the pig can swing onto it.
+        // That is play's report, and its diagnosis is play's too: "третий
+        // свин круги нарезал на месте — он похоже хочет в точку прийти, но не
+        // может из-за того что идёт и поворачивает одновременно."
+        //
+        // A stall would end the order after STUCK_SECONDS, but the brain then
+        // orders the same leg again and the circle starts over, which is what
+        // was on the screen. So the geometry is asked BEFORE the stride: too
+        // close for the arc means turn on the spot, exactly as a big turn
+        // does, and the walk resumes the moment the chord fits.
+        const reaches = distance >= TURN_CHORD * Math.abs(Math.sin(off))
+        if (Math.abs(off) <= REALIGN && reaches) aligned = true
         else if (aligned) aligned = false
         if (!aligned) {
           const turn = turnToward(bearing, delta)

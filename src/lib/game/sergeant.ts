@@ -135,17 +135,24 @@ export function sargeAfterTurn(
  * (`[turn+0x537]`), and `[turn+0x510] == 4`, which is the START OF TURN card
  * (the same mode the side's music steps in, 0x491222).
  *
- * **He speaks over somebody ELSE's turn.** The arm wants the acting
- * controller's kind to be 0 and a controller of kind 2 — the local human, the
- * value the music and the pig's own grunt both test for (0x491208, 0x4724E5) —
- * to exist beside it. So these are remarks made to you while the enemy moves.
+ * **The exe speaks over somebody ELSE's turn, and `[play]` OVERRIDES that.**
+ * The arm wants the acting controller's kind to be 0 and a controller of kind
+ * 2 — the local human, the value the music and the pig's own grunt both test
+ * for (0x491208, 0x4724E5) — to exist beside it, so in the original these are
+ * remarks made to you while the enemy moves. Play watched it and ruled the
+ * other way, 2026-08-25: "генерал говорит с нпс в начале хода — такого не
+ * должно быть — говорит только игрокам." He is the PLAYER's sergeant; a line
+ * delivered over the machine's turn reads as him coaching the enemy.
  *
- * And the health value they turn on is the ACTING side's, not yours (0x498656
- * takes `[turn+0x4fc]`'s own total and compares it to every other): the enemy
- * strictly ahead gets file 04, the enemy strictly behind gets file 02. Both
- * lines read that way round — "will you really let these AMATEURS beat you"
- * about a side that is losing, and "a victory of legendary proportions" about
- * a hole you would have to climb out of.
+ * So the moment moves to the top of OUR turn, and the section mapping turns
+ * over with it. The health value is the ACTING side's in both readings
+ * (0x498656 takes `[turn+0x4fc]`'s own total and compares it to every other),
+ * and the exe's acting side is the enemy: enemy ahead gets file 04, enemy
+ * behind file 02, which is how the words read — "will you really let these
+ * AMATEURS beat you" about a side that is LOSING, "a victory of legendary
+ * proportions" about a hole you would have to climb out of. Now the acting
+ * side is OURS, so the same words want the opposite sign: we are ahead means
+ * the amateurs are behind (file 02), we are behind means the climb (file 04).
  */
 export const SARGE_BEHIND = 1
 export const SARGE_AHEAD = 3
@@ -176,13 +183,15 @@ export const SARGE_GOAD_ODDS = 4
  * so leaving them out makes him speak MORE often, not wrongly.
  */
 export function sargeAtTurnStart(
-  computer: boolean,
+  /** Whether the side taking this turn is the PLAYER's — he says nothing over
+   * anybody else's (see the section pair above, and `[play]`). */
+  human: boolean,
   value: number,
   roll: () => number,
   counters: Map<number, number>
 ): SargeLine | null {
-  if (!computer) return null
-  const section = value === 1 ? SARGE_AHEAD : value === -1 ? SARGE_BEHIND : null
+  if (!human) return null
+  const section = value === 1 ? SARGE_BEHIND : value === -1 ? SARGE_AHEAD : null
   if (section === null) return null
   if (roll() >= 1 / SARGE_GOAD_ODDS) return null
   return take(section, counters)

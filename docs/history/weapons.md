@@ -1476,3 +1476,29 @@ magnitude, line, the corpse case and the gate. Read and not built: the MG
 burst cap (edi 5, first round ×5 then ×1 to five rounds), the stagger
 counter, the medic dart heal, kind 0x36. Full read appended to the disasm
 repo's weapons/fire.md.
+## 2026-08-25 — the round is SPENT, and it never was on the loosed branch
+
+Play, after a mission: "оружия не отнимаются кстати когда стреляешь — 3 было
+гранаты у первого моего, 3 и осталось."
+
+The decrement existed twice and neither site was on the path a gun or a lob
+takes. `strikes.ts` spends one as the swing's clip goes on — the exe's own
+moment, 0x46975e — and `attack.ts` spends one where a planted charge leaves
+the trotters. The branch that actually LOOSES something, the `else` that
+covers every gun and every grenade, wrote nothing to `carrying` at all; the
+whole inventory model was in place around it (`spend` in
+lib/game/inventory.ts already guards the `UNLIMITED` sentinel and drops a slot
+that hits zero), so a pig with three grenades threw three and still had three,
+and the HUD counted honestly what the engine never changed.
+
+One line, at the moment the projectile leaves: `spend` on the skill the branch
+just fired with, and only when `away` says something really left — a refused
+throw is not a round. **No holster there**, unlike the melee's: everything
+that reaches this branch ends the turn (lib/game/spend.ts), so `endTurnBeat`
+puts the weapon away a beat later, and emptying the hand at the instant of the
+throw would take the DETONATOR's own fire key with it while the grenade was
+still in the air.
+
+It changes the shape of a battle rather than a number: the machine's mission-1
+run went from twenty-seven shots to thirty and from ~721 s to ~1357 s, because
+both squads now run out of grenades and finish with rifles.
