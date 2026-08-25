@@ -1139,3 +1139,37 @@ and 432 put the line clear above the bar. Both numbers come off `BAR` now —
 up from under its bottom edge, resting centred on its rectangle — and the bar
 is gone the frame the load is in. So the bar fills the place while there is
 something to wait for and the words take it over when there is not.
+
+## 2026-08-26 — CAREER PATH stands on the plaque it always had
+
+Play: the promotion window "глючит — в окне стоит старьё" when a GRUNT's
+PROMOTE opens the career choice. It literally did: CAREER PATH (kind 13) has
+no backdrop of its own — its two word boxes (184/218 wide at y 339 and 373)
+and its icon row (x 260 + 30·n, y 408) all land inside the pig menu's `swap`
+plaque footprint — and the remake was LAUNCHING the plaque away first
+(`close(() => onCareer)`), so the career words stood on the squad's own
+`pigpro` board through the veil, line on line: the board writes at y 334/358/
+382/406/428, the career screen at 339/373/408. Every state read answered
+correctly the whole time; only the paint was wrong.
+
+The fix is the pig menu's new `holding` phase (ui/pigMenu.ts): choosing a
+GRUNT's PROMOTE keeps the plaque standing, clears its furniture — the
+medallion and the three words, now a function of their own so skipping them
+cannot take the plaque with it — and opens CAREER PATH over it at once, no
+launch and no wait. `onClosed(chosen)` hands the plaque back: chosen, it
+leaves the way every close does (the steam launch); backed out, the rows and
+the medallion come back onto a plaque that never moved — which also replaces
+the empty `onClosed` stub that used to drop the player on the bare squad.
+Input routes CAREER PATH first while it is up (ui/playerScreen.ts); the
+holding menu takes none.
+
+The spec (e2e/001/pigmenu.spec.ts) now carries the PAINT check the bug
+demanded — a hash of a plaque-only strip (x 190..225, y 430..460: left of the
+board's 232 and the medallion's 230, clear of both overlays' words) that must
+read the same with the menu up and with the career screen up — plus the
+back-out round trip. One trap inside it cost a run: expect.poll's first turn
+is immediate, so a "two reads agree" stability check sampled one frame twice
+and blessed a half-ramped veil; the reads are 150 ms apart now. The strip was
+proved right by a pixel diff of full-canvas dumps in both states (zero
+differing pixels in the strip, the plaque held) before the sampling was
+fixed.

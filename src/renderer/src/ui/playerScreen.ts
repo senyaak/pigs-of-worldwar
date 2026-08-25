@@ -652,7 +652,9 @@ export function initPlayerScreen(handlers: {
       spent = { cost, ticks: SPENT.ticks }
       spendCoins(cost)
     },
-    onClosed: () => {}
+    // The plaque CAREER PATH stood on is the pig menu's: chosen, it leaves
+    // for the squad; backed out, the menu's rows come back onto it.
+    onClosed: (chosen) => (chosen ? menu.dismiss() : menu.resume())
   })
   /** Whether either overlay holds the screen — input goes to it and the
    * squad dims under it. */
@@ -720,13 +722,14 @@ export function initPlayerScreen(handlers: {
 
   controller.onAction((action) => {
     if (!visible) return
-    // An overlay holds the screen while it is up.
-    if (menu.state() !== 'closed') {
-      menu.handle(action)
-      return
-    }
+    // An overlay holds the screen while it is up — CAREER PATH first, since
+    // the pig menu stands under it, holding its plaque and taking no input.
     if (career.state() === 'open') {
       career.handle(action)
+      return
+    }
+    if (menu.state() !== 'closed') {
+      menu.handle(action)
       return
     }
     if (action === 'menuUp') vertical(-1)

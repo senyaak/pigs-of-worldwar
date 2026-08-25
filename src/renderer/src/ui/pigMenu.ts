@@ -92,8 +92,15 @@ export interface PigMenu {
   open(slot: number, rank: number): void
   /** Gone at once, no leave and no handler — the squad screen re-entering. */
   reset(): void
-  /** 'closed' is not on screen at all; the squad routes input here otherwise. */
-  state(): 'arriving' | 'here' | 'leaving' | 'closed'
+  /** CAREER PATH chose a way: the held plaque leaves the way every close
+   * does, and the squad stands alone once it is gone. */
+  dismiss(): void
+  /** CAREER PATH backed out: the medallion and the three rows come back onto
+   * the plaque, which never moved. Silent — kind 13 reads no leave sound. */
+  resume(): void
+  /** 'closed' is not on screen at all; 'holding' is the bare plaque standing
+   * under CAREER PATH, its rows and medallion cleared and its input dead. */
+  state(): 'arriving' | 'here' | 'leaving' | 'closed' | 'holding'
   handle(action: string): void
   tick(): void
   draw(context: CanvasRenderingContext2D, sprites: SpriteSet, plain: Font): void
@@ -113,14 +120,15 @@ export function initPigMenu(handlers: {
   onRename: (slot: number) => void
   /** A promotion was paid — the squad shows the floating spend. */
   onSpent: (cost: number) => void
-  /** GRUNT's four ways: the menu has left and CAREER PATH takes its place. */
+  /** GRUNT's four ways: the plaque HOLDS, bare, and CAREER PATH opens over
+   * it — `dismiss()`/`resume()` are how that screen hands the plaque back. */
   onCareer: (slot: number) => void
 }): PigMenu {
   let bank: Bank = SILENT
   let slot = 0
   let rank = 0
   let selection = 0
-  let phase: 'arriving' | 'here' | 'leaving' | 'closed' = 'closed'
+  let phase: 'arriving' | 'here' | 'leaving' | 'closed' | 'holding' = 'closed'
   let after: (() => void) | null = null
   const y = still(PARKED)
   /** Widget 16 — the medallion's row, in frames of 8 raw = 16 px. */
@@ -150,8 +158,14 @@ export function initPigMenu(handlers: {
         handlers.onSpent(result.cost)
         close(null)
       } else if (result.kind === 'career') {
+        // The plaque STAYS: CAREER PATH (kind 13) is drawn over it — its two
+        // word boxes and its icon row all land inside the plaque's footprint
+        // — so the menu only clears its own furniture and holds. Launching
+        // the plaque first left the squad's `pigpro` board showing through
+        // under the career words.
         bank.play(HISS.name, { gain: HISS.gain })
-        close(() => handlers.onCareer(slot))
+        phase = 'holding'
+        handlers.onCareer(slot)
       }
       // 'none' — a HERO: the exe's arm falls through to nothing at all.
       return
@@ -170,6 +184,54 @@ export function initPigMenu(handlers: {
     selection = (selection + by + ROWS.length) % ROWS.length
     row.goTo(2 * selection)
     shade.set(0)
+  }
+
+  /** The plaque's furniture — the medallion and the three words. Everything
+   * the menu clears off the plaque while CAREER PATH stands on it. */
+  const furniture = (
+    context: CanvasRenderingContext2D,
+    sprites: SpriteSet,
+    plain: Font,
+    ride: number
+  ): void => {
+    const medallion = sprites.get(SHADES[row.walking() ? 0 : shade.frame()] ?? SHADES[0])
+    context.drawImage(
+      medallion.image,
+      MEDALLION.x,
+      MEDALLION.y + MEDALLION.step * row.frame() + ride
+    )
+
+    // The words stand still — they do not ride the box. All three wear the
+    // plain shade; the medallion is the highlight.
+    ROWS.forEach((box, i) => {
+      if (i === 0) {
+        const cost = price()
+        const label = feText(ROW_TEXT[0])
+        const tail = cost === null ? '-' : String(cost)
+        const icon = cost === null ? null : sprites.get('vp')
+        const width =
+          plain.measure(label) +
+          PRICE_GAP * 2 +
+          (icon ? icon.width + PRICE_GAP : 0) +
+          plain.measure(tail)
+        let x = Math.round(box.x + (box.width - width) / 2)
+        plain.draw(context, label, x, box.y)
+        x += plain.measure(label) + PRICE_GAP * 2
+        if (icon) {
+          context.drawImage(icon.image, x, box.y - 2)
+          x += icon.width + PRICE_GAP
+        }
+        plain.draw(context, tail, x, box.y)
+        return
+      }
+      const label = feText(ROW_TEXT[i])
+      plain.draw(
+        context,
+        label,
+        Math.round(box.x + (box.width - plain.measure(label)) / 2),
+        box.y
+      )
+    })
   }
 
   return {
@@ -191,9 +253,15 @@ export function initPigMenu(handlers: {
       phase = 'closed'
       after = null
     },
+    dismiss() {
+      if (phase === 'holding') close(null)
+    },
+    resume() {
+      if (phase === 'holding') phase = 'here'
+    },
     state: () => phase,
     handle(action) {
-      if (phase === 'closed' || phase === 'leaving') return
+      if (phase !== 'arriving' && phase !== 'here') return
       if (action === 'menuUp') step(-1)
       else if (action === 'menuDown') step(1)
       else if (action === 'menuSelect') choose()
@@ -228,44 +296,9 @@ export function initPigMenu(handlers: {
         PLAQUE.x, PLAQUE.y + ride, plaque.width, PLAQUE.rows
       )
 
-      const medallion = sprites.get(SHADES[row.walking() ? 0 : shade.frame()] ?? SHADES[0])
-      context.drawImage(
-        medallion.image,
-        MEDALLION.x,
-        MEDALLION.y + MEDALLION.step * row.frame() + ride
-      )
-
-      // The words stand still — they do not ride the box. All three wear the
-      // plain shade; the medallion is the highlight.
-      ROWS.forEach((box, i) => {
-        if (i === 0) {
-          const cost = price()
-          const label = feText(ROW_TEXT[0])
-          const tail = cost === null ? '-' : String(cost)
-          const icon = cost === null ? null : sprites.get('vp')
-          const width =
-            plain.measure(label) +
-            PRICE_GAP * 2 +
-            (icon ? icon.width + PRICE_GAP : 0) +
-            plain.measure(tail)
-          let x = Math.round(box.x + (box.width - width) / 2)
-          plain.draw(context, label, x, box.y)
-          x += plain.measure(label) + PRICE_GAP * 2
-          if (icon) {
-            context.drawImage(icon.image, x, box.y - 2)
-            x += icon.width + PRICE_GAP
-          }
-          plain.draw(context, tail, x, box.y)
-          return
-        }
-        const label = feText(ROW_TEXT[i])
-        plain.draw(
-          context,
-          label,
-          Math.round(box.x + (box.width - plain.measure(label)) / 2),
-          box.y
-        )
-      })
+      // Holding under CAREER PATH the plaque stands BARE — the furniture is
+      // its own function so skipping it cannot take anything else with it.
+      if (phase !== 'holding') furniture(context, sprites, plain, ride)
     },
     use(it) {
       bank = it
