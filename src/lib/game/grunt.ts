@@ -365,13 +365,36 @@ export function createGruntBrain(): Brain {
         // The dumb eye (NEAR_POINTS above): the nearest thing pulls the
         // judgment toward itself, harder the lower the wits — and not at
         // all for an option the price list already killed.
+        //
+        // **HOW FAR IS WHAT THE LEGS PAY**, not what the crow flies: the
+        // greater of the walk to the mark and the line to the target itself.
+        // Play watched a pig cross half a map for a crate past every enemy
+        // ("второй свин побежал через пол карты за ящиком — мимо всех
+        // врагов"), and the log says why — the crate was 31 tiles off in a
+        // straight line and NINETY-NINE round the bay (`walk 50855, legs
+        // 23`), so by the crow's line it looked about as near as the foes.
+        // The line to the target is still in it, because a foe you can shoot
+        // from where you stand costs no walk at all and must still read as
+        // near or far.
+        const away = Math.max(
+          Math.hypot(one.target.x - me.x, one.target.z - me.z),
+          Number.isFinite(one.walk) ? one.walk : 0
+        )
         const near =
-          one.score <= 0
-            ? 0
-            : ((1 - world.wits) * NEAR_POINTS) /
-              (1 + Math.hypot(one.target.x - me.x, one.target.z - me.z) / TILE_STEP / NEAR_HALF)
+          one.score <= 0 ? 0 : ((1 - world.wits) * NEAR_POINTS) / (1 + away / TILE_STEP / NEAR_HALF)
         one.believed = one.score * factor
-        one.judged = (one.score + near) * factor
+        // **THE MISJUDGMENT IS ABOUT THE VALUE, NEVER ABOUT THE DISTANCE** —
+        // which is why the eye is ADDED to the misjudged score instead of
+        // being misjudged with it. A three-year-old cannot tell fifty points
+        // from twenty; it can tell what is under its nose. With the eye
+        // inside the product a generous factor multiplied the nearness too,
+        // and that is exactly what play watched: NOBBY judged a grenade at a
+        // foe seven tiles off 257 and a rifle at one HALF A TILE away 227,
+        // because the grenade's roll came up 1.7 and scaled its 121 points of
+        // nearness with it (`_tmp/telemetry-2026-08-25T18-16-01.log`). Added
+        // instead, the near foe wins 227 to 172 — and the toss still decides
+        // between things that are equally near, which is what it was for.
+        one.judged = one.believed + near
         return one.judged
       }
 

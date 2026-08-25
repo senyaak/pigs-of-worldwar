@@ -1218,3 +1218,36 @@ and the slowdown is explained rather than mysterious: both sides now spend
 their three grenades for real (see docs/history/weapons.md) and fall back on
 rifles, and at ESTU's 1/26 wits both squads chase the nearest thing rather
 than the best one.
+
+## 2026-08-25 late — the eye was being MISJUDGED with the score, and it was looking down the crow's line
+
+Play, straight after the batch above: "свин непись первый кинул гранату в
+дальнего вместо того чтобы бить ближнего", and "второй свин побежал через пол
+карты за ящиком — мимо всех врагов — сразу фигня". Two faults, both in the one
+line that turns a price into a judgment, and the session log
+(`_tmp/telemetry-2026-08-25T18-16-01.log`) names each.
+
+**THE MISJUDGMENT WAS SCALING THE NEARNESS.** NOBBY's kit line reads
+`*lob GRENADE->HUSKI s30~257 | ... | gun RIFLE->KUSKO s20~227`. Work the
+numbers back: HUSKI was about seven tiles off, worth 121 points of eye, and
+KUSKO was HALF A TILE away, worth 207 — the eye had it right. What lost it was
+the product: `(30 + 121) × 1.70` against `(20 + 207) × 1.0`, the grenade's own
+once-a-turn roll multiplying its nearness along with its worth. So the eye is
+ADDED to the misjudged score now, never misjudged with it: a three-year-old
+cannot tell fifty points from twenty, but it can tell what is under its nose.
+Same numbers, added: 172 against 227, and the near foe wins. The toss still
+decides between things that are equally near, which is all it was ever for.
+
+**AND NEARNESS WAS THE CROW'S LINE.** GINGER's plan reads
+`-> 1280,4352 walk 50855 legs 23` — a crate on the far side of the bay, 31
+tiles away in a straight line and NINETY-NINE round the water, walked past
+three enemies over two whole turns. The eye could not see the difference,
+because it measured the line and not the legs. It takes the greater of the
+walk to the mark and the line to the target now. The line stays in it because
+a foe you can shoot from where you stand costs no walk at all and must still
+read as near or far — which is the very case NOBBY's grenade got wrong.
+
+`machine-mission` after both: **a verdict at ~508 s, five kills over
+thirty-three shots, 0v1** — against ~1357 s and four kills an hour earlier, and
+seven seconds of wall clock against sixty-six. The marches are what that
+minute was.
