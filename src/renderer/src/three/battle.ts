@@ -598,6 +598,21 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       lastView = 'face'
       return
     }
+    // A BODY A BLOW THREW is WATCHED, and the camera does not follow it —
+    // it stands where it is and TURNS, the way a man watches a ball. Play,
+    // 2026-08-25: "камера на свина при атаке переключается, но она меняет
+    // ракурс — а на самом деле должна оставаться на месте и только
+    // поворачиваться за свином." That is the exe's own mode 1 to the letter
+    // (three/chase.ts, `watch`): no position is written, no spring stepped,
+    // the ground floor never consulted. Following it was this repo's first
+    // reading of "камера к нему прицепляется" and it was the wrong half of
+    // the sentence — the camera attaches its GAZE, not its feet.
+    if (flungWatch !== null && soldier.pig.id === flungWatch.pig) {
+      chase.watch(drawnStance(soldier))
+      soldier.node.visible = true
+      lastView = 'watch'
+      return
+    }
     // …and so does what the blow left behind. Mode 0 on the crate, which is
     // the ordinary chase rig with something other than a pig in it
     // (0x4661c2).
@@ -836,13 +851,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     if (!now.dropping && !now.starting && !now.over) {
       // The acting pig stands where the locomotion state says, and the camera
       // stops holding the moment the player drives (three/chase.ts).
-      // …**unless a BLOW is what put it in the air**, in which case the camera
-      // goes with it (`flungWatch`): the park exists so a pig that trips or is
-      // ejected off a wall does not swing the view about, and play asked for
-      // the opposite behaviour on the one case that is a blow's doing.
       chase.hold(
-        flungWatch === null &&
-          (now.loco.airborne?.bouncing === true || now.loco.airborne?.ejected === true),
+        now.loco.airborne?.bouncing === true || now.loco.airborne?.ejected === true,
         now.driving,
         delta
       )

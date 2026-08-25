@@ -299,3 +299,17 @@ one `dyingWatch` id and a rig — so `follow` takes a `pull` that multiplies the
 view's distance and nothing else, and the death ramps it (`DYING_DRIFT`,
 `DYING_DRIFT_MAX`). The height and the gaze point stay the face view's, so the
 pig keeps its place in the frame while the world opens up around it.
+
+## 2026-08-25, corrected the same evening — a thrown body is WATCHED, not followed
+
+Play: "камера на свина при атаке переключается, но она меняет ракурс — а на
+самом деле должна оставаться на месте и только поворачиваться за свином."
+
+The first reading of "камера к нему прицепляется" attached the camera's FEET;
+it is the GAZE that attaches. Which is the exe's own mode 1, already decoded
+and already in the file (`chase.watch`): no position written, no spring
+stepped, the ground floor never consulted — the camera stands where the last
+mode left it and turns to keep the subject in frame, like a man watching a
+ball. The flung subject takes that branch now, and the `chase.hold` park goes
+back to what it was, because nothing is following any more and there is
+nothing to park.

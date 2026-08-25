@@ -1251,3 +1251,41 @@ read as near or far — which is the very case NOBBY's grenade got wrong.
 thirty-three shots, 0v1** — against ~1357 s and four kills an hour earlier, and
 seven seconds of wall clock against sixty-six. The marches are what that
 minute was.
+
+## 2026-08-25, the third pass — a leg is walked into a ZONE, and the arc is SIMULATED
+
+Play, after the second batch: "третий свин опять бегал вокруг точки — может
+сделать так, чтобы он бежал не в точку, а в зону? чем точнее надо встать, тем
+меньше зона… ведь по сути промоделировать мы можем, как дойти, не прикладывая
+много усилий, а мы это не используем. Пасфайндинг не дружит с контролом, может
+быть?"
+
+All three sentences are right, and the last one is the diagnosis. The grid
+plans in 128-unit cells and knows nothing about how a pig turns; the hands
+then have to fly legs the body cannot fly. The previous pass added the chord
+test, which catches a target INSIDE the turning circle — and that is only half
+the failure. The other half is the shallow miss: a pig steering onto a point
+at a small angle rides an arc that passes it WIDE, twenty-four units of
+arrival tolerance against an arc 1400 across, so it sails by at a hundred,
+swings round and comes back for another pass. That is the circling, and it
+survived the chord test because the bearing error stayed small the whole way.
+
+**The zone.** `Order.walkTo` carries `within` now, and the brain sets it by
+what the leg is FOR — play's own rule. A corner with another behind it is a
+waypoint and takes `TURN_IN`, the same stride the brain already hands the
+corner over on, so the hands and the brain stop disagreeing about what
+arriving means. The last corner takes the job's own tolerance: a crate is
+COLLECTED by being walked over and gets the floor, a firing mark is a grid
+cell whose shot the search already cleared and gets half a cell.
+
+**And the arc is simulated, in closed form** — which is the "promodelirovat'"
+play asked for, without a simulation. A pig walking and steering rides a
+circle of `TURN_RADIUS` whose centre sits R off the beam, so the distance from
+that centre to the target is `√(d² + R² − 2dR·sin|off|)` and the nearest the
+arc ever passes is `| |CT| − R |`. The arc therefore reaches the order's zone
+exactly when `|CT| ≥ R − within`. Steer when it does, turn on the spot when it
+does not. The old chord test is that same rule at zone zero.
+
+`machine-mission` after it: **~269 s, five kills over sixteen shots** — the
+walk-cost line of the batch is 1357 → 508 → 343 → 269, and every step of that
+is time the machine used to spend not arriving.

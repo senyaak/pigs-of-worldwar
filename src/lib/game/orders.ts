@@ -18,9 +18,20 @@ export type Order =
   /** Take a skill in hand (or put it away with null) — what the player's
    * skill menu writes. SKIP TURN in hand is the THINKING pose. */
   | { kind: 'hold'; skill: number | null }
-  /** Walk to a point, steering with the tank controls on the way. Finishes
-   * `blocked` when the legs stop making progress — a wall, a pig, a wedge. */
-  | { kind: 'walkTo'; x: number; z: number }
+  /**
+   * Walk to a point, steering with the tank controls on the way. Finishes
+   * `blocked` when the legs stop making progress — a wall, a pig, a wedge.
+   *
+   * `within` is the ZONE that counts as arrival, and it is the caller's to
+   * set because only the caller knows how exactly the pig has to stand:
+   * `[play]`, 2026-08-25 — "может сделать так, чтобы он бежал не в точку, а в
+   * зону? чем точнее надо встать, тем меньше зона." A route CORNER is a
+   * waypoint and wants a generous one; a crate has to be walked over and
+   * wants a tight one. The zone is not only the arrival test — the hands
+   * steer by it too (lib/game/actuator.ts): whether a bend can be taken on
+   * the move is the question of whether the arc ENDS inside the zone.
+   */
+  | { kind: 'walkTo'; x: number; z: number; within?: number }
   /** Turn on the spot to face a heading, radians in the engine's own frame
    * (0 is +z, positive toward +x — lib/game/movement.ts). */
   | { kind: 'turnTo'; heading: number }

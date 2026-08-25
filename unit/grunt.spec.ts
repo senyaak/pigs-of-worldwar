@@ -13,8 +13,10 @@ import {
   createGruntBrain,
   SIDE_STEP,
   FRIEND_CLEARANCE,
-  PITCH_WITHIN
+  PITCH_WITHIN,
+  TURN_IN
 } from '../src/lib/game/grunt'
+import { ARRIVE_WITHIN } from '../src/lib/game/actuator'
 import { CLOSE_TO, SHELTER_FROM, SHELTER_NEAR, STAND_RINGS } from '../src/lib/game/evaluate'
 import { BLAST_CORE } from '../src/lib/game/grenade'
 import type { AiWorld, Seen } from '../src/lib/game/ai'
@@ -180,10 +182,14 @@ test('the crate comes FIRST when the clock affords both — the errand', { tag: 
   const brain = createGruntBrain()
   // Rifle in hand, foe in reach, a health crate a stride away and the whole
   // clock: the walk goes THROUGH the crate before any shot.
+  // …and the ZONE the legs are aimed into is the CRATE's, which is the
+  // tightest there is: a pickup happens by being walked over
+  // (lib/game/actuator.ts, `Order.walkTo.within`).
   expect(brain.decide(world({ holding: SKILL.RIFLE, wits: 1, crates }))).toEqual({
     kind: 'walkTo',
     x: 300,
-    z: 0
+    z: 0,
+    within: ARRIVE_WITHIN
   })
   // Collected (gone from the world), the same turn falls through to the
   // fight — no memory needed.
@@ -218,7 +224,9 @@ test('a bending route is walked by its NEXT corner, not the crow line', { tag: '
       route: () => [corner, { x: 0, z: RANGE * 1.2 }]
     })
   )
-  expect(order).toEqual({ kind: 'walkTo', ...corner })
+  // A corner with another behind it is a WAYPOINT: its zone is the same
+  // stride the brain hands it over on.
+  expect(order).toEqual({ kind: 'walkTo', ...corner, within: TURN_IN })
 })
 
 test('a route already walked out is GROUNDED: no reach, so a pass', { tag: '@nodata' }, () => {
@@ -585,7 +593,12 @@ test('an unarmed pig with no foes walks onto the crate that arms it', { tag: '@n
     foes: [],
     crates: [{ x: 0, z: 2000, skill: SKILL.BAZOOKA, amount: 2 }]
   })
-  expect(brain.decide(crated)).toEqual({ kind: 'walkTo', x: 0, z: 2000 })
+  expect(brain.decide(crated)).toEqual({
+    kind: 'walkTo',
+    x: 0,
+    z: 2000,
+    within: ARRIVE_WITHIN
+  })
 })
 
 test('blocked in range: shoot from where it stands', { tag: '@nodata' }, () => {
@@ -646,7 +659,12 @@ test('NOTHING IN REACH: the dumb pig goes for the crate, and the sharp one weigh
     crates: [{ x: 0, z: 200, skill: null, amount: 5 }]
   }
   const dumb = createGruntBrain()
-  expect(dumb.decide(world({ ...scene, wits: 0 }))).toEqual({ kind: 'walkTo', x: 0, z: 200 })
+  expect(dumb.decide(world({ ...scene, wits: 0 }))).toEqual({
+    kind: 'walkTo',
+    x: 0,
+    z: 200,
+    within: ARRIVE_WITHIN
+  })
   expect(dumb.explain?.()?.plan?.errand).toBe(true)
   const sharp = createGruntBrain()
   const order = sharp.decide(world({ ...scene, wits: 1 }))
@@ -692,7 +710,8 @@ test('A THREE-YEAR-OLD MIGHT TAKE THE CRATE OR MIGHT JUST SHOOT — the roll dec
   expect(fetches.decide(world({ ...scene, wits: 0, roll: rolls(0, 1) }))).toEqual({
     kind: 'walkTo',
     x: 0,
-    z: 800
+    z: 800,
+    within: ARRIVE_WITHIN
   })
   expect(fetches.explain?.()?.plan?.errand).toBe(true)
   // …and at the TOP of the scale there is no toss at all: the spread closes

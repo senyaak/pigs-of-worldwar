@@ -34,7 +34,7 @@
 
 import type { AiWorld, Brain, Seen, Thought } from './ai'
 import type { Order } from './orders'
-import { shortest } from './actuator'
+import { ARRIVE_WITHIN, shortest } from './actuator'
 import { AIM_UNITS } from './aim'
 import type { Option } from './evaluate'
 import { BLAST_CORE } from './grenade'
@@ -449,6 +449,26 @@ export function createGruntBrain(): Brain {
       ) {
         leg++
       }
+      /**
+       * **THE ZONE THE LEGS ARE AIMED INTO**, and it is the same number this
+       * loop hands a corner over on, so the hands and the brain cannot
+       * disagree about what "arrived" means (lib/game/actuator.ts,
+       * `Order.walkTo.within`). Play's shape: "чем точнее надо встать, тем
+       * меньше зона."
+       *
+       * A corner with another behind it is a WAYPOINT — anywhere inside
+       * `TURN_IN` of it is on the route. The last one is where the job
+       * happens, and how tight it has to be is what the job says: a crate is
+       * COLLECTED by being walked over, so it takes the floor, while a firing
+       * mark is a grid cell whose shot the search already cleared, so half a
+       * cell is the same cell and the shot still stands.
+       */
+      const zone =
+        leg + 1 < plan.route.length
+          ? TURN_IN
+          : plan.errand !== null || plan.option.kind === 'crate'
+            ? ARRIVE_WITHIN
+            : GRID_STEP / 2
       const walking = !grounded && leg < plan.route.length
       told.plan = {
         goal: plan.goal,
@@ -466,7 +486,12 @@ export function createGruntBrain(): Brain {
       // воде делать нечего — максимум сократить путь."
       if (world.swimming) {
         return walking
-          ? say('transit', { kind: 'walkTo', x: plan.route[leg].x, z: plan.route[leg].z })
+          ? say('transit', {
+              kind: 'walkTo',
+              x: plan.route[leg].x,
+              z: plan.route[leg].z,
+              within: zone
+            })
           : say('shore', shore(world))
       }
 
@@ -476,7 +501,8 @@ export function createGruntBrain(): Brain {
         return say(plan.errand ? 'errand' : 'walk', {
           kind: 'walkTo',
           x: plan.route[leg].x,
-          z: plan.route[leg].z
+          z: plan.route[leg].z,
+          within: zone
         })
       }
 

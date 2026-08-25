@@ -71,8 +71,20 @@ export interface Actuator {
   reset(): void
 }
 
-/** Close enough to a walk target to call it arrival — over one 60 Hz stride
- * (~17 units), so the last step cannot orbit the point. */
+/**
+ * Close enough to a walk target to call it arrival when the order names no
+ * zone of its own — over one 60 Hz stride (~17 units), so the last step
+ * cannot step across it.
+ *
+ * **It is a FLOOR, not the rule.** An order carries its own zone
+ * (`Order.walkTo.within`) and the brain sets it by how exactly the pig has to
+ * stand: a route corner is a waypoint, a crate has to be walked over. This
+ * number alone was what play watched twice — "третий свин опять бегал вокруг
+ * точки" — because a pig steering onto a point can only ever pass NEAR it: at
+ * 1040 units a second and 42° a second the tightest arc it can fly is 1400
+ * across, so an approach that comes in at an angle sails past twenty-four
+ * units by a hundred, turns, and comes back round for another pass.
+ */
 export const ARRIVE_WITHIN = 24
 
 /** A walk that improves its distance by less than this is not progressing. */
@@ -137,17 +149,7 @@ const REALIGN = Math.PI / 3
  */
 export const TURN_RADIUS = WALK_SPEED / TURN_SPEED
 
-/**
- * …and its CHORD, which is the number the walk actually asks with.
- *
- * A target `d` away at a bearing error `off` sits outside the turning circle
- * — and so can be reached by riding it round — exactly when
- * `d ≥ 2·TURN_RADIUS·sin|off|`. (The turn centre is `R` off the beam, so the
- * distance from it to the target is `√(d² + R² − 2dR·sin|off|)`, and that is
- * `≥ R` precisely when the chord fits.) Inside it, no amount of steering
- * closes the gap: the pig orbits.
- */
-export const TURN_CHORD = 2 * TURN_RADIUS
+
 
 /** The shortest way round: (-π, π]. Brains borrow it (lib/game/grunt.ts). */
 export const shortest = (angle: number): number => {
@@ -207,7 +209,10 @@ export function createActuator(rig: Rig): Actuator {
         const dx = order.x - x
         const dz = order.z - z
         const distance = Math.hypot(dx, dz)
-        if (distance <= ARRIVE_WITHIN) {
+        // The ZONE this walk was ordered into (`Order.walkTo.within`), never
+        // tighter than one stride.
+        const within = Math.max(ARRIVE_WITHIN, order.within ?? 0)
+        if (distance <= within) {
           rig.intent(0, 0)
           finish('done')
           return
@@ -222,22 +227,32 @@ export function createActuator(rig: Rig): Actuator {
         // the spot, but a bend inside the band is steered THROUGH while
         // walking ("повернулся — шаг — повернулся — шаг" was the strict
         // version taking every small elbow as a full stop).
-        // …and the SECOND question, which is the one that had a pig walking
-        // in circles: CAN the arc get there at all? A pig that walks and
-        // turns at once travels a circle of `TURN_RADIUS`, and a point closer
-        // than the chord `2R·sin|off|` lies INSIDE that circle — the legs
-        // carry it round the target for ever, never closing, because the
-        // bearing runs away exactly as fast as the pig can swing onto it.
-        // That is play's report, and its diagnosis is play's too: "третий
-        // свин круги нарезал на месте — он похоже хочет в точку прийти, но не
-        // может из-за того что идёт и поворачивает одновременно."
+        // …and the SECOND question, which is the one that had a pig walking in
+        // circles: CAN THE ARC GET THERE? Play again, and the model is play's
+        // own: "ведь по сути промоделировать мы можем, как дойти, не прикладывая
+        // много усилий — а мы это не используем."
         //
-        // A stall would end the order after STUCK_SECONDS, but the brain then
-        // orders the same leg again and the circle starts over, which is what
-        // was on the screen. So the geometry is asked BEFORE the stride: too
-        // close for the arc means turn on the spot, exactly as a big turn
-        // does, and the walk resumes the moment the chord fits.
-        const reaches = distance >= TURN_CHORD * Math.abs(Math.sin(off))
+        // We can, in closed form. A pig that walks and steers at once rides a
+        // circle of `TURN_RADIUS` whose centre C sits R off the beam on the
+        // side it is turning to, so the distance from C to the target is
+        // `√(d² + R² − 2dR·sin|off|)` and the nearest the arc EVER passes the
+        // target is `| |CT| − R |`. The arc therefore reaches the order's own
+        // zone exactly when `|CT| ≥ R − within` — which is the "target outside
+        // the turning circle" rule, softened by the zone. Anything tighter is
+        // an orbit: the bearing runs away as fast as the pig can swing onto
+        // it, so it circles for ever without closing.
+        //
+        // Asked BEFORE the stride, so too-tight means turn on the spot exactly
+        // as a big bend does, and the walk resumes the moment the arc fits. A
+        // stall would end the order eventually, but the brain would order the
+        // same leg again and the circle would start over — which is what was
+        // on the screen, twice.
+        const centre = Math.sqrt(
+          distance * distance +
+            TURN_RADIUS * TURN_RADIUS -
+            2 * distance * TURN_RADIUS * Math.abs(Math.sin(off))
+        )
+        const reaches = centre >= TURN_RADIUS - within
         if (Math.abs(off) <= REALIGN && reaches) aligned = true
         else if (aligned) aligned = false
         if (!aligned) {
