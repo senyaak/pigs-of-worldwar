@@ -108,20 +108,39 @@ export const AIM_WOBBLE = 0.08
 export const CHARGE_WOBBLE = 0.15
 
 /**
- * THE DUMB EYE: what standing NEAR a thing adds to its judgment, at the
- * bottom of the wits scale. Play's model, in play's words (2026-08-24): "я
- * тупой = что ближе всего — ящик/свин — это моя цель. вижу цель — стреляю.
- * чем умнее — тем больше свин думает." So the judgment blends TWO
- * currencies: the price list's points, and a proximity bonus of
- * `(1 − wits) · NEAR_POINTS / (1 + tiles away)` — at wits 0 the nearest
- * interesting thing dominates the election almost regardless of worth, at
- * wits 1 the bonus is zero and only the arithmetic speaks. It is a bonus
- * ADDED, not a replacement, so at ONE target the kit still sorts by damage
- * (the dumb pig shoots the near one with its better gun). An option the
- * price list killed (a blocked shot's 0, a doused lob) earns no bonus —
- * nearness must never resurrect the unplayable. `[deliberate]` — play's
- * dial, sized so adjacency (~NEAR_POINTS) outbids any single-kill worth
- * the kit can price.
+ * **THE DUMB EYE: at the bottom of the scale a judgment is NEARNESS AND
+ * CHANCE, and the worth is not in it at all.**
+ *
+ * Play's model, in play's words (2026-08-24): "я тупой = что ближе всего —
+ * ящик/свин — это моя цель. вижу цель — стреляю. чем умнее — тем больше свин
+ * думает." And the two corrections that finished it a day later, both about
+ * the same thing — that a three-year-old does not READ VALUES:
+ *
+ *   - "50 очков. но тупой это не различает." A health crate is fifty points
+ *     and a rifle shot is twenty, and the dumb pig cannot tell which is the
+ *     better of them. It does not need a rule: `NEAR_POINTS` is sized so
+ *     that at the bottom of the scale the eye SWAMPS the arithmetic — sixty
+ *     points at the trotters against a shot worth twenty — so the worth is
+ *     in the sum and is not what decides.
+ *
+ *     **Taking it out of the sum ALTOGETHER was built and measured and it
+ *     does not work**: with the worth gone the machine could not finish
+ *     mission 1 at all — no verdict in 3600 simulated seconds against 402
+ *     with it, thirty shots for three kills — because a brain that cannot
+ *     tell a foe from a box has no reason to close on anything. Nearness
+ *     that DOMINATES is play's rule; nearness ALONE is a pig that never
+ *     finishes the battle.
+ *   - "я б сделал своего рода рандом — тупой может и ящик взять, может и
+ *     тупо стрельнуть." Nearness sets the ODDS; the misjudgment factor
+ *     (`MISJUDGE`, rolled once a turn off the battle's own stream) is what
+ *     turns them into an answer. Two things about equally near come out a
+ *     toss, and the same world still answers the same way twice — which
+ *     lockstep needs and a die would break.
+ *
+ * The bonus is `(1 − wits) · NEAR_POINTS / (1 + tiles away)`. An option the
+ * price list KILLED (a blocked shot's 0, a doused lob) earns no bonus —
+ * nearness must never resurrect the unplayable, and that is the one thing
+ * the dumbest pig still tells apart. `[deliberate]` — play's dial.
  */
 export const NEAR_POINTS = 60
 

@@ -655,29 +655,54 @@ test('NOTHING IN REACH: the dumb pig goes for the crate, and the sharp one weigh
   if (order.kind !== 'walkTo') return
   expect(order.z).toBeGreaterThan(200)
 })
-test('A THREE-YEAR-OLD GRABS THE NEAREST THING; the sharp pig weighs it and shoots', { tag: '@nodata' }, () => {
+test('A THREE-YEAR-OLD MIGHT TAKE THE CRATE OR MIGHT JUST SHOOT — the roll decides', { tag: '@nodata' }, () => {
   // Play's ruling, 2026-08-25, after two readings of "вижу стреляю" that
-  // were both too literal: "ум 0 — это не верно. он должен ВИДЕТЬ ящик; если
-  // ящик ближе чем враг или ещё как — он МОЖЕТ пойти и взять ящик. но это
-  // тупой свин — он должен играть как трёхлетний ребёнок."
+  // were both too literal, and then a third correction on top of those: "я б
+  // сделал своего рода рандом — тупой может и ящик взять, может и тупо
+  // стрельнуть", and "50 очков, но тупой это не различает."
   //
-  // So nothing suppresses a crate. The crate here is deliberately POOR —
-  // five points of health against a shot worth twenty — and the foe is
-  // inside the rifle's own reach. The wits-0 pig walks to the crate anyway,
-  // because it is nearer and that is the whole of its reasoning; the wits-1
-  // pig reads five points at face, finds them under the shot, and fires.
+  // So at the bottom of the scale the worth is not read at all — a fifty
+  // point health crate and a twenty point shot are the same thing to a
+  // three-year-old — and what is left is how NEAR each is, which sets the
+  // odds, and the turn's own misjudgment factor, which turns them into an
+  // answer. The crate and the foe below are about equally near, so the same
+  // world gives two different answers on two different rolls.
+  //
+  // It is chance off the BATTLE's one seeded stream, never a die: the same
+  // rolls give the same battle on both machines, which is what lockstep
+  // needs (docs/ai.md).
   const scene = {
-    foes: [foe({ z: RANGE * 0.4 })],
-    crates: [{ x: 0, z: 120, skill: null, amount: 5 }]
+    holding: SKILL.RIFLE,
+    foes: [foe({ z: 1000 })],
+    crates: [{ x: 0, z: 800, skill: null, amount: 50 }]
   }
-  const dumb = createGruntBrain()
-  expect(dumb.decide(world({ ...scene, wits: 0, holding: SKILL.RIFLE }))).toEqual({
+  /** The battle's stream, handed out in order: the gun is judged first, the
+   * crate second (lib/game/evaluate.ts, `elect`). */
+  const rolls = (...values: number[]): (() => number) => {
+    let i = 0
+    return () => values[Math.min(i++, values.length - 1)]
+  }
+  // The gun believed high and the crate low: it turns onto the foe and
+  // shoots — no detour, and the plan carries no errand.
+  const shoots = createGruntBrain()
+  expect(shoots.decide(world({ ...scene, wits: 0, roll: rolls(1, 0) })).kind).toBe('turnTo')
+  expect(shoots.explain?.()?.plan?.errand).toBe(false)
+  // The other way about, and the SAME world sends it to the crate.
+  const fetches = createGruntBrain()
+  expect(fetches.decide(world({ ...scene, wits: 0, roll: rolls(0, 1) }))).toEqual({
     kind: 'walkTo',
     x: 0,
-    z: 120
+    z: 800
   })
-  const sharp = createGruntBrain()
-  expect(sharp.decide(world({ ...scene, wits: 1, holding: SKILL.RIFLE }))).toEqual({ kind: 'fire' })
+  expect(fetches.explain?.()?.plan?.errand).toBe(true)
+  // …and at the TOP of the scale there is no toss at all: the spread closes
+  // to nothing, so both rolls answer the same. "Умные всегда оценивают
+  // бенефиты."
+  const sharpA = createGruntBrain()
+  const sharpB = createGruntBrain()
+  expect(sharpA.decide(world({ ...scene, wits: 1, roll: rolls(1, 0) }))).toEqual(
+    sharpB.decide(world({ ...scene, wits: 1, roll: rolls(0, 1) }))
+  )
 })
 test('A HEALTH CRATE IS WORTH WHAT IT PUTS BACK: a topped-up pig walks past one', { tag: '@nodata' }, () => {
   // Play watched DEN take a crate at hp50, then cross the whole island for a
