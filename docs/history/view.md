@@ -328,3 +328,47 @@ So the flung latch now holds for `FLUNG_LINGER` (one second) of stillness on
 top of the settle, and a blow that threw somebody suppresses its own aftermath
 ride (`sawFling`, cleared when the aftermath is). The camera watches the body
 land, holds it a beat, and hands over to whatever comes next.
+
+## 2026-08-25 — THE CAMERA HAS NO MINIMUM DISTANCE AND NO DODGE, and what it really does at a blast is SHAKE
+
+Play asked, having watched a pig thrown at the lens: "помойму там есть
+минимальная дистанция камеры — что если свин летит в камеру от взрыва, она
+либо поворачивается, либо съезжает в сторону — дизасм?" Read: **neither
+exists**, and the search behind that answer is worth writing down because it
+was exhaustive.
+
+- **The chase distance is a symmetric spring with a dead zone, not a floor.**
+  `0x4A0960`: `err = separation − (row[mode] + arg)`, nothing at all inside
+  ±5 units, and the same instruction pushes the camera out when it is close
+  and pulls it in when it is far. No guard, no asymmetry, nothing that refuses
+  to come closer. The one real "no closer than" in the module is mode 0x0D's
+  orbit radius, whose bound is the separation it stamped at the lock
+  (`[cam+0x7A]`, 0x4a3d58) rather than a constant.
+- **Nothing in the camera can even SEE a body.** Every call target in
+  0x49EC00–0x4A5200 is polar maths, `ftol`, `rand`, `Map::SampleHeight` and a
+  bone lookup for the rifle cam — no segment query, no collision call, no
+  physics list. The only obstacle test is `0x4A0030`, which walks eight
+  samples of the GROUND from the target to the camera and raises the pitch
+  over the steepest of them: the camera climbs a ridge, it never steps aside,
+  and there is no lateral analogue anywhere.
+- **The one lateral term is a literal** — `[cam+0x7C]`, a yaw offset of 70 or
+  172 of 4096 (6.2° / 15.1°), written only as a constant and never by damage
+  or blast code.
+- **What a blast DOES to the camera is shake it, and only that.**
+  `Camera::Shake` (0x4A0520) sets an amplitude and a decay; `Camera::Update`
+  (0x49FEA0) jitters all three axes by `±rand() % amplitude` and decays it to
+  zero. Single caller, 0x43AE06, inside the blast: `amp = (10000 −
+  min(d²/26844, 10000)) / 100` and `Shake(max(amp/2, 1), 2)` — quadratic
+  falloff, nothing left at **d = 16384**, and only for blast kinds 0x0C and
+  0x0D.
+
+So a pig flying into the lens is a case the original never handles: mode 1
+(what a thrown body is watched from here) writes no position at all and cannot
+even provoke a re-place. Anything the remake does about it is `[play]`'s to
+invent. **The SHAKE is read and NOT built** — the remake has none.
+
+Mode table 0x4D9528 as shipped, distance/ceiling/third:
+`0:(3072,768,0) 1:(3072,1024,0) 2:(7500,1024,0) 3:(1000,1024,0)
+4:(1500,2000,0) 7:(11000,1024,0) 9:(15000,50,3072) 0x0A:(5000,512,3584)
+0x0D:(3000,824,0) 0x0E:(2048,1024,0) 0x11:(2048,924,0) 0x12:(1600,1024,0)
+0x13:(1700,924,652)`.

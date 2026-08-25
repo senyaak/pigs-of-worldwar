@@ -210,6 +210,17 @@ against the PMG's own block count, and `Map::Load`'s bounds in the exe. A
 pig walking off the end of the world, or refused at a line the original
 lets it cross, is the symptom to reproduce first.
 
+### THE CAMERA SHAKE — read 2026-08-25, NOT BUILT
+
+The one thing the original's camera does about an explosion, and the remake
+does none of it: `Camera::Shake` (0x4A0520) + the jitter in `Camera::Update`
+(0x49FEA0), called from the blast at 0x43AE06 with
+`amp = (10000 − min(d²/26844, 10000)) / 100`, `Shake(max(amp/2, 1), 2)` —
+quadratic falloff to nothing at 16384 units, and only for blast kinds 0x0C and
+0x0D. Everything else play asked about that camera (a minimum distance to the
+subject, a dodge when a body comes at the lens) does NOT exist in the exe; the
+whole search is in docs/history/view.md.
+
 ### The AMBIENCE, from the same session — STILL OPEN
 
 Play: "орлы и стрельба — это реально фон, но играл он странно, очень друг
