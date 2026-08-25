@@ -137,12 +137,45 @@ The reading after: `machine-mission` finishes at ~1357 s, four kills, 2v0
 (against ~721 s, five kills, 1v0). Slower and explained — both sides now spend
 their grenades for real and finish with rifles.
 
+### THE EVENING RAN TO FOUR MORE PASSES, and mission 1 came back "всё отлично"
+
+Play kept playing and reporting; each report was diagnosed out of the session
+log or out of the exe, never guessed. The full write-ups are in
+docs/history/turns.md, weapons.md, view.md, pig.md and frontend.md — what
+matters here is that **every report play made on 2026-08-25 is answered**, and
+the last word on the mission was "а так всё отлично на первой миссии
+остальное". In order, and the ones that changed a MODEL rather than a number:
+
+- **The eye is ADDED to the misjudged score, never misjudged with it**, and it
+  measures what the LEGS pay (the greater of the walk to the mark and the line
+  to the target). A three-year-old misjudges value, not distance.
+- **A leg is walked into a ZONE** (`Order.walkTo.within`), sized by what the
+  leg is for, and whether a bend can be taken on the move is the arc's own
+  closed form — `|CT| = √(d² + R² − 2dR·sin|off|)` reaches the zone when
+  `|CT| ≥ R − within`. That is the "промоделировать, как дойти" play asked
+  for, without a simulation.
+- **Out of reach with the route walked out is `close-in`, never a pass.** A
+  blade's mark and its limit are the same `MELEE_NEAR`, so a hair short of the
+  mark was already hopeless — which is what "подбежал вплотную и пропустил
+  ход" was.
+- **A loosed round is spent** — no branch on the gun/lob path had ever touched
+  the inventory.
+- **The corpse's bang is a real blast** (read: twenty points at 0x400 on land,
+  ten at 0x800 in water and for a gib, damage kind 0 so it can gib the next
+  pig), a charge under the trotters throws along the GROUND'S NORMAL, and a
+  flight wears the FLYING clip until it touches.
+- **The camera**: it only TURNS on a thrown body (the exe's mode 1), holds it a
+  second after it lands and never rides back to the empty crater, keeps two
+  pig-heights by RISING, and SHAKES at every bang on the exe's own curve.
+
+The measurement across the day, `machine-mission`: **1357 → 508 → 343 → 269 →
+331 s**, and the wall clock 66 s → 4 s.
+
 ### WHAT IS LEFT
 
-1. **PLAY THE BATCH ABOVE.** Seven changes went in unseen: the nearest-first
-   eye, the turn-on-the-spot geometry, ammo actually running out, the
-   sergeant only over our own turn, the camera following a thrown body,
-   the throw's room and the death's drift.
+1. **PLAY THE LAST THREE PASSES.** Unseen by play: the zone and the arc test,
+   `close-in`, the camera's keep and its shake, the one-second hold on a
+   landed body. Everything before those was played and signed off.
 2. **THE FREEZE IS NOT DIAGNOSED.** Play met one — "а в конце щас игра тупо
    зависла" — and the log ends on DEN firing a sniper rifle with no `[turn]`
    after it. What was done is INSURANCE, not a fix: the parent walk in
