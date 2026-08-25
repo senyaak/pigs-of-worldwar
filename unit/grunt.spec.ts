@@ -634,44 +634,51 @@ test('THE DUMB EYE: at wits 0 the nearest thing is the target, at wits 1 the ari
   expect(sharp.explain?.()?.chose?.target).toBe(far)
 })
 
-test('NOTHING IN REACH is when a crate stands for election — and the dumb pig takes it', { tag: '@nodata' }, () => {
-  // Play's rule, 2026-08-25: "когда нет цели рядом или цели слишком далеко —
-  // тогда [ящик]. чем тупее тем больше вероятность тупого выбора ящик. а
-  // умные всегда оценивают бенефиты." The foe is 6000 off, so nothing can be
-  // struck from where the pig stands and the crate is a fair alternative:
-  // the dumb eye pulls the wits-0 pig onto the thing at its trotters, while
-  // the wits-1 pig reads five points of health at face, finds them under the
-  // shot, and walks at the foe.
+test('NOTHING IN REACH: the dumb pig goes for the crate, and the sharp one weighs it', { tag: '@nodata' }, () => {
+  // Play's rule, 2026-08-25: "тупой должен — вижу стреляю; не вижу — вижу
+  // ящик — беру ящик." The foe is 6000 off, so nothing can be struck from
+  // where the pig stands: the dumb eye then pulls the wits-0 pig onto the
+  // thing at its trotters and the walk goes THROUGH it. The wits-1 pig reads
+  // five points of health at face, finds them under the errand's own bar,
+  // and sets off at the foe instead.
   const scene = {
     foes: [foe({ z: 6000 })],
     crates: [{ x: 0, z: 200, skill: null, amount: 5 }]
   }
   const dumb = createGruntBrain()
   expect(dumb.decide(world({ ...scene, wits: 0 }))).toEqual({ kind: 'walkTo', x: 0, z: 200 })
-  expect(dumb.explain?.()?.chose?.kind).toBe('crate')
+  expect(dumb.explain?.()?.plan?.errand).toBe(true)
   const sharp = createGruntBrain()
   const order = sharp.decide(world({ ...scene, wits: 1 }))
-  expect(sharp.explain?.()?.chose?.kind).toBe('gun')
+  expect(sharp.explain?.()?.plan?.errand).toBe(false)
   expect(order.kind).toBe('walkTo')
   if (order.kind !== 'walkTo') return
   expect(order.z).toBeGreaterThan(200)
 })
-
-test('A BLOW IN HAND BEATS ANY CRATE, at every level of wits', { tag: '@nodata' }, () => {
-  // The other half of the same rule — "вижу цель — стреляю". A foe inside
-  // the rifle's own reach is struck from where the pig stands, and no
-  // pickup outbids that however near it lies or however dull the pig is.
+test('A BLOW IN HAND IS THE WHOLE ANSWER FOR A DUMB PIG — the smart one still thinks', { tag: '@nodata' }, () => {
+  // The two ends are not one rule turned up, they are different rules, and
+  // play said so twice. The DUMB end is a reflex ladder: "тупой должен —
+  // вижу стреляю", so a foe inside the rifle's own reach is shot and the
+  // crate at its trotters is not weighed at all. The SMART end THINKS —
+  // "чем умнее тем больше думает" — and it does not have to CHOOSE: a
+  // pickup spends no turn, so it walks through the crate and strikes after.
   const scene = {
     foes: [foe({ z: RANGE * 0.4 })],
     crates: [{ x: 0, z: 120, skill: null, amount: 50 }]
   }
-  for (const wits of [0, 1]) {
-    const brain = createGruntBrain()
-    brain.decide(world({ ...scene, wits, holding: SKILL.RIFLE }))
-    expect(brain.explain?.()?.chose?.kind).toBe('gun')
-  }
+  const dumb = createGruntBrain()
+  expect(dumb.decide(world({ ...scene, wits: 0, holding: SKILL.RIFLE }))).toEqual({ kind: 'fire' })
+  expect(dumb.explain?.()?.plan?.errand).toBe(false)
+  const sharp = createGruntBrain()
+  expect(sharp.decide(world({ ...scene, wits: 1, holding: SKILL.RIFLE }))).toEqual({
+    kind: 'walkTo',
+    x: 0,
+    z: 120
+  })
+  expect(sharp.explain?.()?.plan?.errand).toBe(true)
+  // …and the blow the turn is FOR is still the shot: the crate is a prefix.
+  expect(sharp.explain?.()?.chose?.kind).toBe('gun')
 })
-
 test('A HEALTH CRATE IS WORTH WHAT IT PUTS BACK: a topped-up pig walks past one', { tag: '@nodata' }, () => {
   // Play watched DEN take a crate at hp50, then cross the whole island for a
   // second at hp100 and a third after that. The engine has no ceiling and
@@ -683,8 +690,8 @@ test('A HEALTH CRATE IS WORTH WHAT IT PUTS BACK: a topped-up pig walks past one'
   }
   const hurt = createGruntBrain()
   hurt.decide(world({ ...scene, wits: 0, maxHealth: 500 }))
-  expect(hurt.explain?.()?.chose?.kind).toBe('crate')
+  expect(hurt.explain?.()?.plan?.errand).toBe(true)
   const topped = createGruntBrain()
   topped.decide(world({ ...scene, wits: 0, maxHealth: 50 }))
-  expect(topped.explain?.()?.chose?.kind).toBe('gun')
+  expect(topped.explain?.()?.plan?.errand).toBe(false)
 })

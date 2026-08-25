@@ -26,7 +26,7 @@
 
 import type { AiWorld, Seen } from './ai'
 import type { Option, Walked } from './evaluate'
-import { crateErrand, crateFallback, priceKit } from './evaluate'
+import { crateErrand, crateFallback, elect, ERRAND_WORTH } from './evaluate'
 import { WALK_SPEED } from './movement'
 
 /**
@@ -138,10 +138,13 @@ export function makePlan(
   const ground = world.reach(WALK_SPEED * world.turnSeconds * PLAN_TURNS)
   const walked: Walked | undefined = ground ? (to) => ground.walk(to) : undefined
 
-  // The blow: the best (item × target) the ground actually allows. Failing
-  // every weapon, a crate is a NECESSITY — a pig with nothing in reach still
-  // has a job (lib/game/evaluate.ts, `crateFallback`).
-  const option = priceKit(world, note, judge, walked) ?? crateFallback(world, skip)
+  // The two halves of the election, kept apart because they are not
+  // alternatives: a pickup spends no turn and the weapon does
+  // (lib/game/evaluate.ts, `elect`).
+  const { blow, crate } = elect(world, note, judge, walked)
+  // Failing every weapon AND every crate, a crate is still a NECESSITY — a
+  // pig with nothing in reach has a job (`crateFallback`).
+  let option = blow ?? crate ?? crateFallback(world, skip)
   if (!option) return null
 
   /**
@@ -163,26 +166,69 @@ export function makePlan(
     return legs
   }
 
-  // THE ERRAND. A PLANT never detours — a foe is standing in the blast —
-  // and a crate is never an errand on the way to another crate.
+  /**
+   * Whether a crate can be taken ON THE WAY to a blow — the clock and the
+   * ground both asked.
+   *
+   * The clock alone was never a bound: a first-map turn is 99 seconds and
+   * `WALK_SPEED` covers four maps in one, so "does it fit" said yes to
+   * everything, and play watched DEN's own plan line read `-> -1792,5376
+   * (errand) walk 24931` for one health crate. So the DETOUR is what is
+   * measured — there and onward, LESS the walk the turn was going to make
+   * anyway — and only then the clock, which still has to hold the blow that
+   * comes after ("взять ящик И ударить после").
+   */
+  const onTheWay = (one: Option, after: Option): boolean => {
+    // The onward leg is the crow line — one flood is one start, and the
+    // slack in `ERRAND_SPARE` is what covers its optimism.
+    const onward = Math.hypot(after.stand.x - one.target.x, after.stand.z - one.target.z)
+    const together = one.walk + onward
+    const detour = together - after.walk
+    return (
+      detour <= after.walk * ERRAND_DETOUR + ERRAND_REACH &&
+      together / WALK_SPEED + ERRAND_SPARE <= world.timeLeft
+    )
+  }
+
+  // THE ERRAND. A PLANT never detours — a foe is standing in the blast.
   let errand: Option | null = null
-  if (option.kind !== 'plant' && option.kind !== 'crate') {
-    const found = crateErrand(world, judge, walked, skip)
-    if (found) {
-      // The onward leg is the crow line — one flood is one start, and the
-      // slack in `ERRAND_SPARE` is what covers its optimism.
-      const onward = Math.hypot(
-        option.stand.x - found.target.x,
-        option.stand.z - found.target.z
-      )
-      const together = found.walk + onward
-      // ON THE WAY (ERRAND_DETOUR), and then IN THE CLOCK: the walk there,
-      // the walk onward, and the spare the blow itself wants.
-      const detour = together - option.walk
-      const allowed = option.walk * ERRAND_DETOUR + ERRAND_REACH
-      if (detour <= allowed && together / WALK_SPEED + ERRAND_SPARE <= world.timeLeft) {
-        errand = found
-      }
+  if (blow && blow.kind !== 'plant') {
+    // **A CRATE THAT WON THE ELECTION IS STILL A PREFIX IF IT CAN BE ONE.**
+    // The smart pig that prefers fifty points of health to twenty of damage
+    // does not have to CHOOSE: a pickup spends no turn, so the answer is
+    // both — walk through the crate, then strike. Only a crate that cannot
+    // be taken on the way becomes the turn's own goal, and then the blow is
+    // what is given up.
+    const beats = crate !== null && (crate.judged ?? crate.score) > (blow.judged ?? blow.score)
+    // **A BLOW IN HAND ENDS THE DUMB PIG'S THINKING, HERE TOO.** With the
+    // blow needing no walk at all, the only crate that may still be picked
+    // up on the way is the one the ELECTION weighed — and that one is
+    // already scaled by the wits (lib/game/evaluate.ts, `elect`), so at the
+    // bottom of the scale it reads as nothing and the pig simply shoots
+    // ("вижу стреляю"), while at the top it detours and strikes after
+    // ("взять ящик И ударить после"). A pig that has to walk anyway is a
+    // different case and picks up whatever is genuinely on its way, at any
+    // wits.
+    const wanted = beats
+      ? crate
+      : blow.walk === 0
+        ? crate !== null && (crate.judged ?? crate.score) >= ERRAND_WORTH
+          ? crate
+          : null
+        : crateErrand(world, judge, walked, skip)
+    if (wanted && onTheWay(wanted, blow)) {
+      option = blow
+      errand = wanted
+    } else if (beats && blow.walk > 0) {
+      // The crate out-judged the blow and cannot be taken on the way, so it
+      // becomes the turn's own goal — but only for a pig that had to WALK
+      // anyway, where the two are honestly alternatives. **A BLOW ALREADY IN
+      // HAND IS NEVER TRADED FOR A WALK**: a shot expires with the turn and
+      // a crate does not — it will still be lying there next turn — so with
+      // no room for both, the shot is taken and the crate waits. Which is
+      // also what stops five seconds on the clock reading as "jog 300 units
+      // for a health pack with a foe in your sights".
+      option = crate!
     }
   }
 

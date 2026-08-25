@@ -878,22 +878,32 @@ export function crateFallback(
 }
 
 /**
- * The kit priced whole: the best (item × target) pair, or null when nothing
- * scores above zero (then the pass is the honest move — a negative option is
- * never taken just for being the only one). Ties go to the kit's own order —
- * deterministic, like everything here.
+ * **THE ELECTION, IN ITS TWO HALVES** — the best BLOW the kit can land, and
+ * the best CRATE on the ground, kept apart on purpose.
  *
- * **A CRATE IS NOT A CANDIDATE HERE.** It is priced and it is reported, so
- * the telemetry still shows what a pickup was worth, but it never wins the
- * election, because a pickup and a blow are not alternatives: "пикап не
- * тратит ход — тратит ОРУЖИЕ", so a crate is a PREFIX to the attack
- * (`crateErrand`, collected on the way) or the whole job when there is no
- * attack to be had (`crateFallback`). Letting it compete is what play
- * watched go wrong: "второй свин прошёл мимо кучи свиней за аптечкой" —
- * a health crate one tile off out-priced the pig standing beside it, and
- * one misjudge roll was all it took.
+ * They are not alternatives in general: a pickup spends no turn and the
+ * weapon does, so a crate is usually a PREFIX to the attack rather than a
+ * replacement for one, and only whoever knows the turn's shape can tell
+ * which it is this time (lib/game/plan.ts). What is decided HERE is only
+ * what each half is worth.
+ *
+ * **WHEN A BLOW IS IN HAND, A CRATE IS ONLY THE SMART PIG'S BUSINESS.**
+ * Play's rule, 2026-08-25, and the correction that followed it the same
+ * evening. The DUMB end is a reflex ladder and nothing else: "тупой должен —
+ * вижу стреляю; не вижу — вижу ящик — беру ящик." The SMART end is not the
+ * same rule turned up, it is a different thing entirely — "чем умнее тем
+ * больше думает" — so a pig that could shoot may still decide the crate is
+ * worth more, and it is allowed to.
+ *
+ * One number says both. A blow that can be struck from where the pig STANDS
+ * scales every crate by the wits: at 0 the crate prices to nothing and the
+ * reflex is absolute, at 1 it competes at face and only the arithmetic
+ * speaks. With NOTHING in reach the scaling is off and the crate stands
+ * whole — which is where the dumb eye takes over, pulling hard toward
+ * whatever is nearest, so "чем тупее — тем больше вероятность тупого выбора
+ * ящик". Not a die: the same world gives the same answer twice.
  */
-export function priceKit(
+export function elect(
   world: AiWorld,
   note?: (option: Option) => void,
   /** The brain's own JUDGMENT of a score — misjudgment applied
@@ -904,20 +914,23 @@ export function priceKit(
   /** How far the LEGS go to a spot — the route's own length (`Walked`).
    * Absent, the crow line stands in. */
   walked?: Walked
-): Option | null {
-  let best: Option | null = null
-  let bestJudged = 0
-  const keep = (option: Option | null): void => {
+): { blow: Option | null; crate: Option | null } {
+  const rank = (
+    running: { best: Option | null; judged: number },
+    option: Option | null
+  ): void => {
     if (!option) return
     const judged = judge ? judge(option) : option.score
-    if (judged > 0 && (!best || judged > bestJudged)) {
-      best = option
-      bestJudged = judged
+    if (judged > 0 && (!running.best || judged > running.judged)) {
+      running.best = option
+      running.judged = judged
     }
   }
+  const blow = { best: null as Option | null, judged: 0 }
   for (const slot of world.acting.carrying) {
     if (slot.amount === 0) continue
-    keep(
+    rank(
+      blow,
       isPlanted(slot.skill)
         ? plantOption(world, slot.skill, note)
         : (gunOption(world, slot.skill, note, walked) ??
@@ -925,20 +938,36 @@ export function priceKit(
             meleeOption(world, slot.skill, note))
     )
   }
-  // **A CRATE STANDS FOR ELECTION ONLY WHEN THERE IS NOTHING TO HIT.** Play's
-  // ruling, 2026-08-25: "когда нет цели рядом или цели слишком далеко —
-  // тогда." A blow that can be struck from where the pig STANDS is the whole
-  // answer at every level of wits — "вижу цель — стреляю" — and no pickup
-  // outbids it. Once the pig has to walk anyway the crate is a fair
-  // alternative, and which way it goes is the JUDGMENT's business: the dumb
-  // eye pulls hard toward whatever is nearest, so "чем тупее — тем больше
-  // вероятность тупого выбора ящик", while at the top of the scale the
-  // appetite is 1, the near bonus is 0 and only the arithmetic speaks —
-  // "умные всегда оценивают бенефиты".
-  const inHand = best !== null && (best as Option).walk === 0
-  for (const crate of world.crates) {
-    const option = crateOption(world, crate, note, walked)
-    if (!inHand) keep(option)
+  const inHand = blow.best !== null && blow.best.walk === 0
+  const crate = { best: null as Option | null, judged: 0 }
+  for (const one of world.crates) {
+    const option = crateOption(world, one, undefined, walked)
+    if (!option) continue
+    if (inHand) option.score *= world.wits
+    note?.(option)
+    rank(crate, option)
   }
-  return best
+  return { blow: blow.best, crate: crate.best }
+}
+
+/**
+ * The kit and the ground priced whole, best of the two halves — or null when
+ * nothing scores above zero (then the pass is the honest move: a negative
+ * option is never taken just for being the only one). Ties go to the kit's
+ * own order, deterministic like everything here.
+ *
+ * The TURN reaches for `elect` instead, because it can do what this cannot:
+ * take the crate AND strike after it (lib/game/plan.ts).
+ */
+export function priceKit(
+  world: AiWorld,
+  note?: (option: Option) => void,
+  judge?: (option: Option) => number,
+  walked?: Walked
+): Option | null {
+  const { blow, crate } = elect(world, note, judge, walked)
+  if (!blow) return crate
+  if (!crate) return blow
+  const read = (one: Option): number => one.judged ?? one.score
+  return read(crate) > read(blow) ? crate : blow
 }
