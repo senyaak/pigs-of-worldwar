@@ -30,7 +30,7 @@ import { sharedBank } from './audio/bank'
 import { GAME_SOUNDS } from './audio/battleSound'
 import { fall, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
 import { fieldedAt, mapAt, mapId } from '../../lib/game/missions'
-import { foughtAt, missionScore, nextMap } from '../../lib/game/save'
+import { foughtAt, missionScore, nextMap, type FoughtPig } from '../../lib/game/save'
 import { isTrainingGround } from '../../lib/game/tutorial'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
@@ -161,6 +161,11 @@ let campaignBattle = false
  * roster stands back up untouched.
  */
 let replaying: number | null = null
+/** The squad that FINISHED the position being replayed — the save's own
+ * record, read once when the replay launches and held to its debrief. Never
+ * the live roster: pigs die and drafts take their slots, so the roster is a
+ * different squad (`[play]`, 2026-08-26). */
+let replaySquad: FoughtPig[] = []
 /** The replay's pickup count, held from the battle's exit to the debrief's
  * CONTINUE. */
 let replayPoints = 0
@@ -215,6 +220,7 @@ function startMission(): void {
   const save = campaign.current()
   campaignBattle = true
   replaying = null
+  replaySquad = []
   if (!save || save.position === 0) {
     toBriefing()
     return
@@ -229,14 +235,23 @@ function startMission(): void {
  * not one (`[deliberate]`).
  */
 function replayMission(position: number): void {
+  const save = campaign.current()
+  const fought = save && foughtAt(save, position)
+  // NO RECORD, NO REPLAY. The squad that finished the mission is the only
+  // squad that can field it again, and there is nothing to stand in with —
+  // the live roster is a different squad the moment anyone dies. MISSION
+  // SELECT locks such a row, so this is the door being bolted as well.
+  if (!fought) return
   campaignBattle = true
   replaying = position
-  toBriefing(position)
+  replaySquad = fought
+  toBriefing(position, fought)
 }
 
 /** The briefing page up, and the battle loading UNDER it. `replayAt` is
- * MISSION SELECT's position — absent, the campaign's own. */
-function toBriefing(replayAt?: number): void {
+ * MISSION SELECT's position and `fought` the squad it recorded — absent,
+ * this is the campaign's own next mission and the live roster fields it. */
+function toBriefing(replayAt?: number, fought?: FoughtPig[]): void {
   const save = campaign.current()
   const position = replayAt ?? save?.position ?? 0
   const enemy = save ? (save.enemies[position] ?? bootCampEnemy(save.nation)) : null
@@ -251,11 +266,11 @@ function toBriefing(replayAt?: number): void {
   // ESTU, five from then on. The roster is packed standing-first by
   // `regroup`, so the front slots are the front line (lib/game/roster.ts).
   //
-  // A REPLAY fields the squad that FINISHED the mission instead — the save's
-  // own record (`fought`), with the ranks they wore then. `[play]`,
-  // 2026-08-26: "переигрывать именно тем составом". The live roster stands
-  // in only for a record the save never wrote.
-  const fought = save && replayAt !== undefined ? foughtAt(save, replayAt) : null
+  // A REPLAY hands in the squad that FINISHED the mission instead — the
+  // save's own record, with the ranks they wore then (`[play]`, 2026-08-26:
+  // "переигрывать именно тем составом"). It is never worked out here and
+  // there is nothing to fall back on: `replayMission` refuses a position
+  // with no record rather than fielding whoever holds those slots today.
   const own = save
     ? {
         name: save.name,
@@ -300,6 +315,7 @@ const battle = initBattle((exit, fallen, kills, points) => {
   if (exit === 'aborted') {
     if (replaying !== null) {
       replaying = null
+      replaySquad = []
       campaign.discardMission()
     }
     toSquad()
@@ -318,13 +334,12 @@ const battle = initBattle((exit, fallen, kills, points) => {
     // is the mission's WHOLE score — completion, survival, pickups — the
     // same composition the first win banked (lib/game/save.ts).
     //
-    // The pigs on its page are the RECORDED squad the replay fielded
-    // (`fought`), stood up as display pigs with the battle's fall marks —
-    // the LIVE roster is never stamped: the fallen slots name the record's
-    // pigs, not whoever holds those slots today.
-    const fielded = foughtAt(save, replaying) ?? save.squad.slice(0, fieldedAt(replaying))
+    // The pigs on its page are the squad the replay FIELDED — the same
+    // record, stood up as display pigs with the battle's fall marks. The
+    // LIVE roster is never stamped: the fallen slots name the record's pigs,
+    // not whoever holds those slots today.
     const squad = Array.from({ length: SQUAD_SIZE }, (_, slot) => {
-      const pig = fielded[slot]
+      const pig = replaySquad[slot]
       return pig
         ? { name: pig.name, identity: pig.identity, rank: pig.rank,
             missions: 0, score: 0, fell: -1, deaths: 0 }
@@ -368,6 +383,7 @@ const debrief = initDebrief({
     if (replaying !== null) {
       const position = replaying
       replaying = null
+      replaySquad = []
       const before = campaign.current()
       void campaign.bankReplayResult(position, replayPoints).then((after) => {
         if (before && after) pendingAward = after.tokens - before.tokens
@@ -409,6 +425,7 @@ const debrief = initDebrief({
   onEditSquad: () => {
     campaign.discardMission()
     replaying = null
+    replaySquad = []
     toSquad()
   }
 })

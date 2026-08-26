@@ -317,21 +317,22 @@ test('finishMission records WHO fought, with the ranks they wore', { tag: '@noda
   expect(foughtAt(parse(serialise(won))!, 1)).toEqual(foughtAt(won, 1))
 })
 
-test('a save from before `fought` gets each finished mission a squad', { tag: '@nodata' }, () => {
+test('a save from before `fought` gets NOTHING invented', { tag: '@nodata' }, () => {
   const save = newGame('PIGS', 0, squadOf(), '2026-08-26T00:00:00Z')
   const old = JSON.parse(serialise({ ...save, position: 3 }))
   delete old.fought
   const read = parse(JSON.stringify(old))!
-  // Play's own repair for the old files: the first fielded-count of the
-  // standing squad stands in — three at ESTU, five at position 2.
-  expect(foughtAt(read, 1)).toEqual([
-    { name: 'JONES', identity: 8, rank: 0 },
-    { name: 'DEN', identity: 2, rank: 0 },
-    { name: 'BASIL', identity: 4, rank: 0 }
-  ])
-  expect(foughtAt(read, 2)).toHaveLength(5)
-  // The boot camp is never offered as a replay and gets no invented record;
-  // neither does the mission still ahead.
-  expect(foughtAt(read, 0)).toBeNull()
-  expect(foughtAt(read, 3)).toBeNull()
+  // The record is READ, never worked out: the live roster is a different
+  // squad the moment anyone dies, so a position with no record simply has
+  // none, and MISSION SELECT locks that row (`[play]`, 2026-08-26).
+  expect(read.fought).toEqual([])
+  expect(foughtAt(read, 1)).toBeNull()
+  expect(foughtAt(read, 2)).toBeNull()
+  // Rubbish in a row reads the same as absent, and costs no other row.
+  const holed = JSON.parse(serialise({ ...save, position: 3 }))
+  holed.fought = [null, [{ name: 'JONES', identity: 8, rank: 2 }], ['nonsense']]
+  const mixed = parse(JSON.stringify(holed))!
+  expect(foughtAt(mixed, 1)).toEqual([{ name: 'JONES', identity: 8, rank: 2 }])
+  expect(foughtAt(mixed, 0)).toBeNull()
+  expect(foughtAt(mixed, 2)).toBeNull()
 })

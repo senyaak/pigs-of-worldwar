@@ -29,9 +29,30 @@ test('the completed missions are listed, name left and record right', async ({ a
       ),
       new Date().toISOString()
     ),
-    position: 3,
+    // FOUR missions in, and the third of them kept NO squad — the shape of a
+    // campaign that played it before the record existed.
+    position: 4,
     tokens: 2,
-    best: [0, 1, 0]
+    best: [0, 1, 0, 1],
+    // A campaign that PLAYED a mission kept who fought it, and a replay
+    // fields exactly that squad — nothing may stand in for it, so position 3
+    // is locked here despite being behind the campaign (`[play]`,
+    // 2026-08-26; ui/missionSelect.ts).
+    fought: [
+      [],
+      [
+        { name: 'JONES', identity: 0, rank: 0 },
+        { name: 'DEN', identity: 1, rank: 0 },
+        { name: 'BASIL', identity: 2, rank: 0 }
+      ],
+      [
+        { name: 'JONES', identity: 0, rank: 0 },
+        { name: 'DEN', identity: 1, rank: 0 },
+        { name: 'BASIL', identity: 2, rank: 0 },
+        { name: 'GINGER', identity: 3, rank: 0 },
+        { name: 'MONTY', identity: 4, rank: 0 }
+      ]
+    ]
   }
   fs.mkdirSync(SAVE_DIR, { recursive: true })
   fs.writeFileSync(path.join(SAVE_DIR, 'savearmy6.json'), serialise(veteran))
@@ -60,10 +81,14 @@ test('the completed missions are listed, name left and record right', async ({ a
   await expect(page.locator('#missions')).toBeVisible()
 
   // EVERY real mission is a row and boot camp is not one (play: "тренировку
-  // туда не пихай"); the window shows the first eight. The two the campaign
-  // is past carry their pair — completion + survival is what a map with no
-  // specials can pay, and the parse floor gives the old pickup-only records
-  // their completion point — and every locked row is grey: no pair at all.
+  // туда не пихай"); the window shows the first eight. A REPLAYABLE row
+  // carries its pair — completion + survival is what a map with no specials
+  // can pay, and the parse floor gives the old pickup-only records their
+  // completion point — and every locked row is grey: no pair at all.
+  //
+  // The THIRD row is the new rule: the campaign is past it, its `best` says
+  // it was finished, and it is locked anyway because the save kept no squad
+  // for it. A replay fields the pigs that fought, and nothing stands in.
   await expect.poll(() => labels(page, 'missionSelect')).toHaveLength(8)
   const names = await labels(page, 'missionSelect')
   expect(names[0]).toContain('THE WAR FOUNDATION')

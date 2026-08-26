@@ -34,46 +34,32 @@ async function settled(page: Page, screen: 'playerScreen' | 'pigMenu'): Promise<
 }
 
 /**
- * A hash of the board band where only the squad's `pigpro` lines would paint
- * while CAREER PATH is up — between the career title (ends y 355) and the
- * career name (starts y 373), across the board's face. The career screen has
- * no backdrop of its own: it writes ON the board, and the board's own lines
- * make way while it is up. A debug read is not a paint check (CLAUDE.md) —
- * the bug this pins showed the lit pig's stale lines under the career words
- * while every state read answered correctly. Two grunts' career screens must
- * paint this band IDENTICALLY: a leaked board line carries the pig's own
- * name and differs.
+ * How many LETTER pixels stand in the board's second line — the band the
+ * squad's `pigpro` writes the lit pig's NAME across (y 358), which is also
+ * the gap CAREER PATH leaves between its title (y 339) and its career name
+ * (y 373). The career screen has no backdrop of its own: it writes ON the
+ * board, and the board's own lines make way while it is up.
  *
- * The helper waits for the picture to SETTLE before answering — the dim veil
- * ramps 10 ticks of 40 ms after an overlay opens, and a hash taken mid-ramp
- * measures the veil, not the words (it cost a run: two career screens read
- * ×2/3 apart, every pixel, nothing but the shade). Reads ~150 ms apart, by
- * the page's own frames, until two agree; the ramp is monotonic, so agreeing
- * means done.
+ * A debug read is not a paint check (CLAUDE.md) — the bug this pins showed
+ * the lit pig's stale lines under the career words while every state read
+ * answered correctly. It counts BRIGHTNESS rather than hashing the band,
+ * and that is not a detail: hashing measures the DIM VEIL, which ramps 10
+ * ticks of 40 ms behind an overlay, so two captures a keypress apart differ
+ * by the shade alone (it cost a run, and a full-canvas pixel diff showed
+ * the band itself identical both times). A letter is written in the light
+ * shade and stays far over 100 through a veil that only takes a third.
  */
-const boardStrip = (page: Page): Promise<number> =>
-  page.evaluate(async () => {
+const bandLetters = (page: Page): Promise<number> =>
+  page.evaluate(() => {
     const canvas = document.getElementById('player-screen') as HTMLCanvasElement | null
     const context = canvas?.getContext('2d')
     if (!canvas || !context) return -1
-    const read = (): number => {
-      const pixels = context.getImageData(240, 356, 180, 15).data
-      let hash = 0
-      for (let i = 0; i < pixels.length; i++) hash = (hash * 31 + pixels[i]) | 0
-      return hash
+    const pixels = context.getImageData(240, 356, 180, 15).data
+    let lit = 0
+    for (let i = 0; i < pixels.length; i += 4) {
+      if ((pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3 > 100) lit++
     }
-    const frames = async (): Promise<void> => {
-      const start = performance.now()
-      while (performance.now() - start < 150) await new Promise(requestAnimationFrame)
-    }
-    let last = read()
-    for (let round = 0; round < 20; round++) {
-      await frames()
-      const now = read()
-      if (now === last) return now
-      last = now
-    }
-    return last
+    return lit
   })
 
 const menuOpen = (page: Page, which: 'pigMenu' | 'careerPath'): Promise<boolean> =>
@@ -209,10 +195,17 @@ test('a token walks a grunt down the career path, and the next step costs two', 
   await expect(page.locator('#player')).toBeVisible()
   await settled(page, 'playerScreen')
 
+  // Two down: START MISSION → REPLAY MISSIONS → the first pig. With the pig
+  // LIT and no overlay up, the board writes its name across the band — which
+  // is what gives the check below its teeth: the words really are painted
+  // there, and the career screen has to clear them.
+  await tap(page, 'menuDown')
+  await tap(page, 'menuDown')
+  await expect
+    .poll(() => bandLetters(page), { message: "the board never wrote the pig's name" })
+    .toBeGreaterThan(0)
+
   // PROMOTE on a GRUNT opens CAREER PATH — four careers, the tree's order.
-  // Two down: START MISSION → REPLAY MISSIONS → the first pig.
-  await tap(page, 'menuDown')
-  await tap(page, 'menuDown')
   await tap(page, 'menuSelect')
   await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(true)
   await tap(page, 'menuSelect')
@@ -223,29 +216,14 @@ test('a token walks a grunt down the career path, and the next step costs two', 
     'ESPIONAGE',
     'MEDIC'
   ])
-  const jones = await boardStrip(page)
 
-  // BACK closes to the squad. The SECOND grunt's career screen must paint
-  // the board band identically — the board's own lines carry the pig's NAME,
-  // so a leaked line differs between JONES and DEN. This is the paint check:
-  // the board makes way while CAREER PATH stands on it.
-  await tap(page, 'menuBack')
-  await expect.poll(() => menuOpen(page, 'careerPath')).toBe(false)
-  await tap(page, 'menuDown')
-  await tap(page, 'menuSelect')
-  await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(true)
-  await tap(page, 'menuSelect')
-  await expect.poll(() => menuOpen(page, 'careerPath')).toBe(true)
-  expect(await boardStrip(page), 'the board leaked under the career words').toBe(jones)
-  await tap(page, 'menuBack')
-  await expect.poll(() => menuOpen(page, 'careerPath')).toBe(false)
-
-  // Back to the first pig for the promotion itself.
-  await tap(page, 'menuUp')
-  await tap(page, 'menuSelect')
-  await expect.poll(() => menuOpen(page, 'pigMenu')).toBe(true)
-  await tap(page, 'menuSelect')
-  await expect.poll(() => menuOpen(page, 'careerPath')).toBe(true)
+  // THE PAINT CHECK: the band between the career title and the career name
+  // is bare. The board's own line stood there a moment ago and the career
+  // screen is drawn ON the board, so a leaked line is exactly the bug play
+  // reported — stale words showing under the career words.
+  await expect
+    .poll(() => bandLetters(page), { message: 'the board leaked under the career words' })
+    .toBe(0)
 
   // ENGINEER's first step is the SAPPER, for the one token — the carousel
   // walks RIGHT, play's rule: "кнопки в лево в право, а не в верх в низ".

@@ -29,7 +29,7 @@ import { loadSprites } from './sprites'
 import type { SpriteSet } from './sprites'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { current } from '../campaign'
-import { bestAt } from '../../../lib/game/save'
+import { bestAt, foughtAt } from '../../../lib/game/save'
 import { bonusPoints, CAMPAIGN_LENGTH, mapAt, missionNameIndex } from '../../../lib/game/missions'
 
 /** The screen's own title — a literal, because no fetext names a replay
@@ -142,8 +142,18 @@ export function initMissionSelect(handlers: {
   const panel: Widget = widget(0)
   const plates: Widget[] = Array.from({ length: WINDOW }, () => widget(2))
 
-  /** A row past the record is locked — never chosen, only read. */
-  const locked = (position: number): boolean => position >= (current()?.position ?? 0)
+  /**
+   * A row past the record is locked — never chosen, only read. So is one the
+   * save kept no SQUAD for: a replay fields the pigs that finished the
+   * mission and nothing else may stand in (`[play]`, 2026-08-26), so a
+   * position with no record cannot be replayed at all. Only a campaign from
+   * before the record existed has such a row.
+   */
+  const locked = (position: number): boolean => {
+    const save = current()
+    if (!save || position >= save.position) return true
+    return foughtAt(save, position) === null
+  }
 
   const refresh = (): void => {
     positions = current()

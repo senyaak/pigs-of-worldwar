@@ -1230,3 +1230,40 @@ name the record's pigs, not whoever holds those slots today.
 
 Pinned in unit/save.spec.ts: the record survives a promotion and a file
 round trip, and the parser repair fills exactly the finished positions.
+
+## 2026-08-26 — corrected: the record is READ, never invented
+
+Play, on the entry above: "никаких фолбеков - живой ростер может смениться
+если свины умерли - так что только из сейва", and on the parser repair that
+filled the old files: "нет такого правила - а если есть ты сам его придумал".
+Both are right, and the second is the sharper one — the "a save is REPAIRED
+at the parser" line in CLAUDE.md is this repo's own (commit ce2d01f, written
+for the SHORT ENEMY TABLE, which a play session forced), and stretching it to
+manufacture a squad was nobody's rule.
+
+So `parse` no longer fills anything: `fought` is validated and otherwise left
+exactly as the file has it, holes included. A position with no record cannot
+be replayed at all — MISSION SELECT LOCKS such a row (grey, browsable,
+refuses the choice, the same treatment a mission ahead of the campaign gets)
+and `replayMission` refuses it a second time at the door. The briefing takes
+the recorded squad as an ARGUMENT rather than looking one up, and the
+replay's debrief reads the same held record, so there is no place left where
+the live roster could stand in.
+
+The four saves in this checkout were fixed by HAND instead, which is where
+that work belonged: `savearmy1/2/3` each stood at position 2 with the first
+three pigs carrying `missions: 1`, so ESTU's record is those three at the
+ranks they wear now (BASTILLE is an ORDERLY today and fought as a GRUNT —
+the rank at the time is not in the file, and play's instruction was to take
+the active front line). `savearmy0` is at position 1: only boot camp is
+behind it, which is never a replay row, so it keeps an empty record.
+
+The spec's paint check changed shape a second time, and this one earns its
+place. Hashing the board band compared the DIM VEIL — it ramps 10 ticks of
+40 ms behind an overlay, so two captures a keypress apart differ by the
+shade alone, which a full-canvas pixel diff proved (the band itself was
+identical both times). It counts LETTER pixels now — brightness over 100
+across the band — asserted twice: the board really does write the lit pig's
+name there with no overlay up, and the band is bare once CAREER PATH stands
+on it. Verified by MUTATION: with `writeBoard`'s guard removed the run fails
+on that exact line.

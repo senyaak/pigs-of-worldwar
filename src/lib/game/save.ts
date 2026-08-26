@@ -20,7 +20,7 @@
 import { fillEnemies } from './enemies'
 import { CAMPAIGN_LENGTH, fieldedAt, mapAt } from './missions'
 import { seeded } from './random'
-import { regroup, SQUAD_SIZE, standing, type Pig } from './roster'
+import { regroup, SQUAD_SIZE, type Pig } from './roster'
 
 /** Bumped when the shape changes in a way an older file cannot be read as. */
 export const SAVE_VERSION = 1
@@ -290,26 +290,18 @@ export function parse(text: string): SaveGame | null {
   // finishing is a point, so the floor is 1. The survival point cannot be
   // recovered — a replay re-earns it. Pure: seeded off the save itself.
   for (let p = 1; p < save.position; p++) save.best[p] = Math.max(save.best[p] ?? 0, 1)
-  // `fought` arrived when replays began fielding the squad that FINISHED the
-  // mission (2026-08-26); a file from before it fielded replays off the live
-  // roster. Normalised element-wise like `best`, then every completed
-  // position without a record gets one — play's own instruction for the old
-  // files ("возьми активных первых трёх свиней в запись"): the first
-  // fielded-count of the STANDING squad stands in. Position 0 is the boot
-  // camp, which MISSION SELECT never offers, and gets no record invented.
+  // `fought` is READ, never invented. A file from before the field existed
+  // carries no record, and no record means that position cannot be replayed
+  // — the live roster is NOT the squad that fought it (`[play]`,
+  // 2026-08-26: "живой ростер может смениться если свины умерли - так что
+  // только из сейва"). Malformed rows are dropped to empty, which reads the
+  // same as absent; nothing is filled in.
   const recorded = Array.isArray(save.fought) ? save.fought : []
   save.fought = recorded.map((one) =>
     Array.isArray(one) && one.every(isFoughtPig)
       ? one.map(({ name, identity, rank }) => ({ name, identity, rank }))
       : []
   )
-  for (let p = 1; p < save.position; p++) {
-    if (save.fought[p]?.length) continue
-    save.fought[p] = save.squad
-      .filter(standing)
-      .slice(0, fieldedAt(p))
-      .map(({ name, identity, rank }) => ({ name, identity, rank }))
-  }
   /**
    * A SHORT ENEMY TABLE IS FILLED IN HERE, at the door, because nothing
    * downstream can cope with one and everything downstream believes it.
