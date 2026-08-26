@@ -53,8 +53,13 @@ export interface Tumbles {
    * Throw this pig with `velocity` — whoever throws says HOW, this only owns
    * the flight. Throwing one that is already in the air REPLACES what it had:
    * a second blast catching a pig mid-flight is the last word on where it goes.
+   *
+   * `ejected` wears the FLYING clip for the whole arc (a melee hit, a wall's
+   * throw-out); `struck` is a BULLET's knockdown — the exe plays clip 39
+   * "Bouncing on B-Hind" AT the impact (0x478AC4), so the flight starts
+   * already `touched` and wears the bounce from its first frame.
    */
-  fling(pig: Pig, velocity: Velocity, ejected?: boolean): void
+  fling(pig: Pig, velocity: Velocity, ejected?: boolean, struck?: boolean): void
   /** One frame of every flight. */
   update(delta: number): void
   /** How many are in the air — what a turn cannot be handed over through
@@ -180,7 +185,7 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
     )
 
   return {
-    fling(pig, velocity, ejected = false) {
+    fling(pig, velocity, ejected = false, struck = false) {
       // Built where the pig IS, standing on whatever it is standing on — a pig
       // blown off a crate must not be measured from the ground under it
       // (lib/game/locomotion.ts `Footing`).
@@ -200,7 +205,7 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
       // one — which is what a MELEE hit wears, the exe putting a struck pig
       // through 0x470c70 and that arm calling for clip 38 (0x470cf5), the
       // same clip a pig thrown out of a wall gets.
-      state.airborne = { vx, vy, vz, bouncing: true, pushIn: null, ejected }
+      state.airborne = { vx, vy, vz, bouncing: true, pushIn: null, ejected, touched: struck }
       state.getUp = 0
       flying.set(pig.id, state)
       // Nothing is announced HERE: the clip the pig will wear is the one the first
@@ -225,10 +230,18 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
         if (state.clip !== was && !isDead(pig)) {
           emit({ kind: 'clip', pig: pig.id, index: state.clip, once: state.commit })
         }
-        // Down for good. Whatever it was wearing goes back to standing, once —
-        // the get-up clip is what the landing asked for and it plays out on its
-        // own (lib/game/anim.ts).
-        if (state.airborne === null) flying.delete(id)
+        // Down for good — but NOT gone until it is back on its feet. The
+        // landing hands out `getUp` (lib/game/locomotion.ts `fly`), and the
+        // only thing that burns it and HOLDS the get-up clip is `ground()`,
+        // which nothing else runs for a pig that is not acting. Deleting on
+        // the landing frame was the invisible knockdown play reported ("свин
+        // даже не шелохнулся"): the very next battle frame found
+        // `tumbles.has(pig)` false and stamped IDLE over a get-up that had
+        // lived one step. So the record stays — and both dressing loops keep
+        // skipping the pig — until the get-up has run down. A DEAD body keeps
+        // none: its dying clip is not a stand-up (the `isDead` guard above),
+        // and the corpse flow waits on `tumbling` (lib/game/corpses.ts).
+        if (state.airborne === null && (state.getUp <= 0 || isDead(pig))) flying.delete(id)
       }
     },
     live: () => flying.size,

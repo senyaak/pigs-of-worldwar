@@ -753,8 +753,15 @@ and the weakest of them were invented here:
   `nomouse.com`) and its LOAD screen never recolours a label — the plate
   behind it blinks instead. Both are overridden: `ui/mouseRows.ts` is the one
   hit test (un-letterbox the canvas, hit the rows the screen is drawing with,
-  walk the light one row a tick so nothing jumps), and a lit row is written in
-  the light shade wherever a row is written at all. A screen the pointer
+  walk the light one row a tick so nothing jumps — and a CLICK both SEEDS the
+  hover and QUEUES: the light walks to the clicked row and the choice lands
+  when it arrives, `clicked()`, because a screen entered under a parked
+  pointer sees no `mousemove` and a click lost on an unlit row reads as a
+  dead screen), and a lit row is written in
+  the light shade wherever a row is written at all. A LIST screen chooses
+  ONLY through that queue in its `advance` — never in `onClick`, or a lit
+  row would fire twice — and a row's hit band runs to the NEXT row, not to
+  the letters' own height. A screen the pointer
   cannot drive reads as broken however faithful it is. **And the rule covers
   everything ADDED**: a new screen, overlay or interactive element ships with
   its `trackRows` boxes in the same change, or it is not finished — the whole

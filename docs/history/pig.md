@@ -551,3 +551,30 @@ is not water. The same frame also moves the splash sound and the camera's
 `SWIM_SINK` drop, which both read `swimming` and were late by the same
 window. Pinned in `unit/locomotion.spec.ts` ("a splashdown swims from its
 very first frame").
+
+### A knockdown is not a side effect of the shove (2026-08-26, later)
+
+Play, first shotgun volley: "сняли 27, и свин даже не шелохнулся - должен от
+любого урона отлетать так то." The exe knocks a struck pig down
+UNCONDITIONALLY — state 5 at 0x478AB2, clip 39 at 0x478AC4 — whatever the
+shove's size; here the knockdown was nothing but the fling's velocity, and
+a bullet's shove is LEVEL. Four dominoes: a level 90-a-second push never
+leaves the ground (first substep lands), the arrival is soft so no bounce,
+the one flight frame wore EJECTED (38) which the same update overwrote with
+LAND — so clip 39 was never announced — and `tumbles` deleted the record on
+the landing frame, upon which the next battle frame's dressing loop stamped
+IDLE over a get-up that had lived one step. Even the rifle's full 48 only
+skimmed for four frames; the only knock that ever read was the blast's,
+whose 45° launch keeps a pig airborne for real.
+
+Two changes in the mechanism, none in the numbers. `tumbles` now keeps the
+record until the get-up has run down — `ground()` is what burns `getUp` and
+holds the LAND clip, and it only runs while the pig is still in `flying`;
+both dressing loops already skip on `tumbles.has`. And a bullet's fling is
+`struck`: the flight starts already `touched`, so it wears the exe's own
+clip 39 from the impact instead of the wall-eject 38 (melee keeps 38 via
+`ejected`, a blast keeps 38-then-39 via the touch). A dead body still
+leaves the list at once — its dying clip is not a stand-up. The shotgun's
+tiny 6 now reads exactly like the exe: the pig drops and takes its 0.44 s
+getting up, however small the push. Pinned in `unit/knockdown.spec.ts`,
+both shoves.

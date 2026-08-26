@@ -285,7 +285,7 @@ export interface Battle {
    * own (lib/game/tumble.ts). Two states over one pig would fight over its
    * position, and this is the seam that keeps there being one.
    */
-  fling(pig: Pig, velocity: Velocity, ejected?: boolean): void
+  fling(pig: Pig, velocity: Velocity, ejected?: boolean, struck?: boolean): void
   /** Warp the acting pig — the debug surface the e2e suite drives through. */
   warp(x: number, z: number, heading: number): void
 }
@@ -2028,7 +2028,7 @@ export function createBattle(parts: BattleParts): Battle {
       leaveRequested = true
     },
     announce: emit,
-    fling(pig, velocity, ejected = false) {
+    fling(pig, velocity, ejected = false, struck = false) {
       emit({
         kind: 'flung',
         pig: pig.id,
@@ -2038,13 +2038,14 @@ export function createBattle(parts: BattleParts): Battle {
         vz: velocity.vz
       })
       if (pig !== game.currentPig) {
-        tumbles.fling(pig, velocity, ejected)
+        tumbles.fling(pig, velocity, ejected, struck)
         return
       }
       // The acting pig's flight is `loco`'s, and `bouncing` is what tells the
-      // clip chain it was thrown rather than jumped (lib/game/locomotion.ts).
+      // clip chain it was thrown rather than jumped (lib/game/locomotion.ts);
+      // `struck` starts it already touched, the bullet's own knockdown clip.
       const { vx, vy, vz } = velocity
-      loco.airborne = { vx, vy, vz, bouncing: true, pushIn: null, ejected }
+      loco.airborne = { vx, vy, vz, bouncing: true, pushIn: null, ejected, touched: struck }
       loco.getUp = 0
     },
     warp(x, z, heading) {

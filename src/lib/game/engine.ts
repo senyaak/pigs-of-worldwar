@@ -410,8 +410,10 @@ export function createEngine(parts: EngineParts): Engine {
       pose,
       random,
       // A bullet shoves the body it hits (SHOT_SHOVE, lib/game/bullets.ts),
-      // through the same seam every other throw takes.
-      fling: (pig, velocity) => fling(pig, velocity)
+      // through the same seam every other throw takes — STRUCK, so the
+      // knockdown wears the exe's clip 39 from the impact itself, whatever
+      // the shove's size (the shotgun's 6 knocks a pig down as surely as 48).
+      fling: (pig, velocity) => fling(pig, velocity, false, true)
     },
     bus.emit
   )
@@ -428,8 +430,8 @@ export function createEngine(parts: EngineParts): Engine {
   // rather than the sky's (lib/game/tumble.ts, `hurlVelocity`).
   const groundNormal = (x: number, z: number): { x: number; y: number; z: number } =>
     query.normal(x, z)
-  const fling = (pig: Pig, velocity: Velocity, ejected?: boolean): void =>
-    battle.fling(pig, velocity, ejected)
+  const fling = (pig: Pig, velocity: Velocity, ejected?: boolean, struck?: boolean): void =>
+    battle.fling(pig, velocity, ejected, struck)
   /** What becomes of a body once it is killed: the dying clip, the corpse
    * blast, the boots (lib/game/corpses.ts). After the tumbles, because a body
    * a blast threw finishes its flight before it finishes its death. */
