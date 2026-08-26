@@ -1290,17 +1290,22 @@ advance). So the words sat 41 px left of the face they are written on.
 The folded boxes were x 184 wide 218 — centre 293, which is where that came
 from. They are the BOARD's now, x 232 wide 200, which centres them on 332
 and also keeps the longest career name from overhanging the board's face.
-The ICON row is not placed by a stored x at all any more: it is centred as
-a GROUP at draw time, three steps plus the last icon's own width, so the
-row follows the words and nothing has to know how wide an icon is.
+After, measured the same way: title 284..377 (centre 330.5) and name
+272..388 (centre 330), against the board's own 330.
 
-After, measured the same way: title 284..377 (centre 330.5), name 272..388
-(centre 330), and the four icons' ink 279..380 (centre 329.5) — against the
-board's own 330. The icon measurement needed care: a single threshold over
-the whole band also catches the board's bright left rim at 241, which is
-what made a first reading say the icons were still off at 310. Counting
-RUNS of bright pixels instead separates the rim from the four icons, and
-the union over 30 frames catches the one that blinks.
+**The ICONS were moved with them and put straight back** — `[play]`,
+minutes later: "иконки стояли отлично". The row had been re-placed as a
+group, centred at draw time off the sprites' own widths; it keeps the exe's
+x 260 again, and only the text had ever drifted. Worth remembering as the
+plainer lesson: the ask was the TEXT, and the row beside it was not
+evidence of anything.
+
+Measuring the icons at all needed care, which is why the overreach was not
+caught on the numbers: a single threshold over the whole band also catches
+the board's bright left rim at 241, and that made a first reading claim the
+icons sat at 310 both before and after. Counting RUNS of bright pixels
+separates the rim from the four icons, and a union over 30 frames catches
+the one that blinks.
 
 `e2e/001/pigmenu.spec.ts` pins it: the career title's painted ink must
 centre within a pixel of where the board centres a line of its OWN — read

@@ -46,22 +46,23 @@ const ROW_TEXT = 91
  * are centred there (ui/playerScreen.ts, `board.centre`). Measured on the
  * canvas before and after: the title painted 245..338 against the board's
  * own 313..347. So the boxes are the BOARD's here — x 232 wide 200, which
- * also keeps the longest career name from overhanging its face.
+ * also keeps the longest career name from overhanging its face. The ICONS
+ * below did NOT move with them: play had no complaint about the row.
  */
 const TITLE = { x: 232, y: 339, width: 200 }
 const NAME = { x: 232, y: 373, width: 200 }
 
-/** The four icons, y 408, 30 apart — rows 0..3 wear the careers' badges in
- * the stack table's order {0,2,1,3} over the loader's handle array, which
- * lands as heavy, sapper, sniper, medic. The row's own x (the exe's 260) is
- * NOT kept: the group is centred on the board with the words, off the
- * sprites' own widths at draw time, so nothing here has to know how wide an
- * icon is. */
+/**
+ * The four icons: x 260 + 30 a row, y 408 — rows 0..3 wear the careers'
+ * badges in the stack table's order {0,2,1,3} over the loader's handle
+ * array, which lands as heavy, sapper, sniper, medic.
+ *
+ * **The x stays the exe's**, though the WORDS above moved: centring the row
+ * on the board with them was built and thrown out on sight — `[play]`,
+ * 2026-08-26, "иконки стояли отлично". Only the text had drifted.
+ */
 const ICONS = ['pcHweap', 'sappr', 'snipr', 'pcmedic']
-const ICON = { step: 30, y: 408 }
-
-/** What the whole screen is centred on — the board's own centre. */
-const CENTRE = TITLE.x + TITLE.width / 2
+const ICON = { x: 260, step: 30, y: 408 }
 
 /** A row change (0x4280E4) — `click4` at 40, and nothing else moves. */
 const MOVE = { name: 'CLICK4', gain: 0.4 }
@@ -147,13 +148,9 @@ export function initCareerPath(handlers: {
         lit.draw(context, text, Math.round(box.x + (box.width - lit.measure(text)) / 2), box.y)
       centred(feText(TITLE_TEXT), TITLE)
       centred(feText(ROW_TEXT + selection), NAME)
-      // The row is placed as a GROUP: three steps plus the last icon's own
-      // width is how wide it stands, and that lands centred on the board.
-      const last = sprites.get(ICONS[ICONS.length - 1])
-      const left = Math.round(CENTRE - (ICON.step * (ICONS.length - 1) + last.width) / 2)
       ICONS.forEach((name, i) => {
         if (i === selection && blink) return
-        context.drawImage(sprites.get(name).image, left + ICON.step * i, ICON.y)
+        context.drawImage(sprites.get(name).image, ICON.x + ICON.step * i, ICON.y)
       })
     },
     use(it) {
