@@ -254,7 +254,12 @@ call, not a reading. Three things are known and none of them is chosen:
 
 1. the exe's clamp applies **only to the player-driven pig and not in mode
    13**; the remake clamps every pig, the ballistic path and the swim
-   unconditionally, and nothing records that as deliberate;
+   unconditionally. **`[play]`, 2026-08-26, says which way that goes**: in
+   the original a BLAST can throw a pig past the walkable boundary — "там
+   можно чтобы взрывом отбросило за проходимую границу вроде - но потом
+   обратно свин сам бежит" — and then walks itself back in. So the
+   clamp belongs on the WALK alone, and something has to bring a pig home
+   afterwards; that arm is not found yet (`terrain/boundary.md`);
 2. the AI's search grid is derived from `WORLD_LIMIT` (`lib/game/pathgrid.ts`),
    which is why that session's plans sat on ±12032 — the grid's own corner,
    not a map edge, so it is not evidence of a bounds bug;
