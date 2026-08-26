@@ -21,7 +21,16 @@ import { meleeOf } from '../src/lib/game/melee'
 test('a grunt has fifty and a heavy far more — health is the CLASS s', { tag: '@nodata' }, () => {
   expect(maxHealthFor(0)).toBe(50)
   expect(maxHealthFor(4)).toBe(130)
-  expect(CLASS_HEALTH).toHaveLength(12)
+  // EVERY reachable class, and the top of each career is the point: the
+  // table used to stop at 11, so a MEDIC, a SURGEON and a HERO all lived on
+  // a grunt's fifty. Read off the exe's own record (health times 128 at
+  // `+0x00` of the 128-byte row at 0x4d02e0).
+  expect(CLASS_HEALTH).toHaveLength(17)
+  expect(maxHealthFor(11)).toBe(60) // ORDERLY
+  expect(maxHealthFor(12)).toBe(80) // MEDIC
+  expect(maxHealthFor(13)).toBe(120) // SURGEON
+  expect(maxHealthFor(14)).toBe(150) // HERO
+  expect(maxHealthFor(16)).toBe(200) // LEGEND, the final mission's own
   // A class off the end of the table dresses as a grunt and lives like one.
   expect(maxHealthFor(99)).toBe(maxHealthFor(0))
 })

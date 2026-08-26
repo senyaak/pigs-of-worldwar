@@ -481,3 +481,30 @@ is a pig not animating at all.
 
 `Airborne` carries a `touched` flag now: flying until the ground says
 otherwise, bouncing after, and an eject still flies the whole way.
+
+## 2026-08-26 — three classes were living on a grunt's fifty
+
+Play brought a 2008 PlayStation walkthrough (TrulyDexterous, GameFAQs) —
+"может что полезное найдёшь". A fan document settles nothing on its own, but
+its per-rank HP column is a table to check ours against, and checking it is
+what found the hole.
+
+`CLASS_HEALTH` stopped at class 11. The classes past it — 12 MEDIC, 13
+SURGEON, 14 HERO — fell through `maxHealthFor`'s grunt fallback and walked
+around on FIFTY: the whole top of the medic career, and the summit every
+career climbs to. Read straight out of the exe the same day (the 128-byte
+record at 0x4d02e0, `+0x00` is health times 128 — the grunt's 50 is stored
+as 6400) the seventeen reachable rows are 50/75/90/120/130/80/100/120/75/
+90/120/60/80/120/150/150/200, and the FAQ lists the same numbers class for
+class, the LEGEND's 200 included.
+
+The same truncation had already been caught and fixed in the KIT half of
+that record a week earlier (`lib/game/kits.ts`, "all twenty-four records,
+where the notes' table had stopped at class 11") — and the health half,
+which is `+0x00` of the very same row, was left short. Worth remembering
+as a shape: when one field of a record is found truncated, the others in it
+were read from the same place.
+
+`unit/health.spec.ts` now pins every career's top rather than two ends of
+the old table. The cross-check itself is written up in the disasm repo
+(`sources/faq-trulydexterous.md`), including what the FAQ does NOT settle.

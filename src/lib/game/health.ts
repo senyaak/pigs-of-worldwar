@@ -25,8 +25,40 @@
  * first field.
  *
  * **A grunt has fifty, not a hundred**, which is five bayonet swings.
+ *
+ * **All SEVENTEEN reachable rows are here now.** The table used to stop at
+ * class 11 and every class past it fell through to a grunt's fifty - so a
+ * MEDIC, a SURGEON and a HERO, the whole top of the medic career and the
+ * summit of every career, walked around on 50. Read out of the exe on
+ * 2026-08-26 (the record's `+0x00` is health times 128: 6400 for the
+ * grunt's 50), and a fan walkthrough independently lists the same numbers
+ * class for class, 200 for the LEGEND included. The same truncation had
+ * already been found and fixed in the KIT table (lib/game/kits.ts) a week
+ * earlier; this half of the record was missed then.
+ *
+ * 15 is the ACE - the same 150 as a HERO - and 16 the LEGEND, the 200 that
+ * only the final mission fields. Rows 17..23 are real records with no
+ * reader found (kits.ts says the same), so they stop here.
  */
-export const CLASS_HEALTH = [50, 75, 90, 120, 130, 80, 100, 120, 75, 90, 120, 60]
+export const CLASS_HEALTH = [
+  50, // 0  GRUNT
+  75, // 1  GUNNER
+  90, // 2  BOMBARDIER
+  120, // 3  PYROTECH
+  130, // 4  COMMANDO
+  80, // 5  SAPPER
+  100, // 6  ENGINEER
+  120, // 7  SABOTEUR
+  75, // 8  SCOUT
+  90, // 9  SNIPER
+  120, // 10 SPY
+  60, // 11 ORDERLY
+  80, // 12 MEDIC
+  120, // 13 SURGEON
+  150, // 14 HERO
+  150, // 15 ACE
+  200 // 16 LEGEND
+]
 
 /** What a pig of this class starts and tops out at. A class off the end of
  * the table is a grunt, the same fallback its art takes (three/soldiers.ts). */
