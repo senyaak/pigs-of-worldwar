@@ -28,6 +28,7 @@ import type { Pig } from './game'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
 import type { Strikes } from './strikes'
+import type { Heals } from './healing'
 import type { Sights } from './sights'
 import type { Anim } from './anim'
 
@@ -50,6 +51,9 @@ export interface AttackParts {
   shots: Bullets
   grenades: Lobs
   swings: Strikes
+  /** The healing hands — the one skill the press answers on the spot
+   * (lib/game/healing.ts). */
+  heals: Heals
   /** Firing drops the sights, and the aim it leaves is what the shot takes. */
   sights: Sights
   anim: Anim
@@ -170,6 +174,13 @@ export function createAttack(parts: AttackParts): Attack {
       // …asked of the PIG rather than of the cached `holding`, which is only
       // synced further down the frame and is therefore a frame stale here.
       if (acting.holding === SKILL.SKIP_TURN) return 'skip'
+      // HEALING HANDS answers the press ITSELF: no fuse, no gauge, no flight —
+      // the exe's arm reads the pig list and puts the points back on the spot
+      // (lib/game/healing.ts). Refused — nobody in the cone, or a body already
+      // at its ceiling — the press comes to nothing and the charge stays.
+      if (acting.holding === SKILL.HEALING_HANDS) {
+        return parts.heals.begin(acting) ? 'used' : 'none'
+      }
       if (isLobbed(holding)) {
         if (gauge || firing || laying !== null) return 'none'
         // **A GAUGE IS THE WEAPON'S, not the throw's.** The record's +0x14 is

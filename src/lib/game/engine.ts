@@ -32,6 +32,8 @@ import { NO_DROP_IN, createDropIn } from './dropIn'
 import type { DropIn } from './dropIn'
 import { createStrikes } from './strikes'
 import type { Strikes } from './strikes'
+import { createHealing } from './healing'
+import type { Heals } from './healing'
 import { createBullets } from './bullets'
 import type { Bullets } from './bullets'
 import { createLobs } from './lobs'
@@ -221,6 +223,8 @@ export interface Engine {
    * (lib/game/tumble.ts). */
   readonly tumbles: Tumbles
   readonly swings: Strikes
+  /** The healing hands (lib/game/healing.ts). */
+  readonly heals: Heals
   readonly effects: EffectField
   readonly numbers: DamageNumbers
   readonly airDrops: AirDrops
@@ -390,6 +394,9 @@ export function createEngine(parts: EngineParts): Engine {
     },
     bus.emit
   )
+  /** What the HEALING HANDS do when the fire key goes down: the cone, the
+   * nearest body in it and the points back on (lib/game/healing.ts). */
+  const heals = createHealing({ pigs, clips: world.clips }, bus.emit)
   /** What a GUN does: the flight, the substepping and every verdict about what
    * was hit (lib/game/bullets.ts). */
   const shots = createBullets(
@@ -483,6 +490,7 @@ export function createEngine(parts: EngineParts): Engine {
     grenades,
     mines,
     swings,
+    heals,
     tumbles,
     corpses,
     effects,
@@ -648,6 +656,7 @@ export function createEngine(parts: EngineParts): Engine {
     airDrops,
     dropIn,
     swings,
+    heals,
     training
   }
 }

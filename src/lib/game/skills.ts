@@ -64,6 +64,8 @@ export const SKILL = {
   GRENADE: 19,
   BAZOOKA: 29,
   TNT: 37,
+  /** The medic careers' contact heal (lib/game/healing.ts). */
+  HEALING_HANDS: 52,
   /** The door of a BUILDING — what a pig uses to get in and out of one, and
    * what the slot beside the dial carries while it is in there
    * (lib/game/buildings.ts; 60 is the VEHICLE's own). */

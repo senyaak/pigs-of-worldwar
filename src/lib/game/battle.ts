@@ -63,6 +63,7 @@ import type { Lobs } from './lobs'
 import type { Mines } from './mines'
 import type { Tumbles, Velocity } from './tumble'
 import type { Strikes } from './strikes'
+import type { Heals } from './healing'
 import type { EffectField } from './effectField'
 import type { DamageNumbers } from './damage'
 import type { AirDrops } from './airDrop'
@@ -91,6 +92,9 @@ export interface BattleParts {
    * (lib/game/mines.ts). */
   mines: Mines
   swings: Strikes
+  /** The healing hands, when a pig of the medic careers holds them
+   * (lib/game/healing.ts). */
+  heals: Heals
   /** Pigs a blast has THROWN — every pig but the one being driven
    * (lib/game/tumble.ts). */
   tumbles: Tumbles
@@ -286,7 +290,7 @@ export interface Battle {
 }
 
 export function createBattle(parts: BattleParts): Battle {
-  const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, effects, numbers } = parts
+  const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, heals, effects, numbers } = parts
   const { tumbles, corpses, airDrops, dropIn, drowning, onChanged } = parts
   const emit = parts.bus.emit
 
@@ -325,6 +329,7 @@ export function createBattle(parts: BattleParts): Battle {
     shots,
     grenades,
     swings,
+    heals,
     sights,
     anim,
     clips: parts.clips,
@@ -502,6 +507,9 @@ export function createBattle(parts: BattleParts): Battle {
   const committed = (): boolean =>
     attack.busy() ||
     swings.running() ||
+    // …and the laying-on of hands, for the length of its own clip — the same
+    // hold `[pig+0x2FF]` puts on any attack animation (lib/game/healing.ts).
+    heals.running() ||
     // THROWN, not planted: a charge lying at the pig's feet is exactly what it
     // has to be able to run away from (lib/game/lobs.ts `thrown`).
     grenades.thrown() > 0 ||
@@ -944,6 +952,7 @@ export function createBattle(parts: BattleParts): Battle {
     struck = false
     sights.setHeld(false)
     swings.reset()
+    heals.reset()
     // A turn is a fresh start for the machine too (lib/game/ai.ts) — and the
     // moment its SEAT is decided (`machineTurn` above). The hands let go of
     // whatever they were doing and still every control they hold.
@@ -1608,7 +1617,15 @@ export function createBattle(parts: BattleParts): Battle {
     // hand-detonator lives inside `attack.begin`, so swallowing the press took the
     // grenade's own second use with it. Setting off what is already in the air is
     // not a second blow — it is the end of the first one.
-    if (struck && acting.holding !== SKILL.SKIP_TURN && grenades.thrown() === 0) {
+    // …and neither is a HEAL: the hands are not a blow (they never set `struck`
+    // below), and a pig that HAS struck — a charge planted, say — may still lay
+    // them on inside the same turn.
+    if (
+      struck &&
+      acting.holding !== SKILL.SKIP_TURN &&
+      acting.holding !== SKILL.HEALING_HANDS &&
+      grenades.thrown() === 0
+    ) {
       attack.swallow()
     }
 
@@ -1630,7 +1647,12 @@ export function createBattle(parts: BattleParts): Battle {
     // `holding`, which is only synced further down the frame and is a frame stale
     // here.
     if (answered === 'used') {
-      struck = true
+      // HEALING HANDS is the one use that is not a BLOW: the turn is not spent
+      // (lib/game/spend.ts), and it does not take the turn's one strike either —
+      // heal, walk on, and the rifle still answers. What it cannot do twice is
+      // covered by its own bookkeeping: the charge only goes on a heal that
+      // LANDED (lib/game/healing.ts).
+      if (acting.holding !== SKILL.HEALING_HANDS) struck = true
       // The exe counts it here too — this is the arm its own fire dispatcher
       // increments `[gameMode+0x334]` from (0x493E7A).
       weaponUses++
@@ -1758,6 +1780,9 @@ export function createBattle(parts: BattleParts): Battle {
     // the HAND bone, so where the pig is standing has to be settled first. It
     // may put the weapon away on the way out — the last bayonet.
     swings.update(delta, acting)
+    // …and the heal's clip running out, which may put the hands away the same
+    // way (lib/game/healing.ts).
+    heals.update(delta, acting)
 
     // The gauge and the fuse, after the pig has been placed for the same reason
     // a swing is: the muzzle comes off the HAND bone (lib/game/attack.ts).
@@ -1970,6 +1995,7 @@ export function createBattle(parts: BattleParts): Battle {
     },
     warp(x, z, heading) {
       swings.reset()
+      heals.reset()
       effects.clear()
       loco = createLocomotion(query, x, z, heading)
       game.moveCurrentPig(x, loco.y, z, heading)

@@ -214,6 +214,10 @@ export interface DebugHooks {
   /** What the last hand-to-hand strike measured — the blade's three points
    * and how near every other pig came, per axis (three/swing.ts). */
   strike(): unknown
+  /** What the healing hands measured on their last press — who stood where
+   * against the cone, who was taken and what went back on
+   * (lib/game/healing.ts). */
+  heal(): unknown
   /** How many effect rings a blow has in the air (three/effects.ts). */
   effects(): number
   /** How many puffs of smoke a breaking has in the air (three/effects.ts). */

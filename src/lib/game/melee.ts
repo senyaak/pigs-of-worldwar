@@ -143,8 +143,9 @@ export const STRIKE_RISE = 360
  * 4096, which is 67.5° either way (0x475ff9). */
 export const STRIKE_ARC = (0x300 / PHASE_UNITS) * 2 * Math.PI
 
-/** Shortest signed difference between two headings, in radians. */
-function turnBetween(a: number, b: number): number {
+/** Shortest signed difference between two headings, in radians. Exported for
+ * the other cone in the game — the healing hands' (lib/game/healing.ts). */
+export function turnBetween(a: number, b: number): number {
   let d = (a - b) % (2 * Math.PI)
   if (d > Math.PI) d -= 2 * Math.PI
   if (d < -Math.PI) d += 2 * Math.PI

@@ -93,9 +93,11 @@ score: enumerate pairs of **(kit item × target or point)** and take the best
   a plus sign. A medic heals because his kit prices healing highest, not
   because he is a medic. Class flavour, if any is ever wanted, is a weight
   nudge by `pigClass` — never a separate behaviour tree.
-- **Prerequisite gap:** the healing skills (52 HEALING HANDS, 17 MEDIC DART,
-  33 MEDICINE BALL) have no effect in the engine yet — `heal()` is only
-  called by crate pickups. The mechanic lands first, then the brain prices it.
+- **Prerequisite gap, half closed:** 52 HEALING HANDS works now
+  (lib/game/healing.ts, 2026-08-26) — the brain does not press it yet. 17
+  MEDIC DART and 33 MEDICINE BALL still have no effect in the engine —
+  the dart flies and lands zero, the ball cannot be thrown at all. Those
+  mechanics land first, then the brain prices all three.
 
 ## THE TURN IS ONE DECISION, and the mark is SEARCHED FOR
 

@@ -1561,3 +1561,46 @@ is a plane), flat ground still gives (0,−1,0) so the straight-up case is
 untouched, and a thirty-degree face throws the pig thirty degrees down the
 hill. The normal arrives as an optional port on `BlastWorld` (`groundNormal`),
 so the pure damage specs keep their flat world.
+
+### HEALING HANDS land — the medic careers' first working skill (2026-08-26)
+
+The ORDERLY's laying-on of hands works: skill 52 is a contact heal resolved in
+`lib/game/healing.ts`, wired through `attack.begin` the way the blade is, and
+the whole arm was read out of the exe the same day (0x47b894, off the fire
+dispatcher's jump table). What it does, each number at its instruction:
+
+- **The nearest pig within 1024 units and ±45° of the facing** is taken —
+  the search starts its nearest-so-far at 0x100000 square units (0x47b8ca)
+  and the bearing test is |diff| < 0x200 of 4096 (0x47bcfe). **No team
+  filter**: an enemy in the cone is healed as happily as a friend. The exe
+  skips the healer itself by identity (0x47b910); here a dead or gone body is
+  skipped too — the exe's own state list (8/1/4/3, 0x47b8ec) does not name
+  DEAD, and whether a corpse can be picked there is unread.
+- **`min(missing, 20)` points go back** (0x47bf1f..0x47bf3a) — the one CAPPED
+  heal in the game, taken against the class ceiling where the crate's
+  `heal()` deliberately has none.
+- **The charge goes only on a heal that LANDED**: the generic spend in
+  `Pig::Attack` skips skill 52 outright (0x469751) and the arm's own debit
+  sits behind the missing-health test. A press at nobody, or at a body
+  already at its ceiling, is refused with the round still in the slot.
+- **The turn is not spent and neither is the one-blow gate**: 52 was already
+  on the keeps-the-turn list (lib/game/spend.ts) and now it also does not set
+  `struck` — heal, walk on, and the rifle still answers. The pig is held for
+  the length of clip 78 ("Heal") instead, the way any attack clip holds one.
+- The number floats off the healed body in the crate's own heal style and the
+  sigh rides the same `healed` event — nothing new was drawn.
+
+`pow.debug.heal()` is the miss diagnosis: every candidate's distance and
+degrees against 1024/45, who was taken, and an `amount` of 0 for a ceiling
+refusal. `unit/healing.spec.ts` pins all of it.
+
+Deliberately not built: the arm's own sounds (0x4F on a refused press, 0x43
+and hand sparks off bones 5 and 8, effect 0xE4, on a landed one) — the press
+is silent until play asks; and the status-clearing tail past 0x47bf40
+(`[pig+0x3A4]`), because there are no status effects in this engine yet. The
+same read settled the rest of the family for later: 17 MEDIC DART heals
+min(missing, 40) in `Pig::HitByProjectile` (0x4787d6), 33 MEDICINE BALL is
+projectile 425 detonating into blast effect 0x60 — 40 points in the core, the
+usual falloff to a quarter, clamped to the missing health per body
+(0x4778c6) — and the unnamed skill 53 is a SELF-heal of up to 50 (0x47bf48),
+in no class kit.

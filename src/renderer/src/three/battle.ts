@@ -487,7 +487,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // хода").
     computer: (side) => side > 0 && !hotseat
   })
-  const { battle, scenery, obstacles, anim, swings, shots, grenades, mines, effects, numbers, airDrops, dropIn } =
+  const { battle, scenery, obstacles, anim, swings, heals, shots, grenades, mines, effects, numbers, airDrops, dropIn } =
     engine
   /** The mixers, brought into line once a frame with what the engine says each
    * pig is wearing (three/wear.ts). */
@@ -1191,6 +1191,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     strings: () => assets.strings,
     swinging: () => swings.running(),
     strike: () => swings.lastStrike(),
+    // Why a heal did or did not land: the healing hands' own report, the same
+    // rule the blade's is (lib/game/healing.ts).
+    heal: () => heals.lastAttempt(),
     effects: () => effects.rings(),
     smoke: () => effects.smoke(),
     fire: () => effects.fire(),
