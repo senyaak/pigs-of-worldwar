@@ -84,6 +84,9 @@ export interface CareerPath {
   labels(): string[]
   values(): (string | null)[]
   flipping(): boolean
+  /** The four icons as mouse boxes, for the squad screen's own hit test
+   * (ui/mouseRows.ts) — sized off the art, a hair of air around each. */
+  rows(sprites: SpriteSet): { x: number; y: number; width: number; height: number }[]
 }
 
 export function initCareerPath(handlers: {
@@ -157,6 +160,18 @@ export function initCareerPath(handlers: {
       bank = it
     },
     selected: () => selection,
+    rows: (sprites) =>
+      open
+        ? ICONS.map((name, i) => {
+            const icon = sprites.get(name)
+            return {
+              x: ICON.x + ICON.step * i - 2,
+              y: ICON.y - 2,
+              width: icon.width + 4,
+              height: icon.height + 4
+            }
+          })
+        : [],
     labels: () => ICONS.map((_, i) => feText(ROW_TEXT + i)),
     values: () => ICONS.map(() => null),
     flipping: () => false

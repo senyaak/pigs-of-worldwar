@@ -19,6 +19,7 @@ import { byId } from './dom'
 import { SCREEN, loadFrontend } from './barScreen'
 import type { Font } from './font'
 import { controller } from '../input/controller'
+import { trackRows } from './mouseRows'
 import { MENU_BINDINGS } from '../input/actions'
 import { loadLanguageSprites } from './sprites'
 import type { Sprite } from './sprites'
@@ -107,6 +108,17 @@ export function initBriefing(handlers: {
     if (ready()) go()
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
+  // A click is the any-key too, early press remembered the same way (play's
+  // rule: the mouse drives every screen — ui/mouseRows.ts).
+  trackRows(
+    canvas,
+    () => (visible ? [{ x: 0, y: 0, width: SCREEN.width, height: SCREEN.height }] : []),
+    (row) => {
+      if (row !== 0 || !visible) return
+      keyed = true
+      if (ready()) go()
+    }
+  )
 
   const draw = (now: number): void => {
     const context = canvas.getContext('2d')

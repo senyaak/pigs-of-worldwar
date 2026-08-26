@@ -755,7 +755,13 @@ and the weakest of them were invented here:
   hit test (un-letterbox the canvas, hit the rows the screen is drawing with,
   walk the light one row a tick so nothing jumps), and a lit row is written in
   the light shade wherever a row is written at all. A screen the pointer
-  cannot drive reads as broken however faithful it is.
+  cannot drive reads as broken however faithful it is. **And the rule covers
+  everything ADDED**: a new screen, overlay or interactive element ships with
+  its `trackRows` boxes in the same change, or it is not finished — the whole
+  debt was swept once (2026-08-26, "все добавляемые элементы мышкой тоже
+  кликались") and must not accrue again. A key painted into backdrop ART
+  still gets an invisible box over the painted words (the debrief's bar); an
+  any-key screen takes a click anywhere as the any-key.
 - `[deliberate]` **A name is judged and kept TRIMMED.** The exe's ENTER tests
   the buffer's first byte alone (0x42AF50), so a team called one SPACE passes;
   `press` in `lib/game/nameEntry.ts` trims before it refuses and hands the

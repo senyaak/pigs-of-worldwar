@@ -103,6 +103,10 @@ export interface PigMenu {
   labels(): string[]
   values(): (string | null)[]
   flipping(): boolean
+  /** The three rows as mouse boxes, for the squad screen's own hit test
+   * (ui/mouseRows.ts) — the words stand still, so the boxes do too. Empty
+   * until the plaque is at rest: nothing half-arrived is clicked. */
+  rows(): { x: number; y: number; width: number; height: number }[]
 }
 
 export function initPigMenu(handlers: {
@@ -283,6 +287,10 @@ export function initPigMenu(handlers: {
       bank = it
     },
     selected: () => selection,
+    rows: () =>
+      phase === 'here'
+        ? ROWS.map((box) => ({ x: box.x, y: box.y - 6, width: box.width, height: 30 }))
+        : [],
     labels: () => ROW_TEXT.map((id) => feText(id)),
     values: () => {
       const cost = price()

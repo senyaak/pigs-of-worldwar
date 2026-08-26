@@ -36,6 +36,7 @@ import type { Motion } from './springs'
 import { widget } from './frames'
 import type { Widget } from './frames'
 import { controller } from '../input/controller'
+import { trackRows } from './mouseRows'
 import { MENU_BINDINGS } from '../input/actions'
 import { loadSprites } from './sprites'
 import type { SpriteSet } from './sprites'
@@ -212,6 +213,27 @@ export function initAskTraining(handlers: {
     else if (action === 'menuBack') goBack()
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
+  // The mouse works the box too (play's rule — ui/mouseRows.ts): hovering
+  // an answer walks the dial onto it, one tick at a time like the keys do,
+  // and a click on the lit one chooses. The boxes exist only once the box
+  // has landed and the words are up, and they ride the entrance's own xOff.
+  const mouse = trackRows(
+    canvas,
+    () =>
+      visible && phase === 'here' && fade < FADE_SHOWS
+        ? layout.text.items.x.map((left) => ({
+            x: left + scaleX(x.value),
+            y: layout.text.items.y - 4,
+            width: layout.text.items.width,
+            height: 24
+          }))
+        : [],
+    (row) => {
+      if (row < 0 || phase !== 'here') return
+      if (row === selection) choose()
+      else toggle()
+    }
+  )
 
   /** One frontend tick — springs, walks, the fade, and the leave's gates. */
   const advance = (): void => {
@@ -259,6 +281,13 @@ export function initAskTraining(handlers: {
       fade = Math.max(0, fade - FADE_IN)
     } else {
       fade = FADE_HIDDEN
+    }
+    // The pointer's half of the dial: walk the selection toward the hovered
+    // answer, one toggle a tick, exactly as the keys move it.
+    if (phase === 'here') {
+      const over = mouse.hovered()
+      if (over >= 0 && over !== selection) toggle()
+      else if (over === selection) mouse.clear()
     }
   }
 

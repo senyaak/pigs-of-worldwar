@@ -751,15 +751,21 @@ export function initPlayerScreen(handlers: {
    * place chooses it — a pig opens its menu, START MISSION leaves.
    *
    * The rows are the nine places in `selection`'s own order: eight portraits
-   * off `place(slot)` at the portrait's own size, then the option plate. While
-   * an OVERLAY is up the screen answers nothing (neither the pig menu nor the
-   * career path has geometry of its own), so the list goes empty and the
-   * pointer falls through to nothing rather than lighting pigs underneath it.
+   * off `place(slot)` at the portrait's own size, then the option plate.
+   * While an OVERLAY is up, the OVERLAY's own boxes take the list instead —
+   * the pig menu's three rows, the career path's four icons (play: "все
+   * добавляемые элементы мышкой тоже кликались") — so the pointer never
+   * lights a pig underneath one.
    */
   const mouse = trackRows(
     canvas,
     () => {
-      if (!art || overlaid()) return []
+      if (!art) return []
+      if (overlaid()) {
+        if (menu.state() === 'here') return menu.rows()
+        if (career.state() === 'open') return career.rows(art)
+        return []
+      }
       const face = art.get('face1a')
       const plate = art.get('sqoptsf')
       const places = Array.from({ length: SQUAD_SIZE }, (_, slot) => {
@@ -777,6 +783,18 @@ export function initPlayerScreen(handlers: {
       ]
     },
     (row) => {
+      if (row < 0) return
+      // The overlays first, on their own selections — a click chooses the
+      // LIT thing, exactly as everywhere else; the hover-walk in `advance`
+      // is what lights it.
+      if (menu.state() === 'here') {
+        if (row === menu.selected()) menu.handle('menuSelect')
+        return
+      }
+      if (career.state() === 'open') {
+        if (row === career.selected()) career.handle('menuSelect')
+        return
+      }
       if (row === selection) choose()
     }
   )
@@ -1179,7 +1197,15 @@ export function initPlayerScreen(handlers: {
     // and each column's remembered row all go through `step` as usual.
     const hovered = mouse.hovered()
     if (hovered >= 0) {
-      if (hovered === selection) mouse.clear()
+      // The overlays' light first: the medallion slides a row a tick, the
+      // career carousel steps an icon a tick — the same walk the keys make.
+      if (menu.state() === 'here') {
+        if (hovered === menu.selected()) mouse.clear()
+        else menu.handle(hovered > menu.selected() ? 'menuDown' : 'menuUp')
+      } else if (career.state() === 'open') {
+        if (hovered === career.selected()) mouse.clear()
+        else career.handle(hovered > career.selected() ? 'menuRight' : 'menuLeft')
+      } else if (hovered === selection) mouse.clear()
       else step(hovered > selection ? 1 : -1)
     }
     pulse += PULSE_STEP

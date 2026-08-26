@@ -27,6 +27,7 @@ import { loadFont } from './font'
 import type { Font } from './font'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
+import { trackRows } from './mouseRows'
 import { loadDebriefSprites, loadSprites } from './sprites'
 import type { SpriteSet } from './sprites'
 import { TOKEN_FRAMES, TOKEN_SIZE, renderTokenStrip } from '../three/tokenArt'
@@ -237,6 +238,28 @@ export function initDebrief(handlers: {
     }
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
+  // **THE MOUSE DRIVES THIS PAGE TOO** (play: "реплей мишн без эвента
+  // мышки"). The two "buttons" are words PAINTED INTO the backdrop's key bar
+  // — y 438..466 of the 640×480 art, the left word the SPACE action, the
+  // right the ESCAPE one (`debrief/notes.md`) — and the remake's own drawn
+  // rows were built once and deliberately taken out for doubling them. So
+  // the mouse gets two invisible boxes over the bar's halves, firing exactly
+  // what the key under each word fires.
+  trackRows(
+    canvas,
+    () =>
+      visible
+        ? [
+            { x: 0, y: 438, width: SCREEN.width / 2, height: 28 },
+            { x: SCREEN.width / 2, y: 438, width: SCREEN.width / 2, height: 28 }
+          ]
+        : [],
+    (row) => {
+      if (!visible) return
+      if (row === 0) (won ? handlers.onContinue : handlers.onRetry)()
+      else if (row === 1) (won ? handlers.onRetry : handlers.onEditSquad)()
+    }
+  )
 
   const centredAt = (font: Font, text: string, centre: number): number =>
     Math.round(centre - font.measure(text) / 2)

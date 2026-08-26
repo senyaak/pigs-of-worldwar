@@ -10,6 +10,7 @@
 import { byId } from './dom'
 import { SCREEN } from './barScreen'
 import { controller } from '../input/controller'
+import { trackRows } from './mouseRows'
 import { MENU_BINDINGS } from '../input/actions'
 import { loadLanguageSprites } from './sprites'
 import type { Sprite } from './sprites'
@@ -57,6 +58,17 @@ export function initNewspaper(handlers: { onDone: () => void }): Newspaper {
     finish()
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
+  // The mouse turns the page too: a click anywhere is the any-key. Play's
+  // rule — a screen the pointer cannot drive reads as broken (CLAUDE.md,
+  // ui/mouseRows.ts).
+  trackRows(
+    canvas,
+    () =>
+      visible && !done ? [{ x: 0, y: 0, width: SCREEN.width, height: SCREEN.height }] : [],
+    (row) => {
+      if (row === 0 && visible && !done) finish()
+    }
+  )
 
   const draw = (): void => {
     const context = canvas.getContext('2d')

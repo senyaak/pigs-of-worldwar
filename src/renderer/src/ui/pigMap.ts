@@ -27,6 +27,7 @@
 import { byId } from './dom'
 import { SCREEN } from './barScreen'
 import { controller } from '../input/controller'
+import { trackRows } from './mouseRows'
 import { MENU_BINDINGS } from '../input/actions'
 import { loadLanguageSprites, loadTims, tinted } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
@@ -307,6 +308,19 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
     else advance(performance.now())
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
+  // A click skips the phase, the way any non-BACK key does (play's rule: the
+  // mouse drives every screen — ui/mouseRows.ts). Walking out stays on the
+  // keyboard's ESCAPE alone: there is nothing drawn to hang a "back" box on.
+  trackRows(
+    canvas,
+    () =>
+      visible && phase !== 'off'
+        ? [{ x: 0, y: 0, width: SCREEN.width, height: SCREEN.height }]
+        : [],
+    (row) => {
+      if (row === 0 && visible && phase !== 'off') advance(performance.now())
+    }
+  )
 
   let frame = 0
   const paint = (now: number): void => {

@@ -1386,3 +1386,32 @@ frame's crossbar and leaving grey placeholder along the niche's bottom. The
 top is the row line now (77, `debrief/notes.md`: y = 0x4D + 0x4A·i), the
 lift is subtracted once, and the uniform's and r_i_p's drops land on the
 exe's own 73 and 77.
+
+### The mouse debt, swept whole (2026-08-26)
+
+Play, off the debrief: "реплей мишн без эвента мышки - надо чтото сделать
+чтобы все добавляемые элементы мышкой тоже кликались в менюшках." The
+debrief was the only terminal screen with no `trackRows` at all — its two
+"buttons" are words PAINTED into the backdrop's key bar (y 438..466,
+`debrief/notes.md`; the remake's own drawn rows were deliberately removed
+for doubling them) — and a census found the rest of the debt. All of it
+closed in one pass, every screen on the same `ui/mouseRows.ts`:
+
+- **debrief** — two invisible boxes over the painted bar's halves: the left
+  word fires the SPACE action, the right the ESCAPE one, win and loss alike.
+- **newspaper, briefing, pig map** — the any-key screens: a click anywhere
+  IS the any-key (the briefing remembers an early one the same way; the
+  map's ESCAPE walk-out stays on the keyboard — there is nothing drawn to
+  hang a back box on).
+- **askTraining** — hovering YES/NO walks the dial there a tick at a time,
+  a click on the lit answer chooses.
+- **nameScreen** — the whole virtual keyboard: cells and the three keys are
+  boxes in cursor order, hover walks the cursor cell by cell (columns
+  first), a click puts the cursor on the cell and presses it.
+- **pig menu and career path** — the overlays now HAVE geometry: each
+  exposes `rows()` and the squad screen's one `trackRows` serves whichever
+  is up (its own nine places otherwise), hover sliding the medallion or the
+  carousel exactly as the keys do.
+
+The rule went into CLAUDE.md's mouse bullet: anything added ships with its
+boxes in the same change.

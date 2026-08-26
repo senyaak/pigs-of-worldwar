@@ -52,6 +52,7 @@ import { launch, spring, still } from './springs'
 import type { Motion } from './springs'
 import { controller } from '../input/controller'
 import { MENU_BINDINGS } from '../input/actions'
+import { trackRows } from './mouseRows'
 import { loadSprites } from './sprites'
 import type { SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
@@ -318,6 +319,52 @@ export function initNameScreen(handlers: {
   })
   controller.bindKeyboard(() => visible, MENU_BINDINGS)
 
+  /** The keyboard's cells as mouse boxes, in CURSOR order — the same
+   * geometry `draw` lays the letters over, box index = cursor index, the
+   * three keys after the alphabet exactly as the cursor space has them.
+   * Empty until the panel has unrolled: cells that are not drawn are not
+   * clicked. */
+  const cellBoxes = (): { x: number; y: number; width: number; height: number }[] => {
+    if (!visible || phase !== 'here' || !art) return []
+    if (Math.min(gate, PLATE_FRAMES) !== PLATE_FRAMES) return []
+    const plate = art.get(PLATES[PLATE_FRAMES])
+    const screen = screenOffset()
+    const inner = layout.inner
+    const gridX = layout.plate.x + screen.x + inner.left
+    const gridY = doubled() + layout.plate.drop + inner.top
+    const cellWidth = (plate.width - inner.left - inner.right) / GRID_COLUMNS
+    const cellHeight = (plate.height - inner.top - inner.bottom) / grid.rows
+    const boxes: { x: number; y: number; width: number; height: number }[] = []
+    for (let i = 0; i < grid.letters.length; i++) {
+      boxes.push({
+        x: gridX + (i % grid.columns) * cellWidth,
+        y: gridY + Math.floor(i / grid.columns) * cellHeight,
+        width: cellWidth,
+        height: cellHeight
+      })
+    }
+    for (let i = 0; i < KEYS.length; i++) {
+      boxes.push({
+        x: gridX + grid.columns * cellWidth,
+        y: gridY + i * cellHeight,
+        width: cellWidth,
+        height: cellHeight
+      })
+    }
+    return boxes
+  }
+  // The mouse types too (play's rule — ui/mouseRows.ts): a click puts the
+  // cursor on the cell and presses it, the way a keyboard clicks; hovering
+  // walks the light there a cell at a time, in `advance` below.
+  const mouse = trackRows(canvas, cellBoxes, (cell) => {
+    if (cell < 0 || phase !== 'here') return
+    if (entry.cursor !== cell) {
+      entry = { ...entry, cursor: cell }
+      bank.play(KEYPRESS.name, { gain: KEYPRESS.gain })
+    }
+    choose()
+  })
+
   const words = (
     context: CanvasRenderingContext2D,
     font: Font,
@@ -469,6 +516,21 @@ export function initNameScreen(handlers: {
       if (bounced && gate < GATE) gate++
       if (gate === GATE) {
         if (spring(at.field, REST.field, FIELD_SPRING) && phase === 'arriving') phase = 'here'
+      }
+    }
+    // The pointer's half of the cursor: walk it toward the hovered cell one
+    // step a tick, columns first, exactly as the arrows move it — and let a
+    // parked pointer go once the cursor has arrived, so the keys stay free.
+    if (phase === 'here') {
+      const over = mouse.hovered()
+      if (over === entry.cursor) mouse.clear()
+      else if (over >= 0) {
+        const count = grid.letters.length
+        const columnOf = (i: number): number => (i >= count ? grid.columns : i % grid.columns)
+        const rowOf = (i: number): number => (i >= count ? i - count : Math.floor(i / grid.columns))
+        const dc = Math.sign(columnOf(over) - columnOf(entry.cursor))
+        if (dc !== 0) move(dc, 0)
+        else move(0, Math.sign(rowOf(over) - rowOf(entry.cursor)))
       }
     }
     if (phase === 'gone' && leaving) {
