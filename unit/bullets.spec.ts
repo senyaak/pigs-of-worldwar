@@ -92,26 +92,28 @@ test('a hit shoves the body along the bullet line, at the exe\'s 0x30', { tag: '
   expect(Math.abs(vx)).toBeLessThan(SHOT_SHOVE * 0.1)
 })
 
-test('the shotgun looses ten pellets — five counted, the first ×5, one report, a soft shove', { tag: '@nodata' }, () => {
+test('the shotgun looses ten pellets — the first prepays five, one report, a soft shove', { tag: '@nodata' }, () => {
   // Skill 12 is the SHOTGUN (gtext 108 — the old "RIFLE BELL" was the
-  // icon's name), and every number here is the exe's, re-read after play
-  // challenged a five-pellet first build ("точно 1 только летит?"): the
-  // fire arm at 0x47a776 LOOPS ten `new`+init pairs per press with a ±16
-  // jitter on both angles, and the hit handler counts five per body with
-  // the first ×5 (byte map 0x478B18 → `mov edi,5`), the rest refused but
-  // still shoving. Point-blank into one pig: 15+3+3+3+3 = 27.
+  // icon's name), and every number here is the exe's, re-read TWICE on
+  // play's challenges ("точно 1 только летит?", then "а не 15 + 3*5?"):
+  // the fire arm at 0x47a776 LOOPS ten `new`+init pairs per press with a
+  // ±16 jitter on both angles, and the hit handler's first hit deals ×5
+  // (byte map 0x478B18 → `mov edi,5`) PREPAYING pellets 2..5 — absorbed,
+  // no damage, still shoving — while pellets 6..10 each pay their own 3
+  // (`cmp eax,edi; jl` at 0x478891 skips the damage only while the
+  // counter is under five). Point-blank into one pig: 15 + 3×5 = 30.
   const victim = pigAt(0, 512)
   const { fire, flung, events } = range(victim, undefined, SHOTGUN)
   fire()
   const amounts = events.flatMap((one) => (one.kind === 'damaged' ? [one.amount] : []))
-  expect(amounts).toEqual([15, 3, 3, 3, 3])
-  expect(victim.health).toBe(100 - 27)
+  expect(amounts).toEqual([15, 3, 3, 3, 3, 3])
+  expect(victim.health).toBe(100 - 30)
   // ONE press is ONE report, however many pellets leave.
   expect(events.filter((one) => one.kind === 'fired')).toHaveLength(1)
-  // Every pellet stops in the body and shoves it — the five refused ones
-  // included (the exe's refused-by-cap arm still falls through to the
-  // shove) — and the shove is the exe's own exception: 0x478A99 pushes
-  // kind 0x12 by 6 where every other projectile gets the 0x30.
+  // Every pellet stops in the body and shoves it — the four ABSORBED ones
+  // included (the exe's common tail counts and shoves them too) — and the
+  // shove is the exe's own exception: 0x478A99 pushes kind 0x12 by 6
+  // where every other projectile gets the 0x30.
   expect(flung).toHaveLength(10)
   const { vx, vy, vz } = flung[0].velocity
   expect(Math.hypot(vx, vy, vz)).toBeCloseTo(fromExeSpeed(6), 5)

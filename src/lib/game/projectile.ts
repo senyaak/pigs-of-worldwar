@@ -80,13 +80,15 @@ export interface Projectile {
    */
   spread?: number
   /**
-   * `Pig::HitByProjectile`'s `edi` — a first-hit damage MULTIPLIER and the
-   * per-volley hit CAP in one number, per TARGET. `[exe]`: the byte map at
-   * 0x478B18 gives kinds 0x12/0x13 (both shotguns) `mov edi,5` — the first
-   * pellet a body takes deals `damage × 5`, later pellets plain damage,
-   * and past five the damage is refused though the shove still lands
-   * (`weapons/fire.md`). So a full ten-pellet volley into one pig is
-   * 15+3+3+3+3 = 27 points, and even ONE stray pellet is worth 15.
+   * `Pig::HitByProjectile`'s `edi` — the rounds the FIRST hit PREPAYS, per
+   * TARGET per volley. `[exe]`: the byte map at 0x478B18 gives kinds
+   * 0x12/0x13 (both shotguns) `mov edi,5`; the first pellet a body takes
+   * deals `damage × 5` (0x478828), pellets 2..5 are ABSORBED — the branch
+   * at 0x478891 `cmp eax,edi; jl` jumps PAST the damage while the counter
+   * is under edi — and from the sixth on each pellet pays its own damage,
+   * uncapped. So per target the volley deals `3 × max(5, hits)`: one stray
+   * pellet is worth 15, a full ten-pellet volley 30. (Play's arithmetic
+   * corrected an earlier backwards reading of that branch, 2026-08-26.)
    */
   burst?: number
   /**
@@ -116,9 +118,9 @@ const GUNS: Record<number, Projectile> = {
   11: { id: 403, kind: 15, speed: 300, life: 90, damage: 5120, blast: 0 },
   /** 12 SHOTGUN, 13 SUPER SHOTGUN — gtext 108/109 against `SKILL_LINE`;
    * the repo's older "RIFLE BELL" reading was the icon's name, not the
-   * weapon's. TEN pellets a press, jittered ±16, five counted per target
-   * with the first ×5 (`pellets`/`spread`/`burst` above — all three read
-   * out of the exe); the one place the pair differ is the shove — the
+   * weapon's. TEN pellets a press, jittered ±16, the first hit prepaying
+   * five (`pellets`/`spread`/`burst` above — all three read out of the
+   * exe); the one place the pair differ is the shove — the
    * plain shotgun pushes 6 where everything else pushes 48 (0x478A99),
    * the SUPER keeps the 48. */
   12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5, shove: 6 },
@@ -148,17 +150,16 @@ export const damageOf = (skill: number | null): number =>
 /**
  * What ONE trigger pull can take off ONE body at its worst — the number a
  * brain prices a gun by (lib/game/evaluate.ts). A plain gun is its one
- * round; a fanned gun without a cap would be every pellet; the shotguns'
- * `burst` counts `min(pellets, burst)` hits with the first multiplied, so
- * the pair come out at 3 × (5 + 5 − 1) = 27.
+ * round; a fanned gun is `damage × max(burst, pellets)` — the first hit
+ * prepays `burst` rounds and everything past them pays its own — so the
+ * shotguns come out at 3 × max(5, 10) = 30.
  */
 export const volleyDamageOf = (skill: number | null): number => {
   const row = projectileOf(skill)
   if (!row) return 0
   const round = damageOf(skill)
   if (!row.burst) return round * (row.pellets ?? 1)
-  const counted = Math.min(row.pellets ?? 1, row.burst)
-  return round * (row.burst + counted - 1)
+  return round * Math.max(row.burst, row.pellets ?? 1)
 }
 
 /** A bullet in flight. Position is game space (Y-down); velocity is units a

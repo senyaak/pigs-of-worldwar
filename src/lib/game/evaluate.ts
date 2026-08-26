@@ -535,7 +535,7 @@ const gunOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): 
   if (!row) return null
   // The whole VOLLEY, not one pellet: the mark this option walks to is
   // inside CLOSE_TO of the range, where the shotguns' cone lands entire —
-  // pricing the pellet had the brain reading 3 where the trigger deals 27
+  // pricing the pellet had the brain reading 3 where the trigger deals 30
   // (`volleyDamageOf`, lib/game/projectile.ts).
   const damage = volleyDamageOf(skill)
   const me = world.acting

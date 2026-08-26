@@ -1751,3 +1751,18 @@ the whole volley (`volleyDamageOf` — 27, not 3). The lesson joins the
 standing one: an arm is not read until its own last instruction, and a
 generalisation over 56 jump-table arms is not a reading of any one of
 them. Pinned in `unit/bullets.spec.ts` ("the shotgun looses ten pellets").
+
+And a third act, same day: play checked the arithmetic itself — "а 27
+урона от дробовика это норм? … а не 5 дополнительных? 15 + 3*5?" — and was
+right AGAIN. The later-hits branch had been read backwards: `cmp eax,edi;
+jl 0x4788CF` at 0x478891 jumps PAST the TakeDamage while the counter is
+still UNDER five, so hits 2..5 are ABSORBED — the first hit's ×5 is a
+PREPAYMENT for them — and from the sixth pellet on each pays its own 3,
+with no cap at all. Per target the volley deals `3 × max(5, hits)`: 15
+for one stray pellet, 30 point-blank, not 27. `bullets.land` now absorbs
+instead of capping (an absorbed pellet still counts, stops and shoves),
+`volleyDamageOf` prices the max, and `weapons/shotgun-arm.py` in the
+disasm repo asserts the branch's direction so it cannot be re-misread.
+The lesson sharpened: an arm is not read until its last instruction, and
+a BRANCH is not read until its TARGET is — "jl past the damage" and "jl
+to the damage" are one byte apart and opposite weapons.

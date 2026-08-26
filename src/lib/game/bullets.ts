@@ -205,16 +205,23 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
       if (!inside(shot, body)) continue
       const row = projectileOf(shot.skill)
-      // `Projectile.burst` — the exe's `edi`, a first-hit multiplier and a
-      // per-volley cap in one: the first pellet a body takes is ×burst, the
-      // next ones plain, and past `burst` the DAMAGE is refused while the
-      // pellet still stops and still shoves (0x478811/0x47888C,
-      // `weapons/fire.md`). A weapon without the field is its own single hit.
-      const struck = row?.burst ? (volley.get(pig.id) ?? 0) : 0
-      const counted = !row?.burst || struck < row.burst
-      if (counted) {
-        if (row?.burst) volley.set(pig.id, struck + 1)
-        const amount = damageOf(shot.skill) * (row?.burst && struck === 0 ? row.burst : 1)
+      // `Projectile.burst` — the exe's `edi`, and the FIRST hit PREPAYS the
+      // next four: pellet one deals ×burst (0x478828 `imul ecx,edi`), pellets
+      // 2..burst are ABSORBED — `cmp eax,edi; jl` at 0x478891 jumps PAST the
+      // damage while the counter is still under burst — and from burst+1 on
+      // each pellet pays its own row damage, with no cap at all. (An earlier
+      // reading here had that branch backwards, as "refused past burst";
+      // play's arithmetic caught it — "а не 15 + 3*5?" Right: a full volley
+      // is 3 × max(5, hits) = 30, not 27.) Absorbed pellets still count,
+      // still stop and still shove. A weapon without the field is its own
+      // single hit.
+      let amount = damageOf(shot.skill)
+      if (row?.burst) {
+        const struck = volley.get(pig.id) ?? 0
+        volley.set(pig.id, struck + 1)
+        amount = struck === 0 ? amount * row.burst : struck < row.burst ? 0 : amount
+      }
+      if (amount > 0) {
         const outcome = hurt(pig, amount, world.training)
         emit({ kind: 'damaged', at: body, amount, pig: pig.id })
         if (outcome === 'died' || outcome === 'gibbed') {
