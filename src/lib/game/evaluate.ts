@@ -393,7 +393,15 @@ const blastWorth = (
   if (!spareSelf) own.push({ x: at.x, y: me.y, z: at.z, health: me.health })
   for (const friend of own) {
     const share = blastShare(distance2d(friend, landing), range)
-    if (share > 0) total -= worthOf(damage * share, friend, world.wits)
+    // **THE OWN-SIDE OF THE LEDGER IS WEIGHED BY WITS — reading the splash
+    // over yourself and your friends is thinking.** Play, mission 2
+    // (2026-08-26): "самому попасть в свой взрыв можно если тупой, или
+    // союзников задеть если также тупой — или это поможет выйграть если
+    // умный." The reflex end reads none of the cost — it throws where it
+    // throws and takes the burn — and the thinking end reads it WHOLE,
+    // which is also what lets it accept an ally's singeing when the ledger
+    // still comes out ahead: full accounting is the trade, not a taboo.
+    if (share > 0) total -= worthOf(damage * share, friend, world.wits) * world.wits
   }
   return total
 }
@@ -629,16 +637,20 @@ const lobOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): 
     // throw will really be made. It used to be priced as if the grenade
     // landed on the foe from here, and the walk was assumed to fix the
     // difference.
-    // …and never from INSIDE ITS OWN BLAST. A foe at the trotters used to
-    // read as "in the arc, throw from here", which priced the thrower into
-    // the landing and killed the option — leaving a pig point-blank with
-    // nothing but the knife, every turn (play, mission 2). Too close is the
-    // same problem as too far: the mark is SEARCHED, one blast radius out or
-    // more, and the walk to it is what the throw costs.
+    // …and out of its OWN BLAST exactly as far as the wits reach. Walking
+    // out of your own rim is thinking, so the least distance the mark
+    // honours GROWS with the scale (`least = spread · wits`): the reflex
+    // end throws from where it stands and takes the burn — play blessed
+    // exactly that ("самому попасть в свой взрыв можно если тупой", and of
+    // the bazooka's self-clip: "для тупого идеально") — and the veteran
+    // walks out one whole blast radius first. Either way a foe at the
+    // trotters no longer kills the option outright: too close reads like
+    // too far, and the mark is searched with the walk as the cost.
+    const least = spread * world.wits
     const stand: Stand | null =
-      away <= limit && away > spread
+      away <= limit && away > least
         ? { x: me.x, z: me.z, walk: 0 }
-        : standFor(world, foe, limit * LOB_COMFORT, () => true, walked, spread)
+        : standFor(world, foe, limit * LOB_COMFORT, () => true, walked, least)
     const dead = (reach: number): void => {
       const option: Option = {
         skill,

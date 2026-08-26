@@ -177,12 +177,12 @@ The knobs, then:
 | estimate error (range, charge, arc) | large | shrinks toward the tremor floor |
 | what DISTANCE means | — | **not a knob at all**: the price list costs a walk in TURNS for everybody (`trueScore`), and the dumb pig's near-sightedness is the eye below |
 | horizon | shoot now | where do I STAND after, who reaches me |
-| ally-splash accounting | line-of-fire only | full blast radius |
+| ally-splash accounting (`blastWorth`, weighed 2026-08-26) | unread — the splash over friends and himself costs nothing he can see | read whole, which is also what lets him TRADE an ally's singeing for a win — full accounting, not a taboo |
 | clumping penalty | near zero | high — spread out, deny the grenade |
 | memory of hidden pigs | forgets | remembers the spot |
 | actuator noise | over-turns the aim, over-holds the gauge | near clean |
 | WHICH weapon answers (`WHIM_POINTS`, built 2026-08-26) | a toss between whatever can be brought to bear — "тупой должен рандомно решать какое использовать оружие" | reads the two damages apart and takes the better |
-| standing inside its own blast | — | **not a knob either**: a lob's mark is never inside its own blast at ANY wits — too close reads like too far, and the search walks the thrower out one blast radius before the throw (`standFor`'s `least`, built 2026-08-26 off the gunner that stood point-blank and only ever knifed) |
+| standing inside its own blast (`standFor`'s `least = blast · wits`, built and corrected 2026-08-26) | throws from where it stands and takes the burn — "самому попасть в свой взрыв можно если тупой" | walks out one whole blast radius before the throw. Either way a foe at the trotters no longer kills the option (the gunner that only ever knifed) |
 | lob pitch (`TUNE_PITCH_WITS`, built 2026-08-24) | always the 45° start | tunes the come-up: a steeper arc over a hill, solved for the exact landing |
 | self-preservation (`SHELTER_WITS`, built 2026-08-24) | fires from wherever the weapon reaches, and dies where it stood | ends its turn SHOULDER TO SHOULDER with an enemy, so a blast answering it costs them one of their own — guns only, and bounded to four tiles of walk |
 

@@ -146,40 +146,44 @@ test('a throw that comes down ON WATER is worth nothing — the engine douses it
   expect(option).toBeNull()
 })
 
-test('a throw that would catch the THROWER is priced down: up close the rifle wins', { tag: '@nodata' }, () => {
-  // The blast's whole reach is ~1100 units (core 512 + falloff, lib/game/
-  // grenade.ts); at 800 the thrower stands inside his own rim and the ledger
-  // says so: 30 to the foe minus ~19 to himself loses to the rifle's clean
-  // 20. Self-preservation OUT OF ARITHMETIC — no "don't throw close" rule
-  // anywhere.
-  const option = priceKit(
-    world({
-      carrying: [
-        { skill: SKILL.RIFLE, amount: UNLIMITED },
-        { skill: SKILL.GRENADE, amount: 3 }
-      ],
-      foes: [foe({ z: 800 })]
-    })
-  )!
-  expect(option.kind).toBe('gun')
+test('inside his own rim the DUMB pig still throws; the SMART one reads the burn', { tag: '@nodata' }, () => {
+  // Play's correction, 2026-08-26: "самому попасть в свой взрыв можно если
+  // тупой." The own-side of the ledger is weighed BY WITS (blastWorth): at
+  // the bottom the thrower reads none of what the landing costs himself, so
+  // at 800 — inside his own ~1100 rim — the grenade's 30 beats the rifle's
+  // clean 20 and he throws from where he stands. At the top the burn is
+  // read whole, and the same press walks him out first (the test below).
+  const kit = [
+    { skill: SKILL.RIFLE, amount: UNLIMITED },
+    { skill: SKILL.GRENADE, amount: 3 }
+  ]
+  const dumb = priceKit(world({ carrying: kit, foes: [foe({ z: 800 })], wits: 0 }))!
+  expect(dumb.kind).toBe('lob')
+  expect(dumb.walk).toBe(0)
 })
 
-test('a lob at the trotters WALKS AWAY — the mark is searched a blast radius out', { tag: '@nodata' }, () => {
+test('a lob at the trotters: the reflex throws from here, the veteran WALKS OUT', { tag: '@nodata' }, () => {
   // The gunner that stood point-blank and only ever knifed (play, mission 2:
-  // "стоя в плотную не может придумать отбежать и стрельнуть чемто другим").
-  // With nothing but a grenade in the kit the option must not die at the
-  // thrower's own feet: too close is the same problem as too far — the mark
-  // is SEARCHED, one blast radius out or more (lib/game/evaluate.ts,
-  // standFor's `least`), and the walk to it is what the throw costs.
+  // "стоя в плотную не может придумать отбежать и стрельнуть чемто другим",
+  // then the correction: "самому попасть в свой взрыв можно если тупой").
+  // Both ends of the rule in one scene — a foe at the trotters and nothing
+  // but a grenade in the kit. The option never dies outright any more; what
+  // the wits buy is the walk out of the blast (standFor's `least`, which
+  // grows with the scale).
   const near = foe({ z: 200 })
-  const option = priceKit(
-    world({ carrying: [{ skill: SKILL.GRENADE, amount: 3 }], foes: [near] })
-  )
-  expect(option).not.toBeNull()
-  expect(option!.kind).toBe('lob')
-  expect(option!.walk).toBeGreaterThan(0)
-  // …and the mark itself stands clear of the throw's own blast.
-  expect(Math.hypot(option!.stand.x - near.x, option!.stand.z - near.z)).toBeGreaterThanOrEqual(
+  const kit = [{ skill: SKILL.GRENADE, amount: 3 }]
+  // The reflex end: throws from where it stands and takes the burn.
+  const dumb = priceKit(world({ carrying: kit, foes: [near], wits: 0 }))
+  expect(dumb).not.toBeNull()
+  expect(dumb!.kind).toBe('lob')
+  expect(dumb!.walk).toBe(0)
+  // The thinking end: the mark is searched one whole blast radius out, and
+  // the walk to it is what the throw costs.
+  const sharp = priceKit(world({ carrying: kit, foes: [near], wits: 1 }))
+  expect(sharp).not.toBeNull()
+  expect(sharp!.kind).toBe('lob')
+  expect(sharp!.walk).toBeGreaterThan(0)
+  expect(Math.hypot(sharp!.stand.x - near.x, sharp!.stand.z - near.z)).toBeGreaterThanOrEqual(
     blastRange(lobOf(SKILL.GRENADE)!)
   )
 })
@@ -196,19 +200,20 @@ test('a spent slot is not priced: no grenades left means the rifle', { tag: '@no
   expect(option.skill).toBe(SKILL.RIFLE)
 })
 
-test('a FRIEND beside the target prices the grenade under the rifle', { tag: '@nodata' }, () => {
-  // The blast would catch the friend at full share: his 30 cancels their 30,
-  // and the rifle's clean 20 wins. "Не дамажить союзников" as arithmetic.
-  const option = priceKit(
-    world({
-      carrying: [
-        { skill: SKILL.RIFLE, amount: UNLIMITED },
-        { skill: SKILL.GRENADE, amount: 3 }
-      ],
-      friends: [foe({ x: 100 })]
-    })
-  )!
-  expect(option.kind).toBe('gun')
+test('a FRIEND beside the target prices the grenade under the rifle — for the THINKER', { tag: '@nodata' }, () => {
+  // The own-side of the ledger is weighed by wits (blastWorth, play's
+  // 2026-08-26 correction: "союзников задеть если также тупой"). At the top
+  // the blast catches the friend at full share — his 30 cancels their 30 and
+  // the rifle's clean 20 wins, "не дамажить союзников" as arithmetic. At the
+  // bottom the friend costs nothing the reflex can see, and the grenade
+  // comes out anyway.
+  const kit = [
+    { skill: SKILL.RIFLE, amount: UNLIMITED },
+    { skill: SKILL.GRENADE, amount: 3 }
+  ]
+  const friends = [foe({ x: 100 })]
+  expect(priceKit(world({ carrying: kit, friends, wits: 1 }))!.kind).toBe('gun')
+  expect(priceKit(world({ carrying: kit, friends, wits: 0 }))!.kind).toBe('lob')
 })
 
 test('TWO foes clumped make the grenade worth more than the sniper: 60 beats 40', { tag: '@nodata' }, () => {
