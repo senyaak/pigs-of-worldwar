@@ -475,14 +475,23 @@ export function standFor(
   /** Whether the blow can be struck from a mark — the ground's own veto
    * (a gun's sight line; a blade and a lob have none of their own). */
   clear: (from: { x: number; y: number; z: number }) => boolean,
-  walked?: Walked
+  walked?: Walked,
+  /**
+   * No mark NEARER the target than this — a lob standing inside its own
+   * blast is the one caller (`blastRange`), and the rule cuts both ways:
+   * standing still point-blank is refused the same as a ring would be, so
+   * the search WALKS AWAY from a foe at the trotters instead of throwing at
+   * its own feet (play, mission 2: "если надо отойти - он отходит").
+   */
+  least = 0
 ): Stand | null {
   const me = world.acting
   // The crow line stands in when nobody hands over a real one (the specs,
   // and any brain without a flood): the rings then price by distance, which
   // is the arithmetic this had before the search existed.
   const legs: Walked = walked ?? ((to) => Math.hypot(to.x - me.x, to.z - me.z))
-  if (distance2d(me, target) <= reach && clear({ x: me.x, y: me.y, z: me.z })) {
+  const away = distance2d(me, target)
+  if (away <= reach && away > least && clear({ x: me.x, y: me.y, z: me.z })) {
     return { x: me.x, z: me.z, walk: 0 }
   }
   let best: Stand | null = null
@@ -492,6 +501,7 @@ export function standFor(
   const home = Math.atan2(me.x - target.x, me.z - target.z)
   for (const ring of STAND_RINGS) {
     const radius = reach * ring
+    if (radius <= least) continue
     for (let i = 0; i < STAND_WAYS; i++) {
       const turn = ((i + 1) >> 1) * (i % 2 === 0 ? 1 : -1)
       const angle = home + (turn / STAND_WAYS) * 2 * Math.PI
@@ -619,10 +629,16 @@ const lobOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): 
     // throw will really be made. It used to be priced as if the grenade
     // landed on the foe from here, and the walk was assumed to fix the
     // difference.
+    // …and never from INSIDE ITS OWN BLAST. A foe at the trotters used to
+    // read as "in the arc, throw from here", which priced the thrower into
+    // the landing and killed the option — leaving a pig point-blank with
+    // nothing but the knife, every turn (play, mission 2). Too close is the
+    // same problem as too far: the mark is SEARCHED, one blast radius out or
+    // more, and the walk to it is what the throw costs.
     const stand: Stand | null =
-      away <= limit
+      away <= limit && away > spread
         ? { x: me.x, z: me.z, walk: 0 }
-        : standFor(world, foe, limit * LOB_COMFORT, () => true, walked)
+        : standFor(world, foe, limit * LOB_COMFORT, () => true, walked, spread)
     const dead = (reach: number): void => {
       const option: Option = {
         skill,

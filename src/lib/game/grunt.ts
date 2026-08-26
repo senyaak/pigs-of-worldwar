@@ -96,6 +96,32 @@ export const PRESS_GRACE = 0.2
 export const MISJUDGE = 0.75
 
 /**
+ * **THE WHIM: at the bottom of the scale WHICH weapon answers is a TOSS,
+ * not an estimate.** Play, mission 2 (2026-08-26), watching a gunner stand
+ * point-blank and knife every turn: "тупой должен рандомно решать какое
+ * использовать оружие - и если надо отойти - он отходит."
+ *
+ * The rule has two ends, like every wits rule here. The smart end THINKS:
+ * the judgment is the priced score, misjudged a little (`MISJUDGE`). The
+ * dumb end is a REFLEX: it grabs whichever workable blow comes to snout,
+ * so its judgment of a playable option is a flat roll on this scale, worth
+ * and all unread. The blend is by wits — no gate anywhere — and the roll
+ * is one per (kind, skill) per turn off the battle's own stream, so the
+ * same world still answers the same way twice, which lockstep needs.
+ *
+ * Two things the whim never does: it never resurrects an option the price
+ * list KILLED (score ≤ 0 keeps its misjudged self, and the election takes
+ * nothing under zero), and it never touches the dumb eye — nearness still
+ * picks the TARGET (`NEAR_POINTS` swamps everything at the bottom); the
+ * whim only tosses between the weapons that can be brought to bear on it.
+ *
+ * Sized at the score scale — a shot is worth about twenty, a crate fifty —
+ * so mid-scale the toss and the estimate genuinely argue. `[deliberate]` —
+ * play's dial.
+ */
+export const WHIM_POINTS = 30
+
+/**
  * How far off the SHOT itself lands at the bottom of the wits scale — the
  * docs/ai.md "actuator noise" knob ("over-turns the aim, over-holds the
  * gauge"), asked for by play in one line: "слишком сильно точно стреляет".
@@ -237,6 +263,9 @@ export function createGruntBrain(): Brain {
   /** This turn's misjudgments, one factor per (kind, skill) — rolled once,
    * held to the handover, so a bad judgment is a bad PLAN, not a wobble. */
   const judgments = new Map<string, number>()
+  /** …and this turn's whims, one roll per (kind, skill) — the dumb end's
+   * toss between workable weapons (WHIM_POINTS), held the same way. */
+  const whims = new Map<string, number>()
   /** This turn's aim — a heading error and a gauge error, rolled once
    * (AIM_WOBBLE, CHARGE_WOBBLE). Held for the same reason: a bearing that
    * moved between decisions is a pig re-turning forever. */
@@ -382,7 +411,19 @@ export function createGruntBrain(): Brain {
         )
         const near =
           one.score <= 0 ? 0 : ((1 - world.wits) * NEAR_POINTS) / (1 + away / TILE_STEP / NEAR_HALF)
-        one.believed = one.score * factor
+        // The WHIM (WHIM_POINTS above): a playable option's believed worth
+        // slides from the estimate to a flat toss as the wits fall — the
+        // reflex end grabs whatever weapon comes to snout. A killed option
+        // (score ≤ 0) keeps its misjudged self and stays unelectable.
+        let whim = whims.get(key)
+        if (whim === undefined) {
+          whim = world.roll()
+          whims.set(key, whim)
+        }
+        one.believed =
+          one.score <= 0
+            ? one.score * factor
+            : world.wits * one.score * factor + (1 - world.wits) * WHIM_POINTS * whim
         // **THE MISJUDGMENT IS ABOUT THE VALUE, NEVER ABOUT THE DISTANCE** —
         // which is why the eye is ADDED to the misjudged score instead of
         // being misjudged with it. A three-year-old cannot tell fifty points
@@ -643,6 +684,7 @@ export function createGruntBrain(): Brain {
       press = null
       thought = null
       judgments.clear()
+      whims.clear()
       shaky = null
       plan = null
       leg = 0

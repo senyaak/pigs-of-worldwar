@@ -21,6 +21,7 @@ import type { AiWorld, Seen } from '../src/lib/game/ai'
 import { SKILL } from '../src/lib/game/skills'
 import { UNLIMITED } from '../src/lib/game/inventory'
 import { damageOf } from '../src/lib/game/projectile'
+import { blastRange, lobOf } from '../src/lib/game/grenade'
 
 const foe = (over: Partial<Seen> = {}): Seen => ({ x: 0, y: 0, z: 800, health: 50, ...over })
 
@@ -161,6 +162,26 @@ test('a throw that would catch the THROWER is priced down: up close the rifle wi
     })
   )!
   expect(option.kind).toBe('gun')
+})
+
+test('a lob at the trotters WALKS AWAY — the mark is searched a blast radius out', { tag: '@nodata' }, () => {
+  // The gunner that stood point-blank and only ever knifed (play, mission 2:
+  // "стоя в плотную не может придумать отбежать и стрельнуть чемто другим").
+  // With nothing but a grenade in the kit the option must not die at the
+  // thrower's own feet: too close is the same problem as too far — the mark
+  // is SEARCHED, one blast radius out or more (lib/game/evaluate.ts,
+  // standFor's `least`), and the walk to it is what the throw costs.
+  const near = foe({ z: 200 })
+  const option = priceKit(
+    world({ carrying: [{ skill: SKILL.GRENADE, amount: 3 }], foes: [near] })
+  )
+  expect(option).not.toBeNull()
+  expect(option!.kind).toBe('lob')
+  expect(option!.walk).toBeGreaterThan(0)
+  // …and the mark itself stands clear of the throw's own blast.
+  expect(Math.hypot(option!.stand.x - near.x, option!.stand.z - near.z)).toBeGreaterThanOrEqual(
+    blastRange(lobOf(SKILL.GRENADE)!)
+  )
 })
 
 test('a spent slot is not priced: no grenades left means the rifle', { tag: '@nodata' }, () => {

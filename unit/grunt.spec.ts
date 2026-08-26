@@ -131,14 +131,16 @@ test('the gun comes out before anything else', { tag: '@nodata' }, () => {
   expect(brain.decide(world({}))).toEqual({ kind: 'hold', skill: SKILL.RIFLE })
 })
 
-test('of two guns the kit holds, the harder-hitting one comes out', { tag: '@nodata' }, () => {
+test('of two guns the THINKING brain takes the harder-hitting one', { tag: '@nodata' }, () => {
   const brain = createGruntBrain()
-  // Whichever the TABLE says hits harder — computed, not assumed, and the
-  // tie goes to the first slot exactly as the brain's own fold breaks it.
+  // Whichever the TABLE says hits harder — computed, not assumed. At the TOP
+  // of the scale, because reading the two damages apart is thinking: the
+  // bottom end tosses between them instead (WHIM_POINTS, the test below).
   const stronger =
     damageOf(SKILL.SNIPER_RIFLE) > damageOf(SKILL.RIFLE) ? SKILL.SNIPER_RIFLE : SKILL.RIFLE
   const order = brain.decide(
     world({
+      wits: 1,
       carrying: [
         { skill: SKILL.RIFLE, amount: UNLIMITED },
         { skill: SKILL.SNIPER_RIFLE, amount: 3 }
@@ -148,20 +150,46 @@ test('of two guns the kit holds, the harder-hitting one comes out', { tag: '@nod
   expect(order).toEqual({ kind: 'hold', skill: stronger })
 })
 
+test('THE WHIM: at the bottom of the scale which weapon answers is a toss', { tag: '@nodata' }, () => {
+  // Play, mission 2 (2026-08-26), watching a gunner knife point-blank every
+  // turn: "тупой должен рандомно решать какое использовать оружие." Each
+  // judgment spends two rolls — its misjudgment factor, then its whim — and
+  // at wits 0 the whim IS the believed worth, so a generous roll on the
+  // WEAKER gun brings it out over the harder-hitting one. Same stream, same
+  // answer twice: a toss off the battle's seed, not a die.
+  const kit = [
+    { skill: SKILL.RIFLE, amount: UNLIMITED },
+    { skill: SKILL.SNIPER_RIFLE, amount: 3 }
+  ]
+  const weaker =
+    damageOf(SKILL.SNIPER_RIFLE) > damageOf(SKILL.RIFLE) ? SKILL.RIFLE : SKILL.SNIPER_RIFLE
+  const rolls = (...values: number[]): (() => number) => {
+    let i = 0
+    return () => values[Math.min(i++, values.length - 1)]
+  }
+  // Rifle judged first (kit order): factor, whim; then the sniper's pair.
+  const order = createGruntBrain().decide(
+    world({ wits: 0, carrying: kit, roll: rolls(0.5, 0.99, 0.5, 0.01) })
+  )
+  expect(order).toEqual({ kind: 'hold', skill: weaker })
+})
+
 test('a dumb brain MISJUDGES the kit — once a turn, and held', { tag: '@nodata' }, () => {
   const brain = createGruntBrain()
   const kit = [
     { skill: SKILL.RIFLE, amount: UNLIMITED },
     { skill: SKILL.GRENADE, amount: 3 }
   ]
-  // The rifle is judged HIGH (first roll) and the grenade LOW (second): at
-  // wits 0 the grenade's exact 30 reads under the rifle's exact 20, and the
-  // "wrong" gun comes out — an honest mistake, not a die (lib/game/grunt.ts,
-  // MISJUDGE; play: "они всегда выбирали бить свиней гранатами").
-  const rolls = [0.99, 0.01]
+  // MID-SCALE, where the estimate still argues with the whim: the rifle's
+  // factor is rolled HIGH (first roll) and the grenade's LOW (third), whims
+  // neutral, so the grenade's exact 30 reads under the rifle's exact 20 and
+  // the "wrong" gun comes out — an honest mistake (lib/game/grunt.ts,
+  // MISJUDGE; play: "они всегда выбирали бить свиней гранатами"). At the
+  // very bottom the whim owns the judgment instead (the toss test above).
+  const rolls = [0.99, 0.5, 0.01, 0.5]
   let handed = 0
   const rigged = (): ReturnType<typeof world> =>
-    world({ carrying: kit, roll: () => rolls[Math.min(handed++, rolls.length - 1)] })
+    world({ wits: 0.5, carrying: kit, roll: () => rolls[Math.min(handed++, rolls.length - 1)] })
   expect(brain.decide(rigged())).toEqual({ kind: 'hold', skill: SKILL.RIFLE })
   // The judgment is rolled ONCE and held for the turn: the same decision
   // asked again spends no new rolls and picks no new gun — a re-rolled
@@ -695,32 +723,35 @@ test('A THREE-YEAR-OLD MIGHT TAKE THE CRATE OR MIGHT JUST SHOOT — the roll dec
     crates: [{ x: 0, z: 800, skill: null, amount: 50 }]
   }
   /** The battle's stream, handed out in order: the gun is judged first, the
-   * crate second (lib/game/evaluate.ts, `elect`). */
+   * crate second, and each judgment spends TWO rolls — its misjudgment
+   * factor and then its whim (lib/game/grunt.ts, WHIM_POINTS). At wits 0 the
+   * whim is the whole of the believed worth, so the second and fourth rolls
+   * are the ones that decide. */
   const rolls = (...values: number[]): (() => number) => {
     let i = 0
     return () => values[Math.min(i++, values.length - 1)]
   }
-  // The gun believed high and the crate low: it turns onto the foe and
+  // The gun's whim high and the crate's low: it turns onto the foe and
   // shoots — no detour, and the plan carries no errand.
   const shoots = createGruntBrain()
-  expect(shoots.decide(world({ ...scene, wits: 0, roll: rolls(1, 0) })).kind).toBe('turnTo')
+  expect(shoots.decide(world({ ...scene, wits: 0, roll: rolls(0.5, 1, 0.5, 0) })).kind).toBe('turnTo')
   expect(shoots.explain?.()?.plan?.errand).toBe(false)
   // The other way about, and the SAME world sends it to the crate.
   const fetches = createGruntBrain()
-  expect(fetches.decide(world({ ...scene, wits: 0, roll: rolls(0, 1) }))).toEqual({
+  expect(fetches.decide(world({ ...scene, wits: 0, roll: rolls(0.5, 0, 0.5, 1) }))).toEqual({
     kind: 'walkTo',
     x: 0,
     z: 800,
     within: ARRIVE_WITHIN
   })
   expect(fetches.explain?.()?.plan?.errand).toBe(true)
-  // …and at the TOP of the scale there is no toss at all: the spread closes
-  // to nothing, so both rolls answer the same. "Умные всегда оценивают
-  // бенефиты."
+  // …and at the TOP of the scale there is no toss at all: the whim's share
+  // closes to nothing and the spread with it, so both rolls answer the same.
+  // "Умные всегда оценивают бенефиты."
   const sharpA = createGruntBrain()
   const sharpB = createGruntBrain()
-  expect(sharpA.decide(world({ ...scene, wits: 1, roll: rolls(1, 0) }))).toEqual(
-    sharpB.decide(world({ ...scene, wits: 1, roll: rolls(0, 1) }))
+  expect(sharpA.decide(world({ ...scene, wits: 1, roll: rolls(0.5, 1, 0.5, 0) }))).toEqual(
+    sharpB.decide(world({ ...scene, wits: 1, roll: rolls(0.5, 0, 0.5, 1) }))
   )
 })
 test('A HEALTH CRATE IS WORTH WHAT IT PUTS BACK: a topped-up pig walks past one', { tag: '@nodata' }, () => {

@@ -181,6 +181,8 @@ The knobs, then:
 | clumping penalty | near zero | high — spread out, deny the grenade |
 | memory of hidden pigs | forgets | remembers the spot |
 | actuator noise | over-turns the aim, over-holds the gauge | near clean |
+| WHICH weapon answers (`WHIM_POINTS`, built 2026-08-26) | a toss between whatever can be brought to bear — "тупой должен рандомно решать какое использовать оружие" | reads the two damages apart and takes the better |
+| standing inside its own blast | — | **not a knob either**: a lob's mark is never inside its own blast at ANY wits — too close reads like too far, and the search walks the thrower out one blast radius before the throw (`standFor`'s `least`, built 2026-08-26 off the gunner that stood point-blank and only ever knifed) |
 | lob pitch (`TUNE_PITCH_WITS`, built 2026-08-24) | always the 45° start | tunes the come-up: a steeper arc over a hill, solved for the exact landing |
 | self-preservation (`SHELTER_WITS`, built 2026-08-24) | fires from wherever the weapon reaches, and dies where it stood | ends its turn SHOULDER TO SHOULDER with an enemy, so a blast answering it costs them one of their own — guns only, and bounded to four tiles of walk |
 
