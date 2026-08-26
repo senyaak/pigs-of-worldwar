@@ -1351,3 +1351,26 @@ either pay a medal twice or lock one away. The four campaigns here were
 converted BY HAND off what their own files say — every one had finished its
 position with nobody lost and no PROPOINT built yet, so each holds the level
 and the clean sweep. `savearmy3` reads 2/2 now, which is what play earned.
+
+### The debrief's badges sat on a black plate (2026-08-26)
+
+Play: "на экране результатов иконка медика имеет чёрный фон - причём
+огромный - надо также как на экране отряда." Decoded off the art itself: the
+squad screen's badges come out of FEBmps/FEBMP.MAD on a MAGENTA field and
+punch clean, but the debrief's come from the loose BMPs in
+Language/Tims/debrief, and all six badges and both pips there sit on a field
+of PURE BLACK — zero magenta texels — so `punchMagenta` punched nothing and
+every badge drew as an opaque 52×24 black plate. The medic's was the worst
+case only because its art is the smallest (a ~11×20 cross in the middle of
+the plate); all six had the plate.
+
+Fixed by KEYING THOSE EIGHT NAMES ON BLACK — `punchBlack`, the same test the
+skill-menu icons take — threaded as a `blackKeyed` list from `ui/debrief.ts`
+through the IPC to `loadLanguageImages`. Safe because the FEBMP twins of the
+same art carry not one pure-black texel: the black in the debrief copies is
+all field and no art. The faces, uniforms and r_i_p stay magenta-keyed.
+
+The same session's report about the SQUAD screen's portraits being shifted
+found no candidate in the code: the face positions are the exe's own read
+numbers, untouched since they landed, and nothing in git moved them. Wants a
+live measurement (which slot, by how much) before anything is changed.

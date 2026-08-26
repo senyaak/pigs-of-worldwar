@@ -188,7 +188,7 @@ export interface Api {
   loadSound(relPath: string): Promise<LoadSoundResult>
   loadFrontendImages(entryNames: string[]): Promise<FrontendImagesResult>
   /** The debrief's loose BMPs out of Language/Tims/debrief, magenta punched. */
-  loadDebriefImages(names: string[]): Promise<FrontendImagesResult>
+  loadDebriefImages(names: string[], blackKeyed?: string[]): Promise<FrontendImagesResult>
   /** Loose BMPs out of any Language/Tims folder — PigMap, Briefing — with
    * only the `keyed` names magenta-punched (a full page is not). */
   loadLanguageImages(

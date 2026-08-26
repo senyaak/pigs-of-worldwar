@@ -410,7 +410,10 @@ export function initDebrief(handlers: {
       if (loaded) return
       try {
         const [sprites, coinSet, bigFont, smallFont, text] = await Promise.all([
-          loadDebriefSprites(DEBRIEF_ART),
+          // The badges and pips ship on a BLACK field, not magenta — punched
+          // on black, or a medic's little cross drowns in a 52×24 black
+          // plate (play, mission 2: "иконка медика имеет чёрный фон").
+          loadDebriefSprites(DEBRIEF_ART, [...Object.values(BADGE), ...PIPS]),
           loadSprites([TOKEN]),
           loadFont('BIG'),
           loadFont('GameChars'),

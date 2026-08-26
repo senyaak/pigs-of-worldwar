@@ -231,7 +231,13 @@ export async function loadLanguageImages(
   gameDir: string,
   folder: string,
   names: string[],
-  keyed: string[] = []
+  keyed: string[] = [],
+  /** Names keyed on BLACK instead — the debrief's class badges and pips ship
+   * as loose BMPs whose background is pure black, not magenta (their FEBMP
+   * twins are magenta-keyed and carry not one pure-black texel, so the black
+   * here is all field and no art). Punched with the same test the skill
+   * icons take (lib/formats/alpha.ts, punchBlack). */
+  blackKeyed: string[] = []
 ): Promise<FrontendImage[]> {
   const tims = path.join(gameDir, 'Language', 'Tims')
   const folders = await fs.readdir(tims)
@@ -241,12 +247,17 @@ export async function loadLanguageImages(
   const siblings = await fs.readdir(dir)
   const byName = new Map(siblings.map((file) => [file.toLowerCase(), file]))
   const punched = new Set(keyed.map((name) => name.toLowerCase()))
+  const blacked = new Set(blackKeyed.map((name) => name.toLowerCase()))
   return Promise.all(
     names.map(async (wanted) => {
       const file = byName.get(`${wanted.toLowerCase()}.bmp`)
       if (!file) throw new Error(`no ${wanted}.bmp in Language/Tims/${found}`)
       const bmp = parseBmp(await fs.readFile(path.join(dir, file)))
-      const rgba = punched.has(wanted.toLowerCase()) ? punchMagenta(bmp) : bmp.rgba
+      const rgba = blacked.has(wanted.toLowerCase())
+        ? punchBlack(bmp)
+        : punched.has(wanted.toLowerCase())
+          ? punchMagenta(bmp)
+          : bmp.rgba
       return { name: wanted.toLowerCase(), width: bmp.width, height: bmp.height, rgba }
     })
   )

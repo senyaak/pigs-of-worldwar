@@ -107,12 +107,17 @@ export function registerIpc(): void {
     }
   })
 
-  ipcMain.handle('debrief:images', async (_event, names: string[]) => {
+  ipcMain.handle('debrief:images', async (_event, names: string[], blackKeyed: string[] = []) => {
     const gameDir = getGameDir()
     if (!gameDir) return { ok: false, error: 'Game folder is not set' }
     try {
-      // The debrief's overlays are all colour-keyed, so every name punches.
-      return { ok: true, images: await loadLanguageImages(gameDir, 'debrief', names, names) }
+      // The debrief's overlays are all colour-keyed, so every name punches —
+      // on magenta, except the names the caller says sit on a BLACK field
+      // (the class badges and pips, ui/debrief.ts).
+      return {
+        ok: true,
+        images: await loadLanguageImages(gameDir, 'debrief', names, names, blackKeyed)
+      }
     } catch (error) {
       return fail(names.join(', '), error)
     }

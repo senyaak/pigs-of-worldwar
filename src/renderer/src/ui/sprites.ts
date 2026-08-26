@@ -102,9 +102,13 @@ export async function loadArchiveBmps(relPath: string): Promise<SpriteSet> {
 }
 
 /** Load the DEBRIEF's loose BMPs — the one art folder that is not an
- * archive (Language/Tims/debrief, main/assets.ts). */
-export async function loadDebriefSprites(names: string[]): Promise<SpriteSet> {
-  const result = await window.api.loadDebriefImages(names)
+ * archive (Language/Tims/debrief, main/assets.ts). `blackKeyed` names sit
+ * on a black field instead of magenta and are punched on that. */
+export async function loadDebriefSprites(
+  names: string[],
+  blackKeyed: string[] = []
+): Promise<SpriteSet> {
+  const result = await window.api.loadDebriefImages(names, blackKeyed)
   if (!result.ok) throw new Error(result.error)
   return spriteSet(result.images)
 }
