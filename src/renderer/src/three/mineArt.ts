@@ -39,7 +39,11 @@ export interface MineArt {
    */
   draw(
     revealed: readonly { x: number; y: number; z: number }[],
-    tripped: readonly { x: number; y: number; z: number }[]
+    tripped: readonly { x: number; y: number; z: number }[],
+    /** The sapper's mines still lying ON the ground — furniture EVERYBODY
+     * sees, in the original too (lib/game/mines.ts, `laid`). The map's own
+     * `WE_APMIN`, like the trodden ones. */
+    laid?: readonly { x: number; y: number; z: number }[]
   ): void
   /** How many are on the scene, both kinds — what a spec counts, since a marker
    * is art and a screenshot cannot tell one from a stone. */
@@ -56,6 +60,8 @@ export function createMineArt(root: THREE.Object3D, spawn?: SpawnModel): MineArt
   const markers: THREE.Mesh[] = []
   /** …and the trodden ones, out of the map's. */
   const live: THREE.Mesh[] = []
+  /** …and the sapper's, lying on the ground before they bed in. */
+  const lying: THREE.Mesh[] = []
 
   const shrink = (pool: THREE.Mesh[], to: number, pooled: boolean): void => {
     for (let i = to; i < pool.length; i++) {
@@ -89,25 +95,31 @@ export function createMineArt(root: THREE.Object3D, spawn?: SpawnModel): MineArt
   }
 
   return {
-    draw(revealed, tripped) {
+    draw(revealed, tripped, laid = []) {
       if (markers.length > revealed.length) shrink(markers, revealed.length, true)
       if (live.length > tripped.length) shrink(live, tripped.length, false)
+      if (lying.length > laid.length) shrink(lying, laid.length, false)
       place(markers, revealed, () => art.take(MINE_MODEL), MINE_LIFT)
       // …and the trodden ones off the MAP, which is where `WE_APMIN` is. A map
       // whose archive has none simply shows nothing rather than borrowing the
       // carried model back: a stand-in that outlives its excuse is the thing
       // this file just stopped doing.
       place(live, tripped, () => spawn?.(TRIPPED_MINE_MODEL) ?? null, APMIN_LIFT)
+      // The laid ones wear the same map model — in the exe they ARE that
+      // projectile, lying where the sapper put them until everyone leaves.
+      place(lying, laid, () => spawn?.(TRIPPED_MINE_MODEL) ?? null, APMIN_LIFT)
     },
-    shown: () => markers.length + live.length,
+    shown: () => markers.length + live.length + lying.length,
     tripped: () => live.length,
     clear() {
       shrink(markers, 0, true)
       shrink(live, 0, false)
+      shrink(lying, 0, false)
     },
     dispose() {
       shrink(markers, 0, true)
       shrink(live, 0, false)
+      shrink(lying, 0, false)
       art.dispose()
     }
   }

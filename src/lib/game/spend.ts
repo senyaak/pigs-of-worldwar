@@ -60,9 +60,11 @@ export const endsTurn = (skill: number | null): boolean =>
  * **The MINES have their own arm and it is not this one.** 0x4942e6 tests for
  * skills 35 and 36 by number and gives them the same four seconds *only* when
  * `[game+0x534] >= 2` or the turn has less than four seconds left; otherwise
- * laying one costs nothing at all. `[game+0x534]` is undecoded — it is written to
- * 2 there and nowhere this pass read — and neither mine is a weapon in this engine
- * yet, so the arm is recorded rather than implemented.
+ * laying one costs nothing at all. `[game+0x534]` is READ now (2026-08-26, all
+ * five sites): a saturating mines-laid-this-turn byte, zeroed every handover
+ * (0x48f539), incremented only by the mine arm (0x493ed9) — so the first two
+ * lays a turn are free and the third squeezes the clock. The battle implements
+ * it beside the `hurryFor` call (lib/game/battle.ts, `minesLaid`).
  */
 export const hurryFor = (skill: number | null): number =>
   skill === 37 || skill === 38 ? PLANTED_SECONDS : 0

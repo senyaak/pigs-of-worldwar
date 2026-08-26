@@ -98,6 +98,11 @@ score: enumerate pairs of **(kit item × target or point)** and take the best
   MEDIC DART and 33 MEDICINE BALL still have no effect in the engine —
   the dart flies and lands zero, the ball cannot be thrown at all. Those
   mechanics land first, then the brain prices all three.
+- **The MINE works and is not priced** (lib/game/mines.ts, 2026-08-26):
+  `plantOption` still starts from `lobOf` and finds nothing for 35/36 — and
+  a mine's worth is DEFERRED anyway (it pays when somebody treads, turns
+  later), which the immediate-blast pricing cannot say. An enemy sapper
+  today lays nothing; wants its own option shape when the brain grows one.
 
 ## THE TURN IS ONE DECISION, and the mark is SEARCHED FOR
 

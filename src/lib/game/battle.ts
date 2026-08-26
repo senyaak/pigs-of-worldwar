@@ -44,7 +44,7 @@ import {
 import type { WalkAway } from './walkAway'
 import { advanceEndOfGame, beginEndOfGame, outcomeOf } from './endOfGame'
 import type { EndOfGame } from './endOfGame'
-import { endsTurn, hurryFor } from './spend'
+import { PLANTED_SECONDS, endsTurn, hurryFor } from './spend'
 import { blastRange, isPlanted, lobOf } from './grenade'
 import { createSights } from './sights'
 import { createAttack } from './attack'
@@ -60,6 +60,7 @@ import type { Building, Indoors } from './indoors'
 import { INOUT_CLIP } from './buildings'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
+import { isMine } from './mines'
 import type { Mines } from './mines'
 import type { Tumbles, Velocity } from './tumble'
 import type { Strikes } from './strikes'
@@ -330,6 +331,7 @@ export function createBattle(parts: BattleParts): Battle {
     grenades,
     swings,
     heals,
+    mines,
     sights,
     anim,
     clips: parts.clips,
@@ -462,6 +464,10 @@ export function createBattle(parts: BattleParts): Battle {
    * charge. SKIP TURN is not a weapon and is never refused.
    */
   let struck = false
+  /** Mines laid THIS TURN — the exe's saturating byte at `[game+0x534]`,
+   * zeroed every handover (0x48f539): the budget the mine branch below
+   * spends. */
+  let minesLaid = 0
   /**
    * How many weapons have been used this turn — the exe's `[gameMode+0x334]`,
    * and the whole of what the training ground's "you did nothing" line hangs on
@@ -960,6 +966,7 @@ export function createBattle(parts: BattleParts): Battle {
     pending = null
     spent = false
     struck = false
+    minesLaid = 0
     sights.setHeld(false)
     swings.reset()
     heals.reset()
@@ -1644,10 +1651,14 @@ export function createBattle(parts: BattleParts): Battle {
     // …and neither is a HEAL: the hands are not a blow (they never set `struck`
     // below), and a pig that HAS struck — a charge planted, say — may still lay
     // them on inside the same turn.
+    // …and neither is a MINE, whose own budget PROVES the exe lays several a
+    // turn: `[game+0x534]` counts to two free lays before the third squeezes
+    // the clock, a counter that could never reach two under a one-lay gate.
     if (
       struck &&
       acting.holding !== SKILL.SKIP_TURN &&
       acting.holding !== SKILL.HEALING_HANDS &&
+      !isMine(acting.holding) &&
       grenades.thrown() === 0
     ) {
       attack.swallow()
@@ -1681,6 +1692,16 @@ export function createBattle(parts: BattleParts): Battle {
       // increments `[gameMode+0x334]` from (0x493E7A).
       weaponUses++
       if (endsTurn(acting.holding)) spent = true
+      // A MINE has a BUDGET instead of a bill — the exe's `[game+0x534]`,
+      // read whole 2026-08-26: the first TWO laid in a turn cost nothing and
+      // the clock runs on; the third — or a lay with under four seconds
+      // left — squeezes the clock to the planted four, the same "get clear"
+      // the TNT gives (and with under four left it is a small GIFT: the exe
+      // SETS the deadline, so the layer always gets its four to walk away).
+      else if (isMine(acting.holding)) {
+        if (minesLaid >= 2 || game.timeLeft < PLANTED_SECONDS) game.hurryTurn(PLANTED_SECONDS)
+        minesLaid++
+      }
       // A PLANTED charge keeps the turn and takes the clock down to four seconds
       // instead: enough to get clear of the thing, and not enough to do anything
       // else with. TNT's own fuse is nearer six, so it goes off in the beat the

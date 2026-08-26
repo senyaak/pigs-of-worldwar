@@ -19,7 +19,7 @@ import { startGame } from '../menu'
 import { parsePmg, TILE_MINE, TILE_STEP } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import {
-  DETECT_RANGE,
+  DETECT_TILES,
   MINE_BLAST,
   MINE_DAMAGE,
   MINE_FUSE_FRAMES,
@@ -291,10 +291,10 @@ test('a mine is HIDDEN, and only a nearby pig of the right class sees it', () =>
   // Nor does anybody at all, when nobody is looking.
   expect(mines.revealed([])).toEqual([])
 
-  // The three ENGINEER classes do — the ones whose own kit is mines, read off the
-  // class record rather than picked by name (lib/game/mines.ts).
-  for (const pigClass of [5, 6, 7]) expect(detectsMines(pigClass)).toBe(true)
-  for (const pigClass of [0, 1, 2, 3, 4, 8, 9, 10, 11]) {
+  // The exe's own reveal gate (todo B10, closed 2026-08-26): the COMMANDO,
+  // the whole engineer family, and the HERO — `[pig+0x19C]` in {4,5,6,7,0xE}.
+  for (const pigClass of [4, 5, 6, 7, 14]) expect(detectsMines(pigClass)).toBe(true)
+  for (const pigClass of [0, 1, 2, 3, 8, 9, 10, 11]) {
     expect(detectsMines(pigClass), `class ${pigClass}`).toBe(false)
   }
 
@@ -303,9 +303,11 @@ test('a mine is HIDDEN, and only a nearby pig of the right class sees it', () =>
   expect(seen.length, 'standing on the field it sees its own tile and its neighbours')
     .toBeGreaterThan(0)
   expect(seen.some((one) => one.x === at.x && one.z === at.z), 'its own tile among them').toBe(true)
-  // …and nothing further off than the range: it is what is NEAR that shows.
+  // …and nothing outside the exe's own 3×3 of tiles round the detector's:
+  // one tile is 512, so a revealed centre is within 1.5 tiles on each axis.
   for (const one of seen) {
-    expect(Math.hypot(one.x - at.x, one.z - at.z)).toBeLessThanOrEqual(DETECT_RANGE)
+    expect(Math.abs(one.x - at.x)).toBeLessThanOrEqual(512 * (DETECT_TILES + 0.5))
+    expect(Math.abs(one.z - at.z)).toBeLessThanOrEqual(512 * (DETECT_TILES + 0.5))
   }
 
   // Walk it well away and the field goes dark again.

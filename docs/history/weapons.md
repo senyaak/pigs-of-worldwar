@@ -1647,3 +1647,43 @@ from each palm (bones 5 and 8, reads at 0x47be5f/0x47beca) — a pure particle
 effect, four batches of 13 laid in a chain along the facing, life 1000; the
 earlier "0xE4" was the `operator new` size, not an id. It waits on the
 renderer growing a particle chain, and the sound does not.
+
+### The sapper LAYS MINES — skills 35/36, read end to end and built (2026-08-26)
+
+The whole mechanic came out of the exe in one pass, and it is prettier than
+a planted grenade. The lay rides TNT's own door — planted family, no gauge,
+clip 77 with the charge dropped at PLANT_PHASE — but what the key-frame
+drops is FURNITURE: a visible WE_APMIN object at the layer's feet. It arms
+after 25 frames with the L_MINETR click (0x43699d), and then BEDS INTO THE
+GROUND — becomes the tile's own mine bit (`Map::SetMine`, 0x4374cf) — only
+when the bed-in walker (0x436e55) finds not one live pig within ±512 of it
+on either axis, the tile dry and the bit free. **That clearance is the whole
+of why a layer never trips its own mine**: while anyone stands about it is
+furniture; the moment the last pig leaves it sinks, and the ordinary tread
+takes over — the layer's own foot included, no side is checked anywhere.
+
+35 against 36 is a flavour: trigger kinds 40/41, identical 20 points over a
+1024 blast, effect ids 0x55/0x4c both reading parameter row 14 — so the
+remake detonates both through the one MINE_EFFECT_ID, and no shipped kit
+carries 36 anyway.
+
+`[game+0x534]` fell with it — all five sites read: a saturating
+mines-laid-this-turn byte, zeroed every handover. The first TWO lays a turn
+are free with the clock running on; the third — or a lay with under four
+seconds left — squeezes the clock to the planted four (which under four is
+a small gift: the exe SETS the deadline). `minesLaid` in the battle is that
+byte, and the one-blow gate now exempts a mine in hand — a budget that
+counts to two could never fill under a one-lay gate.
+
+Two B10 corrections landed on the way: the detectors are the exe's reveal
+gate {4, 5, 6, 7, 14} (COMMANDO, the engineer family, HERO), and the reveal
+is the exe's own 3×3 of tiles round the detector (0x4767a0) — the invented
+1024-unit radius is gone. A laid-not-yet-bedded mine is drawn to EVERYBODY
+(it is a visible object in the original too); a bedded one goes back to the
+detectors' marker. `unit/mines.spec.ts` pins the lay, the clearance, the
+one-shot tread and the refusal on an occupied tile.
+
+Deliberately diverged / deferred: the lay REFUSES a tile that already holds
+a mine (the exe drops the object and lets it lie for ever); the bed-in's
+own sound (index 0x61, name unread) is silent; the AI does not price a mine
+yet — plantOption still needs a row to read (docs/ai.md).

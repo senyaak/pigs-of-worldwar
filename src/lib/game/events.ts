@@ -101,6 +101,10 @@ export type BattleEvent =
    * blast is four tenths of a second behind it and arrives as `blasted` like any
    * other (lib/game/mines.ts). */
   | { kind: 'mineTripped'; at: Point }
+  /** A LAID mine finished arming — the L_MINETR click off the projectile
+   * state machine (0x43699d), before it beds into the ground
+   * (lib/game/mines.ts). */
+  | { kind: 'mineArmed'; at: Point }
   /** …or met water: every water contact reports this first, and then which of
    * the two it was (`Projectile::OnHitLandscape`, 0x4377d0). */
   | { kind: 'splashed'; at: Point }

@@ -143,6 +143,9 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       // has nothing standing on it — and the bang is four tenths of a second
       // behind it (lib/game/mines.ts).
       mineTripped: () => playCue(bank(), BATTLE_SOUNDS.mine),
+      // A laid mine finishing its arming makes the same trigger click — the
+      // exe's own L_MINETR off the projectile state machine (lib/game/mines.ts).
+      mineArmed: () => playCue(bank(), BATTLE_SOUNDS.mine),
       // Every water contact splashes before the engine looks at the speed at
       // all, and then it is either a skip or a dousing.
       splashed: () => playCue(bank(), BATTLE_SOUNDS.splash),

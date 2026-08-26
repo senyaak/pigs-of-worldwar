@@ -16,6 +16,7 @@ import { advanceFiring, beginFiring } from './shot'
 import type { Firing } from './shot'
 import { isGun } from './projectile'
 import { PLANT_PHASE, isLobbed, isPlanted } from './grenade'
+import { isMine } from './mines'
 import { weaponOf } from './weapons'
 import { PHASE_UNITS } from './melee'
 import { clipSeconds } from './clips'
@@ -54,6 +55,9 @@ export interface AttackParts {
   /** The healing hands — the one skill the press answers on the spot
    * (lib/game/healing.ts). */
   heals: Heals
+  /** Where a LAID mine goes — the sapper's plant, called at the lay clip's
+   * own key-frame the way a charge's is (lib/game/mines.ts). */
+  mines: { lay(pig: Pig, skill: number): boolean }
   /** Firing drops the sights, and the aim it leaves is what the shot takes. */
   sights: Sights
   anim: Anim
@@ -181,7 +185,11 @@ export function createAttack(parts: AttackParts): Attack {
       if (acting.holding === SKILL.HEALING_HANDS) {
         return parts.heals.begin(acting) ? 'used' : 'none'
       }
-      if (isLobbed(holding)) {
+      // A MINE takes the lobbed family's door: it is `isPlanted` like TNT,
+      // has no gauge (record +0x14 is 0), and its charge goes down at the
+      // same clip phase — only what the key-frame DROPS differs
+      // (lib/game/mines.ts).
+      if (isLobbed(holding) || isMine(holding)) {
         if (gauge || firing || laying !== null) return 'none'
         // **A GAUGE IS THE WEAPON'S, not the throw's.** The record's +0x14 is
         // what says whether one fills (`weapons/fire.md`, and it is 1 on the
@@ -228,7 +236,13 @@ export function createAttack(parts: AttackParts): Attack {
         const was = laying.untilDown
         laying.untilDown -= delta
         laying.untilDone -= delta
-        if (was > 0 && laying.untilDown <= 0 && grenades.plant(acting)) {
+        if (
+          was > 0 &&
+          laying.untilDown <= 0 &&
+          (isMine(holding)
+            ? parts.mines.lay(acting, holding ?? 35)
+            : grenades.plant(acting))
+        ) {
           // **AND THE HANDS ARE EMPTY.** Play: "когда поставил тнт — руки после
           // пустые — а ты ещё держишь тнт." A charge is not a weapon you keep: it
           // left the trotters and it is on the ground. The round goes with it, the

@@ -1128,7 +1128,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // itself the moment a foot finds it, and by then it is nobody's secret. Those
     // are the ENGINE's own art and get its model (`WE_APMIN`), which is why the
     // two lists go in separately.
-    mineArt.draw(mines.revealed(game.currentPlayer.pigs), mines.at())
+    mineArt.draw(mines.revealed(game.currentPlayer.pigs), mines.at(), mines.laid())
     // **AND WHATEVER STANDS BETWEEN THE CAMERA AND THE PIG GOES SEE-THROUGH.**
     // Play: "здание не просвечивает когда свинья внутри." Indoors the camera has
     // nowhere to swing to — every heading is a wall (lib/game/sightline.ts) — so
