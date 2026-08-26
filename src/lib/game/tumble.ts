@@ -103,8 +103,15 @@ export const flingVelocity = (speed: number, bearing: number): Velocity => ({
  * effect arm to 0x4778ae..0x477daa, that whole arm contains not one call
  * of either velocity primitive, and an every-caller scan of 0x4A9100 (20
  * sites) and 0x4A9260 (7) puts none of them inside it. **Neither the PC
- * exe nor the PSX build throws a pig from a weapon BLAST** — a grenade,
- * TNT or mine burst deals damage and fatigue and nothing else. (A first
+ * exe nor the PSX build throws a pig from a weapon BLAST** — no arm of
+ * `Pig::OnHit` calls a velocity primitive for an effect. What the blast
+ * DOES do — play: "то что урон не наносит всёравно вроде талкает" — is
+ * push through the CONTACT SOLVER: the burst is a real body, RESIZED per
+ * effect id (0x48d2c0 — TNT a 512×448×512 box, the grenade burst a tall
+ * column), and a pig overlapping it is pushed out along the contact
+ * normal by the solver's decaying bias, radially and independently of
+ * damage. The remake does not model contact softening, so this
+ * damage-scaled 45° knock is that push's stand-in. (A first
  * pass at that scan mis-attributed two arms: the steep 96-at-79° throw at
  * 0x477fd8 belongs to the PROJECTILE arm and is the FIRE RAIN droplets',
  * kind 0x15 — not fielded here yet — and the prologue's throws are

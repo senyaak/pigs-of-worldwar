@@ -634,3 +634,21 @@ rule. The two lessons: an every-caller scan finds candidates, and only
 the dispatch table says WHOSE arm each one is — attribute through the
 table, not through address adjacency; and a false "found it" is the same
 class of error as a false "it is not there".
+
+### …and the blast's push is the CONTACT SOLVER (2026-08-26, closing the day)
+
+Play would not let the no-throw reading rest: "то что урон не наносит
+всёравно вроде талкает." Both are true at once, and the mechanism was one
+read further down: **an effect is a real body, and 0x48d2c0 RESIZES it
+per effect id** — the grenade burst becomes a 128-wide, 1408-tall column,
+TNT a 512×448×512 box, the gas clouds tall columns — replacing the
+factory's radius-35 sphere. A pig overlapping one of those is a touching
+pair in the physics world, and the solver pushes penetrating bodies out
+along the contact normal with the decaying bias (the contact softening
+the remake deliberately does not model): radial from the burst, stronger
+the deeper in, and entirely independent of whether the damage rounded to
+zero. So no arm of `Pig::OnHit` throws — and the blast still shoves,
+because the shove is the physics. The remake's `hurlVelocity` knock is
+the declared stand-in for exactly this. Left open in fire.md: whether
+blast DAMAGE also arrives through the same contact for every burst
+shape, or some detonations sweep pigs separately.
