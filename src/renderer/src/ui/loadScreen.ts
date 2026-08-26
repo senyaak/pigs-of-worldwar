@@ -222,15 +222,20 @@ export function initLoadScreen(handlers: {
   const mouse = trackRows(
     canvas,
     () =>
-      SLOTS.map((_, i) => ({
-        x: layout.rows.x,
-        y: layout.rows.y[i] + scaleY(y.value) - scaleY(REST.y),
-        width: layout.rows.width,
-        height: plain?.height ?? ROW_HEIGHT
-      })),
-    (row) => {
-      if (row === selection) choose()
-    }
+      SLOTS.map((_, i) => {
+        // The band runs to the NEXT slot, not to the letters' own height —
+        // 16 px of type on a 32 px pitch left half the column unclickable.
+        const ys = layout.rows.y
+        return {
+          x: layout.rows.x,
+          y: ys[i] + scaleY(y.value) - scaleY(REST.y),
+          width: layout.rows.width,
+          height: (ys[i + 1] ?? ys[i] + ROW_HEIGHT) - ys[i]
+        }
+      }),
+    // Choosing rides the light: the click queues (ui/mouseRows.ts) and lands
+    // in `advance` when the walk arrives at the slot.
+    () => {}
   )
 
   const advance = (): void => {
@@ -253,7 +258,11 @@ export function initLoadScreen(handlers: {
     // the cursor may not rest on — is forgotten rather than chased.
     const hovered = mouse.hovered()
     if (hovered >= 0) {
-      if (hovered === selection || !entries[hovered]) mouse.clear()
+      if (hovered === selection && entries[hovered]) {
+        const clicked = mouse.clicked()
+        mouse.clear()
+        if (clicked) choose()
+      } else if (!entries[hovered]) mouse.clear()
       else step(hovered > selection ? 1 : -1)
     }
 

@@ -510,9 +510,9 @@ export function initBarScreen(config: {
       const plate = art.get('chose1')
       return bars.map((_, i) => ({ ...rowBox(i, plate), height: plate.height }))
     },
-    (row) => {
-      if (row === selection) choose()
-    }
+    // Choosing rides the light: the click queues (ui/mouseRows.ts) and lands
+    // in `tick` when the machine's walk arrives at the bar.
+    () => {}
   )
 
   const centred = (
@@ -766,8 +766,11 @@ export function initBarScreen(config: {
     // only way the machine can: a bar at a time (ui/mouseRows.ts).
     const hovered = mouse.hovered()
     if (hovered >= 0) {
-      if (hovered === selection) mouse.clear()
-      else step(hovered > selection ? 1 : -1)
+      if (hovered === selection) {
+        const clicked = mouse.clicked()
+        mouse.clear()
+        if (clicked) choose()
+      } else step(hovered > selection ? 1 : -1)
     }
 
     if (driveOn.phase() === 'gone' && leaving) {

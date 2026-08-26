@@ -782,21 +782,10 @@ export function initPlayerScreen(handlers: {
         }))
       ]
     },
-    (row) => {
-      if (row < 0) return
-      // The overlays first, on their own selections — a click chooses the
-      // LIT thing, exactly as everywhere else; the hover-walk in `advance`
-      // is what lights it.
-      if (menu.state() === 'here') {
-        if (row === menu.selected()) menu.handle('menuSelect')
-        return
-      }
-      if (career.state() === 'open') {
-        if (row === career.selected()) career.handle('menuSelect')
-        return
-      }
-      if (row === selection) choose()
-    }
+    // Choosing rides the light: the click queues in `mouseRows` and lands in
+    // `advance` when the walk arrives — overlays and list alike — so a click
+    // on an unlit place is walked to and taken, not swallowed.
+    () => {}
   )
 
   /** Which column and row slot `n` stands in — five down, then three. The
@@ -1200,13 +1189,22 @@ export function initPlayerScreen(handlers: {
       // The overlays' light first: the medallion slides a row a tick, the
       // career carousel steps an icon a tick — the same walk the keys make.
       if (menu.state() === 'here') {
-        if (hovered === menu.selected()) mouse.clear()
-        else menu.handle(hovered > menu.selected() ? 'menuDown' : 'menuUp')
+        if (hovered === menu.selected()) {
+          const clicked = mouse.clicked()
+          mouse.clear()
+          if (clicked) menu.handle('menuSelect')
+        } else menu.handle(hovered > menu.selected() ? 'menuDown' : 'menuUp')
       } else if (career.state() === 'open') {
-        if (hovered === career.selected()) mouse.clear()
-        else career.handle(hovered > career.selected() ? 'menuRight' : 'menuLeft')
-      } else if (hovered === selection) mouse.clear()
-      else step(hovered > selection ? 1 : -1)
+        if (hovered === career.selected()) {
+          const clicked = mouse.clicked()
+          mouse.clear()
+          if (clicked) career.handle('menuSelect')
+        } else career.handle(hovered > career.selected() ? 'menuRight' : 'menuLeft')
+      } else if (hovered === selection) {
+        const clicked = mouse.clicked()
+        mouse.clear()
+        if (clicked) choose()
+      } else step(hovered > selection ? 1 : -1)
     }
     pulse += PULSE_STEP
     // Each action's lamp: blinking while its row is lit, dark otherwise.

@@ -29,9 +29,20 @@ export interface RowBox {
 
 export interface MouseRows {
   /** The row the pointer rests on, or −1 — what a screen walks its light
-   * toward. */
+   * toward. A CLICK seeds it too: a pointer that arrived on a screen already
+   * parked over a row has never moved, and waiting for `mousemove` left that
+   * screen stone dead (play: "select mission не реагирует на мышь" — squad's
+   * REPLAY MISSIONS opens the list under the very pixel just clicked). */
   hovered(): number
-  /** Forget it: the light has caught up, or the screen has left. */
+  /**
+   * True ONCE when a click is QUEUED on the row the light has reached — the
+   * screen chooses on it, then `clear()`s as usual. A click on an unlit row
+   * is not lost any more: it walks the light there (one row a tick, as ever)
+   * and lands when the light does. Moving the pointer OFF the clicked row
+   * cancels the queue — the player changed their mind mid-walk.
+   */
+  clicked(): boolean
+  /** Forget it all: the light has caught up, or the screen has left. */
   clear(): void
 }
 
@@ -46,6 +57,8 @@ export function trackRows(
   onClick: (row: number) => void
 ): MouseRows {
   let hovered = -1
+  /** The row a click is waiting on, or −1 — see `clicked()`. */
+  let pending = -1
 
   const rowUnder = (event: MouseEvent): number => {
     const box = canvas.getBoundingClientRect()
@@ -65,18 +78,32 @@ export function trackRows(
 
   canvas.addEventListener('mousemove', (event) => {
     hovered = rowUnder(event)
+    if (pending >= 0 && hovered !== pending) pending = -1
   })
   canvas.addEventListener('mouseleave', () => {
     hovered = -1
+    pending = -1
   })
   canvas.addEventListener('click', (event) => {
-    onClick(rowUnder(event))
+    const row = rowUnder(event)
+    // The click IS a pointer position — seed the hover from it, so a screen
+    // entered under a parked cursor wakes on the first press instead of
+    // waiting for a move that may never come.
+    hovered = row
+    pending = row
+    onClick(row)
   })
 
   return {
     hovered: () => hovered,
+    clicked() {
+      if (pending < 0 || pending !== hovered) return false
+      pending = -1
+      return true
+    },
     clear() {
       hovered = -1
+      pending = -1
     }
   }
 }

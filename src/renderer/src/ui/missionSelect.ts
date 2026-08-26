@@ -38,8 +38,9 @@ import { bonusPoints, CAMPAIGN_LENGTH, mapAt, missionNameIndex } from '../../../
  * (151 is "CHEAT LEVEL SELECT" and this is not the cheat). `[deliberate]`. */
 const TITLE = 'SELECT MISSION'
 
-/** A row's hit band before the fonts load (ui/mouseRows.ts). */
-const ROW_HEIGHT = 22
+/** The last row's hit band, where there is no next row to run to — the
+ * list's own pitch (ui/mouseRows.ts). */
+const ROW_PITCH = 32
 
 /** LOAD GAME's own furniture, shared name for name (ui/loadScreen.ts). */
 const PLATES = ['pclit0', 'pclit1', 'pclit2']
@@ -211,15 +212,22 @@ export function initMissionSelect(handlers: {
   const mouse = trackRows(
     canvas,
     () =>
-      Array.from({ length: WINDOW }, (_, i) => ({
-        x: layout.rows.x,
-        y: layout.rows.y[i] + scaleY(y.value) - scaleY(REST.y),
-        width: layout.rows.width,
-        height: plain?.height ?? ROW_HEIGHT
-      })),
-    (row) => {
-      if (windowTop + row === selection) choose()
-    }
+      Array.from({ length: WINDOW }, (_, i) => {
+        // A row's band runs to the NEXT row, not to the letters' own height —
+        // 16 px of type on a 32 px pitch left half the list unclickable.
+        const ys = layout.rows.y
+        return {
+          x: layout.rows.x,
+          y: ys[i] + scaleY(y.value) - scaleY(REST.y),
+          width: layout.rows.width,
+          height: (ys[i + 1] ?? ys[i] + ROW_PITCH) - ys[i]
+        }
+      }),
+    // Choosing rides the light: the click queues in `mouseRows` and lands in
+    // `advance` when the walk arrives, one path for lit and unlit rows alike.
+    // (Acting here also mis-chose on a MISS: row −1 made `windowTop + row`
+    // equal the row above the window once the list had scrolled.)
+    () => {}
   )
 
   const advance = (): void => {
@@ -239,7 +247,11 @@ export function initMissionSelect(handlers: {
     const hovered = mouse.hovered()
     if (hovered >= 0) {
       const at = windowTop + hovered
-      if (at === selection || at >= positions.length) mouse.clear()
+      if (at === selection && at < positions.length) {
+        const clicked = mouse.clicked()
+        mouse.clear()
+        if (clicked) choose()
+      } else if (at >= positions.length) mouse.clear()
       else step(at > selection ? 1 : -1)
     }
 

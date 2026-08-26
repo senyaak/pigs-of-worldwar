@@ -349,9 +349,9 @@ export function initTeamScreen(handlers: {
           height: lit?.height ?? ROW_HEIGHT
         }
       }),
-    (row) => {
-      if (row === selection) choose()
-    }
+    // Choosing rides the light: the click queues (ui/mouseRows.ts) and lands
+    // in `advance` when the reel's walk arrives at the row.
+    () => {}
   )
 
   /**
@@ -480,8 +480,11 @@ export function initTeamScreen(handlers: {
     // in time and the emblem would tear through five armies at once.
     const hovered = mouse.hovered()
     if (hovered >= 0) {
-      if (hovered === selection) mouse.clear()
-      else step(hovered > selection ? 1 : -1)
+      if (hovered === selection) {
+        const clicked = mouse.clicked()
+        mouse.clear()
+        if (clicked) choose()
+      } else step(hovered > selection ? 1 : -1)
     }
     // The reel clicks when it LANDS, not once per frame it passes: the
     // builder plays it on the step that reaches the frame it was aimed at.

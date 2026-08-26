@@ -1415,3 +1415,33 @@ closed in one pass, every screen on the same `ui/mouseRows.ts`:
 
 The rule went into CLAUDE.md's mouse bullet: anything added ships with its
 boxes in the same change.
+
+### The parked cursor, and the click that queues (2026-08-26, later)
+
+Play, after the debt sweep: "всё ещё select mission не реагирует на мышь; в
+нутри норм - а на экране группы нет" — and both complaints were ONE defect,
+in `mouseRows.ts` itself. `hovered` was only ever written by `mousemove`, so
+a screen that opens UNDER the pointer — squad's REPLAY MISSIONS puts SELECT
+MISSION beneath the very pixel just clicked — started stone dead: no move,
+no hover, and the click handler compared against a selection the light had
+never walked to. On top of that a click on an UNLIT row was silently lost
+(the guard `row === selection` dropped it), which on the squad's ten places
+and the mission list's eight meant the first click nearly always did
+nothing; the two-to-four-row screens hid it, which is why "внутри — норм".
+
+Two changes, one file and one pattern. A click now SEEDS the hover — a
+click is a pointer position — and QUEUES: `mouseRows` remembers the clicked
+row, the light walks there one row a tick exactly as before, and `clicked()`
+hands the queued press to the screen the moment the light arrives (moving
+the pointer off the row cancels the queue). The five list screens
+(barScreen, loadScreen, teamScreen, missionSelect, playerScreen with both
+its overlays) now choose ONLY through that path — their `onClick` guards
+are gone, so a click on lit and unlit rows alike is the same one gesture:
+walk, arrive, choose. The immediate-click screens (nameScreen, askTraining,
+the any-key family) keep their direct `onClick`.
+
+Two hit-band bugs fell out of the same look: missionSelect and loadScreen
+gave a row the LETTERS' height (16 px) on a 32 px pitch, so half of every
+column was dead space between bands — a band now runs to the next row — and
+missionSelect chose on a MISS once scrolled (`windowTop + (-1)` equalled the
+row above the window), which the queue path removes outright.
