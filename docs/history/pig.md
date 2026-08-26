@@ -578,3 +578,20 @@ leaves the list at once — its dying clip is not a stand-up. The shotgun's
 tiny 6 now reads exactly like the exe: the pig drops and takes its 0.44 s
 getting up, however small the push. Pinned in `unit/knockdown.spec.ts`,
 both shoves.
+
+### The knock is the engine's own 45° throw (2026-08-26, later still)
+
+The held get-up fixed the "не шелохнулся", and play immediately named what
+was still missing: "отброс от дробовика сразу же гасится - ты не переводишь
+свина в стейт полёта? почему он тупо дёргается на месте?" Because the
+bullet's push is LEVEL — the exe adds its 48 (shotgun: 6) along the
+projectile's own pitch — and a level velocity on standing ground lands on
+the first substep: there was never a flight to see, only the twitch and the
+get-up. So the knock now wears the shape every OTHER pig-throw in the exe
+already wears — 45° up (pitch 0x200: the melee, the body shove, the
+building blast, five sites, one pitch) — at the exe's own 0x30, along the
+bullet's bearing, every gun alike. `[play]` over the level add and over the
+shotgun's per-kind 6; both reads stay in fire.md, and `Projectile.shove`
+came back out of the table — a field the code no longer reads is not kept
+(CLAUDE.md's own rule). A struck pig now flies a real half-second arc in
+clip 39, bounces on, and takes its get-up.

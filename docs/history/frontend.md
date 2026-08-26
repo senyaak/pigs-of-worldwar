@@ -1445,3 +1445,32 @@ gave a row the LETTERS' height (16 px) on a 32 px pitch, so half of every
 column was dead space between bands — a band now runs to the next row — and
 missionSelect chose on a MISS once scrolled (`windowTop + (-1)` equalled the
 row above the window), which the queue path removes outright.
+
+### The plate that swallowed a row, and the latch that undid a click (2026-08-26, later still)
+
+Play again, after the queue landed: "клик в выборе сохранения ничего не
+делает … клик по реплей мишн до сих пор не работает и хавер тоже не
+выделяет" — and guessed the first cause outright ("там скорее всего просто
+перекрывает 1 элемент другой - не?"). Right. Both were found by driving the
+REAL app with real pointer events (e2e/mousecheck.spec.ts) after the state
+probes showed nothing:
+
+- **The squad's option plates.** `sqoptsf` is drawn taller than the rows'
+  36 px pitch, the hit boxes took the art's height, and `rowUnder` returns
+  the FIRST box a point lands in — so START's box covered the whole REPLAY
+  MISSIONS band. The sweep proved it: every y in 370..470 read as row 8,
+  and a point inside row 9's own band pulled the light BACK to 8. A row's
+  hit band is the pitch, never the art (playerScreen.ts).
+- **The settled-screen latch.** With choosing moved INSIDE `advance` (the
+  click queue), the LOAD screen chose, set `phase = 'leaving'` — and the
+  END of the same tick ran `if (home && panel open) phase = 'here'`,
+  undoing the leave in the frame it began. The leave trace came back EMPTY:
+  a click that chose, and nothing to show for it. Keyboard never hit this
+  because `choose()` from an action handler runs between ticks. The latch
+  now fires from `'arriving'` alone — loadScreen, missionSelect,
+  askTraining; nameScreen and pigMenu already guarded theirs.
+
+The diagnosis pattern is worth keeping: pow.* said the click was consumed
+and the phase flipped, and only instrumenting the leave arm itself showed
+ZERO ticks of it ever running — a state probe reads what a tick left
+behind, not what the same tick undid.

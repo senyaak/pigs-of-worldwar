@@ -91,13 +91,6 @@ export interface Projectile {
    * corrected an earlier backwards reading of that branch, 2026-08-26.)
    */
   burst?: number
-  /**
-   * The shove a hit gives, in exe units a frame, where the exe's literal
-   * 0x30 does not hold. ONE kind diverges: 0x478A99 pushes kind 0x12 — the
-   * SHOTGUN — by 6 where every other projectile gets 48 (`weapons/fire.md`).
-   * Absent means the ordinary 0x30 (`SHOT_SHOVE`, lib/game/bullets.ts).
-   */
-  shove?: number
 }
 
 /**
@@ -120,10 +113,11 @@ const GUNS: Record<number, Projectile> = {
    * the repo's older "RIFLE BELL" reading was the icon's name, not the
    * weapon's. TEN pellets a press, jittered ±16, the first hit prepaying
    * five (`pellets`/`spread`/`burst` above — all three read out of the
-   * exe); the one place the pair differ is the shove — the
-   * plain shotgun pushes 6 where everything else pushes 48 (0x478A99),
-   * the SUPER keeps the 48. */
-  12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5, shove: 6 },
+   * exe). The exe also shoves kind 0x12 by 6 where everything else gets 48
+   * (0x478A99) — read, recorded in fire.md, and deliberately NOT fielded:
+   * play rules every bullet's knock the engine's own 45° throw at 0x30
+   * (`SHOT_SHOVE`, lib/game/bullets.ts). */
+  12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5 },
   13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5 },
   14: { id: 411, kind: 23, speed: 150, life: 20, damage: 768, blast: 0 },
   15: { id: 434, kind: 46, speed: 300, life: 1000, damage: 6400, blast: 3900 },

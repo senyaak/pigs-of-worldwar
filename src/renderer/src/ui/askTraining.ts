@@ -276,7 +276,7 @@ export function initAskTraining(handlers: {
 
     // The words: pinned hidden while anything is still moving, then counted
     // down; `phase` follows the box, which is the screen's own gate.
-    if (box.frame() === BOX_LANDED && xHome && yHome) {
+    if (phase === 'arriving' && box.frame() === BOX_LANDED && xHome && yHome) {
       phase = 'here'
       fade = Math.max(0, fade - FADE_IN)
     } else {

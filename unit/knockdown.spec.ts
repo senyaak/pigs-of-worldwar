@@ -61,7 +61,7 @@ function struckBy(shove: number): { held: number; clips: { index: number; once: 
   return { held: frames * STEP_SECONDS, clips }
 }
 
-test('the shotgun’s 6-unit shove still knocks the pig down for the whole get-up', { tag: '@nodata' }, () => {
+test('even a tiny level push knocks the pig down for the whole get-up', { tag: '@nodata' }, () => {
   const { held, clips } = struckBy(6)
   // Held through the get-up, not one step — this is the line that fails on
   // the delete-at-landing bug (held came out at a single STEP_SECONDS).

@@ -760,8 +760,12 @@ and the weakest of them were invented here:
   dead screen), and a lit row is written in
   the light shade wherever a row is written at all. A LIST screen chooses
   ONLY through that queue in its `advance` — never in `onClick`, or a lit
-  row would fire twice — and a row's hit band runs to the NEXT row, not to
-  the letters' own height. A screen the pointer
+  row would fire twice — a row's hit band runs to the NEXT row, not to the
+  letters' own height (art taller than the pitch had START swallowing REPLAY
+  MISSIONS whole), and the settled-screen latch fires from `'arriving'`
+  ALONE: `phase = 'here'` unguarded at the tick's end undoes a click-chosen
+  leave in the very frame it began, because the click is chosen inside the
+  tick now. A screen the pointer
   cannot drive reads as broken however faithful it is. **And the rule covers
   everything ADDED**: a new screen, overlay or interactive element ships with
   its `trackRows` boxes in the same change, or it is not finished — the whole
@@ -953,6 +957,15 @@ and the weakest of them were invented here:
   five") hid the prepay — an arm is not read until ITS OWN last instruction,
   and a branch is not read until its TARGET is. Do not "fix" the shotgun
   back to one round.
+- `[play]` **A bullet's knock is the engine's own 45° throw, not the exe's
+  level add.** `Pig::HitByProjectile` adds 48 (kind 0x12: 6) along the
+  projectile's OWN pitch — level, so built literally the body lands on its
+  first substep and only twitches ("отброс сразу же гасится … тупо дёргается
+  на месте"). Every other pig-throw in the exe is pitch 0x200 = 45° (five
+  sites, one pitch), and play rules the bullet joins them: `flingVelocity(
+  SHOT_SHOVE, bearing)` for every gun, `bullets.land`. The level add and the
+  shotgun's 6 stay read in `weapons/fire.md`; `Projectile.shove` was removed
+  with its last reader. Do not resurrect the level shove.
 - `[CHECK — remake]` **The drop face is the 004 pair.** An arriving pig wears
   `eyes004`/`gobs004` out of `Chars/FACES.MTD` — the stare and the scream —
   from `dropOpened` to `dropLanded` (three/faces.ts). The exe loads that

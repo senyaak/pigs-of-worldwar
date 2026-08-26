@@ -10,7 +10,6 @@
 import { test, expect } from '@playwright/test'
 
 import { createBullets, SHOT_SHOVE } from '../src/lib/game/bullets'
-import { fromExeSpeed } from '../src/lib/game/ballistics'
 import { ObstacleField } from '../src/lib/game/obstacles'
 import { NO_BODY } from '../src/lib/game/body'
 import type { Pig } from '../src/lib/game/game'
@@ -78,17 +77,20 @@ function range(
   }
 }
 
-test('a hit shoves the body along the bullet line, at the exe\'s 0x30', { tag: '@nodata' }, () => {
+test('a hit knocks the body 45° up along the bullet line, at the exe\'s 0x30', { tag: '@nodata' }, () => {
   const victim = pigAt(0, 512)
   const { fire, flung, events } = range(victim)
   fire()
   expect(events.some((one) => one.kind === 'damaged')).toBe(true)
   expect(flung).toHaveLength(1)
   const { vx, vy, vz } = flung[0].velocity
-  // Full magnitude, along the flight: the shot flew +z and level-ish, so the
-  // push is forward, and its length is exactly the exe's constant.
+  // The engine's own throw: the exe's level add died on the first substep
+  // (play: "отброс сразу же гасится … тупо дёргается на месте"), so the
+  // knock is the 45°-up fling every other pig-throw uses, at the exe's
+  // speed, pointed along the shot — here +z.
   expect(Math.hypot(vx, vy, vz)).toBeCloseTo(SHOT_SHOVE, 5)
-  expect(vz).toBeGreaterThan(SHOT_SHOVE * 0.9)
+  expect(vz).toBeCloseTo(SHOT_SHOVE * Math.SQRT1_2, 5)
+  expect(vy).toBeCloseTo(-SHOT_SHOVE * Math.SQRT1_2, 5)
   expect(Math.abs(vx)).toBeLessThan(SHOT_SHOVE * 0.1)
 })
 
@@ -110,13 +112,15 @@ test('the shotgun looses ten pellets — the first prepays five, one report, a s
   expect(victim.health).toBe(100 - 30)
   // ONE press is ONE report, however many pellets leave.
   expect(events.filter((one) => one.kind === 'fired')).toHaveLength(1)
-  // Every pellet stops in the body and shoves it — the four ABSORBED ones
-  // included (the exe's common tail counts and shoves them too) — and the
-  // shove is the exe's own exception: 0x478A99 pushes kind 0x12 by 6
-  // where every other projectile gets the 0x30.
+  // Every pellet stops in the body and knocks it — the four ABSORBED ones
+  // included (the exe's common tail counts and shoves them too). The knock
+  // is the engine's 45° throw at the common 0x30 for every gun: the exe's
+  // per-kind level shove (6 for kind 0x12) is read, recorded in fire.md,
+  // and overridden by play — "должен от любого урона отлетать".
   expect(flung).toHaveLength(10)
   const { vx, vy, vz } = flung[0].velocity
-  expect(Math.hypot(vx, vy, vz)).toBeCloseTo(fromExeSpeed(6), 5)
+  expect(Math.hypot(vx, vy, vz)).toBeCloseTo(SHOT_SHOVE, 5)
+  expect(vy).toBeLessThan(0)
 })
 
 test('a killing hit still shoves — a fresh corpse is a body', { tag: '@nodata' }, () => {

@@ -281,7 +281,12 @@ export function initLoadScreen(handlers: {
       plate.tick()
     })
 
-    if (home && panel.frame() === PANEL_OPEN) phase = 'here'
+    // ONLY the arrival may latch 'here' — a click is chosen INSIDE this very
+    // tick now (the queue in ui/mouseRows.ts), and an unguarded latch undid
+    // the leave the same frame it began: the screen was settled, so `home`
+    // was true, and play read it as a dead click ("клик в выборе сохранения
+    // ничего не делает" — the leave trace came back EMPTY).
+    if (phase === 'arriving' && home && panel.frame() === PANEL_OPEN) phase = 'here'
   }
 
   const centred = (font: Font, text: string, left: number, width: number): number =>

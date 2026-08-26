@@ -269,7 +269,9 @@ export function initMissionSelect(handlers: {
       plate.tick()
     })
 
-    if (home && panel.frame() === PANEL_OPEN) phase = 'here'
+    // Arrival only — an unguarded latch undid a click-chosen leave in the
+    // same tick (ui/loadScreen.ts has the full story).
+    if (phase === 'arriving' && home && panel.frame() === PANEL_OPEN) phase = 'here'
   }
 
   /** A row's two halves: the name off gtext's own mission table, and the

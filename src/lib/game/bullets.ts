@@ -18,6 +18,7 @@ import { PIG_RADIUS } from './obstacles'
 import type { Obstruction } from './obstacles'
 import { fromExeSpeed } from './ballistics'
 import { AIM_UNITS } from './aim'
+import { flingVelocity } from './tumble'
 import type { Random } from './random'
 import type { Velocity } from './tumble'
 import { hurt, isDead } from './health'
@@ -63,21 +64,20 @@ const HIT_RISE = 320
 
 
 /**
- * **A bullet SHOVES the body it hits — read, not ruled.** `Pig::HitByProjectile`
- * (0x478710, disassembled to its last arm 2026-08-24) ends every bullet path
- * in `0x4A9260(0x30, [proj+0x90], [proj+0x94], 0)` at 0x478AA1 — the ADD
- * primitive, 48 units a frame along the projectile's OWN pitch and bearing.
- * The 0x30 is a literal in the instruction stream, not a weapon-table field
- * (the row's only field read there is the damage at +0x0C); the one exception
- * is projectile kind 0x12 — the SHOTGUN, skill 12 (0x478A99; an older note
- * here called it the flame family, which is kind 0x17) — which pushes 6. That
- * 6 rides the row as `Projectile.shove`, and this constant is everyone
- * else's. It is the same 0x30 the jump's own push uses (`JUMP_PUSH`).
- *
- * And the body is KNOCKED DOWN with it: unless it is already falling, 0x478AB2
- * calls 0x470C70 — movement state 5 — and 0x478AC4 plays clip 39, "Bouncing on
- * B-Hind", which is exactly the BOUNCE arm `tumbles.fling` wears without the
- * `ejected` flag (the melee's clip 38 is the flag's).
+ * **A bullet KNOCKS the body it hits FLYING — the speed is read, the shape is
+ * play's.** `Pig::HitByProjectile` (0x478710) ends every bullet path in
+ * `0x4A9260(0x30, [proj+0x90], [proj+0x94], 0)` at 0x478AA1 — an ADD of 48
+ * units a frame along the projectile's OWN pitch and bearing, i.e. LEVEL
+ * (kind 0x12, the shotgun, gets 6 there — 0x478A99, `weapons/fire.md`), and
+ * knocks the body down beside it (state 5 at 0x478AB2, clip 39 at 0x478AC4).
+ * Built literally, a level push dies on the first substep — the pig twitched
+ * where it stood, and play threw it out twice: "должен от любого урона
+ * отлетать" and "отброс сразу же гасится … тупо дёргается на месте." So the
+ * knock wears the ENGINE'S OWN throw instead: 45° up along the bullet's
+ * bearing (`flingVelocity` — pitch 0x200, the same shape all five of the
+ * exe's own pig-throw sites use) at this speed, every gun alike. `[play]`
+ * over the level add and over the shotgun's 6; the reads stay in fire.md.
+ * It is the same 0x30 the jump's own push uses (`JUMP_PUSH`).
  */
 export const SHOT_SHOVE = fromExeSpeed(0x30)
 
@@ -228,20 +228,13 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
           emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })
         }
       }
-      // …and the SHOVE, along the bullet's own line (SHOT_SHOVE above). After
-      // the kill is announced, because the exe's one gate on it is the body
-      // being GONE (state 8, 0x4789EF) — a fresh corpse is thrown as happily
-      // as a live pig, and an overkill's body has already left the world.
+      // …and the KNOCK, 45° up along the bullet's bearing (SHOT_SHOVE above).
+      // After the kill is announced, because the exe's one gate on it is the
+      // body being GONE (state 8, 0x4789EF) — a fresh corpse is thrown as
+      // happily as a live pig, and an overkill's body has already left the
+      // world.
       if (!pig.gone) {
-        const span = Math.hypot(shot.vx, shot.vy, shot.vz)
-        const shove = row?.shove !== undefined ? fromExeSpeed(row.shove) : SHOT_SHOVE
-        if (span > 0) {
-          world.fling?.(pig, {
-            vx: (shot.vx / span) * shove,
-            vy: (shot.vy / span) * shove,
-            vz: (shot.vz / span) * shove
-          })
-        }
+        world.fling?.(pig, flingVelocity(SHOT_SHOVE, Math.atan2(shot.vx, shot.vz)))
       }
       return 'flesh'
     }

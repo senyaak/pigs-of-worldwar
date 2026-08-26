@@ -774,11 +774,17 @@ export function initPlayerScreen(handlers: {
       })
       return [
         ...places,
-        ...layout.options.rows.map((rowY) => ({
+        // The plate ART is taller than the rows' own pitch, and `rowUnder`
+        // takes the FIRST box a point lands in — so START's box swallowed the
+        // whole REPLAY MISSIONS band and the pointer could never light row 9
+        // (play: "клик по реплей мишн до сих пор не работает и хавер тоже
+        // не выделяет"; the sweep proved every y in 370..470 read as 8).
+        // A row's hit band is the pitch, never the art.
+        ...layout.options.rows.map((rowY, i, rows) => ({
           x: layout.options.x,
           y: rowY + offset,
           width: plate.width,
-          height: plate.height
+          height: (rows[i + 1] ?? rowY + (rows[1] - rows[0])) - rowY
         }))
       ]
     },
