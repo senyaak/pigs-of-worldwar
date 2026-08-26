@@ -613,14 +613,24 @@ Play kept pulling the thread: "нож сильнее чем дробовик о�
   single bullet 48. "Нож сильнее дробовика" is the original's own
   arithmetic; what was wrong was the volley not stacking (48 flat).
 
-And the day's biggest correction: **the exe DOES throw pigs from weapon
-blasts.** The 2026-08-23/24 "neither original throws — damage and fatigue
-only" was a mis-read that stopped short: scanning every caller of 0x4A9100
-(twenty, where the old note counted five) found the throws in the effect
-arm of `Pig::OnHit` itself — 64 at 45° along the burst-to-pig bearing for
-the general case (0x478553), and a steep 96 at ~79° with knockdown and
-stagger for effect kinds 0x15/0x16 (0x477fd8) — the "динамит под свином
-улетает вверх" of play's memory, in the code all along. Play's answer to
-the false negative was the rule itself: "кидает - как он может не кидать?"
-Which weapons map to which kind is being read now; the remake's blast
-throw stays play-shaped until that lands.
+And a correction that CORRECTED ITSELF within the hour, worth recording in
+full because both halves are lessons. Play challenged the old "the exe
+does not throw from a weapon blast" ("кидает - как он может не кидать?");
+an every-caller scan of 0x4A9100 found twenty sites where the old note
+counted five, two of them apparently inside `Pig::OnHit`'s effect arm —
+and a write-up went out saying the blast throw had been found. It had
+not: the SWITCH TABLE at 0x478564, read whole, bounds the effect arm to
+0x4778ae..0x477daa, and the "found" throws belong to OTHER arms — the
+steep `0x4A9100(0x60, 0x384, …)` + knockdown at 0x477fd8 is the
+PROJECTILE arm's, for kinds 0x15/0x16, which are the **FIRE RAIN
+droplets** (skills 42/59 seed eight of kind 21 at 45° steps; kind 22 is
+built nowhere — dead code), and the prologue's 45° throws are
+pig-VERSUS-pig contacts (a parachute landing on a pig, the script walk),
+gated on the other body's type being 0x1357. The effect arm contains not
+one velocity call: **a grenade, TNT or mine burst really does deal damage
+and fatigue and nothing else, on both originals** — verified three ways
+now — and the remake's blast throw stays what it always was, play's own
+rule. The two lessons: an every-caller scan finds candidates, and only
+the dispatch table says WHOSE arm each one is — attribute through the
+table, not through address adjacency; and a false "found it" is the same
+class of error as a false "it is not there".

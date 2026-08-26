@@ -97,17 +97,20 @@ export const flingVelocity = (speed: number, bearing: number): Velocity => ({
  * the body: `along` is the line from the burst point to the body's own
  * centre of gravity.
  *
- * **The exe DOES throw from a blast — the 2026-08-23/24 "deals damage and
- * fatigue and nothing else" reading was wrong**, and play caught it flat
- * ("кидает - как он может не кидать?"). Scanning EVERY caller of the two
- * velocity primitives (2026-08-26) found the arm's own throws past where
- * that read stopped: `Pig::OnHit`'s effect arm ends in
- * `0x4A9100(0x40, 0x200, bearing, 0)` at 0x478553 — 64 units a frame at
- * 45°, bearing from the effect to the pig — and effect kinds 0x15/0x16
- * take a STEEP arm instead at 0x477fd8: `0x4A9100(0x60, 0x384, …)`, 96
- * at ~79°, plus the knockdown (0x470C70) and the stagger counter. The
- * fire.md write-up carries the read; which weapons wear which kind is
- * being mapped there.
+ * The THROW is `[play]`'s outright, and the read behind that has now been
+ * verified THREE ways (2026-08-26, after play challenged it — "кидает -
+ * как он может не кидать?"): the switch table at 0x478564 bounds the
+ * effect arm to 0x4778ae..0x477daa, that whole arm contains not one call
+ * of either velocity primitive, and an every-caller scan of 0x4A9100 (20
+ * sites) and 0x4A9260 (7) puts none of them inside it. **Neither the PC
+ * exe nor the PSX build throws a pig from a weapon BLAST** — a grenade,
+ * TNT or mine burst deals damage and fatigue and nothing else. (A first
+ * pass at that scan mis-attributed two arms: the steep 96-at-79° throw at
+ * 0x477fd8 belongs to the PROJECTILE arm and is the FIRE RAIN droplets',
+ * kind 0x15 — not fielded here yet — and the prologue's throws are
+ * pig-versus-pig contacts. `weapons/fire.md` carries the whole map.) The
+ * pigs play remembers flying were projectile hits, fire rain, building
+ * explosions and melee.
  *
  * The SHAPE is three cases, and the boundary between them is the body's
  * own FOOTPRINT (`PIG_RADIUS`):
