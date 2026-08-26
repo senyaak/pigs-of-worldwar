@@ -166,6 +166,11 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       // …and a health crate sighs instead, which is the heal's own sound and
       // arrives beside the cheer the crate already made.
       healed: () => playCue(bank(), BATTLE_SOUNDS.healed),
+      // The healing hands: P_HEAL as they go ON — the act, before any points
+      // move — and P_OWW for a press with nothing to lay on (audio/battle.ts,
+      // both decoded off the skill-52 arm).
+      healBegan: () => playCue(bank(), BATTLE_SOUNDS.healHands),
+      healFailed: () => playCue(bank(), BATTLE_SOUNDS.healRefused),
       skillUsed: () => playCue(bank(), BATTLE_SOUNDS.skillUsed),
       menuOpened: () => bank().play(BATTLE_SOUNDS.menuOpen.sound),
       menuMoved: () => playCue(bank(), BATTLE_SOUNDS.menuMove),

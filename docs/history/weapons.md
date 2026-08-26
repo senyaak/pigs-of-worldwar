@@ -1604,3 +1604,46 @@ projectile 425 detonating into blast effect 0x60 — 40 points in the core, the
 usual falloff to a quarter, clamped to the missing health per body
 (0x4778c6) — and the unnamed skill 53 is a SELF-heal of up to 50 (0x47bf48),
 in no class kit.
+
+### The point-blank pistol, and the muzzle that was never tested (2026-08-26)
+
+Play, mission 2: "пистолет в плотную использованый както мимо стрельнул."
+Proved before it was fixed, with a spec that failed on the old code
+(`unit/bullets.spec.ts`, "a point-blank shot lands"): the pistol's barrel is
+the hand bone plus 115 world units (`MUZZLE[6]`, z 230 model units at half
+draw scale), and the hand itself rides forward in the firing pose — so fired
+body to body the round is BORN inside the target's own box, sometimes at its
+far wall. The update's first collision test came only after a first substep,
+and a substep is HIT_RADIUS long (85), so the far 75-odd units of the body
+and everything behind it were a dead zone the shot sailed clean through, to
+land 'air' six thousand units on.
+
+The fix is one sentence: **the muzzle is the flight's first point, and it is
+tested** — `fire` runs the same `land` the update runs, before the shot ever
+joins the flying list. With the spawn point live, the one body that must
+never answer it is the shooter's own (a barrel leaned back over the shoulder
+starts inside it), so the pig loop now skips `shot.owner` — a bazooka still
+clips its owner through the BLAST, which is a different path and play likes
+it ("даже себя задел чутка - для тупого идеально").
+
+The rifle was the same bug at longer odds — its muzzle sits at 175 world
+units, deeper still — and both are fixed by the one test.
+
+### HEALING HANDS: the act first, the points later (2026-08-26)
+
+Play, after using them on mission 2: "они должны звук применять - эффект
+вроде даже и только потом хил проходит, а у тебя сразу хил и анимация." The
+exe does everything in the one arm — sound, sparks, vtable heal, all at
+`Pig::Attack` — and play overrode the ORDER: the press is now the ACT
+(`healBegan` → P_HEAL, decoded at 0x47be0f, plus clip 78), and the points
+land at the clip's own beat (`HEAL_PHASE`, halfway — `[deliberate]`, no
+key-frame of clip 78 is read; `[play]` for the order). A refused press says
+so out loud now too: `healFailed` → P_OWW at 100/100, the arm's own failure
+exit (0x47c6f0). A heal cut short by the clock still lands what was paid
+for — `reset` lands the pending points before it forgets.
+
+The palm SPARKLE is now read and not built: the arm spawns effect id **0x0B**
+from each palm (bones 5 and 8, reads at 0x47be5f/0x47beca) — a pure particle
+effect, four batches of 13 laid in a chain along the facing, life 1000; the
+earlier "0xE4" was the `operator new` size, not an id. It waits on the
+renderer growing a particle chain, and the sound does not.

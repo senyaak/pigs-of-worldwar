@@ -98,25 +98,34 @@ test('a heal that lands spends the charge; a refused press spends nothing', { ta
   const clips = Array.from({ length: 83 }, () => ({ frameCount: 25 }))
   const heals = createHealing({ pigs: () => pigs, clips }, (event) => events.push(event))
 
-  // A body at its ceiling refuses the press: no points, no charge, and the
-  // report says why (exe: the failure exit past 0x47bd42 debits nothing).
+  // A body at its ceiling refuses the press: no points, no charge, the pig
+  // complains (P_OWW rides `healFailed`) and the report says why (exe: the
+  // failure exit past 0x47bd42 debits nothing).
   expect(heals.begin(medic)).toBe(false)
   expect(amountOf(medic.carrying, SKILL.HEALING_HANDS)).toBe(3)
   expect(heals.lastAttempt()?.amount).toBe(0)
+  expect(events).toContainEqual(expect.objectContaining({ kind: 'healFailed', pig: medic.id }))
 
   grunt.health = 25
   expect(heals.begin(medic)).toBe(true)
-  expect(grunt.health).toBe(45)
   expect(amountOf(medic.carrying, SKILL.HEALING_HANDS)).toBe(2)
-  // The number floats off the healed body and the healer plays clip 78 —
-  // both ANNOUNCED, like everything the engine shows (lib/game/events.ts).
-  expect(events).toContainEqual(expect.objectContaining({ kind: 'healed', amount: 20, pig: grunt.id }))
+  // **THE ACT FIRST, THE POINTS LATER** — play's order: the press is the
+  // sound (`healBegan` → P_HEAL) and clip 78; the heal itself lands at the
+  // clip's own beat (HEAL_PHASE), not on the press.
+  expect(events).toContainEqual(expect.objectContaining({ kind: 'healBegan', pig: medic.id }))
   expect(events).toContainEqual(expect.objectContaining({ kind: 'clip', pig: medic.id, index: 78 }))
+  expect(grunt.health).toBe(25)
+  expect(events.some((one) => one.kind === 'healed')).toBe(false)
   // …and the pig is held while the clip plays: a second press inside it is
   // refused without touching anything.
   expect(heals.running()).toBe(true)
   expect(heals.begin(medic)).toBe(false)
   expect(amountOf(medic.carrying, SKILL.HEALING_HANDS)).toBe(2)
+  // Halfway through the one-second clip the hands are laid on: the points
+  // land and the number floats off the healed body.
+  heals.update(0.6, medic)
+  expect(grunt.health).toBe(45)
+  expect(events).toContainEqual(expect.objectContaining({ kind: 'healed', amount: 20, pig: grunt.id }))
 })
 
 test('the last charge puts the hands away, and none of it spends the turn', { tag: '@nodata' }, () => {

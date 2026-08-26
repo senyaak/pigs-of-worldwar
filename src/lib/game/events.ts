@@ -125,6 +125,15 @@ export type BattleEvent =
    * `Pig::Heal` (0x467fd0) is not silent — it shows the same floating number a
    * hit does and plays a sound of its own (damage/notes.md). */
   | { kind: 'healed'; at: Point; amount: number; pig: PigId }
+  /** The HEALING HANDS going ON — the act itself, before any points move.
+   * The exe plays P_HEAL here, at the charge's own decrement (0x47be0f);
+   * the points land later, at the clip's own beat (lib/game/healing.ts,
+   * HEAL_PHASE). `at` is the healer. */
+  | { kind: 'healBegan'; pig: PigId; at: Point }
+  /** …and a press with nothing to lay on — nobody in the cone, or a body at
+   * its ceiling: the exe's failure exit plays P_OWW (0x47c6f0) and spends
+   * nothing. `at` is the healer. */
+  | { kind: 'healFailed'; pig: PigId; at: Point }
   /** …or had no room for: "THIS LITTLE PIG ALREADY HAS TOO MANY TOYS". */
   | { kind: 'refused'; skill: number | null; amount: number; pig: PigId }
   /**

@@ -145,10 +145,46 @@ export interface Heals {
   reset(): void
 }
 
+/**
+ * How far into the Heal clip the points actually land, as a fraction.
+ *
+ * The EXE heals on the spot — sound, sparks and the vtable call all sit in
+ * the one arm — and play overrode the order (2026-08-26): "они должны звук
+ * применять - эффект вроде даже и только потом хил проходит, а у тебя сразу
+ * хил и анимация." So the press is the SOUND and the clip, and the number
+ * comes up as the hands are laid on mid-clip. No key-frame event of clip 78
+ * has been read to pin the moment, so halfway is `[deliberate]` — play's
+ * dial. `[play]` for the order itself.
+ */
+export const HEAL_PHASE = 0.5
+
 export function createHealing(world: HealWorld, emit: Emit): Heals {
-  /** Seconds left of the Heal clip. */
+  /** Seconds left of the Heal clip, and its whole length. */
   let playing = 0
+  let total = 0
+  /** The heal OWED — chosen and paid for at the press, landed at the
+   * clip's own beat (HEAL_PHASE). */
+  let pending: { target: Pig; amount: number } | null = null
   let report: HealReport | null = null
+
+  /** Put the owed points on: the number and the sigh ride the same `healed`
+   * event a crate's do (lib/game/damage.ts, audio/battleAudio.ts). */
+  const land = (): void => {
+    if (!pending) return
+    const { target, amount } = pending
+    pending = null
+    heal(target, amount)
+    emit({
+      kind: 'healed',
+      at: {
+        x: target.position.x,
+        y: originY(target.position.y, target.body),
+        z: target.position.z
+      },
+      amount,
+      pig: target.id
+    })
+  }
 
   return {
     begin(pig) {
@@ -166,31 +202,32 @@ export function createHealing(world: HealWorld, emit: Emit): Heals {
         chosen: chosen?.name ?? null,
         amount
       }
-      if (!chosen || amount <= 0) return false
-      heal(chosen, amount)
+      const at = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
+      if (!chosen || amount <= 0) {
+        // The pig complains (P_OWW, the exe's own failure exit) and nothing
+        // is spent.
+        emit({ kind: 'healFailed', pig: pig.id, at })
+        return false
+      }
       spend(pig.carrying, SKILL.HEALING_HANDS)
-      // The number floats off the body that was healed, exactly where a hit's
-      // would — one spawner, one style apart (lib/game/damage.ts).
-      emit({
-        kind: 'healed',
-        at: {
-          x: chosen.position.x,
-          y: originY(chosen.position.y, chosen.body),
-          z: chosen.position.z
-        },
-        amount,
-        pig: chosen.id
-      })
+      // The ACT first — P_HEAL at the charge's own decrement, the exe's
+      // moment (0x47be0f) — and the points later, at the clip's beat.
+      emit({ kind: 'healBegan', pig: pig.id, at })
       // Clip 78 is "Heal" — the record's own attack clip (lib/game/weapons.ts).
       const clip = weaponOf(SKILL.HEALING_HANDS).attackClip
       emit({ kind: 'clip', pig: pig.id, index: clip, once: true })
-      playing = clipSeconds(world.clips[clip])
+      total = clipSeconds(world.clips[clip])
+      playing = total
+      pending = { target: chosen, amount }
+      // A world with no clips to time (a bare spec) has no beat to wait for.
+      if (total <= 0) land()
       return true
     },
     running: () => playing > 0,
     update(delta, actor) {
       if (playing <= 0) return
       playing -= delta
+      if (total - playing >= total * HEAL_PHASE) land()
       if (playing > 0) return
       playing = 0
       // The last charge puts the skill away, the way the last bayonet does
@@ -199,7 +236,11 @@ export function createHealing(world: HealWorld, emit: Emit): Heals {
     },
     lastAttempt: () => report,
     reset() {
+      // A heal cut short — the clock, a warp — still lands what was paid
+      // for: the charge went at the press, and the beat must not eat it.
+      land()
       playing = 0
+      total = 0
     }
   }
 }
