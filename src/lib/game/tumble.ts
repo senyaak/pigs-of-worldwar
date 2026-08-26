@@ -97,27 +97,28 @@ export const flingVelocity = (speed: number, bearing: number): Velocity => ({
  * the body: `along` is the line from the burst point to the body's own
  * centre of gravity.
  *
- * The THROW is `[play]`'s outright, and the read behind that has now been
- * verified THREE ways (2026-08-26, after play challenged it — "кидает -
- * как он может не кидать?"): the switch table at 0x478564 bounds the
- * effect arm to 0x4778ae..0x477daa, that whole arm contains not one call
- * of either velocity primitive, and an every-caller scan of 0x4A9100 (20
- * sites) and 0x4A9260 (7) puts none of them inside it. **Neither the PC
- * exe nor the PSX build throws a pig from a weapon BLAST** — no arm of
- * `Pig::OnHit` calls a velocity primitive for an effect. What the blast
- * DOES do — play: "то что урон не наносит всёравно вроде талкает" — is
- * push through the CONTACT SOLVER: the burst is a real body, RESIZED per
- * effect id (0x48d2c0 — TNT a 512×448×512 box, the grenade burst a tall
- * column), and a pig overlapping it is pushed out along the contact
- * normal by the solver's decaying bias, radially and independently of
- * damage. The remake does not model contact softening, so this
- * damage-scaled 45° knock is that push's stand-in. (A first
- * pass at that scan mis-attributed two arms: the steep 96-at-79° throw at
- * 0x477fd8 belongs to the PROJECTILE arm and is the FIRE RAIN droplets',
- * kind 0x15 — not fielded here yet — and the prologue's throws are
- * pig-versus-pig contacts. `weapons/fire.md` carries the whole map.) The
- * pigs play remembers flying were projectile hits, fire rain, building
- * explosions and melee.
+ * **The exe's blast throw is READ now — the effect's own PHANTOM SWEEP**
+ * (2026-08-26, chased to the end after play corrected two wrong
+ * mechanisms in a row: "кидает - как он может не кидать?" and then "газ
+ * не толкает вообще"). A combat effect stores RADIUS/FORCE/DAMAGE off
+ * its weapon row (+0x14/+0x18/+0x1C — force was the unread field) and
+ * fires ONE sweep in its life (0x409EF0): overlap query on a sphere of
+ * the radius, two line-of-sight rays (a gas skips them — it reaches
+ * around corners), the damage contact queued, and then — gated on the
+ * phantom's PUSH flag, which a gas does not carry — a velocity ADD:
+ * `normalize(body − burst) × F × (1 − 3d/4R) / mass`, the SAME falloff
+ * law as the damage, **with the vertical component DOUBLED** — a blast
+ * tosses up — plus a random-signed yaw spin on the pig. Grenade
+ * F=2600 R=1024, TNT 6500/5200 R=2048, gases F=0 AND flag off (locked
+ * twice), guns F=0 (their knock is `HitByProjectile`'s own add). A
+ * pig's mass is 30. `weapons/fire.md`, "the phantom sweep", carries the
+ * whole read.
+ *
+ * So the SHAPE below is the remake's stand-in, kept because play tuned
+ * it — and the exe's own formula lands on the same three cases play
+ * asked for: a burst under the body throws radially UP (doubled), one
+ * above throws DOWN, one beside throws out-and-up. Swapping this for
+ * the read formula is now possible whenever play wants it.
  *
  * The SHAPE is three cases, and the boundary between them is the body's
  * own FOOTPRINT (`PIG_RADIUS`):

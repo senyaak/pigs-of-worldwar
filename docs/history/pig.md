@@ -652,3 +652,27 @@ because the shove is the physics. The remake's `hurlVelocity` knock is
 the declared stand-in for exactly this. Left open in fire.md: whether
 blast DAMAGE also arrives through the same contact for every burst
 shape, or some detonations sweep pigs separately.
+
+### The blast push, third mechanism lucky: the PHANTOM SWEEP (2026-08-26, night)
+
+Play corrected two wrong mechanisms in one evening — "кидает - как он
+может не кидать?" buried the no-throw claim, then "газ не толкает вообще"
+buried the contact-solver claim (a pig STANDS in gas; and the "resized
+effect bodies" table turned out to belong to a different constructor
+entirely — world objects, type 0x135A; two number spaces had collided).
+The third read went to the end: **a combat effect carries a phantom
+sphere and fires ONE sweep in its life** — overlap query on the weapon
+row's radius, line-of-sight rays (gas skips them), the damage contact
+queued for next frame's pump, and then, gated on the phantom's push flag,
+a velocity ADD of `dir × F × (1 − 3d/4R) / mass` with the VERTICAL
+DOUBLED, plus a random-signed yaw spin on the pig. FORCE is the weapon
+row's own +0x18 — grenade 2600, TNT 6500, gases ZERO with the flag off
+too, guns zero (their knock is the bullet add) — fully independent of
+damage, which is exactly play's "то что урон не наносит всёравно вроде
+талкает". The remake's `hurlVelocity` stays as play tuned it; the exe
+formula reproduces play's three cases naturally and is ready in fire.md
+if a swap is ever wanted. The evening's method lesson, now thrice paid:
+each mechanism was "found" one read short of the truth, and each time it
+was PLAY that knew — the behaviour is the spec, the binary is the
+mechanism, and a mechanism that contradicts behaviour is simply not yet
+read to its end.
