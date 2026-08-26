@@ -188,6 +188,32 @@ test('a lob at the trotters: the reflex throws from here, the veteran WALKS OUT'
   )
 })
 
+test('the blade prices its walk off the FLOOD — a mark across a bay is no mark', { tag: '@nodata' }, () => {
+  // GERARD on ROAD (telemetry, 2026-08-26): `elect` handed the route to the
+  // guns and the lobs and not to the blade, so a bayonet ring across the
+  // water priced as a crow-line stroll — the whim took it, the water refused
+  // it twice, and a pig with a live grenade PASSED at the shore. The legs
+  // are asked honestly now: an unreachable mark is Infinity, the option
+  // dies, and the election falls to what reaches from the shore. (At the
+  // neutral roll the two whims tie and the kit's first slot — the bayonet —
+  // used to win exactly that tie.)
+  const walked = (to: { x: number; z: number }): number =>
+    to.z > 1000 ? Infinity : Math.hypot(to.x, to.z)
+  const option = priceKit(
+    world({
+      carrying: [
+        { skill: SKILL.BAYONET, amount: UNLIMITED },
+        { skill: SKILL.GRENADE, amount: 3 }
+      ],
+      foes: [foe({ z: 1500 })]
+    }),
+    undefined,
+    undefined,
+    walked
+  )!
+  expect(option.kind).toBe('lob')
+})
+
 test('a spent slot is not priced: no grenades left means the rifle', { tag: '@nodata' }, () => {
   const option = priceKit(
     world({

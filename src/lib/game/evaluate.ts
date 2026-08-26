@@ -974,7 +974,15 @@ export function elect(
         ? plantOption(world, slot.skill, note)
         : (gunOption(world, slot.skill, note, walked) ??
             lobOption(world, slot.skill, note, walked) ??
-            meleeOption(world, slot.skill, note))
+            // The FLOOD goes to the blade too. It was left off here, and the
+            // crow-line fallback priced a bayonet mark ACROSS A BAY as an
+            // 1979-unit stroll — the whim took it, the water refused it
+            // twice, and the pig passed with a live grenade in its pockets
+            // (telemetry 2026-08-26, GERARD on ROAD). With the legs asked
+            // honestly the unreachable mark is Infinity, the option dies,
+            // and the election falls to what can actually be brought to
+            // bear from the shore.
+            meleeOption(world, slot.skill, note, walked))
     )
   }
   const crate = { best: null as Option | null, judged: 0 }
