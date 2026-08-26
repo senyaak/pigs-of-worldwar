@@ -57,17 +57,22 @@ export const endsTurn = (skill: number | null): boolean =>
  * it (0x4945d9), so a pig with ninety seconds left has four the moment the charge
  * goes down.
  *
- * **The MINES have their own arm and it is not this one.** 0x4942e6 tests for
- * skills 35 and 36 by number and gives them the same four seconds *only* when
- * `[game+0x534] >= 2` or the turn has less than four seconds left; otherwise
- * laying one costs nothing at all. `[game+0x534]` is READ now (2026-08-26, all
- * five sites): a saturating mines-laid-this-turn byte, zeroed every handover
- * (0x48f539), incremented only by the mine arm (0x493ed9) — so the first two
- * lays a turn are free and the third squeezes the clock. The battle implements
- * it beside the `hurryFor` call (lib/game/battle.ts, `minesLaid`).
+ * **The MINES have their own arm and it is not this one** — and its NUMBERS
+ * are play's, over the disassembly's. The exe was read (0x4942e6 with
+ * `[game+0x534]`, a mines-laid-this-turn byte zeroed every handover) as "two
+ * free, the third squeezes to four seconds"; play remembers the original
+ * otherwise (2026-08-26): "вторая мина уже не бесплатна - а остаётся 5 секунд
+ * и нельзя больше ничего использовать." So the FIRST lay is free, the SECOND
+ * squeezes the clock to `MINE_HURRY_SECONDS` and closes the hand for the
+ * turn. The battle implements it beside the `hurryFor` call
+ * (lib/game/battle.ts, `minesLaid`). `[play]`.
  */
 export const hurryFor = (skill: number | null): number =>
   skill === 37 || skill === 38 ? PLANTED_SECONDS : 0
 
 /** `+0x18` = 400 hundredths — four seconds, on the two charges that carry one. */
 export const PLANTED_SECONDS = 4
+
+/** What the SECOND mine of a turn leaves on the clock — play's five, not the
+ * exe reading's four (the note above). `[play]`. */
+export const MINE_HURRY_SECONDS = 5

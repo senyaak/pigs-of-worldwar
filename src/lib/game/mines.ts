@@ -31,17 +31,23 @@
 // here (2026-08-26, read out of the exe end to end for the sapper):
 //
 // Skills 35 and 36 lay a VISIBLE OBJECT at the layer's own feet (the lay
-// clip's key-frame drops it, the same phase TNT's charge goes down at). The
-// object arms after 25 frames with the L_MINETR click (0x43699d), and then
-// **BEDS INTO THE GROUND** — becomes the tile bit — only when nobody is
-// near: the bed-in walker (0x436e55) requires the mine on the ground, NOT
-// ONE live pig within ±512 of it on either axis, the tile dry, and no bit
-// already there; then `Map::SetMine(col, row, 1, flavour)` (0x4374cf) and
-// the object vanishes quietly. **That clearance is why a layer never trips
-// its own mine**: while anyone stands about, the mine is furniture; the
-// moment the last pig walks away it sinks into the ground and the ordinary
-// tread above takes over — the layer's own foot included, the exe checks
-// nobody's side and neither does this.
+// clip's key-frame drops it, the same phase TNT's charge goes down at), and
+// the object arms after 25 frames with the L_MINETR click (0x43699d).
+//
+// **WHEN it becomes the ground is `[play]`, over the disassembly's own
+// reading.** The exe's bed-in walker (0x436e55) was read as "sinks the
+// moment nobody is within ±512" — and play overruled the model whole
+// (2026-08-26): "мина взрывается когда ход кончается в оригинале." So the
+// lay is TNT's own shape end to end: furniture through the layer's turn,
+// and at the TURN'S END every laid mine beds into the tile bit
+// (`Map::SetMine`, 0x4374cf) — **and one bedded under somebody's feet goes
+// off then and there**, which is what the five hurried seconds are for.
+// From the bed-in on, the ordinary tread above takes over, no side checked
+// anywhere — the layer's own later foot included.
+//
+// Two on one spot is allowed and is ONE bit — play again: "2 мины можно в
+// 1 место поставить - там урон вроде не как от двух будет." The tile
+// carries a bit, not a count, and the second lay is simply absorbed.
 //
 // 35 against 36 is a FLAVOUR (SetMine's fourth argument, the slip byte's bit
 // 7): trigger kinds 40/41, identical damage (2560) and blast (1024), only
@@ -121,15 +127,9 @@ export const isMine = (skill: number | null): boolean => skill === 35 || skill =
  * frame knob like every count. */
 export const ARM_FRAMES = 25
 
-/** The bed-in clearance: NOT ONE live pig within this of the mine on either
- * axis — the walker at 0x436e55 compares x and z separately against the
- * row's own 512, a one-tile square. This is what keeps a layer from
- * tripping its own mine: while anybody stands about it is furniture. */
-export const BED_CLEARANCE = 512
-
-/** One mine LAID this battle and not yet part of the ground: furniture at
- * the layer's feet, arming and then waiting for everyone to leave. Drawn to
- * EVERYBODY — it is a visible object in the original too. */
+/** One mine LAID this turn and not yet part of the ground: furniture at
+ * the layer's feet until the turn ends (`bedAll`). Drawn to EVERYBODY — it
+ * is a visible object in the original too. */
 export interface Laid {
   x: number
   y: number
@@ -168,17 +168,23 @@ export interface Mines {
   tread(x: number, z: number): boolean
   /**
    * Lay one at the pig's own feet — the lay clip's key-frame calls this the
-   * way TNT's calls `plant` (lib/game/attack.ts). Refused on a tile that
-   * already holds a mine, laid or shipped: the bed-in would refuse a second
-   * bit for ever, so the lay refuses instead of leaving eternal furniture
-   * (`[deliberate]` — the exe drops the object regardless and lets it lie).
+   * way TNT's calls `plant` (lib/game/attack.ts). Never refused on ground:
+   * two on one spot is allowed and beds into ONE bit (`[play]`).
    */
   lay(pig: Pig, skill: number): boolean
   /** The mines laid and not yet bedded — furniture on the ground, for the
    * renderer and the specs. */
   laid(): readonly Laid[]
+  /**
+   * THE TURN ENDS: every laid mine beds into its tile's bit — and one with a
+   * live pig STANDING on the tile goes off under it then and there, the
+   * ordinary tread with no side checked (`[play]`: "мина взрывается когда
+   * ход кончается"). Called from the end-of-turn beat, whose wait already
+   * holds for the fuses this sets counting (lib/game/battle.ts).
+   */
+  bedAll(): void
   /** Burn the fuses down, blast whatever runs out — and walk the laid mines
-   * through arming and bed-in. */
+   * through their arming click. */
   update(delta: number): void
   /** How many are counting down — what the turn cannot end through
    * (lib/game/battle.ts). */
@@ -189,8 +195,8 @@ export interface Mines {
    * spent. */
   buried(x: number, z: number): boolean
   /**
-   * Which buried mines these eyes can SEE — every unspent one within
-   * `DETECT_RANGE` of a watcher whose class detects them.
+   * Which buried mines these eyes can SEE — every unspent one within the
+   * exe's 3×3 of tiles round a watcher whose class detects them.
    *
    * The caller says whose eyes: the side whose turn it is, so an enemy engineer
    * walking past does not light the field up for the player (three/battle.ts).
@@ -229,65 +235,71 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
     return null
   }
 
+  /** Set off whatever live bit is under (x, z) — `tread`, and the bed-in's
+   * own goes-off-under-your-feet case (`bedAll`). */
+  const trip = (x: number, z: number): boolean => {
+    const tile = liveTile(x, z)
+    if (tile === null) return false
+    const k = key(tile.col, tile.row)
+    planted.delete(k)
+    spent.add(k)
+    counting.push({
+      x: tile.x,
+      z: tile.z,
+      // On the ground at the tile's middle, which is where the exe samples it.
+      y: query.height(tile.x, tile.z),
+      fuse: fromExeFrames(MINE_FUSE_FRAMES + Math.floor(world.random() * (FUSE_JITTER + 1)))
+    })
+    return true
+  }
+
   return {
     buried(x, z) {
       return liveTile(x, z) !== null
     },
-    tread(x, z) {
-      const tile = liveTile(x, z)
-      if (tile === null) return false
-      const k = key(tile.col, tile.row)
-      planted.delete(k)
-      spent.add(k)
-      counting.push({
-        x: tile.x,
-        z: tile.z,
-        // On the ground at the tile's middle, which is where the exe samples it.
-        y: query.height(tile.x, tile.z),
-        fuse: fromExeFrames(MINE_FUSE_FRAMES + Math.floor(world.random() * (FUSE_JITTER + 1)))
-      })
-      return true
-    },
+    tread: trip,
     lay(pig, skill) {
       const { x, z } = pig.position
-      const tile = query.tileCentre(x, z)
-      if (tile === null) return false
-      const k = key(tile.col, tile.row)
-      if (planted.has(k) || (query.hasMine(x, z) && !spent.has(k))) return false
+      if (query.tileCentre(x, z) === null) return false
       laid.push({ x, y: query.height(x, z), z, skill, arming: fromExeFrames(ARM_FRAMES) })
       return true
     },
     laid: () => laid,
-    update(delta) {
-      // The laid mines: arm with the click, then BED INTO THE GROUND the
-      // moment nobody is near — the exe's own walker (0x436e55), asked every
-      // step. A wet tile, or one already carrying a bit, refuses for good:
-      // the mine lies there as furniture, which is the exe's own answer.
-      for (let i = laid.length - 1; i >= 0; i--) {
-        const mine = laid[i]
-        if (mine.arming > 0) {
-          mine.arming -= delta
-          if (mine.arming > 0) continue
-          mine.arming = 0
-          emit({ kind: 'mineArmed', at: { x: mine.x, y: mine.y, z: mine.z } })
-        }
-        const near = world
-          .pigs()
-          .some(
-            (pig) =>
-              !pig.gone &&
-              !isDead(pig) &&
-              Math.abs(pig.position.x - mine.x) <= BED_CLEARANCE &&
-              Math.abs(pig.position.z - mine.z) <= BED_CLEARANCE
-          )
-        if (near) continue
+    bedAll() {
+      for (const mine of laid.splice(0, laid.length)) {
+        // A mine in the water simply drowns: no bit under a swimmer's feet.
         if (query.isWater(mine.x, mine.z)) continue
         const tile = query.tileCentre(mine.x, mine.z)
         if (tile === null) continue
         const k = key(tile.col, tile.row)
-        if (planted.has(k) || (query.hasMine(mine.x, mine.z) && !spent.has(k))) continue
+        // ONE bit a tile, however many were laid on it — the second is
+        // absorbed, and a spent map tile is live again under a fresh mine.
+        spent.delete(k)
         planted.set(k, { x: tile.x, y: query.height(tile.x, tile.z), z: tile.z, skill: mine.skill })
-        laid.splice(i, 1)
+        // …and bedded under somebody's FEET it goes off then and there — the
+        // ordinary tread, no side checked, the layer's own included.
+        const stood = world.pigs().some((pig) => {
+          if (pig.gone || isDead(pig)) return false
+          const under = query.tileCentre(pig.position.x, pig.position.z)
+          return under !== null && under.col === tile.col && under.row === tile.row
+        })
+        if (stood) {
+          emit({
+            kind: 'mineTripped',
+            at: { x: tile.x, y: query.height(tile.x, tile.z), z: tile.z }
+          })
+          trip(tile.x, tile.z)
+        }
+      }
+    },
+    update(delta) {
+      // The laid mines' arming click — furniture until the turn ends.
+      for (const mine of laid) {
+        if (mine.arming <= 0) continue
+        mine.arming -= delta
+        if (mine.arming > 0) continue
+        mine.arming = 0
+        emit({ kind: 'mineArmed', at: { x: mine.x, y: mine.y, z: mine.z } })
       }
       for (let i = counting.length - 1; i >= 0; i--) {
         const mine = counting[i]

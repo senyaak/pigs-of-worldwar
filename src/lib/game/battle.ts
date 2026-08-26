@@ -44,7 +44,7 @@ import {
 import type { WalkAway } from './walkAway'
 import { advanceEndOfGame, beginEndOfGame, outcomeOf } from './endOfGame'
 import type { EndOfGame } from './endOfGame'
-import { PLANTED_SECONDS, endsTurn, hurryFor } from './spend'
+import { MINE_HURRY_SECONDS, endsTurn, hurryFor } from './spend'
 import { blastRange, isPlanted, lobOf } from './grenade'
 import { createSights } from './sights'
 import { createAttack } from './attack'
@@ -645,6 +645,13 @@ export function createBattle(parts: BattleParts): Battle {
    * (lib/game/walkAway.ts).
    */
   const endTurnBeat = (): void => {
+    // **THE LAID MINES BECOME THE GROUND.** Play's rule ("мина взрывается
+    // когда ход кончается в оригинале"): the sapper's furniture beds into
+    // the tile bits now — and one bedded under somebody's feet goes off in
+    // this very beat, whose wait already holds for the fuse (`settling`
+    // counts `mines.live`). Before the holster, so the bang is part of the
+    // turn it was laid in.
+    mines.bedAll()
     // **THE WEAPON GOES AWAY WITH THE TURN.** Play's report: "оружие не
     // убирается после выстрела — винтовка (и граната) остаётся в руке до
     // следующего хода." The exe's holster proper is `Pig::HoldWeapon(0)`
@@ -1650,15 +1657,13 @@ export function createBattle(parts: BattleParts): Battle {
     // not a second blow — it is the end of the first one.
     // …and neither is a HEAL: the hands are not a blow (they never set `struck`
     // below), and a pig that HAS struck — a charge planted, say — may still lay
-    // them on inside the same turn.
-    // …and neither is a MINE, whose own budget PROVES the exe lays several a
-    // turn: `[game+0x534]` counts to two free lays before the third squeezes
-    // the clock, a counter that could never reach two under a one-lay gate.
+    // them on inside the same turn. A MINE needs no exemption: the FIRST lay
+    // does not set `struck` at all, and the SECOND sets it deliberately —
+    // that is the "нельзя больше ничего использовать" half of its budget.
     if (
       struck &&
       acting.holding !== SKILL.SKIP_TURN &&
       acting.holding !== SKILL.HEALING_HANDS &&
-      !isMine(acting.holding) &&
       grenades.thrown() === 0
     ) {
       attack.swallow()
@@ -1686,21 +1691,25 @@ export function createBattle(parts: BattleParts): Battle {
       // (lib/game/spend.ts), and it does not take the turn's one strike either —
       // heal, walk on, and the rifle still answers. What it cannot do twice is
       // covered by its own bookkeeping: the charge only goes on a heal that
-      // LANDED (lib/game/healing.ts).
-      if (acting.holding !== SKILL.HEALING_HANDS) struck = true
+      // LANDED (lib/game/healing.ts). A MINE spends no strike either — its
+      // budget below closes the hand itself, on the second lay.
+      if (acting.holding !== SKILL.HEALING_HANDS && !isMine(acting.holding)) struck = true
       // The exe counts it here too — this is the arm its own fire dispatcher
       // increments `[gameMode+0x334]` from (0x493E7A).
       weaponUses++
       if (endsTurn(acting.holding)) spent = true
-      // A MINE has a BUDGET instead of a bill — the exe's `[game+0x534]`,
-      // read whole 2026-08-26: the first TWO laid in a turn cost nothing and
-      // the clock runs on; the third — or a lay with under four seconds
-      // left — squeezes the clock to the planted four, the same "get clear"
-      // the TNT gives (and with under four left it is a small GIFT: the exe
-      // SETS the deadline, so the layer always gets its four to walk away).
+      // A MINE has a BUDGET instead of a bill, and the numbers are PLAY's
+      // (lib/game/spend.ts): the FIRST lay of a turn is free and the clock
+      // runs on; the SECOND squeezes the clock to five seconds and closes
+      // the hand — `struck` from here, so nothing else is used this turn
+      // ("вторая мина уже не бесплатна - остаётся 5 секунд и нельзя больше
+      // ничего использовать").
       else if (isMine(acting.holding)) {
-        if (minesLaid >= 2 || game.timeLeft < PLANTED_SECONDS) game.hurryTurn(PLANTED_SECONDS)
         minesLaid++
+        if (minesLaid >= 2) {
+          game.hurryTurn(MINE_HURRY_SECONDS)
+          struck = true
+        }
       }
       // A PLANTED charge keeps the turn and takes the clock down to four seconds
       // instead: enough to get clear of the thing, and not enough to do anything

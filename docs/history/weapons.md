@@ -1687,3 +1687,24 @@ Deliberately diverged / deferred: the lay REFUSES a tile that already holds
 a mine (the exe drops the object and lets it lie for ever); the bed-in's
 own sound (index 0x61, name unread) is silent; the AI does not price a mine
 yet — plantOption still needs a row to read (docs/ai.md).
+
+### The mine's clock is PLAY's, and so is its bed-in (2026-08-26, same day)
+
+Play corrected the fresh build on all three counts, and play wins:
+
+- **"мина взрывается когда ход кончается в оригинале"** — the bed-in is not
+  a clearance watch, it is the TURN'S END: every laid mine becomes its tile's
+  bit in `endTurnBeat`, and one bedded under somebody's feet — the layer's
+  own included — goes off in that very beat (the wait already holds for the
+  fuse). The ±512 clearance model read off 0x436e55 is gone.
+- **"вторая мина уже не бесплатна - а остаётся 5 секунд и нельзя больше
+  ничего использовать"** — the budget is one free lay; the second squeezes
+  the clock to `MINE_HURRY_SECONDS` (five, play's number over the reading's
+  four) and sets `struck`, closing the hand for the turn. The exe reading's
+  "two free, third squeezes" stays in the spend.ts note as what was read.
+- **"2 мины можно в 1 место поставить"** — the lay never refuses ground: two
+  on one spot bed into ONE bit and one bang (the tile carries a bit, not a
+  count), and a spent map tile is live again under a fresh mine.
+
+The commando seeing mines play also asked for was already in — the exe's own
+detector set {4, 5, 6, 7, 14}. `unit/mines.spec.ts` re-pins the whole shape.
