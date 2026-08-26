@@ -1252,11 +1252,21 @@ the live roster could stand in.
 
 The four saves in this checkout were fixed by HAND instead, which is where
 that work belonged: `savearmy1/2/3` each stood at position 2 with the first
-three pigs carrying `missions: 1`, so ESTU's record is those three at the
-ranks they wear now (BASTILLE is an ORDERLY today and fought as a GRUNT —
-the rank at the time is not in the file, and play's instruction was to take
-the active front line). `savearmy0` is at position 1: only boot camp is
-behind it, which is never a replay row, so it keeps an empty record.
+three pigs carrying `missions: 1`, so ESTU's record is those three.
+
+**And they are recorded as GRUNTs, which is DERIVED rather than guessed.**
+The first pass wrote the ranks they wear TODAY, and play caught it: "так и
+напиши рядовой - в чём проблема?" — BASTILLE is an ORDERLY now and fought
+ESTU as a GRUNT. The rank at the time is not stored anywhere, but it does
+not have to be: **the boot camp pays ZERO** (`missionReward`, 0x47E61F), a
+campaign is born with no tokens, and the cheapest promotion in the tree
+costs one. So nothing could have been bought before the first real mission
+and every pig that fought ESTU was a GRUNT, in any campaign whatsoever. A
+position further along would have no such argument — and no such file
+exists here.
+
+`savearmy0` is at position 1: only boot camp is behind it, which is never a
+replay row, so it keeps an empty record.
 
 The spec's paint check changed shape a second time, and this one earns its
 place. Hashing the board band compared the DIM VEIL — it ramps 10 ticks of
