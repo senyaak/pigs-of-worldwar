@@ -62,6 +62,39 @@ const bandLetters = (page: Page): Promise<number> =>
     return lit
   })
 
+/**
+ * Where the LETTERS painted in a band actually centre, across the board's own
+ * face (x 232..432, so the squad's left column cannot join in). The board
+ * centres its own lines on 332 (ui/playerScreen.ts, `board.centre`) and the
+ * career screen is drawn on the board, so its words have to agree — they were
+ * 41 px left of it, on the exe's folded boxes, and play ruled that out
+ * ("текст при повышении сильно в лево съехал"). Ink is a couple of pixels
+ * shy of the geometric centre because a glyph is not symmetric inside its
+ * advance, which is why this asks for AGREEMENT with the board's own lines
+ * rather than for 332 exactly.
+ */
+const inkCentre = (page: Page, top: number, height: number): Promise<number> =>
+  page.evaluate(
+    ({ top, height }) => {
+      const canvas = document.getElementById('player-screen') as HTMLCanvasElement | null
+      const context = canvas?.getContext('2d')
+      if (!canvas || !context) return -1
+      const pixels = context.getImageData(232, top, 200, height).data
+      let min = 1e9
+      let max = -1
+      for (let y = 0; y < height; y++)
+        for (let x = 0; x < 200; x++) {
+          const i = (y * 200 + x) * 4
+          if ((pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3 > 100) {
+            if (x < min) min = x
+            if (x > max) max = x
+          }
+        }
+      return max < 0 ? -1 : 232 + (min + max) / 2
+    },
+    { top, height }
+  )
+
 const menuOpen = (page: Page, which: 'pigMenu' | 'careerPath'): Promise<boolean> =>
   page.evaluate((name) => {
     const pow = (window as unknown as { pow?: Record<string, { open(): boolean } | undefined> })
@@ -204,6 +237,10 @@ test('a token walks a grunt down the career path, and the next step costs two', 
   await expect
     .poll(() => bandLetters(page), { message: "the board never wrote the pig's name" })
     .toBeGreaterThan(0)
+  // Where the BOARD centres a line of its own — the career words below have
+  // to agree with this, and it is read rather than assumed so the two cannot
+  // drift apart in one place only.
+  const boardCentre = await inkCentre(page, 358, 17)
 
   // PROMOTE on a GRUNT opens CAREER PATH — four careers, the tree's order.
   await tap(page, 'menuSelect')
@@ -224,6 +261,12 @@ test('a token walks a grunt down the career path, and the next step costs two', 
   await expect
     .poll(() => bandLetters(page), { message: 'the board leaked under the career words' })
     .toBe(0)
+
+  // …and the career's own words stand CENTRED on the board, within a pixel
+  // of where the board centres its own lines (`[play]`: they used to sit 41
+  // px left of it).
+  const title = await inkCentre(page, 339, 17)
+  expect(Math.abs(title - boardCentre), `the career title is off the board's centre`).toBeLessThan(3)
 
   // ENGINEER's first step is the SAPPER, for the one token — the carousel
   // walks RIGHT, play's rule: "кнопки в лево в право, а не в верх в низ".
