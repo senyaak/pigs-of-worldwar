@@ -94,6 +94,62 @@ test('a killing hit still shoves — a fresh corpse is a body', { tag: '@nodata'
   expect(flung).toHaveLength(1)
 })
 
+/** A range the spec places the muzzle on itself — the point-blank cases are
+ * ABOUT where the round is born, so `range`'s fixed barrel will not do. */
+function pointBlank(
+  muzzle: { x: number; y: number; z: number },
+  victim: Pig
+): { shooter: Pig; fire: () => void; events: BattleEvent[] } {
+  const events: BattleEvent[] = []
+  const shooter = pigAt(0, 0, 99)
+  shooter.holding = 6 // PISTOL — the weapon play caught missing point-blank.
+  const bullets = createBullets(
+    {
+      pigs: () => [shooter, victim],
+      targets: [],
+      present: () => true,
+      training: false,
+      query: terrain(() => 0),
+      obstacles: new ObstacleField([]),
+      pose: { boneToWorld: () => muzzle }
+    },
+    (event) => events.push(event)
+  )
+  return {
+    shooter,
+    fire: () => {
+      expect(bullets.fire(shooter, 0)).toBe(true)
+      for (let step = 0; step < 240 && bullets.live().length > 0; step++) bullets.update(1 / 60)
+    },
+    events
+  }
+}
+
+test('a point-blank shot lands — the muzzle itself is tested', { tag: '@nodata' }, () => {
+  // Two pigs body to body: centres 170 apart, the victim's box 85..255 down
+  // +z. The pistol's barrel reaches ~155-190 world units past the shooter's
+  // centre, so the round is BORN inside the box — and the update's first test
+  // used to come only after a first HIT_RADIUS substep, 75+ units on, which
+  // for a deep spawn is already past the far wall. Play, mission 2:
+  // "пистолет в плотную использованый както мимо стрельнул".
+  const victim = pigAt(0, 170)
+  const { fire, events } = pointBlank({ x: 0, y: -160, z: 230 }, victim)
+  fire()
+  expect(events.some((one) => one.kind === 'damaged' && one.pig === victim.id)).toBe(true)
+  expect(events.some((one) => one.kind === 'shotLanded' && one.hit === 'flesh')).toBe(true)
+})
+
+test('the live muzzle never guns the shooter down', { tag: '@nodata' }, () => {
+  // With the spawn point tested, the one body that must never answer it is
+  // the shooter's own — a barrel leaned back over the shoulder starts inside
+  // it. The victim a tile on still takes the bullet.
+  const victim = pigAt(0, 512)
+  const { shooter, fire, events } = pointBlank({ x: 0, y: -160, z: 40 }, victim)
+  fire()
+  expect(events.some((one) => one.kind === 'damaged' && one.pig === shooter.id)).toBe(false)
+  expect(events.some((one) => one.kind === 'damaged' && one.pig === victim.id)).toBe(true)
+})
+
 test('an overkill body has left the world and is not shoved', { tag: '@nodata' }, () => {
   // The exe's one gate (state 8, 0x4789EF): the engine's `killed` listener
   // claims a gibbed pig synchronously and marks it gone (lib/game/engine.ts,

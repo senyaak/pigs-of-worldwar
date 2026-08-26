@@ -184,6 +184,11 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       return 'hard'
     }
     for (const pig of world.pigs()) {
+      // Never the shooter's own body: the muzzle test in `fire` made the
+      // SPAWN POINT live, and a barrel leaned back over the shoulder starts
+      // inside the shooter — a pig must not gun itself down. (A bazooka still
+      // clips its owner: that is the blast's business, not the bullet's.)
+      if (pig.id === shot.owner) continue
       if (isDead(pig)) continue
       const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
       if (!inside(shot, body)) continue
@@ -234,8 +239,22 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       if (!shot) return false
       shot.id = named++
       shot.owner = pig.id
-      flying.push(shot)
       emit({ kind: 'fired', skill })
+      // **THE MUZZLE IS THE FLIGHT'S FIRST POINT, AND IT IS TESTED.** A
+      // pistol's barrel sits ~115 world units past the hand bone and the
+      // hand rides forward in the firing pose, so fired point-blank the
+      // round is BORN inside the target's own box — sometimes at its far
+      // wall. The update below only ever tests positions AFTER a substep,
+      // and a substep is HIT_RADIUS long, so everything deeper than the
+      // first 75-odd units used to be a dead zone the shot sailed clean
+      // through (play, mission 2: "пистолет в плотную использованый както
+      // мимо стрельнул").
+      const landed = land(shot)
+      if (landed) {
+        emit({ kind: 'shotLanded', at: { x: shot.x, y: shot.y, z: shot.z }, hit: landed })
+        return true
+      }
+      flying.push(shot)
       return true
     },
     update(delta) {
