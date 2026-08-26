@@ -1311,3 +1311,43 @@ the one that blinks.
 centre within a pixel of where the board centres a line of its OWN — read
 off the screen rather than assumed, so the two cannot drift apart in one
 place only.
+
+## 2026-08-26 — a medal is tied to WHAT it was for
+
+Play, off his own save: "у последнего сейва сломана таблица играных карт -
+написано 1/2 медалей хотя получил 2 - надо привязывать каждую медаль
+конкретно - какая подобрана на карте - какая за прохождение - какая за без
+потерь - чтобы если при прохождении ещё раз - можно было её получить."
+
+Both halves were right, and the second is the deeper one.
+
+**The broken row was a stale record.** `savearmy3` says it all: every pig
+`deaths: 0` with no DRAFT in the roster, so nobody was lost — the survival
+bonus WAS earned — and 1 token left after a 1-token promotion means 2 were
+paid. Yet `best[1]` stood at 1, because the file was written while `best`
+counted PICKUPS ONLY; the parser's floor then lifted the 0 to 1 and the row
+printed 1/2. The award and the record were two separate calculations off the
+same inputs, and only one of them had been kept current.
+
+**And a COUNT could never have carried what play is asking for.** Finishing
+with the survival bonus and finishing with a pickup instead both read 2, so
+a replay that went and fetched the pickup was paid nothing — and the medal
+still lying on the map was unreachable for ever. So `best: number[]` is gone
+and `medals: Medals[]` replaces it: `completed`, `survived`, and `specials`,
+which names the PROPOINTs by the map object's own id. `bankReplay` pays for
+each medal the record does NOT hold and unions the rest in, so a second run
+fetches exactly what is missing and can never take a medal away.
+
+The id had to be carried down: `promotionPoint` now names the pickup
+(lib/game/events.ts, scenery.ts), `ui/battle.ts` collects ids instead of a
+tally, and `onLeave` hands `number[]` up. One object then answers both
+questions — `missionReward` counts the medals it is given, `finishMission`
+records the same ones — which is what stops the award and the record from
+disagreeing again.
+
+**SAVE_VERSION is 2**, because a v1 file genuinely cannot be read as a v2
+one: the count does not say which medals it stood for, and guessing would
+either pay a medal twice or lock one away. The four campaigns here were
+converted BY HAND off what their own files say — every one had finished its
+position with nobody lost and no PROPOINT built yet, so each holds the level
+and the clean sweep. `savearmy3` reads 2/2 now, which is what play earned.

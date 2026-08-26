@@ -11,9 +11,11 @@
 // (2026-08-24). More than eight completed missions scroll through the eight
 // plates, the browsed row held in view.
 //
-// What a replay WINS is the record: beat the position's `best` and the
-// difference lands on the tokens (lib/game/save.ts `bankReplay`,
-// campaign.ts `bankReplayResult`). The campaign position never moves.
+// What a replay WINS is a MEDAL the position's record does not hold - each
+// new one pays a token (lib/game/save.ts `bankReplay`, campaign.ts
+// `bankReplayResult`). The pair a row prints is `taken/available`, taken
+// being how many medals stand: the level, the clean sweep, and each of the
+// level's own pickups. The campaign position never moves.
 
 import { loadFrontend, SCREEN, feText } from './barScreen'
 import { byId } from './dom'
@@ -29,7 +31,7 @@ import { loadSprites } from './sprites'
 import type { SpriteSet } from './sprites'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { current } from '../campaign'
-import { bestAt, foughtAt } from '../../../lib/game/save'
+import { foughtAt, medalCount, medalsAt } from '../../../lib/game/save'
 import { bonusPoints, CAMPAIGN_LENGTH, mapAt, missionNameIndex } from '../../../lib/game/missions'
 
 /** The screen's own title — a literal, because no fetext names a replay
@@ -267,7 +269,10 @@ export function initMissionSelect(handlers: {
     const save = current()
     const map = mapAt(position)
     const name = (map && gtext[missionNameIndex(map)]) || map || '?'
-    const taken = save ? bestAt(save, position) : 0
+    // The medals HELD at this position, counted - which is what the pair
+    // says: taken of available. Which ones they are decides what a replay is
+    // paid for (lib/game/save.ts, `Medals`).
+    const taken = save ? medalCount(medalsAt(save, position)) : 0
     return { name, taken, available: Math.max(2 + bonusPoints(position), taken) }
   }
 

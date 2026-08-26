@@ -30,7 +30,13 @@ import { sharedBank } from './audio/bank'
 import { GAME_SOUNDS } from './audio/battleSound'
 import { fall, newSquad, SQUAD_SIZE, standingCount } from '../../lib/game/roster'
 import { fieldedAt, mapAt, mapId } from '../../lib/game/missions'
-import { foughtAt, missionScore, nextMap, type FoughtPig } from '../../lib/game/save'
+import {
+  foughtAt,
+  medalsWon,
+  nextMap,
+  type FoughtPig,
+  type Medals
+} from '../../lib/game/save'
 import { isTrainingGround } from '../../lib/game/tutorial'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
@@ -166,9 +172,10 @@ let replaying: number | null = null
  * the live roster: pigs die and drafts take their slots, so the roster is a
  * different squad (`[play]`, 2026-08-26). */
 let replaySquad: FoughtPig[] = []
-/** The replay's pickup count, held from the battle's exit to the debrief's
- * CONTINUE. */
-let replayPoints = 0
+/** What the replay EARNED, medal by medal, held from the battle's exit to
+ * the debrief's CONTINUE. Only the medals the record does not already hold
+ * are paid for (`campaign.bankReplayResult`). */
+let replayMedals: Medals | null = null
 /** Points newly landed on the team — the squad screen's coin fly-in takes
  * them the next time it stands up (`playerScreen.award`). */
 let pendingAward = 0
@@ -328,11 +335,12 @@ const battle = initBattle((exit, fallen, kills, points) => {
   }
   if (replaying !== null) {
     // A REPLAY: nothing is settled — no step, no reward, no roster change.
-    // What it may win is the RECORD, and that waits for CONTINUE the same
-    // way a campaign result does. The debrief reads the REPLAYED position,
-    // so its bonus row and fielded count are that mission's own. The record
-    // is the mission's WHOLE score — completion, survival, pickups — the
-    // same composition the first win banked (lib/game/save.ts).
+    // What it may win is a MEDAL the record does not hold, and that waits
+    // for CONTINUE the same way a campaign result does. The debrief reads
+    // the REPLAYED position, so its bonus row and fielded count are that
+    // mission's own; the medals are this run's whole haul - completion,
+    // survival and each PROPOINT by its own id - and `bankReplay` is what
+    // decides which of them are new (lib/game/save.ts).
     //
     // The pigs on its page are the squad the replay FIELDED — the same
     // record, stood up as display pigs with the battle's fall marks. The
@@ -346,8 +354,8 @@ const battle = initBattle((exit, fallen, kills, points) => {
         : { name: '', identity: slot, rank: 0, missions: 0, score: 0, fell: -1, deaths: 0 }
     })
     for (const slot of fallen) fall(squad, slot)
-    replayPoints = exit === 'won' ? missionScore(replaying, fallen.length, points) : 0
-    debrief.show(exit === 'won', { ...save, position: replaying, squad }, points)
+    replayMedals = exit === 'won' ? medalsWon(replaying, fallen.length, points) : null
+    debrief.show(exit === 'won', { ...save, position: replaying, squad }, points.length)
     show('debrief')
     void debrief.load()
     return
@@ -362,7 +370,7 @@ const battle = initBattle((exit, fallen, kills, points) => {
   // The debrief reads the save AS THE MISSION FOUND IT — the position still
   // naming the played mission, the squad carrying its fell marks; the settled
   // result waits in `campaign.afterMission()` for CONTINUE to take it.
-  debrief.show(exit === 'won', save, points)
+  debrief.show(exit === 'won', save, points.length)
   show('debrief')
   void debrief.load()
 })
@@ -385,7 +393,9 @@ const debrief = initDebrief({
       replaying = null
       replaySquad = []
       const before = campaign.current()
-      void campaign.bankReplayResult(position, replayPoints).then((after) => {
+      const won = replayMedals ?? { completed: false, survived: false, specials: [] }
+      replayMedals = null
+      void campaign.bankReplayResult(position, won).then((after) => {
         if (before && after) pendingAward = after.tokens - before.tokens
         toSquad()
       })

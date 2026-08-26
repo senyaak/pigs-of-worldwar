@@ -22,8 +22,18 @@ import { CAMPAIGN_LENGTH, fieldedAt, mapAt } from './missions'
 import { seeded } from './random'
 import { regroup, SQUAD_SIZE, type Pig } from './roster'
 
-/** Bumped when the shape changes in a way an older file cannot be read as. */
-export const SAVE_VERSION = 1
+/**
+ * Bumped when the shape changes in a way an older file cannot be read as.
+ *
+ * **2 dropped `best`** - a COUNT of the medals a position had yielded - for
+ * `medals`, which says WHICH ones. A v1 file cannot be read as a v2 one
+ * because the count does not carry that: 2 could be finishing plus the
+ * survival bonus, or finishing plus a pickup, and guessing would either pay
+ * a medal twice or lock one away for ever. The four campaigns in this
+ * checkout were converted by hand off what their tokens and rosters
+ * actually say (`docs/history/frontend.md`, 2026-08-26).
+ */
+export const SAVE_VERSION = 2
 
 /** One fielded pig as a finished mission recorded it — enough to stand the
  * same squad up again for a replay and to draw its debrief row. */
@@ -31,6 +41,18 @@ export interface FoughtPig {
   name: string
   identity: number
   rank: number
+}
+
+/**
+ * The three KINDS of medal a mission can yield, held apart rather than
+ * counted: LEVEL COMPLETE, SURVIVAL BONUS, and the level's own SPECIAL
+ * BONUS pickups. `specials` names the PROPOINTs by the map object's id, so
+ * a replay knows which one is still lying out there.
+ */
+export interface Medals {
+  completed: boolean
+  survived: boolean
+  specials: number[]
 }
 
 export interface SaveGame {
@@ -61,22 +83,28 @@ export interface SaveGame {
    * is what says the tutorial was finished rather than skipped. */
   tutorial: boolean
   /**
-   * The PROPOINT pickups taken at each COMPLETED position, indexed by
-   * position — the record MISSION SELECT replays against (`[play]`,
-   * 2026-08-24: "при прохождении если число больше того что было —
-   * сохраняется новое и добавляются PP"). The remake's own field: the
-   * original has no replay and keeps no such record. Sparse holes read as
-   * zero (`bestAt`).
+   * WHICH medals each position has yielded, indexed by position - not how
+   * many. `[play]`, 2026-08-26: each medal is tied to what it was FOR - the
+   * one picked up on the map, the one for finishing, the one for finishing
+   * with nobody lost - so a replay can go and fetch the one still missing.
+   *
+   * A COUNT could not answer that: finishing with the survival bonus and
+   * finishing with a pickup instead both read 2, so a replay that took the
+   * pickup this time was paid nothing and the medal still out there was
+   * unreachable for ever.
+   *
+   * Sparse holes read as null (`medalsAt`). The remake's own field: the
+   * original has no replay and keeps no such record.
    */
-  best: number[]
+  medals: Medals[]
   /**
    * WHO finished each completed position, indexed by position — the fielded
    * pigs as the mission ended, with the ranks they wore then. A REPLAY
    * fields exactly this squad (`[play]`, 2026-08-26: "надо запоминать каким
    * составом миссия завершилась и переигрывать именно тем составом"), not
    * the live roster, which may have marched on. The remake's own field, like
-   * `best`: the original has no replay. Sparse holes read as null
-   * (`foughtAt`) and the briefing falls back on the live roster.
+   * `medals`: the original has no replay. Sparse holes read as null
+   * (`foughtAt`), and a position with no record cannot be replayed at all.
    */
   fought: FoughtPig[][]
   /** ISO 8601, for the LOAD GAME list to sort and label by. */
@@ -86,9 +114,42 @@ export interface SaveGame {
 /** A campaign that has been played to the end. */
 export const isComplete = (save: SaveGame): boolean => save.position >= CAMPAIGN_LENGTH
 
-/** The PROPOINT record at a position — a hole is an honest zero (a mission
- * finished before the field existed, or with nothing picked up). */
-export const bestAt = (save: SaveGame, position: number): number => save.best[position] ?? 0
+/** The medals a position has yielded, or null where nothing is recorded. */
+export const medalsAt = (save: SaveGame, position: number): Medals | null =>
+  save.medals[position] ?? null
+
+/** How many medals a record holds - what MISSION SELECT prints as `taken`. */
+export const medalCount = (medals: Medals | null): number =>
+  medals ? (medals.completed ? 1 : 0) + (medals.survived ? 1 : 0) + medals.specials.length : 0
+
+/**
+ * What one FINISHED run earned. The training ground pays nothing at all
+ * (`paysPoints`), so it earns no medal either - the debrief it is shown
+ * after is the remake's own page and must not promise one.
+ */
+export function medalsWon(position: number, losses: number, specials: readonly number[]): Medals {
+  if (!paysPoints(position)) return { completed: false, survived: false, specials: [] }
+  return {
+    completed: true,
+    survived: survivalBonus(position, losses),
+    specials: [...new Set(specials)].sort((a, b) => a - b)
+  }
+}
+
+/** Everything held once a run is added to what already stood. */
+export function unionMedals(stood: Medals | null, won: Medals): Medals {
+  if (!stood) return won
+  return {
+    completed: stood.completed || won.completed,
+    survived: stood.survived || won.survived,
+    specials: [...new Set([...stood.specials, ...won.specials])].sort((a, b) => a - b)
+  }
+}
+
+/** How many medals a run ADDS to what already stood - what a replay is paid,
+ * and zero for a run that only re-earned what the record already held. */
+export const gainedOver = (stood: Medals | null, won: Medals): number =>
+  medalCount(unionMedals(stood, won)) - medalCount(stood)
 
 /** The squad that finished a position, or null where no record stands — a
  * hole and an empty list both mean "no record", never "field nobody". */
@@ -98,21 +159,27 @@ export const foughtAt = (save: SaveGame, position: number): FoughtPig[] | null =
 }
 
 /**
- * A REPLAY came back with `points` pickups: worth banking only past the
- * record, and worth exactly the difference — the points already banked were
- * paid when they were first earned. Null when the record stands.
+ * A REPLAY finished, and `won` is what it earned. Worth banking only where
+ * it holds a medal the record does not: each NEW one pays a token, and the
+ * rest were paid when they were first earned. Null when the record already
+ * held everything this run managed.
+ *
+ * This is the whole point of holding the medals apart (`[play]`): a run
+ * that finishes with nobody lost, having only ever finished before, earns
+ * exactly the SURVIVAL medal - and a count could never have said so.
  */
 export function bankReplay(
   save: SaveGame,
   position: number,
-  points: number,
+  won: Medals,
   now: string
 ): SaveGame | null {
-  const stood = bestAt(save, position)
-  if (points <= stood) return null
-  const best = save.best.slice()
-  best[position] = points
-  return { ...save, best, tokens: save.tokens + (points - stood), savedAt: now }
+  const stood = medalsAt(save, position)
+  const gained = gainedOver(stood, won)
+  if (gained <= 0) return null
+  const medals = save.medals.slice()
+  medals[position] = unionMedals(stood, won)
+  return { ...save, medals, tokens: save.tokens + gained, savedAt: now }
 }
 
 /** The map the next mission opens, or null for a finished campaign. */
@@ -138,7 +205,7 @@ export function newGame(
     drafts: 0,
     tokens: 0,
     tutorial: false,
-    best: [],
+    medals: [],
     fought: [],
     savedAt: now
   }
@@ -160,27 +227,19 @@ export function newGame(
  * FINAL (25, an island of its own on the map) pays. `[exe]` for the `% 5`;
  * the naming is play's.
  *
- * `pickups` waits on the PROPOINT crate being built (`[gap]`); the manual's
- * "hidden bonus points" are exactly those pickups, and the per-position
- * count of them (0x4D3560) is only ever shown, never awarded.
+ * The manual's "hidden bonus points" are the PROPOINTs the squad walks over
+ * (lib/game/scenery.ts), and the per-position COUNT of them (0x4D3560) is
+ * only ever shown, never awarded - what pays is what was actually picked
+ * up, which is why `Medals.specials` names them one by one.
+ *
+ * It reads the MEDALS rather than counting anything itself: one object says
+ * both what the tokens are and what the record keeps, so the two can no
+ * longer disagree. They did: play found a mission paying two tokens while
+ * its row on MISSION SELECT read 1/2.
  */
-export function missionReward(position: number, losses: number, pickups = 0): number {
-  if (position === 0) return 0
+export function missionReward(position: number, won: Medals): number {
   const fifth = position > 1 && position % 5 === 0 ? 5 : 0
-  return missionScore(position, losses, pickups) + fifth
-}
-
-/**
- * The MISSION'S OWN score — the reward less the every-fifth bounty, which
- * belongs to the campaign's march rather than to the mission. This is what
- * the RECORD keeps and what MISSION SELECT prints over `2 + bonusPoints`:
- * play caught the record counting pickups alone ("the war foundation
- * показывает 0/0 — не учитываются за прохождение уровня и за прохождение
- * без смертей").
- */
-export function missionScore(position: number, losses: number, pickups = 0): number {
-  if (position === 0) return 0
-  return 1 + (survivalBonus(position, losses) ? 1 : 0) + pickups
+  return medalCount(won) + fifth
 }
 
 /**
@@ -216,15 +275,15 @@ export function finishMission(
   enemy: number,
   tokens: number,
   now: string,
-  /** The mission's own score (`missionScore`) — the record MISSION SELECT
-   * replays against (`best`). */
-  earned = 0
+  /** What the run EARNED, medal by medal - unioned onto whatever the
+   * position already held (`unionMedals`). */
+  won: Medals = { completed: false, survived: false, specials: [] }
 ): SaveGame {
   const { squad: next, drafts } = regroup(squad, save.drafts)
   const enemies = save.enemies.slice()
   enemies[save.position] = enemy
-  const best = save.best.slice()
-  best[save.position] = Math.max(bestAt(save, save.position), earned)
+  const medals = save.medals.slice()
+  medals[save.position] = unionMedals(medalsAt(save, save.position), won)
   // WHO finished it goes on the record too, off the squad as the battle left
   // it — before the regroup, so the fallen are still themselves and the
   // ranks are the ones the mission was fought at. A replay fields this.
@@ -239,7 +298,7 @@ export function finishMission(
     squad: next,
     drafts,
     tokens,
-    best,
+    medals,
     fought,
     savedAt: now
   }
@@ -279,17 +338,14 @@ export function parse(text: string): SaveGame | null {
   // `tutorial` arrived after the shape shipped; a file without it is from
   // before the question existed, and the honest answer for it is "not played".
   if (typeof save.tutorial !== 'boolean') save.tutorial = false
-  // `best` arrived with MISSION SELECT (2026-08-24); a file without it is
-  // from before replays existed, and every record it would hold is zero.
-  // Normalised element-wise rather than rejected whole: a sparse write
-  // serialises its holes as JSON nulls, and one null must not cost the
-  // other twenty-five records.
-  save.best = Array.isArray(save.best) ? save.best.map((one) => (isCount(one) ? one : 0)) : []
-  // …and a record UNDER what completion alone pays is from the days `best`
-  // counted pickups only: a position the campaign is PAST was finished, and
-  // finishing is a point, so the floor is 1. The survival point cannot be
-  // recovered — a replay re-earns it. Pure: seeded off the save itself.
-  for (let p = 1; p < save.position; p++) save.best[p] = Math.max(save.best[p] ?? 0, 1)
+  // `medals` is READ, never invented, and never counted back up from the
+  // old `best` number: which medal a token stood for is exactly what that
+  // number threw away. Malformed rows drop to a hole, which reads as "no
+  // record" and lets a replay earn the lot.
+  const rows = Array.isArray(save.medals) ? save.medals : []
+  save.medals = rows.map((one) =>
+    isMedals(one) ? tidyMedals(one) : (undefined as unknown as Medals)
+  )
   // `fought` is READ, never invented. A file from before the field existed
   // carries no record, and no record means that position cannot be replayed
   // — the live roster is NOT the squad that fought it (`[play]`,
@@ -330,6 +386,24 @@ function seedOf(name: string, nation: number): number {
 
 const isCount = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0
+
+function isMedals(value: unknown): value is Medals {
+  if (typeof value !== 'object' || value === null) return false
+  const medals = value as Partial<Medals>
+  return (
+    typeof medals.completed === 'boolean' &&
+    typeof medals.survived === 'boolean' &&
+    Array.isArray(medals.specials) &&
+    medals.specials.every(isCount)
+  )
+}
+
+/** A record off the disk, kept to the fields this shape owns. */
+const tidyMedals = (medals: Medals): Medals => ({
+  completed: medals.completed,
+  survived: medals.survived,
+  specials: [...new Set(medals.specials)].sort((a, b) => a - b)
+})
 
 function isFoughtPig(value: unknown): value is FoughtPig {
   if (typeof value !== 'object' || value === null) return false

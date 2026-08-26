@@ -133,7 +133,9 @@ export type BattleEvent =
    * many this battle has yielded so far, so the debrief can pay them out
    * without counting anything of its own.
    */
-  | { kind: 'promotionPoint'; pig: PigId; total: number }
+  /** `id` is the map object's own - a SPECIAL BONUS medal is recorded
+   *  against it, so a replay knows which one is still out there. */
+  | { kind: 'promotionPoint'; pig: PigId; id: number; total: number }
 
   // ——— things coming down ———
   /** A crate is on its way: the aeroplane, and a canopy to hang over it. */

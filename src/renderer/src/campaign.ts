@@ -20,11 +20,12 @@
 import {
   bankReplay,
   finishMission,
+  medalsWon,
   missionReward,
-  missionScore,
   newGame,
   parse,
   serialise,
+  type Medals,
   type SaveGame
 } from '../../lib/game/save'
 import { drawEnemies } from '../../lib/game/enemies'
@@ -112,19 +113,22 @@ export function adopt(from: { slot: string; save: SaveGame }): SaveGame {
  * played and the kills taken, for every pig that was fielded — before the
  * roster regroups, the original's own order (`Team::EndOfMission`).
  */
-export function missionWonResult(kills: readonly number[] = [], points = 0): SaveGame | null {
+export function missionWonResult(
+  kills: readonly number[] = [],
+  points: readonly number[] = []
+): SaveGame | null {
   if (!save) return null
   const losses = SQUAD_SIZE - standingCount(save.squad)
+  // WHAT was earned, medal by medal - one object answers both the tokens
+  // paid and the record kept, so the two can no longer disagree.
+  const medals = medalsWon(save.position, losses, points)
   const won = finishMission(
     save,
     credit(save.squad, fieldedAt(save.position), kills),
     save.enemies[save.position] ?? bootCampEnemy(save.nation),
-    save.tokens + missionReward(save.position, losses, points),
+    save.tokens + missionReward(save.position, medals),
     new Date().toISOString(),
-    // …and the mission's whole score goes on the RECORD — completion,
-    // survival and pickups, the same composition MISSION SELECT prints
-    // (lib/game/save.ts, `missionScore`).
-    missionScore(save.position, losses, points)
+    medals
   )
   // Winning the training ground is what sets the tutorial flag.
   pending = save.position === 0 ? { ...won, tutorial: true } : won
@@ -150,18 +154,21 @@ export const discardMission = (): void => {
 }
 
 /**
- * A MISSION SELECT replay came back won with `points` pickups: the roster is
- * put back the way the mission found it — a replay is consequence-free, no
- * deaths, no battles-and-kills credit, no campaign step — and what it can
- * WIN is the record: past the position's `best`, the difference lands on the
- * tokens and the record moves (`bankReplay`, lib/game/save.ts). `[play]`:
- * "при прохождении если число больше того что было — сохраняется новое и
- * добавляются PP". Returns the save, banked or not.
+ * A MISSION SELECT replay came back WON, and `won` is the medals it earned.
+ * The roster is put back the way the mission found it - a replay is
+ * consequence-free: no deaths, no battles-and-kills credit, no campaign step.
+ * What it can win is a MEDAL THE RECORD DOES NOT HOLD: each new one pays a
+ * token and joins the record (`bankReplay`, lib/game/save.ts). `[play]`,
+ * 2026-08-26 - the medals are held apart precisely so a second run can go
+ * and fetch the one that is still missing.
  */
-export async function bankReplayResult(position: number, points: number): Promise<SaveGame | null> {
+export async function bankReplayResult(
+  position: number,
+  won: Medals
+): Promise<SaveGame | null> {
   discardMission()
   if (!save) return null
-  const banked = bankReplay(save, position, points, new Date().toISOString())
+  const banked = bankReplay(save, position, won, new Date().toISOString())
   if (!banked) return save
   save = banked
   await write()

@@ -11,10 +11,13 @@ import { CAMPAIGN, CAMPAIGN_LENGTH, MAP_NAMES, mapAt, mapId, missionNameIndex } 
 import { RETURNING, SQUAD_SIZE, fall, newSquad, regroup, standing, standingCount } from '../src/lib/game/roster'
 import {
   bankReplay,
-  bestAt,
   finishMission,
   foughtAt,
+  gainedOver,
   isComplete,
+  medalCount,
+  medalsAt,
+  medalsWon,
   missionReward,
   paysPoints,
   newGame,
@@ -151,21 +154,26 @@ test('a save from before the tutorial question answers "not played"', { tag: '@n
   expect(parse(JSON.stringify(aged))).toEqual({ ...save, tutorial: false })
 })
 
-test('the award is the debrief adder: finish, five through, fifths — CAMP pays zero', { tag: '@nodata' }, () => {
+test('the award is the debrief adder: finish, five through, fifths - CAMP pays zero', { tag: '@nodata' }, () => {
+  const won = (position: number, losses: number, specials: number[] = []): number =>
+    missionReward(position, medalsWon(position, losses, specials))
   // The training ground never sees the debrief (0x47E61F sends map 10 to
-  // EndOfMission direct), and pays nothing.
-  expect(missionReward(0, 0)).toBe(0)
+  // EndOfMission direct), and pays nothing - it earns no medal to pay for.
+  expect(won(0, 0)).toBe(0)
+  expect(medalCount(medalsWon(0, 0, []))).toBe(0)
   // An ordinary win: one for the level, one more with all five through.
-  expect(missionReward(2, 0)).toBe(2)
-  expect(missionReward(2, 1)).toBe(1)
-  // Every fifth position pays five on top — 5, 10, 15, 20, 25.
-  expect(missionReward(5, 0)).toBe(7)
-  expect(missionReward(10, 3)).toBe(6)
+  expect(won(2, 0)).toBe(2)
+  expect(won(2, 1)).toBe(1)
+  // Every fifth position pays five on top - 5, 10, 15, 20, 25.
+  expect(won(5, 0)).toBe(7)
+  expect(won(10, 3)).toBe(6)
   // FINAL (position 25) forgives two down, and is itself a fifth.
-  expect(missionReward(25, 2)).toBe(7)
-  expect(missionReward(25, 3)).toBe(6)
-  // The hidden bonuses are the PROPOINTs actually picked up.
-  expect(missionReward(2, 0, 3)).toBe(5)
+  expect(won(25, 2)).toBe(7)
+  expect(won(25, 3)).toBe(6)
+  // The hidden bonuses are the PROPOINTs actually picked up, and the same
+  // one twice over is one medal.
+  expect(won(2, 0, [11, 12, 13])).toBe(5)
+  expect(won(2, 0, [11, 11])).toBe(3)
 })
 
 test('the screen asks the same question the award answers', { tag: '@nodata' }, () => {
@@ -173,10 +181,10 @@ test('the screen asks the same question the award answers', { tag: '@nodata' }, 
   // page has to be told there is nothing to hand out — play found it printing
   // two tokens for a mission that pays none.
   expect(paysPoints(0)).toBe(false)
-  expect(missionReward(0, 0)).toBe(0)
+  expect(missionReward(0, medalsWon(0, 0, []))).toBe(0)
   for (let position = 1; position < 26; position++) {
     expect(paysPoints(position)).toBe(true)
-    expect(missionReward(position, 0)).toBeGreaterThan(0)
+    expect(missionReward(position, medalsWon(position, 0, []))).toBeGreaterThan(0)
   }
 })
 
@@ -266,34 +274,58 @@ test('the table is filled where it is short, and kept where it is not', { tag: '
 
 
 
-test('the PP record: finishMission writes it, bankReplay pays only the difference', { tag: '@nodata' }, () => {
-  let save = newGame('PIGS', 0, squadOf(), '2026-08-24T00:00:00Z')
+test('a medal is tied to WHAT it was for, and a replay fetches the missing one', { tag: '@nodata' }, () => {
+  let save = newGame('PIGS', 0, squadOf(), '2026-08-26T00:00:00Z')
   save = { ...save, position: 3, tokens: 10 }
-  // Finishing a mission records the pickups at the PLAYED position.
-  const won = finishMission(save, save.squad, 1, 12, '2026-08-24T00:01:00Z', 2)
-  expect(bestAt(won, 3)).toBe(2)
+
+  // A first run that FINISHES but loses a pig, taking one of the level's
+  // pickups: two medals, and the survival one is not among them.
+  const first = medalsWon(3, 1, [77])
+  const won = finishMission(save, save.squad, 1, 12, '2026-08-26T00:01:00Z', first)
+  expect(medalsAt(won, 3)).toEqual({ completed: true, survived: false, specials: [77] })
+  expect(medalCount(medalsAt(won, 3))).toBe(2)
   expect(won.position).toBe(4)
-  // A replay past the record banks the DIFFERENCE and moves the record...
-  const banked = bankReplay(won, 3, 5, '2026-08-24T00:02:00Z')!
+
+  // THE POINT OF THE SHAPE. A replay that finishes clean but never touches
+  // the pickup earns two medals again - and a COUNT would have paid nothing,
+  // 2 against 2. What is new is the SURVIVAL one, and it pays exactly that.
+  const clean = medalsWon(3, 0, [])
+  expect(medalCount(clean)).toBe(2)
+  expect(gainedOver(medalsAt(won, 3), clean)).toBe(1)
+  const banked = bankReplay(won, 3, clean, '2026-08-26T00:02:00Z')!
   expect(banked).not.toBeNull()
-  expect(bestAt(banked, 3)).toBe(5)
-  expect(banked.tokens).toBe(won.tokens + 3)
-  // ...and a replay at or under it banks nothing at all.
-  expect(bankReplay(banked, 3, 5, '2026-08-24T00:03:00Z')).toBeNull()
-  expect(bankReplay(banked, 3, 1, '2026-08-24T00:03:00Z')).toBeNull()
+  expect(banked.tokens).toBe(won.tokens + 1)
+  // …and the record now holds all three, the pickup from the first run
+  // included: a replay never takes a medal away.
+  expect(medalsAt(banked, 3)).toEqual({ completed: true, survived: true, specials: [77] })
+
+  // Another pickup on the same level is another medal.
+  const second = bankReplay(banked, 3, medalsWon(3, 1, [78]), '2026-08-26T00:03:00Z')!
+  expect(medalsAt(second, 3)!.specials).toEqual([77, 78])
+  expect(second.tokens).toBe(banked.tokens + 1)
+
+  // A run that earns nothing the record lacks banks nothing at all - the
+  // same pickup twice over included.
+  expect(bankReplay(second, 3, medalsWon(3, 0, [77]), '2026-08-26T00:04:00Z')).toBeNull()
+  expect(bankReplay(second, 3, medalsWon(3, 1, []), '2026-08-26T00:04:00Z')).toBeNull()
 })
 
-test('a save from before the record reads back with an empty one', { tag: '@nodata' }, () => {
-  const save = newGame('PIGS', 0, squadOf(), '2026-08-24T00:00:00Z')
-  const old = JSON.parse(serialise(save))
-  delete old.best
-  const read = parse(JSON.stringify(old))
-  expect(read).not.toBeNull()
-  expect(read!.best).toEqual([])
-  // ...and a sparse write's JSON nulls become zeros, not a lost record.
-  const holed = JSON.parse(serialise(save))
-  holed.best = [null, null, 3]
-  expect(parse(JSON.stringify(holed))!.best).toEqual([0, 0, 3])
+test('a save from before the medals is read as holding NONE', { tag: '@nodata' }, () => {
+  const save = newGame('PIGS', 0, squadOf(), '2026-08-26T00:00:00Z')
+  const old = JSON.parse(serialise({ ...save, position: 3 }))
+  delete old.medals
+  const read = parse(JSON.stringify(old))!
+  // Nothing is counted back up from the old `best` number: which medal a
+  // token stood for is exactly what that number threw away (`[play]`).
+  expect(read.medals).toEqual([])
+  expect(medalsAt(read, 1)).toBeNull()
+  // A malformed row reads as no record and costs no other row.
+  const holed = JSON.parse(serialise({ ...save, position: 3 }))
+  holed.medals = [null, { completed: true, survived: true, specials: [4, 4, 2] }, 'nonsense']
+  const mixed = parse(JSON.stringify(holed))!
+  expect(medalsAt(mixed, 1)).toEqual({ completed: true, survived: true, specials: [2, 4] })
+  expect(medalsAt(mixed, 0)).toBeNull()
+  expect(medalsAt(mixed, 2)).toBeNull()
 })
 
 test('finishMission records WHO fought, with the ranks they wore', { tag: '@nodata' }, () => {

@@ -195,7 +195,7 @@ export function createScenery(
           emit({ kind: 'taken', id: pickup.id })
           obstacles.remove(pickup.id)
           advance(pickup.id, places.get(pickup.id)?.y ?? 0)
-          emit({ kind: 'promotionPoint', pig: pig.id, total: points })
+          emit({ kind: 'promotionPoint', pig: pig.id, id: pickup.id, total: points })
           continue
         }
         const worth = worthOf(pickup, training)

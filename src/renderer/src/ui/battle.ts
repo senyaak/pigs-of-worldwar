@@ -165,7 +165,7 @@ export interface BattleView {
  * lifetime scores when a win is taken.
  */
 export function initBattle(
-  onLeave: (exit: BattleExit, fallen: number[], kills: number[], points: number) => void
+  onLeave: (exit: BattleExit, fallen: number[], kills: number[], points: number[]) => void
 ): BattleView {
   const canvasHost = byId<HTMLDivElement>('battle-canvas')
   const hudCanvas = byId<HTMLCanvasElement>('battle-hud')
@@ -595,9 +595,11 @@ export function initBattle(
    * death with no attacker — water, a mine — is nobody's. */
   let kills: number[] = []
 
-  /** PROMOTION POINTS picked up off the ground this battle — what the debrief
-   * pays as its SPECIAL BONUS (lib/game/scenery.ts). */
-  let points = 0
+  /** WHICH promotion points were picked up off the ground this battle, by
+   * the map object's own id - what the debrief pays as its SPECIAL BONUS,
+   * and what the save records medal by medal (lib/game/scenery.ts,
+   * lib/game/save.ts `Medals`). */
+  let points: number[] = []
 
   /** Put the battle away: the LEAVE button, and the end of a mission. */
   const leave = (): void => {
@@ -653,7 +655,7 @@ export function initBattle(
     verdict = null
     fallen = []
     kills = []
-    points = 0
+    points = []
     // A fresh level is the tutorial's first rung again, whoever asked for it —
     // the menu, `pow.swapMap`, or a step BACK, which sets its own want on the
     // far side of this.
@@ -961,8 +963,8 @@ export function initBattle(
           console.log(kit)
           window.api.logTelemetry(kit)
         },
-        promotionPoint: ({ total }) => {
-          points = total
+        promotionPoint: ({ id }) => {
+          if (!points.includes(id)) points.push(id)
         },
         placed: ({ skill, amount }) => {
           step = 0

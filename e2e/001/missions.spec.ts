@@ -33,7 +33,14 @@ test('the completed missions are listed, name left and record right', async ({ a
     // campaign that played it before the record existed.
     position: 4,
     tokens: 2,
-    best: [0, 1, 0, 1],
+    // One medal each at positions 1 and 2 - the level itself, with the
+    // survival bonus lost and no pickup taken, so both rows read 1/2 and a
+    // replay still has two medals to go and fetch.
+    medals: [
+      { completed: false, survived: false, specials: [] },
+      { completed: true, survived: false, specials: [] },
+      { completed: true, survived: false, specials: [] }
+    ],
     // A campaign that PLAYED a mission kept who fought it, and a replay
     // fields exactly that squad — nothing may stand in for it, so position 3
     // is locked here despite being behind the campaign (`[play]`,
@@ -82,13 +89,13 @@ test('the completed missions are listed, name left and record right', async ({ a
 
   // EVERY real mission is a row and boot camp is not one (play: "тренировку
   // туда не пихай"); the window shows the first eight. A REPLAYABLE row
-  // carries its pair — completion + survival is what a map with no specials
-  // can pay, and the parse floor gives the old pickup-only records their
-  // completion point — and every locked row is grey: no pair at all.
+  // carries its pair — the medals HELD over the medals a map with no
+  // specials can pay, which is two: the level and the clean sweep — and
+  // every locked row is grey: no pair at all.
   //
-  // The THIRD row is the new rule: the campaign is past it, its `best` says
-  // it was finished, and it is locked anyway because the save kept no squad
-  // for it. A replay fields the pigs that fought, and nothing stands in.
+  // The THIRD row is the other rule: the campaign is past it and it holds a
+  // medal, and it is locked anyway because the save kept no SQUAD for it. A
+  // replay fields the pigs that fought, and nothing stands in.
   await expect.poll(() => labels(page, 'missionSelect')).toHaveLength(8)
   const names = await labels(page, 'missionSelect')
   expect(names[0]).toContain('THE WAR FOUNDATION')
