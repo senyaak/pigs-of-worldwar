@@ -1708,3 +1708,34 @@ Play corrected the fresh build on all three counts, and play wins:
 
 The commando seeing mines play also asked for was already in — the exe's own
 detector set {4, 5, 6, 7, 14}. `unit/mines.spec.ts` re-pins the whole shape.
+
+### The SHOTGUN is a shotgun, and it fans five pellets (2026-08-26)
+
+Play: "дробовик не работает - там должно много пуль вылетать - щас одна и
+наносит 3 урона." Three findings and one build:
+
+- **Skills 12/13 are the SHOTGUN and SUPER SHOTGUN** — gtext 108/109 by
+  `SKILL_LINE`, model `WE_BLUND` (a blunderbuss). The repo's "RIFLE BELL /
+  SUPER RIFLE" was the icon's name (`rifbell`), not the weapon's.
+- **The exe fires ONE projectile and fakes the blast of shot in the hit
+  handler.** The byte map at 0x478B18 was read whole (capstone, this
+  session): kinds 0x12 AND 0x13 land on `mov edi,5` — first hit
+  `3 points × 5 = 15`, later hits 3, refused past five per pig. The earlier
+  fire.md reading had only 0x13; both shotguns carry it.
+- **The plain shotgun's shove is 6, not 48** (0x478A99, kind 0x12 alone) —
+  and the remake's SHOT_SHOVE comment had mislabelled that exception "the
+  flame family". The 6 now rides the weapon row (`Projectile.shove`); the
+  SUPER keeps the common 0x30.
+
+The build wears the ×5 as FIVE REAL PELLETS of the row's own 3 points,
+because play wants the shot SEEN: `Projectile.pellets`/`spread` on rows
+12/13 and a FIXED five-wide fan in `bullets.fire` (`FAN` — no random port
+needed, lockstep gets a pattern for free; the centre pellet fires first so
+the shot camera rides the sights' own line). Point-blank the whole fan
+lands — the exe's same 15 — and range thins the cone the way a multiplier
+never could. One press is still ONE report and ONE round spent. The AI now
+prices a fanned gun by its whole fan (`gunOption`, `weaponPoints`), or the
+brain would keep reading 3 where the trigger deals 15. The spread half-angle
+(48/4096 of a turn, ~4.2°) is the remake's own dial — the cone stays inside
+a pig to ~1500 units and is about a tile wide at the row's 4500-unit range.
+Pinned in `unit/bullets.spec.ts` ("the shotgun fans five pellets of three").

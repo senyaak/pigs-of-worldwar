@@ -653,6 +653,29 @@ function fly(
   // down bouncier than free ones, which is what makes coming off a wall read
   // as a bounce and not a step.
   const blocked = !query.walkable(state.x, state.z)
+  // Into the WATER there is no bounce and no getting up: the floor the fall
+  // met is the waterline (`restingY`), and a body that has splashed down is
+  // swimming from its first frame — play, mission 2: "когда свина сбрасывают
+  // в воду - он сначала стоит долю секунды - затем плывёт; позу сразу в
+  // плаванье надо", and again 2026-08-26: "когда свин падает в воду - он
+  // должен в воде сразу включать анимацию плавания. щас ждётся
+  // секунду-две." The wait was the bounce loop below: the arrival test is
+  // the FULL speed, the reflection off the BOTTOM's slope (`query.normal`
+  // reads the bed, not the sheet) keeps feeding it horizontal, and a
+  // blast-thrown pig skimmed the waterline in BOUNCE for 1–1.5 s before the
+  // settle ever reached the swim. Water is not a surface to skip off — the
+  // splash ends the flight where it happens. A roof under the feet is not
+  // water, whatever the tile says — that is the bridge rule (`inWater`
+  // above) — and BLOCKED ground keeps its wall arm whole.
+  if (!blocked && (roof === null || roof >= ground) && query.isWater(state.x, state.z)) {
+    state.y = floor
+    state.airborne = null
+    state.swimming = true
+    state.getUp = 0
+    state.clip = ANIM.SWIM
+    state.commit = false
+    return
+  }
   const normal = query.normal(state.x, state.z)
   const hit = bounceOff(
     { x: a.vx, y: a.vy, z: a.vz },
@@ -702,20 +725,6 @@ function fly(
   // `IsBlocked`, so the pig lies there as a body until the wedge counter ejects
   // it (`updateLocomotion`'s own tail).
   if (blocked) return
-  // Into the WATER there is no getting up either: the floor the fall met is
-  // the waterline (`restingY`), and a body that has splashed down is swimming
-  // from its first frame — play, mission 2: "когда свина сбрасывают в воду -
-  // он сначала стоит долю секунды - затем плывёт; позу сразу в плаванье
-  // надо." The get-up clip held a standing pose ON the surface for its
-  // eleven frames. A roof under the feet is not water, whatever the tile
-  // says — that is the bridge rule (`inWater` above).
-  if ((roof === null || roof >= ground) && query.isWater(state.x, state.z)) {
-    state.swimming = true
-    state.getUp = 0
-    state.clip = ANIM.SWIM
-    state.commit = false
-    return
-  }
   // Down for good, so the pig gets up: clip 10, which is what the landing
   // handler asks for (0x470944) whatever the fall was. It runs down in
   // `ground` and any input throws it away, so a pig that lands running

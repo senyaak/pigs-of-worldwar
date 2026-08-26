@@ -17,6 +17,7 @@ import type { Shot } from './projectile'
 import { PIG_RADIUS } from './obstacles'
 import type { Obstruction } from './obstacles'
 import { fromExeSpeed } from './ballistics'
+import { AIM_UNITS } from './aim'
 import type { Velocity } from './tumble'
 import { hurt, isDead } from './health'
 import { originY } from './body'
@@ -60,14 +61,33 @@ const HIT_RADIUS = PIG_RADIUS
 const HIT_RISE = 320
 
 /**
+ * Where each pellet of a fan points, in fractions of the row's `spread` —
+ * yaw across, pitch up. `[CHECK — remake]` like the spread itself: the exe
+ * fans nothing (`Projectile.pellets` carries the argument), so the shape is
+ * the remake's own — a flat fan five wide with a shallow zigzag, FIXED
+ * rather than rolled because a pattern needs no random port and lockstep
+ * gets it for free. The CENTRE goes first so the shot camera (`head`) rides
+ * the pellet the sights were actually on.
+ */
+const FAN: readonly { yaw: number; pitch: number }[] = [
+  { yaw: 0, pitch: 0 },
+  { yaw: -1 / 2, pitch: -1 / 3 },
+  { yaw: 1 / 2, pitch: -1 / 3 },
+  { yaw: -1, pitch: 1 / 3 },
+  { yaw: 1, pitch: 1 / 3 }
+]
+
+/**
  * **A bullet SHOVES the body it hits — read, not ruled.** `Pig::HitByProjectile`
  * (0x478710, disassembled to its last arm 2026-08-24) ends every bullet path
  * in `0x4A9260(0x30, [proj+0x90], [proj+0x94], 0)` at 0x478AA1 — the ADD
  * primitive, 48 units a frame along the projectile's OWN pitch and bearing.
  * The 0x30 is a literal in the instruction stream, not a weapon-table field
  * (the row's only field read there is the damage at +0x0C); the one exception
- * is projectile kind 0x12 — the flame family, not fielded here — which pushes
- * 6. It is the same 0x30 the jump's own push uses (`JUMP_PUSH`).
+ * is projectile kind 0x12 — the SHOTGUN, skill 12 (0x478A99; an older note
+ * here called it the flame family, which is kind 0x17) — which pushes 6. That
+ * 6 rides the row as `Projectile.shove`, and this constant is everyone
+ * else's. It is the same 0x30 the jump's own push uses (`JUMP_PUSH`).
  *
  * And the body is KNOCKED DOWN with it: unless it is already falling, 0x478AB2
  * calls 0x470C70 — movement state 5 — and 0x478AC4 plays clip 39, "Bouncing on
@@ -204,11 +224,13 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       // as a live pig, and an overkill's body has already left the world.
       if (!pig.gone) {
         const span = Math.hypot(shot.vx, shot.vy, shot.vz)
+        const row = projectileOf(shot.skill)
+        const shove = row?.shove !== undefined ? fromExeSpeed(row.shove) : SHOT_SHOVE
         if (span > 0) {
           world.fling?.(pig, {
-            vx: (shot.vx / span) * SHOT_SHOVE,
-            vy: (shot.vy / span) * SHOT_SHOVE,
-            vz: (shot.vz / span) * SHOT_SHOVE
+            vx: (shot.vx / span) * shove,
+            vy: (shot.vy / span) * shove,
+            vz: (shot.vz / span) * shove
           })
         }
       }
@@ -230,31 +252,43 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
   return {
     fire(pig, aim) {
       const skill = pig.holding
-      if (skill === null || !projectileOf(skill)) return false
+      const row = skill === null ? null : projectileOf(skill)
+      if (skill === null || !row) return false
       const offset = MUZZLE[skill] ?? { x: 0, y: 0, z: 0 }
       // A gun that cannot find its own barrel does not go off.
       const from = world.pose.boneToWorld(pig, HAND_BONE, offset)
       if (!from) return false
-      const shot = fireShot(skill, from, pig.heading, aim)
-      if (!shot) return false
-      shot.id = named++
-      shot.owner = pig.id
+      // ONE press, ONE report — however many pellets it fans out.
       emit({ kind: 'fired', skill })
-      // **THE MUZZLE IS THE FLIGHT'S FIRST POINT, AND IT IS TESTED.** A
-      // pistol's barrel sits ~115 world units past the hand bone and the
-      // hand rides forward in the firing pose, so fired point-blank the
-      // round is BORN inside the target's own box — sometimes at its far
-      // wall. The update below only ever tests positions AFTER a substep,
-      // and a substep is HIT_RADIUS long, so everything deeper than the
-      // first 75-odd units used to be a dead zone the shot sailed clean
-      // through (play, mission 2: "пистолет в плотную использованый както
-      // мимо стрельнул").
-      const landed = land(shot)
-      if (landed) {
-        emit({ kind: 'shotLanded', at: { x: shot.x, y: shot.y, z: shot.z }, hit: landed })
-        return true
+      const count = Math.min(row.pellets ?? 1, FAN.length)
+      for (let pellet = 0; pellet < count; pellet++) {
+        const off = FAN[pellet]
+        const spread = row.spread ?? 0
+        const shot = fireShot(
+          skill,
+          from,
+          pig.heading + ((off.yaw * spread) / AIM_UNITS) * 2 * Math.PI,
+          aim + off.pitch * spread
+        )
+        if (!shot) return false
+        shot.id = named++
+        shot.owner = pig.id
+        // **THE MUZZLE IS THE FLIGHT'S FIRST POINT, AND IT IS TESTED.** A
+        // pistol's barrel sits ~115 world units past the hand bone and the
+        // hand rides forward in the firing pose, so fired point-blank the
+        // round is BORN inside the target's own box — sometimes at its far
+        // wall. The update below only ever tests positions AFTER a substep,
+        // and a substep is HIT_RADIUS long, so everything deeper than the
+        // first 75-odd units used to be a dead zone the shot sailed clean
+        // through (play, mission 2: "пистолет в плотную использованый както
+        // мимо стрельнул").
+        const landed = land(shot)
+        if (landed) {
+          emit({ kind: 'shotLanded', at: { x: shot.x, y: shot.y, z: shot.z }, hit: landed })
+        } else {
+          flying.push(shot)
+        }
       }
-      flying.push(shot)
       return true
     },
     update(delta) {

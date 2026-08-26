@@ -407,9 +407,12 @@ const blastWorth = (
 }
 
 /** What a skill is worth as a weapon, whatever family it is — the crate
- * comparison's one number. */
+ * comparison's one number. A fanned gun is worth its whole fan, the same
+ * reading `gunOption` prices a shot with. */
 const weaponPoints = (skill: number): number =>
-  damageOf(skill) || (lobOf(skill)?.damage ?? 0) / 128 || (meleeOf(skill)?.damage ?? 0)
+  damageOf(skill) * (projectileOf(skill)?.pellets ?? 1) ||
+  (lobOf(skill)?.damage ?? 0) / 128 ||
+  (meleeOf(skill)?.damage ?? 0)
 
 /** What the telemetry hears: every candidate PRICED, not only the winners —
  * the losers are the whole point (lib/game/ai.ts, `Candidate`). */
@@ -532,7 +535,11 @@ export function standFor(
 const gunOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): Option | null => {
   const row = projectileOf(skill)
   if (!row) return null
-  const damage = damageOf(skill)
+  // The whole FAN, not one pellet: the mark this option walks to is inside
+  // CLOSE_TO of the range, where the shotguns' cone lands entire
+  // (lib/game/bullets.ts) — pricing the pellet had the brain reading 3
+  // where the trigger deals 15.
+  const damage = damageOf(skill) * (row.pellets ?? 1)
   const me = world.acting
   const shy = rangeOf(row) * CLOSE_TO
   let best: Option | null = null

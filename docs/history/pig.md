@@ -531,3 +531,23 @@ models, COMMANDO/ENGINEER/SABOTEUR fell through to the grunt. The GUNNER
 family (1/2/3 → pchvy + the nation hat off bone 2) was already right; a
 gunner that still reads as a bare grunt in play means the HAT quietly failed
 to load (`ui/battle.ts` warns and carries on), not the table.
+
+### Water is not bounced on (2026-08-26)
+
+The splashdown fix above had a second half play found the same week: "когда
+свин падает в воду - он должен в воде сразу включать анимацию плавания. щас
+ждётся секунду-две." The wait was the BOUNCE loop, not the get-up. `fly()`'s
+settle test is the exe's own — the FULL arrival speed against 25 a frame —
+and the water branch sat AFTER it, so a blast-thrown body coming down fast
+and flat "landed" on the waterline, reflected off the BOTTOM's slope
+(`query.normal` reads the bed, there being no flat-sheet normal), kept its
+horizontal, and skimmed across the surface in BOUNCE for five to thirty
+touches — 1.2 s on a plain toss, 1.6 s over a slippery tile — before the
+settle ever let the swim branch run. The splash now ends the flight where it
+happens: the water test moved ABOVE the settle, so the first touch of the
+waterline is SWIM with `swimming` set, momentum spent in the splash. Blocked
+(wall-flagged) ground keeps its arm whole, and a roof under the feet still
+is not water. The same frame also moves the splash sound and the camera's
+`SWIM_SINK` drop, which both read `swimming` and were late by the same
+window. Pinned in `unit/locomotion.spec.ts` ("a splashdown swims from its
+very first frame").

@@ -10,6 +10,7 @@
 import { test, expect } from '@playwright/test'
 
 import { createBullets, SHOT_SHOVE } from '../src/lib/game/bullets'
+import { fromExeSpeed } from '../src/lib/game/ballistics'
 import { ObstacleField } from '../src/lib/game/obstacles'
 import { NO_BODY } from '../src/lib/game/body'
 import type { Pig } from '../src/lib/game/game'
@@ -18,6 +19,7 @@ import type { BattleEvent } from '../src/lib/game/events'
 import { terrain } from './fixture'
 
 const RIFLE = 7
+const SHOTGUN = 12
 
 const pigAt = (x: number, z: number, id = 1, health = 100): Pig =>
   ({
@@ -39,12 +41,13 @@ const pigAt = (x: number, z: number, id = 1, health = 100): Pig =>
  * muzzle is answered directly — the pose port is a spec's to answer. */
 function range(
   victim: Pig,
-  onKilled?: (events: BattleEvent[]) => void
+  onKilled?: (events: BattleEvent[]) => void,
+  skill = RIFLE
 ): { fire: () => void; flung: { pig: number; velocity: Velocity }[]; events: BattleEvent[] } {
   const events: BattleEvent[] = []
   const flung: { pig: number; velocity: Velocity }[] = []
   const shooter = pigAt(0, 0, 99)
-  shooter.holding = RIFLE
+  shooter.holding = skill
   const from = { x: 0, y: -160, z: 0 }
   const bullets = createBullets(
     {
@@ -84,6 +87,30 @@ test('a hit shoves the body along the bullet line, at the exe\'s 0x30', { tag: '
   expect(Math.hypot(vx, vy, vz)).toBeCloseTo(SHOT_SHOVE, 5)
   expect(vz).toBeGreaterThan(SHOT_SHOVE * 0.9)
   expect(Math.abs(vx)).toBeLessThan(SHOT_SHOVE * 0.1)
+})
+
+test('the shotgun fans five pellets of three — fifteen up close, one report, a soft shove', { tag: '@nodata' }, () => {
+  // Skill 12 is the SHOTGUN (gtext 108 — the old "RIFLE BELL" was the icon's
+  // name). The exe fires ONE round and fakes the blast of shot in the hit
+  // handler — the byte map at 0x478B18 sends kinds 0x12/0x13 to `mov edi,5`,
+  // ×5 on the first hit, capped at 5 — and play wants the pellets SEEN
+  // (2026-08-26: "там должно много пуль вылетать - щас одна и наносит 3
+  // урона"). So the ×5 is worn as five real pellets of the row's own 3
+  // points (lib/game/projectile.ts `pellets`, lib/game/bullets.ts `FAN`):
+  // the whole fan lands inside a tile, the same 15 the exe deals.
+  const victim = pigAt(0, 512)
+  const { fire, flung, events } = range(victim, undefined, SHOTGUN)
+  fire()
+  const amounts = events.flatMap((one) => (one.kind === 'damaged' ? [one.amount] : []))
+  expect(amounts).toEqual([3, 3, 3, 3, 3])
+  expect(victim.health).toBe(100 - 15)
+  // ONE press is ONE report, however many pellets fan out.
+  expect(events.filter((one) => one.kind === 'fired')).toHaveLength(1)
+  // …and the shove is the exe's own exception: 0x478A99 pushes kind 0x12 by
+  // 6 where every other projectile gets the 0x30 (`Projectile.shove`).
+  expect(flung).toHaveLength(5)
+  const { vx, vy, vz } = flung[0].velocity
+  expect(Math.hypot(vx, vy, vz)).toBeCloseTo(fromExeSpeed(6), 5)
 })
 
 test('a killing hit still shoves — a fresh corpse is a body', { tag: '@nodata' }, () => {

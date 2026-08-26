@@ -57,6 +57,36 @@ export interface Projectile {
    * Init's arg 9, unfollowed.
    */
   blast: number
+  /**
+   * How many rounds ONE trigger pull looses, fanned by `spread` — the
+   * SHOTGUNS' field, absent everywhere else and read as 1.
+   *
+   * `[play]` over the mechanism, and the count is the exe's own number worn
+   * differently. The exe fires one projectile for every gun (0x479f60's arms
+   * all share one `new`, `weapons/fire.md`) and fakes the blast of shot in
+   * `Pig::HitByProjectile` instead: the byte map at 0x478B18 sends kinds
+   * 0x12 AND 0x13 to `mov edi,5` (case 1 of the jump table at 0x478B00, read
+   * 2026-08-26) — first hit `damage × 5`, later hits plain, refused past 5.
+   * Play wants the pellets SEEN — "там должно много пуль вылетать" — so the
+   * multiplier is worn as five real pellets of the row's own 3 points: all
+   * five land point-blank for the same 15, and range thins the cone the way
+   * a multiplier never could.
+   */
+  pellets?: number
+  /**
+   * Half-width of the pellet fan, in the engine's 4096-to-the-turn units
+   * (lib/game/aim.ts). `[CHECK — remake]` — the exe has no spread anywhere,
+   * so 48 (~4.2°) is the remake's own dial: the whole cone is inside a pig
+   * to ~1500 units and about a tile wide at the row's 4500-unit range.
+   */
+  spread?: number
+  /**
+   * The shove a hit gives, in exe units a frame, where the exe's literal
+   * 0x30 does not hold. ONE kind diverges: 0x478A99 pushes kind 0x12 — the
+   * SHOTGUN — by 6 where every other projectile gets 48 (`weapons/fire.md`).
+   * Absent means the ordinary 0x30 (`SHOT_SHOVE`, lib/game/bullets.ts).
+   */
+  shove?: number
 }
 
 /**
@@ -75,8 +105,13 @@ const GUNS: Record<number, Projectile> = {
   /** 11 SNIPER RIFLE — the same speed and THREE times the reach, which is the
    * only thing separating it from the rifle in either table. */
   11: { id: 403, kind: 15, speed: 300, life: 90, damage: 5120, blast: 0 },
-  12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0 },
-  13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0 },
+  /** 12 SHOTGUN, 13 SUPER SHOTGUN — gtext 108/109 against `SKILL_LINE`;
+   * the repo's older "RIFLE BELL" reading was the icon's name, not the
+   * weapon's. Five pellets of 3 points each (`pellets` above); the exe's one
+   * other word on the pair is the shove — the plain shotgun pushes 6 where
+   * everything else pushes 48 (0x478A99), the SUPER keeps the 48. */
+  12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0, pellets: 5, spread: 48, shove: 6 },
+  13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0, pellets: 5, spread: 48 },
   14: { id: 411, kind: 23, speed: 150, life: 20, damage: 768, blast: 0 },
   15: { id: 434, kind: 46, speed: 300, life: 1000, damage: 6400, blast: 3900 },
   17: { id: 424, kind: 36, speed: 300, life: 30, damage: 0, blast: 0 },

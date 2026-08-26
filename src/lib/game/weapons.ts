@@ -97,8 +97,8 @@ export const WEAPON_TABLE: [number, number, number, number, number, number][] = 
   [8, 25, 14, -1, 1, 0], // 9 MACHINE GUN
   [9, 25, 14, -1, 1, 0], // 10 HEAVY M-GUN
   [7, 24, 13, -1, 1, 0], // 11 SNIPER RIFLE
-  [10, 24, 13, -1, 1, 0], // 12 RIFLE BELL
-  [10, 24, 13, -1, 1, 0], // 13 SUPER RIFLE
+  [10, 24, 13, -1, 1, 0], // 12 SHOTGUN (gtext 108; the icon's name is "rifbell")
+  [10, 24, 13, -1, 1, 0], // 13 SUPER SHOTGUN (gtext 109)
   [11, 25, 14, -1, 1, 0], // 14 FLAME THROWER
   [29, 26, 15, -1, 1, 0], // 15 ROCKET
   [29, 26, 15, -1, 1, 0], // 16 GUIDED MISSILE

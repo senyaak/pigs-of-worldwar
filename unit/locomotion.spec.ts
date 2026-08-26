@@ -156,6 +156,27 @@ test('real water swims: capped at 16 a frame, sunk below the surface', { tag: '@
   expect(s.y).toBeCloseTo(sea.height(s.x, s.z) + SWIM_SINK)
 })
 
+test('a splashdown swims from its very first frame — water is not bounced on', { tag: '@nodata' }, () => {
+  // Play, 2026-08-26: "когда свин падает в воду - он должен в воде сразу
+  // включать анимацию плавания. щас ждётся секунду-две." The wait was the
+  // bounce loop: the settle test reads the FULL arrival speed, so a
+  // blast-thrown body skimming the waterline fast and flat kept BOUNCE for
+  // over a second before the swim was ever reached. The splash ends the
+  // flight where it happens (lib/game/locomotion.ts, `fly`).
+  const sea = terrain(() => 0, () => ({ type: 0x24 }))
+  const s = createLocomotion(sea, 0, 0, NORTH)
+  // A blast's toss: fast, flat, coming down onto the sheet — hypot ≈ 900/s
+  // against the settle's 375/s cutoff, the exact shape that used to skip.
+  s.y = SWIM_SINK - 40
+  s.airborne = { vx: 800, vy: 400, vz: 0, bouncing: true, pushIn: null }
+  const frames = run(s, sea, {}, 1, (t) => t.airborne === null)
+  // Down in the couple of frames the fall itself takes — not one bounce.
+  expect(frames).toBeLessThanOrEqual(3)
+  expect(s.swimming).toBe(true)
+  expect(s.clip).toBe(ANIM.SWIM)
+  expect(s.y).toBeCloseTo(sea.height(s.x, s.z) + SWIM_SINK)
+})
+
 test('a wall is not a ladder: the step-up envelope is all a pig ever gets', { tag: '@nodata' }, () => {
   const face = wallFace()
   const s = createLocomotion(face, 0, 1024 - 256, NORTH)
