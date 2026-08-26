@@ -409,3 +409,13 @@ the rules can see it.
 Wired to the `blasted` event, so every explosion the engine announces — a
 grenade, a mine, a charge, and now a corpse going off — rattles the picture.
 `e2e/002/camera.spec.ts` and `camera-smooth.spec.ts` still pass.
+
+### The flung watch lets a floater go too soon (2026-08-26)
+
+The settle that ends `flungWatch` measures x/z creep, and a body knocked into
+the water stops moving sideways the instant it splashes down — so the camera
+counted 1.4 s of "still" over a pig that had only just started swimming and
+walked away (play: "надо чтобы за свином камера следовала дальше"). Swimming
+is not settled now: the SWIM clip on the snapshot holds the still clock at
+zero, and only the hard cap (`FLUNG_LIMIT`, 6 s) still ends the watch — a
+drowning hands the camera to the dying watch on its own.

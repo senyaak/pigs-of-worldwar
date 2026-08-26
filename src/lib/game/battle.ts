@@ -666,7 +666,17 @@ export function createBattle(parts: BattleParts): Battle {
       if (pig === game.currentPig && loco.airborne !== null) continue
       // The wounded stand for the crippled here too — the hand was emptied
       // at the top of this beat, so the armed exemption cannot apply.
-      anim.setClip(pig, woundBand(pig.health) === 2 ? ANIM.WOUNDED : ANIM.IDLE)
+      // …and a body IN THE WATER wears the swim, never a stand: a blast put
+      // it there mid-turn and nothing dresses it again until the shore beat
+      // (play: "позу сразу в плаванье надо").
+      anim.setClip(
+        pig,
+        inWater(query, pig.position.x, pig.position.z, pig.position.y)
+          ? ANIM.SWIM
+          : woundBand(pig.health) === 2
+            ? ANIM.WOUNDED
+            : ANIM.IDLE
+      )
     }
     // **AND THE CAMERA GOES TO THE CHARGE.** Play: "камера должна перемещаться
     // на динамит - а она остаётся на свине." It goes at the END of the turn and
@@ -1412,7 +1422,18 @@ export function createBattle(parts: BattleParts): Battle {
       // A CRIPPLED bystander stands in the wounded stance — the idle
       // picker's own health test (0x472040 test 8, ≤ 10 points), and nobody
       // but the acting pig has a weapon drawn to override it.
-      anim.setClip(pig, woundBand(pig.health) === 2 ? ANIM.WOUNDED : ANIM.IDLE)
+      // A bystander IN THE WATER swims instead of standing on it: a blast
+      // threw it there this turn, and this loop used to stamp the stand back
+      // on every frame until the end-of-turn beat (play: "он сначала стоит
+      // долю секунды - затем плывёт").
+      anim.setClip(
+        pig,
+        inWater(query, pig.position.x, pig.position.z, pig.position.y)
+          ? ANIM.SWIM
+          : woundBand(pig.health) === 2
+            ? ANIM.WOUNDED
+            : ANIM.IDLE
+      )
       // Only the pig being driven holds its weapon up; the rest stand.
       anim.overlay(pig, -1, 0)
     }
@@ -1482,7 +1503,10 @@ export function createBattle(parts: BattleParts): Battle {
         // unconditionally was the interruption.
         // …unless it is in the AIR, where the flight owns what it wears.
         if (!swings.swinging() && !anim.animating(acting) && loco.airborne === null) {
-          anim.setClip(acting, ANIM.IDLE)
+          // …and the ACTING pig knocked into the water inside this very wait
+          // swims through it: stamping IDLE stood it on the surface for the
+          // whole beat (the landing set `loco.swimming`, lib/game/locomotion.ts).
+          anim.setClip(acting, loco.swimming ? ANIM.SWIM : ANIM.IDLE)
         }
         onChanged()
         return

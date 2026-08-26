@@ -702,6 +702,20 @@ function fly(
   // `IsBlocked`, so the pig lies there as a body until the wedge counter ejects
   // it (`updateLocomotion`'s own tail).
   if (blocked) return
+  // Into the WATER there is no getting up either: the floor the fall met is
+  // the waterline (`restingY`), and a body that has splashed down is swimming
+  // from its first frame — play, mission 2: "когда свина сбрасывают в воду -
+  // он сначала стоит долю секунды - затем плывёт; позу сразу в плаванье
+  // надо." The get-up clip held a standing pose ON the surface for its
+  // eleven frames. A roof under the feet is not water, whatever the tile
+  // says — that is the bridge rule (`inWater` above).
+  if ((roof === null || roof >= ground) && query.isWater(state.x, state.z)) {
+    state.swimming = true
+    state.getUp = 0
+    state.clip = ANIM.SWIM
+    state.commit = false
+    return
+  }
   // Down for good, so the pig gets up: clip 10, which is what the landing
   // handler asks for (0x470944) whatever the fall was. It runs down in
   // `ground` and any input throws it away, so a pig that lands running

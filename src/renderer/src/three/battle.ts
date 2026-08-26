@@ -18,6 +18,7 @@ import { weaponModelName } from '../../../lib/game/weapons'
 import { isPlanted } from '../../../lib/game/grenade'
 import { meleeOf } from '../../../lib/game/melee'
 import { flingVelocity } from '../../../lib/game/tumble'
+import { ANIM } from '../../../lib/game/locomotion'
 import { flingSpeed } from '../../../lib/game/blast'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
@@ -943,7 +944,15 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         flungWatch.x = body.x
         flungWatch.z = body.z
         flungWatch.age += step
-        flungWatch.still = moved > FLUNG_CREEP * step ? 0 : flungWatch.still + step
+        // A body KNOCKED INTO THE WATER stops moving sideways the instant it
+        // splashes down, which read as "settled" and the camera walked off a
+        // pig still afloat (play: "надо чтобы за свином камера следовала
+        // дальше"). Swimming is not settled — the still clock holds while the
+        // SWIM clip is on — and only the hard cap (FLUNG_LIMIT) still ends
+        // the watch, because a floater that neither drowns nor swims off is
+        // not a show; a drowning hands the camera to the dying watch anyway.
+        const afloat = body.clip === ANIM.SWIM
+        flungWatch.still = afloat || moved > FLUNG_CREEP * step ? 0 : flungWatch.still + step
         // The settle is the flight ending; the LINGER on top is play's second
         // (FLUNG_LINGER), and the camera holds the body through it.
         if (flungWatch.still >= FLUNG_SETTLE + FLUNG_LINGER || flungWatch.age >= FLUNG_LIMIT) {
