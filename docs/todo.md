@@ -224,24 +224,42 @@ too (lib/game/evaluate.ts). These two are the leftovers, both in the ENGINE:
 Neither has been seen in play. Item 1 is a one-line change once somebody
 decides it is worth diverging from; item 2 wants the `+0xA2` read first.
 
-### PLAY'S REPORT, 2026-08-25: **THE BOUNDS OF THE FIRST MAP LOOK WRONG**
+### PLAY'S REPORT, 2026-08-25: THE BOUNDS OF THE FIRST MAP — **MEASURED**
 
-Written down at play's request and NOT investigated — "зы запиши — похоже
-границы на первой карте не верны". Nothing here is a diagnosis.
+Play's line was "похоже границы на первой карте не верны", and on 2026-08-26
+the data was read rather than guessed at (`terrain/boundary.js` and
+`terrain/boundary.md` in the disasm repo).
 
-The one thing already on the record that may or may not belong to it: in
-that session's log both crates the machine walked to sit hard on the edge
-of the search grid — DEN's plan goes to `12032,12032` and NOBBY's to
-`11072,-12032`, against a `WORLD_LIMIT` that puts the grid's own corner at
-about ±12350 (`GRID_STEP` 128 × 193 cells a side, lib/game/pathgrid.ts).
-Whether that is the MAP being bigger than the remake thinks, the grid being
-smaller than the map, or simply where ESTU's crates honestly are, nobody
-has looked.
+**The limit is not wrong, and it is not per-map.** `WORLD_LIMIT` is the
+exe's own ±0x3000, an immediate compiled into `TryMove` with no map field
+behind it: `Map::Load` reads no bounds, and the 60-byte mission record holds
+sky, weather and colour only. Against a world of ±16384 in 64 tiles of 512
+that clamp is a fixed inset of EIGHT TILES, the same on every level.
 
-Where to start when it is picked up: `WORLD_LIMIT` in lib/game/terrain.ts
-against the PMG's own block count, and `Map::Load`'s bounds in the exe. A
-pig walking off the end of the world, or refused at a line the original
-lets it cross, is the symptom to reproduce first.
+**What differs is what each map BUILDS on it**, and that is the answer to
+how it feels. Counting the wall bit ring by ring inward over every shipped
+PMG: 19 maps carry their wall ring at ring 7 — whose inner face is −12288
+to the unit, flush with the clamp, so the invisible line has a visible wall
+standing exactly on it — four put it at ring 8, one tile inside, and **27
+build nothing at all**.
+
+**ESTU, the first mission, is one of the 27**: 0% wall through ring 7, 6% at
+ring 8. So on the first map a pig is stopped in open ground by a clamp with
+nothing to explain it, which is what play walked into. CAMP, by contrast,
+has its ring at 7 and reads correctly.
+
+So the open question is no longer "what is the number" but **what the
+remake should DO on a map that builds no barrier** — and that is play's
+call, not a reading. Three things are known and none of them is chosen:
+
+1. the exe's clamp applies **only to the player-driven pig and not in mode
+   13**; the remake clamps every pig, the ballistic path and the swim
+   unconditionally, and nothing records that as deliberate;
+2. the AI's search grid is derived from `WORLD_LIMIT` (`lib/game/pathgrid.ts`),
+   which is why that session's plans sat on ±12032 — the grid's own corner,
+   not a map edge, so it is not evidence of a bounds bug;
+3. the raised RIM most maps carry is authored terrain, not a boundary: it
+   stops a pig as ordinary wall tiles and it is what whitens the scanner.
 
 ### THE CAMERA SHAKE — read 2026-08-25, NOT BUILT
 
