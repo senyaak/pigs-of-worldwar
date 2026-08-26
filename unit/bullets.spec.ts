@@ -58,6 +58,9 @@ function range(
       query: terrain(() => 0),
       obstacles: new ObstacleField([]),
       pose: { boneToWorld: () => from },
+      // 0.5 rolls a jitter of exactly ZERO (`floor(0.5·32) − 16`), so every
+      // pellet flies the sights' own line and the counts below are exact.
+      random: () => 0.5,
       fling: (pig, velocity) => flung.push({ pig: pig.id, velocity })
     },
     (event) => {
@@ -89,26 +92,27 @@ test('a hit shoves the body along the bullet line, at the exe\'s 0x30', { tag: '
   expect(Math.abs(vx)).toBeLessThan(SHOT_SHOVE * 0.1)
 })
 
-test('the shotgun fans five pellets of three — fifteen up close, one report, a soft shove', { tag: '@nodata' }, () => {
-  // Skill 12 is the SHOTGUN (gtext 108 — the old "RIFLE BELL" was the icon's
-  // name). The exe fires ONE round and fakes the blast of shot in the hit
-  // handler — the byte map at 0x478B18 sends kinds 0x12/0x13 to `mov edi,5`,
-  // ×5 on the first hit, capped at 5 — and play wants the pellets SEEN
-  // (2026-08-26: "там должно много пуль вылетать - щас одна и наносит 3
-  // урона"). So the ×5 is worn as five real pellets of the row's own 3
-  // points (lib/game/projectile.ts `pellets`, lib/game/bullets.ts `FAN`):
-  // the whole fan lands inside a tile, the same 15 the exe deals.
+test('the shotgun looses ten pellets — five counted, the first ×5, one report, a soft shove', { tag: '@nodata' }, () => {
+  // Skill 12 is the SHOTGUN (gtext 108 — the old "RIFLE BELL" was the
+  // icon's name), and every number here is the exe's, re-read after play
+  // challenged a five-pellet first build ("точно 1 только летит?"): the
+  // fire arm at 0x47a776 LOOPS ten `new`+init pairs per press with a ±16
+  // jitter on both angles, and the hit handler counts five per body with
+  // the first ×5 (byte map 0x478B18 → `mov edi,5`), the rest refused but
+  // still shoving. Point-blank into one pig: 15+3+3+3+3 = 27.
   const victim = pigAt(0, 512)
   const { fire, flung, events } = range(victim, undefined, SHOTGUN)
   fire()
   const amounts = events.flatMap((one) => (one.kind === 'damaged' ? [one.amount] : []))
-  expect(amounts).toEqual([3, 3, 3, 3, 3])
-  expect(victim.health).toBe(100 - 15)
-  // ONE press is ONE report, however many pellets fan out.
+  expect(amounts).toEqual([15, 3, 3, 3, 3])
+  expect(victim.health).toBe(100 - 27)
+  // ONE press is ONE report, however many pellets leave.
   expect(events.filter((one) => one.kind === 'fired')).toHaveLength(1)
-  // …and the shove is the exe's own exception: 0x478A99 pushes kind 0x12 by
-  // 6 where every other projectile gets the 0x30 (`Projectile.shove`).
-  expect(flung).toHaveLength(5)
+  // Every pellet stops in the body and shoves it — the five refused ones
+  // included (the exe's refused-by-cap arm still falls through to the
+  // shove) — and the shove is the exe's own exception: 0x478A99 pushes
+  // kind 0x12 by 6 where every other projectile gets the 0x30.
+  expect(flung).toHaveLength(10)
   const { vx, vy, vz } = flung[0].velocity
   expect(Math.hypot(vx, vy, vz)).toBeCloseTo(fromExeSpeed(6), 5)
 })
@@ -138,7 +142,8 @@ function pointBlank(
       training: false,
       query: terrain(() => 0),
       obstacles: new ObstacleField([]),
-      pose: { boneToWorld: () => muzzle }
+      pose: { boneToWorld: () => muzzle },
+      random: () => 0.5
     },
     (event) => events.push(event)
   )

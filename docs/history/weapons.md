@@ -1709,7 +1709,7 @@ Play corrected the fresh build on all three counts, and play wins:
 The commando seeing mines play also asked for was already in — the exe's own
 detector set {4, 5, 6, 7, 14}. `unit/mines.spec.ts` re-pins the whole shape.
 
-### The SHOTGUN is a shotgun, and it fans five pellets (2026-08-26)
+### The SHOTGUN is a shotgun (2026-08-26)
 
 Play: "дробовик не работает - там должно много пуль вылетать - щас одна и
 наносит 3 урона." Three findings and one build:
@@ -1727,15 +1727,27 @@ Play: "дробовик не работает - там должно много �
   flame family". The 6 now rides the weapon row (`Projectile.shove`); the
   SUPER keeps the common 0x30.
 
-The build wears the ×5 as FIVE REAL PELLETS of the row's own 3 points,
-because play wants the shot SEEN: `Projectile.pellets`/`spread` on rows
-12/13 and a FIXED five-wide fan in `bullets.fire` (`FAN` — no random port
-needed, lockstep gets a pattern for free; the centre pellet fires first so
-the shot camera rides the sights' own line). Point-blank the whole fan
-lands — the exe's same 15 — and range thins the cone the way a multiplier
-never could. One press is still ONE report and ONE round spent. The AI now
-prices a fanned gun by its whole fan (`gunOption`, `weaponPoints`), or the
-brain would keep reading 3 where the trigger deals 15. The spread half-angle
-(48/4096 of a turn, ~4.2°) is the remake's own dial — the cone stays inside
-a pig to ~1500 units and is about a tile wide at the row's 4500-unit range.
-Pinned in `unit/bullets.spec.ts` ("the shotgun fans five pellets of three").
+The first build wore the ×5 as five invented pellets in a fixed fan — and
+play challenged the premise the same day: "ты прочитал прожектайлы? точно 1
+только летит?" Right to. The fire arm itself had never been read — the
+"one projectile" rested on fire.md's "every arm has the same shape" — and
+reading 0x47a776 (the ONE arm both skills 12 and 13 dispatch to) to its
+last instruction found a LOOP: `xor ebx,ebx … inc ebx; cmp ebx,0xA; jl` —
+**TEN `new(0xD0)` + init pairs per press**. Iterations 0..8 build their
+projectile with a NULL owner; the last carries the pig and lands in
+`[pig+0x16C]`, the shot the camera rides. And the spread is real and
+RANDOM: every iteration rolls `(rand & 0x1F) − 0x10` twice — a uniform
+±16/4096 (~±1.4°) — onto the yaw and then the aim. So the exe does BOTH:
+ten real pellets AND the ×5-with-cap in the hit handler, 15+3+3+3+3 = 27
+point-blank, 15 for a single stray pellet.
+
+Rebuilt as read, nothing invented left: `Projectile.pellets: 10`,
+`spread: 16` (the jitter half-width, rolled per pellet per axis off the
+battle's seeded stream — `BulletWorld.random`, the lockstep port), and
+`burst: 5` — the multiplier-and-cap, applied per body per volley in
+`bullets.land` (a refused pellet still stops and still shoves, exactly the
+exe's fall-through). One press is one report and one round. The AI prices
+the whole volley (`volleyDamageOf` — 27, not 3). The lesson joins the
+standing one: an arm is not read until its own last instruction, and a
+generalisation over 56 jump-table arms is not a reading of any one of
+them. Pinned in `unit/bullets.spec.ts` ("the shotgun looses ten pellets").

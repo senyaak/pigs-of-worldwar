@@ -58,28 +58,37 @@ export interface Projectile {
    */
   blast: number
   /**
-   * How many rounds ONE trigger pull looses, fanned by `spread` — the
-   * SHOTGUNS' field, absent everywhere else and read as 1.
+   * How many rounds ONE trigger pull looses — the SHOTGUNS' field, absent
+   * everywhere else and read as 1.
    *
-   * `[play]` over the mechanism, and the count is the exe's own number worn
-   * differently. The exe fires one projectile for every gun (0x479f60's arms
-   * all share one `new`, `weapons/fire.md`) and fakes the blast of shot in
-   * `Pig::HitByProjectile` instead: the byte map at 0x478B18 sends kinds
-   * 0x12 AND 0x13 to `mov edi,5` (case 1 of the jump table at 0x478B00, read
-   * 2026-08-26) — first hit `damage × 5`, later hits plain, refused past 5.
-   * Play wants the pellets SEEN — "там должно много пуль вылетать" — so the
-   * multiplier is worn as five real pellets of the row's own 3 points: all
-   * five land point-blank for the same 15, and range thins the cone the way
-   * a multiplier never could.
+   * `[exe]`, read 2026-08-26 after play challenged the first (five-pellet)
+   * build: the fire routine's jump table at 0x47cf8c sends skills 12 AND 13
+   * to ONE arm, 0x47a776, and that arm is a LOOP — `xor ebx,ebx` …
+   * `inc ebx; cmp ebx,0xA; jl` — TEN `new(0xD0)` + `0x431f00(...)` pairs
+   * per press. Iterations 0..8 build their projectile with a NULL owner;
+   * the last (ebx==9) passes the pig and lands in `[pig+0x16C]`, which is
+   * the shot the camera rides. The fire.md line "every arm has the same
+   * shape" was wrong for this one arm.
    */
   pellets?: number
   /**
-   * Half-width of the pellet fan, in the engine's 4096-to-the-turn units
-   * (lib/game/aim.ts). `[CHECK — remake]` — the exe has no spread anywhere,
-   * so 48 (~4.2°) is the remake's own dial: the whole cone is inside a pig
-   * to ~1500 units and about a tile wide at the row's 4500-unit range.
+   * How far one pellet may wander from the sights, either way, in the
+   * engine's 4096-to-the-turn units — applied to BOTH angles, freshly
+   * rolled per pellet per axis. `[exe]`: each iteration of the 0x47a776
+   * loop calls rand twice and does `(rand & 0x1F) - 0x10` — a uniform
+   * ±16/4096 (~±1.4°) — onto the yaw and then the aim (0x47a803..0x47a82c).
    */
   spread?: number
+  /**
+   * `Pig::HitByProjectile`'s `edi` — a first-hit damage MULTIPLIER and the
+   * per-volley hit CAP in one number, per TARGET. `[exe]`: the byte map at
+   * 0x478B18 gives kinds 0x12/0x13 (both shotguns) `mov edi,5` — the first
+   * pellet a body takes deals `damage × 5`, later pellets plain damage,
+   * and past five the damage is refused though the shove still lands
+   * (`weapons/fire.md`). So a full ten-pellet volley into one pig is
+   * 15+3+3+3+3 = 27 points, and even ONE stray pellet is worth 15.
+   */
+  burst?: number
   /**
    * The shove a hit gives, in exe units a frame, where the exe's literal
    * 0x30 does not hold. ONE kind diverges: 0x478A99 pushes kind 0x12 — the
@@ -107,11 +116,13 @@ const GUNS: Record<number, Projectile> = {
   11: { id: 403, kind: 15, speed: 300, life: 90, damage: 5120, blast: 0 },
   /** 12 SHOTGUN, 13 SUPER SHOTGUN — gtext 108/109 against `SKILL_LINE`;
    * the repo's older "RIFLE BELL" reading was the icon's name, not the
-   * weapon's. Five pellets of 3 points each (`pellets` above); the exe's one
-   * other word on the pair is the shove — the plain shotgun pushes 6 where
-   * everything else pushes 48 (0x478A99), the SUPER keeps the 48. */
-  12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0, pellets: 5, spread: 48, shove: 6 },
-  13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0, pellets: 5, spread: 48 },
+   * weapon's. TEN pellets a press, jittered ±16, five counted per target
+   * with the first ×5 (`pellets`/`spread`/`burst` above — all three read
+   * out of the exe); the one place the pair differ is the shove — the
+   * plain shotgun pushes 6 where everything else pushes 48 (0x478A99),
+   * the SUPER keeps the 48. */
+  12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5, shove: 6 },
+  13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5 },
   14: { id: 411, kind: 23, speed: 150, life: 20, damage: 768, blast: 0 },
   15: { id: 434, kind: 46, speed: 300, life: 1000, damage: 6400, blast: 3900 },
   17: { id: 424, kind: 36, speed: 300, life: 30, damage: 0, blast: 0 },
@@ -133,6 +144,22 @@ export const DAMAGE_UNIT = 128
 /** What this weapon's projectile takes off on a clean hit, in POINTS. */
 export const damageOf = (skill: number | null): number =>
   Math.round((projectileOf(skill)?.damage ?? 0) / DAMAGE_UNIT)
+
+/**
+ * What ONE trigger pull can take off ONE body at its worst — the number a
+ * brain prices a gun by (lib/game/evaluate.ts). A plain gun is its one
+ * round; a fanned gun without a cap would be every pellet; the shotguns'
+ * `burst` counts `min(pellets, burst)` hits with the first multiplied, so
+ * the pair come out at 3 × (5 + 5 − 1) = 27.
+ */
+export const volleyDamageOf = (skill: number | null): number => {
+  const row = projectileOf(skill)
+  if (!row) return 0
+  const round = damageOf(skill)
+  if (!row.burst) return round * (row.pellets ?? 1)
+  const counted = Math.min(row.pellets ?? 1, row.burst)
+  return round * (row.burst + counted - 1)
+}
 
 /** A bullet in flight. Position is game space (Y-down); velocity is units a
  * SECOND, like every other speed in the remake. */

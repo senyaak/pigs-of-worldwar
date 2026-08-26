@@ -18,6 +18,7 @@ import { PIG_RADIUS } from './obstacles'
 import type { Obstruction } from './obstacles'
 import { fromExeSpeed } from './ballistics'
 import { AIM_UNITS } from './aim'
+import type { Random } from './random'
 import type { Velocity } from './tumble'
 import { hurt, isDead } from './health'
 import { originY } from './body'
@@ -60,22 +61,6 @@ const MUZZLE: Record<number, Point> = {
 const HIT_RADIUS = PIG_RADIUS
 const HIT_RISE = 320
 
-/**
- * Where each pellet of a fan points, in fractions of the row's `spread` —
- * yaw across, pitch up. `[CHECK — remake]` like the spread itself: the exe
- * fans nothing (`Projectile.pellets` carries the argument), so the shape is
- * the remake's own — a flat fan five wide with a shallow zigzag, FIXED
- * rather than rolled because a pattern needs no random port and lockstep
- * gets it for free. The CENTRE goes first so the shot camera (`head`) rides
- * the pellet the sights were actually on.
- */
-const FAN: readonly { yaw: number; pitch: number }[] = [
-  { yaw: 0, pitch: 0 },
-  { yaw: -1 / 2, pitch: -1 / 3 },
-  { yaw: 1 / 2, pitch: -1 / 3 },
-  { yaw: -1, pitch: 1 / 3 },
-  { yaw: 1, pitch: 1 / 3 }
-]
 
 /**
  * **A bullet SHOVES the body it hits — read, not ruled.** `Pig::HitByProjectile`
@@ -115,6 +100,9 @@ export interface BulletWorld {
   training: boolean
   /** Where the muzzle is (lib/game/pose.ts). */
   pose: Pose
+  /** The battle's one stream of chance (lib/game/random.ts) — the pellet
+   * jitter rolls from it, so lockstep holds. */
+  random: Random
   /** Throw the struck pig (SHOT_SHOVE above). OPTIONAL the way `BlastWorld`'s
    * is: a spec about the flight or the damage alone needs no thrower. */
   fling?: (pig: Pig, velocity: Velocity) => void
@@ -141,6 +129,10 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
   /** Names them in the order they were fired, which is the same on any machine
    * stepping the same battle. */
   let named = 0
+  /** How many pellets of the CURRENT volley each body has already taken —
+   * `Projectile.burst`'s counter, the remake's `[pig+0x1B1]`. Cleared as the
+   * next trigger is pulled; only one pig is ever firing at once. */
+  const volley = new Map<number, number>()
   const standing = world.targets
 
   /** Take a shot's damage off the target at `at`, and knock it down if that
@@ -212,11 +204,22 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       if (isDead(pig)) continue
       const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
       if (!inside(shot, body)) continue
-      const amount = damageOf(shot.skill)
-      const outcome = hurt(pig, amount, world.training)
-      emit({ kind: 'damaged', at: body, amount, pig: pig.id })
-      if (outcome === 'died' || outcome === 'gibbed') {
-        emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })
+      const row = projectileOf(shot.skill)
+      // `Projectile.burst` — the exe's `edi`, a first-hit multiplier and a
+      // per-volley cap in one: the first pellet a body takes is ×burst, the
+      // next ones plain, and past `burst` the DAMAGE is refused while the
+      // pellet still stops and still shoves (0x478811/0x47888C,
+      // `weapons/fire.md`). A weapon without the field is its own single hit.
+      const struck = row?.burst ? (volley.get(pig.id) ?? 0) : 0
+      const counted = !row?.burst || struck < row.burst
+      if (counted) {
+        if (row?.burst) volley.set(pig.id, struck + 1)
+        const amount = damageOf(shot.skill) * (row?.burst && struck === 0 ? row.burst : 1)
+        const outcome = hurt(pig, amount, world.training)
+        emit({ kind: 'damaged', at: body, amount, pig: pig.id })
+        if (outcome === 'died' || outcome === 'gibbed') {
+          emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })
+        }
       }
       // …and the SHOVE, along the bullet's own line (SHOT_SHOVE above). After
       // the kill is announced, because the exe's one gate on it is the body
@@ -224,7 +227,6 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       // as a live pig, and an overkill's body has already left the world.
       if (!pig.gone) {
         const span = Math.hypot(shot.vx, shot.vy, shot.vz)
-        const row = projectileOf(shot.skill)
         const shove = row?.shove !== undefined ? fromExeSpeed(row.shove) : SHOT_SHOVE
         if (span > 0) {
           world.fling?.(pig, {
@@ -258,17 +260,21 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       // A gun that cannot find its own barrel does not go off.
       const from = world.pose.boneToWorld(pig, HAND_BONE, offset)
       if (!from) return false
-      // ONE press, ONE report — however many pellets it fans out.
+      // ONE press, ONE report — however many pellets it looses.
       emit({ kind: 'fired', skill })
-      const count = Math.min(row.pellets ?? 1, FAN.length)
+      volley.clear()
+      const count = row.pellets ?? 1
+      const spread = row.spread ?? 0
+      // The exe's own jitter, fresh per pellet per axis: `(rand & 0x1F) - 0x10`
+      // — a uniform ±spread in the 4096-to-the-turn units, yaw rolled first,
+      // then aim (0x47a803..0x47a82c). Integer, like the exe's.
+      const jitter = (): number => (spread ? Math.floor(world.random() * spread * 2) - spread : 0)
       for (let pellet = 0; pellet < count; pellet++) {
-        const off = FAN[pellet]
-        const spread = row.spread ?? 0
         const shot = fireShot(
           skill,
           from,
-          pig.heading + ((off.yaw * spread) / AIM_UNITS) * 2 * Math.PI,
-          aim + off.pitch * spread
+          pig.heading + (jitter() / AIM_UNITS) * 2 * Math.PI,
+          aim + jitter()
         )
         if (!shot) return false
         shot.id = named++

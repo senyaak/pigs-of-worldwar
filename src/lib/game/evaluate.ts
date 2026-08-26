@@ -30,7 +30,7 @@
 // not read — so the battle's own stream is never touched (docs/ai.md).
 
 import type { AiWorld, Candidate, Seen } from './ai'
-import { damageOf, projectileOf, rangeOf } from './projectile'
+import { damageOf, projectileOf, rangeOf, volleyDamageOf } from './projectile'
 import { meleeOf } from './melee'
 import {
   advanceLob,
@@ -407,12 +407,10 @@ const blastWorth = (
 }
 
 /** What a skill is worth as a weapon, whatever family it is — the crate
- * comparison's one number. A fanned gun is worth its whole fan, the same
- * reading `gunOption` prices a shot with. */
+ * comparison's one number. A fanned gun is worth its whole volley, the
+ * same reading `gunOption` prices a shot with. */
 const weaponPoints = (skill: number): number =>
-  damageOf(skill) * (projectileOf(skill)?.pellets ?? 1) ||
-  (lobOf(skill)?.damage ?? 0) / 128 ||
-  (meleeOf(skill)?.damage ?? 0)
+  volleyDamageOf(skill) || (lobOf(skill)?.damage ?? 0) / 128 || (meleeOf(skill)?.damage ?? 0)
 
 /** What the telemetry hears: every candidate PRICED, not only the winners —
  * the losers are the whole point (lib/game/ai.ts, `Candidate`). */
@@ -535,11 +533,11 @@ export function standFor(
 const gunOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): Option | null => {
   const row = projectileOf(skill)
   if (!row) return null
-  // The whole FAN, not one pellet: the mark this option walks to is inside
-  // CLOSE_TO of the range, where the shotguns' cone lands entire
-  // (lib/game/bullets.ts) — pricing the pellet had the brain reading 3
-  // where the trigger deals 15.
-  const damage = damageOf(skill) * (row.pellets ?? 1)
+  // The whole VOLLEY, not one pellet: the mark this option walks to is
+  // inside CLOSE_TO of the range, where the shotguns' cone lands entire —
+  // pricing the pellet had the brain reading 3 where the trigger deals 27
+  // (`volleyDamageOf`, lib/game/projectile.ts).
+  const damage = volleyDamageOf(skill)
   const me = world.acting
   const shy = rangeOf(row) * CLOSE_TO
   let best: Option | null = null

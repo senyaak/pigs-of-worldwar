@@ -155,7 +155,8 @@ test("a bullet that a TARGET's own box stops knocks that target down", () => {
       training: false,
       query: campQuery(),
       obstacles: field,
-      pose: { boneToWorld: () => from }
+      pose: { boneToWorld: () => from },
+      random: () => 0.5
     },
     bus.emit
   )

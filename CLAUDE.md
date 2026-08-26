@@ -929,18 +929,18 @@ and the weakest of them were invented here:
   puts the whole battle under canopies (`mapSquads`, lib/game/muster.ts); a
   map that flags nobody still stands everyone, and the bit itself stays read
   as the exe reads it (`e2e/002/parachute.spec.ts` pins the data).
-- `[play]` **The SHOTGUN fires FIVE REAL PELLETS, where the exe fires one.**
-  Skills 12/13 (gtext 108/109 — not "rifle bell") throw a single projectile in
-  the exe and fake the blast of shot in `Pig::HitByProjectile`: the byte map
-  at 0x478B18 gives kinds 0x12 AND 0x13 `edi=5` — ×5 on the first hit, capped
-  at five (`weapons/fire.md`). Play wants the pellets seen — "там должно
-  много пуль вылетать" — so the ×5 is worn as five pellets of the row's own 3
-  points: `Projectile.pellets`, and a FIXED fan (`FAN`, lib/game/bullets.ts)
-  rather than a rolled one, so lockstep needs no random port. The 5 and the 3
-  are the exe's; the spread (48/4096 of a turn) and the fan's shape are
-  `[CHECK — remake]`. One press is one report and one round. Do not "fix" the
-  damage back to one bullet, and price a fanned gun by its whole fan
-  (evaluate.ts does).
+- `[exe]` **The SHOTGUN looses TEN pellets a press, and its hit is capped and
+  multiplied.** Skills 12/13 (gtext 108/109 — not "rifle bell") share ONE arm
+  of the fire routine's jump table, 0x47a776, and that arm is a LOOP: ten
+  projectiles, each with a fresh `(rand & 0x1F) − 0x10` jitter on BOTH angles,
+  the last one the camera's. `Pig::HitByProjectile` then counts at most FIVE
+  pellets per body per volley, the first ×5 — point-blank 15+3+3+3+3 = 27,
+  and one stray pellet is still worth 15 (`weapons/fire.md`, both read
+  2026-08-26). Built as read: `Projectile.pellets/spread/burst`, the jitter
+  off the battle's seeded stream (`BulletWorld.random`), the cap in
+  `bullets.land`, and the AI prices the volley (`volleyDamageOf`). The trap
+  that hid it: fire.md's "every arm has the same shape" — an arm is not read
+  until ITS OWN last instruction. Do not "fix" the shotgun back to one round.
 - `[CHECK — remake]` **The drop face is the 004 pair.** An arriving pig wears
   `eyes004`/`gobs004` out of `Chars/FACES.MTD` — the stare and the scream —
   from `dropOpened` to `dropLanded` (three/faces.ts). The exe loads that

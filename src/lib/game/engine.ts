@@ -408,6 +408,7 @@ export function createEngine(parts: EngineParts): Engine {
       obstacles,
       training,
       pose,
+      random,
       // A bullet shoves the body it hits (SHOT_SHOVE, lib/game/bullets.ts),
       // through the same seam every other throw takes.
       fling: (pig, velocity) => fling(pig, velocity)
