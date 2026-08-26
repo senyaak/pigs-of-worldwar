@@ -595,3 +595,32 @@ shotgun's per-kind 6; both reads stay in fire.md, and `Projectile.shove`
 came back out of the table — a field the code no longer reads is not kept
 (CLAUDE.md's own rule). A struck pig now flies a real half-second arc in
 clip 39, bounces on, and takes its get-up.
+
+### The knock ladder is the exe's, and pellets STACK (2026-08-26, evening)
+
+Play kept pulling the thread: "нож сильнее чем дробовик отбрасывает.. надо
+смотреть что там ты не дочитал." Two more reads came out of it:
+
+- **`0x4A9260` is an ADD, not a set** — it fadds onto the body's velocity —
+  so a volley's pellets accumulate: ten shotgun pellets at 6 each leave the
+  body carrying 60. The remake's fling REPLACES, so each pellet now flings
+  the volley's RUNNING TOTAL (`bullets.land`, on the same per-volley
+  counter as the damage ladder), which is the same arithmetic.
+  `Projectile.shove` came back as the per-pellet unit.
+- **The knock ladder is real and the knife tops the guns**: melee is
+  per-weapon 75..200 out of 0x4785c0 (trotter 100, KNIFE 125, bayonet 75,
+  sword 150, prod 200 — already in `melee.ts`), a full shotgun volley 60, a
+  single bullet 48. "Нож сильнее дробовика" is the original's own
+  arithmetic; what was wrong was the volley not stacking (48 flat).
+
+And the day's biggest correction: **the exe DOES throw pigs from weapon
+blasts.** The 2026-08-23/24 "neither original throws — damage and fatigue
+only" was a mis-read that stopped short: scanning every caller of 0x4A9100
+(twenty, where the old note counted five) found the throws in the effect
+arm of `Pig::OnHit` itself — 64 at 45° along the burst-to-pig bearing for
+the general case (0x478553), and a steep 96 at ~79° with knockdown and
+stagger for effect kinds 0x15/0x16 (0x477fd8) — the "динамит под свином
+улетает вверх" of play's memory, in the code all along. Play's answer to
+the false negative was the rule itself: "кидает - как он может не кидать?"
+Which weapons map to which kind is being read now; the remake's blast
+throw stays play-shaped until that lands.

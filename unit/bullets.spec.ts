@@ -10,6 +10,7 @@
 import { test, expect } from '@playwright/test'
 
 import { createBullets, SHOT_SHOVE } from '../src/lib/game/bullets'
+import { fromExeSpeed } from '../src/lib/game/ballistics'
 import { ObstacleField } from '../src/lib/game/obstacles'
 import { NO_BODY } from '../src/lib/game/body'
 import type { Pig } from '../src/lib/game/game'
@@ -113,14 +114,17 @@ test('the shotgun looses ten pellets — the first prepays five, one report, a s
   // ONE press is ONE report, however many pellets leave.
   expect(events.filter((one) => one.kind === 'fired')).toHaveLength(1)
   // Every pellet stops in the body and knocks it — the four ABSORBED ones
-  // included (the exe's common tail counts and shoves them too). The knock
-  // is the engine's 45° throw at the common 0x30 for every gun: the exe's
-  // per-kind level shove (6 for kind 0x12) is read, recorded in fire.md,
-  // and overridden by play — "должен от любого урона отлетать".
+  // included — and the adds STACK, because the exe's 0x4A9260 is an ADD:
+  // each fling carries the volley's running total, 6 a pellet (0x478A99),
+  // so the last one leaves the pig with the full 60 — half again a rifle
+  // bullet's 48, and still under the knife's 125, which is the exe's own
+  // ladder ("нож сильнее чем дробовик" is the read, not a bug).
   expect(flung).toHaveLength(10)
-  const { vx, vy, vz } = flung[0].velocity
-  expect(Math.hypot(vx, vy, vz)).toBeCloseTo(SHOT_SHOVE, 5)
-  expect(vy).toBeLessThan(0)
+  const first = flung[0].velocity
+  expect(Math.hypot(first.vx, first.vy, first.vz)).toBeCloseTo(fromExeSpeed(6), 5)
+  const last = flung[9].velocity
+  expect(Math.hypot(last.vx, last.vy, last.vz)).toBeCloseTo(fromExeSpeed(60), 5)
+  expect(last.vy).toBeLessThan(0)
 })
 
 test('a killing hit still shoves — a fresh corpse is a body', { tag: '@nodata' }, () => {

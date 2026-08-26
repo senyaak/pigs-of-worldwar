@@ -64,20 +64,21 @@ const HIT_RISE = 320
 
 
 /**
- * **A bullet KNOCKS the body it hits FLYING — the speed is read, the shape is
- * play's.** `Pig::HitByProjectile` (0x478710) ends every bullet path in
- * `0x4A9260(0x30, [proj+0x90], [proj+0x94], 0)` at 0x478AA1 — an ADD of 48
- * units a frame along the projectile's OWN pitch and bearing, i.e. LEVEL
- * (kind 0x12, the shotgun, gets 6 there — 0x478A99, `weapons/fire.md`), and
- * knocks the body down beside it (state 5 at 0x478AB2, clip 39 at 0x478AC4).
- * Built literally, a level push dies on the first substep — the pig twitched
- * where it stood, and play threw it out twice: "должен от любого урона
- * отлетать" and "отброс сразу же гасится … тупо дёргается на месте." So the
- * knock wears the ENGINE'S OWN throw instead: 45° up along the bullet's
- * bearing (`flingVelocity` — pitch 0x200, the same shape all five of the
- * exe's own pig-throw sites use) at this speed, every gun alike. `[play]`
- * over the level add and over the shotgun's 6; the reads stay in fire.md.
- * It is the same 0x30 the jump's own push uses (`JUMP_PUSH`).
+ * **A bullet KNOCKS the body it hits FLYING — the speeds are read, the shape
+ * is play's.** `Pig::HitByProjectile` (0x478710) ends every bullet path in
+ * `0x4A9260(0x30, [proj+0x90], [proj+0x94], 0)` at 0x478AA1 — an **ADD** of
+ * 48 units a frame along the projectile's OWN pitch and bearing (kind 0x12,
+ * the shotgun, adds 6 per pellet — 0x478A99 — and the adds STACK across a
+ * volley: `Projectile.shove`), and knocks the body down beside it (state 5
+ * at 0x478AB2, clip 39 at 0x478AC4). Built literally, an along-the-aim push
+ * dies on the first substep — the pig twitched where it stood, and play
+ * threw it out twice: "должен от любого урона отлетать" and "отброс сразу
+ * же гасится … тупо дёргается на месте." So the knock wears the ENGINE'S
+ * OWN throw instead: 45° up along the bullet's bearing (`flingVelocity` —
+ * pitch 0x200, the same shape the melee, the body shove and the blast all
+ * use) at the read speeds. The exe's own ladder holds: knife 125 > a full
+ * shotgun volley 60 > this 48. It is the same 0x30 the jump's own push uses
+ * (`JUMP_PUSH`).
  */
 export const SHOT_SHOVE = fromExeSpeed(0x30)
 
@@ -215,10 +216,12 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       // is 3 × max(5, hits) = 30, not 27.) Absorbed pellets still count,
       // still stop and still shove. A weapon without the field is its own
       // single hit.
+      // Every landed pellet counts — the damage ladder AND the knock both
+      // run on this volley counter.
+      const struck = volley.get(pig.id) ?? 0
+      volley.set(pig.id, struck + 1)
       let amount = damageOf(shot.skill)
       if (row?.burst) {
-        const struck = volley.get(pig.id) ?? 0
-        volley.set(pig.id, struck + 1)
         amount = struck === 0 ? amount * row.burst : struck < row.burst ? 0 : amount
       }
       if (amount > 0) {
@@ -228,13 +231,17 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
           emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })
         }
       }
-      // …and the KNOCK, 45° up along the bullet's bearing (SHOT_SHOVE above).
-      // After the kill is announced, because the exe's one gate on it is the
-      // body being GONE (state 8, 0x4789EF) — a fresh corpse is thrown as
-      // happily as a live pig, and an overkill's body has already left the
-      // world.
+      // …and the KNOCK, 45° up along the bullet's bearing. The exe's
+      // `0x4A9260` is an ADD, so a volley's pellets STACK — each hit flings
+      // with the volley's whole accumulated speed (`fling` REPLACES, so
+      // re-flinging with the running total is the same arithmetic): the
+      // shotgun climbs 6, 12, … 60 across its ten pellets, a single bullet
+      // is its one 48. After the kill is announced, because the exe's one
+      // gate is the body being GONE (state 8, 0x4789EF) — a fresh corpse is
+      // thrown as happily as a live pig.
       if (!pig.gone) {
-        world.fling?.(pig, flingVelocity(SHOT_SHOVE, Math.atan2(shot.vx, shot.vz)))
+        const unit = row?.shove !== undefined ? fromExeSpeed(row.shove) : SHOT_SHOVE
+        world.fling?.(pig, flingVelocity(unit * (struck + 1), Math.atan2(shot.vx, shot.vz)))
       }
       return 'flesh'
     }

@@ -774,18 +774,25 @@ export function initPlayerScreen(handlers: {
       })
       return [
         ...places,
-        // The plate ART is taller than the rows' own pitch, and `rowUnder`
-        // takes the FIRST box a point lands in — so START's box swallowed the
-        // whole REPLAY MISSIONS band and the pointer could never light row 9
-        // (play: "клик по реплей мишн до сих пор не работает и хавер тоже
-        // не выделяет"; the sweep proved every y in 370..470 read as 8).
-        // A row's hit band is the pitch, never the art.
-        ...layout.options.rows.map((rowY, i, rows) => ({
-          x: layout.options.x,
-          y: rowY + offset,
-          width: plate.width,
-          height: (rows[i + 1] ?? rowY + (rows[1] - rows[0])) - rowY
-        }))
+        // The plate ART is far taller than the rows' 36 px pitch and its
+        // CONTENT sits centred — the letters land around `rowY + pitch`, a
+        // full pitch below the layout row. Two mouse bugs came off that, in
+        // turn: boxes at the art's height had START swallowing the whole
+        // REPLAY band ("хавер тоже не выделяет" — every y in 370..470 read
+        // as row 8), and boxes cut at the NEXT row put the boundary through
+        // the middle of START's own word ("replay mission залезает на
+        // верхнюю кнопку"). Both measured off the real canvas: the labels'
+        // pixels change at 414..429 and 443..468, centres 36 apart. So a
+        // row's hit band is one pitch tall, CENTRED on `rowY + pitch`.
+        ...layout.options.rows.map((rowY, _i, rows) => {
+          const pitch = rows[1] - rows[0]
+          return {
+            x: layout.options.x,
+            y: rowY + pitch / 2 + offset,
+            width: plate.width,
+            height: pitch
+          }
+        })
       ]
     },
     // Choosing rides the light: the click queues in `mouseRows` and lands in

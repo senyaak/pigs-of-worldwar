@@ -77,17 +77,24 @@ test('the mouse drives menu, squad options and the load slots', async () => {
       )
       .toBe(false)
 
-    // 3. REPLAY MISSIONS: hover lights row 9, the click opens the list.
-    const missions = await point('player-screen', 528, 433)
+    // 3. REPLAY MISSIONS: hover ON ITS VISIBLE LETTERS (443..468 — the
+    // content sits a full pitch below the layout row) lights row 9, the
+    // click opens the list — and the same point must NEVER read as START.
+    const lit = (): Promise<number> =>
+      page.evaluate(() =>
+        (window as unknown as { pow: { playerScreen: { selected(): number } } }).pow.playerScreen.selected()
+      )
+    const missions = await point('player-screen', 528, 455)
     await page.mouse.move(missions.x - 3, missions.y)
     await page.mouse.move(missions.x, missions.y)
-    await expect
-      .poll(() =>
-        page.evaluate(() =>
-          (window as unknown as { pow: { playerScreen: { selected(): number } } }).pow.playerScreen.selected()
-        )
-      )
-      .toBe(9)
+    await expect.poll(lit).toBe(9)
+    // …and the middle of START's own word walks the light BACK — the band
+    // boundary no longer cuts through the letters.
+    const startWord = await point('player-screen', 528, 421)
+    await page.mouse.move(startWord.x, startWord.y)
+    await expect.poll(lit).toBe(8)
+    await page.mouse.move(missions.x, missions.y)
+    await expect.poll(lit).toBe(9)
     await page.mouse.click(missions.x, missions.y)
     await expect(page.locator('#missions')).toBeVisible({ timeout: 10_000 })
     await page.keyboard.press('Escape')

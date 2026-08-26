@@ -97,12 +97,17 @@ export const flingVelocity = (speed: number, bearing: number): Velocity => ({
  * the body: `along` is the line from the burst point to the body's own
  * centre of gravity.
  *
- * The THROW is `[play]`'s outright: both originals were read to the last
- * instruction (2026-08-23/24, weapons/fire.md and psx/notes.md in the
- * disasm repo) and **neither the PC exe nor the PSX build throws a pig
- * from a weapon blast at all** — the arm deals damage and FATIGUE and
- * nothing else, on both. The pigs play remembers flying were projectile
- * hits, building explosions and melee.
+ * **The exe DOES throw from a blast — the 2026-08-23/24 "deals damage and
+ * fatigue and nothing else" reading was wrong**, and play caught it flat
+ * ("кидает - как он может не кидать?"). Scanning EVERY caller of the two
+ * velocity primitives (2026-08-26) found the arm's own throws past where
+ * that read stopped: `Pig::OnHit`'s effect arm ends in
+ * `0x4A9100(0x40, 0x200, bearing, 0)` at 0x478553 — 64 units a frame at
+ * 45°, bearing from the effect to the pig — and effect kinds 0x15/0x16
+ * take a STEEP arm instead at 0x477fd8: `0x4A9100(0x60, 0x384, …)`, 96
+ * at ~79°, plus the knockdown (0x470C70) and the stagger counter. The
+ * fire.md write-up carries the read; which weapons wear which kind is
+ * being mapped there.
  *
  * The SHAPE is three cases, and the boundary between them is the body's
  * own FOOTPRINT (`PIG_RADIUS`):

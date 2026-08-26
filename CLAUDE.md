@@ -957,15 +957,19 @@ and the weakest of them were invented here:
   five") hid the prepay — an arm is not read until ITS OWN last instruction,
   and a branch is not read until its TARGET is. Do not "fix" the shotgun
   back to one round.
-- `[play]` **A bullet's knock is the engine's own 45° throw, not the exe's
-  level add.** `Pig::HitByProjectile` adds 48 (kind 0x12: 6) along the
-  projectile's OWN pitch — level, so built literally the body lands on its
-  first substep and only twitches ("отброс сразу же гасится … тупо дёргается
-  на месте"). Every other pig-throw in the exe is pitch 0x200 = 45° (five
-  sites, one pitch), and play rules the bullet joins them: `flingVelocity(
-  SHOT_SHOVE, bearing)` for every gun, `bullets.land`. The level add and the
-  shotgun's 6 stay read in `weapons/fire.md`; `Projectile.shove` was removed
-  with its last reader. Do not resurrect the level shove.
+- `[play]` **A bullet's knock is the engine's own 45° throw, at the exe's
+  own speeds — and pellets STACK.** `Pig::HitByProjectile` ADDS (0x4A9260
+  fadds, never sets) 48 along the projectile's own pitch — kind 0x12 adds 6
+  a pellet (`Projectile.shove`), so a full shotgun volley accumulates to 60.
+  Built literally the along-the-aim push dies on the first substep and the
+  body only twitches ("отброс сразу же гасится … тупо дёргается на месте"),
+  so the SHAPE is play's: 45° up along the bullet's bearing
+  (`flingVelocity`), each hit flinging the volley's running total
+  (`bullets.land`). The exe's knock ladder is real and holds here: melee
+  per-weapon 75..200 (knife 125, `melee.ts`), shotgun volley up to 60,
+  single bullet 48 — "нож сильнее дробовика" is the original's own
+  arithmetic, not a bug. Do not resurrect the level shove, and do not make
+  a pellet's fling replace the total.
 - `[CHECK — remake]` **The drop face is the 004 pair.** An arriving pig wears
   `eyes004`/`gobs004` out of `Chars/FACES.MTD` — the stare and the scream —
   from `dropOpened` to `dropLanded` (three/faces.ts). The exe loads that

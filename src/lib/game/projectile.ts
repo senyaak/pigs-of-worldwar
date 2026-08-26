@@ -91,6 +91,18 @@ export interface Projectile {
    * corrected an earlier backwards reading of that branch, 2026-08-26.)
    */
   burst?: number
+  /**
+   * ONE pellet's knock, in exe units a frame — the figure `Pig::
+   * HitByProjectile` hands `0x4A9260` for this kind: 6 for the shotgun
+   * (0x478A99), where every other projectile passes the literal 0x30.
+   * **0x4A9260 is an ADD** (it fadds onto the body's velocity), so a
+   * volley's pellets STACK: ten shotgun pellets into one pig add up to
+   * 60, half again the single bullet's 48 — which is the read behind
+   * "нож сильнее чем дробовик отбрасывает" being half right: the exe's
+   * own ladder is knife 125 > shotgun volley 60 > rifle 48. Absent
+   * means the ordinary 0x30 (`SHOT_SHOVE`, lib/game/bullets.ts).
+   */
+  shove?: number
 }
 
 /**
@@ -112,13 +124,11 @@ const GUNS: Record<number, Projectile> = {
   /** 12 SHOTGUN, 13 SUPER SHOTGUN — gtext 108/109 against `SKILL_LINE`;
    * the repo's older "RIFLE BELL" reading was the icon's name, not the
    * weapon's. TEN pellets a press, jittered ±16, the first hit prepaying
-   * five (`pellets`/`spread`/`burst` above — all three read out of the
-   * exe). The exe also shoves kind 0x12 by 6 where everything else gets 48
-   * (0x478A99) — read, recorded in fire.md, and deliberately NOT fielded:
-   * play rules every bullet's knock the engine's own 45° throw at 0x30
-   * (`SHOT_SHOVE`, lib/game/bullets.ts). */
-  12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5 },
-  13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5 },
+   * five, each landed pellet ADDING its 6 to the knock
+   * (`pellets`/`spread`/`burst`/`shove` above — all four read out of the
+   * exe). */
+  12: { id: 406, kind: 18, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5, shove: 6 },
+  13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5, shove: 6 },
   14: { id: 411, kind: 23, speed: 150, life: 20, damage: 768, blast: 0 },
   15: { id: 434, kind: 46, speed: 300, life: 1000, damage: 6400, blast: 3900 },
   17: { id: 424, kind: 36, speed: 300, life: 30, damage: 0, blast: 0 },
