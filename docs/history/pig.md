@@ -508,3 +508,26 @@ were read from the same place.
 `unit/health.spec.ts` now pins every career's top rather than two ends of
 the old table. The cross-check itself is written up in the disasm repo
 (`sources/faq-trulydexterous.md`), including what the FAQ does NOT settle.
+
+### Splashing down is swimming, and the class table is now the exe's (2026-08-26)
+
+Two in one session. **A body knocked into the water landed standing**: the
+landing arm of `fly()` gave every soft arrival the get-up (clip 10, eleven
+frames), water included, and both dressing loops in the battle stamped
+IDLE/WOUNDED back onto anything not dead or flying — so a pig blasted into a
+bay stood on the surface for a beat before anything swam (play: "он сначала
+стоит долю секунды - затем плывёт; позу сразу в плаванье надо"). The landing
+now knows the floor it met was the waterline (`restingY`), skips the get-up
+and comes down straight into SWIM with `swimming` set; the two dressing loops
+and the aftermath's idle-stamp all ask `inWater`/`loco.swimming` before
+standing anybody up. A roof under the feet still is not water — the bridge
+rule holds.
+
+**And the DRESS table is read, not guessed**: `ClassToModel` (0x4C2E50) came
+out whole — `1 2 2 2 6 5 5 5 7 7 8 4 4 4 3 3`, kinds indexing the archive's
+nine families in file order — and five classes in `three/soldiers.ts` were
+wrong off the old marker-suffix guess: SNIPER and SPY wore each other's
+models, COMMANDO/ENGINEER/SABOTEUR fell through to the grunt. The GUNNER
+family (1/2/3 → pchvy + the nation hat off bone 2) was already right; a
+gunner that still reads as a bare grunt in play means the HAT quietly failed
+to load (`ui/battle.ts` warns and carries on), not the table.

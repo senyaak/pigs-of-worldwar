@@ -100,7 +100,14 @@ const TOKEN_MODEL = 'propoint'
 const LAYOUT = {
   team: { x: 320, y: 5 },
   rows: {
-    face: { x: 82, top: 65, pitch: 74, lift: 12 },
+    // `top` is the ROW's own line, the exe's `y = 0x4D + 0x4A·i` = 77 + 74·i
+    // (debrief/notes.md), and the face is drawn at `top − lift`. It used to
+    // say 65 — a number that already HAD the lift taken out — so the draw
+    // subtracted the 12 twice and every portrait hung 12 px above its gold
+    // niche on the backdrop, chewing the frame's crossbar (play: "портреты
+    // смещены — надо чтобы как на экране отряда"). At 77 the face's own
+    // content (7 px of inner padding) lands on y 72, the niche's top row.
+    face: { x: 82, top: 77, pitch: 74, lift: 12 },
     uniform: { x: 86, drop: 8 },
     rip: { x: 94, drop: 12 },
     name: { x: 215, top: 90, pitch: 73 },

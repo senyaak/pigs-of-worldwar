@@ -1374,3 +1374,15 @@ The same session's report about the SQUAD screen's portraits being shifted
 found no candidate in the code: the face positions are the exe's own read
 numbers, untouched since they landed, and nothing in git moved them. Wants a
 live measurement (which slot, by how much) before anything is changed.
+
+### The debrief's portraits hung 12 px above their niches (2026-08-26)
+
+Play: "портреты смещены — надо чтобы как на экране отряда просто было." The
+faces are the right art at the right size (70×60, twins of the FEBMP ones);
+what was wrong was one number counted twice: `LAYOUT.rows.face.top` held 65 —
+the exe's row line 77 with the 12-px lift ALREADY taken out — and the draw
+subtracted `lift` again, so every face sat at 53 + 74·i, chewing the gold
+frame's crossbar and leaving grey placeholder along the niche's bottom. The
+top is the row line now (77, `debrief/notes.md`: y = 0x4D + 0x4A·i), the
+lift is subtracted once, and the uniform's and r_i_p's drops land on the
+exe's own 73 and 77.

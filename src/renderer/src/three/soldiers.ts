@@ -34,22 +34,36 @@
 // battle pig (`GR_ME`, `HV_ME`) — so the battle wears `_me` and `pcXXX_hi` is left
 // for whatever wants a close-up standing still.
 
-/** The default dress — and the fallback for a class no marker names. */
+/** The default dress — and the fallback for a class off the table's end. */
 export const GRUNT_ART = 'pcgru_me'
 
+/**
+ * The exe's own dressing, whole: `ClassToModel` (0x4C2E50) is sixteen words —
+ * `1 2 2 2 6 5 5 5 7 7 8 4 4 4 3 3` — and the kind indexes the archive's nine
+ * families in file order: 0 pcace, 1 pcgru, 2 pchvy, 3 pcleg, 4 pcmed,
+ * 5 pcsap, 6 pcsab, 7 pcsni, 8 pcspy (`frontend/notes.md`, read 2026-08-26).
+ * This table used to be guessed off the marker suffixes and had five classes
+ * wrong — the SNIPER and the SPY swapped models, the COMMANDO, ENGINEER and
+ * SABOTEUR falling through to the grunt. Class 16 sits past the exe table's
+ * end; pcace is unreachable through it, and the AC_ME marker is what names it.
+ */
 const BY_CLASS: Record<number, string> = {
   0: GRUNT_ART, // GR_ME
-  1: 'pchvy_me', // HV_ME
+  1: 'pchvy_me', // HV_ME — the heavy family, and the one that wears a hat
   2: 'pchvy_me',
   3: 'pchvy_me',
+  4: 'pcsab_me', // COMMANDO — kind 6
   5: 'pcsap_me', // SA_ME
+  6: 'pcsap_me', // ENGINEER — kind 5, the sapper's own dress
+  7: 'pcsap_me', // SABOTEUR — kind 5
   8: 'pcsni_me', // SN_ME
-  9: 'pcspy_me', // SP_ME
-  10: 'pcsab_me', // SB_ME
+  9: 'pcsni_me', // SNIPER — kind 7, the scout's dress, NOT the spy's
+  10: 'pcspy_me', // SP_ME — kind 8
   11: 'pcmed_me', // ME_ME
   12: 'pcmed_me',
   13: 'pcmed_me',
   14: 'pcleg_me', // LE_ME
+  15: 'pcleg_me', // kind 3, the hero's own dress
   16: 'pcace_me' // AC_ME
 }
 
