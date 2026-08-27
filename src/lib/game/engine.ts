@@ -434,6 +434,9 @@ export function createEngine(parts: EngineParts): Engine {
   /** …and HIDE: the disguise, the decoy and every way it is shed
    * (lib/game/hide.ts). */
   const hides = createHide({ pigs, objects }, bus.emit)
+  /** The decoy's soak, for the bullets: the cover takes a round first and
+   * hands back what broke through (lib/game/hide.ts `absorb`). */
+  const soak = (pig: Pig, amount: number): number => hides.absorb(pig, amount)
   // **THE ENEMY'S SPIES START HIDDEN** — the exe's own Map::Load tail sweep
   // (0x47D790): every machine-side pig holding the skill takes the disguise
   // before the first turn. Side 0 is the player's, always (lib/game/spawns.ts).
@@ -453,6 +456,7 @@ export function createEngine(parts: EngineParts): Engine {
       training,
       pose,
       random,
+      soak,
       // A bullet shoves the body it hits (SHOT_SHOVE, lib/game/bullets.ts),
       // through the same seam every other throw takes — STRUCK, so the
       // knockdown wears the exe's clip 39 from the impact itself, whatever

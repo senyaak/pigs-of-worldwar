@@ -97,7 +97,8 @@ export interface DescentShot {
 }
 
 /** A DISGUISE standing where a hidden pig does (lib/game/hide.ts): which
- * model out of the map's own archive, at the pig's soles and yaw. */
+ * model out of the map's own archive, at the pig's soles and yaw — and what
+ * the cover has left to take (`DECOY_HEALTH`). */
 export interface DecoyShot {
   pig: number
   model: string
@@ -105,6 +106,7 @@ export interface DecoyShot {
   y: number
   z: number
   yaw: number
+  health: number
 }
 
 export interface BattleSnapshot {

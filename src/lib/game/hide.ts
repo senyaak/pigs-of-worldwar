@@ -20,15 +20,23 @@
 // - the exe's AI espionage pigs START the battle hidden (the Map::Load tail
 //   sweep, 0x47D790) — mirrored at engine build.
 //
-// Two deliberate departures, both said here:
-// - the exe hides at the END of a gesture clip (81); this hides AT THE
-//   PRESS. The turn ends with the use and the walk-away beat dresses every
-//   pig — a gesture on a body that is about to stop being drawn buys
-//   nothing, and holding the turn open for it buys a beat of machinery.
-//   `[deliberate]`.
-// - the exe's decoy SOAKS damage before the pig (its own hit points,
-//   unread) — here the decoy is art, damage lands on the pig and reveals
-//   it. `[gap]` until the decoy's HP is read.
+// The decoy is REAL COVER — the manual's "extra protection", read to the
+// numbers (2026-08-27, the ctor at 0x48D092): its hit points come off the
+// generic object-health table at 0x4D6D18 by model id, so what you hide as
+// is how much you can take — a CRATE 40 points, a BUSH 50, a TREE or a
+// CACTUS 80. What the decoy catches is a PROJECTILE (its damage handler
+// 0x48DB58 shows the floating number, and when its health drops under a
+// point hands the REMAINDER to the pig and reveals); a BLAST never asks it —
+// the blast arm sheds the disguise BEFORE dealing its damage (0x477C2F) —
+// and a blade knocks on wood for nothing (lib/game/strikes.ts). `absorb`
+// below is that handler; lib/game/bullets.ts is its one caller.
+//
+// One deliberate departure, said here: the exe hides at the END of a gesture
+// clip (81); this hides AT THE PRESS. The turn ends with the use and the
+// walk-away beat dresses every pig — a gesture on a body that is about to
+// stop being drawn buys nothing. `[deliberate]`. And the GAS washes over a
+// disguise onto the pig directly — whether the exe's cloud sweep catches the
+// decoy body first is unread. `[gap]`.
 //
 // Pure, like the rest of lib/game.
 
@@ -64,6 +72,25 @@ export const DECOY_REACH = 8192
 /** …and what a pig passes for when nothing is near: the exe's own fallback. */
 export const DECOY_FALLBACK = 'CRATE4'
 
+/**
+ * What each disguise can TAKE before it breaks — the object-health table at
+ * 0x4D6D18, by model id, in the 128ths the exe counts: 5120, 6400 and 10240
+ * over 128. The cover you pick is the cover you get.
+ */
+export const DECOY_HEALTH: Record<string, number> = {
+  CRATE4: 40,
+  BUSH1: 50,
+  BUSH2: 50,
+  BUSH3: 50,
+  TREEB: 80,
+  TREEG: 80,
+  TREEP: 80,
+  TREEPA: 80,
+  TREEW: 80,
+  CACTUS: 80,
+  CACT2: 80
+}
+
 /** The nearest disguisable prop's model name, or the crate. */
 export function nearestDisguise(
   objects: MapObject[],
@@ -91,6 +118,8 @@ export interface Decoy {
   y: number
   z: number
   yaw: number
+  /** What it has left to take (DECOY_HEALTH). */
+  health: number
 }
 
 export interface Hides {
@@ -105,6 +134,13 @@ export interface Hides {
    * disguise unconditionally (0x470425). Called at the handover, beside the
    * poison's tick. */
   turnStarted(pig: Pig): void
+  /**
+   * A PROJECTILE arrived on a hidden pig: the decoy takes what it can and
+   * the REMAINDER comes back to land on the pig — 0 while the cover holds.
+   * A broken decoy reveals (the exe's 0x48DB58/0x48D779). Full damage back,
+   * untouched, for a pig that is not hiding.
+   */
+  absorb(pig: Pig, amount: number): number
   /** Every disguise standing — what the snapshot carries. */
   decoys(): readonly Decoy[]
   clear(): void
@@ -133,18 +169,38 @@ export function createHide(world: HideWorld, emit: Emit): Hides {
       // anyone who found one in a crate.
       spend(pig.carrying, SKILL.HIDE)
       pig.hidden = true
+      const model = nearestDisguise(world.objects, pig.position)
       standing.set(pig.id, {
         pig: pig.id,
-        model: nearestDisguise(world.objects, pig.position),
+        model,
         x: pig.position.x,
         y: pig.position.y,
         z: pig.position.z,
-        yaw: pig.heading
+        yaw: pig.heading,
+        health: DECOY_HEALTH[model] ?? DECOY_HEALTH[DECOY_FALLBACK]
       })
       emit({ kind: 'hid', pig: pig.id })
       return true
     },
     reveal,
+    absorb(pig, amount) {
+      if (!pig.hidden) return amount
+      const decoy = standing.get(pig.id)
+      if (!decoy) return amount
+      const took = Math.min(decoy.health, amount)
+      decoy.health -= took
+      // The number floats off the COVER, the exe's own show (0x48DB58's call
+      // to the same spawner a hit uses) — `structure` so it prints without
+      // naming a pig nothing can see.
+      emit({
+        kind: 'damaged',
+        at: { x: decoy.x, y: decoy.y, z: decoy.z },
+        amount: took,
+        structure: true
+      })
+      if (decoy.health <= 0) reveal(pig.id)
+      return amount - took
+    },
     turnStarted(pig) {
       if (pig.hidden) reveal(pig.id)
     },

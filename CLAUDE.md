@@ -980,11 +980,14 @@ and the weakest of them were invented here:
   filter (allies and corpses qualify), a random whole slot, a laugh, and a
   14-slot append cap under which loot silently vanishes — the exe's own
   off-by-one, kept. `lib/game/hide.ts`, `pickpocket.ts`;
-  `weapons/espionage.md` in the disasm repo. Two edges are not the exe's:
-  hiding happens AT THE PRESS, not at the end of the gesture clip
-  (`[deliberate]` — the turn ends with the use and a vanished pig has no
-  gesture to show), and the decoy does not SOAK damage before the pig
-  (`[gap]` — its hit points are unread; here any damage reveals).
+  `weapons/espionage.md` in the disasm repo. The decoy is REAL COVER: it
+  soaks a BULLET first — its hit points are the model's own (crate 40, bush
+  50, tree/cactus 80, the object-health table at 0x4D6D18) — and hands the
+  pig only the remainder of the round that breaks it; a BLAST never asks it,
+  shedding the disguise before dealing (0x477C2F). Two edges are not the
+  exe's: hiding happens AT THE PRESS, not at the end of the gesture clip
+  (`[deliberate]`), and the GAS washes onto the pig directly (`[gap]` —
+  whether the cloud sweep meets the decoy body first is unread).
 - `[play]` **A bullet's knock is the engine's own 45° throw, at the exe's
   own speeds — and pellets STACK.** `Pig::HitByProjectile` ADDS (0x4A9260
   fadds, never sets) 48 along the projectile's own pitch — kind 0x12 adds 6

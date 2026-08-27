@@ -99,6 +99,10 @@ export interface BulletWorld {
   obstacles: Obstruction
   /** The training ground, where a PIG cannot be killed (lib/game/health.ts). */
   training: boolean
+  /** A hidden pig's DECOY takes a round first and hands back the remainder
+   * (lib/game/hide.ts `absorb`). Optional the way `fling` is: a bare spec
+   * has no disguises. */
+  soak?: (pig: Pig, amount: number) => number
   /** Where the muzzle is (lib/game/pose.ts). */
   pose: Pose
   /** The battle's one stream of chance (lib/game/random.ts) — the pellet
@@ -224,12 +228,21 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       if (row?.burst) {
         amount = struck === 0 ? amount * row.burst : struck < row.burst ? 0 : amount
       }
+      // A DISGUISED pig's decoy takes the round first (lib/game/hide.ts):
+      // the cover soaks what it can — the number floats off the bush, not
+      // the pig — and only the remainder of the shot that BREAKS it lands
+      // and reveals. A round the cover ate whole stopped in wood, not
+      // flesh, and moves nobody.
+      const covered = pig.hidden
+      if (world.soak && amount > 0) amount = world.soak(pig, amount)
       if (amount > 0) {
         const outcome = hurt(pig, amount, world.training)
         emit({ kind: 'damaged', at: body, amount, pig: pig.id })
         if (outcome === 'died' || outcome === 'gibbed') {
           emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })
         }
+      } else if (covered) {
+        return 'hard'
       }
       // …and the KNOCK, 45° up along the bullet's bearing. The exe's
       // `0x4A9260` is an ADD, so a volley's pellets STACK — each hit flings

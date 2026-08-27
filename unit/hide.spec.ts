@@ -80,6 +80,27 @@ test('taking it hides the pig and stands the decoy; shedding it does the reverse
   expect(heard.length).toBe(before)
 })
 
+test('the cover SOAKS a round — what you hide as is what you can take', { tag: '@nodata' }, () => {
+  const scout = pigAt(0, 0)
+  const heard: BattleEvent[] = []
+  const hides = createHide({ pigs: () => [scout], objects: [prop('BUSH1', 10, 0)] }, (event) =>
+    heard.push(event)
+  )
+  hides.begin(scout)
+  // A bush is 50 (the object-health table at 0x4D6D18): a 30 lands on the
+  // cover whole, the number floats off the bush, the pig is untouched.
+  expect(hides.absorb(scout, 30)).toBe(0)
+  expect(scout.hidden).toBe(true)
+  expect(heard.filter((one) => one.kind === 'damaged')).toHaveLength(1)
+  expect(heard[heard.length - 1]).toMatchObject({ kind: 'damaged', amount: 30, structure: true })
+  // …and the shot that BREAKS it hands the pig only the remainder, revealed.
+  expect(hides.absorb(scout, 30)).toBe(10)
+  expect(scout.hidden).toBe(false)
+  expect(hides.decoys()).toHaveLength(0)
+  // No cover, nothing soaked: the full round comes back.
+  expect(hides.absorb(scout, 30)).toBe(30)
+})
+
 test('the cover lasts one round: the pig\'s own turn starting drops it', { tag: '@nodata' }, () => {
   const scout = pigAt(0, 0)
   const hides = createHide({ pigs: () => [scout], objects: [] }, () => {})
