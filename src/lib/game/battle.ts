@@ -885,6 +885,10 @@ export function createBattle(parts: BattleParts): Battle {
   /** Whether the SERGEANT is still talking — the scene's poll, the same road
    * the firing bark's takes (contracts/sound.ts). */
   let sargeSpeaking = false
+  /** Seconds the BOOTS still hold the end-of-turn beat — set by `remains`,
+   * play's own second (see the handler below). */
+  let bootsFor = 0
+  const BOOTS_SECONDS = 1
 
   parts.bus.on(
     handling({
@@ -893,6 +897,15 @@ export function createBattle(parts: BattleParts): Battle {
         if (!dead) return
         if (game.currentPlayer.pigs.includes(dead)) tally.losses++
         else tally.kills++
+      },
+      // THE BOOTS GET THEIR SECOND. The walk-away beat holds while a corpse
+      // is playing out and could end the very frame the boots land — which
+      // yanked the camera to the shooter for the sergeant's praise with the
+      // boots barely on the ground. Play: "после смерти - ещё секунду видны
+      // сапоги - а не сразу возвращается к стрелявшему." `[play]` — the exe's
+      // own pacing here is not read.
+      remains: () => {
+        bootsFor = BOOTS_SECONDS
       },
       // A promotion point off the ground is worth a word from him — the one
       // category whose lines name a drop point (lib/game/sergeant.ts).
@@ -1103,6 +1116,11 @@ export function createBattle(parts: BattleParts): Battle {
     // stays; what it must not do is depend on which mode the game is in.
     payScriptStep()
 
+    // The boots' second runs down in EVERY mode, not only under the beat it
+    // holds — a death long before the turn's end has spent its second by the
+    // time the walk-away asks.
+    bootsFor = Math.max(0, bootsFor - delta)
+
     // The beat at the END of a turn: mode 13, WALK AWAY. Nobody is driving, the
     // clock does not run, and everyone still in the water makes for the nearest
     // shore (lib/game/walkAway.ts). It holds until they are all out and the
@@ -1122,7 +1140,13 @@ export function createBattle(parts: BattleParts): Battle {
       // own DEATH_QUIET and this beat's quiet are the same second counted
       // from the same stillness, and a beat that could finish first would
       // hand the turn over in the very step the dying was due to start.
-      const done = walkAway.update(delta, settling() || pending !== null || corpses.live() > 0)
+      // …and the BOOTS hold it one second past the corpse (`remains` above):
+      // the beat must not end — and the sergeant must not take the camera —
+      // in the very frame they landed.
+      const done = walkAway.update(
+        delta,
+        settling() || pending !== null || corpses.live() > 0 || bootsFor > 0
+      )
       // A pig thrown by the charge it planted is still in the air, and the beat is
       // waiting for it (`settling`). Its flight owns its position for as long as it
       // lasts; the walk home is what the beat does with pigs on the ground.
