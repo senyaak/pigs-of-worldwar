@@ -1869,3 +1869,19 @@ exempt one, not this).
 Pinned in `unit/hide.spec.ts` and `unit/pickpocket.spec.ts`. With these two,
 the SCOUT'S KIT IS WHOLE: knife, rifle, gas, hide, theft — every slot does
 what the original's does.
+
+### …and the decoy's numbers landed the same evening (2026-08-27, later)
+
+The two edges the morning's write-up left open closed before the day ended,
+both on play's prompt ("20 урона вроде должно поглощать" — close, and the
+table said more). The decoy's hit points are the object-health table's own by
+model — crate 40, bush 50, tree or cactus 80 — so what you hide as is what
+you can take; a bullet lands on the cover first and only the hit that BREAKS
+it passes its remainder to the pig. Then the gas gap: the hidden pig's body
+turns out to be OUT of the physics entirely (SetHidden's body bit is the
+sweep's own first-instruction skip), and the decoy's effect arm excludes the
+whole status-gas band — so GAS touches nobody hidden, and a BLAST is soaked
+by the cover through the same falloff every pig takes. One earlier reading
+stood corrected by that: "the blast sheds the disguise before dealing" was
+the belt to the decoy's braces, not the road. `weapons/espionage.md` in the
+disasm repo carries all three passes; `unit/hide.spec.ts` pins the soak.
