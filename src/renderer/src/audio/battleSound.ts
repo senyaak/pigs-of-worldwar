@@ -189,6 +189,7 @@ export function createBattleSound(
     reset: () => sounds.reset(),
     chuteOverhead: audio.chuteOverhead,
     fuseBurning: audio.fuseBurning,
+    gasHissing: audio.gasHissing,
     ambient: (delta, running) => ambience.update(delta, running),
     played: () => bank.played(),
     spoken: () => voice.spoken(),

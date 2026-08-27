@@ -72,6 +72,7 @@ import type { DropIn } from './dropIn'
 import type { Corpses } from './corpses'
 import { drowns } from './drowning'
 import type { Drowning } from './drowning'
+import type { Poison } from './poison'
 import type { Point } from './pose'
 import type { Random } from './random'
 import { handling } from './events'
@@ -110,6 +111,9 @@ export interface BattleParts {
   /** What being in the water costs, for every pig on the map
    * (lib/game/drowning.ts). */
   drowning: Drowning
+  /** …and what the gas's bit costs the acting pig at the top of its own turn
+   * (lib/game/poison.ts). */
+  poison: Poison
   /** Whether this is the TRAINING ground, whose mission ends on its own
    * condition rather than on the squads (lib/game/endOfGame.ts). */
   training: boolean
@@ -292,7 +296,7 @@ export interface Battle {
 
 export function createBattle(parts: BattleParts): Battle {
   const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, heals, effects, numbers } = parts
-  const { tumbles, corpses, airDrops, dropIn, drowning, onChanged } = parts
+  const { tumbles, corpses, airDrops, dropIn, drowning, poison, onChanged } = parts
   const emit = parts.bus.emit
 
   /** Which sides the machine plays, and the brain that plays them — the
@@ -841,6 +845,13 @@ export function createBattle(parts: BattleParts): Battle {
     }
     game.endTurn()
     focus(game.currentPig)
+    // **THE POISON BITES AT THE TOP OF THE PIG'S OWN TURN** — the exe's
+    // per-turn pass (0x4703A0, lib/game/poison.ts): ten points, before the
+    // card, so the health the announcement reads is the health the turn
+    // starts on. Under eleven it dies right here — and a dead acting pig is
+    // already what ends a turn (the ranOut test below), which is the FAQ's
+    // own wording: a poisoned pig under ten dies the moment it takes its turn.
+    poison.turnStarted(game.currentPig)
     announceTurn()
   }
 

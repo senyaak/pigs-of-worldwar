@@ -40,6 +40,9 @@ import { createLobs } from './lobs'
 import type { Lobs } from './lobs'
 import { createMines } from './mines'
 import type { Mines } from './mines'
+import { createGas } from './gas'
+import { createPoison } from './poison'
+import type { Poison } from './poison'
 import { createTumbles } from './tumble'
 import type { Tumbles, Velocity } from './tumble'
 import { createCorpses } from './corpses'
@@ -219,6 +222,9 @@ export interface Engine {
   readonly grenades: Lobs
   /** The minefields, and what has been trodden on (lib/game/mines.ts). */
   readonly mines: Mines
+  /** Who carries the gas's bit, and the ten points a turn it costs
+   * (lib/game/poison.ts). */
+  readonly poison: Poison
   /** Pigs still in the air because something blew up under them
    * (lib/game/tumble.ts). */
   readonly tumbles: Tumbles
@@ -308,10 +314,18 @@ export function createEngine(parts: EngineParts): Engine {
         if (pig !== undefined || structure) numbers.show(at, amount)
       },
       // A heal shows the same number a hit does — one spawner, one style
-      // argument apart (lib/game/scenery.ts).
-      healed: ({ at, amount }) => numbers.show(at, amount, 'heal'),
+      // argument apart (lib/game/scenery.ts) — **and it CURES**: the tail of
+      // `Pig::Heal` zeroes the status word (0x4680a6), so any heal in the
+      // game takes the poison off through this one event (lib/game/poison.ts).
+      healed: ({ at, amount, pig }) => {
+        numbers.show(at, amount, 'heal')
+        poison.cure(pig)
+      },
       struck: ({ skill, at }) => effects.hit(skill, at),
       blasted: ({ at, effect }) => effects.blast(at, effect),
+      // A gas canister's little cloud — thirty green blobs where it stands
+      // (lib/game/gas.ts announces, lib/game/effects.ts is the picture).
+      gasPuffed: ({ at }) => effects.gas(at),
       // The splash is drawn on the WATER LINE however deep it gets, because
       // effect 0x0E snaps its own y there (0x488c19).
       skimmed: ({ at }) => effects.splash(at),
@@ -463,9 +477,27 @@ export function createEngine(parts: EngineParts): Engine {
     { pigs, targets, present, query, training, random, fling, groundNormal },
     bus.emit
   )
+  /** The gas's bit on a pig, and the ten points a turn it costs — before the
+   * grenades, because the canister's clouds are what set it. */
+  const poison = createPoison({ training }, bus.emit)
+  /** …and the canister's stream itself (lib/game/gas.ts). */
+  const gas = createGas({ pigs, training, poison }, bus.emit)
   /** …and what a GRENADE does, which is a parabola rather than a line. */
   const grenades = createLobs(
-    { pigs, targets, present, query, obstacles, training, pose, random, mines, fling, groundNormal },
+    {
+      pigs,
+      targets,
+      present,
+      query,
+      obstacles,
+      training,
+      pose,
+      random,
+      mines,
+      gas,
+      fling,
+      groundNormal
+    },
     bus.emit
   )
 
@@ -492,6 +524,7 @@ export function createEngine(parts: EngineParts): Engine {
     shots,
     grenades,
     mines,
+    poison,
     swings,
     heals,
     tumbles,
@@ -653,6 +686,7 @@ export function createEngine(parts: EngineParts): Engine {
     shots,
     grenades,
     mines,
+    poison,
     tumbles,
     effects,
     numbers,

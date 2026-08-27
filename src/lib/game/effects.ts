@@ -344,6 +344,32 @@ export const SPLASH_EFFECT: HitEffect = {
   ]
 }
 
+/**
+ * One little cloud of the POISON GAS — effect **0x5E**, whose init arm
+ * (0x489083, shared with 0x5D FREEZE and 0x5F MADNESS) is its own and not the
+ * twelve-stage table.
+ *
+ * The read (`weapons/gas.md` in the disasm repo): a 30-slot array, five blobs
+ * at birth and one more a frame while the tick is under 20, particle type
+ * 0x20 — colour **(2,22,0)** five-bit, bright GREEN where FREEZE is cyan and
+ * MADNESS red — **no gravity, no drift**, a blob living ~12 frames, the whole
+ * ~32. The canister spawns one of these every 5th frame of its flight
+ * (lib/game/gas.ts), so the plume is a CHAIN of them, not this one grown big.
+ *
+ * The exe's trickle-in and its type-0x20 sprite sizing are not this system's
+ * shapes, so the stage is the nearest the cloud spawner speaks: the full
+ * thirty at birth, hanging where they are born. `up` 1 is the one liberty —
+ * a whisper of rise so a standing plume breathes — and `size` 2 against the
+ * fireball's 4 keeps a puff a puff. `[CHECK — remake]` for those two; the
+ * count, the colour and the stillness are the read.
+ */
+export const GAS_EFFECT: HitEffect = {
+  id: 0x5e,
+  kind: 28,
+  rings: [],
+  clouds: [{ at: 1, count: 30, colour: [2, 22, 0], up: 1, out: 1, gravity: 0, size: 2 }]
+}
+
 /** How far round the burst fans its particles: the same 1638.4-per-turn unit
  * the ring is drawn in, stepped `0x648 / count` a particle (0x48cb0b). */
 const BURST_SPREAD = 0x648 / 1638.4

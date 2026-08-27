@@ -37,6 +37,12 @@ export interface SceneSound {
    */
   fuseBurning(remaining: readonly number[], delta: number): void
   /**
+   * A GAS canister streaming its cloud — the hiss, for as long as one is
+   * live. A poll for the fuse's own reason: a running noise with no single
+   * moment to fire on (audio/battleAudio.ts, `gasHissing`).
+   */
+  gasHissing(streaming: boolean, delta: number): void
+  /**
    * The war going on somewhere ELSE — the distant battle and the birds
    * (audio/ambience.ts).
    *

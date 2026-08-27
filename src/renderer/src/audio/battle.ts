@@ -302,6 +302,23 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    */
   skim: { sound: 'FT_MUD', volume: 60, pitch: 90, jitter: 63 },
   /**
+   * The GAS canister streaming. DECODED as far as the exe goes: the
+   * projectile's every-5th-frame arm starts sound **8 = BG_GAS** on the
+   * canister at frame 15 of the flight (0x4365e8) — play had already named
+   * the sample cold: "газовая граната так делает". The exe's is a sound
+   * attached to a body for as long as it lives; this bank is fire-and-forget,
+   * so the 0.38-second sample is laid end to end by the `gasHissing` poll
+   * (audio/battleAudio.ts, HISS_TICK) — the same shape the fuse's tick takes.
+   * The MIX is not read; full, like the fuse's.
+   */
+  gasHiss: { sound: 'BG_GAS', volume: 100, pitch: 100 },
+  /**
+   * …and its POP: no blast — the destructor arm of the gas kind plays
+   * **I_BULIT1 at volume 50** and spawns one last cloud (0x432d83,
+   * `weapons/gas.md` in the disasm repo). Half volume is the exe's own mix.
+   */
+  gasPop: { sound: 'I_BULIT1', volume: 50, pitch: 100 },
+  /**
    * Collecting a crate, and being refused one. These two are DECODED rather
    * than picked by name: `Pig::GiveSkill` plays 0x5E at the pig's own
    * position once the skill is in (0x4759F2, out of 0x475960), and 0x4F on

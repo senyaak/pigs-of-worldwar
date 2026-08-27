@@ -45,6 +45,16 @@ import {
 import { GAUGE_FULL } from './gauge'
 import { AIM_LOB } from './aim'
 import { WALK_SPEED } from './movement'
+import { POISON_PER_TURN } from './poison'
+
+/**
+ * What the GAS canister's poison is worth on top of the fifteen at the touch:
+ * ten a turn with no clock on it is unbounded, and the brain prices TWO turns
+ * of it — a wound on the instalment plan, next turn's ten and the one after.
+ * `[deliberate]` — the brain's own horizon, not a read; the engine's poison
+ * runs until a heal whatever this says (lib/game/poison.ts).
+ */
+export const POISON_WORTH = POISON_PER_TURN * 2
 
 /** What FINISHING a pig is worth on top of the health it takes — the kill
  * bonus docs/ai.md prices whole turns at. In health points, so a kill
@@ -406,11 +416,20 @@ const blastWorth = (
   return total
 }
 
+/** What one THROW of a lob is worth against a body it reaches: the core
+ * damage in points, plus the poison's instalments for the gas
+ * (POISON_WORTH above). */
+const lobPoints = (skill: number): number => {
+  const row = lobOf(skill)
+  if (!row) return 0
+  return row.damage / 128 + (row.gas ? POISON_WORTH : 0)
+}
+
 /** What a skill is worth as a weapon, whatever family it is — the crate
  * comparison's one number. A fanned gun is worth its whole volley, the
  * same reading `gunOption` prices a shot with. */
 const weaponPoints = (skill: number): number =>
-  volleyDamageOf(skill) || (lobOf(skill)?.damage ?? 0) / 128 || (meleeOf(skill)?.damage ?? 0)
+  volleyDamageOf(skill) || lobPoints(skill) || (meleeOf(skill)?.damage ?? 0)
 
 /** What the telemetry hears: every candidate PRICED, not only the winners —
  * the losers are the whole point (lib/game/ai.ts, `Candidate`). */
@@ -615,7 +634,10 @@ const lobOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): 
   const row = lobOf(skill)
   if (!row) return null
   const me = world.acting
-  const damage = row.damage / 128
+  // The gas throw is priced with its poison's instalments on top of the
+  // fifteen — over friends and the thrower too, because the bit does not
+  // read uniforms any more than the blast does.
+  const damage = lobPoints(skill)
   const spread = blastRange(row)
   // The whole arc, measured by throwing FLAT OUT at each foe's bearing —
   // near enough for "can I reach him at all", and re-derived every decision.

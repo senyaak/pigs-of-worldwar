@@ -35,6 +35,13 @@ export interface BattleAudio {
    * (`BATTLE_SOUNDS.fuse`, `.fuseTimer`, `.fuseOut`).
    */
   fuseBurning(remaining: readonly number[], delta: number): void
+  /**
+   * A GAS canister streaming (`lib/game/gas.ts`) — the exe hangs `BG_GAS` on
+   * the projectile from frame 15 on (0x4365e8), a running noise, so it is a
+   * poll exactly the way the fuse's tick is: the sample is 0.38 s and is
+   * fired at its own length while any canister is live.
+   */
+  gasHissing(streaming: boolean, delta: number): void
 }
 
 /**
@@ -50,6 +57,9 @@ export const FUSE_TICK = 1.1
 /** How much fuse is left when the timer is heard RUNNING OUT — `L_MINETR`, a
  * fifth of a second, so it lands clear of the blast. */
 export const FUSE_LAST = 0.5
+/** The gas's hiss, back to back: `BG_GAS` is 0.38 s, so one every 0.4 keeps
+ * it continuous without piling copies. */
+export const HISS_TICK = 0.4
 
 /**
  * `bank` is asked for rather than held: it loads beside the scene and the
@@ -63,6 +73,8 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
   /** Whether a fuse was already inside its last half second last frame — the
    * click is one per charge, not one a frame. */
   let running = false
+  /** Seconds until the next hiss of a streaming gas canister. */
+  let untilHiss = 0
 
   return {
     fuseBurning(remaining, delta) {
@@ -84,6 +96,18 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       const out = Math.min(...remaining) <= FUSE_LAST
       if (out && !running) playCue(bank(), BATTLE_SOUNDS.fuseOut)
       running = out
+    },
+    gasHissing(streaming, delta) {
+      // The same shape as the fuse's tick: fire-and-forget copies laid end to
+      // end while it runs, and prompt the moment the next canister opens.
+      if (!streaming) {
+        untilHiss = 0
+        return
+      }
+      untilHiss -= delta
+      if (untilHiss > 0) return
+      untilHiss = HISS_TICK
+      playCue(bank(), BATTLE_SOUNDS.gasHiss)
     },
     listen: handling({
       // ——— weapons ———
@@ -151,6 +175,11 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       splashed: () => playCue(bank(), BATTLE_SOUNDS.splash),
       skimmed: () => playCue(bank(), BATTLE_SOUNDS.skim),
       doused: () => playCue(bank(), BATTLE_SOUNDS.doused),
+      // The gas canister's own end: not a blast — the exe's destructor arm
+      // plays I_BULIT1 at HALF volume and nothing else (0x432d83). The touch
+      // needs no line of its own here: its fifteen rides `damaged` and
+      // squeals like any hit.
+      gasPopped: () => playCue(bank(), BATTLE_SOUNDS.gasPop),
 
       // ——— the frame ———
       // A hoof landing. WHEN is the clip's own key-frame event

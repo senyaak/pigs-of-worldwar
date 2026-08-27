@@ -110,6 +110,25 @@ export type BattleEvent =
   | { kind: 'splashed'; at: Point }
   | { kind: 'skimmed'; at: Point }
   | { kind: 'doused'; at: Point }
+  /** A GAS canister opened its valve — frame 15 of the flight, where the exe
+   * starts BG_GAS on the projectile (0x4365e8). Once per throw; the hiss
+   * itself is a POLL like the fuse's tick (contracts/sound.ts). */
+  | { kind: 'gasStreaming'; at: Point }
+  /** …one little cloud let go — every 5th frame while the canister lives, and
+   * once more at the pop (lib/game/gas.ts). The picture, not the touch. */
+  | { kind: 'gasPuffed'; at: Point }
+  /** …and the canister's own end: one last puff and a pop — the exe plays
+   * I_BULIT1 at half volume there (0x432d83) and there is NO blast. */
+  | { kind: 'gasPopped'; at: Point }
+  /** The gas TOUCHED this pig — the once-per-throw service: fifteen points
+   * flat, the Sneeze, and the poison bit (lib/game/gas.ts). The damage
+   * itself rides `damaged` as usual; this is the moment for anything that
+   * wants the cough. */
+  | { kind: 'gassed'; pig: PigId; at: Point }
+  /** …and the POISON went ON — the status newly set, not a refresh
+   * (lib/game/poison.ts). Ten points at every one of this pig's own turns
+   * until something heals it. */
+  | { kind: 'poisoned'; pig: PigId }
 
   // ——— the map ———
   /** Something on it has been knocked down. */

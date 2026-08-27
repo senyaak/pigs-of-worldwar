@@ -13,6 +13,7 @@ import {
   BLAST_EFFECT,
   BREAK_EFFECT,
   DUST_EFFECT,
+  GAS_EFFECT,
   MINE_EFFECT,
   SPLASH_EFFECT,
   advanceEffect,
@@ -44,6 +45,10 @@ export interface EffectField {
   /** …and something heavy LANDED here. Row 0's smoke without its fire, so a
    * crate arriving raises dust rather than going off (lib/game/effects.ts). */
   dust(at: Point): void
+  /** …and a GAS canister let a little cloud go here — effect 0x5E, thirty
+   * green blobs hanging where they were born (lib/game/effects.ts). One per
+   * puff; the plume is a chain of these along the canister's path. */
+  gas(at: Point): void
   /** …and something went into WATER here. Effect 0x0E, row 2: three bright
    * rings and a white cloud. Pass the WATER LINE, not where the thing is — the
    * engine's own arm snaps its y to the surface. */
@@ -85,6 +90,7 @@ export function createEffectField(random: Random = Math.random): EffectField {
     blast: (at, effect) =>
       void live.push(beginEffect(effect === MINE_EFFECT.id ? MINE_EFFECT : BLAST_EFFECT, at)),
     dust: (at) => void live.push(beginEffect(DUST_EFFECT, at)),
+    gas: (at) => void live.push(beginEffect(GAS_EFFECT, at)),
     splash: (at) => void live.push(beginEffect(SPLASH_EFFECT, at)),
     update(delta) {
       for (const effect of live) advanceEffect(effect, delta, random)

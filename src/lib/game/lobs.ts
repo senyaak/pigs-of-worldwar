@@ -32,6 +32,7 @@ import {
 } from './grenade'
 import type { Lobbed } from './grenade'
 import { burst } from './blast'
+import type { Gas } from './gas'
 import type { Mines } from './mines'
 import type { BlastWorld } from './blast'
 import { HAND_BONE } from './pose'
@@ -72,6 +73,9 @@ export interface LobWorld extends BlastWorld {
   /** What is buried in the ground: a thrown thing sets a mine off the same way a
    * foot does (lib/game/mines.ts). */
   mines: Mines
+  /** The poison canister's stream (lib/game/gas.ts). Optional the way `fling`
+   * is: a bare spec that throws no gas needs none. */
+  gas?: Gas
   /** Where the hand is (lib/game/pose.ts). */
   pose: Pose
   /** The battle's own stream (lib/game/random.ts). The fuse is thrown with a
@@ -142,6 +146,12 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
     // No row and there is nothing to announce either: a lob without one cannot
     // have been thrown in the first place (`throwOne` refuses).
     if (!row) return
+    // A GAS canister does not burst: its destructor is one last cloud and a
+    // pop, with no 0x54 and no push — the exe's own shape (lib/game/gas.ts).
+    if (row.gas) {
+      world.gas?.pop(shot)
+      return
+    }
     burst(
       { x: shot.x, y: shot.y, z: shot.z },
       { damage: row.damage, reach: blastRange(row) },
@@ -317,10 +327,16 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
         // the first thing the destructor tests and that branch spawns no effect
         // and plays no sound (0x4328c9), so there is no blast to hold back.
         if (shot.doused) {
+          // …and a gas canister's valve is CLOSED by the water — the quiet
+          // flag's own arm (0x437d3b): no stream, and never a pop.
+          world.gas?.quench(shot)
           sinkLob(shot, delta)
           if (sunkAway(shot)) flying.splice(i, 1)
           continue
         }
+        // A live canister STREAMS — from frame 15 of the flight, rolling or
+        // flying alike, so the plume follows wherever it goes (lib/game/gas.ts).
+        if (lobOf(shot.skill)?.gas) world.gas?.stream(shot)
         // **A PLACED CHARGE DOES NOT MOVE.** Play: "динамит катится по склону."
         // It did, and stepping it at all was the mistake: gravity pulled it into
         // the hillside, the contact reflected the normal part away and — by the

@@ -1766,3 +1766,62 @@ disasm repo asserts the branch's direction so it cannot be re-misread.
 The lesson sharpened: an arm is not read until its last instruction, and
 a BRANCH is not read until its TARGET is — "jl past the damage" and "jl
 to the damage" are one byte apart and opposite weapons.
+
+### The POISON GAS streams — skill 26 read and built, and the lob table was CROSSED (2026-08-27)
+
+Continuing with the Scout meant continuing with its kit, and three of its five
+items were poses with no mechanics. The gas came first, being the one that is
+actually a weapon — and the read opened with a correction bigger than the
+weapon.
+
+**The skill→kind map was crossed for five rows.** The grenade family's table
+in `grenade.ts` assumed the projectile kinds follow the skills in order,
+24..32 for 19..27. Field +0x10 of the skill record says otherwise: 21→29,
+22→31, 23→28, 24→26, 25→27, 26→28. HIGH EXPLOSIVE had been dealing 20 points
+instead of its true SIXTY over half again a grenade's field; the ROLLER had
+15 instead of 40 — and the 0.001/0.001 material this file had filed under
+"26 sticks where it lands" is the ROLLER's, which is the punchline: near-zero
+friction is WHY it rolls for ever, near-zero restitution is why it never hops
+while it does. Nothing "sticks". And CONFUSION and POISON turned out to be
+ONE projectile in the PC exe — both records carry id 416, same flight, same
+cloud, apart only in text and icon. Whether that identity is the game or a
+port accident is play's to rule; until then 23 stays a plain burst.
+`weapons/gas.md` in the disasm repo carries the whole re-read table; the fix
+went in as its own commit, pinned in `unit/lob.spec.ts`.
+
+**The gas itself is a STREAM, not a bang.** The projectile update's
+every-5th-frame dispatcher has kind 28 spawn effect 0x5E at the canister's own
+position from frame 15 of the flight on, hissing BG_GAS as it goes — so a full
+fuse lets go a couple of dozen little green clouds and a rolling canister
+draws a LINE of them. The destructor is one last cloud and I_BULIT1 at half
+volume: **no 0x54 blast, no push** (the row's force column is nil). A doused
+canister goes quiet entirely — a gas grenade in the water is nothing at all.
+Each cloud sweeps ONCE: a sphere, no line of sight (gas reaches round a
+corner), first service per throw fifteen points FLAT (the falloff is only the
+gate) with the Sneeze clip and the squeal, and the POISON bit for everyone it
+washes over. The bit has NO timer: ten points at the start of every one of
+the pig's own turns, for ever — under eleven the pig dies the moment its turn
+comes round, which is the fan FAQ's own wording — and the tail of `Pig::Heal`
+zeroes the status word, so ANY heal cures it. The swamp sets the same bit in
+the exe, which makes the bog mechanically a cloud that never lifts (not
+built). Skill 41's artillery GAS SHELL streams the same clouds off the same
+row, hard-wired.
+
+**The build rode three existing rails and invented almost nothing.** The
+stream is `gas.ts` (valve times per canister, serviced masks per throw), fed
+by `lobs.ts` at the one detonation seam and the update loop; the bit is
+`poison.ts`, a Set beside the drowning counter's Map, drained at the handover
+right before the turn card so the announced health is the turn's real one —
+and a pig killed there ends the turn through the same dead-acting-pig test
+that already existed. The picture needed NO renderer work at all: a puff is
+an ordinary short-lived effect (`GAS_EFFECT`, thirty green blobs through the
+same cloud spawner the fireball uses), so it rides the snapshot like any
+blast. The cure needed no wiring either: both heal paths already emit
+`healed`, and the engine's own subscription cures on it. The hiss joined the
+fuse's tick as the second repeating poll (`gasHissing`), BG_GAS laid end to
+end — play had identified that sample cold weeks ago ("газовая граната так
+делает"). The AI prices the throw as damage plus a two-turn poison horizon
+(`POISON_WORTH` — the brain's own model, the engine's poison runs until a
+heal whatever the brain thinks). Pinned in `unit/gas.spec.ts` and
+`unit/poison.spec.ts`; what is still open — the afflicted Scramble stance,
+the green face, the other three status grenades, the swamp — is todo P2b.

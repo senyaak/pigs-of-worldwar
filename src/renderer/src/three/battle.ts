@@ -15,7 +15,7 @@ import { createEngine } from '../../../lib/game/engine'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { aimRadians } from '../../../lib/game/aim'
 import { weaponModelName } from '../../../lib/game/weapons'
-import { isPlanted } from '../../../lib/game/grenade'
+import { isPlanted, lobOf } from '../../../lib/game/grenade'
 import { meleeOf } from '../../../lib/game/melee'
 import { flingVelocity } from '../../../lib/game/tumble'
 import { ANIM } from '../../../lib/game/locomotion'
@@ -859,6 +859,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       // …still BURNING: a charge doused in the water has stopped counting and
       // travels as −1 (lib/game/snapshot.ts).
       now.lobs.filter((one) => isPlanted(one.skill) && one.fuse >= 0).map((one) => one.fuse),
+      delta
+    )
+    // …and a GAS canister streaming: the hiss runs while one is live and a
+    // doused one (fuse −1) has gone quiet (lib/game/gas.ts).
+    sounds.gasHissing(
+      now.lobs.some((one) => lobOf(one.skill)?.gas === true && one.fuse >= 0),
       delta
     )
     // …and the war beyond the map's edge, which nothing on the field causes

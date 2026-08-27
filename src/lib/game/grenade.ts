@@ -127,6 +127,23 @@ export interface Lob {
    * the same block, two instructions further on; those are other rows.)
    */
   contact: boolean
+  /**
+   * **Whether it STREAMS the poison cloud instead of bursting.**
+   *
+   * The projectile update's every-5th-frame dispatcher (0x4365a2, byte map
+   * 0x436D08) has kind 28 spawn effect 0x5E at the canister's own position
+   * from frame 15 of the flight on, and its destructor arm spawns one last
+   * 0x5E with **no 0x54 blast at all** — the row's `damage` is the cloud's
+   * flat contact figure, not a burst's, and its +0x08 force is nil, so the
+   * gas pushes nobody (`weapons/gas.md` in the disasm repo, 2026-08-27).
+   * `lib/game/gas.ts` is the stream; `lobs.ts` branches on this flag at the
+   * one detonation seam.
+   *
+   * Deliberately NOT on 23 CONFUSION though the exe's is the same projectile:
+   * its own status is not built, and play has not ruled whether the PC's
+   * "confusion gas poisons" is the game or a port accident.
+   */
+  gas?: boolean
 }
 
 /**
@@ -159,7 +176,9 @@ const LOBS: Record<number, Lob> = {
   23: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
   24: { id: 414, kind: 26, speed: 300, fuse: 150, arming: 3, damage: 2560, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
   25: { id: 415, kind: 27, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
-  26: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  /** 26 POISON — the canister that STREAMS (`gas` above): fifteen flat at the
+   * touch, the poison bit after, and no blast at the pop. */
+  26: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false, gas: true },
   27: { id: 420, kind: 32, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
   /**
    * **37 TNT — PLANTED, not thrown**, and its row says so in three places: a
