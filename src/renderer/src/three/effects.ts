@@ -79,12 +79,12 @@ const BLOB_SCALE = MODEL_SCALE
  */
 const BLOB_ALPHA = 0.4
 /**
- * …and MATTER is denser than light. The gas at the fireball's 0.4 read as
- * spray — play, against the original's footage: "там прям клубы, а у нас
- * будто брызки" — and the original's cloud is a near-solid green mass. The
- * remake's own, like BLOB_ALPHA.
+ * …and MATTER is THIN layers. It went to 0.8 chasing the original's solid
+ * mass and play sent it back — "дым должен быть прозрачнее… не
+ * накладываться": the mass comes from many soft blobs overlapping, not from
+ * each one being paint. The remake's own, like BLOB_ALPHA.
  */
-const MATTER_ALPHA = 0.8
+const MATTER_ALPHA = 0.5
 
 /** A point in game space, Y-down. */
 type Spot = { x: number; y: number; z: number }

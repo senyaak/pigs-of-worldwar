@@ -358,24 +358,27 @@ export const SPLASH_EFFECT: HitEffect = {
  *
  * The exe's trickle-in and its type-0x20 sprite sizing are not this system's
  * shapes, so the stage is the nearest the cloud spawner speaks: the full
- * thirty at birth, hanging where they are born. `up` 1 is the one liberty —
- * a whisper of rise so a standing plume breathes — and the SIZE is the
- * exe's own 15 for the type-0x20 particle, through the same sprite law the
- * fireball's 4 goes through: blobs near a pig tall, thirty of them
- * overlapping into one rolling cloud, which is what the original's footage
- * shows (play, with the screens side by side: "там прям клубы, а у нас
- * будто брызги" — 2 drew sparks, 8 drew spray). `matter` keeps it a cloud
- * rather than a light — its saturated green is past the fireball's
- * brightness line and drawn additive it SPARKLED (three/effects.ts, `LIT`,
- * and the matter DENSITY beside it). `[CHECK — remake]` for the rise; the
- * count, the colour, the size and the stillness are the read.
+ * thirty in all — but NOT at once: the exe TRICKLES its blobs, five at
+ * birth and one a frame after, and the all-at-birth first cut read as
+ * discrete bursts piling into a wall (play: "чаще выходить. не
+ * накладываться"). Four stages of eight, five frames apart, is that trickle
+ * in this system's own grammar. The SIZE rides the exe's own 15 for the
+ * type-0x20 particle and a little over (play: "чуть побольше"); `up` 1 is
+ * a whisper of rise so a standing plume breathes; `matter` keeps it a cloud
+ * rather than a light — drawn additive its green SPARKLED — and matter's
+ * own alpha is THIN (three/effects.ts, MATTER_ALPHA), because a cloud is
+ * layers, not paint. `[CHECK — remake]` for the rise and the staging; the
+ * total, the colour and the stillness are the read.
  */
 export const GAS_EFFECT: HitEffect = {
   id: 0x5e,
   kind: 28,
   rings: [],
   clouds: [
-    { at: 1, count: 30, colour: [2, 22, 0], up: 1, out: 1, gravity: 0, size: 15, matter: true }
+    { at: 1, count: 8, colour: [2, 22, 0], up: 1, out: 1, gravity: 0, size: 18, matter: true },
+    { at: 6, count: 8, colour: [2, 22, 0], up: 1, out: 1, gravity: 0, size: 18, matter: true },
+    { at: 11, count: 8, colour: [2, 22, 0], up: 1, out: 1, gravity: 0, size: 18, matter: true },
+    { at: 16, count: 8, colour: [2, 22, 0], up: 1, out: 1, gravity: 0, size: 18, matter: true }
   ]
 }
 
