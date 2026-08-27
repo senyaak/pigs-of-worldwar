@@ -78,6 +78,13 @@ const BLOB_SCALE = MODEL_SCALE
  * be this and might be anything; the draw is the library's.
  */
 const BLOB_ALPHA = 0.4
+/**
+ * …and MATTER is denser than light. The gas at the fireball's 0.4 read as
+ * spray — play, against the original's footage: "там прям клубы, а у нас
+ * будто брызки" — and the original's cloud is a near-solid green mass. The
+ * remake's own, like BLOB_ALPHA.
+ */
+const MATTER_ALPHA = 0.8
 
 /** A point in game space, Y-down. */
 type Spot = { x: number; y: number; z: number }
@@ -300,7 +307,8 @@ export function createEffectArt(root: THREE.Object3D): EffectArt {
       cloudChannel(one.colour[2]) / 255
     )
     sprite.material.opacity =
-      BLOB_ALPHA * Math.min(1, (RING_DEAD - one.age) / (RING_DEAD * 0.1))
+      (one.matter === true ? MATTER_ALPHA : BLOB_ALPHA) *
+      Math.min(1, (RING_DEAD - one.age) / (RING_DEAD * 0.1))
   }
 
   const redraw = (live: readonly Effect[]): void => {
