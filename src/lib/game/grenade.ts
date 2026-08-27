@@ -352,12 +352,16 @@ export function blastShare(distance: number, range: number): number {
   // only TNT was ever complained about: a grenade loses under a hundred units by
   // this and TNT loses four hundred.
   //
-  // The exe's own WHO is still not found and this is not it: `Pig::OnHit`'s
-  // blast arm is reached from a physics CONTACT with the effect's own body,
-  // which the shape table gives a sphere of 35 (0x4A8F42) — 205 units of reach
-  // against a pig, at which the falloff could never be anything but full. So
-  // something grows that contact and it has not been read; until it has, the
-  // rim the formula itself draws is the honest reach.
+  // **And the exe's own WHO is now READ, and it lands on this same rim.** The
+  // blast-push session (`weapons/fire.md` in the disasm repo, the force-column
+  // read) found the damage reaches a pig through the PHANTOM SWEEP at the
+  // row's own +0x04 radius, not through the 35-sphere body contact — and the
+  // sweep's edge, radius + the struck body's own, is EXACTLY where the
+  // falloff's quarter-rim sits (radius + body − 512 = the divisor, so
+  // `past = range` at the edge). The exe deals a quarter of the core at its
+  // last touchable point and nothing past it; this clamp is that limiter to
+  // the unit. `unit/reach.spec.ts` pins the table — asked for by play when a
+  // TNT's honest 21 points at three and a half tiles read as a bug.
   if (past > range) return 0
   return Math.max(0, 1 - (3 * past) / (4 * range))
 }
