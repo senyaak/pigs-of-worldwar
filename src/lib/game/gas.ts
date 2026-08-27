@@ -95,6 +95,12 @@ export function createGas(world: GasWorld, emit: Emit): Gas {
       // cloud, whatever the distance says (the same skip the hands make,
       // lib/game/healing.ts).
       if (pig.gone || isDead(pig)) continue
+      // …and a DISGUISED one is untouchable by gas ENTIRELY — read both ways
+      // (2026-08-27): the hidden pig's body is inert (`[body+0x44] & 1`, the
+      // sweep's first test at 0x406AEA skips it), and the decoy's own effect
+      // arm EXCLUDES the status-gas ids 0x5C..0x61 (0x48EB18). A bush does
+      // not breathe. `weapons/espionage.md` in the disasm repo.
+      if (pig.hidden) continue
       const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
       const away = Math.hypot(body.x - at.x, body.y - at.y, body.z - at.z)
       if (blastShare(away, reach) <= 0) continue

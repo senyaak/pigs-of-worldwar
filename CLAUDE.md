@@ -983,11 +983,14 @@ and the weakest of them were invented here:
   `weapons/espionage.md` in the disasm repo. The decoy is REAL COVER: it
   soaks a BULLET first — its hit points are the model's own (crate 40, bush
   50, tree/cactus 80, the object-health table at 0x4D6D18) — and hands the
-  pig only the remainder of the round that breaks it; a BLAST never asks it,
-  shedding the disguise before dealing (0x477C2F). Two edges are not the
-  exe's: hiding happens AT THE PRESS, not at the end of the gesture clip
-  (`[deliberate]`), and the GAS washes onto the pig directly (`[gap]` —
-  whether the cloud sweep meets the decoy body first is unread).
+  pig only the remainder of the hit that breaks it, a BLAST included (the
+  decoy's own effect arm runs the same falloff onto itself, 0x48EB26). The
+  GAS touches NOBODY: the hidden pig's body is out of the physics
+  (`[body+0x44] & 1`, the sweep's own first test at 0x406AEA) and the
+  decoy's effect arm excludes the status-gas ids 0x5C..0x61 — a bush does
+  not breathe, so do not "fix" gas to poison a hidden pig. One edge is not
+  the exe's: hiding happens AT THE PRESS, not at the end of the gesture
+  clip (`[deliberate]`).
 - `[play]` **A bullet's knock is the engine's own 45° throw, at the exe's
   own speeds — and pellets STACK.** `Pig::HitByProjectile` ADDS (0x4A9260
   fadds, never sets) 48 along the projectile's own pitch — kind 0x12 adds 6

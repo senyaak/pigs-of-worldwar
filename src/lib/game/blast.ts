@@ -75,6 +75,13 @@ export interface BlastWorld {
    * specs want.
    */
   groundNormal?: (x: number, z: number) => { x: number; y: number; z: number }
+  /**
+   * A hidden pig's DECOY takes the share first and hands back the remainder
+   * (lib/game/hide.ts `absorb`) — the exe's decoy has its own effect arm
+   * that computes the same falloff onto itself (0x48EB26), and the pig sees
+   * only what breaks through (0x48DB58). Optional the way `fling` is.
+   */
+  soak?: (pig: Pig, amount: number) => number
 }
 
 /**
@@ -168,8 +175,15 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     const dx = body.x - at.x
     const dy = body.y - at.y
     const dz = body.z - at.z
-    const amount = took(dx, dy, dz)
+    let amount = took(dx, dy, dz)
     if (amount <= 0) continue
+    // A DISGUISED pig's decoy takes the share first (lib/game/hide.ts): the
+    // exe's decoy runs this same falloff onto its own health and the pig
+    // sees only what breaks through — a blast the cover ate whole moves and
+    // reveals nobody.
+    const covered = pig.hidden
+    if (world.soak) amount = world.soak(pig, amount)
+    if (amount <= 0 && covered) continue
     const outcome = hurt(pig, amount, world.training)
     emit({ kind: 'damaged', at: body, amount, pig: pig.id })
     if (outcome === 'died' || outcome === 'gibbed')
