@@ -705,3 +705,29 @@ scale about the heart's own centre, the depth still `[CHECK — remake]`. The
 line is laid out on the resting size so the letters beside it hold still, and
 the beat's clock is the frame delta, so a pause freezes it with everything
 else.
+
+### FALL DAMAGE — read and built in one pass (2026-08-27)
+
+Play: "от падения урона по-моему нет? а должен быть (в начале раунда с
+парашюта не дамажится)". Right on both counts, and the read
+(`movement/falling.md` in the disasm repo) came back cleaner than expected:
+only a FLYING body is hurt by the ground. A plain jump or step-off lands
+through an arm with no damage code at all; a fall that outlasts 25 frames
+CONVERTS mid-air (yelp, clip 38) and becomes eligible; every throw — blast,
+melee, eject — is flying from its first frame. The arrival speed is a GATE at
+200 a frame, never a multiplier: crossing it costs a flat 508/128 ≈ 4 points,
+kind 4, per qualifying contact, so a chain of hard bounces is charged per
+bounce. The parachute is exempt STRUCTURALLY — its landing path has no damage
+call, and cutting the canopy deliberately keeps the flag — so the campaign
+drop-in was never in danger, which is exactly what play remembered.
+
+Built along the exe's own seams: `locomotion.ts` accumulates the airborne
+seconds, converts past `FLY_AFTER_SECONDS` (the clip goes to 38 with it) and
+records every non-water ground contact on the state (`impact` — full arrival
+speed and whether the body was flying); `falling.ts` turns a record into the
+flat four; `battle.ts` charges the acting pig once a frame and `tumble.ts`
+charges every thrown one. The object threshold (250, ~5 points) is folded
+into the landscape's 200 — a roof landing is rare and reads the same — and
+the conversion's yelp is not wired. `unit/falling.spec.ts` pins all four
+corners: the thrown pig's flat four, the harmless short hop, the long fall
+converting, and the gate itself.

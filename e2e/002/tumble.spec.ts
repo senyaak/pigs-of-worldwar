@@ -78,7 +78,7 @@ function fielded(apart: number): {
   const heard: BattleEvent[] = []
   const bus = createBus()
   bus.on((event) => heard.push(event))
-  const tumbles = createTumbles({ query, pigs, obstacles: NO_OBSTACLES }, bus.emit)
+  const tumbles = createTumbles({ query, pigs, obstacles: NO_OBSTACLES, training: true }, bus.emit)
   const mines = createMines(
     {
       pigs,

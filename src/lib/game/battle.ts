@@ -72,6 +72,7 @@ import type { DropIn } from './dropIn'
 import type { Corpses } from './corpses'
 import { drowns } from './drowning'
 import type { Drowning } from './drowning'
+import { chargeLanding } from './falling'
 import type { Poison } from './poison'
 import type { Point } from './pose'
 import type { Random } from './random'
@@ -1121,6 +1122,13 @@ export function createBattle(parts: BattleParts): Battle {
     // time the walk-away asks.
     bootsFor = Math.max(0, bootsFor - delta)
 
+    // The ACTING pig's last ground contact, charged if it qualifies — a
+    // flying arrival over the gate costs its flat four (lib/game/falling.ts).
+    // Here, before the branches, so it runs whichever beat stepped the
+    // flight: the contact sits on `loco` from last frame's fly and is
+    // cleared by the charge (or by the next locomotion frame).
+    chargeLanding(game.currentPig, loco, parts.training, emit)
+
     // The beat at the END of a turn: mode 13, WALK AWAY. Nobody is driving, the
     // clock does not run, and everyone still in the water makes for the nearest
     // shore (lib/game/walkAway.ts). It holds until they are all out and the
@@ -2080,7 +2088,18 @@ export function createBattle(parts: BattleParts): Battle {
       // clip chain it was thrown rather than jumped (lib/game/locomotion.ts);
       // `struck` starts it already touched, the bullet's own knockdown clip.
       const { vx, vy, vz } = velocity
-      loco.airborne = { vx, vy, vz, bouncing: true, pushIn: null, ejected, touched: struck }
+      // `hurled` — a thrown body is FLYING and the ground can hurt it on
+      // arrival, the acting pig no less than anyone (lib/game/falling.ts).
+      loco.airborne = {
+        vx,
+        vy,
+        vz,
+        bouncing: true,
+        pushIn: null,
+        ejected,
+        touched: struck,
+        hurled: true
+      }
       loco.getUp = 0
     },
     warp(x, z, heading) {

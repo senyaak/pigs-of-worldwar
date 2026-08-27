@@ -23,6 +23,7 @@
 
 import { createLocomotion, updateLocomotion } from './locomotion'
 import type { LocomotionState } from './locomotion'
+import { chargeLanding } from './falling'
 import { PIG_RADIUS, withPigs } from './obstacles'
 import type { Obstruction } from './obstacles'
 import { isDead } from './health'
@@ -37,6 +38,9 @@ export interface TumbleWorld {
   /** The map's own objects — a flung pig hits a crate the way a jumping one
    * does. */
   obstacles: Obstruction
+  /** The training ground spares a hard landing the way it spares any hit
+   * (lib/game/falling.ts → health.ts). */
+  training: boolean
 }
 
 /** A throw, as the velocity it starts with — game space, up is −Y. Built by
@@ -221,7 +225,19 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
       // one — which is what a MELEE hit wears, the exe putting a struck pig
       // through 0x470c70 and that arm calling for clip 38 (0x470cf5), the
       // same clip a pig thrown out of a wall gets.
-      state.airborne = { vx, vy, vz, bouncing: true, pushIn: null, ejected, touched: struck }
+      // …and `hurled`: every throw in the exe enters the FLYING state
+      // (0x470c70), which is the one the ground can hurt on arrival
+      // (lib/game/falling.ts).
+      state.airborne = {
+        vx,
+        vy,
+        vz,
+        bouncing: true,
+        pushIn: null,
+        ejected,
+        touched: struck,
+        hurled: true
+      }
       state.getUp = 0
       flying.set(pig.id, state)
       // Nothing is announced HERE: the clip the pig will wear is the one the first
@@ -240,6 +256,9 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
         // whole movement update for a pig in the air and so does this.
         updateLocomotion(state, query, { walk: 0, turn: 0, jump: false }, delta, around(id, state))
         pig.position = { x: state.x, y: state.y, z: state.z }
+        // A hard arrival costs its flat four — a thrown pig is FLYING and the
+        // ground charges it per qualifying contact (lib/game/falling.ts).
+        chargeLanding(pig, state, world.training, emit)
         // A dead pig still flies — it is a body, and the exe throws corpses about
         // as happily as anything else — but it must not be told to stand up out of
         // its own dying clip.

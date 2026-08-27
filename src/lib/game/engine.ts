@@ -439,7 +439,7 @@ export function createEngine(parts: EngineParts): Engine {
    * there; `battle` is built further down and `fling` is only ever called from
    * inside a step, by which time it exists.
    */
-  const tumbles = createTumbles({ query, pigs, obstacles }, bus.emit)
+  const tumbles = createTumbles({ query, pigs, obstacles, training }, bus.emit)
   // What a blast under a pig's trotters throws ALONG — the slope's own up
   // rather than the sky's (lib/game/tumble.ts, `hurlVelocity`).
   const groundNormal = (x: number, z: number): { x: number; y: number; z: number } =>

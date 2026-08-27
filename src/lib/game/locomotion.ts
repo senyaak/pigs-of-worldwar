@@ -320,6 +320,21 @@ export interface Airborne {
    * all.
    */
   touched?: boolean
+  /**
+   * Seconds this flight has been in the air — `fly` accumulates it. Past
+   * `FLY_AFTER_SECONDS` a plain fall has become FLYING, which is the exe's
+   * own conversion (0x46e95d: 25 airborne frames turn `+0x1fd` into
+   * `+0x21c`, the yelp, clip 38) — and only a FLYING body is hurt by the
+   * ground (lib/game/falling.ts).
+   */
+  aloft?: number
+  /**
+   * Born from a THROW — a blast's, a melee's, a bullet's knockdown — so
+   * FLYING from its first frame: every fling path in the exe enters through
+   * 0x470c70, which is the flying state's own door. A jump or a step-off
+   * leaves it unset and stays harmless until the 25 frames are up.
+   */
+  hurled?: boolean
 }
 
 export interface Intent {
@@ -397,6 +412,15 @@ export interface LocomotionState {
    * Written by the driver beside `wounded`.
    */
   armed: boolean
+  /**
+   * The GROUND CONTACT this frame made, or null — the full arrival speed
+   * (the exe's `[hit+0x14]`, the length of the relative velocity) and
+   * whether the body was FLYING when it hit. `fly` writes one per non-water
+   * contact, `updateLocomotion` clears it at the top of every frame, and
+   * whoever owns the PIG turns it into damage (lib/game/falling.ts): this
+   * state knows no pig, the same split as `wounded`.
+   */
+  impact: { speed: number; flying: boolean } | null
 }
 
 /**
@@ -504,7 +528,8 @@ export function createLocomotion(
     // above is this question asked in a second place).
     swimming: inWater(query, x, z, y),
     wounded: 0,
-    armed: false
+    armed: false,
+    impact: null
   }
 }
 
@@ -526,7 +551,8 @@ export function createLocomotion(
 export const copyLocomotion = (state: LocomotionState): LocomotionState => ({
   ...state,
   airborne: state.airborne ? { ...state.airborne } : null,
-  bounciness: { ...state.bounciness }
+  bounciness: { ...state.bounciness },
+  impact: state.impact ? { ...state.impact } : null
 })
 
 /**
@@ -544,6 +570,9 @@ export function updateLocomotion(
   delta: number,
   obstruction: Obstruction = NO_OBSTACLES
 ): void {
+  // Last frame's contact has been read by now or never will be
+  // (lib/game/falling.ts runs off it each frame).
+  state.impact = null
   // Turning on the spot works in every grounded state; the air steers
   // nothing (`UpdateMovement` returns at once on state 5), and neither does
   // a pig already crouched to jump.
@@ -577,6 +606,14 @@ export function updateLocomotion(
   state.bounciness = easeBounciness(state.bounciness, wedged, state.airborne === null, delta)
 }
 
+/**
+ * How long a plain fall stays harmless: the exe's conversion counter — 25
+ * airborne frames (`cmp [esi+0x20c],0x19` at 0x46e95d) and the fall becomes
+ * FLYING, yelp, clip 38, damage-eligible. Frames at the engine's own rate,
+ * like every frame count (CLAUDE.md).
+ */
+export const FLY_AFTER_SECONDS = 25 * FRAME_SECONDS
+
 /** Momentum carries; gravity does the rest. */
 function fly(
   state: LocomotionState,
@@ -587,10 +624,17 @@ function fly(
   const a = state.airborne as Airborne
   // Nothing in the air is in the water, whatever is under it.
   state.swimming = false
+  a.aloft = (a.aloft ?? 0) + delta
+  // Whether this body is in the exe's FLYING state — the one the ground can
+  // hurt (lib/game/falling.ts): thrown, ejected, or a plain fall past the
+  // exe's 25-frame conversion (0x46e95d).
+  const flying = a.hurled === true || a.ejected === true || a.aloft > FLY_AFTER_SECONDS
   // FLYING until it has hit something, BOUNCING after (`Airborne.touched`);
-  // an eject flies the whole way, which is what it was already doing.
+  // an eject flies the whole way, which is what it was already doing — and a
+  // long plain fall wears the same clip 38 from the conversion on, which is
+  // the exe's own dressing for it (0x470cf5).
   state.clip =
-    a.ejected || (a.bouncing && !a.touched)
+    a.ejected || (flying && !a.touched) || (a.bouncing && !a.touched)
       ? ANIM.EJECTED
       : a.bouncing
         ? ANIM.BOUNCE
@@ -685,6 +729,13 @@ function fly(
     delta
   )
   state.y = floor
+  // THE CONTACT, recorded for whoever owns the pig: the full arrival speed —
+  // the exe's `[hit+0x14]` is the length of the relative velocity — and
+  // whether the body was FLYING when it hit. Every non-water ground contact
+  // makes one, the bounce arm's included: the exe charges a hard bounce per
+  // contact (lib/game/falling.ts). Water made none above, which is the exe's
+  // own skip at the damage call site.
+  state.impact = { speed: Math.hypot(a.vx, a.vy, a.vz), flying }
   /**
    * A landing is binary in the original, and the test is the ARRIVAL SPEED —
    * the FULL magnitude, not its vertical part. The impact handler compares
