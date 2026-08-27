@@ -23,6 +23,7 @@
 // since a wide window is wider than 640 of these units.
 
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { aimRadians } from '../../../lib/game/aim'
 import { loadFont } from './font'
 import type { Font } from './font'
@@ -44,18 +45,20 @@ const MARKERS = 'Language/Tims/MAPICONS.MTD'
 /** The battle's own big letters — the title card and the floating numbers. */
 const TEXT_FONT = 'BIG'
 /**
- * The letters over a pig's head: the battle's BIG, drawn SMALLER than its own
- * size (`LAYOUT.plate.scale`), team-coloured per pig.
+ * The letters over a pig's head: the battle's SMALL, at its own size,
+ * team-coloured per pig.
  *
- * Play ruled BIG's 32 too big and the plate was moved to SMALL doubled, which
- * is 24 tall. Play then saw that in the game and ruled the LETTERS wrong —
- * "не тот шрифт! верни тот что был — но просто сделай меньше его" — so it is
- * BIG's shapes at a plate height that is still about 24: BIG's 32 at 0.75.
- * The same 24 either way, the glyphs BIG's. Which font the exe's own plate
- * drawer uses is still not read (`0x459B20`, scanner/notes.md), so play's
- * word is the ruling.
+ * **READ now, and it settles a font that had gone back and forth on taste.**
+ * The plate dispatcher (0x459B20) only COLLECTS — it projects each pig and
+ * parks the screen point — and every print helper it hands the list to,
+ * 0x45A510 and 0x45A4B0, prints through `[0x51BA54]` — `FETEXT\small` — and
+ * never once through BIG's `[0x51BA58]` (2026-08-27, swept per callee). So
+ * the original's plate is SMALL at its native 12, which is also why the
+ * remake's BIG kept reading wrong to play at any scale: "там вроде другой
+ * шрифт". The earlier bounce off "SMALL doubled" was the ×2 blow-up, not the
+ * font. `[exe]`
  */
-const PLATE_FONT = 'BIG'
+const PLATE_FONT = 'SMALL'
 /** The height the dashboard art was drawn for. */
 const AUTHORED_HEIGHT = 480
 
@@ -78,12 +81,13 @@ const AUTHORED_HEIGHT = 480
  *   OVERLAP by seven rows of plain black, which is what closes their rim
  *   into a ring — with `ang5` capping its right end.
  * - PLATE: the name over a pig, the health under it beside a heart, both
- *   lines in the pig's TEAM colour (contracts/overlay.ts). The heart is a
- *   10×11 map marker standing next to letters 24 tall (BIG at 0.75 — see
- *   PLATE_FONT), so it is drawn at twice its size, on a scale of its OWN
- *   that no longer follows the letters'; it and the fans ship WHITE for the
- *   game to paint, and the heart's pink and the fans' green are matched to
- *   play rather than measured.
+ *   lines in the pig's TEAM colour (contracts/overlay.ts). The letters are
+ *   the exe's own SMALL at native size (see PLATE_FONT), and the heart — a
+ *   10×11 map marker — stands beside them at ITS native size too, which is
+ *   the original's own proportion; it and the fans ship WHITE for the game
+ *   to paint, and the heart's pink and the fans' green are matched to play
+ *   rather than measured. The heart PULSES — play remembers it beating —
+ *   at the lit portrait's own read rate (PULSE_STEP below).
  */
 export const LAYOUT = {
   clock: {
@@ -235,8 +239,10 @@ export const LAYOUT = {
   },
   plate: {
     /** Seconds a pig must have stood still before its name comes back. Play
-     * on the original: "задержка есть — но не 2 секунды а меньше". */
-    delay: 1,
+     * on the original: "задержка есть — но не 2 секунды а меньше" — and then
+     * cut it again (2026-08-27, "надо уменьшить таймер непоказывания"):
+     * 2 → 1 → half a second. Play's dial. */
+    delay: 0.5,
     /**
      * …and seconds it is shown for after its number went DOWN, whatever it is
      * doing.
@@ -258,17 +264,15 @@ export const LAYOUT = {
      * anything when the model's scale moved. */
     lift: 120,
     /**
-     * BIG's glyphs shrunk. It was 0.75 — 32 at 0.75 being the 24-tall plate
-     * measured off the original — and play took it down another **70 per
-     * cent** on seeing it beside the thicker outline: "шрифт поменьше -
-     * процентов 70 от текущего". 0.75 × 0.7 = 0.525, so a glyph is about
-     * seventeen pixels tall.
+     * NATIVE — the exe prints the plate in SMALL at the glyphs' own 12 (see
+     * PLATE_FONT: the read that ended the scale-hunting). The 0.75s and
+     * 0.525s this carried were all attempts to shrink BIG toward a size that
+     * was really another font's.
      *
-     * The outline below does NOT follow it and that is the point: letters that
-     * shrink against an outline that does not are letters with more black
-     * around them, which is what the pair of changes was asking for.
+     * The outline below does NOT follow this and that is the point: it is a
+     * constant weight in screen pixels whatever the glyphs do.
      */
-    scale: 0.525,
+    scale: 1,
     /**
      * How far the BLACK OUTLINE stands off the letters, in screen pixels.
      *
@@ -286,7 +290,10 @@ export const LAYOUT = {
      * `aroundBy`. Play has moved it twice, 1 → 2 → 3, each time on seeing it.
      */
     outline: 3,
-    heart: { colour: [248, 64, 152] as [number, number, number], scale: 2 }
+    /** The heart's ×2 followed BIG's tall letters; beside SMALL's native 12
+     * the 10×11 art stands at its OWN size, which is the original's
+     * proportion. The pink stays play's. */
+    heart: { colour: [248, 64, 152] as [number, number, number], scale: 1 }
   }
   // THE MAP has no entry here on purpose: nothing about its placement or its
   // size is free. Where it sits, how big it is, how far it tilts and how it
@@ -317,6 +324,19 @@ const aroundBy = (radius: number): readonly (readonly [number, number])[] => {
 
 /** What the specs wait for; the console tweaks `LAYOUT.plate.delay`. */
 export const PLATE_DELAY = LAYOUT.plate.delay
+
+/**
+ * The heart's PULSE — play remembers it beating ("и сердечко пульсирует").
+ *
+ * The RATE is the exe's one read swell, borrowed whole: the lit portrait's
+ * angle steps 100 of 4096 a frame (0x41D365, ui/playerScreen.ts uses the same
+ * pair), so a beat is about a second and a half. The DEPTH is `[CHECK —
+ * remake]` there and stays it here. The pulse is a scale about the heart's own
+ * centre — the lines around it are laid out on the resting size, so nothing
+ * else on the plate breathes with it.
+ */
+const PULSE_STEP = (100 / 4096) * Math.PI * 2
+const PULSE_DEPTH = 0.12
 
 export interface HudState {
   /** Seconds since the last frame — the briefing bar's slide and scroll run
@@ -469,6 +489,9 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
    * every pig's number was last frame — the only way to see it fall. */
   let hurtFor = 0
   const wasHealth = new Map<string, number>()
+  /** Where the heart's beat stands (PULSE_STEP). A pause freezes it with
+   * everything else: the delta it advances by is zero there. */
+  let heartBeat = 0
   /** Which colours the tints were baked with, so a console change to them
    * repaints instead of being quietly ignored. */
   let painted = ''
@@ -842,6 +865,11 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           if (before !== undefined && plate.health < before) hurtFor = PLATE.hurt
           wasHealth.set(plate.name, plate.health)
         }
+        // The beat runs while the plates are hidden too — a heart that
+        // restarts from zero every time the plate comes back would visibly
+        // hiccup — and it counts the exe's frames the way the portrait's
+        // swell does (25 a second, ui/playerScreen.ts).
+        heartBeat += (delta / EXE_FRAME_SECONDS) * PULSE_STEP
         if (state.still < PLATE.delay && hurtFor <= 0) return
         const factor = PLATE.scale
         const line = base.height * factor
@@ -951,12 +979,17 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           letters(block.font, block.name, Math.round(block.x - block.nameWidth / 2), Math.round(block.top))
           const healthLeft = Math.round(block.x - block.healthWidth / 2)
           const healthTop = Math.round(block.top + line + PLATE.gap)
+          // The BEAT: a swell about the heart's own centre. The line is laid
+          // out on the resting size, so the letters beside it hold still.
+          const swell = 1 + PULSE_DEPTH * Math.sin(heartBeat)
+          const beatWidth = heartSize.width * swell
+          const beatHeight = heartSize.height * swell
           context.drawImage(
             heart.image,
-            healthLeft,
-            healthTop + Math.round((line - heartSize.height) / 2),
-            heartSize.width,
-            heartSize.height
+            healthLeft + (heartSize.width - beatWidth) / 2,
+            healthTop + Math.round((line - heartSize.height) / 2) + (heartSize.height - beatHeight) / 2,
+            beatWidth,
+            beatHeight
           )
           letters(block.font, block.health, healthLeft + heartSize.width + gap, healthTop)
         }

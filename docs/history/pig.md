@@ -676,3 +676,32 @@ each mechanism was "found" one read short of the truth, and each time it
 was PLAY that knew — the behaviour is the spec, the binary is the
 mechanism, and a mechanism that contradicts behaviour is simply not yet
 read to its end.
+
+### The plate is SMALL — the font READ ends the scale-hunting, the delay halves, the heart beats (2026-08-27)
+
+Play, in one breath: "надо имена поправить. надо уменьшить таймер
+непоказывания. + там вроде другой шрифт. и сердечко пульсирует". Three
+changes, and the middle one closed a file that had been open since P0.1.
+
+**The font.** The plate had been BIG at 0.75, then 0.525 — each scale a
+play-session's attempt to shrink it toward something that kept reading wrong.
+The reason it kept reading wrong is now read: 0x459B20 only collects the pigs
+and their screen points, and both print helpers it hands the list to (0x45A510
+and 0x45A4B0) print through `[0x51BA54]` — **`FETEXT\small`** — and never
+through BIG's object. The original's plate is SMALL at its native 12, so that
+is what the plate wears now, scale 1, and the heart went back to its native
+10×11 beside it — the ×2 was matched to BIG's tall letters and followed them
+out. The earlier bounce off "SMALL doubled" was the blow-up, not the font.
+`scanner/notes.md` carries the sweep.
+
+**The delay** — the stand-still second before a name comes back — halved
+again on play's word, 2 → 1 → 0.5 (`LAYOUT.plate.delay`, play's dial as
+before).
+
+**The heart beats.** Play remembers it pulsing, and the rate is not invented:
+it is the lit portrait's own swell — the angle stepping 100 of 4096 an exe
+frame (0x41D365) that `ui/playerScreen.ts` already carries — applied as a
+scale about the heart's own centre, the depth still `[CHECK — remake]`. The
+line is laid out on the resting size so the letters beside it hold still, and
+the beat's clock is the frame delta, so a pause freezes it with everything
+else.
