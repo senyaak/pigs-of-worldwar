@@ -130,23 +130,36 @@ export interface Lob {
 }
 
 /**
- * The grenade family, skills 19–27 — nine of them, and their rows are all but
- * identical. 26 is the odd one: half the row's +0x04 and no +0x08, which is
- * whatever those two fields drive (they feed effect 0x5D at 0x436665).
+ * The grenade family, skills 19–27 — nine of them.
+ *
+ * **The kinds do NOT follow the skills in order, and this table had them
+ * crossed for a fortnight.** Field +0x10 of the 80-byte skill record
+ * (0x4d7300 + skill·80) is the projectile id, kind = id − 388, and read out
+ * of the exe (2026-08-27, `weapons/gas.md` in the disasm repo): 21→29,
+ * 22→31, 23→28, 24→26, 25→27, 26→28. So HIGH EXPLOSIVE really is the heavy
+ * one (60 points over half again a grenade's field), the 0.001/0.001
+ * material is the ROLLER's — near-zero friction is WHY it rolls for ever —
+ * and CONFUSION and POISON are the SAME projectile, id 416: same flight,
+ * same cloud, apart only in text and icon. Kind 30 (the family's one
+ * speed-500 row) is id 418, which no skill claims.
  */
 const LOBS: Record<number, Lob> = {
   /** 19 GRENADE — the plain one. Friction 0.30, restitution 0.80, so 0.12 and
    * 0.32 against grass: a few hops and then a long roll. */
   19: { id: 412, kind: 24, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
   20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
-  21: { id: 414, kind: 26, speed: 300, fuse: 150, arming: 3, damage: 2560, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
-  22: { id: 415, kind: 27, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  /** 21 HIGH EXPLOSIVE — sixty points at the core over a 1536 field: the
+   * heaviest thing a pig throws. */
+  21: { id: 417, kind: 29, speed: 300, fuse: 150, arming: 3, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  /** 22 ROLLER — a grenade's forty points on a material of 0.001/0.001:
+   * nothing bounces and nothing slows, so it ROLLS, which is the weapon. */
+  22: { id: 419, kind: 31, speed: 300, fuse: 150, arming: 3, damage: 5120, blast: 1024, friction: 4 / FIXED, restitution: 4 / FIXED, contact: false },
+  /** 23 CONFUSION — id 416, the SAME projectile as 26 POISON (the status is
+   * not built; until it is, this bursts as a stand-in). */
   23: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
-  24: { id: 417, kind: 29, speed: 300, fuse: 150, arming: 3, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
-  25: { id: 418, kind: 30, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
-  /** 26 is the odd one twice over: half the row's +0x04 and no +0x08, and a
-   * material of 0.001 on both — it STICKS where it lands. */
-  26: { id: 419, kind: 31, speed: 300, fuse: 150, arming: 3, damage: 5120, blast: 1024, friction: 4 / FIXED, restitution: 4 / FIXED, contact: false },
+  24: { id: 414, kind: 26, speed: 300, fuse: 150, arming: 3, damage: 2560, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  25: { id: 415, kind: 27, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  26: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
   27: { id: 420, kind: 32, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
   /**
    * **37 TNT — PLANTED, not thrown**, and its row says so in three places: a
@@ -360,7 +373,8 @@ export function blastShare(distance: number, range: number): number {
  * behaviour play describes in one line: it hops a few times rather than
  * trampolining, and then rolls a long way because 0.12 is very little friction.
  *
- * Skill 26's kind is the odd one at 0.001/0.001 — it does not bounce at all.
+ * The ROLLER's kind is the odd one at 0.001/0.001 — nothing bounces and
+ * nothing slows, so it rolls (the table above has the corrected map).
  */
 export const lobBounce = (row: Lob): Bounciness => ({
   friction: row.friction,

@@ -55,8 +55,10 @@ test('a grenade brings its own material, and it is not near-elastic', { tag: '@n
   // Row +0x20 and +0x22 of the projectile table: 0.30 and 0.80.
   expect(ROW.friction).toBeCloseTo(0.3, 3)
   expect(ROW.restitution).toBeCloseTo(0.8, 3)
-  // Skill 26's kind is the odd one — it does not bounce at all, it sticks.
-  expect(lobOf(26)!.restitution).toBeCloseTo(0.001, 3)
+  // The ROLLER's kind is the odd one — nothing bounces and nothing slows,
+  // which is why it rolls (the skill→kind map is pinned in grenade.ts).
+  expect(lobOf(22)!.restitution).toBeCloseTo(0.001, 3)
+  expect(lobOf(22)!.friction).toBeCloseTo(0.001, 3)
 })
 
 test('the surface multiplies its half in, so grass is not stone', { tag: '@nodata' }, () => {
