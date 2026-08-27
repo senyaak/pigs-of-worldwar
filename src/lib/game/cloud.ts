@@ -93,6 +93,14 @@ export interface CloudStage {
   gravity: number
   /** What scales the sprite — `param(base+7)`, `[child+0x7e]`. */
   size: number
+  /**
+   * This cloud is MATTER, never light: drawn covering whatever its colour,
+   * where the fireball's bright-colour-is-light rule would add it
+   * (three/effects.ts, `LIT`). The gas is the case that forced the field —
+   * its saturated green is brighter than the rule's line, and drawn additive
+   * it read as sparks: "там какие-то искры - а должно быть облако".
+   */
+  matter?: boolean
 }
 
 /** One sprite. Game space, Y-DOWN, and exe units a frame. */
@@ -113,6 +121,8 @@ export interface Cloud {
   gravity: number
   size: number
   colour: [number, number, number]
+  /** Matter, not light — carried off the stage (see `CloudStage.matter`). */
+  matter?: boolean
   blobs: Blob[]
 }
 
@@ -165,7 +175,14 @@ export function spawnCloud(
       dz: out(fixed(Math.sin(yaw)))
     })
   }
-  return { age: 0, gravity: stage.gravity, size: stage.size, colour: stage.colour, blobs }
+  return {
+    age: 0,
+    gravity: stage.gravity,
+    size: stage.size,
+    colour: stage.colour,
+    matter: stage.matter,
+    blobs
+  }
 }
 
 /**

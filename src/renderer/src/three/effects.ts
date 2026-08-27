@@ -319,7 +319,10 @@ export function createEffectArt(root: THREE.Object3D): EffectArt {
         drape(sprite, one, effect.at)
       }
       for (const cloud of effect.clouds) {
-        const lit = Math.max(...cloud.colour) >= LIT
+        // MATTER never glows, whatever its colour — the gas's green is past
+        // the brightness line and added it read as sparks (lib/game/cloud.ts,
+        // `CloudStage.matter`).
+        const lit = cloud.matter !== true && Math.max(...cloud.colour) >= LIT
         for (const blob of cloud.blobs) {
           const sprite = blobAt(b++, lit)
           sprite.visible = true

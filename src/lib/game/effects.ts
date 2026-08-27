@@ -359,15 +359,21 @@ export const SPLASH_EFFECT: HitEffect = {
  * The exe's trickle-in and its type-0x20 sprite sizing are not this system's
  * shapes, so the stage is the nearest the cloud spawner speaks: the full
  * thirty at birth, hanging where they are born. `up` 1 is the one liberty —
- * a whisper of rise so a standing plume breathes — and `size` 2 against the
- * fireball's 4 keeps a puff a puff. `[CHECK — remake]` for those two; the
- * count, the colour and the stillness are the read.
+ * a whisper of rise so a standing plume breathes — and the SIZE is play's
+ * dial: 2 drew thirty near-invisible points ("там какие-то искры - а должно
+ * быть облако"), 8 draws blobs of about half a pig that overlap into one
+ * green puff. `matter` keeps it a cloud rather than a light — its saturated
+ * green is past the fireball's brightness line and drawn additive it
+ * SPARKLED (three/effects.ts, `LIT`). `[CHECK — remake]` for the rise and
+ * the size; the count, the colour and the stillness are the read.
  */
 export const GAS_EFFECT: HitEffect = {
   id: 0x5e,
   kind: 28,
   rings: [],
-  clouds: [{ at: 1, count: 30, colour: [2, 22, 0], up: 1, out: 1, gravity: 0, size: 2 }]
+  clouds: [
+    { at: 1, count: 30, colour: [2, 22, 0], up: 1, out: 1, gravity: 0, size: 8, matter: true }
+  ]
 }
 
 /** How far round the burst fans its particles: the same 1638.4-per-turn unit
