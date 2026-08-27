@@ -971,6 +971,20 @@ and the weakest of them were invented here:
   evaluate.ts) is `[deliberate]`, and 23 CONFUSION — in the PC exe LITERALLY
   the same projectile, id 416 — is deliberately left a plain burst until
   play rules whether that identity is the game or a port accident.
+- `[exe]` **HIDE (55) turns the pig into a BUSH, and PICK POCKET (54) takes
+  the WHOLE slot.** The disguise is a real decoy prop — nearest disguisable
+  model within 8192, CRATE4 fallback — the hidden pig is untargetable, off
+  the plate, the blip and the picture, a blade on it KNOCKS ON WOOD for
+  nothing, the cover drops at the pig's own next turn, and the enemy's spies
+  start every battle hidden. The theft is the heal's cone with a looser
+  filter (allies and corpses qualify), a random whole slot, a laugh, and a
+  14-slot append cap under which loot silently vanishes — the exe's own
+  off-by-one, kept. `lib/game/hide.ts`, `pickpocket.ts`;
+  `weapons/espionage.md` in the disasm repo. Two edges are not the exe's:
+  hiding happens AT THE PRESS, not at the end of the gesture clip
+  (`[deliberate]` — the turn ends with the use and a vanished pig has no
+  gesture to show), and the decoy does not SOAK damage before the pig
+  (`[gap]` — its hit points are unread; here any damage reveals).
 - `[play]` **A bullet's knock is the engine's own 45° throw, at the exe's
   own speeds — and pellets STACK.** `Pig::HitByProjectile` ADDS (0x4A9260
   fadds, never sets) 48 along the projectile's own pitch — kind 0x12 adds 6

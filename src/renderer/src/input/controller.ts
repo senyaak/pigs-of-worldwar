@@ -246,6 +246,9 @@ export interface DebugHooks {
   /** How many pairs of BOOTS are drawn — the renderer's word that a `remains`
    * event became art (three/remains.ts). */
   remains(): number
+  /** …and how many DISGUISES — a hidden pig's decoy became art
+   * (three/decoyArt.ts). */
+  decoys(): number
   /** How full the power gauge is, 0..1, or null when nothing is charging
    * (lib/game/gauge.ts). */
   charging(): number | null

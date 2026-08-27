@@ -61,6 +61,12 @@ export interface PigShot {
    * the renderer's job and being in a shelter is the engine's.
    */
   sheltered: boolean
+  /**
+   * DISGUISED — HIDE's own flag (lib/game/hide.ts): not drawn either, and a
+   * decoy from `BattleSnapshot.decoys` stands in its place. A mirror of
+   * `Pig.hidden`, the way `health` mirrors the pig's.
+   */
+  hidden: boolean
 }
 
 /** One thing in the air. Bullets and grenades share a shape because what is
@@ -88,6 +94,17 @@ export interface FlightShot {
 export interface DescentShot {
   id: number
   y: number
+}
+
+/** A DISGUISE standing where a hidden pig does (lib/game/hide.ts): which
+ * model out of the map's own archive, at the pig's soles and yaw. */
+export interface DecoyShot {
+  pig: number
+  model: string
+  x: number
+  y: number
+  z: number
+  yaw: number
 }
 
 export interface BattleSnapshot {
@@ -130,6 +147,8 @@ export interface BattleSnapshot {
   bullets: FlightShot[]
   lobs: FlightShot[]
   crates: DescentShot[]
+  /** Every disguise standing (lib/game/hide.ts). */
+  decoys: DecoyShot[]
   /** The rings, smoke and clouds a blow threw (lib/game/effects.ts) — already
    * plain numbers, so they travel as they are. */
   effects: Effect[]

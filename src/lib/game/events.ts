@@ -137,6 +137,15 @@ export type BattleEvent =
    * reach that far...") or a victim with nothing left (`nothing`). P_OWW,
    * the exe's own two exits. */
   | { kind: 'stealFailed'; pig: PigId; at: Point; reason: 'reach' | 'nothing' }
+  /** This pig took the DISGUISE — it stops being drawn and a decoy prop
+   * stands where it does (lib/game/hide.ts). */
+  | { kind: 'hid'; pig: PigId }
+  /** …and shed it: damage, a fling, death, or its own next turn starting. */
+  | { kind: 'revealed'; pig: PigId }
+  /** A blade met a DISGUISE: the exe diverts the whole strike to a knock on
+   * wood — FT_WOOD, no damage, no throw, and not a reveal
+   * (lib/game/strikes.ts). */
+  | { kind: 'struckWood'; at: Point }
 
   // ——— the map ———
   /** Something on it has been knocked down. */

@@ -317,6 +317,11 @@ export function pigBlips(players: readonly Player[], acting: number, clock: numb
       // 0x440A44 on state 8 before it touches the model.
       if (pig.health <= 0) continue
       if (HIDDEN_CLASSES.has(pig.pigClass) && !own) continue
+      // A DISGUISED pig is off the board for EVERYONE, its own side included
+      // — the exe never submits a hidden pig to the draw at all, blip and
+      // plate with it (lib/game/hide.ts). The player knows which bush is
+      // theirs; the map does not say.
+      if (pig.hidden) continue
       const active = own && players[team].pigs[players[team].activePig] === pig
       blips.push({
         x: pig.position.x,

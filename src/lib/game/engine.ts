@@ -36,6 +36,8 @@ import { createHealing } from './healing'
 import type { Heals } from './healing'
 import { createPockets } from './pickpocket'
 import type { Pockets } from './pickpocket'
+import { createHide, startsHidden } from './hide'
+import type { Hides } from './hide'
 import { createBullets } from './bullets'
 import type { Bullets } from './bullets'
 import { createLobs } from './lobs'
@@ -235,6 +237,8 @@ export interface Engine {
   readonly heals: Heals
   /** The pickpocket (lib/game/pickpocket.ts). */
   readonly pockets: Pockets
+  /** The disguise, and who stands behind which bush (lib/game/hide.ts). */
+  readonly hides: Hides
   readonly effects: EffectField
   readonly numbers: DamageNumbers
   readonly airDrops: AirDrops
@@ -294,7 +298,12 @@ export function createEngine(parts: EngineParts): Engine {
       killed: ({ pig, gibbed }) => {
         const one = pigOf(pig)
         if (one) corpses.claim(one, gibbed === true)
+        // Death sheds the disguise before the dying (the exe's 0x467D87).
+        hides.reveal(pig)
       },
+      // …and being THROWN sheds it too — every fling in the exe enters the
+      // flying state through 0x470C70, whose first act is the unhide.
+      flung: ({ pig }) => hides.reveal(pig),
       // A crate on the ground is something to walk into again. Collision, not
       // art — the canopy coming off is the scene's half of the same event.
       crateLanded: ({ id, at }) => {
@@ -316,6 +325,10 @@ export function createEngine(parts: EngineParts): Engine {
       // `structure` flag the day one is enterable. `[play]`
       damaged: ({ at, amount, pig, structure }) => {
         if (pig !== undefined || structure) numbers.show(at, amount)
+        // Any damage REVEALS — the tail of `Pig::TakeDamage` (0x47863D,
+        // lib/game/hide.ts). The decoy soaking first is a [gap]: its own
+        // hit points are unread.
+        if (pig !== undefined) hides.reveal(pig)
       },
       // A heal shows the same number a hit does — one spawner, one style
       // argument apart (lib/game/scenery.ts) — **and it CURES**: the tail of
@@ -418,6 +431,16 @@ export function createEngine(parts: EngineParts): Engine {
   /** …and PICK POCKET, its cone's twin with the looser filter
    * (lib/game/pickpocket.ts). */
   const pockets = createPockets({ pigs, clips: world.clips, random }, bus.emit)
+  /** …and HIDE: the disguise, the decoy and every way it is shed
+   * (lib/game/hide.ts). */
+  const hides = createHide({ pigs, objects }, bus.emit)
+  // **THE ENEMY'S SPIES START HIDDEN** — the exe's own Map::Load tail sweep
+  // (0x47D790): every machine-side pig holding the skill takes the disguise
+  // before the first turn. Side 0 is the player's, always (lib/game/spawns.ts).
+  for (const [side, player] of game.players.entries()) {
+    if (side === 0) continue
+    for (const one of player.pigs) if (startsHidden(one, true)) hides.begin(one)
+  }
   /** What a GUN does: the flight, the substepping and every verdict about what
    * was hit (lib/game/bullets.ts). */
   const shots = createBullets(
@@ -535,6 +558,7 @@ export function createEngine(parts: EngineParts): Engine {
     swings,
     heals,
     pockets,
+    hides,
     tumbles,
     corpses,
     effects,
@@ -630,6 +654,7 @@ export function createEngine(parts: EngineParts): Engine {
       overlayPhase: over.phase,
       underCanopy: dropIn.underCanopy(pig),
       sheltered: indoors.inside(pig) !== null,
+      hidden: pig.hidden,
       arriving: dropIn.live().some((one) => one.pig === pig)
     }
   }
@@ -679,6 +704,7 @@ export function createEngine(parts: EngineParts): Engine {
         bullets: shots.live().map(flightOf),
         lobs: grenades.all().map(flightOf),
         crates: airDrops.live().map((one): DescentShot => ({ id: one.id, y: one.drop.y })),
+        decoys: hides.decoys().map((one) => ({ ...one })),
         effects: [...effects.all()],
         numbers: [...numbers.all()]
       }
@@ -696,6 +722,7 @@ export function createEngine(parts: EngineParts): Engine {
     mines,
     poison,
     pockets,
+    hides,
     tumbles,
     effects,
     numbers,

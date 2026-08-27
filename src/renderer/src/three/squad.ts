@@ -276,6 +276,9 @@ export function fieldSquad(
         // team's turn — the exe's one rule about the plate, the identical test
         // its blip takes, and it cuts both ways (0x459BA7, lib/game/scanner.ts).
         if (HIDDEN_CLASSES.has(soldier.pig.pigClass) && soldier.side !== acting) continue
+        // A DISGUISED pig carries no plate at all — a bush with a name over
+        // it is not a disguise (lib/game/hide.ts).
+        if (soldier.pig.hidden) continue
         soldier.node.getWorldPosition(at)
         // World space is Y-up, so the plate hangs above by ADDING to y. The
         // node sits at the model's ORIGIN — the hip — so clear the rise to

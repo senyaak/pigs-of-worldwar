@@ -1825,3 +1825,47 @@ end — play had identified that sample cold weeks ago ("газовая гран
 heal whatever the brain thinks). Pinned in `unit/gas.spec.ts` and
 `unit/poison.spec.ts`; what is still open — the afflicted Scramble stance,
 the green face, the other three status grenades, the swamp — is todo P2b.
+
+### The Scout's other two: HIDE becomes a bush, PICK POCKET takes the slot (2026-08-27)
+
+The kit's last two items, read and built in one day (`weapons/espionage.md`
+in the disasm repo carries the whole read).
+
+**HIDE (55) is a DECOY, not a fade.** `Pig::SetHidden` stops the pig being
+submitted to the renderer at all — no model, no plate, no blip — and stands a
+scenery object where it was: the nearest disguisable prop within 8192 out of
+a fixed name list (bushes, trees, cacti, CRATE4), the crate when nothing is
+near. The hidden flag's writers were swept whole: one in-play setter (the
+fire arm), and the clearers are the per-turn status pass (the cover lasts
+exactly one round), any damage, a blast, any fling, death, madness gas, and
+the decoy's own destruction. `Team::BuildTargetList` skips a hidden pig — the
+AI cannot price it — and a MELEE strike on one diverts whole to a KNOCK ON
+WOOD: FT_WOOD, a sample no shipped map's ground ever plays, finally finds its
+job. The enemy's espionage pigs start every battle hidden (Map::Load's own
+tail sweep). Using it ends the turn, off the record's own flags.
+
+Built on three precedents at once: the decoy rides `props.spawn` the way the
+boots do (`three/decoyArt.ts`), the hidden pig travels as `PigShot.hidden`
+beside `sheltered`, and the reveal wiring hangs off the engine's own bus
+subscription (damaged / killed / flung). Two honest edges, both in
+CLAUDE.md's list: hiding lands AT THE PRESS rather than at the end of the
+gesture clip, and the decoy does not yet SOAK damage (its hit points are
+unread — the manual's "extra protection" waits on that read). Restoring a
+revealed non-acting pig's mesh exposed a standing renderer bug — the
+visibility loop only ever wrote `false` — fixed by writing the snapshot's
+word both ways.
+
+**PICK POCKET (54) is the heal's cone with a burglar's filter.** Same 1024
+and ±45°, but no team test, no dead test — an ally or a corpse is fair game —
+and what crosses is a random WHOLE slot, unlimited included, never one
+charge. The victim has no reaction whatsoever; the thief tiptoes through clip
+79 and sniggers (P_LAUGH1-3, the exe's own roll). The verdict lands at the
+END of the clip, both failure exits P_OWW. One deliberate verbatim keep: the
+thief's append cap is 14 — one less than a crate's 15 — and at the cap the
+loot silently vanishes while the victim still loses it. Keeps the turn, is
+not a blow, and the charge goes at the press whiff or not (the heal is the
+exempt one, not this).
+
+Pinned in `unit/hide.spec.ts` and `unit/pickpocket.spec.ts`. With these two,
+the SCOUT'S KIT IS WHOLE: knife, rifle, gas, hide, theft — every slot does
+what the original's does.

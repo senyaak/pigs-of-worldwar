@@ -63,6 +63,7 @@ import { MODEL_SCALE } from '../../../lib/game/scale'
 import { createGrenadeArt } from './grenades'
 import { createMineArt } from './mineArt'
 import { createRemainsArt } from './remains'
+import { createDecoyArt } from './decoyArt'
 import { PIG_HEIGHT, PIG_HOLD, PIG_RADIUS } from '../../../lib/game/obstacles'
 import { weaponLayer } from '../../../lib/game/controls'
 import { advanceTraining, nextBreak } from '../../../lib/game/training'
@@ -527,6 +528,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const mineArt = createMineArt(root, (name) => props.spawn(name))
   /** …and the boots a finished death leaves on the spot (three/remains.ts). */
   const remainsArt = createRemainsArt(root, (name) => props.spawn(name))
+  /** …and the DISGUISES — a bush where a hidden pig stands
+   * (three/decoyArt.ts). */
+  const decoyArt = createDecoyArt(root, (name) => props.spawn(name))
   /**
    * Camera and marker onto a pig, wherever it happens to be standing — or
    * hanging: a pig still on its canopy is watched from the front, face on,
@@ -682,7 +686,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // own word rather than a flourish: the exe clears `[pig+0x30]`, the byte its
     // draw loop gates every object on (lib/game/indoors.ts). The camera stays
     // where it is — pointed at the building he is in.
-    if (pigShot(soldier.pig.id)?.sheltered) soldier.node.visible = false
+    // …and a DISGUISED one the same way — the decoy stands in for it
+    // (lib/game/hide.ts).
+    const shot = pigShot(soldier.pig.id)
+    if (shot?.sheltered || shot?.hidden) soldier.node.visible = false
   }
 
   /** Take the battle to a pig, and the camera and marker with it. */
@@ -904,9 +911,18 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     if (now.ending) {
       for (const soldier of squad.members) weapons.show(soldier.mesh, null)
     }
-    // …and every pig in a building is gone from the picture, acting or not.
+    // …and every pig in a building — or under a DISGUISE — is gone from the
+    // picture, acting or not. The other direction matters too: this loop
+    // only ever CLEARED visibility, and the sole writer of true was the
+    // watch, for the acting pig — so a pig that shed its disguise while not
+    // acting stayed invisible for good. The snapshot's word is written both
+    // ways now, with the acting pig left to the watch (the scope view hides
+    // it deliberately).
     for (const soldier of squad.members) {
-      if (pigShot(soldier.pig.id)?.sheltered) soldier.node.visible = false
+      const shot = pigShot(soldier.pig.id)
+      if (!shot) continue
+      if (shot.sheltered || shot.hidden) soldier.node.visible = false
+      else if (soldier.pig.id !== now.acting) soldier.node.visible = true
     }
     // EVERY pig that is not being drawn by somebody else follows its own
     // body. This loop was corpses-only — "nothing else places a pig that is
@@ -1011,7 +1027,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const worldPoint = new THREE.Vector3()
 
   const survey = (delta: number): void => {
-    const shown = now.pigs.filter((pig) => pig.health > 0 && !pig.sheltered)
+    const shown = now.pigs.filter((pig) => pig.health > 0 && !pig.sheltered && !pig.hidden)
     if (shown.length === 0) return
     const frames = delta / EXE_FRAME_SECONDS
     const first = !flying
@@ -1135,6 +1151,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // are the ENGINE's own art and get its model (`WE_APMIN`), which is why the
     // two lists go in separately.
     mineArt.draw(mines.revealed(game.currentPlayer.pigs), mines.at(), mines.laid())
+    // …and the disguises, straight off the snapshot (lib/game/hide.ts).
+    decoyArt.draw(now.decoys)
     // **AND WHATEVER STANDS BETWEEN THE CAMERA AND THE PIG GOES SEE-THROUGH.**
     // Play: "здание не просвечивает когда свинья внутри." Indoors the camera has
     // nowhere to swing to — every heading is a wall (lib/game/sightline.ts) — so
@@ -1226,6 +1244,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // engine's `remains` event. It exists because the two disagreed silently:
     // the event fired and `spawn('BOOTS')` answered null (lib/game/ammo.ts).
     remains: () => remainsArt.standing(),
+    decoys: () => decoyArt.standing(),
     charging: () => battle.charging(),
     firing: () => battle.view().firing?.phase ?? null,
 
@@ -1329,6 +1348,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       grenadeArt.dispose()
       mineArt.dispose()
       remainsArt.dispose()
+      decoyArt.dispose()
       airDropArt.dispose()
       weapons.dispose()
       squad.dispose()

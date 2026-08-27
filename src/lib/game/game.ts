@@ -95,6 +95,14 @@ export interface Pig {
    * still a body a blast can throw; a gone one is nothing at all.
    */
   gone: boolean
+  /**
+   * DISGUISED — the exe's `[pig+0x3B2]`, HIDE's own flag (lib/game/hide.ts).
+   * A hidden pig is not drawn, carries no plate and no blip, cannot be
+   * TARGETED, and turns a blade away with a knock on wood; a decoy prop
+   * stands where it does. On the Pig itself because the blip and the plate
+   * read live pigs, the way `pigClass` is (lib/game/scanner.ts).
+   */
+  hidden: boolean
   /** Whether it arrives by parachute when the level opens. Where it lands is
    * where it was always going to stand, so nothing else in the domain cares;
    * the battle scene owns the descent. */
@@ -238,6 +246,7 @@ export class Game {
             heading: at.heading ?? 0,
             pigClass,
             gone: false,
+            hidden: false,
             parachutes: at.parachutes ?? false
           }
         })

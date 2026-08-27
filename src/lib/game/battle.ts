@@ -73,6 +73,7 @@ import type { Corpses } from './corpses'
 import { drowns } from './drowning'
 import type { Drowning } from './drowning'
 import { chargeLanding } from './falling'
+import type { Hides } from './hide'
 import type { Pockets } from './pickpocket'
 import type { Poison } from './poison'
 import type { Point } from './pose'
@@ -101,6 +102,8 @@ export interface BattleParts {
   heals: Heals
   /** …and the espionage careers' theft (lib/game/pickpocket.ts). */
   pockets: Pockets
+  /** …and their disguise (lib/game/hide.ts). */
+  hides: Hides
   /** Pigs a blast has THROWN — every pig but the one being driven
    * (lib/game/tumble.ts). */
   tumbles: Tumbles
@@ -299,7 +302,7 @@ export interface Battle {
 }
 
 export function createBattle(parts: BattleParts): Battle {
-  const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, heals, pockets, effects, numbers } = parts
+  const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, heals, pockets, hides, effects, numbers } = parts
   const { tumbles, corpses, airDrops, dropIn, drowning, poison, onChanged } = parts
   const emit = parts.bus.emit
 
@@ -340,6 +343,7 @@ export function createBattle(parts: BattleParts): Battle {
     swings,
     heals,
     pockets,
+    hides,
     mines,
     sights,
     anim,
@@ -852,6 +856,10 @@ export function createBattle(parts: BattleParts): Battle {
     }
     game.endTurn()
     focus(game.currentPig)
+    // **THE DISGUISE DROPS AT THE TOP OF THE PIG'S OWN TURN** — the same
+    // per-turn pass the poison rides (0x470425 in 0x4703A0): a round of
+    // cover, no more (lib/game/hide.ts).
+    hides.turnStarted(game.currentPig)
     // **THE POISON BITES AT THE TOP OF THE PIG'S OWN TURN** — the exe's
     // per-turn pass (0x4703A0, lib/game/poison.ts): ten points, before the
     // card, so the health the announcement reads is the health the turn
@@ -1364,7 +1372,12 @@ export function createBattle(parts: BattleParts): Battle {
               carrying: acting.carrying.map((slot) => ({ ...slot }))
             },
             foes: game.players.flatMap((player, side) =>
-              side === actingSide ? [] : player.pigs.filter((pig) => !isDead(pig)).map(seen)
+              side === actingSide
+                ? []
+                : // A DISGUISED pig is not on the list at all — the exe's
+                  // `Team::BuildTargetList` skips the hidden flag before
+                  // anything is priced (lib/game/hide.ts).
+                  player.pigs.filter((pig) => !isDead(pig) && !pig.hidden).map(seen)
             ),
             friends: game.currentPlayer.pigs
               .filter((pig) => pig !== acting && !isDead(pig))

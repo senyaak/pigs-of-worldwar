@@ -146,6 +146,24 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
         z: target.position.z
       }
       const gap = strikeGap(blade, from, body)
+      // A DISGUISED pig turns the blade away whole: the exe diverts the
+      // strike to a KNOCK ON WOOD — FT_WOOD, no damage, no throw — and it is
+      // NOT a reveal: only damage or a knockdown sheds the disguise, and a
+      // parried knock is neither (0x4760F1, `weapons/espionage.md` in the
+      // disasm repo).
+      if (target.hidden) {
+        if (caught(gap) && !already.has(target)) {
+          already.add(target)
+          emit({ kind: 'struckWood', at: body })
+        }
+        report.candidates.push({
+          name: target.name,
+          gap,
+          degrees: (gap.off * 180) / Math.PI,
+          hit: false
+        })
+        continue
+      }
       // A body already down is not struck again, nor one this swing has
       // caught already — the exe's first test in `Pig::TakeDamage` is the
       // dead state (0x467ac9) and `[pig+0x1b0]` is the once-per-swing guard.

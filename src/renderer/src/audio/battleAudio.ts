@@ -211,6 +211,9 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
         playCue(bank(), laugh[Math.floor(Math.random() * laugh.length)])
       },
       stealFailed: () => playCue(bank(), BATTLE_SOUNDS.tooMany),
+      // A blade on a disguise: the knock on wood, and nothing else — no
+      // squeal, because no damage rides it (lib/game/strikes.ts).
+      struckWood: () => playCue(bank(), BATTLE_SOUNDS.knockWood),
       skillUsed: () => playCue(bank(), BATTLE_SOUNDS.skillUsed),
       menuOpened: () => bank().play(BATTLE_SOUNDS.menuOpen.sound),
       menuMoved: () => playCue(bank(), BATTLE_SOUNDS.menuMove),

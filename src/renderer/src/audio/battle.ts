@@ -339,6 +339,14 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
   laugh2: { sound: 'P_LAUGH2', volume: 60, pitch: 100 },
   laugh3: { sound: 'P_LAUGH3', volume: 60, pitch: 100 },
   /**
+   * A blade meeting a DISGUISE — DECODED: the strike on a hidden pig diverts
+   * whole to a knock on wood, sound 26 = FT_WOOD (0x4760F1,
+   * `weapons/espionage.md` in the disasm repo). The one thing in the game
+   * that plays this sample: no shipped map has a wood tile underfoot
+   * (lib/game/underfoot.ts), so the footstep never reaches it.
+   */
+  knockWood: { sound: 'FT_WOOD', volume: 100, pitch: 100 },
+  /**
    * Points going back IN — a health crate. DECODED, mix and all: `Pig::Heal`
    * (0x467fd0) ends by playing index **0x53 at volume 100 and pitch 100** at
    * the pig's own position (0x46809f, through the same 0x43A9D0), and index 83

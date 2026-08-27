@@ -35,7 +35,12 @@
  * here — a list of everything in the AMMO run would load 55 models for the two
  * that are used.
  */
-export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ', 'BOOTS']
+// …and CRATE4, HIDE's fallback disguise (lib/game/hide.ts): the decoy is
+// normally a model a record already placed — safe by construction — but a
+// map with nothing disguisable near falls back to the crate, and a map that
+// never PLACED one would spawn nothing, which is the exact silent failure
+// the BOOTS entry below records.
+export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ', 'BOOTS', 'CRATE4']
 
 /** What a finished death leaves on the spot (three/remains.ts). In every map's
  * own .MAD and in no .POG — exactly the case this list exists for: without the

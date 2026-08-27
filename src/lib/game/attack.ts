@@ -58,6 +58,9 @@ export interface AttackParts {
   /** The pickpocket's tiptoe — a press starts the clip and the verdict
    * lands at its end (lib/game/pickpocket.ts). */
   pockets: { begin(pig: Pig): boolean }
+  /** …and the disguise (lib/game/hide.ts): the pig vanishes at the press
+   * and the record's own flags end the turn behind it. */
+  hides: { begin(pig: Pig): boolean }
   /** Where a LAID mine goes — the sapper's plant, called at the lay clip's
    * own key-frame the way a charge's is (lib/game/mines.ts). */
   mines: { lay(pig: Pig, skill: number): boolean }
@@ -194,6 +197,12 @@ export function createAttack(parts: AttackParts): Attack {
       // heal's exempt one.
       if (acting.holding === SKILL.PICK_POCKET) {
         return parts.pockets.begin(acting) ? 'used' : 'none'
+      }
+      // HIDE: the pig takes the disguise on the spot, and the use ENDS the
+      // turn through the ordinary spend rules (lib/game/hide.ts says why the
+      // exe's end-of-clip timing is not copied).
+      if (acting.holding === SKILL.HIDE) {
+        return parts.hides.begin(acting) ? 'used' : 'none'
       }
       // A MINE takes the lobbed family's door: it is `isPlanted` like TNT,
       // has no gauge (record +0x14 is 0), and its charge goes down at the
