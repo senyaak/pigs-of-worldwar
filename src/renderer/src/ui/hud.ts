@@ -287,13 +287,15 @@ export const LAYOUT = {
      * device pixels and fade.
      *
      * It is a RADIUS and the stamp is a filled disc, not a ring — see
-     * `aroundBy`. Play has moved it twice, 1 → 2 → 3 — around BIG's tall
-     * letters — and BACK to 1 the day the plate went to SMALL's native 12
-     * (2026-08-27): against 12-tall glyphs a radius of 3 read as a solid
-     * black slab behind the word ("текст ужасный", with the two screens
-     * side by side), where the original wears a hairline.
+     * `aroundBy`. Play moved it 1 → 2 → 3 around BIG's tall letters, back
+     * to 1 when the plate went to SMALL — and then OFF, because the stamp
+     * was never the original's outline at all: the letters carry their own
+     * dark edging INSIDE the art, and the flat team-paint was erasing it
+     * (ui/font.ts `painted`, now a multiply). Play called it before the
+     * atlas was measured: "обводка должна быть внутри букв". The dial stays
+     * for a font that has no edge of its own.
      */
-    outline: 1,
+    outline: 0,
     /** The heart's ×2 followed BIG's tall letters; beside SMALL's native 12
      * the 10×11 art stands at its OWN size, which is the original's
      * proportion. The pink stays play's. */

@@ -93,11 +93,20 @@ function makeFont(
 }
 
 /**
- * PAINT an atlas one colour, keeping only the glyph shapes.
+ * PAINT an atlas one colour — by MULTIPLY, so the glyph's own shading
+ * survives.
  *
- * `source-in` and not a multiply (`ui/sprites.ts`, which is right for the white
- * map markers): a letter arrives with its own colour baked in, and the point
- * here is to override that rather than shade it.
+ * This was `source-in` — a flat fill of the glyph shape — and that is what
+ * made the name plates read fat: the game's letters carry their own dark
+ * EDGING inside the art (SMALL's atlas holds MORE near-black edge pixels,
+ * 2837 of (32,32,32), than bright body ones, 1470 of (248,248,248) —
+ * measured 2026-08-27, after play's own hunch: "обводка должна быть внутри
+ * букв"). A flat fill erased that edge, a stamped outline was invented to
+ * replace it, and the two together were a slab. Multiplying instead leaves
+ * the near-black edge near-black and hands the bright body the colour —
+ * which is exactly the original's look, coloured letters with their own
+ * dark rim. Black in, black out, so the outline font still works where it
+ * is still wanted.
  */
 async function painted(
   atlas: ImageData,
@@ -106,10 +115,15 @@ async function painted(
   const canvas = new OffscreenCanvas(atlas.width, atlas.height)
   const context = canvas.getContext('2d')
   if (!context) throw new Error('no 2d context to paint the letters with')
-  context.putImageData(atlas, 0, 0)
-  context.globalCompositeOperation = 'source-in'
+  const shapes = await createImageBitmap(atlas)
+  context.drawImage(shapes, 0, 0)
+  context.globalCompositeOperation = 'multiply'
   context.fillStyle = `rgb(${colour[0]}, ${colour[1]}, ${colour[2]})`
   context.fillRect(0, 0, atlas.width, atlas.height)
+  // The multiply painted the transparent field too; the glyphs' own alpha
+  // cuts it back out.
+  context.globalCompositeOperation = 'destination-in'
+  context.drawImage(shapes, 0, 0)
   return createImageBitmap(canvas)
 }
 
