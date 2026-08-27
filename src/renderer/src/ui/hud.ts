@@ -287,13 +287,23 @@ export const LAYOUT = {
      * device pixels and fade.
      *
      * It is a RADIUS and the stamp is a filled disc, not a ring — see
-     * `aroundBy`. Play has moved it twice, 1 → 2 → 3, each time on seeing it.
+     * `aroundBy`. Play has moved it twice, 1 → 2 → 3 — around BIG's tall
+     * letters — and BACK to 1 the day the plate went to SMALL's native 12
+     * (2026-08-27): against 12-tall glyphs a radius of 3 read as a solid
+     * black slab behind the word ("текст ужасный", with the two screens
+     * side by side), where the original wears a hairline.
      */
-    outline: 3,
+    outline: 1,
     /** The heart's ×2 followed BIG's tall letters; beside SMALL's native 12
      * the 10×11 art stands at its OWN size, which is the original's
      * proportion. The pink stays play's. */
-    heart: { colour: [248, 64, 152] as [number, number, number], scale: 1 }
+    heart: { colour: [248, 64, 152] as [number, number, number], scale: 1 },
+    /**
+     * Seconds a plate takes to FADE IN once its gate opens. Play, against the
+     * original side by side: "имена вейдятся не просто показываются". The
+     * original's own ramp is not read — this is play's dial, like the delay.
+     */
+    fade: 0.3
   }
   // THE MAP has no entry here on purpose: nothing about its placement or its
   // size is free. Where it sits, how big it is, how far it tilts and how it
@@ -492,6 +502,10 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
   /** Where the heart's beat stands (PULSE_STEP). A pause freezes it with
    * everything else: the delta it advances by is zero there. */
   let heartBeat = 0
+  /** Seconds the plates' gate has been OPEN — what the fade-in ramps on
+   * (`LAYOUT.plate.fade`). Zeroed the moment the gate shuts, so the next
+   * appearance fades again. */
+  let shownFor = 0
   /** Which colours the tints were baked with, so a console change to them
    * repaints instead of being quietly ignored. */
   let painted = ''
@@ -870,12 +884,20 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         // hiccup — and it counts the exe's frames the way the portrait's
         // swell does (25 a second, ui/playerScreen.ts).
         heartBeat += (delta / EXE_FRAME_SECONDS) * PULSE_STEP
-        if (state.still < PLATE.delay && hurtFor <= 0) return
+        if (state.still < PLATE.delay && hurtFor <= 0) {
+          shownFor = 0
+          return
+        }
+        shownFor += delta
         const factor = PLATE.scale
         const line = base.height * factor
         const gap = base.measure(' ') * factor
         context.save()
         context.scale(scale, scale)
+        // The FADE-IN: the whole plate rides one alpha from the moment the
+        // gate opened. Play, with the original beside it: "имена вейдятся
+        // не просто показываются".
+        context.globalAlpha = PLATE.fade > 0 ? Math.min(1, shownFor / PLATE.fade) : 1
         const heartSize = {
           width: heart.width * PLATE.heart.scale,
           height: heart.height * PLATE.heart.scale
