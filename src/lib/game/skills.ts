@@ -66,6 +66,11 @@ export const SKILL = {
   TNT: 37,
   /** The medic careers' contact heal (lib/game/healing.ts). */
   HEALING_HANDS: 52,
+  /** The espionage careers' theft (lib/game/pickpocket.ts). */
+  PICK_POCKET: 54,
+  /** …and their disguise — the icon calls it CONCEAL, gtext says HIDE
+   * (lib/game/hide.ts). */
+  HIDE: 55,
   /** The door of a BUILDING — what a pig uses to get in and out of one, and
    * what the slot beside the dial carries while it is in there
    * (lib/game/buildings.ts; 60 is the VEHICLE's own). */

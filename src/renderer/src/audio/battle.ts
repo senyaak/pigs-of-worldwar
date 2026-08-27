@@ -330,6 +330,15 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
   pickup: { sound: 'P_WHOOPE', volume: 50, pitch: 100 },
   tooMany: { sound: 'P_OWW', volume: 50, pitch: 100 },
   /**
+   * The PICKPOCKET's snigger — DECODED: the steal arm rolls `rand % 3` over
+   * sounds 72/73/74 P_LAUGH1-3 at volume 60 (0x47C480,
+   * `weapons/espionage.md` in the disasm repo). The roll is out here because
+   * sound is presentation, like the squeal pair's.
+   */
+  laugh1: { sound: 'P_LAUGH1', volume: 60, pitch: 100 },
+  laugh2: { sound: 'P_LAUGH2', volume: 60, pitch: 100 },
+  laugh3: { sound: 'P_LAUGH3', volume: 60, pitch: 100 },
+  /**
    * Points going back IN — a health crate. DECODED, mix and all: `Pig::Heal`
    * (0x467fd0) ends by playing index **0x53 at volume 100 and pitch 100** at
    * the pig's own position (0x46809f, through the same 0x43A9D0), and index 83

@@ -55,6 +55,9 @@ export interface AttackParts {
   /** The healing hands — the one skill the press answers on the spot
    * (lib/game/healing.ts). */
   heals: Heals
+  /** The pickpocket's tiptoe — a press starts the clip and the verdict
+   * lands at its end (lib/game/pickpocket.ts). */
+  pockets: { begin(pig: Pig): boolean }
   /** Where a LAID mine goes — the sapper's plant, called at the lay clip's
    * own key-frame the way a charge's is (lib/game/mines.ts). */
   mines: { lay(pig: Pig, skill: number): boolean }
@@ -184,6 +187,13 @@ export function createAttack(parts: AttackParts): Attack {
       // at its ceiling — the press comes to nothing and the charge stays.
       if (acting.holding === SKILL.HEALING_HANDS) {
         return parts.heals.begin(acting) ? 'used' : 'none'
+      }
+      // PICK POCKET answers it too — the tiptoe clip starts and the steal
+      // lands at its END, the exe's own shape (lib/game/pickpocket.ts). The
+      // charge goes at the press, whiff or not: the generic spend, not the
+      // heal's exempt one.
+      if (acting.holding === SKILL.PICK_POCKET) {
+        return parts.pockets.begin(acting) ? 'used' : 'none'
       }
       // A MINE takes the lobbed family's door: it is `isPlanted` like TNT,
       // has no gauge (record +0x14 is 0), and its charge goes down at the

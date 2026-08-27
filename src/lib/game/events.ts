@@ -129,6 +129,14 @@ export type BattleEvent =
    * (lib/game/poison.ts). Ten points at every one of this pig's own turns
    * until something heals it. */
   | { kind: 'poisoned'; pig: PigId }
+  /** A POCKET was PICKED: the whole slot crossed, the victim none the wiser
+   * — no reaction is the exe's own shape (lib/game/pickpocket.ts). The
+   * thief's laugh hangs here (P_LAUGH1-3 at 60, the arm's own roll). */
+  | { kind: 'stole'; thief: PigId; victim: PigId; skill: number; amount: number }
+  /** …or came up empty: nobody in the cone (`reach` — "Your arms don't
+   * reach that far...") or a victim with nothing left (`nothing`). P_OWW,
+   * the exe's own two exits. */
+  | { kind: 'stealFailed'; pig: PigId; at: Point; reason: 'reach' | 'nothing' }
 
   // ——— the map ———
   /** Something on it has been knocked down. */

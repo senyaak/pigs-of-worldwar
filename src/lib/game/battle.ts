@@ -73,6 +73,7 @@ import type { Corpses } from './corpses'
 import { drowns } from './drowning'
 import type { Drowning } from './drowning'
 import { chargeLanding } from './falling'
+import type { Pockets } from './pickpocket'
 import type { Poison } from './poison'
 import type { Point } from './pose'
 import type { Random } from './random'
@@ -98,6 +99,8 @@ export interface BattleParts {
   /** The healing hands, when a pig of the medic careers holds them
    * (lib/game/healing.ts). */
   heals: Heals
+  /** …and the espionage careers' theft (lib/game/pickpocket.ts). */
+  pockets: Pockets
   /** Pigs a blast has THROWN — every pig but the one being driven
    * (lib/game/tumble.ts). */
   tumbles: Tumbles
@@ -296,7 +299,7 @@ export interface Battle {
 }
 
 export function createBattle(parts: BattleParts): Battle {
-  const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, heals, effects, numbers } = parts
+  const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, heals, pockets, effects, numbers } = parts
   const { tumbles, corpses, airDrops, dropIn, drowning, poison, onChanged } = parts
   const emit = parts.bus.emit
 
@@ -336,6 +339,7 @@ export function createBattle(parts: BattleParts): Battle {
     grenades,
     swings,
     heals,
+    pockets,
     mines,
     sights,
     anim,
@@ -521,6 +525,8 @@ export function createBattle(parts: BattleParts): Battle {
     // …and the laying-on of hands, for the length of its own clip — the same
     // hold `[pig+0x2FF]` puts on any attack animation (lib/game/healing.ts).
     heals.running() ||
+    // …and the tiptoe, for its clip's own length (lib/game/pickpocket.ts).
+    pockets.running() ||
     // THROWN, not planted: a charge lying at the pig's feet is exactly what it
     // has to be able to run away from (lib/game/lobs.ts `thrown`).
     grenades.thrown() > 0 ||
@@ -1002,6 +1008,7 @@ export function createBattle(parts: BattleParts): Battle {
     sights.setHeld(false)
     swings.reset()
     heals.reset()
+    pockets.reset(game.currentPig)
     // A turn is a fresh start for the machine too (lib/game/ai.ts) — and the
     // moment its SEAT is decided (`machineTurn` above). The hands let go of
     // whatever they were doing and still every control they hold.
@@ -1707,6 +1714,9 @@ export function createBattle(parts: BattleParts): Battle {
       struck &&
       acting.holding !== SKILL.SKIP_TURN &&
       acting.holding !== SKILL.HEALING_HANDS &&
+      // A pocket picked is not a blow either — the exe's record keeps the
+      // turn whole (lib/game/pickpocket.ts).
+      acting.holding !== SKILL.PICK_POCKET &&
       grenades.thrown() === 0
     ) {
       attack.swallow()
@@ -1736,7 +1746,12 @@ export function createBattle(parts: BattleParts): Battle {
       // covered by its own bookkeeping: the charge only goes on a heal that
       // LANDED (lib/game/healing.ts). A MINE spends no strike either — its
       // budget below closes the hand itself, on the second lay.
-      if (acting.holding !== SKILL.HEALING_HANDS && !isMine(acting.holding)) struck = true
+      if (
+        acting.holding !== SKILL.HEALING_HANDS &&
+        acting.holding !== SKILL.PICK_POCKET &&
+        !isMine(acting.holding)
+      )
+        struck = true
       // The exe counts it here too — this is the arm its own fire dispatcher
       // increments `[gameMode+0x334]` from (0x493E7A).
       weaponUses++
@@ -1880,6 +1895,9 @@ export function createBattle(parts: BattleParts): Battle {
     // …and the heal's clip running out, which may put the hands away the same
     // way (lib/game/healing.ts).
     heals.update(delta, acting)
+    // …and the tiptoe's, whose end is where the steal lands
+    // (lib/game/pickpocket.ts).
+    pockets.update(delta, acting)
 
     // The gauge and the fuse, after the pig has been placed for the same reason
     // a swing is: the muzzle comes off the HAND bone (lib/game/attack.ts).
@@ -2105,6 +2123,7 @@ export function createBattle(parts: BattleParts): Battle {
     warp(x, z, heading) {
       swings.reset()
       heals.reset()
+      pockets.reset(game.currentPig)
       effects.clear()
       loco = createLocomotion(query, x, z, heading)
       game.moveCurrentPig(x, loco.y, z, heading)

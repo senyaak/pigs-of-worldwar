@@ -34,6 +34,8 @@ import { createStrikes } from './strikes'
 import type { Strikes } from './strikes'
 import { createHealing } from './healing'
 import type { Heals } from './healing'
+import { createPockets } from './pickpocket'
+import type { Pockets } from './pickpocket'
 import { createBullets } from './bullets'
 import type { Bullets } from './bullets'
 import { createLobs } from './lobs'
@@ -231,6 +233,8 @@ export interface Engine {
   readonly swings: Strikes
   /** The healing hands (lib/game/healing.ts). */
   readonly heals: Heals
+  /** The pickpocket (lib/game/pickpocket.ts). */
+  readonly pockets: Pockets
   readonly effects: EffectField
   readonly numbers: DamageNumbers
   readonly airDrops: AirDrops
@@ -411,6 +415,9 @@ export function createEngine(parts: EngineParts): Engine {
   /** What the HEALING HANDS do when the fire key goes down: the cone, the
    * nearest body in it and the points back on (lib/game/healing.ts). */
   const heals = createHealing({ pigs, clips: world.clips }, bus.emit)
+  /** …and PICK POCKET, its cone's twin with the looser filter
+   * (lib/game/pickpocket.ts). */
+  const pockets = createPockets({ pigs, clips: world.clips, random }, bus.emit)
   /** What a GUN does: the flight, the substepping and every verdict about what
    * was hit (lib/game/bullets.ts). */
   const shots = createBullets(
@@ -527,6 +534,7 @@ export function createEngine(parts: EngineParts): Engine {
     poison,
     swings,
     heals,
+    pockets,
     tumbles,
     corpses,
     effects,
@@ -687,6 +695,7 @@ export function createEngine(parts: EngineParts): Engine {
     grenades,
     mines,
     poison,
+    pockets,
     tumbles,
     effects,
     numbers,

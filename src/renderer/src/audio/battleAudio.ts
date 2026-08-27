@@ -203,6 +203,14 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       // both decoded off the skill-52 arm).
       healBegan: () => playCue(bank(), BATTLE_SOUNDS.healHands),
       healFailed: () => playCue(bank(), BATTLE_SOUNDS.healRefused),
+      // The pocket picked: the thief sniggers — the exe's own rand%3 over
+      // P_LAUGH1-3 at 60 — and a whiff complains with P_OWW, both of the
+      // arm's failure exits alike (weapons/espionage.md in the disasm repo).
+      stole: () => {
+        const laugh = [BATTLE_SOUNDS.laugh1, BATTLE_SOUNDS.laugh2, BATTLE_SOUNDS.laugh3]
+        playCue(bank(), laugh[Math.floor(Math.random() * laugh.length)])
+      },
+      stealFailed: () => playCue(bank(), BATTLE_SOUNDS.tooMany),
       skillUsed: () => playCue(bank(), BATTLE_SOUNDS.skillUsed),
       menuOpened: () => bank().play(BATTLE_SOUNDS.menuOpen.sound),
       menuMoved: () => playCue(bank(), BATTLE_SOUNDS.menuMove),
