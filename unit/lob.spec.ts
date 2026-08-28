@@ -48,10 +48,7 @@ const dropped = (vy: number, vx = 0): Lobbed => ({
   age: 0,
   resting: false,
   doused: false,
-  sinking: 0,
-  spin: 0,
-  axisX: 1,
-  axisZ: 0
+  sinking: 0
 })
 
 test('a grenade brings its own material, and it is not near-elastic', { tag: '@nodata' }, () => {

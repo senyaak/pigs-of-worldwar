@@ -1993,3 +1993,31 @@ and clamp, no damage, no shove). With these two the MEDIC'S STEP IS WHOLE:
 what class 12 adds over the ORDERLY — the health row was already in — now
 all does what the original's does. Still open in the medic family: 18
 TRANQUILLISER DART's status (SURGEON), skill 53's self-heal (no kit).
+
+### The tumble lasted one day, and the fuse found its clock (2026-08-28, later)
+
+Play threw the lob TUMBLE out on sight — "она крутится в воздухе криво…
+граната по сути шар, лучше убрать" — and out it went whole: `Lobbed.spin`,
+the axle, `TUMBLE_TURNS`, the snapshot fields and the renderer's wearing of
+them, per the no-leftovers rule. It was `[CHECK — remake]` from birth; a
+grenade flies unturned now, the rocket keeps its measured nose-on-velocity,
+a planted charge its stand. The note stays in grenade.ts so nobody rebuilds
+it without a fresh ruling.
+
+Play also asked "может у нас граната меньше летит чем в оригинале?" — and
+the answer split in two. The ARC is exact: speed rides 1/F and gravity
+1/F², so v²/g cancels the clock — 9000 units at full charge either way,
+17.6 tiles, pinned in unit/lob.spec.ts (one sub-percent difference in the
+remake's favour, `/0xfff` against the exe's `>>12`). What was short was the
+ROLL: `EXE_FRAME_SECONDS` was **1/30** — a leftover console figure that
+contradicted the repo's own 25 Hz inference (the turn clock's hundredths,
+the 250-frame crush, the 25-frame wedge) — so the 153-frame fuse burned in
+5.1 s where the original gives 6.12, while the FLIGHT rides the stretched
+1/15 world and takes 2.83 s of it. The rolling window after landing came
+out under half the original's, which is exactly what a shorter throw looks
+like. The constant is **1/25** now; every decoded frame count (the fuse,
+the gauge's 52 frames, the effect stages, the gas valve, the frontend's
+tick) runs 20% longer and lands on the engine's own rate. Watch one number
+in play: the beat after a blow moves 0.5 → 0.6 s, and play had blessed the
+half second — if it drags, the beat's own frame count is the knob, not the
+clock.

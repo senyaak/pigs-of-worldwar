@@ -626,9 +626,6 @@ export function createEngine(parts: EngineParts): Engine {
     vz: number
     fuse?: number
     doused?: boolean
-    spin?: number
-    axisX?: number
-    axisZ?: number
   }): FlightShot => ({
     id: one.id,
     skill: one.skill,
@@ -643,11 +640,7 @@ export function createEngine(parts: EngineParts): Engine {
     z: one.z,
     vx: one.vx,
     vy: one.vy,
-    vz: one.vz,
-    // A bullet carries none of the tumble; the zeros read as "do not".
-    spin: one.spin ?? 0,
-    axisX: one.axisX ?? 0,
-    axisZ: one.axisZ ?? 0
+    vz: one.vz
   })
 
   const pigShotOf = (pig: Pig): PigShot => {

@@ -15,9 +15,25 @@ import type { Blocked } from '../../../lib/game/sightline'
 /** After a flight the camera stays put this long before gliding back behind
  * the pig — resuming the chase the instant of landing is a jolt. */
 const CHASE_DELAY = 0.5
-/** How far back and how high the rig sits, in the pig's own units. */
-const BACK = 2100 * MODEL_SCALE
-const LIFT = 900 * MODEL_SCALE
+/**
+ * How far back and how high the rig sits — **the exe's own chase row, at
+ * last**. Mode 0 of the table at 0x4d9528 is a SEPARATION of **3072** under
+ * the **768** elevation ceiling — 22.5° above level (`elevationOf`, declared
+ * below with the read) — and the distance spring holds the hypotenuse, so
+ * the run and the rise are that row split by its own angle.
+ *
+ * The remake's own 1050/450 eyework stood here for years — 2.7× closer than
+ * the original — under a note that moving it was play's call, the whole feel
+ * hanging off it. Play called it (2026-08-28), screenshot in hand: "в
+ * оригинале камера чуть больше показывает — толи фов больше, толи дальше от
+ * свина." The FOV is 45° in both (scale/notes.md, π/4); the distance was the
+ * whole difference.
+ */
+const CHASE_RANGE = 3072
+/** `elevationOf(768)`, written out because the helper is declared below. */
+const CHASE_PITCH = ((0x400 - 768) / 4096) * 2 * Math.PI
+const BACK = CHASE_RANGE * Math.cos(CHASE_PITCH)
+const LIFT = CHASE_RANGE * Math.sin(CHASE_PITCH)
 /** Where the gaze rests on the pig. The remake's own. */
 const GAZE = 300 * MODEL_SCALE
 /**
@@ -31,7 +47,7 @@ const GAZE = 300 * MODEL_SCALE
  * — which is what lets the TR cam sit 400 over a pig rather than 768 over the
  * ground, and is why `RIG` carries a `floor` flag.
  */
-const CLEARANCE = 768 * MODEL_SCALE
+const CLEARANCE = 768
 /**
  * The drop-in view: the camera stands IN FRONT of a pig on a canopy and looks
  * it in the face, which is what play remembers of the original's opening.
@@ -144,14 +160,10 @@ const RIFLE_CLOSE = 2048 / 3072
  * the fudge factor invented to argue with it is deleted. The exe's own reading
  * lands where play was pointing on its own.
  *
- * The same halving is still on `BACK`/`LIFT` and on the TR cam's 400, and there
- * it is NOT a decoded number being halved — `BACK` is the remake's own eyework,
- * tuned when the models were full size and halved with them so the framing
- * would not move. Worth knowing what that costs, since it is the same question
- * one step along: the exe's ordinary chase is its row's **3072 at 22.5°**,
- * where `BACK`/`LIFT` put the lens 1142 from the pig — **2.7× closer than the
- * original's**. Not touched here; it is not what was asked and it is play's
- * call, the whole feel of the game hanging off it.
+ * That question is CLOSED now (2026-08-28): `BACK`/`LIFT` are the exe row's
+ * own 3072-at-22.5° split (see their declaration), `CLEARANCE` is the bare
+ * 768, and nothing in this rig rides `MODEL_SCALE` any more. The eyework
+ * that stood 2.7× closer is gone on play's own comparison with the original.
  */
 
 /**
@@ -182,13 +194,19 @@ const RIFLE_CLOSE = 2048 / 3072
  * is describing. So it is applied here.
  *
  * What it does to the picture is the check. The camera holds `LOB_RANGE` to the
- * LOOK POINT, so it stands 1520 behind the pig and 1706 over him: he falls
- * **19.1° under the view axis**, and the frame is 45° tall, so he sits within a
- * sixth of the bottom edge — "свин у нижней границы экрана", which is what play
- * asked for in those words. He is 2285 from the lens; aimed AT him the same rig
- * had him dead centre at 3500.
+ * LOOK POINT, so at the full 0x600 it stood 1520 behind the pig and 1706 over
+ * him — 19.1° under the view axis, within a sixth of the bottom edge of the
+ * 45° frame, which is what "свин у нижней границы экрана" first asked for.
+ *
+ * **HALVED to 768 on play's second ruling (2026-08-28)**: that sixth put the
+ * pig INSIDE the power gauge's own 64 rows at the bottom of the screen —
+ * "индикатор перекрывает свина — в оригинале индикатор ПОД ним". At 768 the
+ * camera stands 2287 behind and the same 1706 over: the pig falls 7.5° under
+ * the axis, a third of the way to the bottom edge — still low, and clear of
+ * the strip. The exe's own number is the dead call's 0x600; the half is
+ * play's dial over it, `[play]`.
  */
-const LOB_AHEAD = 1536
+const LOB_AHEAD = 768
 
 /**
  * **COLUMN 1 OF THE MODE TABLE IS HOW HIGH THE CAMERA MAY STAND**, and that is

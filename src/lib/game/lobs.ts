@@ -26,7 +26,6 @@ import {
   isPlanted,
   lobOf,
   sinkLob,
-  TUMBLE_TURNS,
   skipOffWater,
   skipsOnWater,
   sunkAway
@@ -368,11 +367,6 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
           }
           continue
         }
-        // The TUMBLE — presentation, but stepped HERE because the renderer
-        // draws a snapshot and animates nothing (lib/game/grenade.ts,
-        // TUMBLE_TURNS). A resting or doused one held still above, so only
-        // flight and roll turn the model.
-        shot.spin += delta * TUMBLE_TURNS * 2 * Math.PI
         const speed = Math.hypot(shot.vx, shot.vy, shot.vz)
         const steps = Math.max(1, Math.ceil((speed * delta) / LOB_STEP))
         let spent = false

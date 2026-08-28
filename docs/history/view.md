@@ -419,3 +419,34 @@ walked away (play: "надо чтобы за свином камера след�
 is not settled now: the SWIM clip on the snapshot holds the still clock at
 zero, and only the hard cap (`FLUNG_LIMIT`, 6 s) still ends the watch — a
 drowning hands the camera to the dying watch on its own.
+
+
+### The chase steps back to the exe's own row, and the battle fills the window (2026-08-28)
+
+Play, with the original side by side: "в оригинале камера чуть больше
+показывает — толи фов больше, толи дальше от свина", and the answer had been
+sitting in todo since the mode table was decoded: the FOV is 45 degrees in
+both builds (scale/notes.md, pi/4), and the remake's chase stood 2.7x closer
+— BACK/LIFT were 1050/450 eyework where mode 0's row is a SEPARATION of 3072
+under the 768 ceiling (22.5 degrees). They are that row's own split now
+(CHASE_RANGE/CHASE_PITCH in three/chase.ts), CLEARANCE dropped its
+MODEL_SCALE in the same pass (a camera length is of the world — the file's
+own rule, finally applied to its last holdout), and the melee/rifle views
+ride along by their decoded RATIOS. The drop-in face keeps its "chase turned
+round" design and moves with it.
+
+The same session settled the GAUGE overlap: the lob view's dead-call look
+point (LOB_AHEAD, the exe's discarded 0x600) sat the pig within a sixth of
+the bottom edge — INSIDE the power gauge's 64 rows. "Индикатор перекрывает
+свина — в оригинале индикатор ПОД ним." Halved to 768: the pig falls 7.5
+degrees under the axis, a third of the way down from centre, still low and
+clear of the strip. The exe number stays named in the comment; the half is
+play's dial.
+
+And the FRAME went. The battle used to render inside the app's own chrome —
+header, main's padding, a toolbar row, a 1px olive border with rounded
+corners. "Убрать рамку эту тупую и только саму игру рендерить": #battle is
+position:fixed inset:0 now, toolbar hidden (End Turn is the keyboard's,
+leaving is the pause menu's; the DOM stays for its listeners), no border.
+The menu screens keep their letterboxed 4:3 — they are authored 640x480 art;
+the battle never was.

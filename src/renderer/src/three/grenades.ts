@@ -104,8 +104,6 @@ const facing = new THREE.Vector3()
  */
 const NOSE_AXIS = new THREE.Vector3(0, -1, 0)
 const heading = new THREE.Vector3()
-/** The tumble's axle, rebuilt from the snapshot each draw. */
-const axle = new THREE.Vector3()
 
 /**
  * How far to lift THIS mesh so it sits ON the ground rather than half in it — a
@@ -207,14 +205,14 @@ export function createGrenadeArt(
         const at = where(shot)
         // How it SITS in the air. Nothing has been read about a projectile's
         // orientation — the constructor hands the body a yaw and a pitch and
-        // the drawing half is not decoded — so all three poses are the
-        // remake's. A charge that was PUT somewhere has no velocity to point
-        // along: it stands on its end instead (`STAND`). A ROCKET points its
-        // nose along its flight (`NOSE_AXIS` — measured, the apex vertex).
-        // Everything THROWN tumbles end over end about the lateral axle the
-        // engine fixed at launch (lib/game/grenade.ts, `TUMBLE_TURNS`) — the
-        // spin is the engine's, this only wears it, the way `wear.ts` wears
-        // a pose.
+        // the drawing half is not decoded — so both poses are the remake's.
+        // A charge that was PUT somewhere has no velocity to point along: it
+        // stands on its end instead (`STAND`). A ROCKET points its nose
+        // along its flight (`NOSE_AXIS` — measured, the apex vertex).
+        // Everything else flies UNTURNED — a tumble was built and play threw
+        // it out ("граната по сути шар", lib/game/grenade.ts has the note) —
+        // and the identity is WRITTEN, not assumed, because the meshes are a
+        // pool and the slot may have worn another pose last frame.
         if (isPlanted(shot.skill)) mesh.rotation.z = STAND
         else if (shot.skill === SKILL.BAZOOKA) {
           heading.set(shot.vx, shot.vy, shot.vz)
@@ -222,10 +220,7 @@ export function createGrenadeArt(
             mesh.quaternion.setFromUnitVectors(NOSE_AXIS, heading.normalize())
           }
         } else {
-          axle.set(shot.axisX, 0, shot.axisZ)
-          if (axle.lengthSq() > 1e-6) {
-            mesh.quaternion.setFromAxisAngle(axle.normalize(), shot.spin)
-          }
+          mesh.quaternion.identity()
         }
         // …and the lift comes after the pose, because it is measured FROM it.
         // Y-DOWN, so lifting is subtracting.

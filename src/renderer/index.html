@@ -253,33 +253,27 @@
         object-fit: contain;
         image-rendering: pixelated;
       }
+      /* THE BATTLE IS EDGE-TO-EDGE. Play: "убрать рамку эту тупую и только
+         саму игру рендерить" — so the view covers the window whole, over the
+         header and <main>'s padding (which stay for the tool screens), with
+         no border and no toolbar row. The toolbar's DOM stays for its
+         listeners and the debug span; its buttons' jobs are the keyboard's
+         (End Turn) and the pause menu's (leaving). */
       #battle {
-        flex: 1;
+        position: fixed;
+        inset: 0;
+        z-index: 10;
         display: flex;
         flex-direction: column;
-        min-height: 0;
-        gap: 12px;
+        background: #000;
       }
       #battle-toolbar {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-      }
-      #battle-toolbar button {
-        padding: 6px 14px;
-        font-size: 13px;
-      }
-      #battle-tile {
-        color: var(--dim, #8a8f7a);
-        font-size: 12px;
-        font-family: ui-monospace, monospace;
+        display: none;
       }
       #battle-canvas {
         flex: 1;
         position: relative;
         min-height: 0;
-        border: 1px solid var(--border);
-        border-radius: 6px;
         overflow: hidden;
       }
       #battle-canvas canvas {

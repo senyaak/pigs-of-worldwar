@@ -241,11 +241,23 @@ export const PLAIN_GRAVITY = fromExeAccel(10)
  * Every timer taken off the exe as a NUMBER OF FRAMES therefore runs twice as
  * long as the original ran it, if it is converted with `FRAME_SECONDS`.
  *
- * So a duration read out of the binary is converted with this instead. The
- * two places that do are the beat after a blow (15 frames, and play
- * independently asked for the half second that gives) and the grenade's fuse.
+ * So a duration read out of the binary is converted with this instead — the
+ * beat after a blow, the fuse, the gauge, the effect stages, the gas valve.
+ *
+ * **1/25, and it was 1/30 for its first weeks** — a leftover console figure
+ * that contradicted this file's own 25 Hz inference (the turn clock's
+ * hundredths, the 250-frame crush = 10 s, the 25-frame wedge = 1 s, PAL
+ * halved — the argument above FRAME_SECONDS). At 1/30 every decoded timer
+ * ran 17% fast: the grenade's 153-frame fuse burned in 5.1 s where the
+ * original gives 6.12 — and since the FLIGHT rides the stretched 1/15
+ * world, the roll window after landing was less than half the original's,
+ * which play read as "у нас граната меньше летит" (2026-08-28; the arc
+ * itself is exact — v² / g cancels the clock, unit/lob.spec.ts pins it).
+ * The beat after a blow moves 0.5 → 0.6 s with this; play had blessed the
+ * half second, so if the beat now drags, the beat's own frame count is the
+ * knob, not this constant.
  */
-export const EXE_FRAME_SECONDS = 1 / 30
+export const EXE_FRAME_SECONDS = 1 / 25
 export const fromExeFrames = (frames: number): number => frames * EXE_FRAME_SECONDS
 
 /**

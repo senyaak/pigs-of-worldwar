@@ -1961,12 +1961,14 @@ by play. In the order they turn up:
    alone — if a wall hides a grenade in play, that is the thing to bring back,
    as a swing of the STANDING camera.
 
-   **What this leaves standing: the ordinary chase is 2.7× closer than the
-   exe's.** `BACK`/`LIFT` put the lens 1142 from the pig where mode 0's row is
-   3072 at 22.5°. Those two are the remake's own eyework, tuned when models were
-   full size and halved with them so the framing would not move — not a decoded
-   number being mis-scaled. Not touched: the whole feel of the game hangs off
-   it and it is play's call.
+   ~~**What this leaves standing: the ordinary chase is 2.7× closer than the
+   exe's.**~~ **CLOSED 2026-08-28** — play compared against the original's own
+   framing ("в оригинале камера чуть больше показывает") and `BACK`/`LIFT`
+   are now the exe row's 3072-at-22.5° split (three/chase.ts, `CHASE_RANGE`/
+   `CHASE_PITCH`); `CLEARANCE` dropped its `MODEL_SCALE` in the same pass.
+   `LOB_AHEAD` is halved to 768 on the same session's second ruling — the
+   full 0x600 sat the pig inside the power gauge's rows; the half keeps him
+   low and clear of the strip, `[play]`.
 
    Two numbers that were invented and are not any more: `CLEARANCE` is the exe's
    **ground + 768** (0x4a0c12, the tail every mode ends with), and **column 1 of
