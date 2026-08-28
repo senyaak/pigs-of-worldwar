@@ -1928,3 +1928,68 @@ Play's list, worked through in one day and its evening:
   the remake's play-tuned 6×points lands, so the models differ in SHAPE
   (falloff to 25% at the rim, doubled vertical, damage-independence) more
   than in size. Switching to the exe's shape is play's call, still open.
+
+### The MEDIC's level-2 kit: the dart heals, the ball bursts blue (2026-08-28)
+
+Level 3 work opened with the second-step classes, and the MEDIC (class 12)
+is the one whose two new skills — 17 MEDIC DART ×3 and 33 MEDICINE BALL ×3,
+the whole of what the step adds beside +20 max health — were poses with no
+mechanics: the dart fired and did nothing, the ball had a weapon row and no
+throw at all. Both were already half-read; a fresh capstone pass closed the
+gaps and cross-checked every layout against a value the notes had pinned.
+
+**The DART (kind 0x24) is a rifle round that puts points ON.** Its arm in
+`Pig::HitByProjectile` (0x4787D6) is `min(deficit, 0x1400)` through
+`Pig::Heal` — forty points, clamped to what the body is missing, NEVER a
+knock (the kind is on the no-throw list). Built as `Projectile.heal` and a
+heal arm in `bullets.land` before the damage path: the `healed` event is
+the whole common tail — the pink number, the sigh, and the CURE
+(lib/game/poison.ts) ride it already, so a dart into a poisoned pig at its
+ceiling heals zero and still takes the poison off, which is the arm's own
+gate (0x4787E8) read literally. A dart into a DISGUISED pig stops in the
+wood like any round. Its destructor's effect 0x3F is below the combat
+window — purely visual, not built. No gauge (record +0x14 = 0), 30 frames
+of life at speed 300 — a short-range gun round.
+
+**The BALL (kind 0x25) is a grenade that heals a FIELD.** Row read whole
+(VA 0x4C25F8): speed 300, arming 2 under the 150-frame fuse, material
+0.5/0.8 — bouncier than a grenade — and its destructor (0x4331D1) spawns
+effect **0x60** with the row's radius 2048, force 0, amount 5120. The 0x60
+arm in `Pig::OnHit` (0x4778C6) is `min(deficit, falloff)` — the SAME
+`blastShare` ramp every blast runs, forty at the core, a quarter at the
+rim — and the id sits in the GAS group's phantom flags (Init 0x489A00): no
+push, no line of sight — it heals through walls. A flying ball touches
+nobody (kind 0x25 is not in the projectile pass filter); everything
+happens at the burst. Built as `Lob.heals` branching the one detonation
+seam into `mend` (blast.ts) — `burst`'s mirror with every destructive half
+out: no fling, no dummies, no `killed`, hidden pigs skipped (the decoy
+handler excludes the status band 0x5C..0x61 whole), and the ceiling gate
+kept: a full-health pig is passed over UNLESS afflicted, and then the zero
+heal goes through for the cure (`BlastWorld.afflicted`, wired to the
+poison set). The flight wears **WE_BALL** (row 425 of the name table).
+
+**Its picture is parameter ROW 4, decoded and validated.** The accessor
+came out corrected on the way — `param(row, off) = s8[0x4D61E8 + row·143 +
+off] × u8[0x4D6C88 + off]`, the scale table is BYTES, not dwords — and the
+proof is that rows 0 and 14 fed through it reproduce ROW_ZERO and
+MINE_EFFECT to the number. Row 4's live stages are F, K, L (as
+effects/notes.md had), all on frame 1, all at step 1 — a slow blue-violet
+ring and twenty gently rising blue motes living the full 100 frames, the
+longest-lived stages in any row read so far, and visually the opposite of
+a blast. `HEAL_EFFECT` in effects.ts, dispatched by id in effectField. The
+bang is gated OFF for 0x60 in both presenters: no camera shake (the effect
+carries no force) and no blast boom — the ball's own report is unread
+(`[gap]`), so it opens in silence and the P_SIGH of each heal carries it.
+
+**The brain does not throw it.** A heals row prices to NOTHING as a weapon
+(`lobOption`/`lobPoints` refuse it) — priced as a bomb it would lob forty
+points onto the enemy. Teaching the AI to HEAL — the ball, the dart and
+the hands alike, none priced today — is a wits feature of its own, still
+open (docs/ai.md).
+
+Pinned in `unit/mend.spec.ts` (the row, the cap, the ramp, the ceiling
+gate, the hidden skip, the id) and `unit/bullets.spec.ts` (the dart's cap
+and clamp, no damage, no shove). With these two the MEDIC'S STEP IS WHOLE:
+what class 12 adds over the ORDERLY — the health row was already in — now
+all does what the original's does. Still open in the medic family: 18
+TRANQUILLISER DART's status (SURGEON), skill 53's self-heal (no kit).

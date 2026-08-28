@@ -14,6 +14,7 @@ import { handling } from '../../../lib/game/events'
 import type { Emit } from '../../../lib/game/events'
 import { meleeOf } from '../../../lib/game/melee'
 import { isGun } from '../../../lib/game/projectile'
+import { HEAL_EFFECT_ID } from '../../../lib/game/blast'
 import { BARREL_SOUND, BATTLE_SOUNDS, playCue, stepCue, underlayCue } from './battle'
 import type { Bank } from './bank'
 
@@ -129,7 +130,12 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
         const weapon = meleeOf(skill)
         if (weapon) playCue(bank(), BATTLE_SOUNDS[weapon.impact])
       },
-      blasted: () => playCue(bank(), BATTLE_SOUNDS.blast),
+      // …except the MEDICINE BALL's 0x60, which is a heal and not a bang:
+      // its own report is unread, so it opens in silence and the P_SIGH of
+      // each `healed` it lands is what carries it. `[gap]` for the sound.
+      blasted: ({ effect }) => {
+        if (effect !== HEAL_EFFECT_ID) playCue(bank(), BATTLE_SOUNDS.blast)
+      },
       // The weapon going away with the turn (lib/game/battle.ts, endTurnBeat).
       holstered: () => playCue(bank(), BATTLE_SOUNDS.holster),
       // A round ARRIVING: meat and masonry sound different, thin air is

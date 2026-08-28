@@ -531,7 +531,10 @@ export function createEngine(parts: EngineParts): Engine {
       gas,
       fling,
       groundNormal,
-      soak
+      soak,
+      // The medicine ball's zero-amount cure gate: a pig at its ceiling is
+      // healed anyway when a status is on it (lib/game/blast.ts, `mend`).
+      afflicted: (pig) => poison.poisoned(pig)
     },
     bus.emit
   )

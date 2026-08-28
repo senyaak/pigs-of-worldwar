@@ -40,7 +40,9 @@
 // map with nothing disguisable near falls back to the crate, and a map that
 // never PLACED one would spawn nothing, which is the exact silent failure
 // the BOOTS entry below records.
-export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ', 'BOOTS', 'CRATE4']
+// …and WE_BALL, the MEDICINE BALL in flight (row 425) — thrown by the
+// engine, placed by no record, so it takes the same door.
+export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ', 'BOOTS', 'CRATE4', 'WE_BALL']
 
 /** What a finished death leaves on the spot (three/remains.ts). In every map's
  * own .MAD and in no .POG — exactly the case this list exists for: without the
@@ -61,7 +63,10 @@ export const REMAINS_MODEL = 'BOOTS'
  * here: it would change how every grenade in the game looks, nothing has asked
  * for it, and it is one line the day something does.
  */
-export const PROJECTILE_MODEL: Record<number, string> = { 29: 'WE_BAZZ' }
+// The MEDICINE BALL's flight is row **425, `WE_BALL`** — what is in the hand
+// for skill 33 is its own held mesh (weapons.ts row +0x0C = 27), so without
+// this the thrown ball flew as the held model.
+export const PROJECTILE_MODEL: Record<number, string> = { 29: 'WE_BAZZ', 33: 'WE_BALL' }
 
 /** What flies when this skill is fired, or null to fall back to the held model
  * (lib/game/weapons.ts). */

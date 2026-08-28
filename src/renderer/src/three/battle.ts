@@ -19,7 +19,7 @@ import { isPlanted, lobOf } from '../../../lib/game/grenade'
 import { meleeOf } from '../../../lib/game/melee'
 import { flingVelocity } from '../../../lib/game/tumble'
 import { ANIM } from '../../../lib/game/locomotion'
-import { flingSpeed } from '../../../lib/game/blast'
+import { HEAL_EFFECT_ID, flingSpeed } from '../../../lib/game/blast'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
 import { buildMapProps } from './props'
@@ -441,7 +441,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       },
       // A BANG SHAKES THE LENS, and this is the exe's own reaction to an
       // explosion — the only one it has (three/chase.ts, `SHAKE_REACH`).
-      blasted: ({ at }) => chase.shake(at),
+      // …and the MEDICINE BALL's 0x60 does not: a heal is not a bang — its
+      // effect carries no force at all (lib/game/blast.ts, `mend`).
+      blasted: ({ at, effect }) => {
+        if (effect !== HEAL_EFFECT_ID) chase.shake(at)
+      },
       crateSent: ({ id }) => airDropArt.open(id),
       crateLanded: ({ id }) => airDropArt.land(id),
       canopiesCut: () => airDropArt.cutAll(),

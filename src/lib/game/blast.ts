@@ -16,7 +16,7 @@ import { hurlVelocity } from './tumble'
 import type { Velocity } from './tumble'
 import { DAMAGE_UNIT } from './projectile'
 import { fromExeSpeed } from './ballistics'
-import { hurt, isDead } from './health'
+import { heal, hurt, isDead, maxHealthFor } from './health'
 import { originY } from './body'
 import type { Point } from './pose'
 import type { Pig } from './game'
@@ -47,6 +47,10 @@ export interface Charge {
 export const LOB_EFFECT_ID = 0x54
 /** …and what a MINE's does (0x433cd0/0x433d1f) — parameter row 14. */
 export const MINE_EFFECT_ID = 0x4c
+/** …and the MEDICINE BALL's (0x4331D1) — parameter row 4, the one burst in
+ * the game that heals (`mend` below). The id is in the GAS group's phantom
+ * flags, which is what makes it push nobody and ignore line of sight. */
+export const HEAL_EFFECT_ID = 0x60
 
 /** Everything a blast can catch. The same four fields the bullets and the blade
  * take, and the SAME dummy array — a list of its own means a dummy dies twice
@@ -82,6 +86,14 @@ export interface BlastWorld {
    * only what breaks through (0x48DB58). Optional the way `fling` is.
    */
   soak?: (pig: Pig, amount: number) => number
+  /**
+   * Whether this pig carries a STATUS a heal would take off (lib/game/
+   * poison.ts) — the second half of the heal arm's own gate (0x4778D8):
+   * a body at its ceiling is passed over UNLESS the status word is set, and
+   * then a zero-amount heal goes through for the cure alone. Only `mend`
+   * reads it; a world without one simply never cures at full health.
+   */
+  afflicted?: (pig: Pig) => boolean
 }
 
 /**
@@ -218,5 +230,48 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
       standing.splice(i, 1)
       emit({ kind: 'broke', target: dummy.id, at: { x: dummy.x, y: dummy.y, z: dummy.z } })
     }
+  }
+}
+
+/**
+ * Set a HEALING burst off at `at` — the MEDICINE BALL's, and the mirror of
+ * `burst` with every destructive half taken out, each absence the exe's own:
+ *
+ * - **Nobody is thrown.** The row's force is 0 and the id's phantom flags are
+ *   the gas group's no-push set (Init 0x489A00) — a heal moves no bodies.
+ * - **Nothing breaks.** Only pigs are mended; the dummies and the scenery are
+ *   left alone, and there is no `killed` to credit.
+ * - **A hidden pig gets NOTHING**: the decoy's contact handler excludes the
+ *   status band 0x5C..0x61 whole (lib/game/hide.ts) — a bush does not
+ *   convalesce, and the pig under it is out of the physics.
+ * - The amount is `min(deficit, falloff)` (0x4778C6): the same `blastShare`
+ *   ramp every blast runs, clamped to what the body is actually missing —
+ *   forty at the core, never past the ceiling. A body at its ceiling is
+ *   passed over UNLESS it carries a status (`afflicted`), and then the zero
+ *   heal goes through and the `healed` event's cure does the work
+ *   (lib/game/poison.ts).
+ *
+ * The announcement is the same `blasted` beat — the effect id is what tells
+ * the picture and the ear apart (HEAL_EFFECT_ID).
+ */
+export function mend(at: Point, charge: Charge, world: BlastWorld, emit: Emit): void {
+  emit({
+    kind: 'blasted',
+    at: { x: at.x, y: at.y, z: at.z },
+    effect: charge.effect ?? HEAL_EFFECT_ID
+  })
+  const shareAt = (dx: number, dy: number, dz: number): number =>
+    Math.round((charge.damage * blastShare(Math.hypot(dx, dy, dz), charge.reach)) / DAMAGE_UNIT)
+  for (const pig of world.pigs()) {
+    if (isDead(pig)) continue
+    if (pig.hidden) continue
+    const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
+    const reach = shareAt(body.x - at.x, body.y - at.y, body.z - at.z)
+    // Out of the field entirely: not even the cure reaches it.
+    if (reach <= 0) continue
+    const amount = Math.min(reach, Math.max(0, maxHealthFor(pig.pigClass) - pig.health))
+    if (amount <= 0 && !world.afflicted?.(pig)) continue
+    heal(pig, amount)
+    emit({ kind: 'healed', at: body, amount, pig: pig.id })
   }
 }

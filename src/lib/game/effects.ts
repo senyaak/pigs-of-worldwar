@@ -382,6 +382,46 @@ export const GAS_EFFECT: HitEffect = {
   ]
 }
 
+/**
+ * The MEDICINE BALL going off — effect id **0x60**, parameter row **4**, read
+ * out of the exe 2026-08-28 and validated by reproducing ROW_ZERO and
+ * MINE_EFFECT from their own rows through the same accessor first
+ * (`param(row, off) = s8[0x4D61E8 + row·143 + off] × u8[0x4D6C88 + off]` —
+ * the scale table is BYTES, which corrects the notes' dword reading).
+ *
+ * Live stages F, K, L — exactly the set effects/notes.md:757 recorded — all
+ * on frame 1, and **step 1 across the board**: the ring and both bursts live
+ * the full 100 frames, near seven seconds, the longest-lived stages in any
+ * row read so far. A slow blue-violet ring and twenty gently rising blue
+ * motes on a whisper of gravity — visually the opposite of a blast, which is
+ * what a heal should be. No clouds, no fireball. Row 4 also carries
+ * authored-but-off stages (G, D, E, C, I, J hold data under flag 0); the
+ * flags, not the data, decide, so nothing of them is built.
+ */
+export const HEAL_EFFECT: HitEffect = {
+  id: 0x60,
+  kind: 4,
+  rings: [
+    {
+      at: 1,
+      radius: 20,
+      growth: 75,
+      drift: 0,
+      width: 20,
+      spread: 60,
+      step: 1,
+      colour: [4, 2, 10],
+      // The row says +100 and +y is up in the engine, so it sits 100 ABOVE
+      // the burst — flipped on the way in, the same way MINE_EFFECT's is.
+      lift: -100
+    }
+  ],
+  bursts: [
+    { at: 1, count: 10, colour: [4, 1, 16], out: 10, up: 10, jitter: 15, gravity: 2, step: 1 },
+    { at: 1, count: 10, colour: [4, 1, 9], out: 10, up: 20, jitter: 10, gravity: 2, step: 1 }
+  ]
+}
+
 /** How far round the burst fans its particles: the same 1638.4-per-turn unit
  * the ring is drawn in, stepped `0x648 / count` a particle (0x48cb0b). */
 const BURST_SPREAD = 0x648 / 1638.4

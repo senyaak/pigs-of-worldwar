@@ -92,6 +92,16 @@ export interface Projectile {
    */
   burst?: number
   /**
+   * The heal CAP of the one projectile that puts points ON — kind 0x24's own
+   * arm inside `Pig::HitByProjectile` (0x4787D6): `min(max − health, 0x1400)`
+   * through `Pig::Heal`, so it is clamped to the DEFICIT and never past forty
+   * points. The 0x1400 is the arm's own literal, not a row field, and it
+   * rides here because the row is where every other verdict about a bullet
+   * lives. The kind passes the function's filter and takes NO knock — the
+   * fire.md read files it as "MEDICINE DART (heals, no throw)". In 128ths.
+   */
+  heal?: number
+  /**
    * ONE pellet's knock, in exe units a frame — the figure `Pig::
    * HitByProjectile` hands `0x4A9260` for this kind: 6 for the shotgun
    * (0x478A99), where every other projectile passes the literal 0x30.
@@ -131,7 +141,9 @@ const GUNS: Record<number, Projectile> = {
   13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5, shove: 6 },
   14: { id: 411, kind: 23, speed: 150, life: 20, damage: 768, blast: 0 },
   15: { id: 434, kind: 46, speed: 300, life: 1000, damage: 6400, blast: 3900 },
-  17: { id: 424, kind: 36, speed: 300, life: 30, damage: 0, blast: 0 },
+  /** 17 MEDIC DART — damage 0 ("it heals, so it must not hurt") and the heal
+   * arm's own cap of forty points (`heal` above). */
+  17: { id: 424, kind: 36, speed: 300, life: 30, damage: 0, blast: 0, heal: 0x1400 },
   18: { id: 442, kind: 54, speed: 300, life: 30, damage: 2560, blast: 0 }
 }
 

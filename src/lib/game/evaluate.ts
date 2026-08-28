@@ -422,6 +422,11 @@ const blastWorth = (
 const lobPoints = (skill: number): number => {
   const row = lobOf(skill)
   if (!row) return 0
+  // A HEALS row is worth NOTHING as a weapon — the medicine ball's forty
+  // points go the wrong way for this ledger, and the brain does not heal
+  // (it prices no heal option for the hands either; that is a wits feature
+  // of its own the day it lands).
+  if (row.heals) return 0
   return row.damage / 128 + (row.gas ? POISON_WORTH : 0)
 }
 
@@ -633,6 +638,10 @@ const meleeOption = (world: AiWorld, skill: number, note: Note, walked?: Walked)
 const lobOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): Option | null => {
   const row = lobOf(skill)
   if (!row) return null
+  // The MEDICINE BALL is not a bomb: priced as one it would be lobbed AT
+  // the enemy and put forty points back ON them. No option at all until
+  // the brain learns to heal (lobPoints above says where that lands).
+  if (row.heals) return null
   const me = world.acting
   // The gas throw is priced with its poison's instalments on top of the
   // fifteen — over friends and the thrower too, because the bit does not

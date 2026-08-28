@@ -32,7 +32,7 @@ import {
   sunkAway
 } from './grenade'
 import type { Lobbed } from './grenade'
-import { burst } from './blast'
+import { burst, mend } from './blast'
 import type { Gas } from './gas'
 import type { Mines } from './mines'
 import type { BlastWorld } from './blast'
@@ -151,6 +151,17 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
     // pop, with no 0x54 and no push — the exe's own shape (lib/game/gas.ts).
     if (row.gas) {
       world.gas?.pop(shot)
+      return
+    }
+    // …and the MEDICINE BALL's burst PUTS POINTS ON — same seam, the mirror
+    // routine (lib/game/blast.ts `mend`; the row's `heals` is the read).
+    if (row.heals) {
+      mend(
+        { x: shot.x, y: shot.y, z: shot.z },
+        { damage: row.damage, reach: blastRange(row) },
+        world,
+        emit
+      )
       return
     }
     burst(

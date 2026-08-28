@@ -20,6 +20,7 @@ import { terrain } from './fixture'
 
 const RIFLE = 7
 const SHOTGUN = 12
+const MEDIC_DART = 17
 
 const pigAt = (x: number, z: number, id = 1, health = 100): Pig =>
   ({
@@ -190,6 +191,30 @@ test('the live muzzle never guns the shooter down', { tag: '@nodata' }, () => {
   fire()
   expect(events.some((one) => one.kind === 'damaged' && one.pig === shooter.id)).toBe(false)
   expect(events.some((one) => one.kind === 'damaged' && one.pig === victim.id)).toBe(true)
+})
+
+test('the medic dart heals its cap of forty — no damage, no shove', { tag: '@nodata' }, () => {
+  // Kind 0x24's own arm in `Pig::HitByProjectile` (0x4787D6):
+  // `min(deficit, 0x1400)` through `Pig::Heal`, and the kind is on the
+  // no-throw list — "MEDICINE DART (heals, no throw)" (`weapons/fire.md`).
+  // A grunt at 5 of its 50 is 45 short, so the cap is what lands.
+  const victim = pigAt(0, 512, 1, 5)
+  const { fire, flung, events } = range(victim, undefined, MEDIC_DART)
+  fire()
+  const healed = events.flatMap((one) => (one.kind === 'healed' ? [one.amount] : []))
+  expect(healed).toEqual([40])
+  expect(victim.health).toBe(45)
+  expect(events.some((one) => one.kind === 'damaged')).toBe(false)
+  expect(flung).toHaveLength(0)
+})
+
+test('…and is clamped to the deficit, never past the ceiling', { tag: '@nodata' }, () => {
+  const victim = pigAt(0, 512, 1, 45)
+  const { fire, events } = range(victim, undefined, MEDIC_DART)
+  fire()
+  const healed = events.flatMap((one) => (one.kind === 'healed' ? [one.amount] : []))
+  expect(healed).toEqual([5])
+  expect(victim.health).toBe(50)
 })
 
 test('an overkill body has left the world and is not shoved', { tag: '@nodata' }, () => {

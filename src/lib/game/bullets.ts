@@ -12,7 +12,7 @@
 //
 // Game space (Y-down) throughout.
 
-import { advanceShot, damageOf, fireShot, projectileOf, spentShot } from './projectile'
+import { DAMAGE_UNIT, advanceShot, damageOf, fireShot, projectileOf, spentShot } from './projectile'
 import type { Shot } from './projectile'
 import { PIG_RADIUS } from './obstacles'
 import type { Obstruction } from './obstacles'
@@ -21,7 +21,7 @@ import { AIM_UNITS } from './aim'
 import { flingVelocity } from './tumble'
 import type { Random } from './random'
 import type { Velocity } from './tumble'
-import { hurt, isDead } from './health'
+import { heal, hurt, isDead, maxHealthFor } from './health'
 import { originY } from './body'
 import { HAND_BONE } from './pose'
 import type { Point, Pose } from './pose'
@@ -210,6 +210,25 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       const body = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
       if (!inside(shot, body)) continue
       const row = projectileOf(shot.skill)
+      // **THE MEDIC DART PUTS POINTS ON** — kind 0x24's own arm inside
+      // `Pig::HitByProjectile` (0x4787D6): `min(deficit, 0x1400)` through
+      // `Pig::Heal`, and NO knock — the kind is filed "heals, no throw".
+      // The `healed` event is the heal's whole common tail: the pink number,
+      // the sigh, and the CURE (lib/game/poison.ts) — a dart into a pig at
+      // its ceiling heals nothing and still takes the poison off, which is
+      // the exe's own zero-amount heal let through for the status.
+      if (row?.heal) {
+        // A DISGUISED pig is a BUSH, and a bush is not healed: the dart
+        // stops in the wood the way any round does (lib/game/hide.ts).
+        if (pig.hidden) return 'hard'
+        const amount = Math.min(
+          row.heal / DAMAGE_UNIT,
+          Math.max(0, maxHealthFor(pig.pigClass) - pig.health)
+        )
+        heal(pig, amount)
+        emit({ kind: 'healed', at: body, amount, pig: pig.id })
+        return 'flesh'
+      }
       // `Projectile.burst` — the exe's `edi`, and the FIRST hit PREPAYS the
       // next four: pellet one deals ×burst (0x478828 `imul ecx,edi`), pellets
       // 2..burst are ABSORBED — `cmp eax,edi; jl` at 0x478891 jumps PAST the

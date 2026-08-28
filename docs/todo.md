@@ -1399,7 +1399,10 @@ Non-AI bugs from the same session, queued after the AI:
    `SHOT_SHOVE` (lib/game/bullets.ts) through the ordinary fling seam,
    pinned in unit/bullets.spec.ts. Read and NOT built (nothing fields
    them): the MG burst cap (edi=5, first round ×5), the stagger counter
-   raise, the medic dart HEAL (kind 0x24), kind 0x36's flag.
+   raise, kind 0x36's flag. The medic dart HEAL (kind 0x24) was on that
+   list and is BUILT 2026-08-28 — `min(deficit, 0x1400)` with no shove,
+   `Projectile.heal` + the `healed` arm in bullets.ts, pinned in
+   unit/bullets.spec.ts — the MEDIC's level-2 kit work.
 10. ~~**No WOUNDED bearing on a hurt pig**~~ **READ AND BUILT 2026-08-24**
     — the bands are ABSOLUTE points, not a fraction of max (0x3B8 has no
     movement reader): over 25 untouched; 10–25 walk ×2/3 and run clip 1;

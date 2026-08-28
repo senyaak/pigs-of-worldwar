@@ -144,6 +144,21 @@ export interface Lob {
    * "confusion gas poisons" is the game or a port accident.
    */
   gas?: boolean
+  /**
+   * **Whether the burst PUTS POINTS ON instead of taking them off.**
+   *
+   * Kind 37's destructor arm (0x4331D1) spawns effect **0x60** with the row's
+   * own radius, force and amount, and 0x60's arm inside `Pig::OnHit`
+   * (0x4778C6) is `min(deficit, falloff)` through `Pig::Heal` — the same
+   * falloff every blast runs (`blastShare`), the same quarter rim. Its force
+   * is 0 and the id sits in the GAS group's phantom flags (Init 0x489A00,
+   * ids 0x5D..0x60): **no push, and no line of sight — it heals through
+   * walls.** The arm's own gate (0x4778D8) lets a ZERO heal through when the
+   * status word is set, so a full-health poisoned pig in the cloud is cured.
+   * `lobs.ts` branches on this at the one detonation seam, into `mend`
+   * (lib/game/blast.ts). Read out of the exe 2026-08-28.
+   */
+  heals?: boolean
 }
 
 /**
@@ -180,6 +195,13 @@ const LOBS: Record<number, Lob> = {
    * touch, the poison bit after, and no blast at the pop. */
   26: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false, gas: true },
   27: { id: 420, kind: 32, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
+  /** 33 MEDICINE BALL — the MEDIC's thrown AREA heal, every field read out of
+   * the exe's own row (kind 37, VA 0x4C25F8, 2026-08-28): a grenade's throw
+   * (gauge, clip 19) on a BOUNCIER material (0.5/0.8 against the grenade's
+   * 0.3/0.8), arming 2 under the same 150-frame fuse, and forty points over a
+   * 2048 field that HEAL (`heals` above) — full inside the 512 core, down to
+   * a quarter at the rim, clamped to each body's own deficit. */
+  33: { id: 425, kind: 37, speed: 300, fuse: 150, arming: 2, damage: 5120, blast: 2048, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false, heals: true },
   /**
    * **37 TNT — PLANTED, not thrown**, and its row says so in three places: a
    * speed of 50 where a grenade has 300 and no power gauge to multiply it by, so

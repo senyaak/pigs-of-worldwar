@@ -64,6 +64,12 @@ export const SKILL = {
   GRENADE: 19,
   BAZOOKA: 29,
   TNT: 37,
+  /** The MEDIC's dart — a rifle-shaped shot that heals whoever it hits
+   * (lib/game/projectile.ts, `heal`). */
+  MEDIC_DART: 17,
+  /** …and their thrown AREA heal, the class's other level-2 skill
+   * (lib/game/grenade.ts). */
+  MEDICINE_BALL: 33,
   /** The medic careers' contact heal (lib/game/healing.ts). */
   HEALING_HANDS: 52,
   /** The espionage careers' theft (lib/game/pickpocket.ts). */
