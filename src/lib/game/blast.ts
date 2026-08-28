@@ -114,22 +114,20 @@ export interface BlastWorld {
  * The FALLOFF is free: the damage is already the share for the distance, so
  * standing back saves your footing along with your health.
  *
- * The six, and the cap, are the REMAKE's calibration. The throw itself is
- * the GAME's — play said so first ("есть в екзе отброс! там отброс от
- * любого урона!") and the 2026-08-28 read FOUND it where three arm reads
- * had missed it: the throw is the EFFECT's own world sweep (0x409EF0,
- * fired once from Effect::Update), writing body velocity directly and
- * bypassing both impulse primitives — which is why reading the damage arm
- * (0x477c22) to its ret kept "proving" there was none. The original's
- * shape, for when play wants it built: sphere of the whole RANGE centred
- * 128 ABOVE the blast, impulse `strength · (1 − 3d/4R)` along centre→body
- * (25% still standing at the rim), the vertical DOUBLED, a coin-flip spin
- * on a pig; `strength` is the effect's own field — land death 3250 over
- * range 1024, water 2600/4000 over 2048 — and does NOT scale with the
+ * The six, and the cap, are the REMAKE's calibration. The exe's own throw
+ * is READ — `weapons/fire.md` §"phantom sweep" — and it is the EFFECT's
+ * one-shot world sweep (0x409EF0), not any arm of the pig's: sphere of
+ * the whole RANGE centred 128 ABOVE the blast, impulse
+ * `strength · (1 − 3d/4R)` along centre→body (25% still standing at the
+ * rim), the vertical DOUBLED, divided by the body's MASS (a pig's is 30),
+ * a coin-flip spin; `strength` is the effect's own FORCE field — grenade
+ * 2600, TNT 6500, the land death 3250 — and does NOT scale with the
  * damage. Gas, fire and heal are built with the impulse flag off: damage
- * without throw. `effects/notes.md` has the whole chain. This model here
- * (damage-scaled, 45°, capped) is `[play]`-tuned and stays until play
- * asks for the exe's numbers.
+ * without throw. In per-frame Δv that is ~87 for a grenade at the centre,
+ * ~108 for a corpse, ~217 for TNT — the same order this model's 6×points
+ * lands (180/120/200-capped), so the two disagree in SHAPE (falloff, the
+ * doubled vertical, damage-independence) more than in size. This model
+ * stays `[play]`-tuned until play asks for the exe's numbers.
  *
  * The DIRECTION is the engine's one throwing explosion borrowed: a BUILDING
  * going off (PC 0x44050c at 0x40, PSX 0x800FAC84, contact arm 0x78) throws

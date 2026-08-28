@@ -1058,24 +1058,25 @@ and the weakest of them were invented here:
   `jmp [eax*4+0x4a90CC]` at 0x4a8ece where `eax = type - 0x1357`, built by
   `0x407AF0` at 0x4a9044). It does not need to grow — that idea was invented to
   prop up a misread range and is gone.
-- **DAMAGE THROWS — in the EXE, from ANY damage — and the blast's throw is
-  FOUND now (2026-08-28), where three arm reads had missed it.** Play's
-  word came first ("есть в екзе отброс! там отброс от любого урона!") and
-  the read then proved it: the throw is the EFFECT's own world sweep
-  (0x409EF0, fired once from Effect::Update), which writes body velocity
-  DIRECTLY — bypassing both impulse primitives, which is why every
-  enumeration of their call sites kept coming back clean. The original's
-  shape: sphere of the effect's whole RANGE centred 128 above the blast,
-  impulse `strength · (1 − 3d/4R)` along centre→body (still 25% at the
-  rim), the VERTICAL DOUBLED, plus a coin-flip spin on a pig; `strength`
-  is the effect's own field (land death 3250 over range 1024) and does NOT
-  scale with damage. Gas, fire and heal ids are built with the impulse
-  flag off — damage without throw, matching their special-cased arms. The
-  lesson stands beside the fact: an arm without the impulse call only
-  means the throw's site is elsewhere — never "throws nobody". The
-  remake's damage-scaled model (`FLING_PER_POINT`) is `[play]`-tuned and
-  stays until play asks for the exe's numbers; `effects/notes.md` carries
-  the whole read.
+- **DAMAGE THROWS — in the EXE, from ANY damage — and the blast throw is
+  READ: `weapons/fire.md` §"phantom sweep". GREP THE DISASM REPO BEFORE
+  CONCLUDING.** The mechanism is the effect's own one-shot world sweep
+  (0x409EF0), writing body velocity directly and bypassing both impulse
+  primitives: sphere of the whole RANGE centred 128 above the blast,
+  impulse `strength · (1 − 3d/4R)` along centre→body (25% at the rim),
+  VERTICAL DOUBLED, **divided by the body's mass (a pig's is 30)**, plus a
+  coin-flip spin; `strength` is the effect's own field (weapon-row FORCE:
+  grenade 2600, TNT 6500; the land death 3250) and does NOT scale with
+  damage. Gas/fire/heal are built with the impulse flag off — damage, no
+  throw. That section already existed when a later session read the OnHit
+  arm alone, concluded "the death blast throws nobody", reported it to
+  play — who had to correct it, "есть в екзе отброс!" — and a fresh pass
+  re-derived the whole chain before the duplicate was caught. TWO lessons,
+  both permanent: an arm without the impulse call only means the throw
+  lives elsewhere; and the notes repo is searched FIRST — the answer was
+  already written down. The remake's damage-scaled model
+  (`FLING_PER_POINT`) is `[play]`-tuned and stays until play asks for the
+  exe's numbers.
 - **"I could not find it" is never "it is not there".** Twice in one session: the
   grenade's TRAIL was declared absent because both of the projectile update's
   dispatches skip a plain grenade — it is in the CONSTRUCTOR (0x43247b); then the
