@@ -945,12 +945,18 @@ export function crateFallback(
  * that stood mid-bridge and ended its turn: "он должен был всёравно бежать
  * не?" — yes.
  *
- * It is a REFLEX, not a judgment: no score, no wits, both ends of the dial
- * run at the enemy when there is nothing better (a wits rule slides weights,
- * it never gates a behaviour). The option is shaped as the blade's own so
- * the walk turns into the strike by itself the moment the foe comes inside
- * `MELEE_NEAR` — and the route to it is `legsTo`'s honest best effort, which
- * ends short past the flood and re-plans nearer next turn.
+ * And it SLIDES with the wits, both ends play's own: "это норм если тупые
+ * будут пропускать ход потому что не будут знать чо делать". Knowing that
+ * an unreachable fight is still worth walking toward IS thinking, so the
+ * march is rolled against the dial — the 1/26 rookie stands about baffled
+ * most turns, the campaign's end runs almost every time. A roll, not a
+ * gate: either end can do either, only the odds move (the battle's one
+ * stream, so a lockstep peer rolls the same).
+ *
+ * The option is shaped as the blade's own so the walk turns into the
+ * strike by itself the moment the foe comes inside `MELEE_NEAR` — and the
+ * route to it is `legsTo`'s honest best effort, which ends short past the
+ * flood and re-plans nearer next turn.
  *
  * Null for a pig with no BLADE to close with — a march is a charge, and a
  * pig with nothing to strike with when it arrives keeps the honest pass
@@ -969,6 +975,9 @@ export function marchOption(world: AiWorld): Option | null {
   if (!foe) return null
   const blade = me.carrying.find((slot) => slot.amount !== 0 && meleeOf(slot.skill))
   if (!blade) return null
+  // The dial's roll, last — after the cheap refusals, so a battle with no
+  // march to offer spends nothing off the stream.
+  if (world.roll() >= world.wits) return null
   const skill = blade.skill
   return {
     skill,
