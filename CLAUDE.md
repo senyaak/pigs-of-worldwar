@@ -564,7 +564,12 @@ and the weakest of them were invented here:
   CHARS2" and library/notes.md's "= small" were both right about different
   program states. GameChars/BigChars are PSX leftovers no PC binary loads.
   `PLATE_FONT` in `ui/hud.ts`, no metrics — the battle's letters carry no
-  tracking (the frontend flag is clear in a mission).
+  tracking (the frontend flag is clear in a mission) — and STRETCHED ×2
+  vertically, width 1:1, which is the library's own glyph quad
+  (`min(2·h, 45)`, text/notes.md): SMALL stands 24 tall on screen. The
+  full text-object read (no outline pass exists; the /C colour escapes;
+  the heart being a blinking font glyph coloured by status) is
+  text/notes.md in the disasm repo.
 - `[play]` **The pig slides, and that stays.** The walking clips carry a body
   about 855 units a second at 25 fps; the exe walks 1560, so the feet skate
   about 2×. Driving playback off the walking speed to close that (a `gait.ts`
@@ -611,12 +616,15 @@ and the weakest of them were invented here:
   test itself, is still undecoded), so `lib/game/obstacles.ts` draws its own
   line at a box two units across — which drops grass, flowers and the swimming
   fish, each of which carries a box exactly one unit wide.
-- `[CHECK — remake]` **Three numbers on the dashboard are the remake's own**,
+- `[CHECK — remake]` **Two numbers on the dashboard are the remake's own**,
   and each says so where it lives: the GREEN the dial's face is filled in (the
   archive ships the beaded RIM and no disc behind it, so the face is a filled
-  ellipse matched to play), the PINK the heart is painted (its art is white),
-  and the heart's ×2 (the map's marker is 10×11 and stands beside letters 32
-  tall). Correct them against play.
+  ellipse matched to play) and the PINK the heart is painted (its art is
+  white). Correct them against play. The heart's ×2 GRADUATED to `[exe]`
+  (2026-08-28): the original's plate heart is a GLYPH of the plate font,
+  blinking, riding the same ×2 vertical stretch the battle draws every
+  glyph with (text/notes.md) — and its colour comes off a per-STATUS
+  table, which is the poisoned green's own mechanism.
 - `[gap]` **The power gauge and the weapon icons wait for a weapon.**
   `newpow1..7` and `powg1` are the gauge — which the original shows only when
   the weapon in hand needs one — and `FACETIMS.MAD`, despite the name, holds

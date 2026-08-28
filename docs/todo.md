@@ -2673,3 +2673,17 @@ the ruling changes what the work IS.
   LUNAR1**, at heights 1440..1984. `three/props.ts` draws by name off the map's
   own archive, so they are probably already drawn and simply silent. Open
   LUNAR1 before assuming anything is missing.
+- **The TEXT OBJECT is read whole (2026-08-28, text/notes.md) and ui/font.ts
+  matches it only where the plates needed it.** Built the same day: the ×2
+  battle stretch and the heart-glyph justification. STILL OPEN, each one
+  measured and waiting: escape parsing (`/C` mid-string colour, `/N`
+  newline at 22, `/S`, `/Z…)`, `//` — our draw prints them as literal
+  glyphs); the frontend's THREE-ATLAS shading (avg<50 → chars2D, >100 →
+  chars2L — our `painted` multiply is the battle's mechanism applied to
+  the frontend, where the exe never modulates); space advance carries no
+  tracking (ours adds 3 — every frontend space 3 px wide of the exe's) and
+  `measure` should drop one trailing tracking; alignment/box/wrap modes;
+  the half-texel bias; diffuse ALPHA on battle text; the frontend 2D
+  list's REVERSED draw order. None of it urgent — the menus were tuned by
+  eye against the originals' screens — but any future "the text looks off"
+  starts at this list, not at a new read.

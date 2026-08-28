@@ -25,7 +25,7 @@
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { aimRadians } from '../../../lib/game/aim'
-import { loadFont } from './font'
+import { BATTLE_STRETCH, loadFont } from './font'
 import type { Font } from './font'
 import { loadTims, tinted } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
@@ -57,6 +57,11 @@ const TEXT_FONT = 'BIG'
  * CHARS2/CHARS3 into them, and entering a battle 0x480D10 rebuilds the pair
  * as `FETEXT\small` / `FETEXT\big` (0x47E187) — so in battle `[0x51BA54]`
  * IS SMALL. `scanner/notes.md` carries the corrected read.
+ *
+ * And the battle path draws every glyph STRETCHED ×2 vertically, width 1:1
+ * (`BATTLE_STRETCH`, ui/font.ts): SMALL stands 24 tall on screen — the
+ * narrow, tall letters play remembers. "SMALL doubled" had once been waved
+ * off as a BIG-scale artefact; it was the library's own quad.
  */
 const PLATE_FONT = 'SMALL'
 /** The height the dashboard art was drawn for. */
@@ -295,15 +300,18 @@ export const LAYOUT = {
      * return. The dial stays for a font that has no edge of its own.
      */
     outline: 0,
-    /** The heart's ×2 followed BIG's tall letters; beside SMALL's native 12
-     * the 10×11 art stands at its OWN size, which is the original's
-     * proportion. The pink stays play's, and so does the GREEN a poisoned
-     * pig's heart turns — `[play]`, the original as remembered; the art is
-     * white and both are tints of it. */
+    /** The heart's ×2 is the exe's own proportion now: the original's heart
+     * is a GLYPH of the plate font (SMALL's coloured palette indices, chars
+     * 0x5E..0x61 blinking, text/notes.md) and rides the same ×2 vertical
+     * stretch the letters do — so the 10×11 marker art stands doubled
+     * beside 24-tall letters. The pink stays play's, and so does the GREEN
+     * a poisoned pig's heart turns — which the exe agrees with in
+     * mechanism: the heart glyph's colour comes off a per-STATUS table
+     * (0x4CF2A0). The art is white and both are tints of it. */
     heart: {
       colour: [248, 64, 152] as [number, number, number],
       poisoned: [96, 200, 72] as [number, number, number],
-      scale: 1
+      scale: 2
     },
     /**
      * Seconds a plate takes to FADE IN once its gate opens. Play, against the
@@ -494,7 +502,10 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
       teamLoads.add(key)
       // No metrics: the battle's letters carry no tracking — the exe's
       // frontend flag is CLEAR in a mission (ui/font.ts, Metrics).
-      void loadFont(PLATE_FONT, { colour: [colour[0], colour[1], colour[2]] }).then((painted) => {
+      void loadFont(PLATE_FONT, {
+        colour: [colour[0], colour[1], colour[2]],
+        stretch: BATTLE_STRETCH
+      }).then((painted) => {
         teamFonts.set(key, painted)
       })
     }
@@ -558,8 +569,8 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           loadTims(DASHBOARD),
           loadTims(MARKERS),
           loadFont(TEXT_FONT),
-          loadFont(PLATE_FONT),
-          loadFont(PLATE_FONT, { colour: [0, 0, 0] })
+          loadFont(PLATE_FONT, { stretch: BATTLE_STRETCH }),
+          loadFont(PLATE_FONT, { colour: [0, 0, 0], stretch: BATTLE_STRETCH })
         ])
         art = dashboard
         font = big

@@ -54,12 +54,23 @@ export interface Metrics {
 
 export const FRONTEND_METRICS: Metrics = { tracking: 3, space: 8 }
 
+/**
+ * The BATTLE's vertical stretch — the library's own glyph quad: width 1:1,
+ * height `min(2 × the font's height, 45)` (`afDrawText`, dll 0x1000DFB6 —
+ * read 2026-08-28, text/notes.md in the disasm repo). SMALL's 12 draws 24
+ * tall on screen; BIG's 32 clamps to 45. The frontend path never stretches.
+ */
+export const BATTLE_STRETCH = 2
+const STRETCH_CAP = 45
+
 function makeFont(
   name: string,
   atlas: CanvasImageSource,
   table: GlyphTable,
-  metrics?: Metrics
+  metrics?: Metrics,
+  stretch = 1
 ): Font {
+  const drawnHeight = Math.min(table.height * stretch, STRETCH_CAP)
   const boxOf = (charCode: number): GlyphTable['glyphs'][number] | null => {
     const index = charCode - GLYPH_SHIFT
     return index >= 0 && index < table.glyphs.length ? table.glyphs[index] : null
@@ -72,7 +83,7 @@ function makeFont(
   }
   return {
     name,
-    height: table.height,
+    height: drawnHeight,
     measure(text) {
       let width = 0
       for (let i = 0; i < text.length; i++) width += advance(text.charCodeAt(i))
@@ -84,7 +95,9 @@ function makeFont(
         const code = text.charCodeAt(i)
         const box = boxOf(code)
         if (box && box.width > 0) {
-          context.drawImage(atlas, box.x, box.y, box.width, box.height, at, y, box.width, box.height)
+          // Width 1:1, height the font's stretched one — the library's own
+          // quad shape (BATTLE_STRETCH above).
+          context.drawImage(atlas, box.x, box.y, box.width, box.height, at, y, box.width, drawnHeight)
         }
         at += advance(code)
       }
@@ -137,7 +150,7 @@ async function painted(
  */
 export async function loadFont(
   name: string,
-  options?: { colour?: [number, number, number]; metrics?: Metrics }
+  options?: { colour?: [number, number, number]; metrics?: Metrics; stretch?: number }
 ): Promise<Font> {
   const result = await window.api.loadFont(name)
   if (!result.ok) throw new Error(result.error)
@@ -148,5 +161,5 @@ export async function loadFont(
   const bitmap = options?.colour
     ? await painted(image, options.colour)
     : await createImageBitmap(image)
-  return makeFont(result.font.name, bitmap, table, options?.metrics)
+  return makeFont(result.font.name, bitmap, table, options?.metrics, options?.stretch)
 }
