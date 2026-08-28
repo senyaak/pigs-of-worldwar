@@ -51,6 +51,9 @@ const canister = (age = 0): Lobbed => ({
   resting: false,
   doused: false,
   sinking: 0,
+  spin: 0,
+  axisX: 1,
+  axisZ: 0,
   owner: 9
 })
 

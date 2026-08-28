@@ -101,8 +101,17 @@ export interface Squad {
    * over the crown the name floats — the dashboard's own number, passed in
    * rather than read, so this module owes `ui/` nothing. `acting` is the SIDE
    * whose turn it is: an espionage pig of any other side goes unlabelled, the
-   * same test that takes its blip off the map (lib/game/scanner.ts). */
-  plates(camera: THREE.Camera, width: number, height: number, lift: number, acting: number): PigPlate[]
+   * same test that takes its blip off the map (lib/game/scanner.ts).
+   * `poisoned` is the gas's bite, asked of the engine — this module holds no
+   * status of its own, it only projects. */
+  plates(
+    camera: THREE.Camera,
+    width: number,
+    height: number,
+    lift: number,
+    acting: number,
+    poisoned: (pig: Pig) => boolean
+  ): PigPlate[]
   /**
    * This pig's body is GONE — its death has finished playing out
    * (lib/game/corpses.ts, `remains`) — so its model comes off the scene for
@@ -267,7 +276,7 @@ export function fieldSquad(
       members
         .filter((soldier) => soldier !== except)
         .map((soldier) => ({ ...soldier.pig.position })),
-    plates(camera, width, height, lift, acting) {
+    plates(camera, width, height, lift, acting, poisoned) {
       const at = new THREE.Vector3()
       const out: PigPlate[] = []
       for (const soldier of members) {
@@ -299,7 +308,8 @@ export function fieldSquad(
           health: Math.floor(soldier.pig.health),
           // The team's colour by SKIN, not nation — the art's own index, the
           // way every table of the exe's is keyed (lib/game/nations.ts).
-          colour: SKIN_COLOURS[skinOf(soldier.nation)] ?? [255, 255, 255]
+          colour: SKIN_COLOURS[skinOf(soldier.nation)] ?? [255, 255, 255],
+          poisoned: poisoned(soldier.pig)
         })
       }
       return out

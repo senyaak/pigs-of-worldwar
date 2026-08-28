@@ -88,6 +88,13 @@ export interface FlightShot {
   vx: number
   vy: number
   vz: number
+  /** The in-flight TUMBLE — radians turned about the lateral axis below.
+   * Zero for a bullet, which never tumbles (lib/game/grenade.ts). */
+  spin: number
+  /** The tumble's axis, horizontal, fixed at launch — (0,0) for a bullet,
+   * which the renderer reads as "do not tumble". */
+  axisX: number
+  axisZ: number
 }
 
 /** A crate coming down under a canopy — only its height moves. */

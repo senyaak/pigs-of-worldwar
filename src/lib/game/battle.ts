@@ -377,6 +377,22 @@ export function createBattle(parts: BattleParts): Battle {
     if (pressed) attack.press()
     attack.hold(held)
   }
+  /**
+   * Whether a pig HERE would be IN the water — the tile's word, overruled by
+   * a DECK it could stand on. The path grid already walks bridges
+   * (lib/game/pathgrid.ts asks `standOn` before the water probes), and the
+   * machine's price list and hands must not veto what its own legs can do:
+   * a foe mid-bridge had every melee mark round it discarded as "wet" and
+   * the last pig passed its turn on the spot (play, 2026-08-28). The reach
+   * is unbounded because the question is "is there ANYTHING standable
+   * here", not "can these feet climb to it" — the flood prices the climb.
+   */
+  const swimAt = (x: number, z: number): boolean => {
+    if (!query.isWater(x, z)) return false
+    return (
+      scenery.obstacles.standOn(x, z, query.surface(x, z), Number.POSITIVE_INFINITY) === null
+    )
+  }
   /** The machine's HANDS (lib/game/actuator.ts): a brain's order becomes the
    * same inputs the player's keys write, and nothing else — every read on
    * this rig is something the screen shows anyway. */
@@ -386,7 +402,7 @@ export function createBattle(parts: BattleParts): Battle {
       z: game.currentPig.position.z,
       heading: game.currentPig.heading
     }),
-    wet: (x, z) => query.isWater(x, z),
+    wet: swimAt,
     swims: () => !drowns(game.currentPig.pigClass),
     aim: () => sights.angle(),
     gauge: () => attack.gauge(game.currentPig.holding),
@@ -531,6 +547,9 @@ export function createBattle(parts: BattleParts): Battle {
     heals.running() ||
     // …and the tiptoe, for its clip's own length (lib/game/pickpocket.ts).
     pockets.running() ||
+    // …and the disguise's gesture, whose end is where the pig vanishes
+    // (lib/game/hide.ts).
+    hides.running() ||
     // THROWN, not planted: a charge lying at the pig's feet is exactly what it
     // has to be able to run away from (lib/game/lobs.ts `thrown`).
     grenades.thrown() > 0 ||
@@ -1017,6 +1036,7 @@ export function createBattle(parts: BattleParts): Battle {
     swings.reset()
     heals.reset()
     pockets.reset(game.currentPig)
+    hides.reset(game.currentPig)
     // A turn is a fresh start for the machine too (lib/game/ai.ts) — and the
     // moment its SEAT is decided (`machineTurn` above). The hands let go of
     // whatever they were doing and still every control they hold.
@@ -1057,6 +1077,14 @@ export function createBattle(parts: BattleParts): Battle {
       jumpRequested = false
       doorRequested = false
       attack.swallow()
+      // The LAST death's blast may have thrown the acting pig — the flight
+      // owns its position for as long as it lasts, tour or no tour. Everyone
+      // else's air is `tumbles`, which the engine steps regardless; the
+      // acting pig's lives on `loco` and only `flyOn` moves it. Without this
+      // the velocity was written and never read: the pig that killed the
+      // last enemy point-blank stood still through its own knockback (play,
+      // 2026-08-28).
+      flyOn(delta)
       // **THE HANDS ARE EMPTY AND THE TOUR CHEERS.** Play, in two rounds:
       // first "при выигрыше остаётся оружие в руках свина, он не танцует" —
       // then "должно идти по свинам и каждого показывать как он радуется".
@@ -1198,6 +1226,10 @@ export function createBattle(parts: BattleParts): Battle {
     if (sarge) {
       jumpRequested = false
       attack.swallow()
+      // A pig the last blow threw is still in the air — its flight owns its
+      // position for as long as it lasts, remark or no remark (the same
+      // rule the walk-away beat holds above).
+      flyOn(delta)
       sarge.floor = Math.max(0, sarge.floor - delta)
       if (sarge.floor <= 0 && !sargeSpeaking) {
         sarge = null
@@ -1405,7 +1437,7 @@ export function createBattle(parts: BattleParts): Battle {
             // clifftop and threw grenades into the bay every turn for a
             // simulated hour (the machine-mission stall guard caught it).
             groundAt: (x, z) => (query.isWater(x, z) ? query.surface(x, z) : query.height(x, z)),
-            wet: (x, z) => query.isWater(x, z),
+            wet: swimAt,
             swimming: loco.swimming,
             swims: !drowns(acting.pigClass),
             // The machine's own live grenade: the newest lob while any
@@ -1911,6 +1943,9 @@ export function createBattle(parts: BattleParts): Battle {
     // …and the tiptoe's, whose end is where the steal lands
     // (lib/game/pickpocket.ts).
     pockets.update(delta, acting)
+    // …and the disguise's, whose end is where the pig becomes the bush
+    // (lib/game/hide.ts).
+    hides.update(delta, acting)
 
     // The gauge and the fuse, after the pig has been placed for the same reason
     // a swing is: the muzzle comes off the HAND bone (lib/game/attack.ts).
@@ -2137,6 +2172,7 @@ export function createBattle(parts: BattleParts): Battle {
       swings.reset()
       heals.reset()
       pockets.reset(game.currentPig)
+      hides.reset(game.currentPig)
       effects.clear()
       loco = createLocomotion(query, x, z, heading)
       game.moveCurrentPig(x, loco.y, z, heading)

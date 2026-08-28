@@ -1324,7 +1324,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     focus,
     dropping: () => now.dropping,
     plates: (width, height, lift) =>
-      squad.plates(host.camera, width, height, lift, game.players.indexOf(game.currentPlayer)),
+      squad.plates(host.camera, width, height, lift, game.players.indexOf(game.currentPlayer), (pig) =>
+        engine.poison.poisoned(pig)
+      ),
     numbers: (width, height) => projectDamage(now.numbers, host.camera, root, width, height),
     still: () => now.still,
     eye,

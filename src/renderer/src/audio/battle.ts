@@ -108,7 +108,6 @@ export interface Cue {
  * P_BRRR    they are COLD
  * P_BRUSH   brushing itself down
  * P_BURP    a burp
- * P_BUSH    walking through bushes
  * P_CHUTE1  something tearing
  * P_CLAP    clapping its trotters
  * P_COUGH1  a cough — poisoned?
@@ -133,7 +132,6 @@ export interface Cue {
  * P_MAD2    …
  * P_MOAN    a groan
  * P_MUTTER  swearing under its breath
- * P_WHIST1  hiding behind the sniper
  * ```
  *
  * **AND THE FRONT END'S BANK, walked after it** — `FESounds/`, which is the
@@ -338,6 +336,21 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
   laugh1: { sound: 'P_LAUGH1', volume: 60, pitch: 100 },
   laugh2: { sound: 'P_LAUGH2', volume: 60, pitch: 100 },
   laugh3: { sound: 'P_LAUGH3', volume: 60, pitch: 100 },
+  /**
+   * The thief's INNOCENT WHISTLE — DECODED: clip 79's own sound keyframe at
+   * phase 640 asks for index 91 P_WHIST1 (`weapons/espionage.md` in the
+   * disasm repo). The engine fires it as the clip crosses that phase
+   * (lib/game/pickpocket.ts, WHISTLE_PHASE); the keyframe carries no volume
+   * of its own, so it goes out at full.
+   */
+  whistle: { sound: 'P_WHIST1', volume: 100, pitch: 100 },
+  /**
+   * The DISGUISE going on — a NAME PICK, not a read: the hide arm
+   * (0x47C6FC → 0x47D080) has no Sound::Play in it at all, and P_BUSH
+   * ("walking through bushes") is the bank's one bush-flavoured sample.
+   * `[CHECK — remake]` — correct it in play.
+   */
+  bushRustle: { sound: 'P_BUSH', volume: 100, pitch: 100 },
   /**
    * A blade meeting a DISGUISE — DECODED: the strike on a hidden pig diverts
    * whole to a knock on wood, sound 26 = FT_WOOD (0x4760F1,

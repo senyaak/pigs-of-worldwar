@@ -553,6 +553,12 @@ and the weakest of them were invented here:
   width is arithmetic rather than taste: the track is twenty `I ` pairs, `I`
   is 4 wide and a space advances 8, so a cell is 12 and the track is exactly
   240 across a panel of 260. `ui/pauseMenu.ts`.
+- `[play]` **The pig NAME plates are printed in CHARS2 too**, and the exe
+  prints them in `FETEXT\small` (both plate print helpers, 0x45A510 and
+  0x45A4B0, go through `[0x51BA54]`; read 2026-08-27). Same ruling as the
+  pause: SMALL was built as read and sent back on taste. `PLATE_FONT` in
+  `ui/hud.ts`, with `FRONTEND_METRICS` so the letters space the way the
+  menus space them.
 - `[play]` **The pig slides, and that stays.** The walking clips carry a body
   about 855 units a second at 25 fps; the exe walks 1560, so the feet skate
   about 2×. Driving playback off the walking speed to close that (a `gait.ts`
@@ -988,9 +994,11 @@ and the weakest of them were invented here:
   GAS touches NOBODY: the hidden pig's body is out of the physics
   (`[body+0x44] & 1`, the sweep's own first test at 0x406AEA) and the
   decoy's effect arm excludes the status-gas ids 0x5C..0x61 — a bush does
-  not breathe, so do not "fix" gas to poison a hidden pig. One edge is not
-  the exe's: hiding happens AT THE PRESS, not at the end of the gesture
-  clip (`[deliberate]`).
+  not breathe, so do not "fix" gas to poison a hidden pig. The disguise
+  lands at the END of the gesture clip (81), the exe's own shape — it hid
+  at the press for a while (`[deliberate]`) and play revoked that. The
+  rustle at the press is a name pick (P_BUSH), `[CHECK — remake]`: the
+  hide arm plays no sound of its own.
 - `[play]` **A bullet's knock is the engine's own 45° throw, at the exe's
   own speeds — and pellets STACK.** `Pig::HitByProjectile` ADDS (0x4A9260
   fadds, never sets) 48 along the projectile's own pitch — kind 0x12 adds 6

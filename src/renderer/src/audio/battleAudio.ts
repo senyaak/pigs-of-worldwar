@@ -211,6 +211,13 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
         playCue(bank(), laugh[Math.floor(Math.random() * laugh.length)])
       },
       stealFailed: () => playCue(bank(), BATTLE_SOUNDS.tooMany),
+      // …and the tiptoe clip's own keyframe: the innocent whistle, P_WHIST1
+      // at phase 640 (lib/game/pickpocket.ts).
+      whistled: () => playCue(bank(), BATTLE_SOUNDS.whistle),
+      // The disguise going on: the rustle rides the gesture clip from the
+      // press; the vanish at its end makes no sound of its own
+      // (audio/battle.ts, a name pick).
+      hiding: () => playCue(bank(), BATTLE_SOUNDS.bushRustle),
       // A blade on a disguise: the knock on wood, and nothing else — no
       // squeal, because no damage rides it (lib/game/strikes.ts).
       struckWood: () => playCue(bank(), BATTLE_SOUNDS.knockWood),

@@ -25,7 +25,7 @@
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { aimRadians } from '../../../lib/game/aim'
-import { loadFont } from './font'
+import { FRONTEND_METRICS, loadFont } from './font'
 import type { Font } from './font'
 import { loadTims, tinted } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
@@ -45,20 +45,18 @@ const MARKERS = 'Language/Tims/MAPICONS.MTD'
 /** The battle's own big letters — the title card and the floating numbers. */
 const TEXT_FONT = 'BIG'
 /**
- * The letters over a pig's head: the battle's SMALL, at its own size,
- * team-coloured per pig.
+ * The letters over a pig's head: CHARS2 — the frontend's font, the same one
+ * the pause menu was moved to — team-coloured per pig. `[play]` overriding
+ * `[exe]`, the same override the pause got.
  *
- * **READ now, and it settles a font that had gone back and forth on taste.**
- * The plate dispatcher (0x459B20) only COLLECTS — it projects each pig and
- * parks the screen point — and every print helper it hands the list to,
- * 0x45A510 and 0x45A4B0, prints through `[0x51BA54]` — `FETEXT\small` — and
- * never once through BIG's `[0x51BA58]` (2026-08-27, swept per callee). So
- * the original's plate is SMALL at its native 12, which is also why the
- * remake's BIG kept reading wrong to play at any scale: "там вроде другой
- * шрифт". The earlier bounce off "SMALL doubled" was the ×2 blow-up, not the
- * font. `[exe]`
+ * The exe's own plate is `FETEXT\small`: the plate dispatcher (0x459B20)
+ * only COLLECTS, and both print helpers it hands the list to, 0x45A510 and
+ * 0x45A4B0, go through `[0x51BA54]` — never BIG's `[0x51BA58]` (2026-08-27,
+ * swept per callee). SMALL was built as read and play sent the names to the
+ * menu's font instead — the same taste ruling that moved the pause off
+ * SMALL ("шрифт гавно").
  */
-const PLATE_FONT = 'SMALL'
+const PLATE_FONT = 'CHARS2'
 /** The height the dashboard art was drawn for. */
 const AUTHORED_HEIGHT = 480
 
@@ -264,10 +262,11 @@ export const LAYOUT = {
      * anything when the model's scale moved. */
     lift: 120,
     /**
-     * NATIVE — the exe prints the plate in SMALL at the glyphs' own 12 (see
-     * PLATE_FONT: the read that ended the scale-hunting). The 0.75s and
-     * 0.525s this carried were all attempts to shrink BIG toward a size that
-     * was really another font's.
+     * NATIVE — the plate prints CHARS2 at the glyphs' own 16 (see
+     * PLATE_FONT for the font's story; the exe's SMALL was native 12, so
+     * the plate grew a third with the font). The 0.75s and 0.525s this
+     * carried were all attempts to shrink BIG toward a size that was
+     * really another font's — a bitmap font reads best unscaled.
      *
      * The outline below does NOT follow this and that is the point: it is a
      * constant weight in screen pixels whatever the glyphs do.
@@ -298,8 +297,14 @@ export const LAYOUT = {
     outline: 0,
     /** The heart's ×2 followed BIG's tall letters; beside SMALL's native 12
      * the 10×11 art stands at its OWN size, which is the original's
-     * proportion. The pink stays play's. */
-    heart: { colour: [248, 64, 152] as [number, number, number], scale: 1 },
+     * proportion. The pink stays play's, and so does the GREEN a poisoned
+     * pig's heart turns — `[play]`, the original as remembered; the art is
+     * white and both are tints of it. */
+    heart: {
+      colour: [248, 64, 152] as [number, number, number],
+      poisoned: [96, 200, 72] as [number, number, number],
+      scale: 1
+    },
     /**
      * Seconds a plate takes to FADE IN once its gate opens. Play, against the
      * original side by side: "имена вейдятся не просто показываются". The
@@ -487,7 +492,10 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     if (had) return had
     if (!teamLoads.has(key)) {
       teamLoads.add(key)
-      void loadFont(PLATE_FONT, { colour: [colour[0], colour[1], colour[2]] }).then((painted) => {
+      void loadFont(PLATE_FONT, {
+        colour: [colour[0], colour[1], colour[2]],
+        metrics: FRONTEND_METRICS
+      }).then((painted) => {
         teamFonts.set(key, painted)
       })
     }
@@ -496,6 +504,8 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
   let digits: Sprite[] = []
   let fans: Sprite[] = []
   let heart: Sprite | null = null
+  /** The same heart baked poisoned-green — swapped in per plate, never both. */
+  let sickHeart: Sprite | null = null
   let loaded = false
   /** Seconds of plate still owed to a pig that has just been hurt, and what
    * every pig's number was last frame — the only way to see it fall. */
@@ -515,11 +525,16 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
 
   const repaint = async (): Promise<void> => {
     if (!white) return
-    const wanted = JSON.stringify([LAYOUT.dial.green, LAYOUT.plate.heart.colour])
+    const wanted = JSON.stringify([
+      LAYOUT.dial.green,
+      LAYOUT.plate.heart.colour,
+      LAYOUT.plate.heart.poisoned
+    ])
     if (wanted === painted) return
     painted = wanted
     fans = await Promise.all(white.fans.map((wedge) => tinted(wedge, LAYOUT.dial.green)))
     heart = await tinted(white.heart, LAYOUT.plate.heart.colour)
+    sickHeart = await tinted(white.heart, LAYOUT.plate.heart.poisoned)
     // The heal's letters take the same colour its heart does, so nudging one in
     // the console moves both.
     healFont = await loadFont(TEXT_FONT, { colour: LAYOUT.plate.heart.colour })
@@ -544,8 +559,8 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           loadTims(DASHBOARD),
           loadTims(MARKERS),
           loadFont(TEXT_FONT),
-          loadFont(PLATE_FONT),
-          loadFont(PLATE_FONT, { colour: [0, 0, 0] })
+          loadFont(PLATE_FONT, { metrics: FRONTEND_METRICS }),
+          loadFont(PLATE_FONT, { colour: [0, 0, 0], metrics: FRONTEND_METRICS })
         ])
         art = dashboard
         font = big
@@ -869,8 +884,8 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         // A pig's name, and its health beside a heart under it — once it has
         // stood still long enough. Drawn in the widget's own units, with the
         // scene's screen positions brought back into them. The letters are
-        // SMALL at PLATE.scale, painted the pig's TEAM colour; the heart keeps
-        // its own pink (contracts/overlay.ts).
+        // PLATE_FONT at PLATE.scale, painted the pig's TEAM colour; the heart
+        // keeps its own pink — green while poisoned (contracts/overlay.ts).
         //
         // …or the moment anybody's number goes DOWN, standing still or not: the
         // water hurts silently and invisibly, and without this nothing on screen
@@ -952,6 +967,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           nameWidth: number
           health: string
           healthWidth: number
+          poisoned: boolean
         }
         const blocks: Block[] = []
         for (const plate of state.pigs) {
@@ -976,7 +992,8 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
             name: plate.name,
             nameWidth,
             health,
-            healthWidth
+            healthWidth,
+            poisoned: plate.poisoned
           })
         }
         blocks.sort((a, b) => a.top - b.top)
@@ -1009,7 +1026,9 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           const beatWidth = heartSize.width * swell
           const beatHeight = heartSize.height * swell
           context.drawImage(
-            heart.image,
+            // The poisoned pig's heart is the GREEN bake — same art, same
+            // beat, only the tint says the gas has it.
+            (block.poisoned && sickHeart ? sickHeart : heart).image,
             healthLeft + (heartSize.width - beatWidth) / 2,
             healthTop + Math.round((line - heartSize.height) / 2) + (heartSize.height - beatHeight) / 2,
             beatWidth,

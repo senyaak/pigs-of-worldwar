@@ -443,7 +443,25 @@ export interface Lobbed {
    * its blast's kills can be tallied against their attacker
    * (lib/game/events.ts, `killed`). A spec-built lob has none. */
   owner?: number
+  /** The in-flight TUMBLE: how far the model has turned, radians, about the
+   * lateral axis below. Presentation, but it lives HERE because the renderer
+   * draws a snapshot and animates nothing (CLAUDE.md); `TUMBLE_TURNS` is the
+   * rate and lib/game/lobs.ts steps it. */
+  spin: number
+  /** The tumble's axis — horizontal, perpendicular to the throw, fixed at
+   * launch, so the flight reads as one end-over-end turn. */
+  axisX: number
+  axisZ: number
 }
+
+/**
+ * How fast a thrown thing TUMBLES, in full turns a second. Nothing about a
+ * projectile's orientation is decoded — the constructor hands the body a yaw
+ * and a pitch and the drawing half is not read — so the END-OVER-END turn
+ * and its rate are the remake's own, matched to how play remembers the
+ * flight. `[CHECK — remake]` — correct it in play.
+ */
+export const TUMBLE_TURNS = 2
 
 /**
  * Throw one.
@@ -481,7 +499,12 @@ export function lob(
     age: 0,
     resting: false,
     doused: false,
-    sinking: 0
+    sinking: 0,
+    spin: 0,
+    // The lateral axis: forward is (sin h, cos h), so this is its horizontal
+    // perpendicular — the axle of the end-over-end turn.
+    axisX: Math.cos(heading),
+    axisZ: -Math.sin(heading)
   }
 }
 

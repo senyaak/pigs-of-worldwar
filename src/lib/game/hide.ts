@@ -31,17 +31,23 @@
 // and a blade knocks on wood for nothing (lib/game/strikes.ts). `absorb`
 // below is that handler; lib/game/bullets.ts is its one caller.
 //
-// One deliberate departure, said here: the exe hides at the END of a gesture
-// clip (81); this hides AT THE PRESS. The turn ends with the use and the
-// walk-away beat dresses every pig — a gesture on a body that is about to
-// stop being drawn buys nothing. `[deliberate]`. And the GAS washes over a
-// disguise onto the pig directly — whether the exe's cloud sweep catches the
-// decoy body first is unread. `[gap]`.
+// The disguise lands at the END of the gesture clip (81), the exe's own
+// shape: both espionage skills resolve through the end-of-sequence path
+// 0x473600, the clip carrying no event-65 keyframe. It hid AT THE PRESS for
+// a while (`[deliberate]`, since revoked in play: "свин тоже анимацию
+// делает … а потом только прячется"). The rustle at the press is a name
+// pick, not a read — the hide arm has no Sound::Play in it, and P_BUSH is
+// the bank's one bush-flavoured sample. `[CHECK — remake]` for the sound.
+// And the GAS washes over a disguise onto the pig directly — whether the
+// exe's cloud sweep catches the decoy body first is unread. `[gap]`.
 //
 // Pure, like the rest of lib/game.
 
 import { amountOf, spend } from './inventory'
 import { SKILL } from './skills'
+import { weaponOf } from './weapons'
+import { clipSeconds } from './clips'
+import type { ClipTiming } from './clips'
 import type { MapObject } from '../formats/pog'
 import type { Emit, PigId } from './events'
 import type { Pig } from './game'
@@ -123,10 +129,22 @@ export interface Decoy {
 }
 
 export interface Hides {
-  /** Take the disguise: the pig vanishes and the prop stands up. False when
-   * already hidden. The turn's end is the caller's — the record says the use
-   * spends it (lib/game/spend.ts). */
+  /** The press: the charge goes, the gesture clip (81) starts, and the
+   * disguise lands at its END. False when already hidden or mid-gesture.
+   * The turn's end is the caller's — the record says the use spends it
+   * (lib/game/spend.ts). */
   begin(pig: Pig): boolean
+  /** Take the disguise NOW, no gesture — the Map::Load tail sweep's own
+   * instant path (0x47D790): the enemy's spies start the battle hidden and
+   * nobody is watching them do it. */
+  concealNow(pig: Pig): boolean
+  /** Whether the gesture clip is still holding the pig. */
+  running(): boolean
+  /** One frame; `actor` is the pig taking cover. */
+  update(delta: number, actor: Pig): void
+  /** A turn ending or a warp mid-gesture: the disguise lands now — the
+   * charge went at the press and the beat must not eat it. */
+  reset(actor: Pig): void
   /** Shed it — damage, a fling, death, or the wearer's own next turn.
    * Idempotent; quiet when the pig was not hiding. */
   reveal(pig: PigId): void
@@ -150,10 +168,17 @@ export interface HideWorld {
   pigs: () => Pig[]
   /** The map's own records — where the disguise scout looks. */
   objects: MapObject[]
+  /** What times the gesture clip — empty in a bare spec's world, where the
+   * disguise then lands at the press. */
+  clips: ClipTiming[]
 }
 
 export function createHide(world: HideWorld, emit: Emit): Hides {
   const standing = new Map<number, Decoy>()
+  /** Seconds left of the gesture clip. */
+  let playing = 0
+  /** Who owes a disguise — the pig, held from the press to the clip's end. */
+  let owing: Pig | null = null
 
   const reveal = (pig: PigId): void => {
     if (!standing.delete(pig)) return
@@ -162,25 +187,60 @@ export function createHide(world: HideWorld, emit: Emit): Hides {
     emit({ kind: 'revealed', pig })
   }
 
+  /** The disguise itself — the pig vanishes and the prop stands up. */
+  const conceal = (pig: Pig): void => {
+    if (pig.hidden) return
+    pig.hidden = true
+    const model = nearestDisguise(world.objects, pig.position)
+    standing.set(pig.id, {
+      pig: pig.id,
+      model,
+      x: pig.position.x,
+      y: pig.position.y,
+      z: pig.position.z,
+      yaw: pig.heading,
+      health: DECOY_HEALTH[model] ?? DECOY_HEALTH[DECOY_FALLBACK]
+    })
+    emit({ kind: 'hid', pig: pig.id })
+  }
+
   return {
     begin(pig) {
-      if (pig.hidden) return false
+      if (pig.hidden || playing > 0) return false
       // The generic charge — moot for the Scout's unlimited slot, honest for
       // anyone who found one in a crate.
       spend(pig.carrying, SKILL.HIDE)
-      pig.hidden = true
-      const model = nearestDisguise(world.objects, pig.position)
-      standing.set(pig.id, {
-        pig: pig.id,
-        model,
-        x: pig.position.x,
-        y: pig.position.y,
-        z: pig.position.z,
-        yaw: pig.heading,
-        health: DECOY_HEALTH[model] ?? DECOY_HEALTH[DECOY_FALLBACK]
-      })
-      emit({ kind: 'hid', pig: pig.id })
+      const clip = weaponOf(SKILL.HIDE).attackClip
+      emit({ kind: 'clip', pig: pig.id, index: clip, once: true })
+      emit({ kind: 'hiding', pig: pig.id })
+      playing = clipSeconds(world.clips[clip])
+      owing = pig
+      // A bare spec's world has no clips to time: the disguise lands now.
+      if (playing <= 0) {
+        owing = null
+        conceal(pig)
+      }
       return true
+    },
+    concealNow(pig) {
+      if (pig.hidden) return false
+      spend(pig.carrying, SKILL.HIDE)
+      conceal(pig)
+      return true
+    },
+    running: () => playing > 0,
+    update(delta, actor) {
+      if (playing <= 0) return
+      playing -= delta
+      if (playing > 0) return
+      playing = 0
+      owing = null
+      conceal(actor)
+    },
+    reset(actor) {
+      if (owing !== null) conceal(owing ?? actor)
+      owing = null
+      playing = 0
     },
     reveal,
     absorb(pig, amount) {

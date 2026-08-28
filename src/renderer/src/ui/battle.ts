@@ -83,6 +83,13 @@ const SAMPLE_LINE = 227
 const TOO_MANY_TOYS = 171
 const FOUND_PROVISIONS = 172
 
+/** The pickpocket's two refusals are NOT gtext — literal `.data` strings the
+ * exe prints straight onto the bar (0x4D16D0 / 0x4D16F4, dwell 300 and 500;
+ * `weapons/espionage.md`). A success prints the skill's own name with the
+ * crate pickup's "%u X%d" formats. */
+const STEAL_NO_REACH = "Your arms don't reach that far..."
+const STEAL_NOTHING = 'This pig has nothing left to steal....poor little porker.'
+
 /**
  * "GET READY >S..." — `gtext 168`, and it is the game's own answer to the beat at
  * the top of a turn.
@@ -820,6 +827,17 @@ export function initBattle(
           if (by === undefined || one) return
           const killer = game?.players[0]?.pigs.find((p) => p.id === by)
           if (killer) kills[killer.index] = (kills[killer.index] ?? 0) + 1
+        },
+        // The POCKET PICKED: the bar says what crossed, in the crate pickup's
+        // own formats — the skill's name bare when the slot came unlimited,
+        // "X<count>" otherwise — and the two refusals print the exe's literal
+        // strings (weapons/espionage.md).
+        stole: ({ skill, amount }) => {
+          const name = skillName(battleText, skill)
+          hud.say(amount === UNLIMITED ? name : `${name} X${amount}`)
+        },
+        stealFailed: ({ reason }) => {
+          hud.say(reason === 'reach' ? STEAL_NO_REACH : STEAL_NOTHING)
         },
         // FLING TELEMETRY — play has twice reported a knocked pig that went
         // nowhere, and three headless probes could not reproduce it. These two

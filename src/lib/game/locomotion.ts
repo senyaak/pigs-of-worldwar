@@ -761,8 +761,10 @@ function fly(
    * slope-parallel speed off `WALL_MATERIAL`, never settled, and the wedge
    * counter relaunched it every 25 frames for ever. So BLOCKED ground keeps the
    * old normal-arrival test and comes down from a slide — the remake's own
-   * guard, kept deliberately against the exe's reading — and the counter throws
-   * the pig out downhill from a standstill.
+   * guard, kept deliberately against the exe's reading — and the touch-down
+   * itself throws the pig out downhill (below), which is the exe's own
+   * immediate arm: `IsBlocked && speed < 0x32 → EjectFromWall` on the landing
+   * frame (0x471041), so nothing ever comes to rest on a wall.
    */
   const arrival = blocked
     ? -(a.vx * normal.x + a.vy * normal.y + a.vz * normal.z)
@@ -772,10 +774,19 @@ function fly(
     return
   }
   state.airborne = null
-  // …and in a wall it does not get up: the exe's stand-up is gated on
-  // `IsBlocked`, so the pig lies there as a body until the wedge counter ejects
-  // it (`updateLocomotion`'s own tail).
-  if (blocked) return
+  // …and in a WALL it does not stay: the exe's impact handler tests
+  // `IsBlocked && speed < 0x32` BEFORE anything else and calls
+  // `Pig::EjectFromWall` on the landing frame (0x471041..0x47104D) — a
+  // blocked tile is never rested on, the body is thrown out downhill at
+  // once. Waiting for the wedge counter instead was the hang play saw
+  // ("свин висит на склоне"): a knocked-back pig that is not the acting
+  // one settles here with `getUp` at 0, `tumble.ts` drops its flight
+  // record that same frame, and the counter in `updateLocomotion`'s tail
+  // never runs for it again.
+  if (blocked) {
+    eject(state, query)
+    return
+  }
   // Down for good, so the pig gets up: clip 10, which is what the landing
   // handler asks for (0x470944) whatever the fall was. It runs down in
   // `ground` and any input throws it away, so a pig that lands running

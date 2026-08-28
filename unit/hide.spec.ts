@@ -60,7 +60,9 @@ test('taking it hides the pig and stands the decoy; shedding it does the reverse
   const scout = pigAt(100, 200)
   scout.carrying.push({ skill: SKILL.HIDE, amount: UNLIMITED })
   const heard: BattleEvent[] = []
-  const hides = createHide({ pigs: () => [scout], objects: [prop('BUSH1', 150, 200)] }, (event) =>
+  // No clips to time: the disguise lands at the press, which is what a bare
+  // spec wants.
+  const hides = createHide({ pigs: () => [scout], objects: [prop('BUSH1', 150, 200)], clips: [] }, (event) =>
     heard.push(event)
   )
   expect(hides.begin(scout)).toBe(true)
@@ -83,7 +85,7 @@ test('taking it hides the pig and stands the decoy; shedding it does the reverse
 test('the cover SOAKS a round — what you hide as is what you can take', { tag: '@nodata' }, () => {
   const scout = pigAt(0, 0)
   const heard: BattleEvent[] = []
-  const hides = createHide({ pigs: () => [scout], objects: [prop('BUSH1', 10, 0)] }, (event) =>
+  const hides = createHide({ pigs: () => [scout], objects: [prop('BUSH1', 10, 0)], clips: [] }, (event) =>
     heard.push(event)
   )
   hides.begin(scout)
@@ -103,7 +105,7 @@ test('the cover SOAKS a round — what you hide as is what you can take', { tag:
 
 test('the cover lasts one round: the pig\'s own turn starting drops it', { tag: '@nodata' }, () => {
   const scout = pigAt(0, 0)
-  const hides = createHide({ pigs: () => [scout], objects: [] }, () => {})
+  const hides = createHide({ pigs: () => [scout], objects: [], clips: [] }, () => {})
   hides.begin(scout)
   hides.turnStarted(scout)
   expect(scout.hidden).toBe(false)

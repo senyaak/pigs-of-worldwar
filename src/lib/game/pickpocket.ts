@@ -30,7 +30,7 @@
 import { UNLIMITED, amountOf, spend } from './inventory'
 import type { Slot } from './inventory'
 import { HEAL_ARC, HEAL_RANGE } from './healing'
-import { turnBetween } from './melee'
+import { PHASE_UNITS, turnBetween } from './melee'
 import { SKILL } from './skills'
 import { weaponOf } from './weapons'
 import { clipSeconds } from './clips'
@@ -46,6 +46,10 @@ export const STEAL_ARC = HEAL_ARC
 
 /** The thief's append cap — the exe's own 14, one less than a crate's 15. */
 export const STEAL_SLOT_CAP = 14
+
+/** Where in clip 79 the innocent whistle sits — the clip's own sound
+ * keyframe: phase 640, sound 91 P_WHIST1 (`weapons/espionage.md`). */
+export const WHISTLE_PHASE = 640
 
 /**
  * The NEAREST pig in the cone, by the exe's loose filter: not the thief, not
@@ -94,6 +98,8 @@ export function createPockets(world: PocketWorld, emit: Emit): Pockets {
   let playing = 0
   /** Who owes a verdict — the thief, held from the press to the clip's end. */
   let owing: Pig | null = null
+  /** Seconds until the clip's whistle keyframe — 0 once fired or none due. */
+  let whistleIn = 0
 
   /** The steal itself — the whole slot, the loose filter, the two refusals. */
   const resolve = (thief: Pig): void => {
@@ -144,6 +150,9 @@ export function createPockets(world: PocketWorld, emit: Emit): Pockets {
       const clip = weaponOf(SKILL.PICK_POCKET).attackClip
       emit({ kind: 'clip', pig: pig.id, index: clip, once: true })
       playing = clipSeconds(world.clips[clip])
+      // The innocent whistle is the clip's own sound keyframe, not the
+      // press's: it rides the clip to phase 640 the way a footfall would.
+      whistleIn = (playing * WHISTLE_PHASE) / PHASE_UNITS
       owing = pig
       // A bare spec's world has no clips to time: the verdict lands now.
       if (playing <= 0) {
@@ -155,6 +164,13 @@ export function createPockets(world: PocketWorld, emit: Emit): Pockets {
     running: () => playing > 0,
     update(delta, actor) {
       if (playing <= 0) return
+      if (whistleIn > 0) {
+        whistleIn -= delta
+        if (whistleIn <= 0) {
+          whistleIn = 0
+          emit({ kind: 'whistled', pig: actor.id })
+        }
+      }
       playing -= delta
       if (playing > 0) return
       playing = 0
@@ -167,6 +183,7 @@ export function createPockets(world: PocketWorld, emit: Emit): Pockets {
       if (owing !== null) resolve(owing ?? actor)
       owing = null
       playing = 0
+      whistleIn = 0
     }
   }
 }

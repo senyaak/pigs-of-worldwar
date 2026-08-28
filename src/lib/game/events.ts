@@ -133,10 +133,16 @@ export type BattleEvent =
    * — no reaction is the exe's own shape (lib/game/pickpocket.ts). The
    * thief's laugh hangs here (P_LAUGH1-3 at 60, the arm's own roll). */
   | { kind: 'stole'; thief: PigId; victim: PigId; skill: number; amount: number }
+  /** The thief's innocent whistle — clip 79's own sound keyframe at phase
+   * 640, sound 91 P_WHIST1 (lib/game/pickpocket.ts, WHISTLE_PHASE). */
+  | { kind: 'whistled'; pig: PigId }
   /** …or came up empty: nobody in the cone (`reach` — "Your arms don't
    * reach that far...") or a victim with nothing left (`nothing`). P_OWW,
    * the exe's own two exits. */
   | { kind: 'stealFailed'; pig: PigId; at: Point; reason: 'reach' | 'nothing' }
+  /** The DISGUISE was pressed: the gesture clip is playing and the pig will
+   * vanish at its end. The rustle hangs here (lib/game/hide.ts). */
+  | { kind: 'hiding'; pig: PigId }
   /** This pig took the DISGUISE — it stops being drawn and a decoy prop
    * stands where it does (lib/game/hide.ts). */
   | { kind: 'hid'; pig: PigId }

@@ -24,8 +24,10 @@ export interface PigPlate {
   health: number
   /** The TEAM's colour, by the pig's skin — the same table the exe paints its
    * markers from (lib/game/nations.ts, SKIN_COLOURS). The letters and the
-   * number wear it; the heart keeps its own pink. */
+   * number wear it; the heart keeps its own pink — GREEN while poisoned. */
   colour: readonly [number, number, number]
+  /** The gas's bite (lib/game/poison.ts) — the heart goes green with it. */
+  poisoned: boolean
 }
 
 /** One damage number floating off whatever was just hurt. */

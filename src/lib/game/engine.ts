@@ -433,7 +433,7 @@ export function createEngine(parts: EngineParts): Engine {
   const pockets = createPockets({ pigs, clips: world.clips, random }, bus.emit)
   /** …and HIDE: the disguise, the decoy and every way it is shed
    * (lib/game/hide.ts). */
-  const hides = createHide({ pigs, objects }, bus.emit)
+  const hides = createHide({ pigs, objects, clips: world.clips }, bus.emit)
   /** The decoy's soak, for the bullets: the cover takes a round first and
    * hands back what broke through (lib/game/hide.ts `absorb`). */
   const soak = (pig: Pig, amount: number): number => hides.absorb(pig, amount)
@@ -442,7 +442,7 @@ export function createEngine(parts: EngineParts): Engine {
   // before the first turn. Side 0 is the player's, always (lib/game/spawns.ts).
   for (const [side, player] of game.players.entries()) {
     if (side === 0) continue
-    for (const one of player.pigs) if (startsHidden(one, true)) hides.begin(one)
+    for (const one of player.pigs) if (startsHidden(one, true)) hides.concealNow(one)
   }
   /** What a GUN does: the flight, the substepping and every verdict about what
    * was hit (lib/game/bullets.ts). */
@@ -623,6 +623,9 @@ export function createEngine(parts: EngineParts): Engine {
     vz: number
     fuse?: number
     doused?: boolean
+    spin?: number
+    axisX?: number
+    axisZ?: number
   }): FlightShot => ({
     id: one.id,
     skill: one.skill,
@@ -637,7 +640,11 @@ export function createEngine(parts: EngineParts): Engine {
     z: one.z,
     vx: one.vx,
     vy: one.vy,
-    vz: one.vz
+    vz: one.vz,
+    // A bullet carries none of the tumble; the zeros read as "do not".
+    spin: one.spin ?? 0,
+    axisX: one.axisX ?? 0,
+    axisZ: one.axisZ ?? 0
   })
 
   const pigShotOf = (pig: Pig): PigShot => {

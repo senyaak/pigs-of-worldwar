@@ -235,34 +235,34 @@ test('out of the wall, the counter forgets', { tag: '@nodata' }, () => {
   expect(s.wedgedSeconds).toBe(0)
 })
 
-test('a landing inside a wall rests but never STANDS UP, and the counter throws it', { tag: '@nodata' }, () => {
-  // A flat world that is ALL wall: nowhere to stand up. What `Map::IsBlocked`
-  // gates is the getting-up — the impact handler's own test is the arrival speed
-  // and nothing else (`cmp di,19h`, 0x4711d8, then `0x471350` zeroes the
-  // velocity) — and the wedge counter throws the pig out downhill, because a pig
-  // left in a wall is unplayable.
-  //
-  // This spec used to assert the pig never rested AT ALL, which is the reading
-  // that locked one into sliding on the spot for ever on CAMP's tile 43,17 —
-  // play: "соскользнул с подьема и попал в бесконечный цыкл". The comment above
-  // it always described the right rule; the assertion did not.
+test('a landing inside a wall never RESTS — the touch-down throws it out', { tag: '@nodata' }, () => {
+  // A flat world that is ALL wall: nowhere to rest. The exe's impact handler
+  // tests `IsBlocked && speed < 0x32` BEFORE anything else and calls
+  // `Pig::EjectFromWall` on the landing frame (0x471041..0x47104D) — a
+  // blocked tile is never come to rest on. Waiting for the wedge counter
+  // instead was the hang play saw ("свин висит на склоне"): a knocked-back
+  // pig that is not the acting one settles, its flight record is dropped
+  // that same frame (lib/game/tumble.ts), and the counter never runs for it
+  // again.
   const allWall = terrain(() => 0, () => ({ type: 0x80, slip: 0 }))
   const s = createLocomotion(allWall, 0, 0, NORTH)
   s.airborne = { vx: 0, vy: 2000, vz: 0, bouncing: false, pushIn: null }
   s.y = allWall.height(0, 0) - 800
-  let rested = false
+  let restedAcrossFrames = false
   let stoodUp = false
   let ejected = false
   const frames = Math.round(3 / FRAME_SECONDS)
   for (let i = 0; i < frames; i++) {
     updateLocomotion(s, allWall, { walk: 0, turn: 0, jump: false }, FRAME_SECONDS)
-    if (s.airborne === null) rested = true
+    // The settle and the eject happen inside ONE frame, so between frames the
+    // pig is never seen at rest in the wall.
+    if (s.airborne === null) restedAcrossFrames = true
     if (s.getUp > 0 || s.clip === ANIM.LAND) stoodUp = true
     if (s.airborne?.ejected) ejected = true
   }
-  expect(rested, 'it came to rest').toBe(true)
-  expect(stoodUp, 'but never stood up inside the wall').toBe(false)
-  expect(ejected, 'and the wedge counter threw it out').toBe(true)
+  expect(restedAcrossFrames, 'it was seen at rest in the wall').toBe(false)
+  expect(stoodUp, 'and never stood up inside it').toBe(false)
+  expect(ejected, 'the touch-down threw it out').toBe(true)
 })
 
 test('wedged, the pig grows bouncier; free, it recovers only on landing', { tag: '@nodata' }, () => {
