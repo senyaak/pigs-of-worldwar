@@ -25,7 +25,7 @@
 import { MODEL_SCALE } from '../../../lib/game/scale'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { aimRadians } from '../../../lib/game/aim'
-import { FRONTEND_METRICS, loadFont } from './font'
+import { loadFont } from './font'
 import type { Font } from './font'
 import { loadTims, tinted } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
@@ -45,18 +45,20 @@ const MARKERS = 'Language/Tims/MAPICONS.MTD'
 /** The battle's own big letters — the title card and the floating numbers. */
 const TEXT_FONT = 'BIG'
 /**
- * The letters over a pig's head: CHARS2 — the frontend's font, the same one
- * the pause menu was moved to — team-coloured per pig. `[play]` overriding
- * `[exe]`, the same override the pause got.
+ * The letters over a pig's head: the battle's SMALL, at its own size,
+ * team-coloured per pig. `[exe]`, re-proven 2026-08-28 after two taste
+ * detours (BIG, then CHARS2 — play: "не тот шрифт — иди ищи что в екзе").
  *
- * The exe's own plate is `FETEXT\small`: the plate dispatcher (0x459B20)
- * only COLLECTS, and both print helpers it hands the list to, 0x45A510 and
- * 0x45A4B0, go through `[0x51BA54]` — never BIG's `[0x51BA58]` (2026-08-27,
- * swept per callee). SMALL was built as read and play sent the names to the
- * menu's font instead — the same taste ruling that moved the pause off
- * SMALL ("шрифт гавно").
+ * The REAL chain this time (the 2026-08-27 sweep had named two functions
+ * that turned out to be a clip test and an overlap counter): the dispatcher
+ * 0x459B20 collects and de-overlaps, then per record calls the drawer
+ * 0x45A5C0, which touches `[0x51BA54]` eleven times and `[0x51BA58]` never.
+ * And the slots are CONTEXT-SWITCHED, not fixed files: the frontend loads
+ * CHARS2/CHARS3 into them, and entering a battle 0x480D10 rebuilds the pair
+ * as `FETEXT\small` / `FETEXT\big` (0x47E187) — so in battle `[0x51BA54]`
+ * IS SMALL. `scanner/notes.md` carries the corrected read.
  */
-const PLATE_FONT = 'CHARS2'
+const PLATE_FONT = 'SMALL'
 /** The height the dashboard art was drawn for. */
 const AUTHORED_HEIGHT = 480
 
@@ -262,11 +264,10 @@ export const LAYOUT = {
      * anything when the model's scale moved. */
     lift: 120,
     /**
-     * NATIVE — the plate prints CHARS2 at the glyphs' own 16 (see
-     * PLATE_FONT for the font's story; the exe's SMALL was native 12, so
-     * the plate grew a third with the font). The 0.75s and 0.525s this
-     * carried were all attempts to shrink BIG toward a size that was
-     * really another font's — a bitmap font reads best unscaled.
+     * NATIVE — the exe prints the plate in SMALL at the glyphs' own 12 (see
+     * PLATE_FONT: the read that ended the scale-hunting, twice). The 0.75s
+     * and 0.525s this carried were all attempts to shrink BIG toward a size
+     * that was really another font's — a bitmap font reads best unscaled.
      *
      * The outline below does NOT follow this and that is the point: it is a
      * constant weight in screen pixels whatever the glyphs do.
@@ -289,11 +290,11 @@ export const LAYOUT = {
      * `aroundBy`. Play moved it 1 → 2 → 3 around BIG's tall letters, back
      * to 1 when the plate went to SMALL — then OFF, because SMALL carries
      * its own dark edging INSIDE the art ("обводка должна быть внутри
-     * букв") — and back ON at 1 when the plate went to CHARS2, whose inner
-     * edging does not read at the plate's size: "обводка внутри — для
-     * этого шрифта не очень — давай снаружи".
+     * букв"); ON at 1 for CHARS2's brief stay, whose inner edging did not
+     * read at plate size ("давай снаружи"); and OFF again with SMALL's
+     * return. The dial stays for a font that has no edge of its own.
      */
-    outline: 1,
+    outline: 0,
     /** The heart's ×2 followed BIG's tall letters; beside SMALL's native 12
      * the 10×11 art stands at its OWN size, which is the original's
      * proportion. The pink stays play's, and so does the GREEN a poisoned
@@ -491,10 +492,9 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     if (had) return had
     if (!teamLoads.has(key)) {
       teamLoads.add(key)
-      void loadFont(PLATE_FONT, {
-        colour: [colour[0], colour[1], colour[2]],
-        metrics: FRONTEND_METRICS
-      }).then((painted) => {
+      // No metrics: the battle's letters carry no tracking — the exe's
+      // frontend flag is CLEAR in a mission (ui/font.ts, Metrics).
+      void loadFont(PLATE_FONT, { colour: [colour[0], colour[1], colour[2]] }).then((painted) => {
         teamFonts.set(key, painted)
       })
     }
@@ -558,8 +558,8 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
           loadTims(DASHBOARD),
           loadTims(MARKERS),
           loadFont(TEXT_FONT),
-          loadFont(PLATE_FONT, { metrics: FRONTEND_METRICS }),
-          loadFont(PLATE_FONT, { colour: [0, 0, 0], metrics: FRONTEND_METRICS })
+          loadFont(PLATE_FONT),
+          loadFont(PLATE_FONT, { colour: [0, 0, 0] })
         ])
         art = dashboard
         font = big

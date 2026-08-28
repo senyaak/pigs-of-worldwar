@@ -553,12 +553,18 @@ and the weakest of them were invented here:
   width is arithmetic rather than taste: the track is twenty `I ` pairs, `I`
   is 4 wide and a space advances 8, so a cell is 12 and the track is exactly
   240 across a panel of 260. `ui/pauseMenu.ts`.
-- `[play]` **The pig NAME plates are printed in CHARS2 too**, and the exe
-  prints them in `FETEXT\small` (both plate print helpers, 0x45A510 and
-  0x45A4B0, go through `[0x51BA54]`; read 2026-08-27). Same ruling as the
-  pause: SMALL was built as read and sent back on taste. `PLATE_FONT` in
-  `ui/hud.ts`, with `FRONTEND_METRICS` so the letters space the way the
-  menus space them.
+- `[exe]` **The pig NAME plates are SMALL — settled twice, and the font
+  GLOBALS are context-switched slots, not files.** The plates tried BIG,
+  then CHARS2, and play sent both back; the 2026-08-28 re-read pinned the
+  real chain (the 2026-08-27 one had named a clip test and an overlap
+  counter as "print helpers"): dispatcher 0x459B20 → drawer 0x45A5C0 →
+  `[0x51BA54]` only — and `[0x51BA54]`/`[0x51BA58]` hold CHARS2/CHARS3 in
+  the frontend but are REBUILT as `FETEXT\small`/`big` on the way into a
+  battle (0x480D10 at 0x47E187). So frontend/notes.md's "0x51BA54 =
+  CHARS2" and library/notes.md's "= small" were both right about different
+  program states. GameChars/BigChars are PSX leftovers no PC binary loads.
+  `PLATE_FONT` in `ui/hud.ts`, no metrics — the battle's letters carry no
+  tracking (the frontend flag is clear in a mission).
 - `[play]` **The pig slides, and that stays.** The walking clips carry a body
   about 855 units a second at 25 fps; the exe walks 1560, so the feet skate
   about 2×. Driving playback off the walking speed to close that (a `gait.ts`
