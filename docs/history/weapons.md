@@ -1336,7 +1336,9 @@ grenade now goes off beside the foe it was thrown at.
 земле в сторону" — and asked for the source itself: "может задизасмить
 полностью как это в источнике?" The hunt (weapons/fire.md in the disasm
 repo) read every arm to its end and overturned the standing theory: **the PC
-exe's blast throws nobody at all.** `[pig+0x1B8]` is a FATIGUE meter —
+exe's blast throws nobody at all** *(itself overturned three days later —
+the throw is the effect's own phantom sweep, `pig.md` 2026-08-26)*.
+`[pig+0x1B8]` is a FATIGUE meter —
 walking feeds it, panting and the tired idle drain it — and the "physics
 contact toss" this file guessed at is the ordinary solver doing nothing to a
 standing pig. The pigs play remembers being thrown were the PSX's, and
@@ -1354,12 +1356,15 @@ ends closed first: the blast effect turns out to own NO physics body at all
 (the r=35 sphere is a dead shape-table row for it; damage arrives by a
 deferred hit-mark timer, `[pig+0x1A2]`, not by contact), and a whole-image
 scan found zero indirect references to any throw primitive — the PC verdict
-hardened from "throws nobody" to "does not even touch". Then the PSX build
+hardened from "throws nobody" to "does not even touch" *(both since
+overturned by the phantom sweep)*. Then the PSX build
 itself was read — play supplied the disc, the exe turned out RNC-packed with
 the game code hidden in overlays disguised as data files (psx/notes.md in
 the disasm repo carries that archaeology) — and its blast arm (0x800B22C4)
 is the same damage-fatigue-smoke-squeal and return: **no original ever threw
-a pig from a weapon blast.** The pigs play remembers flying were projectile
+a pig from a weapon blast** *(wrong as a verdict — the PC throws through
+the effect's phantom sweep, found 2026-08-26, `pig.md`; the PSX arm is
+clean too and its sweep analogue is still unlooked-for)*. The pigs play remembers flying were projectile
 hits, building explosions and melee, which throw identically in both
 builds. So the remake's blast fling stands as play's own rule with no
 original behind it — kept because the game plays better thrown about — and
@@ -1532,11 +1537,16 @@ pig past the gib threshold and blow IT apart in turn. It cannot touch the
 dead — `TakeDamage` returns at once for states 6, 7 and 8 (`0x467ac9`) — which
 is the same rule `burst` already had in `isDead`.
 
-Two things stay the remake's. The exe's corpse blast **throws nobody**: a full
+Two things stay the remake's. ~~The exe's corpse blast **throws nobody**~~
+*(superseded — the corpse blast THROWS, through the effect's phantom sweep
+`0x409EF0` like every blast in the band, `pig.md` "phantom sweep" /
+`weapons/fire.md`; the primitive scan below was accurate and beside the
+point, the sweep writes the velocity directly. Its strengths: land 3250
+over range 1024, water 2600, lava-water 4000 — 2026-08-28)*: a full
 scan of the two velocity primitives (`0x4A9260` ADD, seven sites; `0x4A9100`
 SET, twenty) puts none of them inside `0x4680E0..0x468B70` or in the blast
-arm. In this engine every blast throws, which is `[play]`'s own override
-(above), so this one does too. And the PICTURE is still the grenade's row —
+arm. In this engine every blast throws — now the exe's own shape too, not
+only `[play]`'s override. And the PICTURE is still the grenade's row —
 0x56 reads parameter row 7 and 0x5B row 8, neither transcribed.
 
 Built as a port: `CorpseWorld.blast` hands the charge to the same `burst`
