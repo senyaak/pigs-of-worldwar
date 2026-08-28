@@ -145,6 +145,27 @@ export interface Lob {
    */
   gas?: boolean
   /**
+   * The EFFECT id this row's destructor spawns, when it is not the grenade
+   * family's own 0x54 — the bomblet's 0x47 (parameter row 6). Absent means
+   * 0x54 (lib/game/blast.ts, `Charge.effect`).
+   */
+  effect?: number
+  /**
+   * **Whether the burst SCATTERS BOMBLETS on top of its own blast.**
+   *
+   * The CLUSTER's whole difference lives in its destructor — the flight row
+   * is the grenade's to the byte (one unread flag apart). Kind 25's arm
+   * (0x43290E, jump table 0x435A6C) spawns its own full 30-point blast
+   * (effect 0x46 — the same parameter row 0 a grenade reads) and then FIVE
+   * projectiles of id 0x1A5 = 421, kind 33, at full charge: four pitched
+   * 0x3E8 of 4096 (≈88°) with yaws a quarter turn apart, one dead vertical
+   * (0x400), spawn heights staggered 40 apart so they cannot slip into one
+   * another. Each bomblet is then an ordinary timed grenade of its own row
+   * (`BOMBLET` below). Read out of the exe 2026-08-28; `weapons/cluster.md`
+   * in the disasm repo. `lobs.ts` scatters at the detonation seam.
+   */
+  cluster?: boolean
+  /**
    * **Whether the burst PUTS POINTS ON instead of taking them off.**
    *
    * Kind 37's destructor arm (0x4331D1) spawns effect **0x60** with the row's
@@ -179,7 +200,10 @@ const LOBS: Record<number, Lob> = {
   /** 19 GRENADE — the plain one. Friction 0.30, restitution 0.80, so 0.12 and
    * 0.32 against grass: a few hops and then a long roll. */
   19: { id: 412, kind: 24, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
-  20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
+  /** 20 CLUSTER GRENADE — a grenade's own flight and blast, plus the five
+   * bomblets its destructor lets go (`cluster` above). Worst case on one
+   * body: 30 + 5×15. */
+  20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false, cluster: true },
   /** 21 HIGH EXPLOSIVE — sixty points at the core over a 1536 field: the
    * heaviest thing a pig throws. */
   21: { id: 417, kind: 29, speed: 300, fuse: 150, arming: 3, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
@@ -233,8 +257,35 @@ const LOBS: Record<number, Lob> = {
    * is index **0x24 `L_BAZOO`** at 100/100, straight off the fire arm
    * (0x47ae9d..0x47aea3).
    */
-  29: { id: 398, kind: 10, speed: 500, fuse: 0, arming: 0, damage: 5120, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true }
+  29: { id: 398, kind: 10, speed: 500, fuse: 0, arming: 0, damage: 5120, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true },
+  /** The CLUSTER's bomblet, keyed by the `BOMBLET` pseudo-skill (0x100,
+   * declared below the table — a literal key because the table comes first).
+   * Kind 33's own row: fifteen points over 1300, a 0.40/0.80 material. */
+  0x100: { id: 421, kind: 33, speed: 250, fuse: 150, arming: 3, damage: 1920, blast: 1300, friction: 1638 / FIXED, restitution: 3276 / FIXED, contact: false, effect: 0x47 }
 }
+
+/**
+ * The BOMBLET — what a cluster grenade bursts into. No pig ever HOLDS one,
+ * so its key is a pseudo-skill safely past the table (skills end at 66):
+ * everything downstream that asks a lob's row by skill — the physics, the
+ * detonation, the model — answers for it through this one number.
+ *
+ * The row is kind 33's, read whole (VA 0x4C2030 + 33·40): speed 250, the
+ * family's 150-frame fuse behind 3 frames of arming, FIFTEEN points over a
+ * 1300 field (effect 0x47 — parameter row 6, a dry crack of sparks with no
+ * fireball), material 0.40/0.80. It bounces, rolls and bursts on its own
+ * clock exactly like the grenade it fell out of.
+ */
+export const BOMBLET = 0x100
+
+/** How the destructor throws the five (0x4329C1/0x432AAE): four at this
+ * pitch with yaws a quarter turn apart, one dead vertical, all at FULL
+ * charge, spawn heights 40 apart. The parent's own yaw seeds the cross in
+ * the exe and is not kept on `Lobbed`; the cross is world-aligned here,
+ * which four-way symmetry makes invisible. */
+export const BOMBLET_AIM = 0x3e8
+export const BOMBLET_AIM_UP = 0x400
+export const BOMBLET_LIFT = 40
 
 /**
  * The explosives a pig PLANTS rather than throws — 35 MINE, 36 ANTI-PERSONNEL

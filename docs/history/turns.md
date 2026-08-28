@@ -1348,3 +1348,38 @@ ending and sarge beats also run `flyOn` for a late blast (a grenade finishing
 under the tour), and the ending's dressing loop skips airborne pigs — its
 per-frame IDLE stamp was overwriting the once-announced flight clip, which
 was play's "свин летел в режиме стояния будто".
+
+
+### A flung pig froze in its landing pose till the handover (2026-08-28)
+
+Play: "если перед концом хода кого-то отбрасывает — он остаётся в позе
+полёта на земле, пока ход не перейдёт к другому." The frozen one was the
+ACTING pig: its flight lives on `loco`, not in `tumbles`, and `flyOn` — its
+only locomotion step outside the driving frame — returned the moment
+`airborne` cleared. `fly()` clears that on the very frame of touchdown and
+leaves `getUp` (0.44 s) for `ground()` to burn, so outside the driving
+frame nobody burned it: the pig lay in clip 10 until `handOver`'s `focus()`
+threw the stale state away and the bystander loop stamped IDLE — exactly
+"пока ход не перейдёт".
+
+Three lines fix it, each mirroring what everybody else already had: `flyOn`
+keeps stepping while `getUp` burns (the same null-intent feed tumble.ts
+gives the non-acting flights); the landing clip is committed with
+`playOnce` when `loco.commit` says so, not worn as a loop (the driving
+frame's own rule — looped, it also never read as animating, so nothing
+waited on it); and `settling()` counts `loco.getUp` beside
+`loco.airborne`, so the handover cannot cut the rise short. Not pinned by a
+spec: nothing in unit/ builds the full Battle, and the window is a
+turn-end beat — if play sees it again, an e2e beside tumble.spec.ts is the
+move.
+
+Found in the same pass, not built: the exe COLLAPSES a side's whole turn
+(mode 3, "CAN'T SELECT ANY PIGS", ~5 s) when NextPig lands on a pig that
+cannot act, and a poisoned pig at ten points or under folds the same way —
+the poison then kills it in the per-turn pass. The remake plays those turns
+out. And the mission-3 "очерёдность ходов у врага не верная" dissolved
+under the read: Team::NextPig (0x499370, read this session — the notes had
+only the address) is the same forward round-robin in POG-marker order the
+remake runs, wrap and dead-skip included; TRENCH fields 5 on 4, so the
+enemy wraps a round earlier and the pairings drift — the original drifts
+identically.

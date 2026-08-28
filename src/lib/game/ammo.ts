@@ -25,7 +25,9 @@
 // it: nothing in the .POG names it, so the loader's "one model per placed
 // record" pass walks straight past.
 //
-// Pure: names only.
+// Pure: names only (plus the one pseudo-skill key the bomblet brings).
+
+import { BOMBLET } from './grenade'
 
 /**
  * Models the ENGINE spawns that no map record places, so the map loader would
@@ -40,9 +42,10 @@
 // map with nothing disguisable near falls back to the crate, and a map that
 // never PLACED one would spawn nothing, which is the exact silent failure
 // the BOOTS entry below records.
-// …and WE_BALL, the MEDICINE BALL in flight (row 425) — thrown by the
-// engine, placed by no record, so it takes the same door.
-export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ', 'BOOTS', 'CRATE4', 'WE_BALL']
+// …WE_BALL, the MEDICINE BALL in flight (row 425), and WE_SU_GR, the
+// cluster's BOMBLET (row 421) — thrown by the engine, placed by no record,
+// so they take the same door.
+export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ', 'BOOTS', 'CRATE4', 'WE_BALL', 'WE_SU_GR']
 
 /** What a finished death leaves on the spot (three/remains.ts). In every map's
  * own .MAD and in no .POG — exactly the case this list exists for: without the
@@ -65,8 +68,14 @@ export const REMAINS_MODEL = 'BOOTS'
  */
 // The MEDICINE BALL's flight is row **425, `WE_BALL`** — what is in the hand
 // for skill 33 is its own held mesh (weapons.ts row +0x0C = 27), so without
-// this the thrown ball flew as the held model.
-export const PROJECTILE_MODEL: Record<number, string> = { 29: 'WE_BAZZ', 33: 'WE_BALL' }
+// this the thrown ball flew as the held model. The BOMBLET (the cluster's
+// child, `BOMBLET` in lib/game/grenade.ts) is row **421, `WE_SU_GR`** and has
+// no held model at all — nobody ever carries one.
+export const PROJECTILE_MODEL: Record<number, string> = {
+  29: 'WE_BAZZ',
+  33: 'WE_BALL',
+  [BOMBLET]: 'WE_SU_GR'
+}
 
 /** What flies when this skill is fired, or null to fall back to the held model
  * (lib/game/weapons.ts). */

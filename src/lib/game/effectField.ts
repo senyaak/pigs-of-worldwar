@@ -11,6 +11,7 @@
 
 import {
   BLAST_EFFECT,
+  BOMBLET_EFFECT,
   BREAK_EFFECT,
   DUST_EFFECT,
   GAS_EFFECT,
@@ -88,12 +89,20 @@ export function createEffectField(random: Random = Math.random): EffectField {
       live.push(beginEffect(effect, at))
     },
     broke: (at) => void live.push(beginEffect(BREAK_EFFECT, at)),
-    // …and the MEDICINE BALL's 0x60 reads row 4 — the slow blue ring and
-    // motes of a heal, nothing of a fireball (lib/game/effects.ts).
+    // …the MEDICINE BALL's 0x60 reads row 4 — the slow blue ring and motes
+    // of a heal — and a BOMBLET's 0x47 row 6, the dry crack. Everything
+    // else (the cluster's own 0x46 included — it reads row 0 too) falls to
+    // the grenade's picture (lib/game/effects.ts).
     blast: (at, effect) =>
       void live.push(
         beginEffect(
-          effect === MINE_EFFECT.id ? MINE_EFFECT : effect === HEAL_EFFECT.id ? HEAL_EFFECT : BLAST_EFFECT,
+          effect === MINE_EFFECT.id
+            ? MINE_EFFECT
+            : effect === HEAL_EFFECT.id
+              ? HEAL_EFFECT
+              : effect === BOMBLET_EFFECT.id
+                ? BOMBLET_EFFECT
+                : BLAST_EFFECT,
           at
         )
       ),

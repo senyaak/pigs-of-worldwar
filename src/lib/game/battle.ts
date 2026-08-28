@@ -584,6 +584,9 @@ export function createBattle(parts: BattleParts): Battle {
     // began under a flying pig. Play: "матч кончается только после всех
     // анимаций — стейт машина поломана похоже".
     loco.airborne !== null ||
+    // …and its GET-UP: the landing is the flight's last act (`flyOn`), and a
+    // beat that could not see it cut the rise short at the handover.
+    loco.getUp > 0 ||
     // …and a DEATH whose dying is actually PLAYING — the clip, the sink, the
     // boots (lib/game/corpses.ts). The exe's list asks the same (`0x47D800`,
     // no pig still busy), and it is what keeps the camera on a kill until the
@@ -656,7 +659,15 @@ export function createBattle(parts: BattleParts): Battle {
    * `tumble` follows for everybody else and the exe's own (0x46b205).
    */
   const flyOn = (delta: number): void => {
-    if (loco.airborne === null) return
+    // …and the LANDING is part of the flight. This used to return the moment
+    // `airborne` cleared — but `fly()` clears it on the very frame the pig
+    // touches down, leaving `getUp` (0.44 s) with nobody to burn it: outside
+    // the driving frame `ground()` was never reached, so a pig flung late in
+    // a turn lay in the landing pose until the handover re-dressed it (play:
+    // "остаётся в позе полёта на земле, пока ход не перейдёт к другому").
+    // The null intent below is exactly what `tumble.ts` feeds everybody
+    // else's get-up.
+    if (loco.airborne === null && loco.getUp <= 0) return
     updateLocomotion(
       loco,
       query,
@@ -673,7 +684,15 @@ export function createBattle(parts: BattleParts): Battle {
       )
     )
     game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
-    if (!anim.animating(game.currentPig)) anim.setClip(game.currentPig, loco.clip)
+    // The driving frame's own rule (further down `update`): a COMMITTED clip
+    // — the landing's get-up — is started once and left to play out; worn as
+    // a loop it never reads as finished, which both froze the pose and let
+    // `settling()` hand the turn over on top of it.
+    if (loco.commit) {
+      if (!anim.animating(game.currentPig)) anim.playOnce(game.currentPig, loco.clip)
+    } else if (!anim.animating(game.currentPig)) {
+      anim.setClip(game.currentPig, loco.clip)
+    }
   }
 
   /**

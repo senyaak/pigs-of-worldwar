@@ -2004,6 +2004,33 @@ grenade flies unturned now, the rocket keeps its measured nose-on-velocity,
 a planted charge its stand. The note stays in grenade.ts so nobody rebuilds
 it without a fresh ruling.
 
+### The CLUSTER scatters at last — five bomblets out of the destructor (2026-08-28)
+
+Play, off a mission-3 crate: "кластерная граната работает как обычная." It
+did — its LOBS row is the grenade's to the byte, and the whole difference
+lives in the destructor nobody had read. Read whole (weapons/cluster.md in
+the disasm repo): kind 25's arm spawns its own FULL 30-point blast (effect
+0x46 — the grenade's row 0 picture) and then five projectiles of id 421,
+kind 33, at full charge — four pitched 0x3E8 (≈88°) with yaws a quarter
+turn apart, one dead vertical, spawn heights stepped 40 so none is born
+inside another — and re-seats the tracked camera on the vertical one. Each
+bomblet is an ordinary timed grenade of its own row: speed 250, fifteen
+points over 1300, material 0.40/0.80, bursting as effect 0x47 — parameter
+row 6, decoded through the validated accessor: stages I and K only, twelve
+grey sparks, no fireball. Worst case on one body 30 + 5×15 = 105.
+
+Built as `Lob.cluster` branching the detonation seam: the vertical bomblet
+is pushed FIRST so `head()` rides it (the exe's own camera re-seat), the
+four angled follow on a world-aligned cross (`Lobbed` keeps no yaw; the
+four-way symmetry hides the difference, and the note says so), each a lob
+of the `BOMBLET` pseudo-skill (0x100 — past the real table, nobody ever
+holds one) wearing WE_SU_GR (row 421). `Lob.effect` carries the bomblet's
+0x47 into the blast announcement. Pinned in unit/cluster.spec.ts. The AI
+still prices the cluster as a plain 30-point lob — the 105 potential is a
+pricing note for the day the brain learns to lead with it. The same
+destructor pattern (skimmed, not built): 40 ARTILLERY CLUSTER (five of id
+426), 31/32 AIRBURST (id 399, the SUPER in two waves).
+
 Play also asked "может у нас граната меньше летит чем в оригинале?" — and
 the answer split in two. The ARC is exact: speed rides 1/F and gravity
 1/F², so v²/g cancels the clock — 9000 units at full charge either way,

@@ -422,6 +422,25 @@ export const HEAL_EFFECT: HitEffect = {
   ]
 }
 
+/**
+ * A BOMBLET going off — effect id **0x47**, parameter row **6**, read through
+ * the same validated accessor HEAL_EFFECT's row was (2026-08-28). Live
+ * stages I and K only — no clouds, no rings: SIX grey puffs on frame 2 and
+ * six more, faintly warm (20,16,16), on frame 3. A dry crack of a dozen
+ * sparks against the grenade's hundred-and-forty-sprite fireball, which is
+ * how five of them going off around a cluster's pop read as children of it.
+ * (Row 6 also carries an authored-but-off J stage; the flags decide.)
+ */
+export const BOMBLET_EFFECT: HitEffect = {
+  id: 0x47,
+  kind: 6,
+  rings: [],
+  bursts: [
+    { at: 2, count: 6, colour: [16, 16, 16], out: 10, up: 10, jitter: 25, gravity: 0, step: 7 },
+    { at: 3, count: 6, colour: [20, 16, 16], out: 10, up: 10, jitter: 0, gravity: 0, step: 3 }
+  ]
+}
+
 /** How far round the burst fans its particles: the same 1638.4-per-turn unit
  * the ring is drawn in, stepped `0x648 / count` a particle (0x48cb0b). */
 const BURST_SPREAD = 0x648 / 1638.4

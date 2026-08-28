@@ -51,6 +51,12 @@ export const MINE_EFFECT_ID = 0x4c
  * the game that heals (`mend` below). The id is in the GAS group's phantom
  * flags, which is what makes it push nobody and ignore line of sight. */
 export const HEAL_EFFECT_ID = 0x60
+/** The CLUSTER's own pop (0x43290E) — reads row 0 like the grenade's 0x54,
+ * so the picture is the same; the id is kept for faithfulness' sake. */
+export const CLUSTER_EFFECT_ID = 0x46
+/** …and its bomblet's (0x433038) — parameter row 6, a dry crack of sparks
+ * with no fireball (lib/game/effects.ts, BOMBLET_EFFECT). */
+export const BOMBLET_EFFECT_ID = 0x47
 
 /** Everything a blast can catch. The same four fields the bullets and the blade
  * take, and the SAME dummy array — a list of its own means a dummy dies twice
