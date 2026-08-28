@@ -1318,3 +1318,33 @@ Two halves, and the second is the one that matters:
 
 Pinned in `unit/grunt.spec.ts` ("a mark missed by a hair is CLOSED, never
 passed"). `machine-mission` after it: ~331 s, four kills over eighteen shots.
+
+## 2026-08-28 — the bridge pass, the march, and the beats that could not see a flight
+
+Play's melee-only last pig ended its turn standing mid-bridge with the clock
+full. Two causes, both fixed:
+
+- **The price list could not see a deck.** `standFor`'s marks around a foe
+  over water were all vetoed by `world.wet` — a terrain probe — while the
+  path grid underneath walks bridges happily (`standOn` first). `swimAt` in
+  battle.ts now overrules the tile's water by anything standable at the
+  column (unbounded reach — the flood prices the climb), and both the brain's
+  `wet` and the actuator's water guard read it.
+- **No plan had no floor.** When the whole election dies (every stand vetoed,
+  the foe past `PLAN_TURNS`' flood horizon, no crate), `marchOption` now runs
+  the pig AT the nearest foe — shaped as the blade's own option so arriving
+  becomes the strike by itself, route = `legsTo`'s honest best effort. Play
+  set both ends: "он должен был всёравно бежать" and "это норм если тупые
+  будут пропускать ход" — so the march is ROLLED against the wits off the
+  battle's stream, odds not a gate. No blade → the old pass stands (the stub
+  game's weaponless pig pinned in `unit/grunt.spec.ts`).
+
+And the END of a battle waited for everything except the acting pig's own
+air: `settling()` counted `tumbles.live()` but not `loco.airborne`, so the
+last death's blast flung the killer and the sergeant/END OF GAME beats began
+under a flying pig, dropping the velocity ("матч кончается только после всех
+анимаций — стейт машина поломана"). `loco.airborne` joined `settling()`; the
+ending and sarge beats also run `flyOn` for a late blast (a grenade finishing
+under the tour), and the ending's dressing loop skips airborne pigs — its
+per-frame IDLE stamp was overwriting the once-announced flight clip, which
+was play's "свин летел в режиме стояния будто".

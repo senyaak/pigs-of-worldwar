@@ -1273,3 +1273,34 @@ failure — a missing debrief folder costs the icon, not the screen).
   (never shrinks — the majority-silhouette rule still decides), the renderer
   measuring every prop model the way `bodyExtent` measures a pig
   (three/battle.ts). unit/seeThrough.spec.ts pins the crown-vs-trunk ray.
+
+## 2026-08-28 — play's nine-point list, built in a day; what the next battle should look at
+
+The work itself is written up in turns.md (the bridge pass, the march, the
+beats that could not see a flight), pig.md (a wall is never rested on) and
+weapons.md (the espionage beats voiced, the lob tumbles, the deaths'
+strengths). Two smaller pieces with no story of their own: the NAME PLATES
+print in CHARS2 with the frontend metrics now — the same `[play]` override
+the pause got, letters a third taller than SMALL's — and a POISONED pig's
+plate heart is baked GREEN (`LAYOUT.plate.heart.poisoned`, same white art,
+second tint).
+
+What the next session in play decides:
+
+- the plates' new size (CHARS2 at native 16; `pow.hud.layout` scales it);
+- the hide gesture's gag — the fart is a coin flip, so hide twice;
+- `TUMBLE_TURNS` (2 turns/s, invented) and whether the grenade should fly
+  as `WE_GRE2` (todo's own open item) now that it visibly turns;
+- how pigs come off slopes now (the immediate eject) — and whether 60°
+  `WALK_OFF_GRADE` still feels right beside it;
+- the march: a melee-only pig should now cross the map at the smart end
+  and stand about baffled at the dumb end;
+- **the open ruling: move the blast fling to the exe's shape?** (falloff to
+  25% at the rim, doubled vertical, strength per effect instead of
+  6×damage — one edit in blast.ts, recolours every explosion at once).
+
+And the day's dear lesson, pinned in CLAUDE.md and memory both: the blast
+throw had been READ two days earlier (`weapons/fire.md` §phantom sweep) and
+a session that did not grep the notes re-concluded "throws nobody" to play's
+face. Every stale headline now opens with its retraction; the notes repo is
+searched FIRST.

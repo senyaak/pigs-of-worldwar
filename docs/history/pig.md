@@ -731,3 +731,23 @@ into the landscape's 200 — a roof landing is rare and reads the same — and
 the conversion's yelp is not wired. `unit/falling.spec.ts` pins all four
 corners: the thrown pig's flat four, the harmless short hop, the long fall
 converting, and the gate itself.
+
+## 2026-08-28 — a wall is never rested on: the landing ejects
+
+Play: "свин висит на склоне — со склона должен отталкиваться при
+отбрасывании." The hang had two halves. The exe's impact handler tests
+`IsBlocked && speed < 0x32` BEFORE its bounce/land fork and calls
+`Pig::EjectFromWall` on the landing frame (0x471041; and under the bounce
+gate a blocked landscape hit is re-routed to the bounce with a random yaw —
+only free ground reaches the settle 0x471350; `movement/notes.md`). The
+remake instead settled on blocked ground and left the wedge counter to throw
+the pig out — which works for the ACTING pig, whose locomotion runs every
+frame, and never for a knocked-back bystander: it settles with `getUp` 0,
+`tumble.ts` drops its flight record that same frame, and the counter never
+runs for it again. Now `fly()`'s blocked settle calls `eject` on the landing
+frame — the exe's own arm — so nothing rests on a wall and the record stays
+live for the flight out. `unit/locomotion.spec.ts` repinned from "rests but
+never stands, the counter throws it" to "never seen at rest, the touch-down
+throws it". No steepness test exists anywhere on the exe's landing path —
+"can't rest here" is the wall FLAG; the one unread place a slope rule could
+still hide is the 0x406BB0 sweep.

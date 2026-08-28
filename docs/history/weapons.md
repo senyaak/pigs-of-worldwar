@@ -1895,3 +1895,36 @@ by the cover through the same falloff every pig takes. One earlier reading
 stood corrected by that: "the blast sheds the disguise before dealing" was
 the belt to the decoy's braces, not the road. `weapons/espionage.md` in the
 disasm repo carries all three passes; `unit/hide.spec.ts` pins the soak.
+
+## 2026-08-28 — the espionage beats voiced, the lob tumbles, the deaths' strengths
+
+Play's list, worked through in one day and its evening:
+
+- **PICK POCKET says what it took.** The bar prints the stolen skill in the
+  crate pickup's own "%u X%d" formats, and the two refusals print the exe's
+  literal `.data` strings (0x4D16D0/0x4D16F4) — both wired in ui/battle.ts
+  off `stole`/`stealFailed`. The innocent whistle is clip 79's own keyframe:
+  phase 640, event 35, P_WHIST1 at 40..55 pitch 105 — the engine times it
+  (`WHISTLE_PHASE`, pickpocket.ts) and the mix is decoded, not picked.
+- **HIDE is a gesture now, and its sound is the exe's gag.** The disguise
+  lands at the END of clip 81 (the exe's end-of-sequence shape; hiding at
+  the press was `[deliberate]` and play revoked it). A first pass gave the
+  press an invented P_BUSH rustle; play asked "точно нет?" and the DLL's
+  keyframe table answered: the clip carries a fatigue-gated breath at phase
+  1078 (silent for a fresh pig, here and in the exe — fatigue is not
+  modelled) and a COIN-FLIP FART at phase 2310 (`STRAIN_PHASE`, hide.ts;
+  P_FART1-3 at 50..65/100..115). The keyframe RECORD itself is decoded now
+  — `anim/audio-events.md` — which also gave clip 17's draw/stow swap.
+- **A thrown lob TUMBLES.** No flight animation ever existed — the only
+  orientation was the rocket's nose-on-velocity, invisible on a symmetric
+  grenade. The spin lives in the engine (`Lobbed.spin` + a lateral axle
+  fixed at launch, stepped in lobs.ts at `TUMBLE_TURNS` = 2 turns/s,
+  `[CHECK — remake]`), crosses on the snapshot, and three/grenades.ts only
+  wears it; the rocket keeps its nose, a planted charge its stand.
+- **The corpse blasts' own strengths, read** (they spawn direct, outside
+  the weapon-row table): land 3250 over range 1024, water 2600, lava-water
+  4000 over 2048 — through the same phantom sweep as every blast. In
+  per-frame Δv (÷ the pig's mass 30) that is ~108/87/133 — the same order
+  the remake's play-tuned 6×points lands, so the models differ in SHAPE
+  (falloff to 25% at the rim, doubled vertical, damage-independence) more
+  than in size. Switching to the exe's shape is play's call, still open.
