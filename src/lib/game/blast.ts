@@ -115,17 +115,21 @@ export interface BlastWorld {
  * standing back saves your footing along with your health.
  *
  * The six, and the cap, are the REMAKE's calibration. The throw itself is
- * the GAME's: play's standing word is that the exe knocks back on ANY
- * damage — "есть в екзе отброс! там отброс от любого урона!" — and that
- * word OVERRIDES the arm reads. Two reads (PC 0x477c22 to its `ret`, PSX
- * 0x800B22C4) found no impulse call inside the blast arm itself, and by the
- * house rule that proves only that the throw's SITE was not found — the
- * impulse primitives (0x4A9260 adds, 0x4A9100 sets) are scattered and a
- * grenade's trail already taught this lesson once: absent from both
- * dispatches, present in the constructor. Do NOT re-read "no knockback"
- * out of the exe; the conclusion has been wrong every time it was drawn
- * (the bullet shove, the blast, the death blast). The ruling that started
- * the fling stands: "мины не отбрасывают — как и тнт… это общая проблема."
+ * the GAME's — play said so first ("есть в екзе отброс! там отброс от
+ * любого урона!") and the 2026-08-28 read FOUND it where three arm reads
+ * had missed it: the throw is the EFFECT's own world sweep (0x409EF0,
+ * fired once from Effect::Update), writing body velocity directly and
+ * bypassing both impulse primitives — which is why reading the damage arm
+ * (0x477c22) to its ret kept "proving" there was none. The original's
+ * shape, for when play wants it built: sphere of the whole RANGE centred
+ * 128 ABOVE the blast, impulse `strength · (1 − 3d/4R)` along centre→body
+ * (25% still standing at the rim), the vertical DOUBLED, a coin-flip spin
+ * on a pig; `strength` is the effect's own field — land death 3250 over
+ * range 1024, water 2600/4000 over 2048 — and does NOT scale with the
+ * damage. Gas, fire and heal are built with the impulse flag off: damage
+ * without throw. `effects/notes.md` has the whole chain. This model here
+ * (damage-scaled, 45°, capped) is `[play]`-tuned and stays until play
+ * asks for the exe's numbers.
  *
  * The DIRECTION is the engine's one throwing explosion borrowed: a BUILDING
  * going off (PC 0x44050c at 0x40, PSX 0x800FAC84, contact arm 0x78) throws

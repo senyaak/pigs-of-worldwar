@@ -1058,18 +1058,24 @@ and the weakest of them were invented here:
   `jmp [eax*4+0x4a90CC]` at 0x4a8ece where `eax = type - 0x1357`, built by
   `0x407AF0` at 0x4a9044). It does not need to grow — that idea was invented to
   prop up a misread range and is gone.
-- **DAMAGE THROWS — in the EXE, from ANY damage. Stop re-reading "no
-  knockback" out of the binary.** Play's standing word, given after the
-  reads kept concluding otherwise: "есть в екзе отброс! там отброс от
-  любого урона!" Every time an arm was read and "no impulse call" was found
-  in it — the bullet shove, the blast arm (PC 0x477c22, PSX 0x800B22C4),
-  the death blast — the conclusion "throws nobody" was drawn and it was
-  WRONG: the impulse primitives (0x4A9260 adds, 0x4A9100 sets) are
-  scattered, and an arm not containing one only means the throw's site is
-  elsewhere. The remake's rule stands and is not to be weakened by any
-  future read: every damage knocks back (`lib/game/blast.ts`,
-  `FLING_PER_POINT`; bullets `flingVelocity`; melee its own ladder). A read
-  may still refine the NUMBERS; it may never again remove the throw.
+- **DAMAGE THROWS — in the EXE, from ANY damage — and the blast's throw is
+  FOUND now (2026-08-28), where three arm reads had missed it.** Play's
+  word came first ("есть в екзе отброс! там отброс от любого урона!") and
+  the read then proved it: the throw is the EFFECT's own world sweep
+  (0x409EF0, fired once from Effect::Update), which writes body velocity
+  DIRECTLY — bypassing both impulse primitives, which is why every
+  enumeration of their call sites kept coming back clean. The original's
+  shape: sphere of the effect's whole RANGE centred 128 above the blast,
+  impulse `strength · (1 − 3d/4R)` along centre→body (still 25% at the
+  rim), the VERTICAL DOUBLED, plus a coin-flip spin on a pig; `strength`
+  is the effect's own field (land death 3250 over range 1024) and does NOT
+  scale with damage. Gas, fire and heal ids are built with the impulse
+  flag off — damage without throw, matching their special-cased arms. The
+  lesson stands beside the fact: an arm without the impulse call only
+  means the throw's site is elsewhere — never "throws nobody". The
+  remake's damage-scaled model (`FLING_PER_POINT`) is `[play]`-tuned and
+  stays until play asks for the exe's numbers; `effects/notes.md` carries
+  the whole read.
 - **"I could not find it" is never "it is not there".** Twice in one session: the
   grenade's TRAIL was declared absent because both of the projectile update's
   dispatches skip a plain grenade — it is in the CONSTRUCTOR (0x43247b); then the
