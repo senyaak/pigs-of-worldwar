@@ -287,14 +287,13 @@ export const LAYOUT = {
      *
      * It is a RADIUS and the stamp is a filled disc, not a ring — see
      * `aroundBy`. Play moved it 1 → 2 → 3 around BIG's tall letters, back
-     * to 1 when the plate went to SMALL — and then OFF, because the stamp
-     * was never the original's outline at all: the letters carry their own
-     * dark edging INSIDE the art, and the flat team-paint was erasing it
-     * (ui/font.ts `painted`, now a multiply). Play called it before the
-     * atlas was measured: "обводка должна быть внутри букв". The dial stays
-     * for a font that has no edge of its own.
+     * to 1 when the plate went to SMALL — then OFF, because SMALL carries
+     * its own dark edging INSIDE the art ("обводка должна быть внутри
+     * букв") — and back ON at 1 when the plate went to CHARS2, whose inner
+     * edging does not read at the plate's size: "обводка внутри — для
+     * этого шрифта не очень — давай снаружи".
      */
-    outline: 0,
+    outline: 1,
     /** The heart's ×2 followed BIG's tall letters; beside SMALL's native 12
      * the 10×11 art stands at its OWN size, which is the original's
      * proportion. The pink stays play's, and so does the GREEN a poisoned
