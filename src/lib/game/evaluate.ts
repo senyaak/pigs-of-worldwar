@@ -938,6 +938,52 @@ export function crateFallback(
 }
 
 /**
+ * **THE MARCH — the floor under the whole election.** When every option died
+ * — no ranged mark, every melee stand refused or beyond the flood's two-turn
+ * horizon, no crate worth having — a pig with legs and a foe still RUNS AT
+ * the nearest one instead of passing. Play's ruling, off the melee-only pig
+ * that stood mid-bridge and ended its turn: "он должен был всёравно бежать
+ * не?" — yes.
+ *
+ * It is a REFLEX, not a judgment: no score, no wits, both ends of the dial
+ * run at the enemy when there is nothing better (a wits rule slides weights,
+ * it never gates a behaviour). The option is shaped as the blade's own so
+ * the walk turns into the strike by itself the moment the foe comes inside
+ * `MELEE_NEAR` — and the route to it is `legsTo`'s honest best effort, which
+ * ends short past the flood and re-plans nearer next turn.
+ *
+ * Null for a pig with no BLADE to close with — a march is a charge, and a
+ * pig with nothing to strike with when it arrives keeps the honest pass
+ * (the stub game's weaponless pig stays put) — or no foe left at all.
+ */
+export function marchOption(world: AiWorld): Option | null {
+  const me = world.acting
+  let foe: Seen | null = null
+  let nearest = Infinity
+  for (const one of world.foes) {
+    const away = distance2d(me, one)
+    if (away >= nearest) continue
+    nearest = away
+    foe = one
+  }
+  if (!foe) return null
+  const blade = me.carrying.find((slot) => slot.amount !== 0 && meleeOf(slot.skill))
+  if (!blade) return null
+  const skill = blade.skill
+  return {
+    skill,
+    kind: 'melee',
+    target: foe,
+    score: 0,
+    worth: 0,
+    stand: { x: foe.x, z: foe.z },
+    walk: nearest,
+    reach: MELEE_NEAR,
+    limit: MELEE_NEAR
+  }
+}
+
+/**
  * **THE ELECTION, IN ITS TWO HALVES** — the best BLOW the kit can land, and
  * the best CRATE on the ground, kept apart on purpose.
  *

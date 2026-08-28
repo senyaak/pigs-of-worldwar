@@ -35,11 +35,15 @@
 // shape: both espionage skills resolve through the end-of-sequence path
 // 0x473600, the clip carrying no event-65 keyframe. It hid AT THE PRESS for
 // a while (`[deliberate]`, since revoked in play: "свин тоже анимацию
-// делает … а потом только прячется"). The rustle at the press is a name
-// pick, not a read — the hide arm has no Sound::Play in it, and P_BUSH is
-// the bank's one bush-flavoured sample. `[CHECK — remake]` for the sound.
-// And the GAS washes over a disguise onto the pig directly — whether the
-// exe's cloud sweep catches the decoy body first is unread. `[gap]`.
+// делает … а потом только прячется"). The clip's SOUND is decoded now
+// (2026-08-28, the DLL's keyframe table + the exe's event switch,
+// anim/audio-events.md): two keyframes — phase 1078 a winded breath, gated
+// on the fatigue counter `[pig+0x1B8]` being over 201, which this engine
+// does not model, so a fresh pig is silent there exactly as in the exe;
+// and phase 2310 event 43, a COIN-FLIP FART (P_FART1-3, half the plays
+// silent) — `strained` below, the gag the gesture is. And the GAS washes
+// over a disguise onto the pig directly — whether the exe's cloud sweep
+// catches the decoy body first is unread. `[gap]`.
 //
 // Pure, like the rest of lib/game.
 
@@ -173,12 +177,22 @@ export interface HideWorld {
   clips: ClipTiming[]
 }
 
+/** Where in clip 81 the STRAIN lands — the clip's own second keyframe:
+ * phase 2310, event id 43, a coin-flip fart (anim/audio-events.md, read
+ * 2026-08-28 out of the DLL's keyframe table). */
+export const STRAIN_PHASE = 2310
+
+/** …against the phase scale every clip event is authored in. */
+const CLIP_PHASE_UNITS = 4096
+
 export function createHide(world: HideWorld, emit: Emit): Hides {
   const standing = new Map<number, Decoy>()
   /** Seconds left of the gesture clip. */
   let playing = 0
   /** Who owes a disguise — the pig, held from the press to the clip's end. */
   let owing: Pig | null = null
+  /** Seconds until the clip's strain keyframe — 0 once fired or none due. */
+  let strainIn = 0
 
   const reveal = (pig: PigId): void => {
     if (!standing.delete(pig)) return
@@ -212,8 +226,10 @@ export function createHide(world: HideWorld, emit: Emit): Hides {
       spend(pig.carrying, SKILL.HIDE)
       const clip = weaponOf(SKILL.HIDE).attackClip
       emit({ kind: 'clip', pig: pig.id, index: clip, once: true })
-      emit({ kind: 'hiding', pig: pig.id })
       playing = clipSeconds(world.clips[clip])
+      // The strain rides the clip to its own keyframe, the way the
+      // pickpocket's whistle does.
+      strainIn = (playing * STRAIN_PHASE) / CLIP_PHASE_UNITS
       owing = pig
       // A bare spec's world has no clips to time: the disguise lands now.
       if (playing <= 0) {
@@ -231,6 +247,13 @@ export function createHide(world: HideWorld, emit: Emit): Hides {
     running: () => playing > 0,
     update(delta, actor) {
       if (playing <= 0) return
+      if (strainIn > 0) {
+        strainIn -= delta
+        if (strainIn <= 0) {
+          strainIn = 0
+          emit({ kind: 'strained', pig: actor.id })
+        }
+      }
       playing -= delta
       if (playing > 0) return
       playing = 0
@@ -241,6 +264,7 @@ export function createHide(world: HideWorld, emit: Emit): Hides {
       if (owing !== null) conceal(owing ?? actor)
       owing = null
       playing = 0
+      strainIn = 0
     },
     reveal,
     absorb(pig, amount) {

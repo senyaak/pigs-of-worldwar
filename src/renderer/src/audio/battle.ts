@@ -108,6 +108,7 @@ export interface Cue {
  * P_BRRR    they are COLD
  * P_BRUSH   brushing itself down
  * P_BURP    a burp
+ * P_BUSH    walking through bushes
  * P_CHUTE1  something tearing
  * P_CLAP    clapping its trotters
  * P_COUGH1  a cough — poisoned?
@@ -116,9 +117,6 @@ export interface Cue {
  * P_COWER3  …another
  * P_DROWN   drowning
  * P_EXERT   a jump?
- * P_FART1   a fart
- * P_FART2   …
- * P_FART3   …
  * P_FLAP1   a ROPE
  * P_HAND1   rubbing its trotters together
  * P_HEAL    the heal SKILL, done by hand
@@ -337,20 +335,24 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
   laugh2: { sound: 'P_LAUGH2', volume: 60, pitch: 100 },
   laugh3: { sound: 'P_LAUGH3', volume: 60, pitch: 100 },
   /**
-   * The thief's INNOCENT WHISTLE — DECODED: clip 79's own sound keyframe at
-   * phase 640 asks for index 91 P_WHIST1 (`weapons/espionage.md` in the
-   * disasm repo). The engine fires it as the clip crosses that phase
-   * (lib/game/pickpocket.ts, WHISTLE_PHASE); the keyframe carries no volume
-   * of its own, so it goes out at full.
+   * The thief's INNOCENT WHISTLE — DECODED to the mix: clip 79's keyframe
+   * at phase 640 dispatches event 35, whose arm plays sound 91 P_WHIST1 at
+   * volume 40..55 and pitch 105, unconditionally (0x474160,
+   * anim/audio-events.md). The engine fires it as the clip crosses the
+   * phase (lib/game/pickpocket.ts, WHISTLE_PHASE); the volume roll is out
+   * here, mid-range, like the squeal pair's.
    */
-  whistle: { sound: 'P_WHIST1', volume: 100, pitch: 100 },
+  whistle: { sound: 'P_WHIST1', volume: 47, pitch: 105 },
   /**
-   * The DISGUISE going on — a NAME PICK, not a read: the hide arm
-   * (0x47C6FC → 0x47D080) has no Sound::Play in it at all, and P_BUSH
-   * ("walking through bushes") is the bank's one bush-flavoured sample.
-   * `[CHECK — remake]` — correct it in play.
+   * The DISGUISE gesture's own gag — DECODED: clip 81's phase-2310 keyframe
+   * dispatches event 43, which flips a coin and FARTS — sound 62/63/64
+   * P_FART1-3, volume 50..65, pitch 100..115, silent half the time
+   * (0x474432, anim/audio-events.md). The flip and both rolls live in
+   * battleAudio, because sound is presentation.
    */
-  bushRustle: { sound: 'P_BUSH', volume: 100, pitch: 100 },
+  fart1: { sound: 'P_FART1', volume: 57, pitch: 107 },
+  fart2: { sound: 'P_FART2', volume: 57, pitch: 107 },
+  fart3: { sound: 'P_FART3', volume: 57, pitch: 107 },
   /**
    * A blade meeting a DISGUISE — DECODED: the strike on a hidden pig diverts
    * whole to a knock on wood, sound 26 = FT_WOOD (0x4760F1,

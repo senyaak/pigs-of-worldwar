@@ -26,7 +26,7 @@
 
 import type { AiWorld, Seen } from './ai'
 import type { Option, Walked } from './evaluate'
-import { crateErrand, crateFallback, elect } from './evaluate'
+import { crateErrand, crateFallback, elect, marchOption } from './evaluate'
 import { WALK_SPEED } from './movement'
 
 /**
@@ -143,8 +143,10 @@ export function makePlan(
   // (lib/game/evaluate.ts, `elect`).
   const { blow, crate } = elect(world, note, judge, walked)
   // Failing every weapon AND every crate, a crate is still a NECESSITY — a
-  // pig with nothing in reach has a job (`crateFallback`).
-  let option = blow ?? crate ?? crateFallback(world, skip)
+  // pig with nothing in reach has a job (`crateFallback`) — and failing THAT
+  // the pig marches at the nearest foe rather than passing (`marchOption`):
+  // "он должен был всёравно бежать не?"
+  let option = blow ?? crate ?? crateFallback(world, skip) ?? marchOption(world)
   if (!option) return null
 
   /**

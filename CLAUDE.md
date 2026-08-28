@@ -997,8 +997,10 @@ and the weakest of them were invented here:
   not breathe, so do not "fix" gas to poison a hidden pig. The disguise
   lands at the END of the gesture clip (81), the exe's own shape — it hid
   at the press for a while (`[deliberate]`) and play revoked that. The
-  rustle at the press is a name pick (P_BUSH), `[CHECK — remake]`: the
-  hide arm plays no sound of its own.
+  clip's sound is DECODED (anim/audio-events.md): a fatigue-gated breath at
+  phase 1078 (silent here — fatigue is not modelled, and a fresh pig's is
+  silent in the exe too) and a COIN-FLIP FART at phase 2310 (P_FART1-3,
+  half the plays silent). `[exe]`.
 - `[play]` **A bullet's knock is the engine's own 45° throw, at the exe's
   own speeds — and pellets STACK.** `Pig::HitByProjectile` ADDS (0x4A9260
   fadds, never sets) 48 along the projectile's own pitch — kind 0x12 adds 6
@@ -1056,6 +1058,18 @@ and the weakest of them were invented here:
   `jmp [eax*4+0x4a90CC]` at 0x4a8ece where `eax = type - 0x1357`, built by
   `0x407AF0` at 0x4a9044). It does not need to grow — that idea was invented to
   prop up a misread range and is gone.
+- **DAMAGE THROWS — in the EXE, from ANY damage. Stop re-reading "no
+  knockback" out of the binary.** Play's standing word, given after the
+  reads kept concluding otherwise: "есть в екзе отброс! там отброс от
+  любого урона!" Every time an arm was read and "no impulse call" was found
+  in it — the bullet shove, the blast arm (PC 0x477c22, PSX 0x800B22C4),
+  the death blast — the conclusion "throws nobody" was drawn and it was
+  WRONG: the impulse primitives (0x4A9260 adds, 0x4A9100 sets) are
+  scattered, and an arm not containing one only means the throw's site is
+  elsewhere. The remake's rule stands and is not to be weakened by any
+  future read: every damage knocks back (`lib/game/blast.ts`,
+  `FLING_PER_POINT`; bullets `flingVelocity`; melee its own ladder). A read
+  may still refine the NUMBERS; it may never again remove the throw.
 - **"I could not find it" is never "it is not there".** Twice in one session: the
   grenade's TRAIL was declared absent because both of the projectile update's
   dispatches skip a plain grenade — it is in the CONSTRUCTOR (0x43247b); then the

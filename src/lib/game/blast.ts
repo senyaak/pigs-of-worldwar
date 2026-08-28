@@ -114,19 +114,18 @@ export interface BlastWorld {
  * The FALLOFF is free: the damage is already the share for the distance, so
  * standing back saves your footing along with your health.
  *
- * The six, and the cap, are the REMAKE's — and so is the throw itself, which
- * the 2026-08-23/24 reads settled for good: **neither original's blast throws
- * anybody.** The PC arm (0x477c22) was read to its `ret` — damage, twice it
- * onto `[pig+0x1b8]` (a FATIGUE meter, not a knockback tally), smoke, a
- * squeal — every caller of the two throw primitives (27 sites) accounted for
- * without it, the blast effect owning no physics body at all, and zero
- * indirect references in the whole image. Then the PSX build (SLES-01041,
- * psx/notes.md in the disasm repo) answered the same: its blast arm
- * (0x800B22C4) is the same damage-fatigue-smoke-squeal and return. The pigs
- * play remembers flying were projectile hits, buildings and melee. So the
- * fling is `[play]`'s rule with no original behind it — kept because the
- * game plays better thrown about, which is the ruling that started it:
- * "мины не отбрасывают — как и тнт… это общая проблема."
+ * The six, and the cap, are the REMAKE's calibration. The throw itself is
+ * the GAME's: play's standing word is that the exe knocks back on ANY
+ * damage — "есть в екзе отброс! там отброс от любого урона!" — and that
+ * word OVERRIDES the arm reads. Two reads (PC 0x477c22 to its `ret`, PSX
+ * 0x800B22C4) found no impulse call inside the blast arm itself, and by the
+ * house rule that proves only that the throw's SITE was not found — the
+ * impulse primitives (0x4A9260 adds, 0x4A9100 sets) are scattered and a
+ * grenade's trail already taught this lesson once: absent from both
+ * dispatches, present in the constructor. Do NOT re-read "no knockback"
+ * out of the exe; the conclusion has been wrong every time it was drawn
+ * (the bullet shove, the blast, the death blast). The ruling that started
+ * the fling stands: "мины не отбрасывают — как и тнт… это общая проблема."
  *
  * The DIRECTION is the engine's one throwing explosion borrowed: a BUILDING
  * going off (PC 0x44050c at 0x40, PSX 0x800FAC84, contact arm 0x78) throws

@@ -573,11 +573,17 @@ export function createBattle(parts: BattleParts): Battle {
     // second, and nothing may hand the turn over inside it (lib/game/mines.ts).
     mines.live() > 0 ||
     // …and a pig still in the AIR, which is what a blast leaves behind
-    // (lib/game/tumble.ts) — the acting pig's own flight among them. Play watched
-    // what leaving it out costs: "динамит не толкает", because TNT's six-second
-    // fuse runs out inside the beat that ends the turn, and a beat that does not
-    // wait for the flight hands the turn on before the pig has moved a unit.
+    // (lib/game/tumble.ts). Play watched what leaving it out costs: "динамит
+    // не толкает", because TNT's six-second fuse runs out inside the beat
+    // that ends the turn, and a beat that does not wait for the flight hands
+    // the turn on before the pig has moved a unit.
     tumbles.live() > 0 ||
+    // …the ACTING pig's own flight included — it lives on `loco`, not in
+    // `tumbles` (see `fling`), and a beat that could not see it ended with
+    // the pig still in the air, so the sergeant and the END OF GAME both
+    // began under a flying pig. Play: "матч кончается только после всех
+    // анимаций — стейт машина поломана похоже".
+    loco.airborne !== null ||
     // …and a DEATH whose dying is actually PLAYING — the clip, the sink, the
     // boots (lib/game/corpses.ts). The exe's list asks the same (`0x47D800`,
     // no pig still busy), and it is what keeps the camera on a kill until the
@@ -1096,6 +1102,13 @@ export function createBattle(parts: BattleParts): Battle {
       // loss stands everyone easy throughout.
       for (const pig of everyone()) {
         if (isDead(pig) || indoors.inside(pig)) continue
+        // A pig still IN THE AIR is not re-dressed — the same guard the
+        // other two whole-squad dressing loops carry. The flight clip is
+        // announced ONCE, at launch (lib/game/tumble.ts emits on change),
+        // so one IDLE stamp here held for the whole arc and the thrown pig
+        // flew in its standing pose (play: "летел в режиме стояния будто").
+        if (tumbles.has(pig)) continue
+        if (pig === game.currentPig && loco.airborne !== null) continue
         pig.holding = null
         // …and the AIMING POSE goes with the weapon. Play: "анимация победы
         // играется в позе вытащенного оружия — все оружия надо убрать у всех

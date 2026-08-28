@@ -140,9 +140,12 @@ export type BattleEvent =
    * reach that far...") or a victim with nothing left (`nothing`). P_OWW,
    * the exe's own two exits. */
   | { kind: 'stealFailed'; pig: PigId; at: Point; reason: 'reach' | 'nothing' }
-  /** The DISGUISE was pressed: the gesture clip is playing and the pig will
-   * vanish at its end. The rustle hangs here (lib/game/hide.ts). */
-  | { kind: 'hiding'; pig: PigId }
+  /** The DISGUISE gesture's own sound keyframe — clip 81 phase 2310, where
+   * the exe rolls a coin and FARTS (id 43 → P_FART1-3 half the time,
+   * anim/audio-events.md). The clip's other keyframe, a winded breath at
+   * phase 1078, is gated on a fatigue counter this engine does not model,
+   * so a fresh pig's is silent there — as it is in the exe. */
+  | { kind: 'strained'; pig: PigId }
   /** This pig took the DISGUISE — it stops being drawn and a decoy prop
    * stands where it does (lib/game/hide.ts). */
   | { kind: 'hid'; pig: PigId }
