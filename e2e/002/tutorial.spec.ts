@@ -52,12 +52,31 @@ const BAZOOKA_CRATE = 19
 type Page = import('@playwright/test').Page
 
 /** Every training clip the sergeant has spoken, in order (ui/battle.ts). */
+/**
+ * Every clip the sergeant has spoken — **and it is the whole APP's list, not
+ * this battle's**, whatever `pow.spoken`'s own comment used to say. The speech
+ * bank deliberately outlives a mission (`002/audio.spec.ts`, "the bank SURVIVES
+ * a mission restart"), and `heard` inside it is only cleared by `dispose`.
+ *
+ * So a spec that reads ORDER out of it has to read its own stretch of it, and
+ * this one did not: it took indices over the whole history and passed only
+ * while nothing before it had ever spoken clips 3, 4 and 5. The day
+ * `002/trainingStep.spec.ts` stopped failing half way through — it had been red
+ * since the class kits landed — that spec ran to the end for the first time,
+ * walked the whole training chain, and left a 4 in the list before this test
+ * had said anything at all. `since` is the fix and `sinceNow` is how a test
+ * takes its mark.
+ */
 const spoken = (page: Page): Promise<number[]> =>
   page.evaluate(() => {
     const pow = (window as unknown as { pow?: { spoken?(): number[] } }).pow
     if (!pow?.spoken) throw new Error('no battle is up')
     return pow.spoken()
   })
+
+/** What has been said since `mark` — this test's own stretch of the bank. */
+const since = async (page: Page, mark: number): Promise<number[]> =>
+  (await spoken(page)).slice(mark)
 
 const dummies = (page: Page): Promise<number> =>
   page.evaluate(
@@ -118,11 +137,14 @@ test('the mine line is armed by the minefield crates and by nothing else', () =>
 
 test('the training script moves: collected, chosen, and then PLACED', async ({ app }) => {
   const { page } = app
+  // The MARK first: everything below is read from here on, because the bank is
+  // the app's and this test is not the first thing to talk into it.
+  const mark = (await spoken(page)).length
   await startGame(page)
 
   // The opening two beats are not an object's doing — the level starting, and
   // the round starting under it (lib/game/tutorial.ts, `CLIP_FOR`).
-  await expect.poll(async () => spoken(page), { timeout: 30_000 }).toContain(2)
+  await expect.poll(async () => since(page, mark), { timeout: 30_000 }).toContain(2)
 
   // Step one: the bayonet crate, which is the one record on CAMP that is on the
   // ground from the first frame — it carries no wait label, so nothing has to
@@ -131,7 +153,7 @@ test('the training script moves: collected, chosen, and then PLACED', async ({ a
   expect(crate, 'CAMP carries a bayonet crate').toBeDefined()
   await warp(page, crate!.x, crate!.z, 0)
   await expect
-    .poll(async () => spoken(page), { timeout: 10_000 })
+    .poll(async () => since(page, mark), { timeout: 10_000 })
     .toContain(3) // PRESS RETURN BUTTON FOR SKILL MENU.
 
   // Step two: take it in hand through the real menu. The prompt is the script's
@@ -144,10 +166,10 @@ test('the training script moves: collected, chosen, and then PLACED', async ({ a
   expect(clipForMenu(BAYONET, 0), 'the bayonet is what clip 4 answers to').toBe(4)
   expect(await chooseSkill(page, BAYONET)).toBe(true)
   await expect
-    .poll(async () => spoken(page), { timeout: 10_000 })
+    .poll(async () => since(page, mark), { timeout: 10_000 })
     .toContain(4) // PRESS SPACE TO SELECT YOUR WEAPON.
   await expect
-    .poll(async () => spoken(page), { timeout: 10_000 })
+    .poll(async () => since(page, mark), { timeout: 10_000 })
     .toContain(5) // PRESS SPACE TO ATTACK THE DUMMY.
 
   // Step three: knock the dummy down. Its command places the rifle crate, and
@@ -166,12 +188,12 @@ test('the training script moves: collected, chosen, and then PLACED', async ({ a
   const line = clipForPlacement(RIFLE, 0)
   expect(line, 'the placement table has forgotten the rifle').toBe(6)
   await expect
-    .poll(async () => spoken(page), { timeout: 15_000 })
+    .poll(async () => since(page, mark), { timeout: 15_000 })
     .toContain(line) // FOLLOW THE YELLOW PATH AND COLLECT THE CRATE.
 
   // …and in that order. A script that says step three before step one is not a
   // script at all.
-  const heard = await spoken(page)
+  const heard = await since(page, mark)
   expect(at(heard, 3), `out of order: ${heard.join(',')}`).toBeLessThan(at(heard, 4))
   expect(at(heard, 4), `out of order: ${heard.join(',')}`).toBeLessThan(at(heard, 5))
   expect(at(heard, 5), `out of order: ${heard.join(',')}`).toBeLessThan(at(heard, line))
@@ -179,6 +201,8 @@ test('the training script moves: collected, chosen, and then PLACED', async ({ a
 
 test('BLOWING THE DOOR drops the bazooka, and the sergeant says so', async ({ app }) => {
   const { page } = app
+  // Its own mark in the app-wide speech bank, for the reason `since` gives.
+  const mark = (await spoken(page)).length
   await startGame(page)
 
   // CAMP's door is record #46, `STW04_D2`, and it is the one object on the map
@@ -213,5 +237,5 @@ test('BLOWING THE DOOR drops the bazooka, and the sergeant says so', async ({ ap
   // skill 29 (lib/game/tutorial.ts).
   const line = clipForPlacement(BAZOOKA, 0)
   expect(line, 'the placement table has forgotten the bazooka').toBe(22)
-  await expect.poll(async () => spoken(page), { timeout: 10_000 }).toContain(line)
+  await expect.poll(async () => since(page, mark), { timeout: 10_000 }).toContain(line)
 })

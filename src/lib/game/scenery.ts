@@ -67,7 +67,21 @@ export interface Scenery {
   /** Every record the script has not placed yet. */
   waiting(): number[]
   /** Hand over any crate this pig is standing in. */
-  collect(pig: Pig): void
+  /**
+   * Walk everything within reach into the pig, and answer with the SKILL the
+   * last crate handed over — null for a health crate, a promotion point, or
+   * nothing within reach at all.
+   *
+   * The answer exists for the training ground's step jump, which has to put
+   * what it just collected in the pig's hands (three/battle.ts). That used to
+   * be guessed as `carrying[last]`, which is only the crate's own skill while
+   * the pig is carrying nothing else — true until every pig started spawning
+   * with its CLASS KIT (lib/game/kits.ts), and false ever since: a grunt's kit
+   * ends in three grenades and `give` MERGES into an existing slot rather than
+   * appending, so the jump to the bayonet put a grenade in hand. Nothing else
+   * reads this; the ordinary frame collects and ignores it.
+   */
+  collect(pig: Pig): number | null
   /** What is still on the ground AND placed — the pickups an AI weighs
    * walking to; a script-held record is not on the map yet. */
   remaining(): readonly Pickup[]
@@ -180,6 +194,7 @@ export function createScenery(
     at: (id) => places.get(id) ?? null,
     points: () => points,
     collect(pig) {
+      let handed: number | null = null
       for (let i = pickups.length - 1; i >= 0; i--) {
         const pickup = pickups[i]
         // A crate the script has not placed yet is not there to be walked into.
@@ -265,7 +280,9 @@ export function createScenery(
         // the pickup class (0x464633).
         advance(pickup.id, places.get(pickup.id)?.y ?? 0)
         emit({ kind: 'collected', skill: pickup.skill, amount: pickup.amount, given, pig: pig.id })
+        handed = pickup.skill
       }
+      return handed
     }
   }
 }

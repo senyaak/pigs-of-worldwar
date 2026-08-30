@@ -25,6 +25,8 @@ import { createBus } from '../../src/lib/game/events'
 import type { BattleEvent } from '../../src/lib/game/events'
 import { bodyExtent } from '../../src/lib/game/body'
 import { give } from '../../src/lib/game/inventory'
+import { flingSpeed } from '../../src/lib/game/blast'
+import { PLAIN_GRAVITY } from '../../src/lib/game/ballistics'
 
 /** Skill 19 — the plain grenade (lib/game/grenade.ts). */
 const GRENADE = 19
@@ -98,17 +100,33 @@ test('a grenade bursting at a hillside pig SENDS IT FLYING — displacement, not
       engine.update(STEP_SECONDS)
       frames++
     }
-    const hurt = heard.some(
-      (event) => event.kind === 'damaged' && (event as { pig?: number }).pig === victim.id
-    )
-    if (!hurt) continue
+    const took = heard
+      .filter((event) => event.kind === 'damaged' && (event as { pig?: number }).pig === victim.id)
+      .map((event) => (event as { amount: number }).amount)
+    if (took.length === 0) continue
     landed++
     const moved = Math.hypot(victim.position.x - before.x, victim.position.z - before.z)
-    // The flight alone is worth over a thousand at a grenade's core damage;
-    // 400 is the floor that still catches every way this has failed — the
-    // settle discarding the horizontal, a near-vertical launch, a blocked
-    // flight — while leaving room for rim hits.
-    expect(moved, `a burst that hurt the pig at offset ${offset} moved it`).toBeGreaterThan(400)
+    // **THE FLOOR IS DERIVED FROM THE DAMAGE, because the throw is.**
+    // `flingSpeed` is `6 × points` capped at the cattle prod's 200
+    // (lib/game/blast.ts), thrown at 45°, so the flat-ground range it buys is
+    // `v²/g` — and a flat floor cannot serve both ends of that. This line WAS
+    // flat, at 400, and it went red on a round that took NINE points at the
+    // rim and travelled 254: right down to the arithmetic, and the spec calling
+    // it a failure.
+    //
+    // Two thirds is the discount for everything the ideal ignores — the pig is
+    // thrown along a HILLSIDE, it drags, and it stops where it lands. Measured
+    // over both rounds that connect here: 30 points buys 3240 and travels 1709
+    // (53%), 9 points buys 291 and travels 254 (87%). The floor is under the
+    // looser of the two with room to spare, and still catches every way this
+    // has actually failed — the settle discarding the horizontal, a
+    // near-vertical launch, a blocked flight, a fling not applied at all.
+    const bought = took.reduce((most, points) => Math.max(most, flingSpeed(points)), 0)
+    const floor = 0.4 * ((bought * bought) / PLAIN_GRAVITY)
+    expect(
+      moved,
+      `a burst that took ${took.join('+')} points at offset ${offset} moved it`
+    ).toBeGreaterThan(floor)
   }
   // The sweep must actually test something: with seed 7 three of the five
   // rounds burst within reach, and a stream change that sends every grenade

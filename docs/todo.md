@@ -2338,7 +2338,7 @@ So neither is a regression, and neither is written down anywhere else.
 Neither has been touched: they are timing in the SPECS, not behaviour, and the
 fix is a measurement each rather than a tuned number.
 
-### B14. NINE SPECS ARE RED AT HEAD, and eight of them are the 25 Hz clock — 2026-08-29
+### B14. NINE SPECS WERE RED AT HEAD — all nine settled 2026-08-29
 
 Found while verifying the mine and cluster work: a full run was **67 failed**,
 and almost all of it was one broken thing wearing sixty-six disguises.
@@ -2371,12 +2371,52 @@ nudging: the knockback one in particular is worth a moment's thought first,
 because "a rim hit throws you 253 instead of 400" could equally be a fling that
 now falls short in play.
 
-The other four are not the clock and are not read yet: `002/crate.spec.ts:116`
-(a stride away already collects, `[3,7,19]`), `:154` (a finite slot arrives at
-2, not 1), `002/spawns.spec.ts:116` (the class gives `pcspy_me` where the spec
-wants `pcsab_me`) and `:142`, `002/trainingStep.spec.ts:124`. The three spawn
-and crate ones smell of the CLASS KITS — see the LOW section's note that play
-accepted those going red — but nobody has confirmed it.
+**And then all nine were fixed, each against a reading rather than a nudge.**
+
+- **The three fuse/fling floors were re-derived.** The two mine ones are on the
+  FRAMES now — rows 40/41 and 53 of 0x4c2030, re-read the same day (arming 0
+  fuse 12; arming 50 fuse 125) — because a bound in seconds measures
+  `EXE_FRAME_SECONDS` and nothing else, which is exactly how they went red. The
+  knockback floor was never the clock at all (`fromExeSpeed` rides
+  `FRAME_SECONDS`, untouched): it was a FLAT 400 against a throw that scales
+  with the damage, and the round it failed on took NINE points at the rim and
+  travelled 254 — right down to the arithmetic. The floor is derived from the
+  damage now, `0.4 · v²/g` off `flingSpeed`, measured against both rounds that
+  connect (30 points buys 3240 and travels 1709; 9 buys 291 and travels 254).
+- **The TNT plant flake (B12's first half) is closed** by sampling in the PAGE
+  at frame rate instead of polling over a round trip — a sampler cannot land
+  late, and the assertion is on the sequence rather than on one lucky reading.
+  B12's other half, `002/grenade.spec.ts:89`, is untouched.
+- **`002/spawns.spec.ts` was stale, and the exe says so.** `ClassToModel` —
+  sixteen words at 0x4C2E50, read into the display object at 0x440898 with no
+  bounds check: `1 2 2 2 6 5 5 5 7 7 8 4 4 4 3 3`, indexing `british.mad` in
+  FILE order (pcace, pcgru, pchvy, pcleg, pcmed, pcsap, pcsab, pcsni, pcspy).
+  Class 10 SPY is kind 8 `pcspy_me`; class 4 COMMANDO is kind 6 `pcsab_me`.
+  `cdd6c6e` corrected `three/soldiers.ts` to exactly this and left the spec on
+  the retired marker-suffix guess.
+- **`002/trainingStep.spec.ts:124` was the ENGINE, and it is the one play
+  named**: the step jump put `carrying[last]` in the pig's hands, which is the
+  crate's own skill only while the pig carries nothing else. `Scenery.collect`
+  ANSWERS with the skill it handed over now, and the jump holds that. The
+  tutorial's first step gives out the BLADE again.
+- **And fixing `trainingStep` turned `002/tutorial.spec.ts` red, which was a
+  LANDMINE rather than a regression.** `pow.spoken()` is the APP's speech bank
+  and not the battle's — it deliberately outlives a mission
+  (`002/audio.spec.ts`) and is only emptied by `dispose` — so the tutorial spec
+  was taking indices over the whole session's history and passing only while
+  nothing before it had ever spoken clips 3, 4 and 5. `trainingStep` had been
+  dying half way through since the class kits landed; the moment it ran to the
+  end it walked the whole training chain and left a 4 in the list before the
+  tutorial had said a word. Both tests take a MARK now and read their own
+  stretch, and `pow.spoken`'s own comment — which claimed "this battle" — is
+  corrected where it lives.
+- **The two crate specs were stale the same way** — a grunt spawns with
+  `[[3,∞],[7,∞],[19,3]]` and GUNS' spy with a TNT of its own, so neither "the
+  skill appeared" nor "the slot reads one" says anything about the crate. The
+  walk is asserted on the crate LEAVING THE MAP (the drawn node), the stack on
+  `before + the record's amount`, and `spend`'s drop-at-zero moved to
+  `unit/inventory.spec.ts`, where the arithmetic lives and no battle is needed
+  to reach it.
 
 ### B11. `002/camera-smooth.spec.ts`'s opening drop scores worse near 60 fps
 

@@ -113,6 +113,23 @@ const give = (page: Page, skill: number, amount: number): Promise<boolean> =>
     { skill, amount }
   )
 
+/**
+ * How many CRATES are still DRAWN on the ground. The signal a walk-in used to
+ * be asserted by — the skill turning up in the pig's list — stopped being one
+ * the day every pig started spawning with its CLASS KIT (lib/game/kits.ts): a
+ * grunt's is bayonet, rifle and three grenades, and CAMP's only unscripted
+ * crate is the BAYONET's, so the skill is in the list before the pig has moved.
+ * The crate LEAVING THE MAP is what the walk actually does, and it is the
+ * drawn node that says so rather than anything the engine merely thinks.
+ */
+const crates = (page: Page): Promise<number> =>
+  page.evaluate(
+    () =>
+      (
+        window as unknown as { pow: { debug: { props(): { at: { name: string }[] } } } }
+      ).pow.debug.props().at.filter((one) => /^CRATE/i.test(one.name)).length
+  )
+
 test('a crate is walked into, takes nothing away, and on CAMP never runs out', async ({ app }) => {
   const { page } = app
   await startGame(page)
@@ -129,15 +146,21 @@ test('a crate is walked into, takes nothing away, and on CAMP never runs out', a
   // A stride short of it and facing it — heading 0 walks +z (lib/game/movement.ts)
   // — and then WALKED in, which is the reach test doing its own job.
   await warp(page, crate!.x, crate!.z - APPROACH, 0)
-  expect(await skills(page), 'nothing is collected from a stride away').not.toContain(BAYONET)
+  const standing = await crates(page)
+  expect(standing, 'CAMP has crates on its ground').toBeGreaterThan(0)
+  expect(await crates(page), 'nothing is collected from a stride away').toBe(standing)
   await press(page, 'walkForward')
-  await expect.poll(() => skills(page), { timeout: 10_000 }).toContain(BAYONET)
+  await expect.poll(() => crates(page), { timeout: 10_000 }).toBe(standing - 1)
   await release(page, 'walkForward')
+  expect(await skills(page), 'and it handed the blade over').toContain(BAYONET)
 
   // **A COLLECTION TAKES NOTHING.** The exe clears on PLACEMENT alone (0x4aa6cb).
   expect(await skills(page), 'the grenade survived the crate').toContain(GRENADE)
   // …and the training ground hands its weapons out UNLIMITED, whatever the
-  // record says the crate holds.
+  // record says the crate holds. The grunt's kit already carries the blade
+  // unlimited, so what this catches is the collection turning that slot into a
+  // COUNT: `give` merges into an existing slot by adding, and a crate worth its
+  // record's one charge would leave a number here.
   expect(await amountOf(page, BAYONET)).toBe(UNLIMITED)
 
   // Use it. A bayonet spends its round as the swing runs (lib/game/strikes.ts).
@@ -151,7 +174,7 @@ test('a crate is walked into, takes nothing away, and on CAMP never runs out', a
   expect(await amountOf(page, BAYONET)).toBe(UNLIMITED)
 })
 
-test('a finite slot is GONE the moment it is spent', async ({ app }) => {
+test('a finite crate STACKS onto the kit, and spending takes one off', async ({ app }) => {
   const { page } = app
   await startGame(page)
   expect(await swapMap(page, 'GUNS'), 'GUNS opens').toBe(true)
@@ -162,17 +185,26 @@ test('a finite slot is GONE the moment it is spent', async ({ app }) => {
 
   // Straight onto it here rather than walking: the walk is pinned above, and
   // this map's ground around the crate is nobody's business.
+  // **GUNS' first pig is a SPY, and a spy's kit already carries one charge**
+  // (lib/game/kits.ts, the exe's own record at 0x4d02e0 +0x08). So the crate is
+  // read against what the pig walked in with rather than against nothing: off
+  // the training ground it is worth what the record says, and `give` STACKS it
+  // onto the slot that is already there.
+  const before = await amountOf(page, TNT)
+  expect(before, 'the spy arrives with a charge of its own').toBe(1)
   await warp(page, crate!.x, crate!.z, 0)
-  await expect.poll(() => skills(page), { timeout: 10_000 }).toContain(TNT)
-  // Off the training ground a crate is worth what the record says.
-  expect(await amountOf(page, TNT)).toBe(1)
+  await expect.poll(() => amountOf(page, TNT), { timeout: 10_000 }).toBe(before! + crate!.amount)
 
   expect(await chooseSkill(page, TNT)).toBe(true)
 
-  // The charge goes down on the clip's own frame and the round with it; a slot
-  // that reaches zero is dropped rather than kept at nothing.
-  await useUntil(page, async () => !(await skills(page)).includes(TNT))
-  expect(await amountOf(page, TNT)).toBe(null)
+  // The charge goes down on the clip's own frame and the round with it. ONE
+  // plant is all a turn allows — TNT keeps the turn but takes its one blow
+  // (lib/game/battle.ts, `struck`) — so what the app can show is the slot going
+  // DOWN by one. That a slot reaching zero is DROPPED rather than kept at
+  // nothing is `spend`'s own arithmetic and is pinned where it lives, in
+  // `unit/inventory.spec.ts`.
+  await useUntil(page, async () => (await amountOf(page, TNT)) === before)
+  expect(await amountOf(page, TNT), 'one charge spent, one left').toBe(before)
 
   // The app is left on GUNS deliberately: the fixture hands the next spec a
   // page back on the MENU, and ONE PLAYER always opens the training ground

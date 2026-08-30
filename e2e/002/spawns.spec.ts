@@ -122,20 +122,31 @@ test('a marker carries the class, and the class picks the art', () => {
   expect(first.map((at) => at.pigClass)).toEqual([10, 14, 0, 0, 0])
   expect(second.map((at) => at.marker)).toEqual(['SP_ME', 'SP_ME', 'HV_ME', 'SP_ME', 'SP_ME'])
 
-  // Each class group has its own model in Chars/british.mad.
+  // Each class group has its own model in Chars/british.mad — and WHICH model
+  // is `ClassToModel`, sixteen words at 0x4C2E50 read straight into the display
+  // object at 0x440898 with no bounds check: `1 2 2 2 6 5 5 5 7 7 8 4 4 4 3 3`,
+  // indexing the archive in FILE order (pcace, pcgru, pchvy, pcleg, pcmed,
+  // pcsap, pcsab, pcsni, pcspy). So class 10 SPY is kind 8, `pcspy_me`, and
+  // class 4 COMMANDO is kind 6, `pcsab_me`.
+  //
+  // This block used to say `pcsab_me` for the SPY and `pcspy_me` for the
+  // SNIPER, off the old guess that read a marker's own suffix — `SB_ME` as
+  // "saboteur". `cdd6c6e` corrected `three/soldiers.ts` against the exe and
+  // left the spec behind (docs/history/pig.md: "SNIPER and SPY wore each
+  // other's models"). The table is the authority; this is the spec catching up.
   expect(first.map((at) => classArt(at.pigClass))).toEqual([
-    'pcsab_me',
+    'pcspy_me',
     'pcleg_me',
     'pcgru_me',
     'pcgru_me',
     'pcgru_me'
   ])
   expect(second.map((at) => classArt(at.pigClass))).toEqual([
-    'pcspy_me',
-    'pcspy_me',
+    'pcsni_me',
+    'pcsni_me',
     'pchvy_me',
-    'pcspy_me',
-    'pcspy_me'
+    'pcsni_me',
+    'pcsni_me'
   ])
 })
 
@@ -160,7 +171,7 @@ test('the battle fields the map’s own squads, dressed by class', async ({ app 
   const squads = await page.evaluate(() => window.pow!.debug!.squads())
   expect(squads.map((squad) => squad.pigs.length)).toEqual([5, 5])
   expect(squads[0].pigs.map((pig) => pig.art)).toEqual([
-    'pcsab_me',
+    'pcspy_me',
     'pcleg_me',
     'pcgru_me',
     'pcgru_me',

@@ -1106,9 +1106,14 @@ export function initBattle(
     // The bar has no script driving it yet, so this is how it is watched:
     // any line, or the tutorial's own long one by default.
     say: (text?: string) => hud.say(text ?? battleText[SAMPLE_LINE] ?? ''),
-    // Every clip the sergeant has spoken this battle, in order — the script
-    // runs on speech, so this is the only way to watch it work. Read-only, and
-    // the same list `Speech.spoken()` keeps (audio/speech.ts).
+    // Every clip the sergeant has spoken — **the APP's list, not this
+    // battle's**, and it used to say otherwise here. The bank deliberately
+    // outlives a mission (audio/speech.ts, and `002/audio.spec.ts` pins it),
+    // and `heard` is only emptied by `dispose`. The script runs on speech, so
+    // this is the only way to watch it work; a spec reading ORDER out of it has
+    // to take a mark first and read its own stretch, which cost
+    // `002/tutorial.spec.ts` a red the day the spec ahead of it stopped failing
+    // half way through and started speaking into the list.
     spoken: () => speech.spoken(),
     /**
      * **The training ground, step by step.** `pow.step()` says where it stands,

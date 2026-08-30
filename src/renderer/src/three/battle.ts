@@ -782,11 +782,15 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       ? Math.atan2(target.x - at.x, target.z - at.z)
       : game.currentPig.heading
     warp(at.x, at.z, heading)
-    scenery.collect(game.currentPig)
     // Whatever that just handed over goes into the hands — a health crate hands
-    // over nothing to hold, and leaves them empty.
-    const holding = game.currentPig.carrying[game.currentPig.carrying.length - 1]
-    game.currentPig.holding = holding?.skill ?? null
+    // over nothing to hold, and leaves them empty. **It is what `collect`
+    // ANSWERS, not the last slot of the inventory**: that guess held only while
+    // a pig carried nothing but the crate, and every pig has spawned with its
+    // CLASS KIT since `a7412e9`. A grunt's ends in three grenades and `give`
+    // merges rather than appends, so the jump to step 1 — the BAYONET — put a
+    // grenade in the trainee's hands and `e2e/002/trainingStep.spec.ts` had
+    // been saying so ever since.
+    game.currentPig.holding = scenery.collect(game.currentPig)
     onGameChanged()
     return true
   }

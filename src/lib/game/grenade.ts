@@ -232,8 +232,11 @@ const LOBS: Record<number, Lob> = {
    * `speed * charge >> 12` with the charge of 1 a press hands over
    * (`weapons/fire.md`) is nothing at all — it goes down at the pig's own feet.
    * A material of 0.0999 on both halves, so it does not roll off. And fifty
-   * frames of arming under a 125-frame fuse: **near enough six seconds**, against
-   * the four the turn gives you to get clear (lib/game/spend.ts).
+   * frames of arming under a 125-frame fuse: **175 frames, which is seven
+   * seconds at the engine's 25 Hz**, against the four the turn gives you to get
+   * clear (lib/game/spend.ts). Do not write that as a number of seconds
+   * anywhere — it rides `EXE_FRAME_SECONDS`, and two specs went red the day
+   * that knob moved.
    *
    * Fifty points at the core over 2048 of blast — twice a grenade's reach, and
    * enough to kill a grunt outright where a grenade takes thirty off it.

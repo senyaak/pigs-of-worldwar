@@ -124,10 +124,17 @@ test('a mine is ONE-SHOT: trodden on it counts down, and the tile is spent', () 
   expect(mines.buried(at.x, at.z), 'the map put one here').toBe(true)
   expect(mines.tread(at.x, at.z), 'and a foot found it').toBe(true)
   expect(mines.live()).toBe(1)
-  // Twelve frames and no jitter with this roll — four tenths of a second, which
-  // is the click before the bang and not a delay before anything is decided.
+  // Twelve frames and no jitter with this roll. **The bound is in FRAMES**, and
+  // the exe is where it comes from: rows 40 and 41 of 0x4c2030 carry arming 0
+  // and fuse 12 (re-read 2026-08-29, both rows, `weapons/mines.md`). This line
+  // used to say "under 0.7 s" and went red the day `EXE_FRAME_SECONDS` became
+  // 1/25 and made nineteen frames 0.76 — it was measuring the clock knob, not
+  // the mine. Nineteen frames is under a second at any rate this repo has run,
+  // and that is the whole claim: the click before the bang, not a delay before
+  // anything is decided.
   expect(mines.at()[0].fuse).toBeCloseTo(fromExeFrames(MINE_FUSE_FRAMES), 5)
-  expect(fromExeFrames(MINE_FUSE_FRAMES + FUSE_JITTER)).toBeLessThan(0.7)
+  expect(MINE_FUSE_FRAMES + FUSE_JITTER, 'the row reads fuse 12, jittered by rand & 7').toBe(19)
+  expect(fromExeFrames(MINE_FUSE_FRAMES + FUSE_JITTER)).toBeLessThan(1)
 
   // The same tile cannot be trodden on twice — the exe clears the bit in the
   // breath it spawns the blast (`Map::SetMine(col, row, 0, 0)`).
@@ -261,11 +268,16 @@ test('TNT is PLANTED: no gauge, no aim view, and a fuse longer than the run', ()
   expect(row!.damage / DAMAGE_UNIT, 'fifty points kills a grunt outright').toBe(50)
   expect(row!.blast, "twice a grenade's reach").toBe(2048)
 
-  // Fifty frames of arming under a 125-frame fuse: near enough six seconds,
-  // against the FOUR the turn gives the pig to get clear.
+  // Fifty frames of arming under a 125-frame fuse — row 53 of 0x4c2030, +0x14
+  // and +0x18, read again 2026-08-29. **The assertion is on the FRAMES**, for
+  // the same reason the mine's above is: this line said 5.5..6.2 seconds and
+  // went red the day the clock became 1/25 and made the same 175 frames seven,
+  // which measured the knob and nothing else. What it is really about is the
+  // comparison underneath — the charge outlasting the four seconds the turn
+  // leaves the pig to get clear — and both sides of that ride the same clock.
+  expect(row!.arming + row!.fuse, 'fifty of arming under a 125-frame fuse').toBe(175)
   const fuse = fuseSeconds(row!, () => 0)
-  expect(fuse).toBeGreaterThan(5.5)
-  expect(fuse).toBeLessThan(6.2)
+  expect(fuse).toBeCloseTo(fromExeFrames(175), 5)
   expect(fuse).toBeGreaterThan(PLANTED_SECONDS)
   // …and a grenade's is unchanged by the row carrying its own arming count now.
   expect(fuseSeconds(lobOf(GRENADE)!, () => 0)).toBeCloseTo(fromExeFrames(153), 5)
@@ -531,9 +543,44 @@ test('TNT goes down IN FRONT of the pig, keeps the turn, and leaves four seconds
   // FIRST THE ANIMATION. Play: "ТНТ ставится на землю — с анимацией", and the
   // clip is not a decoration over the placing — its own key-frame event is what
   // puts the charge down, a third of the way in (lib/game/grenade.ts
-  // `PLANT_PHASE`), so the pig is wearing clip 77 before anything exists.
-  await expect.poll(async () => wearing(page), { timeout: 4000 }).toBe(LAY_CLIP)
-  expect((await thrown(page)).length, 'nothing is down until the pig has bent over').toBe(0)
+  // `PLANT_PHASE` = 1314 of 4096), so the pig is wearing clip 77 for a while
+  // before anything exists.
+  //
+  // **SAMPLED IN THE PAGE, because over a round trip this is a race** — and it
+  // was one, flaking for a fortnight (todo.md B12): the spec polled for the
+  // clip and then asked, in a second call, whether anything was down, and a
+  // poll that landed past the key-frame found a charge already there and called
+  // it a failure. A frame-rate sampler inside the page cannot land late: it
+  // sees every frame of the clip, and the assertion is on what the SEQUENCE
+  // says rather than on one lucky reading of it.
+  const laying = await page.evaluate(
+    () =>
+      new Promise<{ clip: number | null; down: number }[]>((done) => {
+        const pow = (
+          window as unknown as {
+            pow: { debug: { pose(): { clip: number | null }; grenades(): unknown[] } }
+          }
+        ).pow
+        const seen: { clip: number | null; down: number }[] = []
+        // Runs to a DEADLINE, not to a frame count. A count was tried first and
+        // it went red under a full suite: the window is not in front, the frame
+        // loop is throttled with it, and a hundred and eighty ticks stopped
+        // short of the key-frame. What the sampler is for is not landing late,
+        // and a clock keeps that whatever the frame rate does.
+        const until = performance.now() + 10_000
+        const tick = (): void => {
+          seen.push({ clip: pow.debug.pose().clip, down: pow.debug.grenades().length })
+          if (seen[seen.length - 1].down > 0 || performance.now() > until) done(seen)
+          else requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      })
+  )
+  const bending = laying.filter((one) => one.clip === LAY_CLIP && one.down === 0)
+  expect(bending.length, 'the pig bends over with nothing down yet').toBeGreaterThan(4)
+  const first = laying.findIndex((one) => one.down > 0)
+  expect(first, `and then the charge appears — ${laying.length} frames watched`).toBeGreaterThan(0)
+  expect(laying[first].clip, 'on the laying clip, not after it').toBe(LAY_CLIP)
 
   // It is on the ground, and the pig still has the controls: the turn was NOT
   // spent, it was HURRIED (lib/game/spend.ts).
