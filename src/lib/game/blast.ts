@@ -204,7 +204,7 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     if (world.soak) amount = world.soak(pig, amount)
     if (amount <= 0 && covered) continue
     const outcome = hurt(pig, amount, world.training)
-    emit({ kind: 'damaged', at: body, amount, pig: pig.id })
+    emit({ kind: 'damaged', at: body, amount, pig: pig.id, blow: true })
     if (outcome === 'died' || outcome === 'gibbed')
       emit({ kind: 'killed', pig: pig.id, by, gibbed: outcome === 'gibbed' })
     // …AND IT GOES FLYING. Where the burst stood against the body decides —

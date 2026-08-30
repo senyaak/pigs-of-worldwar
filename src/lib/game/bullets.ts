@@ -256,7 +256,7 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       if (world.soak && amount > 0) amount = world.soak(pig, amount)
       if (amount > 0) {
         const outcome = hurt(pig, amount, world.training)
-        emit({ kind: 'damaged', at: body, amount, pig: pig.id })
+        emit({ kind: 'damaged', at: body, amount, pig: pig.id, blow: true })
         if (outcome === 'died' || outcome === 'gibbed') {
           emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })
         }

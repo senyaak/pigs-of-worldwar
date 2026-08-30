@@ -957,6 +957,27 @@ export function createBattle(parts: BattleParts): Battle {
         if (game.currentPlayer.pigs.includes(dead)) tally.losses++
         else tally.kills++
       },
+      // **A BLOW ON THE ACTING PIG ENDS ITS TURN — the mine's answer.**
+      // Play asked whether treading on one closes the turn ("вроде в оригинале
+      // да"), and the tread path does not: it makes a projectile and clears the
+      // tile, and no handover is anywhere in it. The rule is one level down, in
+      // `Pig::TakeDamage` itself — 0x467c56 reads the routine's second argument
+      // a second time and, when it is **0** and the pig being hurt is the one
+      // being played, calls `Game::EndTurn` (0x494430). Every weapon path passes
+      // 0; a status tick, a hard landing and a drowning pass something else,
+      // which is what `blow` on the event carries (lib/game/events.ts). So the
+      // mine ends the turn through the BLAST it sets off, not through the foot
+      // that found it — and so does a pig's own grenade at its own trotters.
+      //
+      // Health does not come into it: the arm sits above the death checks and
+      // one point is enough. It is a `spent` like a weapon's, cashed on the
+      // quiet below, so the blast plays out and the pig is thrown before the
+      // turn goes. One half of the exe's arm is NOT modelled and is written up
+      // rather than guessed at: on the TRAINING GROUND the floor at one point
+      // hands the turn on whatever the cause was (0x467c76).
+      damaged: ({ pig, blow }) => {
+        if (blow && pig !== undefined && pig === game.currentPig.id) spent = true
+      },
       // THE BOOTS GET THEIR SECOND. The walk-away beat holds while a corpse
       // is playing out and could end the very frame the boots land — which
       // yanked the camera to the shooter for the sergeant's praise with the
@@ -1588,7 +1609,18 @@ export function createBattle(parts: BattleParts): Battle {
         emit({ kind: 'canopiesCut' })
       }
       jumpRequested = false
-      attack.swallow()
+      // **AND SO IS THE HAND-DETONATOR, for the same reason the ONE BLOW A TURN
+      // guard makes room for it below: setting off what is already in the air is
+      // the end of the first blow rather than a second one.** Play, of the
+      // cluster: "разлётные сами только могут взорваться по времени." The five
+      // bomblets are born INSIDE this beat — the canister's own burst is what
+      // opens it — and `settling()` counts them, so the wait cannot end while
+      // they fly and this line ate every press until the last fuse had run out
+      // on its own. The gate is `thrown()`, not the beat: a press with nothing
+      // live is still swallowed, which is what the beat is for.
+      // `e2e/002/cluster.spec.ts` fails on the old line.
+      if (grenades.thrown() > 0) attack.begin(acting, holding)
+      else attack.swallow()
       // The world keeps going — the crate has to reach the ground for the wait
       // to end, and the smoke off the thing that broke is what is being
       // watched.

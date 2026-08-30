@@ -490,6 +490,20 @@ test('a pig that walks onto a MINE hears it and then loses twenty points', async
   // grunt, and a grunt cannot see a mine even standing on it (lib/game/mines.ts).
   expect(await markers(page), 'a grunt sees no mines').toBe(0)
 
+  // **AND THE TURN IS OVER.** Play asked whether it should be, remembering that
+  // it is — and the rule is not the mine's at all: `Pig::TakeDamage`'s second
+  // argument, 0 on every weapon path, hands the turn on when the pig it is
+  // hurting is the one being played (0x467c56, `turns/notes.md`). So the BLAST
+  // ends it, above any death check and on any number of points. Asserted last
+  // because it must not cut across the flight above: the handover waits for the
+  // quiet like a weapon's does (lib/game/battle.ts, `spent`).
+  await expect
+    .poll(async () => (await hud(page)).turn, {
+      timeout: 20000,
+      message: 'the blast to hand the turn on'
+    })
+    .toBeGreaterThan(before.turn)
+
   expect(app.errors()).toEqual([])
 })
 

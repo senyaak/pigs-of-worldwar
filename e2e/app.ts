@@ -27,8 +27,16 @@ import type { Action } from './controller'
  * a FRONTEND screen has none — it is drawn on a canvas in the game's own art
  * and is left the way a player leaves it, on the back key.
  */
-const EXITS: [string, { click: string } | { key: Action }][] = [
-  ['#battle', { click: '#battle-leave' }],
+const EXITS: [string, { click: string } | { fire: string } | { key: Action }][] = [
+  // **The BATTLE's is `fire`, not `click`, because the toolbar is not on the
+  // screen any more.** `02a36f3` took the frame off the battle — `#battle-toolbar`
+  // is `display: none` — and the button behind it stayed, wired, as the remake's
+  // own way out. Playwright refuses to click what is not visible, so this table
+  // pointed the whole suite at a control nobody could reach: every spec that
+  // finished with the battle up timed out in the fixture, and each one after it
+  // in the same worker went down with it. The button is CLEANUP and not a
+  // subject — nothing asserts it — so the event goes straight to it.
+  ['#battle', { fire: '#battle-leave' }],
   ['#viewer', { click: '#viewer-back' }],
   ['#archive-view', { click: '#archive-back' }],
   ['#browser', { click: '#browser-menu' }],
@@ -65,6 +73,7 @@ export async function toMenu(page: Page): Promise<void> {
     for (const [view, exit] of EXITS) {
       if (await page.locator(view).isVisible()) {
         if ('click' in exit) await page.locator(exit.click).click()
+        else if ('fire' in exit) await page.locator(exit.fire).dispatchEvent('click')
         else await tap(page, exit.key)
         // Several screens LEAVE the way they arrived — springs and launchers,
         // half a second of travel — so wait the exit out before walking on.
@@ -75,6 +84,17 @@ export async function toMenu(page: Page): Promise<void> {
   }
   await expect(page.locator('#menu'), 'the previous spec left a view nothing can exit').toBeVisible()
 }
+
+/**
+ * WALK OUT OF A BATTLE — the toolbar's own button, reached the only way that is
+ * left. `02a36f3` took the frame off the battle (`#battle-toolbar` is
+ * `display: none`) and left the button behind it wired, so a real click cannot
+ * land on it any more and every spec that walked out this way sat there for
+ * thirty seconds. It is the REMAKE's own exit, with no original to be faithful
+ * to, and nothing asserts the button itself — so the event goes straight to it.
+ */
+export const leaveBattle = (page: Page): Promise<void> =>
+  page.locator('#battle-leave').dispatchEvent('click')
 
 export interface App {
   page: Page

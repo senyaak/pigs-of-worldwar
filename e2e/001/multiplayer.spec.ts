@@ -13,7 +13,7 @@
 import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
-import { expect, test } from '../app'
+import { expect, leaveBattle, test } from '../app'
 import { tap } from '../controller'
 import { choose, labels, nudge, selection, values } from '../menu'
 
@@ -120,7 +120,7 @@ test('DONE opens a battle with two real squads in it', async ({ app }) => {
   expect(squads.length, 'a two-sided map').toBe(2)
   for (const squad of squads) expect(squad.pigs.length).toBeGreaterThan(0)
 
-  await page.locator('#battle-leave').click()
+  await leaveBattle(page)
   await expect(page.locator('#menu')).toBeVisible()
   expect(app.errors()).toEqual([])
 })

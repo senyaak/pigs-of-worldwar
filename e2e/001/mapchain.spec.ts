@@ -7,7 +7,7 @@
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-import { test } from '../app'
+import { leaveBattle, test } from '../app'
 import { FIRST_ARMY, TEST_TEAM, choose, nameTeam } from '../menu'
 import { tap } from '../controller'
 
@@ -135,7 +135,7 @@ test('declining the tutorial launches through the map: world, zoom, region, brie
   await expect(page.locator('#battle')).toBeVisible()
 
   // Walking out is an abort: back to the squad, nothing settled.
-  await page.locator('#battle-leave').click()
+  await leaveBattle(page)
   await expect(page.locator('#player')).toBeVisible()
 
   expect(app.errors()).toEqual([])
@@ -195,7 +195,7 @@ test('the key that leaves the briefing does not cut the squad loose', async ({ a
   expect(drop.pigs.length).toBeGreaterThan(0)
   expect(drop.pigs.filter((pig) => !pig.canopy && !pig.landed)).toEqual([])
 
-  await page.locator('#battle-leave').click()
+  await leaveBattle(page)
   await expect(page.locator('#player')).toBeVisible()
 
   expect(app.errors()).toEqual([])
@@ -267,7 +267,7 @@ test('back on the map skips the whole chain to the briefing', async ({ app }) =>
   await expect(page.locator('#briefing'), "the briefing answered the map's key").toBeVisible()
   await tap(page, 'menuSelect')
   await expect(page.locator('#battle')).toBeVisible()
-  await page.locator('#battle-leave').click()
+  await leaveBattle(page)
   await expect(page.locator('#player')).toBeVisible()
 
   expect(app.errors()).toEqual([])

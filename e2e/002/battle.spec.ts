@@ -8,7 +8,7 @@
 import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
-import { expect, test } from '../app'
+import { expect, leaveBattle, test } from '../app'
 import {
   beginTurn,
   debugState,
@@ -205,7 +205,7 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   // the squad with nothing written to the save (src/renderer/src/main.ts). Only
   // a battle with no campaign behind it leaves to the menu, which is what this
   // line used to assert, from before there was a campaign to belong to.
-  await page.locator('#battle-leave').click()
+  await leaveBattle(page)
   await expect(page.locator('#player')).toBeVisible()
 
   // …and START MISSION opens it again, at turn 1 with a full clock: nothing

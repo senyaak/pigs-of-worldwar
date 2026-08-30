@@ -1383,3 +1383,56 @@ only the address) is the same forward round-robin in POG-marker order the
 remake runs, wrap and dead-skip included; TRENCH fields 5 on 4, so the
 enemy wraps a round earlier and the pairings drift — the original drifts
 identically.
+
+## A BLOW ON THE ACTING PIG ends its turn — which is what a mine does (2026-08-29)
+
+Play asked whether treading on a mine closes the turn, remembering that it does
+in the original. It does, and finding out why took two passes — the first of
+which answered NO and is worth keeping because the second only stands on it.
+
+**Pass one: enumerate the handovers.** Rather than read the tread path again,
+`turns/endturn-callers.py` in the disasm repo lists every direct call to
+`Game::EndTurn` (0x494430). There are sixteen, and the address is a literal
+nowhere in the image, so nothing reaches it behind a pointer. None of the sixteen
+is inside 0x46b1e0..0x46c678 — the per-pig ground update that carries the whole
+tread at 0x46bfd9..0x46c169. All true, and all beside the point: the tread makes
+a projectile and clears the tile, and the handover is one level further down.
+
+**Pass two: four of the sixteen are inside `Pig::TakeDamage`.** It is virtual —
+slot +0x34 of the pig vtable, base 0x4bd298 — which is why nothing calls it
+directly and why the first sweep found no caller to read. It takes a damage and a
+**cause**, and at **0x467c56** it reads the cause a second time: **0, and the pig
+being hurt is the pig being played, is a handover**. That arm sits ABOVE every
+death check and one point is enough — health has nothing to do with it. Every
+weapon path passes 0 (the blast arms at 0x477dd6/0x4788ac take the row's own
+damage, falloff multiplied in, and push 0 beside it); the sources that are not
+blows pass 1, 3, 4, 5 or 6.
+
+So the mine ends the turn through the BLAST it sets off, not through the foot
+that found it — and nothing about it is special to mines. A pig's own grenade at
+its own trotters does the same, and so would anything else that could reach it
+while its clock runs.
+
+**Built as one flag on one event.** `damaged` carries `blow` — the exe's cause-0,
+set by `blast.ts`, `bullets.ts` and `strikes.ts` and by nothing else, so the gas
+tick, the poison, the fall and the drown stay out of it by construction rather
+than by a list somebody has to keep. `battle.ts`'s handler sets `spent` when the
+hurt pig is the acting one, which is the same flag a weapon's use sets: cashed on
+the QUIET below, so the blast plays out and the pig is thrown before the turn
+goes rather than the handover cutting across it.
+
+**FALLING is on the right side of this already, and it was checked rather than
+assumed.** Play asked. The landing arm — 0x4aa010, which `falling.ts` was built
+off — passes **4** for a pig, and 4 is not 0, so the four points a hard landing
+costs leave the clock running. The remake matches by doing nothing: `falling.ts`
+emits its `damaged` without `blow`, which is the same statement in the same
+place. The two arms that DO end a turn nearby are neither of them a drop off a
+ledge: 0x46d7bb is `[pig+0x388] > 250` — a FRAME COUNT of the fall, set to 1 when
+it starts and incremented per update, so ten seconds of continuous falling, which
+is falling out of the world — and 0x46d039 is leaving the map at `|x|` or `|z|`
+past 15871. Both are deaths, and a death already ends the turn. Neither is
+modelled and neither needs to be while nothing can reach them.
+
+One half of the exe's own arm is NOT modelled and is written down rather than
+guessed: on the TRAINING GROUND the floor at one point (0x467c76) hands the turn
+on whatever the cause was.

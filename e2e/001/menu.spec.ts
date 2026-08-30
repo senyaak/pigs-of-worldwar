@@ -17,7 +17,7 @@
 import { existsSync } from 'node:fs'
 
 import { PHASE_ENV, launchApp, openAssets } from '../launch'
-import { expect, test, toMenu } from '../app'
+import { expect, leaveBattle, test, toMenu } from '../app'
 import { tap } from '../controller'
 import { choose, labels, lightBar, nudge, selection, startGame } from '../menu'
 
@@ -194,7 +194,7 @@ test('NEW GAME opens the battle, and F1 the asset browsers', async ({ app }) => 
   await expect(page.locator('#menu')).toBeHidden()
   // Walking out of a campaign battle is an ABORT: it lands on the squad, not
   // the menu — nothing is settled and nothing is written (main.ts).
-  await page.locator('#battle-leave').click()
+  await leaveBattle(page)
   await expect(page.locator('#player')).toBeVisible()
   await toMenu(page)
   await expect(page.locator('#menu')).toBeVisible()

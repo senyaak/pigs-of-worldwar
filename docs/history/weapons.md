@@ -2048,3 +2048,35 @@ tick) runs 20% longer and lands on the engine's own rate. Watch one number
 in play: the beat after a blow moves 0.5 → 0.6 s, and play had blessed the
 half second — if it drags, the beat's own frame count is the knob, not the
 clock.
+
+### The scattered five could not be set off by hand (2026-08-29)
+
+Play, the day after the cluster was built: "кластерная граната должна при
+разлёте тоже позволять взрывать когда захочешь — а щас разлётные сами только
+могут взорваться по времени." The engine was innocent — `detonateNow` cuts a
+bomblet's fuse like any other lob's, and unit/cluster.spec.ts had been pinning
+exactly that since the day it was written. What the spec could not see is that
+the press never reached it.
+
+The canister's own burst is what OPENS the aftermath beat, and the beat's first
+act is `attack.swallow()`. The five are born inside it. `settling()` counts
+them, so the beat cannot end while they fly, and every press for the next six
+seconds went in the bin — the player watching five grenades bounce with a dead
+fire key. The unit suite could not catch it because the hole is in `battle.ts`,
+between the input and the seam it was testing.
+
+The fix is the exemption the ONE BLOW A TURN guard forty lines below had already
+made, in the same words: setting off what is already in the air is the END of
+the first blow, not a second one. So the beat swallows the press only when
+`grenades.thrown()` is nought. It is not a cluster rule — anything that opens a
+beat with a live lob still in the air was mute the same way, a grenade thrown
+onto a minefield among them.
+
+Pinned in `e2e/002/cluster.spec.ts`, headless and driving `battle.setFiring` —
+the same call the input layer makes — with the engine stepped by hand. **The
+app-level version was written first and thrown away**, and that is the part
+worth keeping: it has to catch the window between the canister bursting and a
+six-second fuse, with a turn handover inside it, and it passed and failed on the
+same tree depending on how busy the machine was. A spec that races the thing it
+tests is worse than none. The headless one runs in eighty milliseconds and fails
+on the old `attack.swallow()` line, which is the only proof that matters.

@@ -2338,6 +2338,46 @@ So neither is a regression, and neither is written down anywhere else.
 Neither has been touched: they are timing in the SPECS, not behaviour, and the
 fix is a measurement each rather than a tuned number.
 
+### B14. NINE SPECS ARE RED AT HEAD, and eight of them are the 25 Hz clock — 2026-08-29
+
+Found while verifying the mine and cluster work: a full run was **67 failed**,
+and almost all of it was one broken thing wearing sixty-six disguises.
+
+**The cascade is fixed.** `02a36f3` took the frame off the battle
+(`#battle-toolbar` is `display: none`) and left `#battle-leave` behind it,
+wired. Playwright will not click what is not visible, so `e2e/app.ts`'s exit
+table — and five specs that walk out by hand — sat on a thirty-second timeout,
+and every spec after them in the same worker went down in the fixture. All six
+sites go through `leaveBattle(page)` now, which dispatches the event straight at
+the button: it is the remake's own exit, nothing asserts it, and there is no
+other way to reach it. 67 → 9.
+
+**The nine that remain were red before any of this**, proved by running them
+with only `src/lib/game/` stashed: the same nine, the same numbers, and the one
+difference is `002/mines.spec.ts:441` going green with the damage rule in. Four
+of them are arithmetic anyone can check by reading:
+
+| spec | wants | gets | why |
+| ---- | ----- | ---- | --- |
+| `002/mines.spec.ts:120` | `fromExeFrames(12+7) < 0.7` | 0.76 | 19/25 |
+| `002/mines.spec.ts:255` | TNT's fuse `< 6.2` | 7 | 175/25 |
+| `002/knockback.spec.ts:32` | a rim fling `> 400` | 253.6 | every exe speed is 5/6 of what it was |
+| `002/mines.spec.ts:510` | nothing planted before the clip's key-frame | one already down | B12's own flake, still unfixed |
+
+The first three are **stale floors from `EXE_FRAME_SECONDS` going 1/30 → 1/25**
+in the same commit, and none of them is a measured constant — each is a guard
+rail written when the clock was 1/30. They want re-deriving at 25 Hz, not
+nudging: the knockback one in particular is worth a moment's thought first,
+because "a rim hit throws you 253 instead of 400" could equally be a fling that
+now falls short in play.
+
+The other four are not the clock and are not read yet: `002/crate.spec.ts:116`
+(a stride away already collects, `[3,7,19]`), `:154` (a finite slot arrives at
+2, not 1), `002/spawns.spec.ts:116` (the class gives `pcspy_me` where the spec
+wants `pcsab_me`) and `:142`, `002/trainingStep.spec.ts:124`. The three spawn
+and crate ones smell of the CLASS KITS — see the LOW section's note that play
+accepted those going red — but nobody has confirmed it.
+
 ### B11. `002/camera-smooth.spec.ts`'s opening drop scores worse near 60 fps
 
 0.157 at 144 fps and 0.355 at 62, a hair over the engine's own 60 Hz step, so its

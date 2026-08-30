@@ -51,6 +51,17 @@ export type BattleEvent =
       at: Point
       amount: number
       pig?: PigId
+      /**
+       * A BLOW — a blast, a bullet, a blade — as against a status tick, a fall
+       * or a drowning. It is the exe's own second argument to `Pig::TakeDamage`
+       * (0x467ac0), which every weapon path passes as **0** and every other
+       * source passes something else (a poison arm passes 3, and so on): the
+       * routine reads it twice, and the second read is the one that HANDS THE
+       * TURN ON when the pig it is hurting is the one being played (0x467c56).
+       * So this flag is what a mine under the acting pig's foot ends its turn
+       * with (`turns/notes.md` in the disasm repo).
+       */
+      blow?: boolean
       structure?: boolean
       /** A METAL thing took it — a gun, a machine, a drum — which is what
        * `I_METAL` is (play: "взрыв по танку, пушке и прочему"). */
