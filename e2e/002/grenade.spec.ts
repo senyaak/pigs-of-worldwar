@@ -23,6 +23,8 @@ import { DUMMY_MODEL, targetsOf } from '../../src/lib/game/targets'
 import { GAUGE_SECONDS } from '../../src/lib/game/gauge'
 import { BLAST_CORE } from '../../src/lib/game/grenade'
 import { AIM_LOB } from '../../src/lib/game/aim'
+import { fromExeFrames } from '../../src/lib/game/ballistics'
+import { STEP_SECONDS } from '../../src/lib/game/engine'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const GRENADE = 19
@@ -102,15 +104,40 @@ test('the gauge fills while F is held and the throw comes on the release', async
   expect((await look(page)).charge ?? 0).toBeLessThanOrEqual(1)
 
   // Letting go arms the same ten-frame fuse a gun's press arms, and then it is
-  // in the air with about five seconds on it — the row's own 150 frames at the
-  // engine's rate, three of arming, and a jitter of up to seven.
+  // in the air with the row's own 150 frames on it, three of arming and a
+  // jitter of up to seven — 153..160, which is **6.12 to 6.40 seconds** at the
+  // engine's 25 Hz.
+  //
+  // **Caught on the FIRST FRAME it exists, from inside the page.** This used to
+  // read the fuse over a round trip and check it against a flat 4.5..5.5
+  // window, which measured the machine: the fuse burns while the reading is in
+  // flight, so a busy run came back under the floor (todo.md B12) and a fast
+  // one would now come back OVER the ceiling, the window having been written
+  // when the clock was 1/30. A watcher armed before the release sees the lob
+  // appear and takes the fuse there and then; the only slack left is the step
+  // the lob was born in.
+  const watching = page.evaluate(
+    () =>
+      new Promise<number | null>((done) => {
+        const pow = (window as unknown as { pow: { debug: { grenades(): { fuse: number }[] } } })
+          .pow
+        const until = performance.now() + 8000
+        const tick = (): void => {
+          const live = pow.debug.grenades()
+          if (live.length > 0) done(live[0].fuse)
+          else if (performance.now() > until) done(null)
+          else requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      })
+  )
   await release(page, 'fire')
-  await expect
-    .poll(async () => (await look(page)).live.length, { timeout: 4000 })
-    .toBeGreaterThan(0)
-  const thrown = (await look(page)).live[0]
-  expect(thrown.fuse).toBeGreaterThan(4.5)
-  expect(thrown.fuse).toBeLessThan(5.5)
+  const fuse = await watching
+  expect(fuse, 'the lob never appeared').not.toBeNull()
+  // One engine step of slack under the floor, and none over the ceiling: the
+  // jitter is the only thing that can put it above 153 frames.
+  expect(fuse!).toBeGreaterThan(fromExeFrames(153) - 2 * STEP_SECONDS)
+  expect(fuse!).toBeLessThanOrEqual(fromExeFrames(160))
 
   // …and it goes off on its own, without having hit anything.
   await expect.poll(async () => (await look(page)).live.length, { timeout: 12000 }).toBe(0)
