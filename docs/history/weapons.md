@@ -2080,3 +2080,31 @@ six-second fuse, with a turn handover inside it, and it passed and failed on the
 same tree depending on how busy the machine was. A spec that races the thing it
 tests is worse than none. The headless one runs in eighty milliseconds and fails
 on the old `attack.swallow()` line, which is the only proof that matters.
+
+### The knockback spec measured a place the throw stopped going (2026-08-31)
+
+Rewritten because it was shaky by construction: five grenades down one turn,
+with the thrower standing inside its own blast, so every round was thrown from
+wherever the last one had flung it. It also aimed at a dip the throw had not
+reached in a long while — the grenade bursts about 285 units from the pig, not
+1590 — and passed only when the drift happened to carry it into range.
+
+Now: a battle of its own per round off the same seed, and the geometry MEASURED
+— one probe round finds where the burst lands, and the victim is planted at
+offsets back along the throw from there. Which rule applies is read per round
+too, off the round's own burst, because a pig's body is in the collision world
+and DEFLECTS the grenade: two rounds of the same throw do not burst in the same
+place once something is in the way.
+
+**It immediately found what the old geometry never exercised**: a placement
+where the engine hands out a clean 45° knock of about 2700 a second and the pig
+travels eight units. `docs/todo.md` B15 has the numbers and where to look; the
+test carries `test.fail()` so the suite stays green and the marker has to be
+deleted by whoever fixes it.
+
+The floor it asserts is derived from the damage now rather than flat, which is
+the other half of why it used to be wrong: `flingSpeed` is `6 × points`, thrown
+at 45°, so the ideal range is `v²/g`, and a single number cannot serve both a
+core hit and a rim one. The rounds that connect keep between 22% and 48% of the
+ideal — the pig is thrown along a slope, it drags, and it stops where it lands
+— so the floor is 15% of it.

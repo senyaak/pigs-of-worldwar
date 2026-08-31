@@ -2338,6 +2338,98 @@ So neither is a regression, and neither is written down anywhere else.
 Neither has been touched: they are timing in the SPECS, not behaviour, and the
 fix is a measurement each rather than a tuned number.
 
+### B16. READ AND NOT BUILT — three closers and a family that changed shape — 2026-08-31
+
+All four came out of the same session as B14/B15. Each is READ; none is guessed;
+none is built. They are small apart from the last, which got BIGGER on reading.
+
+**Three ways the exe ends a turn that the remake has no equivalent for.** The
+big one — a BLOW on the acting pig — is built (`turns.md`, the `blow` flag).
+These are the leftovers of the same read:
+
+- **The training-ground floor, 0x467c76.** On CAMP a pig cannot die: health at
+  or under 0x7f is floored at 0x80 — and then, **whatever the cause was**, the
+  turn is handed on if the pig is the one being played. Ours floors the health
+  (`health.ts`, TRAINING_FLOOR) and keeps the turn. One line beside the
+  `damaged` handler in `battle.ts`, gated on `world.training`.
+- **The fatal fall, 0x46d7bb.** `[pig+0x388]` is a FRAME COUNT of the fall, set
+  to 1 at 0x46fc92 and incremented at 0x46fe8a. Past 25 the drop becomes the
+  flying state that the ground can hurt (built — `falling.ts`); past **250**,
+  ten seconds of continuous falling at 25 Hz, the pig is dead: effect 12, the
+  scoreboard, and EndTurn if it was acting. That is falling out of the world,
+  not off a ledge.
+- **The map bound, 0x46d039.** `|x|` or `|z|` past **15871** and the pig is
+  snapped back to its own cell and tallied dead — again with the handover if it
+  was acting.
+
+Neither of the last two is reachable in the remake today, which is the honest
+reason they are unbuilt rather than an oversight: nothing lets a pig fall for
+ten seconds or leave the map. Build them when something does.
+
+**And 40 ARTILLERY CLUSTER is not the job it looked like.** `weapons/cluster.md`
+was read whole this session and its skim corrected three times over. The one
+that matters for planning: **the artillery cluster's five children are the
+MINE-LAYING projectile** (id 426, kind 38, the one skills 35/36 use) — so the
+skill is a 25-point blast plus a five-mine minefield, not a second bomblet
+scatter. Building it means laying mines from the air, which is `mines.ts` work
+and a play question (a minefield the enemy did not place), not another twenty
+lines in `lobs.ts`.
+
+The AIRBURST pair is closer to buildable and bigger than it read: both are
+**CONTACT, not timed** (the constructor's state machine, 0x43200C — the fuse of
+125 in their rows has no reader), 31 scatters five 20-point sub-shells off a
+40-point blast, and 32 fires **two whole airburst shells 180° apart** off its
+own 50-point one — 330 on one body, twelve detonations. Every number is in
+`cluster.md`; what is NOT decoded there is effect parameter rows 1, 3 and 14.
+
+
+### B15. A BLAST'S KNOCK IS SWALLOWED WHOLE when the pig is thrown into a slope — 2026-08-31
+
+**Found by rewriting `002/knockback.spec.ts`, and it is play's own old report
+back again**: "он на месте катился". The spec is marked `test.fail()` on it —
+green suite, executable TODO, and it will fail FOR PASSING the moment the flight
+stops eating the knock, so nobody can fix this quietly.
+
+**What is measured.** ESTU, the thrower on the hill at (6400, −8600), heading 0,
+a plain grenade at half charge. One placement of the victim gives:
+
+```
+damaged   30 points  (a core hit)
+flung     (-1634, -1909, 988)      horizontal 1909, vertical 1909 — a clean 45°
+travel    8 units, peak and resting alike
+```
+
+So the fling IS applied — the `flung` event carries a knock of about 2700 a
+second — and the flight produces nothing. The comparison round, at another
+placement, takes the same 30 points and travels 936.
+
+**Where to look.** `tumbles.hurl` writes `state.airborne` and then every frame
+runs `updateLocomotion(state, query, { walk: 0, turn: 0, jump: false }, delta,
+around(id, state))` (lib/game/tumble.ts). The suspicion, untested, is that the
+victim is thrown INTO rising ground and the first substep is REFUSED whole
+instead of being slid along the surface — a flight that starts inside the hill
+has nowhere to go and the landing pins it on frame one. What would settle it is
+tracing `state.airborne` over the first ten steps of that round and watching
+where the velocity goes.
+
+**Two things NOT to conclude.** The fling itself is not the bug — the event's
+vector is right, and `unit/blast.spec.ts` pins the geometry. And the footprint
+rule is not it either: `hurlVelocity` splits on `flat < PIG_RADIUS` and this
+round is at 100, clear of it, which is why the spec reads `flat` per round off
+the round's own burst instead of trusting the offset.
+
+**What the rewrite changed, and why it had to.** The spec used to throw five
+grenades down ONE turn and measure the victim after each. The thrower stands
+inside its own blast at that range, so it took rim damage, was flung, and threw
+the next one from somewhere else — every round depended on the ones before it,
+and whether a round connected at all was an accident of drift. It also aimed at
+a dip at (7909, −8090) that a clean throw has not reached in a long while: the
+grenade actually bursts about 285 units from the thrower, and the spec passed
+only because the drift occasionally carried it into range. Now: a fresh engine
+per offset off the same seed, one probe round to MEASURE where the burst lands,
+and the victim planted at offsets back along the throw from there.
+
+
 ### B14. NINE SPECS WERE RED AT HEAD — all nine settled 2026-08-29
 
 Found while verifying the mine and cluster work: a full run was **67 failed**,
