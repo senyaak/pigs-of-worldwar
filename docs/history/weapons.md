@@ -2108,3 +2108,54 @@ at 45°, so the ideal range is `v²/g`, and a single number cannot serve both a
 core hit and a rim one. The rounds that connect keep between 22% and 48% of the
 ideal — the pig is thrown along a slope, it drags, and it stops where it lands
 — so the floor is 15% of it.
+
+### …and the next day it turned out to be the THROWER standing behind him (2026-08-31)
+
+The marker lasted one session. The note left in B15 guessed at rising ground
+refusing the first substep; tracing `state.airborne` frame by frame killed that
+in one reading, because the horizontal was **already zero on the first logged
+frame** — before the body had moved anywhere at all.
+
+What zeroed it was the flight's own blocked step. `fly` had
+
+```ts
+if (obstruction.blocks(to.x, to.z, state.y, 0)) { a.vx = 0; a.vz = 0 }
+```
+
+and the pig that threw the grenade was standing 185 units away on the far side
+of the victim — which is where a thrower always is, because the grenade flies
+from it and bursts past the body. `withPigs` blocks at exactly 2·PIG_RADIUS =
+170, so it had fifteen units to spare, and the first substep of the 1909 carried
+thirty-two of them at a sixtieth of a second. Nothing ever writes a horizontal
+back, so from that frame on the pig went straight up and straight down on the
+spot.
+
+**The comment beside that line had said what it was**: "Stopping the horizontal
+dead is the remake's own — the exe resolves it as a contact with the box's own
+material, and that solver is not read." It is read enough now. A non-landscape
+contact goes through the SAME impact handler a landing does — 0x470d10, callers
+0x4772bb landscape and 0x4777e2 object — and the handler forks on the arrival
+speed alone (`cmp di,19h` at 0x4711d8, `di` being `[hit+0x14]`, the LENGTH of the
+relative velocity): at or over 25 a frame it bounces, and the bounce's kick rides
+the ADD primitive, so whatever the solver left survives the contact. Only under
+25 does 0x471350 build zero vectors. The remake was applying the under-25 arm to
+every contact in the game, and **no knock in the game is that slow** — the
+weakest fling a grenade hands out, nine points at the rim, is 810 a second
+against a cutoff of 375.
+
+So a blocked step refuses the move and keeps the speed. A 45° knock now rides
+OVER the mate it was thrown at — a pig is 320 tall and a throw of 1900 up clears
+that in a sixth of a second — and carries on.
+
+**Worth keeping in mind for the next one of these.** This is the same bug the
+melee half of `tumble.spec.ts` fixed months ago ("a body thrown while it is
+INSIDE another still travels"): that pass added the `bodiesOverlap` exclusion so
+a flight starting inside a body could leave it, and stopped there. Starting just
+OUTSIDE one and being thrown INTO it is the same sentence with one word changed,
+and it survived untouched. The new spec beside it is that sentence.
+
+And the exe's own pig-versus-pig answer is a SHOVE rather than a block —
+0x477842 throws the OTHER pig at 0x40, 45°, on the flyer's heading plus a
+random eighth of a turn — which this engine still does not do. What becomes of
+the flying one's own velocity is not written down anywhere, and the pig body
+class's three contact methods are named and unread. B15 carries that.

@@ -140,20 +140,18 @@ test('a grenade bursting at a hillside pig SENDS IT FLYING — displacement, not
   if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
     test.skip(true, `no game install at ${GAME_DIR}`)
   }
-  // **EXPECTED TO FAIL, and the failure is the point** (docs/todo.md B15). The
-  // rewrite below — a battle of its own per round, the geometry MEASURED rather
-  // than written down — put a victim where the old drifting sweep never did,
-  // and there the engine hands out a 45-degree knock of about 2700 a second and
-  // the pig travels EIGHT UNITS. The fling is applied: the `flung` event
-  // carries (-1634, -1909, 988), a horizontal 1909 of it. Something between the
-  // hurl and the flight eats the lot, which is play's own "он на месте
-  // катился" from the report this spec was written for.
-  //
-  // Marked rather than tuned away, and marked rather than left red: when the
-  // flight stops swallowing the knock this test starts passing, Playwright
-  // fails it for passing, and whoever fixed it has to come and delete this
-  // line. That is the only kind of TODO that cannot rot.
-  test.fail()
+  // **THIS SPEC CAUGHT ONE, and it is worth knowing which.** The rewrite —
+  // a battle of its own per round, the geometry MEASURED rather than written
+  // down — put a victim where the old drifting sweep never had: a hundred units
+  // out from the burst, with the pig that threw the grenade 185 away on the far
+  // side. The knock was handed out in full (the `flung` event carried
+  // (-1634, -1909, 988), a horizontal 1909 of it) and the pig travelled EIGHT
+  // UNITS, which is play's own "он на месте катился" from the report this spec
+  // was written for. What ate it was the flight's own blocked step: it zeroed
+  // the horizontal on any contact, for good, and `withPigs` blocks at
+  // 2·PIG_RADIUS = 170, which the victim's very first substep crossed. `lib/game/locomotion.ts` carries
+  // the read that replaced it; the mechanism has a spec of its own in
+  // `e2e/002/tumble.spec.ts`.
   const maps = path.join(GAME_DIR, 'Maps')
   const chars = path.join(GAME_DIR, 'Chars')
   const terrain = await loadTerrain(path.join(maps, 'ESTU.PMG'))

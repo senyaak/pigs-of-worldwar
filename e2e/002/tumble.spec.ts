@@ -279,6 +279,40 @@ test('a blast with nobody to throw it to still hurts — the fling is optional',
   expect(heard.filter((one) => one.kind === 'blasted')).toHaveLength(1)
 })
 
+test('a body thrown AT another still travels — it rides over, it does not die on the boundary', () => {
+  // The sibling of the test below, and the one play actually met. That one is
+  // about starting INSIDE a body (a bayonet, at melee range); this one is about
+  // being thrown at one from just OUTSIDE it, which is every grenade that goes
+  // off between two pigs — and it survived the fix that one bought.
+  //
+  // `withPigs` blocks at exactly 2·PIG_RADIUS = 170, so a pig standing 185 away
+  // is clear at the launch by fifteen units and inside on the very first
+  // substep, which carries thirty-two. The flight then
+  // zeroed the horizontal for good, and since nothing ever writes one back the
+  // pig went straight up and came straight down: eight units of travel on a
+  // thirty-point core hit. `e2e/002/knockback.spec.ts` is where that was caught
+  // and `lib/game/locomotion.ts` carries the read that replaced it — a contact
+  // REFUSES the step, it does not confiscate the speed.
+  const { tumbles, pigs } = fielded(2 * PIG_RADIUS + 15)
+  const thrown = pigs()[1]
+  const standing = { ...pigs()[0].position }
+  const from = { ...thrown.position }
+  expect(
+    Math.hypot(from.x - standing.x, from.z - standing.z),
+    'it starts clear of the body it is thrown at, and only just'
+  ).toBeGreaterThan(2 * PIG_RADIUS)
+
+  // Thrown straight AT the other one: bearing −x, which is where it stands.
+  tumbles.fling(thrown, flingVelocity(flingSpeed(30), -Math.PI / 2))
+  for (let i = 0; i < 400 && tumbles.live() > 0; i++) tumbles.update(STEP)
+  const went = Math.hypot(thrown.position.x - from.x, thrown.position.z - from.z)
+  expect(went, 'the knock was delivered, not eaten by the mate it was aimed at').toBeGreaterThan(
+    4 * PIG_RADIUS
+  )
+  // …past the pig it was thrown at, and not back the other way.
+  expect(thrown.position.x).toBeLessThan(standing.x)
+})
+
 test('a body thrown while it is INSIDE another still travels', () => {
   // Play, on a bayonet: "свинья будто на месте летит пол секунды вместо
   // настоящего отбрасывания — похоже застревания какието", and the arithmetic

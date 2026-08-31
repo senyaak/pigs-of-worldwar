@@ -664,13 +664,43 @@ function fly(
   // straight through the training ground's dummies and its barbed wire.
   //
   // No step-up reach in the air: a box whose top is above the feet is a wall,
-  // and one below them is what `standOn` lands on further down. Stopping the
-  // horizontal dead is the remake's own — the exe resolves it as a contact with
-  // the box's own material, and that solver is not read (movement/notes.md).
-  if (obstruction.blocks(to.x, to.z, state.y, 0)) {
-    a.vx = 0
-    a.vz = 0
-  } else {
+  // and one below them is what `standOn` lands on further down.
+  //
+  // **THE STEP IS REFUSED, NOT PAID FOR — the speed survives a contact.** This
+  // used to zero the horizontal outright, and that is one arm of the exe's fork
+  // applied to every contact in the game. A non-landscape hit goes through the
+  // SAME impact handler a landing does — 0x470d10, whose two callers are
+  // 0x4772bb for the landscape and 0x4777e2 for an object — and the handler
+  // forks on the arrival speed alone (`cmp di,19h`, 0x4711d8, `di` being
+  // `[hit+0x14]`, the LENGTH of the relative velocity): at or over 25 a frame it
+  // bounces, and the bounce's kick rides the ADD primitive (0x4712e0), so
+  // whatever the solver left survives the contact; only UNDER 25 does 0x471350
+  // build zero vectors and kill the velocity. The `Map::IsBlocked` re-test on
+  // that fork is the landscape arm's alone.
+  //
+  // No knock in this game is that slow. `BOUNCE_CUTOFF` is 375 a second and the
+  // weakest fling a blast hands out — nine points at a grenade's rim — is 810,
+  // so the dead stop fired on every one of them. What it cost is what play
+  // reported and this engine could not reproduce for a long time: a pig thrown
+  // at a mate 185 away crossed the two-radius boundary on its FIRST substep —
+  // 32 units of the 1909 at a sixtieth, against the 15 it had to spare — lost
+  // the throw for good, because nothing ever writes a horizontal back, and went
+  // straight up and down on the spot. "Он на месте катился" (docs/todo.md B15).
+  //
+  // So the body presses on: blocked, it does not move this frame and it keeps
+  // what it was given, which is re-tested next frame — and a 45° knock RIDES
+  // OVER the body it was thrown at: a pig is 320 tall, and a throw of 1900 up
+  // clears that in a sixth of a second.
+  //
+  // The under-cutoff arm is deliberately NOT built. It would have to kill the
+  // whole velocity, vertical included — 0x4a9ee0 builds zero vectors — which in
+  // the air is a body hanging on the side of a crate until gravity refills it,
+  // and nothing that slow ever gets thrown at one. Neither is what an object's
+  // own surface would throw BACK: the pig body class's contact methods
+  // (0x411c90/0x412070/0x411620) are named in movement/notes.md and unread — so
+  // a body meeting a box simply STALLS against it, with no slide along the face
+  // and no bounce off it, until it clears the thing or comes down beside it.
+  if (!obstruction.blocks(to.x, to.z, state.y, 0)) {
     state.x = to.x
     state.z = to.z
   }
