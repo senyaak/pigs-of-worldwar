@@ -450,3 +450,44 @@ position:fixed inset:0 now, toolbar hidden (End Turn is the keyboard's,
 leaving is the pause menu's; the DOM stays for its listeners), no border.
 The menu screens keep their letterboxed 4:3 — they are authored 640x480 art;
 the battle never was.
+
+## The thrown weapon's camera does not LOOK at the grenade — 2026-09-01
+
+Play: "вроде у нас щас 1 граната в центре экрана — а в оригинале по другому."
+Right, and the reason is a reading fault rather than a design one: mode 0x0D
+was decoded from the MIDDLE of its arm. The orbit at 0x4a3ccb onward was found,
+written up and built; the hundred and eighty instructions in front of it were
+never opened, and that is where the framing lives.
+
+`[cam+0x64]`, `[cam+0x66]`, `[cam+0x68]` are an AIM POINT the handler keeps of
+its own, and 0x4a3ed1 hands that to `0x4A0B50` as what to look at — never the
+subject. Every frame:
+
+- the flat pair spring **a third of the way** toward the flight (`[0x4BD6C8]`);
+- the vertical springs only **a sixth** (`[0x4BD6A8]`), and toward a height
+  that is itself just **a third of the way up from the ground** beneath the
+  grenade (`[0x4BD698]`, over `Map::SampleHeight` at 0x4A5140).
+
+Both lags pull the same way on a lob and the vertical pulls hardest, so the
+grenade climbs out of the middle of the frame while the camera pans up behind
+it. Ours had `camera.lookAt(the grenade)` — a lock, which is exactly the "one
+grenade in the centre of the screen" play described.
+
+Built as read (`AIM_CHASE`, `AIM_RISE`, `AIM_LIFT` in three/chase.ts), with the
+per-frame fractions carried as continuous rates the way `FLIGHT_ROOM` already
+was, because this rig is stepped at the display's rate and not the exe's. The
+aim is seeded on the subject when the pursuit begins — what it must not do is
+start somewhere stale and lurch — and it is NOT reset when the subject changes,
+which is the second thing the read gives: when a cluster bursts and the tracked
+shot becomes a bomblet, the aim sweeps across instead of cutting.
+
+**Measured, before and after.** `e2e/002/grenade-aim.spec.ts` throws a grenade
+on CAMP and reads `pow.debug.facing()` against the direction from
+`pow.debug.camera()` to the flight. Locked on, the peak was **0.4°** off — the
+grenade dead centre for the whole arc. With the springs it is **9.0°**, and 9.0°
+of that is the grenade sitting ABOVE where the lens points, which is the sign
+that says it is the exe's rule rather than a wobble. The spec was run both ways
+round: it fails at 0.4 and passes at 9.
+
+`keepClear` still measures against the SUBJECT and not the aim — the point of
+that rule is not to end up inside the thing being watched.

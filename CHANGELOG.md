@@ -20,6 +20,10 @@ one.
   points at the pig's own feet that it does not survive. Both were in shipped
   kits already and both did nothing at all when the fire key went down.
 
+- **A thrown grenade no longer sits pinned to the middle of the screen.** The
+  original's camera chases the flight rather than locking on to it, so a lob
+  climbs out of the top of the frame and the view pans up after it.
+
 - **The hospital tents pay out.** Spend a turn inside a MASH tent and your pig
   wakes at full health; a medic tent gives fifty points back. The plain tents
   and the shelter give nothing, which is what the original does too.

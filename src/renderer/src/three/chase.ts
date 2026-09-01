@@ -540,6 +540,42 @@ const SHAKE_DECAY = 2 / EXE_FRAME_SECONDS
 const FLIGHT_TURN = 1 / 3
 
 /**
+ * **THE CAMERA DOES NOT LOOK AT THE GRENADE.** Play, 2026-09-01: "вроде у нас
+ * щас 1 граната в центре экрана — а в оригинале по другому." Right, and the
+ * head of mode 0x0D is where it lives — the part this file had never read,
+ * because the orbit was found in the middle of the arm and the first hundred
+ * and eighty instructions were left behind it.
+ *
+ * `[cam+0x64]`, `[cam+0x66]`, `[cam+0x68]` are an AIM POINT the handler keeps
+ * of its own, and 0x4a3ed1 hands THAT to `0x4A0B50` as what to look at — not
+ * the subject. Every frame it is sprung toward the flight, and the vertical is
+ * not sprung toward the flight at all:
+ *
+ * ```
+ * 4a3b69  ground = Map::SampleHeight(subject.x, subject.z)      ; 0x4A5140
+ * 4a3ba8  wantY  = ground + (subject.y - ground) * 0.333        ; [0x4BD698]
+ * 4a3bc2  [cam+0x66] += (wantY - [cam+0x66]) * 0.166667         ; [0x4BD6A8]
+ * 4a3bf0  [cam+0x64] += (subject.x - [cam+0x64]) * 0.333        ; [0x4BD6C8]
+ * 4a3c17  [cam+0x68] += (subject.z - [cam+0x68]) * 0.333        ; the same
+ * ```
+ *
+ * So the aim point chases the grenade a THIRD of the way each frame on the
+ * flat, and climbs at a SIXTH toward a height that is itself only a third of
+ * the way up from the ground beneath it. A high lob therefore leaves the
+ * middle of the frame and rises out of the top of it while the camera pans up
+ * behind — and when a CLUSTER bursts and the tracked shot becomes one of the
+ * bomblets, the aim sweeps across rather than cutting.
+ *
+ * The fractions are per EXE FRAME and this rig is stepped at the display's
+ * rate, so they are carried as continuous rates the way `FLIGHT_ROOM` is:
+ * `-ln(1 - f)` a frame is `-ln(1 - f) / EXE_FRAME_SECONDS` a second.
+ */
+const AIM_CHASE = -Math.log(1 - 1 / 3) / EXE_FRAME_SECONDS
+const AIM_RISE = -Math.log(1 - 1 / 6) / EXE_FRAME_SECONDS
+/** …and how far up from the ground the aim reaches for — `[0x4BD698]`. */
+const AIM_LIFT = 1 / 3
+
+/**
  * **THE FLIGHT IS WATCHED FROM A LITTLE FURTHER OUT than the exe watches it.**
  * `[play]`, 2026-08-25: "у гранаты камера отдаляется чутка при полёте, чтобы
  * лучше было видно." The orbit's own radius is the separation the camera
@@ -811,6 +847,9 @@ export function createChase(
   /** How much of `FLIGHT_ROOM` the flight's camera has taken so far — 1 at the
    * throw, easing out while it rides (see FLIGHT_ROOM). */
   let room = 1
+  /** …and the flight camera's AIM POINT, `[cam+0x64..0x68]` — what it actually
+   * looks at, which is never quite the grenade (`AIM_CHASE`). */
+  const aim = new THREE.Vector3()
   /** How hard the lens is still shaking, world units (`SHAKE_REACH`). */
   let shaking = 0
 
@@ -1012,6 +1051,10 @@ export function createChase(
         bearing = away
         radius = separation
         room = 1
+        // Seeded on the subject, the way the setter's own setup arm seeds the
+        // smoothing memory (0x49fcfe). It LAGS from the next frame on; what
+        // it must not do is start somewhere else and lurch.
+        aim.set(point.x, -point.y, -point.z)
       }
       if (!orbiting) {
         // Phase one: swing round to behind the flight, a third of what is left
@@ -1048,12 +1091,24 @@ export function createChase(
       // view exempt from that and this is not it.
       position.y = Math.max(position.y, -query.surface(position.x, -position.z) + CLEARANCE)
       const eye = new THREE.Vector3(point.x, -point.y, -point.z)
+      // **AND THE AIM CHASES, IT DOES NOT LOCK** (`AIM_CHASE`): a third of the
+      // way to the flight on the flat each frame, a sixth of the way toward a
+      // height that is a third up from the GROUND under it. So the grenade
+      // rides above the middle of the frame on the way up.
+      const ground = -query.surface(point.x, -point.z)
+      const flat = 1 - Math.exp(-AIM_CHASE * (delta ?? 0))
+      const rise = 1 - Math.exp(-AIM_RISE * (delta ?? 0))
+      aim.x += (eye.x - aim.x) * flat
+      aim.z += (eye.z - aim.z) * flat
+      aim.y += (ground + (eye.y - ground) * AIM_LIFT - aim.y) * rise
+      // The lens is kept off the SUBJECT and not off the aim: the point of
+      // that rule is not to end up inside the thing being watched.
       keepClear(position, eye)
       at.copy(position)
       snapped = true
       camera.position.copy(at)
       rattle(delta)
-      camera.lookAt(eye)
+      camera.lookAt(aim)
     },
     ride(point, heading, delta) {
       chasing = false
