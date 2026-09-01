@@ -1304,3 +1304,46 @@ throw had been READ two days earlier (`weapons/fire.md` §phantom sweep) and
 a session that did not grep the notes re-concluded "throws nobody" to play's
 face. Every stale headline now opens with its retraction; the notes repo is
 searched FIRST.
+
+## 2026-09-01 — the level-2 classes, a weapons suite, the tents and the grenade camera
+
+One day, five landings and two reading passes, all committed in both repos. The
+forward-looking version is `docs/todo.md`'s P0 block, written for the session
+that tests it; this is the record.
+
+**Built**
+
+- **28 MORTAR and 51 SUICIDE**, which finishes the second rank of classes —
+  BOMBARDIER, ENGINEER and SNIPER wanted exactly those two between them, the
+  MEDIC's own pair having landed 2026-08-28. Both were in shipped kits doing
+  nothing at all. With them the mortar also reaches the PYROTECH and the
+  suicide the SABOTEUR, so the third rank lost two holes as well.
+- **`unit/weapons/`**, a suite of its own with a sub-suite per class and one for
+  the skills no class carries — 81 tests, and it exists to catch the exact
+  silence those two sat in.
+- **The hospital tents**, which nothing had ever run for.
+- **The grenade camera's aim point**, which had been a lock.
+
+**Read**
+
+- The mortar's and the suicide's arms, the tents' three arms, the head of
+  camera mode 0x0D, every arm of the fire table sized, and the hero's five.
+
+**Three things worth carrying forward**
+
+1. **An arm decoded from the MIDDLE is half a reading.** Mode 0x0D's orbit was
+   found, written up and built while the hundred and eighty instructions in
+   front of it — the framing — went unopened, and play felt the difference
+   before anybody looked. Two more camera modes are in that state (0x0A and
+   mode 2) and both are unbuilt.
+2. **A skill can be in a shipped kit and do nothing, silently.** The fire
+   ladder's default answers `false` for anything without a blade, so no round
+   is spent, no turn ends and nothing is said. That is now a test rather than a
+   habit of noticing.
+3. **A crate reaches further than any kit.** Sixteen skills the fire key
+   ignores can be handed over by a pickup, against a kit's one. Whether a
+   shipped map places such a crate is unmeasured and is `e2e/`'s question.
+
+**And two skills turn out not to exist** — 23 CONFUSION GAS and 57 SPECIAL OPS
+have no arm in either dispatcher. Anything the remake does for them is its own
+invention.
