@@ -2338,6 +2338,47 @@ So neither is a regression, and neither is written down anywhere else.
 Neither has been touched: they are timing in the SPECS, not behaviour, and the
 fix is a measurement each rather than a tuned number.
 
+### B22. WHAT IS LEFT TO READ — sized, 2026-09-01
+
+Play: "дальше есть что читать?" Section D below is mostly closed and what
+survives there is WIRING. The real reading agenda is the fire table, and it has
+now been measured rather than guessed — every one of its 37 arms sized first
+instruction to next (`weapons/fire.md`, the 2026-09-01 section). Two things
+fell out of making the list:
+
+- **23 CONFUSION GAS and 57 SPECIAL OPS have no arm at all.** Their entries
+  point straight at 0x47CD88, the function's shared TAIL, which 44 other jumps
+  land in. **This settles a `[CHECK — remake]` we have carried since the gas
+  landed**: 23's row really is the poison canister's (id 416), and the PC exe
+  never fires it. The sharing is a fact about the DATA. Our stand-in burst for
+  23 is therefore a remake INVENTION rather than a port accident to preserve —
+  play's call whether it stays.
+- **The artillery is not a subsystem to read, it is 203 bytes.** 39/41/42/43/44
+  share one arm and 40 has its own of the same size. "Nothing delivers a
+  called-in shell" (B16) is a BUILD gap; the read is an hour.
+
+**The cheapest unread block, and the one that finishes the top of the tree**:
+53 MEDIC, 56 SHOCKWAVE, 58 AIR STRIKE, 59 CLUSTER AIR STRIKE come to **323
+bytes and about ninety instructions between them** — and 57, the fifth of that
+set, does not exist. Those five are what makes a HERO's and an ACE's kit half
+dead (B18).
+
+Then, by size: 31/32 AIRBURST (188, and already read from the destructor end —
+this is only the fire arm), 30 GRENADE LAUNCHER (188), 45/46 the pillbox's two
+(203/186), 15 ROCKET (244), 16 GUIDED MISSILE (246), 34 HOMING MISSILE (296),
+47/48/49 the vehicle's three (291), 50 JETPACK (412), 60 VEHICLE IN-OUT (621).
+
+**And a standing warning after B21**: two camera arms were decoded from the
+MIDDLE and both are unbuilt — 0x0A (34, 50 JETPACK) and mode 2 (51 SUICIDE).
+Re-open them from the top before building on either. Same for anything else in
+the notes whose section starts mid-function.
+
+Smaller threads this session left, none blocking: the per-turn pass's own gate
+`[[0x537f24]+0x510]` and the `0x47D080(0)` at its tail (B20); `0x49F6D0(0xFA0)`
+and the `[[pig+0x194]+0x18]` counter in the suicide arm; and where a no-gauge
+weapon's charge of 1 becomes 0xFFF, which both the guns and now the mortar
+stand on.
+
 ### B21. THE GRENADE CAMERA LOOKED STRAIGHT AT THE GRENADE — fixed 2026-09-01
 
 Play: "вроде у нас щас 1 граната в центре экрана — а в оригинале по другому."
