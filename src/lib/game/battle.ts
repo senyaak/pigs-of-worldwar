@@ -74,6 +74,7 @@ import { drowns } from './drowning'
 import type { Drowning } from './drowning'
 import { chargeLanding } from './falling'
 import type { Hides } from './hide'
+import type { Sacrifice } from './suicide'
 import type { Pockets } from './pickpocket'
 import type { Poison } from './poison'
 import type { Point } from './pose'
@@ -104,6 +105,9 @@ export interface BattleParts {
   pockets: Pockets
   /** …and their disguise (lib/game/hide.ts). */
   hides: Hides
+  /** …and the last resort the engineer and sniper careers carry
+   * (lib/game/suicide.ts). */
+  sacrifice: Sacrifice
   /** Pigs a blast has THROWN — every pig but the one being driven
    * (lib/game/tumble.ts). */
   tumbles: Tumbles
@@ -309,7 +313,7 @@ export interface Battle {
 }
 
 export function createBattle(parts: BattleParts): Battle {
-  const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, heals, pockets, hides, effects, numbers } = parts
+  const { game, query, scenery, indoors, anim, shots, grenades, mines, swings, heals, pockets, hides, sacrifice, effects, numbers } = parts
   const { tumbles, corpses, airDrops, dropIn, drowning, poison, onChanged } = parts
   const emit = parts.bus.emit
 
@@ -351,6 +355,7 @@ export function createBattle(parts: BattleParts): Battle {
     heals,
     pockets,
     hides,
+    sacrifice,
     mines,
     sights,
     anim,
@@ -557,6 +562,9 @@ export function createBattle(parts: BattleParts): Battle {
     // …and the disguise's gesture, whose end is where the pig vanishes
     // (lib/game/hide.ts).
     hides.running() ||
+    // …and the last resort's, whose end is where the pig does
+    // (lib/game/suicide.ts).
+    sacrifice.running() ||
     // THROWN, not planted: a charge lying at the pig's feet is exactly what it
     // has to be able to run away from (lib/game/lobs.ts `thrown`).
     grenades.thrown() > 0 ||
@@ -1091,6 +1099,7 @@ export function createBattle(parts: BattleParts): Battle {
     heals.reset()
     pockets.reset(game.currentPig)
     hides.reset(game.currentPig)
+    sacrifice.reset()
     // A turn is a fresh start for the machine too (lib/game/ai.ts) — and the
     // moment its SEAT is decided (`machineTurn` above). The hands let go of
     // whatever they were doing and still every control they hold.
@@ -2030,6 +2039,10 @@ export function createBattle(parts: BattleParts): Battle {
     // …and the disguise's, whose end is where the pig becomes the bush
     // (lib/game/hide.ts).
     hides.update(delta, acting)
+    // …and the gesture that ends the pig (lib/game/suicide.ts). It takes no
+    // actor: the pig it is spending is the one it was begun with, and by the
+    // time this lands the turn may already have moved on.
+    sacrifice.update(delta)
 
     // The gauge and the fuse, after the pig has been placed for the same reason
     // a swing is: the muzzle comes off the HAND bone (lib/game/attack.ts).
@@ -2258,6 +2271,7 @@ export function createBattle(parts: BattleParts): Battle {
       heals.reset()
       pockets.reset(game.currentPig)
       hides.reset(game.currentPig)
+    sacrifice.reset()
       effects.clear()
       loco = createLocomotion(query, x, z, heading)
       game.moveCurrentPig(x, loco.y, z, heading)

@@ -37,6 +37,42 @@ import { GAUGE_FULL } from './gauge'
 import { AIM_UNITS } from './aim'
 import { PIG_RADIUS } from './obstacles'
 
+/**
+ * What a burst throws out — the shape both scattering destructors share.
+ *
+ * They differ in five numbers and nothing else, so they are five fields
+ * rather than two branches:
+ *
+ * | | CLUSTER (0x43290E) | MORTAR (0x4339A6) |
+ * | - | - | - |
+ * | child | bomblet, id 421 | sub-shell, id 399 |
+ * | ring | four at 0x3E8 (≈88°) | three at 0x3B6 (83.5°) |
+ * | yaw step | 0x400 — a quarter turn | 0x555 — a third |
+ * | upright | one more, dead vertical at 0x400 | none |
+ * | seeded | no, the loop starts at 0 | yes, off the shell's own yaw |
+ *
+ * Both step the spawn HEIGHT by 40 per child so none is born inside the one
+ * before it, and both throw at FULL charge.
+ */
+export interface Scatter {
+  /** The pseudo-skill each child flies as — `BOMBLET`, `SUB_SHELL`. */
+  child: number
+  /** How many go round, and the pitch they all leave at. */
+  count: number
+  aim: number
+  /** The yaw between them, in the engine's 4096 to a turn. */
+  step: number
+  /** One MORE child thrown at this pitch and no yaw at all, or 0 for a family
+   * that has none. The cluster's dead-vertical fifth. */
+  upright: number
+  /** Whether the ring is measured off the PARENT's own yaw (0x433af3 adds
+   * `[proj+0x94]`) or world-aligned (the cluster's loop, whose four-way
+   * symmetry hides which it is). */
+  seeded: boolean
+  /** Spawn heights stepped this far apart, in the order the exe makes them. */
+  lift: number
+}
+
 /** One lobbed weapon's row, read out of 0x4c2030 the same way a gun's is. */
 export interface Lob {
   /** The exe's projectile id, field +0x10 of the weapon's 80-byte record. */
@@ -151,20 +187,18 @@ export interface Lob {
    */
   effect?: number
   /**
-   * **Whether the burst SCATTERS BOMBLETS on top of its own blast.**
+   * **What the burst THROWS OUT on top of its own blast**, or absent for the
+   * rows that only go off.
    *
-   * The CLUSTER's whole difference lives in its destructor — the flight row
-   * is the grenade's to the byte (one unread flag apart). Kind 25's arm
-   * (0x43290E, jump table 0x435A6C) spawns its own full 30-point blast
-   * (effect 0x46 — the same parameter row 0 a grenade reads) and then FIVE
-   * projectiles of id 0x1A5 = 421, kind 33, at full charge: four pitched
-   * 0x3E8 of 4096 (≈88°) with yaws a quarter turn apart, one dead vertical
-   * (0x400), spawn heights staggered 40 apart so they cannot slip into one
-   * another. Each bomblet is then an ordinary timed grenade of its own row
-   * (`BOMBLET` below). Read out of the exe 2026-08-28; `weapons/cluster.md`
-   * in the disasm repo. `lobs.ts` scatters at the detonation seam.
+   * Two weapons in this table carry one and their destructors are the same
+   * arm written twice — a blast, a sound, then a `ebp += step` loop of
+   * `new(0xD0)` children at a fixed pitch with the yaw stepped each time
+   * (`Scatter` below has the fields). The CLUSTER's is kind 25's at
+   * 0x43290E, the MORTAR's kind 42's at 0x4339A6; both read out of the exe,
+   * `weapons/cluster.md` in the disasm repo. `lobs.ts` throws them at the
+   * one detonation seam.
    */
-  cluster?: boolean
+  scatter?: Scatter
   /**
    * **Whether the burst PUTS POINTS ON instead of taking them off.**
    *
@@ -201,9 +235,11 @@ const LOBS: Record<number, Lob> = {
    * 0.32 against grass: a few hops and then a long roll. */
   19: { id: 412, kind: 24, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
   /** 20 CLUSTER GRENADE — a grenade's own flight and blast, plus the five
-   * bomblets its destructor lets go (`cluster` above). Worst case on one
-   * body: 30 + 5×15. */
-  20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false, cluster: true },
+   * bomblets its destructor lets go (`scatter` above). Its own pop is effect
+   * **0x46** (0x43290E), which resolves to parameter row 0 like the
+   * grenade's 0x54, so the picture is the same and the id is kept for
+   * faithfulness' sake. Worst case on one body: 30 + 5×15. */
+  20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false, effect: 0x46, scatter: { child: 0x100, count: 4, aim: 0x3e8, step: 0x400, upright: 0x400, seeded: false, lift: 40 } },
   /** 21 HIGH EXPLOSIVE — sixty points at the core over a 1536 field: the
    * heaviest thing a pig throws. */
   21: { id: 417, kind: 29, speed: 300, fuse: 150, arming: 3, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
@@ -261,10 +297,43 @@ const LOBS: Record<number, Lob> = {
    * (0x47ae9d..0x47aea3).
    */
   29: { id: 398, kind: 10, speed: 500, fuse: 0, arming: 0, damage: 5120, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true },
+  /**
+   * **28 MORTAR — the BOMBARDIER's own weapon, and it is an AIRBURST that is
+   * thrown rather than a grenade.** Kind **42** (record +0x10 is 430), read
+   * whole 2026-09-01 with the rest of it: speed **500** like the rocket,
+   * damage **6400 — fifty points** over a blast field of 2048, the bazooka's
+   * 0.0999 material, and **arming 0 under a fuse of 0**, which is the switch
+   * into `contact`. So the shell itself is a heavier rocket.
+   *
+   * Then its destructor (0x4339A6) throws **three sub-shells** almost
+   * straight up, a third of a turn apart off the shell's own yaw
+   * (`scatter`) — 50 + 3×20 = **110 on one body** at the worst.
+   *
+   * **It has NO POWER GAUGE**: record +0x14 is 0 and skill 28 is absent from
+   * the gauge list at 0x493796, so the press fires it at once — the ANGLE is
+   * the whole of the aim, and it cannot be pointed below 45° (`FLOOR_LOB` in
+   * lib/game/aim.ts). What charge the exe then flies it at is the one open
+   * number: the no-gauge branch writes 1, and `speed * 1 >> 12` is nothing,
+   * so a mortar would drop at the pig's trotters. It does not in the game,
+   * and `weapons/fire.md` already carries the same hole for every gun; the
+   * remake fires a no-gauge lob that is NOT planted at FULL charge
+   * (lib/game/attack.ts). `[play]` over the reading, the way the guns are.
+   *
+   * The shell wears **`WE_BAZZ`** — name-table row 430, the rocket's own mesh
+   * again (lib/game/ammo.ts) — and the report is index **0x29** at 100/100
+   * off the fire arm (0x47ade5).
+   */
+  28: { id: 430, kind: 42, speed: 500, fuse: 0, arming: 0, damage: 6400, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true, effect: 0x58, scatter: { child: 0x101, count: 3, aim: 0x3b6, step: 0x555, upright: 0, seeded: true, lift: 40 } },
   /** The CLUSTER's bomblet, keyed by the `BOMBLET` pseudo-skill (0x100,
    * declared below the table — a literal key because the table comes first).
    * Kind 33's own row: fifteen points over 1300, a 0.40/0.80 material. */
-  0x100: { id: 421, kind: 33, speed: 250, fuse: 150, arming: 3, damage: 1920, blast: 1300, friction: 1638 / FIXED, restitution: 3276 / FIXED, contact: false, effect: 0x47 }
+  0x100: { id: 421, kind: 33, speed: 250, fuse: 150, arming: 3, damage: 1920, blast: 1300, friction: 1638 / FIXED, restitution: 3276 / FIXED, contact: false, effect: 0x47 },
+  /** …and the MORTAR's sub-shell, `SUB_SHELL` (0x101), on kind **11**'s row:
+   * twenty points over 1024, the same 0.0999 material as the shell that made
+   * it, and ONE frame of arming under no fuse at all — so it goes off on
+   * whatever it touches from the second frame of its own flight. Effect
+   * **0x4A** (0x433249), the dry crack the bomblet draws. */
+  0x101: { id: 399, kind: 11, speed: 250, fuse: 0, arming: 1, damage: 2560, blast: 1024, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true, effect: 0x4a }
 }
 
 /**
@@ -281,14 +350,58 @@ const LOBS: Record<number, Lob> = {
  */
 export const BOMBLET = 0x100
 
-/** How the destructor throws the five (0x4329C1/0x432AAE): four at this
- * pitch with yaws a quarter turn apart, one dead vertical, all at FULL
- * charge, spawn heights 40 apart. The parent's own yaw seeds the cross in
- * the exe and is not kept on `Lobbed`; the cross is world-aligned here,
- * which four-way symmetry makes invisible. */
-export const BOMBLET_AIM = 0x3e8
-export const BOMBLET_AIM_UP = 0x400
-export const BOMBLET_LIFT = 40
+/**
+ * …and the MORTAR's SUB-SHELL, on the same footing: id 399 `WESUBB`, kind 11,
+ * never in anybody's hands, so it takes the next pseudo-skill along.
+ */
+export const SUB_SHELL = 0x101
+
+/** One child a scattering burst lets go, in the order the exe MAKES them —
+ * which is what decides the spawn height each is given. */
+export interface Shard {
+  skill: number
+  /** Radians, the engine's own heading. */
+  heading: number
+  /** The exe's 4096-to-a-turn pitch, straight through to `lob`. */
+  aim: number
+  /** How far ABOVE the burst it is born: `lift` times its place in the
+   * order, so none is inside the one before it. */
+  rise: number
+}
+
+/**
+ * What this burst throws out, HEAD FIRST — or null for a row that only goes
+ * off.
+ *
+ * The head is the one the CAMERA rides, and both destructors re-seat on the
+ * LAST child they make (0x432BA8 for the cluster, 0x433C45 for the mortar):
+ * the cluster's dead-vertical fifth, the mortar's third round the ring. So
+ * the rule is one line — the upright where there is one, the end of the ring
+ * where there is not — and `lobs.ts` need only push them in the order given
+ * for `head()` to be looking at the right thing.
+ */
+export function shardsOf(row: Lob, heading: number): Shard[] | null {
+  const scatter = row.scatter
+  if (!scatter) return null
+  const from = scatter.seeded ? heading : 0
+  const ring: Shard[] = []
+  for (let i = 0; i < scatter.count; i++) {
+    ring.push({
+      skill: scatter.child,
+      heading: from + ((i * scatter.step) / AIM_UNITS) * 2 * Math.PI,
+      aim: scatter.aim,
+      rise: i * scatter.lift
+    })
+  }
+  if (!scatter.upright) return [ring[ring.length - 1], ...ring.slice(0, -1)]
+  const up: Shard = {
+    skill: scatter.child,
+    heading: 0,
+    aim: scatter.upright,
+    rise: scatter.count * scatter.lift
+  }
+  return [up, ...ring]
+}
 
 /**
  * The explosives a pig PLANTS rather than throws — 35 MINE, 36 ANTI-PERSONNEL
@@ -498,6 +611,10 @@ export interface Lobbed {
   vx: number
   vy: number
   vz: number
+  /** The yaw it was thrown on — `[proj+0x94]`, which the exe keeps and reads
+   * back when a destructor SCATTERS off it (0x433af3, the mortar's ring).
+   * Nothing else asks: the flight is in the velocity. */
+  heading: number
   /** Seconds left. It runs from the THROW and nothing resets it on landing:
    * state 1 is entered three frames in and only ever leaves for state 6. */
   fuse: number
@@ -561,6 +678,7 @@ export function lob(
     vx: Math.sin(heading) * flat,
     vy: -Math.sin(pitch) * speed,
     vz: Math.cos(heading) * flat,
+    heading,
     fuse: fuseSeconds(row, random),
     age: 0,
     resting: false,

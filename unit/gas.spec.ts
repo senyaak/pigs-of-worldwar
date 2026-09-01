@@ -46,6 +46,7 @@ const canister = (age = 0): Lobbed => ({
   vx: 0,
   vy: 0,
   vz: 0,
+  heading: 0,
   fuse: 5,
   age,
   resting: false,

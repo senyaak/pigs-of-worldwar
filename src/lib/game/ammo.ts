@@ -27,7 +27,7 @@
 //
 // Pure: names only (plus the one pseudo-skill key the bomblet brings).
 
-import { BOMBLET } from './grenade'
+import { BOMBLET, SUB_SHELL } from './grenade'
 
 /**
  * Models the ENGINE spawns that no map record places, so the map loader would
@@ -45,7 +45,17 @@ import { BOMBLET } from './grenade'
 // …WE_BALL, the MEDICINE BALL in flight (row 425), and WE_SU_GR, the
 // cluster's BOMBLET (row 421) — thrown by the engine, placed by no record,
 // so they take the same door.
-export const SPAWNED_MODELS = ['WE_APMIN', 'WE_BAZZ', 'BOOTS', 'CRATE4', 'WE_BALL', 'WE_SU_GR']
+// …and WESUBB, the MORTAR's SUB-SHELL (row 399) — three of them come out of
+// every shell and no record places one either.
+export const SPAWNED_MODELS = [
+  'WE_APMIN',
+  'WE_BAZZ',
+  'BOOTS',
+  'CRATE4',
+  'WE_BALL',
+  'WE_SU_GR',
+  'WESUBB'
+]
 
 /** What a finished death leaves on the spot (three/remains.ts). In every map's
  * own .MAD and in no .POG — exactly the case this list exists for: without the
@@ -71,10 +81,17 @@ export const REMAINS_MODEL = 'BOOTS'
 // this the thrown ball flew as the held model. The BOMBLET (the cluster's
 // child, `BOMBLET` in lib/game/grenade.ts) is row **421, `WE_SU_GR`** and has
 // no held model at all — nobody ever carries one.
+// The MORTAR's shell is row **430**, which the name table gives as `WE_BAZZ`
+// as well — the rocket's mesh serves both — and what is in the hand for
+// skill 28 is `mortr`, the TUBE, so without this a fired shell flew as a
+// second mortar. Its three children are row **399, `WESUBB`**, a mesh of
+// their own that nothing else in the game uses.
 export const PROJECTILE_MODEL: Record<number, string> = {
+  28: 'WE_BAZZ',
   29: 'WE_BAZZ',
   33: 'WE_BALL',
-  [BOMBLET]: 'WE_SU_GR'
+  [BOMBLET]: 'WE_SU_GR',
+  [SUB_SHELL]: 'WESUBB'
 }
 
 /** What flies when this skill is fired, or null to fall back to the held model

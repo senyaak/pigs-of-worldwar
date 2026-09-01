@@ -10,7 +10,7 @@
 // sequence, a lobbed weapon charges instead of going off, and a live grenade
 // answers the button before any of them.
 
-import { beginGauge, chargeGauge, gaugeFraction } from './gauge'
+import { GAUGE_FULL, beginGauge, chargeGauge, gaugeFraction } from './gauge'
 import type { Gauge } from './gauge'
 import { advanceFiring, beginFiring } from './shot'
 import type { Firing } from './shot'
@@ -61,6 +61,9 @@ export interface AttackParts {
   /** …and the disguise (lib/game/hide.ts): the pig vanishes at the press
    * and the record's own flags end the turn behind it. */
   hides: { begin(pig: Pig): boolean }
+  /** …and the last resort, which spends the pig itself
+   * (lib/game/suicide.ts). */
+  sacrifice: { begin(pig: Pig): boolean }
   /** Where a LAID mine goes — the sapper's plant, called at the lay clip's
    * own key-frame the way a charge's is (lib/game/mines.ts). */
   mines: { lay(pig: Pig, skill: number): boolean }
@@ -204,6 +207,13 @@ export function createAttack(parts: AttackParts): Attack {
       if (acting.holding === SKILL.HIDE) {
         return parts.hides.begin(acting) ? 'used' : 'none'
       }
+      // SUICIDE answers the press the same way, and it is the one skill that
+      // never refuses: there is no target to miss and no cone to be empty
+      // (lib/game/suicide.ts). A second press while the gesture runs is what
+      // `begin` turns down.
+      if (acting.holding === SKILL.SUICIDE) {
+        return parts.sacrifice.begin(acting) ? 'used' : 'none'
+      }
       // A MINE takes the lobbed family's door: it is `isPlanted` like TNT,
       // has no gauge (record +0x14 is 0), and its charge goes down at the
       // same clip phase — only what the key-frame DROPS differs
@@ -217,7 +227,14 @@ export function createAttack(parts: AttackParts): Attack {
         // for a planted charge is the whole point — `speed * charge >> 12` is
         // nothing, so it goes down at the pig's feet (lib/game/grenade.ts).
         if (!weaponOf(holding).power) {
-          thrownWith = 1
+          // **…and a no-gauge weapon that FLIES takes the full charge
+          // instead.** The exe's one is the MORTAR, and its arithmetic cannot
+          // be what happens: `speed * 1 >> 12` of 500 is nothing, so the shell
+          // would land on the pig's own trotters. `weapons/fire.md` carries
+          // the identical hole for every no-gauge GUN and answers it the same
+          // way — the row's own speed — and this is the lobbed half of it.
+          // Where the 1 becomes 0xFFF is still unfound. `[play]`.
+          thrownWith = isPlanted(holding) ? 1 : GAUGE_FULL
           arm()
           return 'used'
         }

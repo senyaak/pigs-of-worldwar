@@ -70,6 +70,12 @@ export const SKILL = {
   /** …and their thrown AREA heal, the class's other level-2 skill
    * (lib/game/grenade.ts). */
   MEDICINE_BALL: 33,
+  /** The BOMBARDIER's thrown shell, which bursts into three more
+   * (lib/game/grenade.ts, `scatter`). */
+  MORTAR: 28,
+  /** The ENGINEER's, the SABOTEUR's and the SNIPER's last resort: the pig
+   * spends itself (lib/game/suicide.ts). */
+  SUICIDE: 51,
   /** The medic careers' contact heal (lib/game/healing.ts). */
   HEALING_HANDS: 52,
   /** The espionage careers' theft (lib/game/pickpocket.ts). */

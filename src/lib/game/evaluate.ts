@@ -43,7 +43,8 @@ import {
   skipsOnWater
 } from './grenade'
 import { GAUGE_FULL } from './gauge'
-import { AIM_LOB } from './aim'
+import { weaponOf } from './weapons'
+import { AIM_LIMIT, AIM_LOB } from './aim'
 import { WALK_SPEED } from './movement'
 import { POISON_PER_TURN } from './poison'
 
@@ -718,26 +719,51 @@ const lobOption = (world: AiWorld, skill: number, note: Note, walked?: Walked): 
       landing: { x: number; z: number; seconds: number; doused: boolean }
       miss: number
     } | null = null
-    for (const aim of aims) {
-      const arc = distance2d(from, flight(world, from, skill, heading, GAUGE_FULL, aim))
-      if (throwAway > arc) continue
-      // In the arc: SOLVE the gauge — the landing grows with the charge, so
-      // halve the interval on which side of the foe it comes down.
-      let low = LEAST_CHARGE * GAUGE_FULL
-      let high = GAUGE_FULL
+    if (!weaponOf(skill).power) {
+      // **A LOB WITH NO GAUGE IS AIMED, NOT CHARGED** — the MORTAR is the one
+      // (lib/game/grenade.ts): the press fires it at full, so the only thing
+      // the pig can trade for range is the COME-UP. Which is the same
+      // bisection turned on its side: reach falls as the pitch rises, from
+      // the 45° floor the weapon cannot go under (`FLOOR_LOB`,
+      // lib/game/aim.ts) to nothing at the vertical.
+      //
+      // **And it is not gated on wits.** The ladder above is a tuning a smart
+      // pig does instead of playing the gauge; here there is no gauge to
+      // play, so a dumb bombardier that could not raise its tube would have
+      // exactly one range and be useless with the thing in its hands. The
+      // shake still lands on it (lib/game/grunt.ts).
+      let low = AIM_LOB
+      let high = AIM_LIMIT
       for (let i = 0; i < 14; i++) {
         const mid = (low + high) / 2
-        if (distance2d(from, flight(world, from, skill, heading, mid, aim)) < throwAway) low = mid
+        if (distance2d(from, flight(world, from, skill, heading, GAUGE_FULL, mid)) > throwAway)
+          low = mid
         else high = mid
       }
-      const charge = (low + high) / 2
-      const landing = flight(world, from, skill, heading, charge, aim)
-      const miss = distance2d(landing, foe)
-      if (!solved || miss < solved.miss) solved = { aim, charge, landing, miss }
-      // Near enough is done: flat ground stops on the first rung, so the
-      // ladder only costs where the ground actually interferes.
-      if (solved.miss <= PITCH_SLACK) break
-    }
+      const aim = Math.round((low + high) / 2)
+      const landing = flight(world, from, skill, heading, GAUGE_FULL, aim)
+      solved = { aim, charge: GAUGE_FULL, landing, miss: distance2d(landing, foe) }
+    } else
+      for (const aim of aims) {
+        const arc = distance2d(from, flight(world, from, skill, heading, GAUGE_FULL, aim))
+        if (throwAway > arc) continue
+        // In the arc: SOLVE the gauge — the landing grows with the charge, so
+        // halve the interval on which side of the foe it comes down.
+        let low = LEAST_CHARGE * GAUGE_FULL
+        let high = GAUGE_FULL
+        for (let i = 0; i < 14; i++) {
+          const mid = (low + high) / 2
+          if (distance2d(from, flight(world, from, skill, heading, mid, aim)) < throwAway) low = mid
+          else high = mid
+        }
+        const charge = (low + high) / 2
+        const landing = flight(world, from, skill, heading, charge, aim)
+        const miss = distance2d(landing, foe)
+        if (!solved || miss < solved.miss) solved = { aim, charge, landing, miss }
+        // Near enough is done: flat ground stops on the first rung, so the
+        // ladder only costs where the ground actually interferes.
+        if (solved.miss <= PITCH_SLACK) break
+      }
     if (!solved) {
       dead(throwAway)
       continue

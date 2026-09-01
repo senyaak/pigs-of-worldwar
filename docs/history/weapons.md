@@ -2224,3 +2224,89 @@ unrecorded). What is not in doubt is which reading keeps the behaviour play
 asked for. `Battle.aloft` is the one predicate that answers it for any pig, the
 acting one's own flight included, because a caller that has to know which kind
 of pig it is holding will get it wrong.
+
+## The MORTAR and SUICIDE — the level-2 classes finished, 2026-09-01
+
+Play asked to finish the second rank of the class ladder. Reading the kits
+against what the fire button actually answers, the ORDERLY→**MEDIC**→SURGEON
+line was already whole (the dart and the ball landed 2026-08-28) and the other
+three wanted exactly two skills between them: **28 MORTAR** for the
+BOMBARDIER, **51 SUICIDE** for the ENGINEER and the SNIPER. Everything else in
+those four kits was built. Both were in shipped kits and both did NOTHING —
+`attack.ts`'s ladder fell through to the melee default, which answers `false`
+for a skill with no blade, so the fire key was silently inert.
+
+Both were read out of the exe first (`weapons/cluster.md` and the new
+`weapons/suicide.md` in the disasm repo; `weapons/level2.py` asserts every
+number), and the read moved two things that had been believed:
+
+- **the mortar had been skimmed and the skim was of the arm next door.** What
+  0x4339A6 does is a fifty-point CONTACT blast and then three sub-shells of
+  kind 11 — twenty points each — thrown at 83.5° a third of a turn apart off
+  the shell's own yaw. 110 on one body at the worst.
+- **suicide had never been opened at all.** Three facts about its edges were
+  on file (camera mode 2, `WE_TNT` in the hand, clip 81 "Hari Kiri") and the
+  arm itself is thirty-two instructions with no projectile in it: a sound, the
+  pig taken out of the world, and one blast of fifty points over 2048 built
+  from literals. The order is the answer to the only question it is asked —
+  the pig is gone BEFORE the blast, so it does not take its own fifty.
+
+### The cluster's branch became a table, because there were two of them
+
+The two destructors are the same arm written twice — blast, sound, then a
+`ebp += step` loop of children at a fixed pitch. So `Lob.cluster` (a boolean)
+became `Lob.scatter` (five numbers: the child, the count, the pitch, the yaw
+step, whether the ring is seeded off the parent's yaw, and the height stagger),
+and `shardsOf` in `grenade.ts` turns a row into the list of children HEAD
+FIRST. Head first is not a detail: the exe re-seats the camera on the LAST
+child it makes — the cluster's dead-vertical fifth, the mortar's third round
+the ring — and `lobs.ts` pushes them in order, so `head()` rides the right one
+with no rule of its own.
+
+That also gave `Lobbed` a `heading`. The cluster's cross had been
+world-aligned with a note saying the parent's yaw was not kept and four-way
+symmetry hid it; three shells 120° apart hide nothing, and `[proj+0x94]` is a
+real field the destructor reads. And the four effect ids that were constants in
+`blast.ts` (0x46, 0x47, and now 0x58 and 0x4A) are on their ROWS, where the
+destructor that reads them keeps them; what is left in `blast.ts` is what no
+row carries.
+
+### Two divergences, and both are the same hole
+
+The mortar has **no power gauge** — record +0x14 is 0 and skill 28 is absent
+from the gauge list at 0x493796 — so the press fires it at once and the
+COME-UP is the whole of the aim (it cannot be pointed under 45°). But the
+exe's no-gauge branch writes a charge of ONE, and `speed * 1 >> 12` of 500 is
+nothing: by the arithmetic the shell lands on the pig's own trotters. That is
+the identical hole `fire.md` records for every no-gauge GUN and answers the
+same way, so `attack.ts` fires a no-gauge lob that is not PLANTED at full
+charge. Where the 1 becomes 0xFFF is still unfound.
+
+Which changed the AI as well, and it had to. `evaluate.ts` prices a lob by
+BISECTING the gauge for the range; with no gauge there is nothing to bisect, so
+for such a weapon it bisects the PITCH instead, between the 45° floor and the
+aim ceiling — the same fourteen halvings, turned on its side. Not gated on
+wits, unlike the pitch LADDER above it: that ladder is a tuning a smart pig
+does instead of playing the gauge, and here a dumb bombardier that could not
+raise its tube would have one range and be useless. The hands' shake moved with
+it — `grunt.ts` wobbles the pitch rather than the gauge when the gauge is not
+what the shot is aimed with, or an AI mortar would never miss.
+
+The other divergence is the suicide's timing, `[CHECK — remake]`: the exe takes
+the pig out at the top of the arm, so its "Hari Kiri" is never seen, and here
+the clip plays and the blast lands at its END — the same call `hide.ts` already
+makes for the same clip 81.
+
+### What is wired around them
+
+`L_MORT` and `E_1000P` came off the "placed and unplayed" list, both off the
+exe's own sound indices (0x29 and 0x0D) rather than by ear — and the suicide's
+blast has to be told apart from an ordinary one in `battleAudio.ts`, because
+the arm plays its sound BEFORE it spawns an effect that carries none. `WESUBB`
+joined `SPAWNED_MODELS`; it is in 51 of the 61 map archives, missing only from
+the demo and GEN* terrains, so no campaign map is short of it. The shell itself
+wears `WE_BAZZ` — name-table row 430 is the rocket's mesh again, and without
+the entry a fired shell would have flown as a second mortar TUBE.
+
+`unit/mortar.spec.ts` and `unit/suicide.spec.ts` pin both, 12 tests; the whole
+unit suite is 444 green.

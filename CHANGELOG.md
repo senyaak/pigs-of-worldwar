@@ -14,6 +14,12 @@ one.
 
 ## Unreleased
 
+- **The second rank of classes plays.** The BOMBARDIER's **mortar** — a shell
+  that bursts into three more, and whose ANGLE is its range, because it has no
+  power gauge to hold — and the ENGINEER's and SNIPER's **suicide**, fifty
+  points at the pig's own feet that it does not survive. Both were in shipped
+  kits already and both did nothing at all when the fire key went down.
+
 ## 0.1.0
 
 The first build anyone can download. It is an **engine**, not a game: it reads

@@ -160,9 +160,10 @@ export interface Cue {
  *
  * STILL PLACED AND UNPLAYED: `EN_BIP`, the AIRSHIPS, which is a missing
  * PROP before it is a missing sound; and the weapon reports for weapons we
- * do not field yet (`L_ARTIL`, `L_MORT`, `L_ROC`, `L_SHOTG`, `L_HVYMG`,
- * `L_MGUN`, `L_FLAME`), one line each the day their weapon lands. See
- * `docs/todo.md`.
+ * do not field yet (`L_ARTIL`, `L_ROC`, `L_SHOTG`, `L_HVYMG`, `L_MGUN`,
+ * `L_FLAME`), one line each the day their weapon lands — `L_MORT` came off
+ * this list with the MORTAR (2026-09-01) and `E_1000P` with SUICIDE, both
+ * wired off the exe's own index rather than by ear. See `docs/todo.md`.
  */
 /**
  * **WHAT IS ALREADY PLACED** — by ear, by wiring, or by the exe's own table.
@@ -179,10 +180,10 @@ export interface Cue {
  */
 const PLACED_BY_EAR = [
   'AMB_1D', 'AMB_2D', 'BATT_L1', 'BATT_L2', 'BATT_L3', 'BATT_S1', 'BATT_S2',
-  'BATT_S3', 'BG_GAS', 'BG_PLANE', 'EN_BIP', 'EN_TANK', 'E_1', 'E_1000P',
+  'BATT_S3', 'BG_GAS', 'BG_PLANE', 'EN_BIP', 'EN_TANK',
   'I_BUILD', 'I_BULIT1', 'I_METAL', 'I_PICKUP', 'I_SPLASH', 'I_STAB',
   'I_SWMISS', 'I_SWORD', 'L_ARTIL', 'L_BAZOO', 'L_FLAME', 'L_HVYMG', 'L_MGUN',
-  'L_MINETR', 'L_MORT', 'L_PISTOL', 'L_RIFLE', 'L_ROC', 'L_SHOTG', 'S_CLOCK',
+  'L_MINETR', 'L_PISTOL', 'L_RIFLE', 'L_ROC', 'L_SHOTG', 'S_CLOCK',
   'S_OPEN', 'S_SELECT', 'S_UNHOLS',
   // …and the surfaces, which are read rather than heard.
   'FT_GRASS', 'FT_ICE', 'FT_LAVA', 'FT_METAL', 'FT_MUD', 'FT_QUAG', 'FT_ROCK',
@@ -533,7 +534,23 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * **0x24 at 100/100** (0x47ae9d), and index 36 of `Audio/sfxday.srl` is
    * `L_BAZOO`. Nothing here is a name pick.
    */
-  bazooka: { sound: 'L_BAZOO', volume: 100, pitch: 100 }
+  bazooka: { sound: 'L_BAZOO', volume: 100, pitch: 100 },
+  /**
+   * The MORTAR going off, and it is decoded down to the index: skill 28's own
+   * arm plays `Sound::Play(0x29, 100, 100)` at 0x47ade5, and index 41 of
+   * `Audio/sfxday.srl` is **`L_MORT`** — which lands exactly where the column
+   * puts it, one past the 40 `L_MINETR` the mine trigger already pins.
+   */
+  mortar: { sound: 'L_MORT', volume: 100, pitch: 100 },
+  /**
+   * A pig SPENDING ITSELF (lib/game/suicide.ts). Decoded, mix and all: skill
+   * 51's arm plays index **0x0D at 100/100** (0x47cbcd), and 13 of
+   * `Audio/sfxday.srl` is **`E_1000P`** — the thousand-pounder, sitting
+   * beside the ordinary `E_1` at 12. The blast the arm spawns afterwards
+   * (effect 0x56) plays nothing of its own, so this is the whole noise and
+   * `blasted` has to stand out of its way.
+   */
+  sacrifice: { sound: 'E_1000P', volume: 100, pitch: 100 }
 }
 
 /**
@@ -551,8 +568,9 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
  * pin, not a blast), 30 GRENADE LAUNCHER 36 like the bazooka, 37 TNT 35
  * `L_ARTIL`. They are one line each the day they are wanted.
  */
-export const BARREL_SOUND: Record<number, 'pistol' | 'rifle' | 'bazooka'> = {
+export const BARREL_SOUND: Record<number, 'pistol' | 'rifle' | 'bazooka' | 'mortar'> = {
   6: 'pistol',
+  28: 'mortar',
   29: 'bazooka'
   // **37 TNT is deliberately NOT here.** Its own index is read — 35 `L_ARTIL`,
   // off the same column as the bazooka's — and play refused it: a charge being

@@ -37,6 +37,7 @@ import type { Heals } from './healing'
 import { createPockets } from './pickpocket'
 import type { Pockets } from './pickpocket'
 import { createHide, startsHidden } from './hide'
+import { createSacrifice } from './suicide'
 import type { Hides } from './hide'
 import { createBullets } from './bullets'
 import type { Bullets } from './bullets'
@@ -555,6 +556,13 @@ export function createEngine(parts: EngineParts): Engine {
     bus.emit
   )
 
+  /** …and SUICIDE, which is a blast rather than a projectile and so is built
+   * with the blast's own world (lib/game/suicide.ts). */
+  const sacrifice = createSacrifice(
+    { pigs, targets, present, training, fling, groundNormal, soak, clips: world.clips },
+    bus.emit
+  )
+
   /** The level's opening. A map whose squad has no canopy stands on its markers
    * instead, which is what `NO_DROP_IN` is. */
   const dropIn = world.parachutes ? createDropIn(pigs(), query, bus.emit, random) : NO_DROP_IN
@@ -583,6 +591,7 @@ export function createEngine(parts: EngineParts): Engine {
     heals,
     pockets,
     hides,
+    sacrifice,
     tumbles,
     corpses,
     effects,

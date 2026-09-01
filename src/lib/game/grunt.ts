@@ -36,6 +36,7 @@ import type { AiWorld, Brain, Seen, Thought } from './ai'
 import type { Order } from './orders'
 import { ARRIVE_WITHIN, shortest } from './actuator'
 import { AIM_UNITS } from './aim'
+import { weaponOf } from './weapons'
 import type { Option } from './evaluate'
 import { BLAST_CORE } from './grenade'
 import { GRID_STEP } from './pathfind'
@@ -656,9 +657,18 @@ export function createGruntBrain(): Brain {
         }
       }
       if (option.kind === 'lob' && option.aim !== undefined && !pitched) {
-        if (Math.abs(option.aim - me.aim) > PITCH_WITHIN) {
+        // **AND WHERE THE PITCH IS THE RANGE, THE SHAKE GOES ON IT.** A lob
+        // with no gauge — the MORTAR — is fired at full the instant the key
+        // goes down, so the `charge` wobble below reaches nothing and a dumb
+        // bombardier would drop shells on the button every time. Its aim was
+        // SOLVED rather than laddered (evaluate.ts), so it is the number the
+        // hands are unsteady on, in the aim's own units.
+        const wanted = weaponOf(option.skill).power
+          ? option.aim
+          : Math.round(option.aim * (1 + shaky.charge))
+        if (Math.abs(wanted - me.aim) > PITCH_WITHIN) {
           pitched = true
-          return say('pitch', { kind: 'aimTo', angle: option.aim })
+          return say('pitch', { kind: 'aimTo', angle: wanted })
         }
       }
       // A lob's press is PLANNED here, before the button goes down: the

@@ -17,10 +17,6 @@
 // Game space (Y-down) throughout.
 
 import {
-  BOMBLET,
-  BOMBLET_AIM,
-  BOMBLET_AIM_UP,
-  BOMBLET_LIFT,
   advanceLob,
   blastRange,
   bounceLob,
@@ -32,10 +28,11 @@ import {
   sinkLob,
   skipOffWater,
   skipsOnWater,
+  shardsOf,
   sunkAway
 } from './grenade'
 import type { Lobbed } from './grenade'
-import { CLUSTER_EFFECT_ID, burst, mend } from './blast'
+import { burst, mend } from './blast'
 import { GAUGE_FULL } from './gauge'
 import type { Gas } from './gas'
 import type { Mines } from './mines'
@@ -168,39 +165,31 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       )
       return
     }
-    // A CLUSTER scatters its five on top of its own blast (lib/game/grenade.ts,
-    // `cluster` — the destructor arm 0x43290E read whole). The VERTICAL one is
-    // pushed FIRST so `head()` rides it, which is the exe's own camera
-    // re-seat; the four angled ones follow, yaws a quarter turn apart,
-    // spawn heights stepped `BOMBLET_LIFT` so none is born inside another
-    // (Y-down: higher is smaller). Each flies on its own fuse, jittered off
-    // the battle's one stream, and credits the same thrower.
-    if (row.cluster) {
+    // A SCATTERING burst lets its children go on top of its own blast — the
+    // CLUSTER's five bomblets, the MORTAR's three sub-shells
+    // (lib/game/grenade.ts, `scatter`; the destructor arms 0x43290E and
+    // 0x4339A6 read whole). `shardsOf` hands them over HEAD FIRST, which is
+    // the one the exe's camera re-seats on, so `head()` rides the right thing
+    // just by pushing them in order. Each is born its own `rise` above the
+    // burst so none is inside the one before it (Y-down: higher is smaller),
+    // flies at FULL charge on its own row, and credits the same thrower.
+    const shards = shardsOf(row, shot.heading)
+    if (shards) {
       const at = { x: shot.x, y: shot.y, z: shot.z }
-      const throwOut = (heading: number, aim: number, step: number): void => {
-        const bomblet = lob(
-          BOMBLET,
-          { x: at.x, y: at.y - step * BOMBLET_LIFT, z: at.z },
-          heading,
-          aim,
+      for (const shard of shards) {
+        const child = lob(
+          shard.skill,
+          { x: at.x, y: at.y - shard.rise, z: at.z },
+          shard.heading,
+          shard.aim,
           GAUGE_FULL,
           world.random
         )
-        if (!bomblet) return
-        bomblet.id = named++
-        bomblet.owner = shot.owner
-        flying.push(bomblet)
+        if (!child) continue
+        child.id = named++
+        child.owner = shot.owner
+        flying.push(child)
       }
-      throwOut(0, BOMBLET_AIM_UP, 5)
-      for (let k = 0; k < 4; k++) throwOut((k * Math.PI) / 2, BOMBLET_AIM, k + 1)
-      burst(
-        at,
-        { damage: row.damage, reach: blastRange(row), effect: CLUSTER_EFFECT_ID },
-        world,
-        emit,
-        shot.owner
-      )
-      return
     }
     burst(
       { x: shot.x, y: shot.y, z: shot.z },

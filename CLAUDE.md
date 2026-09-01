@@ -1015,6 +1015,24 @@ and the weakest of them were invented here:
   phase 1078 (silent here — fatigue is not modelled, and a fresh pig's is
   silent in the exe too) and a COIN-FLIP FART at phase 2310 (P_FART1-3,
   half the plays silent). `[exe]`.
+- `[play]` **A LOB WITH NO GAUGE FIRES AT FULL CHARGE — unless it is
+  PLANTED.** The MORTAR (28) is the one: record +0x14 is 0 and skill 28 is
+  absent from the gauge list at 0x493796, so the press fires it at once and
+  the COME-UP is the whole aim (it cannot be pointed under 45°). But the
+  exe's no-gauge branch writes a charge of ONE, and `speed * 1 >> 12` of 500
+  is nothing — by the arithmetic the shell lands on the pig's own trotters.
+  It is the identical hole `weapons/fire.md` records for every no-gauge GUN
+  and takes the same answer. `attack.ts`; where the 1 becomes 0xFFF is
+  unfound. **The AI follows it**: `evaluate.ts` bisects the PITCH rather than
+  the gauge for such a weapon — not gated on wits, because with no gauge there
+  is nothing else to aim with — and `grunt.ts` moves the hands' shake onto the
+  pitch with it, or an AI mortar never misses.
+- `[CHECK — remake]` **A SUICIDE (51) is seen before it lands.** The exe takes
+  the pig out of the world at the TOP of its arm (0x47CBA0) and blasts after,
+  so its "Hari Kiri" clip 81 is never drawn at all; here the clip plays and
+  the fifty points land at its END — the same call `hide.ts` already makes for
+  the same clip. What is NOT a divergence is the order inside it: the pig dies
+  first and therefore does not take its own fifty, which is the exe's.
 - `[exe]` **A PIG IS NOT A WALL IN THE AIR — a body in flight BOWLS IT OVER.**
   Two pigs briefly inside one another during a flight is not a collision bug.
   `withPigs` is the WALKING test; the exe has no wall for a flight at all — a

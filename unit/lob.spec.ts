@@ -44,6 +44,7 @@ const dropped = (vy: number, vx = 0): Lobbed => ({
   vx,
   vy,
   vz: 0,
+  heading: 0,
   fuse: 5,
   age: 0,
   resting: false,
