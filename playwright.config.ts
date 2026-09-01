@@ -31,7 +31,14 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   projects: [
-    { name: 'unit', testDir: './unit' },
+    // `unit/weapons/` is a SUITE OF ITS OWN — one sub-suite per class, and one
+    // for the skills no class carries. It is `unit/` in every way that matters
+    // (no window, no Electron, no installed game, every test @nodata) and is a
+    // separate project only so it can be run and read on its own:
+    // `npm run test:weapons`. `test:unit` names both, so a build server still
+    // runs the lot.
+    { name: 'unit', testDir: './unit', testIgnore: '**/weapons/**' },
+    { name: 'weapons', testDir: './unit/weapons' },
     { name: 'e2e', testDir: './e2e' }
   ]
 })

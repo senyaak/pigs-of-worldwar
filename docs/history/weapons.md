@@ -2310,3 +2310,41 @@ the entry a fired shell would have flown as a second mortar TUBE.
 
 `unit/mortar.spec.ts` and `unit/suicide.spec.ts` pin both, 12 tests; the whole
 unit suite is 444 green.
+
+## The WEAPONS suite — 2026-09-01, the same afternoon
+
+Play asked for it by shape: a suite of its own, a sub-suite per class, and one
+for the skills no class carries. `unit/weapons/` is that — its own Playwright
+project, one `test.describe` per class, a file per career out of `ranks.ts`'s
+own six, and `unclaimed.spec.ts` for the thirty-one leftovers. 81 tests, and
+`unit/kits.spec.ts` folded into it.
+
+**The one decision worth recording is why it drives the real `createAttack`.**
+The bug it exists for is a fall-through: a skill with no row in any of the four
+classification tables reaches the melee default, which answers false for
+anything without a blade, and the press does nothing at all. A harness that
+re-implemented the ladder would agree with itself and catch none of it — so the
+suite builds the real thing and stubs only its leaves, each stub recording
+which door the press went through. The blade's leaf is not even a stub: it
+answers off `meleeOf`, because "a skill with no weapon behind it" is exactly
+the verdict under test.
+
+The second decision: **inert skills are asserted by NAME, not counted.**
+Building one turns the suite red and whoever built it deletes a line. Counting
+would go quietly green and nobody would learn the class was finished.
+
+What fell out of it, all in `docs/todo.md` B19: every class below the COMMANDO
+is finished end to end; a CRATE can hand over sixteen skills the fire key
+ignores where a kit can hand over one; 38 FIRECRACKER's control layer promises
+a door `attack.ts` does not have; and `careerOf` answers 'heavy' for classes 15
+and 16 by fallback rather than by reading. A coverage survey over both existing
+suites named the rest — six implemented guns with no assertions, four melee
+weapons never actually swung, weapon sound pinned for exactly one skill, and an
+AI that is priced for five.
+
+One tool change came with it: `scripts/boundaries.mjs` counted `test.describe(`
+as a test and wanted the `@nodata` tag on it. A describe is a group and the tag
+is a claim each test makes about itself, so the rule now skips describes — and
+in the same edit it started matching INDENTED tests, which the old column-0
+pattern never did. It is a strengthening: an untagged test inside a describe is
+caught where before an untagged test at any indent was not.

@@ -126,8 +126,17 @@ function* specsIn(dir) {
 const needsTheInstall = (source) =>
   /from '(\.\.\/)+app'/.test(source) || source.includes('GAME_DIR')
 
-/** A line that starts a test — `test(`, `test.skip(`, `test.describe(`. */
-const startsATest = (line) => /^test[.(]/.test(line)
+/**
+ * A line that starts a TEST — `test(`, `test.skip(`, `test.only(`.
+ *
+ * **`test.describe(` is not one.** A describe is a GROUP, and the tag is a
+ * claim each test makes about itself: putting it on the wrapper would make
+ * `--grep @nodata` and `--project=unit` disagree the moment one test inside a
+ * tagged group forgot its own. The weapons suite (`unit/weapons/`) is the
+ * first thing in the repo to use them — one describe per class — and it is
+ * what found this line counting seven groups as untagged tests.
+ */
+const startsATest = (line) => /^\s*test(\.(skip|only|fixme|fail))?\(/.test(line)
 
 for (const file of specsIn(UNIT)) {
   const source = readFileSync(file, 'utf8')

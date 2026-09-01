@@ -39,6 +39,38 @@ The terrain fixture lives at `unit/fixture.ts` — it is pure, and the two e2e
 specs that build a map to order import it from there. That direction is the
 only one allowed: `e2e/` may use what `unit/` has, never the reverse.
 
+### …and one SUITE inside `unit/`: `unit/weapons/`
+
+The split above is still two. `unit/weapons/` is a third Playwright PROJECT,
+not a third kind of spec: it is `unit/` in every way the rules care about — no
+window, no Electron, no installed game, every test tagged — and it is separate
+only so it can be run and read on its own.
+
+It is arranged by CLASS, one `test.describe` per class, grouped into a file per
+CAREER (`ranks.ts`'s own six), plus `unclaimed.spec.ts` for every skill no
+class carries. Each class says what it costs and buys, what its kit holds, and
+**which door every skill in that kit goes through when the fire key is
+pressed** — through the real `createAttack`, with only its leaves stubbed
+(`unit/weapons/kit.ts` says why at length). The failure it exists for is
+silent: a skill with no row in any of the four classification tables falls
+through the ladder to the melee default and does nothing at all, which is how
+28 MORTAR sat in two shipped kits for weeks.
+
+The inert ones are asserted BY NAME rather than merely counted, so building a
+weapon turns the suite red and whoever built it deletes a line. That is
+deliberate: a test that only counted failures would go quietly green and
+nobody would learn the class was finished.
+
+```bash
+npm run test:weapons   # the class suite alone
+```
+
+`npm run test:unit` names both projects, so a build server still runs the lot.
+**Note for anything that parses specs**: this is the first place in the repo to
+use `test.describe`, and `scripts/boundaries.mjs` had to learn that a describe
+is a GROUP rather than a test before it would stop reporting seven of them as
+untagged.
+
 ## Phased specs — inside `e2e/`
 
 Tests live in `e2e/` at the repo root. Each **phase is a folder** named by
@@ -175,9 +207,10 @@ same commit as the dialog.
 ## Running
 
 ```bash
-npm run test:unit  # unit/ only — no game, no window, a couple of seconds
-npm run test:e2e   # boundaries + build + e2e/, against your own installation
-npm run test:all   # both suites, unit first
+npm run test:unit     # unit/ and unit/weapons/ — no game, no window, seconds
+npm run test:weapons  # just the per-class weapons suite
+npm run test:e2e      # boundaries + build + e2e/, against your own installation
+npm run test:all      # everything, unit first
 ```
 
 **`npx playwright test` on its own does NOT build**, and `e2e/launch.ts`

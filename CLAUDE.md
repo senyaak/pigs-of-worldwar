@@ -482,7 +482,20 @@ npm run typecheck && npm run build && npx playwright test
 **THE SUITE IS TWO, and the folder is the split.** `unit/` is the engine
 stepped directly — no window, no Electron, no installed game — and is what a
 build server runs (`npm run test:unit`, `.github/workflows/ci.yml`). `e2e/`
-launches the app against the real installation and can only run here. Every
+launches the app against the real installation and can only run here.
+
+**`unit/weapons/` is a PROJECT inside the first, not a third kind.** One
+`test.describe` per CLASS, a file per career, plus `unclaimed.spec.ts` for
+every skill no class carries — and what each class asserts is which door every
+skill in its kit goes through when the fire key is pressed, through the real
+`createAttack` with only its leaves stubbed. It exists because that failure is
+SILENT: a skill with no row in any of the four classification tables falls
+through the ladder to the melee default and does nothing, which is how 28
+MORTAR sat in two shipped kits for weeks. **The inert ones are named rather
+than counted**, so building one turns the suite red and whoever built it
+deletes the line. `npm run test:weapons` runs it alone; `test:unit` names both.
+It is also the first place in the repo to use `test.describe`, which
+`scripts/boundaries.mjs` had to be taught is a group and not a test. Every
 test in `unit/` also carries the tag `@nodata`, because the folder is what a
 RUN selects and the tag is what one test claims about itself. **`npm run
 boundaries` holds the two together** — a unit spec may not import out of
