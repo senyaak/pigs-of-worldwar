@@ -473,7 +473,23 @@ export function createEngine(parts: EngineParts): Engine {
    * there; `battle` is built further down and `fling` is only ever called from
    * inside a step, by which time it exists.
    */
-  const tumbles = createTumbles({ query, pigs, obstacles, training }, bus.emit)
+  const tumbles = createTumbles(
+    {
+      query,
+      pigs,
+      obstacles,
+      training,
+      random,
+      // A pig BOWLED OVER by a flying body is thrown like any other — through
+      // the seam that decides whose state a throw lands on, because the one
+      // knocked over may be the acting pig (`battle.fling`, below).
+      shove: (pig, velocity) => battle.fling(pig, velocity),
+      // …and a pig already off the ground is not bowled over again — the
+      // acting one's flight is the battle's to know about.
+      inTheAir: (pig) => battle.aloft(pig)
+    },
+    bus.emit
+  )
   // What a blast under a pig's trotters throws ALONG — the slope's own up
   // rather than the sky's (lib/game/tumble.ts, `hurlVelocity`).
   const groundNormal = (x: number, z: number): { x: number; y: number; z: number } =>

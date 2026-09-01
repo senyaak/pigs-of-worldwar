@@ -2159,3 +2159,68 @@ And the exe's own pig-versus-pig answer is a SHOVE rather than a block —
 random eighth of a turn — which this engine still does not do. What becomes of
 the flying one's own velocity is not written down anywhere, and the pig body
 class's three contact methods are named and unread. B15 carries that.
+
+### A flying body BOWLS OVER the pig it runs into (2026-08-31)
+
+Play: "конечно строить." The gap B15 left behind, built the same day it was
+written down.
+
+`Pig::OnHitObject`'s prologue, gated on the OTHER body being type 0x1357 — a
+pig — and reached from either airborne regime, the plain fall `[pig+0x1FD]` and
+the FLYING `[pig+0x21C]`: `0x4A9100(0x40, 0x200, own heading + (rand & 0xFF),
+0)` at **0x477842**. Every part of that is load-bearing. 0x4A9100 is the SET,
+not the add, so a body already moving takes the shove whole. 0x200 is the same
+45° every knock in this game is thrown at. And the bearing is the FLYER's own
+heading with a ONE-SIDED jitter of up to 0xFF of 4096 — 22.4°, never the other
+way, which is what tells this site apart from the parachutist's at 0x477695
+(`rand & 0xFFF`, a whole random turn with no heading in it).
+
+`BARGE_SPEED` is `fromExeSpeed(0x40)` = 960 a second, against the 2700 a
+thirty-point core hit throws — a fifth of a blast, which is about right for
+being run into.
+
+**And building it took the pig-wall out of the air, which was not planned.**
+The first cut fired zero times, and the reason was structural rather than a
+slip: `withPigs` blocks a flight at exactly 2·PIG_RADIUS and `bodiesOverlap`
+tests the same distance, so a body held off by the wall can never reach the
+contact that fires the barge. It rises on the spot until it clears the other
+pig's head and sails past — which was measured, not reasoned.
+
+So the wall came out, and it should never have been there: `withPigs` is the
+WALKING test, and the exe has no such thing for a flight. A pig in the air is a
+rigid body in the physics world (`Pig::StartFalling` pushes it there, 0x4707F0 →
+0x4A9720) and what its contact with another pig does is knock that one over.
+The map's objects keep their boxes, and with them the rule the morning's fix
+bought — a blocked step is refused, not paid for. Both call sites went: the
+flights `tumble.ts` steps itself, and the acting pig's, which the battle drives
+— and the acting pig's own JUMP with it, because it is the same call and a jump
+into a mate is the same contact.
+
+**One thing here is the remake's own and is marked so.** The contact fires ONCE
+as the bodies meet, keyed by the PAIR rather than by direction. The exe's pump
+calls the handler on both sides of a pair (0x4A8B4C) and nobody has transcribed
+the arm, so whether it re-fires every frame is unread. Keyed by direction it
+would be worse than unread: a pig knocked over is a pig in the air, which is
+the state that qualifies to shove BACK, so a body flung into a mate at 2700
+would be shoved back at 960 on the very next frame and the blast's own knock
+would be gone — this session's bug rebuilt from the other end. The spec asserts
+that it is not.
+
+**And the full suite caught the half of it a targeted run could not.** With
+airborne victims in, `002/knockback.spec.ts` went red: 420 units of travel where
+the damage-derived floor wanted 486. The cause is the geometry the sweep is
+built on — the victim stands between the burst and the pig that threw it, so
+BOTH are inside the blast, both are thrown the same way at the same instant, and
+they overlap on the way out. The shove is a SET, so whichever body the loop
+stepped first cut the other from 2700 down to 960 and the blast's own knock was
+gone: this session's bug for the third time, from a third direction.
+
+So **only a body on the ground is bowled over**. The exe cannot settle it — the
+prologue arm has never been transcribed, and its one hint cuts both ways
+(0x4A9100 carries a `[body+0x46] & 0x2000` live-body test that 0x4A9260 does
+not, which either means only bodies already in the physics take the shove, the
+opposite of this, or that the arm enables the victim's physics first, which is
+unrecorded). What is not in doubt is which reading keeps the behaviour play
+asked for. `Battle.aloft` is the one predicate that answers it for any pig, the
+acting one's own flight included, because a caller that has to know which kind
+of pig it is holding will get it wrong.

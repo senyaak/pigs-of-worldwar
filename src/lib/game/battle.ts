@@ -297,6 +297,13 @@ export interface Battle {
    * position, and this is the seam that keeps there being one.
    */
   fling(pig: Pig, velocity: Velocity, ejected?: boolean, struck?: boolean): void
+  /**
+   * Whether this pig is OFF THE GROUND — for anybody but the acting one that is
+   * `tumbles.has`, and for the acting one it is the flight the battle drives
+   * itself. One question, one answer, because a caller that has to know which
+   * kind of pig it is holding will get it wrong (lib/game/tumble.ts, `barge`).
+   */
+  aloft(pig: Pig): boolean
   /** Warp the acting pig — the debug surface the e2e suite drives through. */
   warp(x: number, z: number, heading: number): void
 }
@@ -673,17 +680,18 @@ export function createBattle(parts: BattleParts): Battle {
       query,
       { walk: 0, turn: 0, jump: false },
       delta,
-      withPigs(
-        scenery.obstacles,
-        everyone()
-          .filter((pig) => pig !== game.currentPig && !isDead(pig))
-          .map((pig) => ({ ...pig.position })),
-        // …minus any body it is already inside: a flight that starts in an
-        // overlap has no way out of one (lib/game/obstacles.ts).
-        { x: loco.x, y: loco.y, z: loco.z }
-      )
+      // **A PIG IS NOT A WALL IN THE AIR** — the map's objects are the whole of
+      // what is in a flight's way, and another body is something to knock over
+      // rather than something to stop at (lib/game/tumble.ts, `around` and
+      // `BARGE_SPEED`).
+      scenery.obstacles
     )
     game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
+    // …and it BOWLS OVER whoever it runs into, the same as anybody else's
+    // flight. The contact belongs to `tumble.ts` and the bookkeeping with it;
+    // this pig's flight is the only one that module does not step itself, so it
+    // is the only one that has to ask (lib/game/tumble.ts `barge`).
+    if (loco.airborne !== null) tumbles.barge(game.currentPig, loco.heading)
     // The driving frame's own rule (further down `update`): a COMMITTED clip
     // — the landing's get-up — is started once and left to play out; worn as
     // a loop it never reads as finished, which both froze the pose and let
@@ -1935,14 +1943,26 @@ export function createBattle(parts: BattleParts): Battle {
       delta,
       // The squad is in the way too: every pig but the acting one, as the body
       // its own spawn marker measured (lib/game/obstacles).
-      withPigs(
-        scenery.obstacles,
-        everyone()
-          .filter((pig) => pig !== acting)
-          .map((pig) => ({ ...pig.position })),
-        { x: loco.x, y: loco.y, z: loco.z }
-      )
+      //
+      // **WALKING ONLY.** A body in the air has the map's objects in its way
+      // and nothing else — another pig is something to knock over up there, not
+      // something to stop at, and holding a flyer off at 2·PIG_RADIUS is what
+      // makes the contact unreachable (lib/game/tumble.ts, `around`). The same
+      // call serves both states, so the choice is here: this is the pig's OWN
+      // jump as much as it is a knock, and the two must not behave differently.
+      loco.airborne === null
+        ? withPigs(
+            scenery.obstacles,
+            everyone()
+              .filter((pig) => pig !== acting)
+              .map((pig) => ({ ...pig.position })),
+            { x: loco.x, y: loco.y, z: loco.z }
+          )
+        : scenery.obstacles
     )
+    // …and in the air it BOWLS OVER whoever it lands on, its own jump included
+    // (lib/game/tumble.ts `barge`).
+    if (loco.airborne !== null) tumbles.barge(acting, loco.heading)
     jumpRequested = false
     // …and the DOOR overrules all of it. The exe adds its own step to the body's
     // position every frame the clip runs (0x46e1a1), after the movement update
@@ -2201,6 +2221,7 @@ export function createBattle(parts: BattleParts): Battle {
       leaveRequested = true
     },
     announce: emit,
+    aloft: (pig) => (pig === game.currentPig ? loco.airborne !== null : tumbles.has(pig)),
     fling(pig, velocity, ejected = false, struck = false) {
       emit({
         kind: 'flung',

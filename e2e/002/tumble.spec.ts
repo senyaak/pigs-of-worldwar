@@ -19,7 +19,7 @@ import { TerrainQuery } from '../../src/lib/game/terrain'
 import { MINE_DAMAGE, createMines } from '../../src/lib/game/mines'
 import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
 import { FLING_CAP, FLING_PER_POINT, burst, flingSpeed } from '../../src/lib/game/blast'
-import { PITCH, createTumbles, flingVelocity } from '../../src/lib/game/tumble'
+import { BARGE_SPEED, PITCH, createTumbles, flingVelocity } from '../../src/lib/game/tumble'
 import { NO_OBSTACLES, PIG_RADIUS, withPigs } from '../../src/lib/game/obstacles'
 import { BLAST_CORE, blastReach, blastShare } from '../../src/lib/game/grenade'
 import { fromExeSpeed } from '../../src/lib/game/ballistics'
@@ -78,7 +78,31 @@ function fielded(apart: number): {
   const heard: BattleEvent[] = []
   const bus = createBus()
   bus.on((event) => heard.push(event))
-  const tumbles = createTumbles({ query, pigs, obstacles: NO_OBSTACLES, training: true }, bus.emit)
+  const tumbles = createTumbles(
+    {
+      query,
+      pigs,
+      obstacles: NO_OBSTACLES,
+      training: true,
+      random: () => 0,
+      // The battle routes a bowled-over pig through its own fling seam, which
+      // ANNOUNCES and then decides whose state the throw lands on
+      // (lib/game/battle.ts `fling`). With no battle here, everybody's throw is
+      // a tumble — and the announcement is the spec's own way of watching it.
+      shove: (pig, velocity) => {
+        bus.emit({
+          kind: 'flung',
+          pig: pig.id,
+          at: { ...pig.position },
+          vx: velocity.vx,
+          vy: velocity.vy,
+          vz: velocity.vz
+        })
+        tumbles.fling(pig, velocity)
+      }
+    },
+    bus.emit
+  )
   const mines = createMines(
     {
       pigs,
@@ -279,20 +303,108 @@ test('a blast with nobody to throw it to still hurts — the fling is optional',
   expect(heard.filter((one) => one.kind === 'blasted')).toHaveLength(1)
 })
 
-test('a body thrown AT another still travels — it rides over, it does not die on the boundary', () => {
+test("a body in the air BOWLS OVER the pig it runs into — 0x40 at 45°, the exe's own", () => {
+  // `Pig::OnHitObject`'s prologue: a body in either airborne regime — the plain
+  // fall `[pig+0x1FD]` or the FLYING `[pig+0x21C]` — that contacts a body of
+  // type 0x1357 throws it, `0x4A9100(0x40, 0x200, own heading + rand & 0xFF, 0)`
+  // at 0x477842. So a pig blown into his mate takes the mate with him, and the
+  // knock is a fifth of what a core hit hands out (`BARGE_SPEED` against
+  // `flingSpeed(30)`).
+  const { tumbles, pigs, heard } = fielded(2 * PIG_RADIUS + 15)
+  const flyer = pigs()[1]
+  const bowled = pigs()[0]
+  const stood = { ...bowled.position }
+  const from = { ...flyer.position }
+
+  tumbles.fling(flyer, flingVelocity(flingSpeed(30), -Math.PI / 2))
+  for (let i = 0; i < 400 && tumbles.live() > 0; i++) tumbles.update(STEP)
+
+  const shove = heard.filter(
+    (event) => event.kind === 'flung' && (event as { pig: number }).pig === bowled.id
+  ) as { vx: number; vy: number; vz: number }[]
+  expect(shove, 'the pig in the way was thrown, once').toHaveLength(1)
+  expect(
+    Math.hypot(shove[0].vx, shove[0].vy, shove[0].vz),
+    "at the exe's own 0x40 a frame"
+  ).toBeCloseTo(BARGE_SPEED, 6)
+  // 45° up, which is every knock in this game: the rise equals the run.
+  expect(-shove[0].vy).toBeCloseTo(Math.hypot(shove[0].vx, shove[0].vz), 6)
+  expect(
+    Math.hypot(bowled.position.x - stood.x, bowled.position.z - stood.z),
+    'and it went somewhere'
+  ).toBeGreaterThan(PIG_RADIUS)
+
+  // **AND THE FLYER KEEPS ITS OWN KNOCK.** The shove is a SET, and a bowled
+  // pig is a pig in the air — which is the state that qualifies to shove back.
+  // Keyed by direction rather than by PAIR, the mate would shove 960 straight
+  // back into a body carrying 2700 and the blast's knock would be gone.
+  expect(
+    Math.hypot(flyer.position.x - from.x, flyer.position.z - from.z),
+    'the one doing the bowling was not bowled back'
+  ).toBeGreaterThan(4 * PIG_RADIUS)
+})
+
+test('…but a body ALREADY IN THE AIR is not bowled over — two pigs of one blast keep their knocks', () => {
+  // `[CHECK — remake]`, and it is here because a measurement put it here. One
+  // blast throws everything in reach the same way at the same instant, so the
+  // bodies leave together and overlap on the way out — and the barge is a SET.
+  // With airborne victims in, whichever body was stepped first cut the other
+  // from a core hit's 2700 down to `BARGE_SPEED`'s 960, and the blast's own
+  // knock was gone: `002/knockback.spec.ts` went red on 420 units of travel
+  // where the arithmetic wanted 486. The exe cannot settle it — the prologue
+  // arm at 0x477390 has never been transcribed — so the reading that keeps the
+  // knock is the one built.
+  //
+  // Nothing here goes through the barge's own seam, so ANY `flung` heard is a
+  // barge: a plain `tumbles.fling` announces nothing (lib/game/tumble.ts).
+  const { tumbles, pigs, heard } = fielded(2 * PIG_RADIUS + 15)
+  const [one, two] = pigs()
+  const first = { x: one.position.x, z: one.position.z }
+  const second = { x: two.position.x, z: two.position.z }
+  tumbles.fling(one, flingVelocity(flingSpeed(30), Math.PI / 2))
+  tumbles.fling(two, flingVelocity(flingSpeed(30), Math.PI / 2))
+
+  // Half a second, which is the part of the arc that matters: both are up, both
+  // are overlapping, and neither may touch the other's velocity. What happens
+  // after one has LANDED is a different contact and not this rule — a body that
+  // is back on its feet is a body that can be bowled over again.
+  for (let i = 0; i < 30; i++) tumbles.update(STEP)
+  expect(tumbles.live(), 'both are still in the air, which is what is being tested').toBe(2)
+  expect(
+    heard.filter((event) => event.kind === 'flung'),
+    'neither body shoved the other: both were already going somewhere'
+  ).toEqual([])
+
+  for (let i = 0; i < 400 && tumbles.live() > 0; i++) tumbles.update(STEP)
+  expect(
+    Math.hypot(one.position.x - first.x, one.position.z - first.z),
+    'the one in front kept the whole of its own knock'
+  ).toBeGreaterThan(4 * PIG_RADIUS)
+  expect(
+    Math.hypot(two.position.x - second.x, two.position.z - second.z),
+    '…and so did the one behind it'
+  ).toBeGreaterThan(4 * PIG_RADIUS)
+})
+
+test('a body thrown AT another still travels — a pig is not a WALL in the air', () => {
   // The sibling of the test below, and the one play actually met. That one is
   // about starting INSIDE a body (a bayonet, at melee range); this one is about
   // being thrown at one from just OUTSIDE it, which is every grenade that goes
   // off between two pigs — and it survived the fix that one bought.
   //
-  // `withPigs` blocks at exactly 2·PIG_RADIUS = 170, so a pig standing 185 away
-  // is clear at the launch by fifteen units and inside on the very first
-  // substep, which carries thirty-two. The flight then
-  // zeroed the horizontal for good, and since nothing ever writes one back the
-  // pig went straight up and came straight down: eight units of travel on a
-  // thirty-point core hit. `e2e/002/knockback.spec.ts` is where that was caught
-  // and `lib/game/locomotion.ts` carries the read that replaced it — a contact
-  // REFUSES the step, it does not confiscate the speed.
+  // **It cost two separate mistakes, in order.** `withPigs` blocks at exactly
+  // 2·PIG_RADIUS = 170, so a pig standing 185 away is clear at the launch by
+  // fifteen units and inside on the very first substep, which carries
+  // thirty-two. The flight then ZEROED the horizontal for good, and since
+  // nothing ever writes one back the pig went straight up and came straight
+  // down: eight units of travel on a thirty-point core hit
+  // (`e2e/002/knockback.spec.ts`, which is where it was caught and where the
+  // rule that replaced it is still pinned end to end). And then the wall
+  // itself turned out not to belong in the air at all — the exe's answer to a
+  // body meeting a body is the BARGE above, and a flyer held off at
+  // 2·PIG_RADIUS can never reach the contact that fires it. So what this now
+  // says is the simpler thing: thrown at a mate, a body goes where it was
+  // thrown.
   const { tumbles, pigs } = fielded(2 * PIG_RADIUS + 15)
   const thrown = pigs()[1]
   const standing = { ...pigs()[0].position }

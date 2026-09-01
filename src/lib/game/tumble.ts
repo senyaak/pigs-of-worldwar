@@ -24,8 +24,10 @@
 import { createLocomotion, updateLocomotion } from './locomotion'
 import type { LocomotionState } from './locomotion'
 import { chargeLanding } from './falling'
-import { PIG_RADIUS, withPigs } from './obstacles'
+import { fromExeSpeed } from './ballistics'
+import { PIG_RADIUS, bodiesOverlap } from './obstacles'
 import type { Obstruction } from './obstacles'
+import type { Random } from './random'
 import { isDead } from './health'
 import type { Pig } from './game'
 import type { TerrainQuery } from './terrain'
@@ -41,6 +43,26 @@ export interface TumbleWorld {
   /** The training ground spares a hard landing the way it spares any hit
    * (lib/game/falling.ts → health.ts). */
   training: boolean
+  /** The battle's own stream — the barge's bearing jitter is a roll everyone
+   * has to agree on (lib/game/random.ts). */
+  random: Random
+  /**
+   * Throw the pig a flying body has just BARGED INTO (`BARGE_SPEED`).
+   *
+   * Not `fling` above: the pig knocked over may be the ACTING one, whose
+   * flight belongs to the battle rather than to this module, so the throw goes
+   * out through the same seam a blast's does (lib/game/battle.ts `fling`).
+   * OPTIONAL for the reason `BlastWorld.fling` is — a spec about one flight
+   * needs nobody to bowl over.
+   */
+  shove?: (pig: Pig, velocity: Velocity) => void
+  /**
+   * Whether this pig is ALREADY off the ground — a body in the air is not
+   * bowled over again (`BARGE_SPEED`). The flights this module steps it knows
+   * about itself; the ACTING pig's is the battle's, which is why this is asked
+   * rather than answered here (lib/game/battle.ts `aloft`).
+   */
+  inTheAir?: (pig: Pig) => boolean
 }
 
 /** A throw, as the velocity it starts with — game space, up is −Y. Built by
@@ -71,6 +93,15 @@ export interface Tumbles {
   live(): number
   /** Whether THIS pig is being thrown right now. */
   has(pig: Pig): boolean
+  /**
+   * A body in the air has moved — knock over whatever it has just run into.
+   *
+   * Called for this module's own flights by `update`, and by the battle for
+   * the ACTING pig, whose flight it drives itself (lib/game/battle.ts
+   * `flyOn`). `heading` is the flying body's own, which is what the bearing is
+   * measured from.
+   */
+  barge(pig: Pig, heading: number): void
   /** Where each one is, for a spec to measure — a flight is a thing nothing else
    * can see. */
   at(): { pig: number; y: number; vx: number; vy: number; vz: number }[]
@@ -85,6 +116,30 @@ export interface Tumbles {
  * around it as it goes. Five call sites, one pitch.
  */
 export const PITCH = Math.PI / 4
+
+/**
+ * **HOW HARD A BODY IN THE AIR KNOCKS OVER THE PIG IT RUNS INTO: 0x40 a
+ * frame, 45° up, along its own heading.**
+ *
+ * The exe's own, and the answer to what a flying body does to a standing one:
+ * `Pig::OnHitObject`'s prologue, gated on the OTHER body being type 0x1357 — a
+ * pig — and reached from either airborne regime, the plain fall `[pig+0x1FD]`
+ * and the FLYING `[pig+0x21C]` (`movement/falling.md`). The call is
+ * `0x4A9100(0x40, 0x200, own heading + (rand & 0xFF), 0)` at **0x477842**, and
+ * every part of that matters: 0x4A9100 is the SET, not the add, so a body
+ * already moving takes the shove whole; 0x200 is the same 45° every knock in
+ * this game is thrown at; and the bearing is the FLYER's own heading with a
+ * ONE-SIDED jitter of up to `0xFF` of 4096 — 22.4°, never the other way.
+ *
+ * Do not confuse it with its two siblings in the same prologue: 0x477695 is a
+ * PARACHUTIST landing on somebody and its bearing is `rand & 0xFFF`, a whole
+ * random turn with no heading in it; 0x47751F is the scripted walk pushing an
+ * object. The mask is the tell.
+ */
+export const BARGE_SPEED = fromExeSpeed(0x40)
+
+/** …and that one-sided jitter, as an angle: `rand & 0xFF` of a 4096 turn. */
+export const BARGE_SPREAD = (0xff / 4096) * 2 * Math.PI
 
 /** The velocity a throw of this speed and bearing comes to — spherical, the way
  * `0x4a9100` builds it, and up is −Y. */
@@ -190,21 +245,89 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
   /** One locomotion state per pig in the air, by id. */
   const flying = new Map<number, LocomotionState>()
 
-  /** Everything in the way of the body at `id`, which is standing at `at`: the
-   * map's objects and every OTHER pig, the same body list the driven walk is
-   * given — minus any it is already inside, or it would never get out
-   * (lib/game/obstacles.ts). A body struck by a BAYONET always starts there. */
-  const around = (id: number, at: LocomotionState): Obstruction =>
-    withPigs(
-      world.obstacles,
-      world
-        .pigs()
-        .filter((pig) => pig.id !== id && !isDead(pig))
-        .map((pig) => ({ ...pig.position })),
-      { x: at.x, y: at.y, z: at.z }
-    )
+  /**
+   * Everything in the way of a body in the AIR: **the map's objects, and only
+   * those.**
+   *
+   * A PIG IS NOT A WALL UP HERE. `withPigs` is the WALKING test — a body you
+   * cannot walk into — and the exe has no such thing for a flight: a pig in the
+   * air is a rigid body in the physics world (`Pig::StartFalling` pushes it
+   * there, 0x4707F0 → 0x4A9720), and what its contact with another pig does is
+   * KNOCK THAT ONE OVER (`BARGE_SPEED` — 0x477842). Wearing both, the barge can
+   * never fire: the wall stops the flyer at 2·PIG_RADIUS and the contact test
+   * is the same distance, so the bodies never meet and a flight into a mate is
+   * a pig rising on the spot until it clears his head. That was measured, not
+   * reasoned — the barge fired zero times with the wall in.
+   *
+   * The map's objects keep theirs, and so does the rule that a blocked step is
+   * REFUSED rather than paid for (lib/game/locomotion.ts): a crate is a crate.
+   */
+  const around = (): Obstruction => world.obstacles
+
+  /**
+   * Which PAIRS of bodies were touching last frame, so a contact fires ONCE as
+   * they meet rather than every frame they overlap.
+   *
+   * **The key is the pair, not the direction**, and that is load-bearing. The
+   * exe's contact pump calls the handler on BOTH sides of a pair (0x4A8B4C),
+   * so a shove is symmetrical in principle — but the primitive here is the SET
+   * (0x4A9100), and a pig knocked over is a pig in the air, which is the very
+   * state that qualifies to shove back. Keyed one way round, a body flung into
+   * a mate at 2700 would be shoved back at 960 on the next frame and the
+   * blast's own knock would be gone — the bug this whole session was about,
+   * rebuilt from the other end.
+   *
+   * `[CHECK — remake]` on the ONCE. Nothing in the notes puts an
+   * already-served mask on this path, and nobody has transcribed the arm
+   * (`weapons/fire.md` says so); fired every frame the SET would pin the
+   * victim's velocity for as long as the two bodies overlapped, which is a
+   * shove lasting as long as the shover takes to pass. Once, on meeting, is
+   * the readable half of a fork nobody has read.
+   */
+  const touching = new Set<string>()
+  const pairKey = (a: number, b: number): string => (a < b ? `${a}:${b}` : `${b}:${a}`)
+
+  /** A body in the air has just moved — knock over whatever it has run into. */
+  const bargeInto = (flyer: Pig, heading: number): void => {
+    const shove = world.shove
+    if (!shove) return
+    for (const other of world.pigs()) {
+      // Never itself, and never a corpse: a dead body is out of the flight's
+      // own obstruction list too (`around`), so it is not something this one
+      // ran into — it is something it passed through.
+      if (other.id === flyer.id || isDead(other)) continue
+      // **AND ONLY A BODY ON THE GROUND IS BOWLED OVER.** `[CHECK — remake]`,
+      // and the reason is a measurement: with airborne victims in, two pigs
+      // caught by ONE blast rob each other. They are thrown the same way at the
+      // same instant, they overlap on the way out, and the shove is a SET — so
+      // whichever is stepped first cuts the other from 2700 down to 960 and the
+      // blast's own knock is gone. `002/knockback.spec.ts` failed on exactly
+      // that, 420 units of travel where the arithmetic wanted 486.
+      //
+      // The exe is no help here and says so: `weapons/fire.md` has never
+      // transcribed the prologue arm, and the one hint cuts BOTH ways —
+      // 0x4A9100 carries a `[body+0x46] & 0x2000` live-body test that 0x4A9260
+      // does not, which either means only bodies already in the physics take
+      // the shove (the opposite of this) or that the arm enables the victim's
+      // physics first (unrecorded). What is not in doubt is which of the two
+      // readings keeps the behaviour play asked for.
+      if (flying.has(other.id) || world.inTheAir?.(other) === true) continue
+      const pair = pairKey(flyer.id, other.id)
+      if (!bodiesOverlap(flyer.position, other.position)) {
+        touching.delete(pair)
+        continue
+      }
+      if (touching.has(pair)) continue
+      touching.add(pair)
+      // The bearing is the FLYER's, jittered one way only — and a pig already
+      // in the air takes it too, because the exe's primitive here is the SET
+      // and a moving body is exactly what it is written for.
+      shove(other, flingVelocity(BARGE_SPEED, heading + world.random() * BARGE_SPREAD))
+    }
+  }
 
   return {
+    barge: bargeInto,
     fling(pig, velocity, ejected = false, struck = false) {
       // Built where the pig IS, standing on whatever it is standing on — a pig
       // blown off a crate must not be measured from the ground under it
@@ -254,8 +377,11 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
         const was = state.clip
         // Nothing is DRIVEN here: no walk, no turn, no jump. The exe skips the
         // whole movement update for a pig in the air and so does this.
-        updateLocomotion(state, query, { walk: 0, turn: 0, jump: false }, delta, around(id, state))
+        updateLocomotion(state, query, { walk: 0, turn: 0, jump: false }, delta, around())
         pig.position = { x: state.x, y: state.y, z: state.z }
+        // …and whoever it has just run into goes over (`BARGE_SPEED`). After
+        // the move, because what it has run into is decided by where it now is.
+        bargeInto(pig, state.heading)
         // A hard arrival costs its flat four — a thrown pig is FLYING and the
         // ground charges it per qualifying contact (lib/game/falling.ts).
         chargeLanding(pig, state, world.training, emit)
@@ -291,6 +417,7 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
       })),
     clear() {
       flying.clear()
+      touching.clear()
     }
   }
 }

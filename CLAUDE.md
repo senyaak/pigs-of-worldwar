@@ -1015,6 +1015,29 @@ and the weakest of them were invented here:
   phase 1078 (silent here — fatigue is not modelled, and a fresh pig's is
   silent in the exe too) and a COIN-FLIP FART at phase 2310 (P_FART1-3,
   half the plays silent). `[exe]`.
+- `[exe]` **A PIG IS NOT A WALL IN THE AIR — a body in flight BOWLS IT OVER.**
+  Two pigs briefly inside one another during a flight is not a collision bug.
+  `withPigs` is the WALKING test; the exe has no wall for a flight at all — a
+  pig in the air is a rigid body in the physics world, and its contact with
+  another pig throws THAT one: `0x4A9100(0x40, 0x200, own heading + (rand &
+  0xFF), 0)` at 0x477842, reached from either airborne regime (the plain fall
+  `[pig+0x1FD]` and the FLYING `[pig+0x21C]`), gated on the other body being
+  type 0x1357. `BARGE_SPEED` in `lib/game/tumble.ts`, 960 a second against the
+  2700 a core hit throws; the map's objects keep their boxes. **The two cannot
+  both be there** — a flight held off at 2·PIG_RADIUS can never reach a
+  contact tested at the same distance, which is what the first build measured.
+  It covers the pig's own JUMP as much as a knock: same call, same contact.
+  **Two things about it are `[CHECK — remake]`, and both are the same trap.**
+  The whole prologue arm at 0x477390 is untranscribed, so neither is a
+  reading — and each is the half that keeps a blast's knock rather than eating
+  it. (1) The contact fires ONCE as the bodies meet, keyed by the PAIR and not
+  by direction: keyed by direction, a body flung at 2700 is shoved back at 960
+  the next frame. (2) **Only a body ON THE GROUND is bowled over.** One blast
+  throws everything in reach the same way at the same instant, so the bodies
+  leave together and overlap on the way out; with airborne victims in, whichever
+  was stepped first cut the other down to 960 — measured, on
+  `002/knockback.spec.ts`, 420 units of travel where the arithmetic wanted 486.
+  Both are pinned in `e2e/002/tumble.spec.ts`.
 - `[play]` **A bullet's knock is the engine's own 45° throw, at the exe's
   own speeds — and pellets STACK.** `Pig::HitByProjectile` ADDS (0x4A9260
   fadds, never sets) 48 along the projectile's own pitch — kind 0x12 adds 6

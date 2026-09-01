@@ -46,7 +46,13 @@ function struckBy(shove: number): { held: number; clips: { index: number; once: 
   const pig = pigAt(0, 0)
   const clips: { index: number; once: boolean }[] = []
   const tumbles = createTumbles(
-    { query: flat, pigs: () => [pig], obstacles: new ObstacleField([]), training: false },
+    {
+      query: flat,
+      pigs: () => [pig],
+      obstacles: new ObstacleField([]),
+      training: false,
+      random: () => 0
+    },
     (event: BattleEvent) => {
       if (event.kind === 'clip') clips.push({ index: event.index, once: event.once })
     }

@@ -2371,9 +2371,23 @@ was read whole this session and its skim corrected three times over. The one
 that matters for planning: **the artillery cluster's five children are the
 MINE-LAYING projectile** (id 426, kind 38, the one skills 35/36 use) — so the
 skill is a 25-point blast plus a five-mine minefield, not a second bomblet
-scatter. Building it means laying mines from the air, which is `mines.ts` work
-and a play question (a minefield the enemy did not place), not another twenty
-lines in `lobs.ts`.
+scatter. Building it means laying mines from the air, which is `mines.ts` work,
+not another twenty lines in `lobs.ts`.
+
+**The question that used to sit here is ANSWERED and is not a question**
+(2026-08-31): a minefield the enemy did not place is exactly what the original
+drops, so that is what this drops. "Очевидно что как в оригинале — как можно по
+другому?" Nothing to weigh next time it comes up. `[play]`
+
+**What it is actually blocked on is the ARTILLERY, which does not exist here at
+all.** No pig can hold skill 40: the whole family 39–44 (`artrang`, `cluster`,
+`artgas`, `artrain`, `art1000`, `artshoc`) is absent from `CLASS_KIT`
+(lib/game/kits.ts), and nothing in `lib/game/` delivers a called-in shell —
+there is no off-map arrival, no aiming for one, no shell. The poison note above
+already says as much for its sibling ("Skill 41 GAS SHELL … lands with the
+artillery, whenever that is"). So the cluster's five mines are twenty lines
+sitting behind a subsystem, and the subsystem is the job. Every number for the
+shell itself is in `cluster.md`.
 
 The AIRBURST pair is closer to buildable and bigger than it read: both are
 **CONTACT, not timed** (the constructor's state machine, 0x43200C — the fuse of
@@ -2445,15 +2459,24 @@ vector is right, and `unit/blast.spec.ts` pins the geometry. Nor was the
 footprint rule: `hurlVelocity` splits on `flat < PIG_RADIUS` and this round is at
 100 against a radius of 85, clear of it.
 
-**What is still open, and belongs to nobody yet.** The exe's own pig-versus-pig
-answer is a SHOVE, not a block: 0x477842 — "the common tail of `[pig+0x1FD]` /
-`[pig+0x21C]`", the plain-falling and FLYING flags — throws the OTHER pig at
-speed 0x40, pitch 0x200, bearing the flyer's own heading plus `rand & 0xFF`
-(`weapons/fire.md`, the OnHit body-type switch). What becomes of the FLYING one's
-own velocity is not written down anywhere, and the pig body class's three contact
+**And the gap it left is CLOSED the same day** — play: "конечно строить." The
+exe's own pig-versus-pig answer is a SHOVE, not a block: 0x477842 throws the
+OTHER pig at 0x40, 45°, on the flyer's own heading plus a one-sided `rand & 0xFF`
+(22.4°). Built as `BARGE_SPEED` in `lib/game/tumble.ts`, and building it took the
+pig-wall out of the air, because the two cannot both be there: a flight held off
+at 2·PIG_RADIUS can never reach a contact tested at the same distance. See
+`docs/history/weapons.md`.
+
+**What is still not written down anywhere**, and is the remake's own until it
+is: whether the contact re-fires every frame the bodies overlap (ours fires once,
+keyed by the PAIR), whether a body ALREADY IN THE AIR can be bowled over (ours
+says no — with it in, two pigs of one blast rob each other and this very spec
+went red at 420 against a floor of 486), what becomes of the FLYING one's own
+velocity, and whether the shove carries a clip, a sound or damage. The pig body class's three contact
 methods (0x411c90 / 0x412070 / 0x411620) are named in `movement/notes.md` and
-unread. So a body bowling a mate over is a real behaviour of the original that
-this engine does not have.
+unread, and `weapons/fire.md` says the whole prologue arm 0x477390..0x477898 has
+never been transcribed — all three shove sites live in it and share one
+sentence.
 
 **What the spec rewrite changed, and why it had to.** It used to throw five
 grenades down ONE turn and measure the victim after each. The thrower stands

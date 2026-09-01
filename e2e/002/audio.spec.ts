@@ -107,11 +107,23 @@ test('the pig is heard jumping and landing', async ({ app }) => {
   // READY card does and it WAITS for the bank if the bank is still loading
   // (audio/battleSound.ts), so on a slow load it arrives after the warp and
   // lands inside the slice below.
-  await expect.poll(async () => (await heard()).includes('P_HMMM')).toBe(true)
+  await expect.poll(async () => (await heard()).includes(BATTLE_SOUNDS.ready.sound)).toBe(true)
   const beforeJump = (await heard()).length
   await tap(page, 'jump')
+  // …and the grunt is taken OUT of the slice as well as waited for, because
+  // waiting is not enough: the TURN CLOCK is real time, and a full-suite run
+  // under load can spend long enough between the battle opening and this jump
+  // that the turn hands over — which starts the next pig's turn and grunts
+  // again, inside the slice. Seen once in three full runs, on a slice that came
+  // back `[P_HMMM, jump, land]`: the jump and the landing were both there, in
+  // order, with a turn boundary sitting in front of them. This spec is about
+  // the two, so the third is filtered rather than raced.
   await expect
-    .poll(async () => (await heard()).slice(beforeJump), { message: 'the jump and the landing' })
+    .poll(
+      async () =>
+        (await heard()).slice(beforeJump).filter((sound) => sound !== BATTLE_SOUNDS.ready.sound),
+      { message: 'the jump and the landing' }
+    )
     .toEqual([BATTLE_SOUNDS.jump.sound, BATTLE_SOUNDS.land.sound])
 
   expect(app.errors()).toEqual([])
