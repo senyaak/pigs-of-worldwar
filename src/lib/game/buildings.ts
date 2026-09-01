@@ -63,6 +63,58 @@ export const buildingHealth = (kind: number): number => BUILDING_ROW[kind - 1][0
 export const buildingRoom = (kind: number): number => BUILDING_ROW[kind - 1][1]
 
 /**
+ * **WHAT A TURN SPENT INSIDE ONE IS WORTH** — the game's two hospital tents,
+ * and the answer to "do the tents work" is that only two of the three do.
+ *
+ * The manual says it in words (`manual.txt`, and it is `[manual]` rather than
+ * inference): *"If your porker gets in a Medic tent and manages to stay inside
+ * it until he gets his next turn, he will receive a handy health boost"*, and
+ * *"if your trooper is lucky enough to find himself inside a MASH tent, then
+ * instead of a meagre health boost, he will be cured back up to full health"*.
+ *
+ * The exe says which is which, read 2026-09-01 (`damage/notes.md`, whose open
+ * question this closes). `Pig::PerTurn` (0x4703A0) calls 0x470340 for a pig
+ * whose `[+0x2EC]` is **4** — inside a BUILDING rather than a vehicle — and
+ * that arm asks the building itself through 0x43F930, a six-way jump on
+ * `[building+0xD4]`, which the constructor sets to **kind − 1** (0x43F1C8):
+ *
+ * ```
+ * 0 BIG_GUN  -> 0     3 PILLBOX -> 0
+ * 1 M_TENT1  -> 1     4 SHELTER -> 3
+ * 2 M_TENT2  -> 2     5 TENT_S  -> 3
+ * ```
+ *
+ * and 0x470340 does `deficit = [pig+0x3B8] − [pig+0x4C]`, then: code 0 and
+ * code 3 return, **code 1 heals `min(deficit, 0x1900)`** — fifty points — and
+ * **code 2 heals the whole deficit**. So `M_TENT1` is the MEDIC tent and
+ * `M_TENT2` the MASH one, which their rows agree with from the other side:
+ * the MASH tent is the bigger and tougher of the two (40 points and room for
+ * four against 30 and two).
+ *
+ * **`TENT_S` is not a hospital at all** — code 3, the shelter's — and that is
+ * worth knowing because it is the tent a player meets FIRST: two of them on
+ * TRENCH, which is the third mission. It is cover, and cover only.
+ */
+export type BuildingHeal = 'none' | 'boost' | 'full'
+
+const BUILDING_HEAL: readonly BuildingHeal[] = [
+  'none', // 1 BIG_GUN
+  'boost', // 2 M_TENT1 — the MEDIC tent
+  'full', // 3 M_TENT2 — the MASH tent
+  'none', // 4 PILLBOX
+  'none', // 5 SHELTER
+  'none' // 6 TENT_S
+]
+
+/** What a turn spent inside this kind puts back. */
+export const buildingHeal = (kind: number): BuildingHeal => BUILDING_HEAL[kind - 1] ?? 'none'
+
+/** How much the MEDIC tent's boost is capped at — `cmp esi, 0x1900` at
+ * 0x47037C, which is fifty points in the engine's 128ths. The same fifty a
+ * stick of TNT takes off. */
+export const TENT_BOOST = 0x1900 / 128
+
+/**
  * **What a pig can DO while it is inside one.**
  *
  * Play: "в инвентаре скилы только постройки, и у бомбоубежища это только

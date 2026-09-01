@@ -21,7 +21,16 @@
 //
 // Pure, and game space (Y-down) like the rest of lib/game.
 
-import { ENTER_REACH, buildingKind, buildingRoom, buildingSkills } from './buildings'
+import {
+  ENTER_REACH,
+  TENT_BOOST,
+  buildingHeal,
+  buildingKind,
+  buildingRoom,
+  buildingSkills
+} from './buildings'
+import { heal, maxHealthFor } from './health'
+import { originY } from './body'
 import { copyLocomotion } from './locomotion'
 import type { LocomotionState } from './locomotion'
 import { boxOf } from './obstacles'
@@ -80,6 +89,17 @@ export interface Indoors {
   /** …and back out, onto the footing it came from — which is handed back, so
    * the battle can stand on it again. Null when the pig was not inside. */
   leave(pig: Pig): LocomotionState | null
+  /**
+   * **THE TENT PAYS OUT AT THE TOP OF THE PIG'S OWN TURN.** Call it for the
+   * pig whose turn is starting, beside the disguise's and the poison's own
+   * passes — all three are the same routine in the exe (0x4703A0), and the
+   * heal is the FIRST thing in it.
+   *
+   * A pig that walked into a MASH tent and stayed there wakes at full health;
+   * a MEDIC tent gives it fifty back (lib/game/buildings.ts, `buildingHeal`).
+   * Everything else it might be standing in gives nothing.
+   */
+  turnStarted(pig: Pig): void
   /** Whatever the pig is standing in, gone — a pig that just died, or a battle
    * being torn down. */
   clear(pig?: Pig): void
@@ -166,6 +186,29 @@ export function createIndoors(objects: readonly MapObject[], emit: Emit): Indoor
       pig.heading = step.footing.heading
       emit({ kind: 'cameOut', pig: pig.id, building: step.building })
       return step.footing
+    },
+    turnStarted(pig) {
+      const building = this.inside(pig)
+      if (!building) return
+      const worth = buildingHeal(building.kind)
+      if (worth === 'none') return
+      // `deficit = [pig+0x3B8] - [pig+0x4C]` (0x470354), the pig's own ceiling
+      // less what it has left. A pig already topped up is healed by nothing,
+      // and the exe's two `jl` guards say the same: a deficit under zero is
+      // not a wound to close.
+      const deficit = maxHealthFor(pig.pigClass) - pig.health
+      const amount = worth === 'full' ? deficit : Math.min(deficit, TENT_BOOST)
+      if (amount <= 0) return
+      heal(pig, amount)
+      // The same `healed` beat a crate and the healing hands ride — the number
+      // over the head and the sigh under it (lib/game/damage.ts,
+      // audio/battleAudio.ts) — because from the outside this IS one.
+      emit({
+        kind: 'healed',
+        at: { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z },
+        amount,
+        pig: pig.id
+      })
     },
     clear(pig) {
       if (pig) held.delete(pig.id)

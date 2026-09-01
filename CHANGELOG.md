@@ -20,6 +20,10 @@ one.
   points at the pig's own feet that it does not survive. Both were in shipped
   kits already and both did nothing at all when the fire key went down.
 
+- **The hospital tents pay out.** Spend a turn inside a MASH tent and your pig
+  wakes at full health; a medic tent gives fifty points back. The plain tents
+  and the shelter give nothing, which is what the original does too.
+
 ## 0.1.0
 
 The first build anyone can download. It is an **engine**, not a game: it reads

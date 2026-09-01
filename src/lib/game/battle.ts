@@ -920,6 +920,14 @@ export function createBattle(parts: BattleParts): Battle {
     // per-turn pass the poison rides (0x470425 in 0x4703A0): a round of
     // cover, no more (lib/game/hide.ts).
     hides.turnStarted(game.currentPig)
+    // **AND THE TENT PAYS OUT, BEFORE THE POISON DOES.** The same per-turn
+    // pass again, and this is the FIRST thing in it (0x4703BD, ahead of the
+    // status tick at 0x47040A): a pig that spent its turn inside a MASH tent
+    // wakes at full health, a MEDIC tent gives it fifty back, and everything
+    // else it might be standing in gives nothing (lib/game/buildings.ts,
+    // `buildingHeal`). The order matters where both apply — a poisoned pig in
+    // a MASH tent is topped up and then pays its ten.
+    indoors.turnStarted(game.currentPig)
     // **THE POISON BITES AT THE TOP OF THE PIG'S OWN TURN** — the exe's
     // per-turn pass (0x4703A0, lib/game/poison.ts): ten points, before the
     // card, so the health the announcement reads is the health the turn

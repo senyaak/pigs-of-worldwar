@@ -657,3 +657,56 @@ walking onto a PROPOINT.
 `e2e/000/propoint.spec.ts` pins the census, because eight maps out of sixty-one
 carry one and "I never saw it" is the expected experience everywhere else.
 LIBERATE is the earliest map with one.
+
+## The HOSPITAL TENTS — 2026-09-01
+
+Play: "теперь давай на третьей карте посмотрим на палатки хилки — они
+работают?" Three answers, and the first two are about the question rather than
+the code.
+
+**The third mission's tents are not healing tents.** TRENCH carries two
+`TENT_S`, and `TENT_S` takes the SHELTER's arm of the exe's own jump: a turn
+spent inside it is worth nothing at all. It is cover. That is the original's
+behaviour and not a gap.
+
+**The healing ones are two other models, and they come later.** Counted over
+the campaign's own POGs: `M_TENT2`, the MASH tent, on SNIPER (position 8),
+GUNS (10) and EMPLACE (20); `M_TENT1`, the medic tent, four of them on BRIDGE
+(17). So the first one a player can reach is a MASH tent, five missions past
+the tents they asked about.
+
+**And nothing was built for either.** The turn beat ran the disguise's pass and
+the poison's and nothing else; a pig could sit in a MASH tent all game.
+
+### What the exe says, now that it has been read
+
+The manual had the behaviour in words all along (`manual.txt`: a medic tent is
+"a handy health boost", a MASH tent "cured back up to full health") and
+`damage/notes.md` had carried it as an open question — WHICH model was which.
+`Pig::PerTurn` (0x4703A0) answers it in three short arms: a pig whose
+`[+0x2EC]` is 4 — inside a building rather than a vehicle — goes to 0x470340,
+which computes the deficit and asks the building itself through 0x43F930, a
+six-way jump on kind − 1. Code 1 heals `min(deficit, 0x1900)` = fifty points,
+code 2 heals the lot, and codes 0 and 3 return. M_TENT1 is 1, M_TENT2 is 2, and
+BIG_GUN, PILLBOX, SHELTER and TENT_S are not hospitals.
+
+The rows agree from the other side: the MASH tent is the bigger and tougher of
+the pair, 40 points of health and room for four against the medic tent's 30 and
+two.
+
+**The heal comes BEFORE the poison's ten**, in the same routine — so a poisoned
+pig in a MASH tent is topped up and then pays. That ordering is reproduced
+rather than assumed: `indoors.turnStarted` sits ahead of `poison.turnStarted`
+in the turn beat, with the address beside it.
+
+### Built
+
+`buildingHeal` and `TENT_BOOST` in `lib/game/buildings.ts` — a table beside the
+health and capacity ones it was read with — and `indoors.turnStarted`, which
+owns it because `indoors.ts` is what knows who is inside what. The payout rides
+the same `healed` event a crate and the healing hands do, so the number over
+the head and the sigh under it come for free.
+
+`unit/tents.spec.ts` pins all of it, TENT_S included: seven tests, and the one
+that matters most is the negative — the tent a player meets first pays
+nothing.
