@@ -1153,9 +1153,16 @@ and the weakest of them were invented here:
   re-derived the whole chain before the duplicate was caught. TWO lessons,
   both permanent: an arm without the impulse call only means the throw
   lives elsewhere; and the notes repo is searched FIRST — the answer was
-  already written down. The remake's damage-scaled model
-  (`FLING_PER_POINT`) is `[play]`-tuned and stays until play asks for the
-  exe's numbers.
+  already written down. **The remake now uses those numbers**: play measured
+  the old damage-scaled model in the one unit that shows — "граната
+  откидывает через чур далеко, раза в 3-4 дальше чем надо" — and a throw is
+  ballistic, so 180 a frame against the exe's 86.7 is 4.3 times the ground.
+  `flingSpeed(force, share)` in `lib/game/blast.ts` is `force × share / 30`;
+  `Lob.force` is row +0x08 and the DIRECTION is still `hurlVelocity`'s, which
+  is what play tuned over four passes and is not about how hard.
+  **A force of 0 throws nobody**, which is how the gases and the medicine ball
+  are built — the shove no longer rides the damage, so a weapon that heals
+  cannot shove.
 - **"I could not find it" is never "it is not there".** Twice in one session: the
   grenade's TRAIL was declared absent because both of the projectile update's
   dispatches skip a plain grenade — it is in the CONSTRUCTOR (0x43247b); then the

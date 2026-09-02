@@ -44,6 +44,18 @@ export const LAND_DEATH_DAMAGE = 0xa00
 export const LAND_DEATH_RANGE = 0x400
 export const WET_DEATH_DAMAGE = 0x500
 export const WET_DEATH_RANGE = 0x800
+/**
+ * …and how hard each THROWS — `[effect+0x64]`, the FORCE the phantom sweep
+ * divides by the pig's mass (lib/game/blast.ts, `flingSpeed`).
+ *
+ * `effects/notes.md`, the Pig::Die strengths: the land death is **0xCB2 =
+ * 3250** and the water one **0xA28 = 2600**, the grenade's own. Both are
+ * bigger than the damage they carry would suggest, which is the point of the
+ * force being a column rather than a multiple: a body coming apart is a shove
+ * before it is a wound.
+ */
+export const LAND_DEATH_FORCE = 3250
+export const WET_DEATH_FORCE = 2600
 /** The effect ids the arms name: 0x56 on land and for a gib (parameter row
  * 7), 0x5B in the water (row 8). Neither row is transcribed, so the picture
  * falls back on the grenade's (lib/game/effectField.ts). */
@@ -202,14 +214,25 @@ export function createCorpses(
       }
       const charge: Charge =
         how === 'land'
-          ? { damage: LAND_DEATH_DAMAGE, reach: blastReach(LAND_DEATH_RANGE), effect: DEATH_EFFECT }
+          ? {
+              damage: LAND_DEATH_DAMAGE,
+              reach: blastReach(LAND_DEATH_RANGE),
+              effect: DEATH_EFFECT,
+              force: LAND_DEATH_FORCE
+            }
           : how === 'water'
             ? {
                 damage: WET_DEATH_DAMAGE,
                 reach: blastReach(WET_DEATH_RANGE),
-                effect: WET_DEATH_EFFECT
+                effect: WET_DEATH_EFFECT,
+                force: WET_DEATH_FORCE
               }
-            : { damage: WET_DEATH_DAMAGE, reach: blastReach(WET_DEATH_RANGE), effect: DEATH_EFFECT }
+            : {
+                damage: WET_DEATH_DAMAGE,
+                reach: blastReach(WET_DEATH_RANGE),
+                effect: DEATH_EFFECT,
+                force: WET_DEATH_FORCE
+              }
       world.blast(at, charge)
     }
     pig.gone = true

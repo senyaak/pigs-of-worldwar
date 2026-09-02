@@ -30,7 +30,10 @@ import type { TerrainQuery } from '../src/lib/game/terrain'
 import { terrain } from './fixture'
 
 /** A grenade's own throw: thirty points at the core. */
-const SPEED = flingSpeed(30)
+// A grenade's FORCE at the core (lib/game/blast.ts): the throw stopped
+// riding the damage when play measured it three or four times too long.
+const GRENADE_FORCE = 2600
+const SPEED = flingSpeed(GRENADE_FORCE, 1)
 
 /**
  * The whole flight, at the engine's step: launched from (0,0) with `v`,
@@ -55,13 +58,17 @@ const knock: Velocity = { vx: Math.SQRT1_2 * SPEED, vy: -Math.SQRT1_2 * SPEED, v
 
 test('a 45° toss over FLAT ground flies, lands, and ROLLS on along the ground', { tag: '@nodata' }, () => {
   const { touchdown, rest } = flown(terrain(() => 0), knock)
-  // The arc itself — measured 1884 at the bench, floored loosely.
-  expect(touchdown).toBeGreaterThan(1500)
+  // The arc itself — measured **560** at the bench, floored loosely. It was
+  // 1884 while the throw rode the damage at six times a point; the exe's own
+  // force over the pig's mass is 86.7 a frame against 180, and a ballistic
+  // throw covers the SQUARE of that, which is what play measured as "three or
+  // four times too far" (lib/game/blast.ts).
+  expect(touchdown).toBeGreaterThan(450)
   // …and the roll past it: the horizontal SURVIVES the landing and is eaten
   // by friction, not discarded. This is the line that failed before the fix
   // (the settle threw 700+ a second away on the second touch: rest — touchdown
   // came out under 30).
-  expect(rest - touchdown).toBeGreaterThan(80)
+  expect(rest - touchdown).toBeGreaterThan(50)
 })
 
 test('knocked DOWNHILL, the pig always gets away — the slope only helps', { tag: '@nodata' }, () => {
@@ -80,7 +87,8 @@ test('knocked INTO a rising slope, it still moves off the spot and comes to rest
   // ground, but the parallel part of the arrival survives the landing and
   // skips on up the hill — no freezing where the flight happened to end.
   const { rest } = flown(terrain((x) => x * Math.tan(Math.PI / 6)), knock)
-  expect(rest).toBeGreaterThan(600)
+  // Measured 407 — it was over 600 on the old throw.
+  expect(rest).toBeGreaterThan(300)
 })
 
 test('a BLAST up the hill of a pig on a slope sends it away DOWN the slope', { tag: '@nodata' }, () => {
@@ -98,7 +106,7 @@ test('a BLAST up the hill of a pig on a slope sends it away DOWN the slope', { t
   burst(
     // On the ground 300 up the slope: higher ground is a SMALLER game y.
     { x: -300, y: -hill.height(-300, 0), z: 0 },
-    { damage: 30 * DAMAGE_UNIT, reach: blastReach(1024) },
+    { damage: 30 * DAMAGE_UNIT, reach: blastReach(1024), force: GRENADE_FORCE },
     {
       pigs: () => [pig],
       targets: [],
@@ -115,5 +123,7 @@ test('a BLAST up the hill of a pig on a slope sends it away DOWN the slope', { t
   expect(velocity!.vx).toBeGreaterThan(0)
   expect(-velocity!.vy).toBeCloseTo(velocity!.vx, 6)
   const { rest } = flown(hill, velocity!)
-  expect(rest).toBeGreaterThan(1500)
+  // Measured 1347, against 1500-and-more on the old throw. The hill is what
+  // keeps this one long: the ground falls away under the arc.
+  expect(rest).toBeGreaterThan(1000)
 })

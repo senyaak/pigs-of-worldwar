@@ -41,6 +41,16 @@ export interface Charge {
    * and simply looks like a grenade.
    */
   effect?: number
+  /**
+   * **How hard it THROWS** — a row's +0x08, the column `weapons/fire.md` calls
+   * FORCE and the effect keeps at `[eff+0x64]` (`flingSpeed`).
+   *
+   * Absent or zero throws nobody, which is not a default so much as a
+   * behaviour: the gases and the medicine ball carry a real 0 in that column,
+   * and a blast raised by something with no row of its own says so by leaving
+   * it out.
+   */
+  force?: number
 }
 
 /** What a GRENADE's destructor spawns (0x432e75) — parameter row 0. */
@@ -106,49 +116,51 @@ export interface BlastWorld {
 }
 
 /**
- * **What a blast THROWS with: six times the damage it did, in points.**
+ * **WHAT A BLAST THROWS WITH: the effect's own FORCE, over the body's MASS.**
  *
- * The exe's whole vocabulary for shoving a pig is one call,
- * `0x4a9100(speed, 0x200, bearing, 0)`, and the speeds at its six sites are the
- * scale everything here is measured against: **0x40** for a pig shoved by another
- * body (0x477695, 0x477842) or by a building going off (0x44050c), **0x78** for
- * types 0x1358/0x135A, and for the melee the weapon's own `knockback` —
- * **75 for a bayonet, 100 for a trotter, 150 for a sword, 200 for the cattle
- * prod** (`weapons/melee.md`).
+ * This replaces a `[play]`-tuned invention — `6 × the damage in points`, capped
+ * at the cattle prod's 200 — and it is replaced because play measured it in the
+ * one unit that matters: **"граната откидывает через чур далеко, раза в 3-4
+ * дальше чем надо"** (2026-09-01). The arithmetic agrees exactly, and this
+ * file's own comment had already written down why it would:
  *
- * That last row is what the first attempt got wrong. It used 0x40 flat, which is
- * **less than a punch** for a charge going off under a pig's trotters, and play
- * said so at once: "толчёк очень мелкий." So the magnitude scales with the damage
- * instead — and then once more, because four times it still left a mine feeling
- * light ("отбрасывание миной всё ещё кажется слабым"). At **six** the three blasts
- * in the game land like this:
+ * | | old, 6×points | the exe |
+ * | - | - | - |
+ * | a grenade at the core | 180 | **86.7** |
+ * | TNT | 200, at the cap | **173** |
+ * | a mine | 120 | **130** |
  *
- * | blast | points at the core | speed |
- * | ----- | ------------------ | ----- |
- * | a MINE | 20 | **120 = 0x78**, the engine's other decoded knock |
- * | a GRENADE | 30 | 180 |
- * | TNT | 50 | 300, held at the **200** cap |
+ * A throw is ballistic, so the DISTANCE goes as the square of the launch
+ * speed: `(180 / 86.7)² = 4.3`, which is the "three or four times" play saw.
+ * The mine and TNT were close all along; it was the grenade — the thing thrown
+ * most — that was double.
  *
- * — monotone, none of it past the hardest knock the exe hands out, and both ends on
- * the engine's own numbers.
+ * **The exe's own model** (`weapons/fire.md` §"phantom sweep", 0x40A500) is the
+ * EFFECT's one-shot world sweep, not any arm of the pig's:
  *
- * The FALLOFF is free: the damage is already the share for the distance, so
- * standing back saves your footing along with your health.
+ * ```
+ * dir = normalize(body - burst)      (zero distance -> straight up)
+ * M   = FORCE * (1 - 3d/4R)          the SAME falloff the damage runs
+ * v   = dir * M ;  v.y *= 2          the vertical always doubles
+ * dv  = v / [body+0x90]              the body's MASS -- a pig's is 30
+ * ```
  *
- * The six, and the cap, are the REMAKE's calibration. The exe's own throw
- * is READ — `weapons/fire.md` §"phantom sweep" — and it is the EFFECT's
- * one-shot world sweep (0x409EF0), not any arm of the pig's: sphere of
- * the whole RANGE centred 128 ABOVE the blast, impulse
- * `strength · (1 − 3d/4R)` along centre→body (25% still standing at the
- * rim), the vertical DOUBLED, divided by the body's MASS (a pig's is 30),
- * a coin-flip spin; `strength` is the effect's own FORCE field — grenade
- * 2600, TNT 6500, the land death 3250 — and does NOT scale with the
- * damage. Gas, fire and heal are built with the impulse flag off: damage
- * without throw. In per-frame Δv that is ~87 for a grenade at the centre,
- * ~108 for a corpse, ~217 for TNT — the same order this model's 6×points
- * lands (180/120/200-capped), so the two disagree in SHAPE (falloff, the
- * doubled vertical, damage-independence) more than in size. This model
- * stays `[play]`-tuned until play asks for the exe's numbers.
+ * Two of those four lines were already here and stay: the falloff is
+ * `blastShare`, which every blast already computes for the damage, and the
+ * DIRECTION is `hurlVelocity`'s — four passes of play shaped it (the paragraph
+ * below) and none of what play tuned there is about how HARD the throw is.
+ * What changes is the magnitude, and only that.
+ *
+ * **And it no longer rides the damage**, which is the second half of the exe's
+ * shape. The force is a column of its own (row +0x08) and the two do not track:
+ * the MEDICINE BALL does forty points of healing at force **0**, the gases hurt
+ * at force 0, and the mine throws harder than the grenade while hurting less.
+ * A weapon that heals or poisons must not shove, and now it cannot.
+ *
+ * The cap is gone with the invention it bounded. The exe divides and does not
+ * clamp, and nothing in a shipped kit reaches the old ceiling anyway — the
+ * hardest force in the game is the SHOCKWAVE's 9750 (325 a frame), which is a
+ * push weapon and is supposed to be.
  *
  * The DIRECTION is the engine's one throwing explosion borrowed: a BUILDING
  * going off (PC 0x44050c at 0x40, PSX 0x800FAC84, contact arm 0x78) throws
@@ -163,13 +175,13 @@ export interface BlastWorld {
  * pig wide ("должно было вверх по горе подвинуть, а он на месте катился"),
  * and the footprint boundary that answers all three.
  */
-export const FLING_PER_POINT = 6
-/** …and no harder than the hardest knock in the engine: the cattle prod's. */
-export const FLING_CAP = fromExeSpeed(200)
+export const PIG_MASS = 30
 
-/** How hard a blast that took `points` off a pig throws it. */
-export const flingSpeed = (points: number): number =>
-  Math.min(FLING_CAP, fromExeSpeed(FLING_PER_POINT * points))
+/** How hard a blast of this FORCE throws a body at `share` of the core — the
+ * same 0..1 the damage is scaled by (`blastShare`). Force 0 throws nobody,
+ * which is how the heals and the gases are built. */
+export const flingSpeed = (force: number, share: number): number =>
+  fromExeSpeed((force * share) / PIG_MASS)
 
 /**
  * Set one off at `at`: announce it, and hurt everything within reach.
@@ -221,7 +233,10 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     world.fling?.(
       pig,
       hurlVelocity(
-        flingSpeed(amount),
+        // The throw is the FORCE's, not the damage's — and it runs the same
+        // falloff, so standing back still saves your footing along with your
+        // health (`flingSpeed`).
+        flingSpeed(charge.force ?? 0, blastShare(Math.hypot(dx, dy, dz), charge.reach)),
         { x: dx, y: dy, z: dz },
         world.groundNormal?.(pig.position.x, pig.position.z)
       )

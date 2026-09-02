@@ -36,6 +36,8 @@ import type { BattleEvent } from '../../src/lib/game/events'
 import { bodyExtent } from '../../src/lib/game/body'
 import { give } from '../../src/lib/game/inventory'
 import { flingSpeed } from '../../src/lib/game/blast'
+import { lobOf } from '../../src/lib/game/grenade'
+import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
 import { PLAIN_GRAVITY } from '../../src/lib/game/ballistics'
 import { PIG_RADIUS } from '../../src/lib/game/obstacles'
 
@@ -208,10 +210,12 @@ test('a grenade bursting at a hillside pig SENDS IT FLYING — displacement, not
     if (flat < PIG_RADIUS) continue
     landed++
 
-    // **THE FLOOR IS DERIVED FROM THE DAMAGE, because the throw is.**
-    // `flingSpeed` is `6 × points` capped at the cattle prod's 200
-    // (lib/game/blast.ts), thrown at 45°, so the flat-ground range it buys is
-    // `v²/g`. A FLAT floor cannot serve both ends of that: this line was one,
+    // **THE FLOOR IS DERIVED FROM THE THROW, and the throw is the row's
+    // FORCE.** `flingSpeed` is `force × share / 30` (lib/game/blast.ts) —
+    // it stopped riding the damage the day play measured the old model three
+    // or four times too long — and the share is what the damage already is:
+    // the points taken over the row's own core. Thrown at 45°, so the
+    // flat-ground range it buys is `v²/g`. A FLAT floor cannot serve both ends of that: this line was one,
     // at 400, and it went red on a round that took nine points at the rim and
     // travelled 254 — its own arithmetic, called a failure.
     //
@@ -224,7 +228,12 @@ test('a grenade bursting at a hillside pig SENDS IT FLYING — displacement, not
     // applied. The round that reported eight units of travel on thirty points
     // of damage — before the footprint split above was written — is two orders
     // of magnitude under it.
-    const bought = took.reduce((most, points) => Math.max(most, flingSpeed(points)), 0)
+    const row = lobOf(GRENADE)!
+    const core = row.damage / DAMAGE_UNIT
+    const bought = took.reduce(
+      (most, points) => Math.max(most, flingSpeed(row.force, points / core)),
+      0
+    )
     const floor = 0.15 * ((bought * bought) / PLAIN_GRAVITY)
     expect(
       moved,

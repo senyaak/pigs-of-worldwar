@@ -67,7 +67,20 @@ panning up behind, and a CLUSTER's burst should **sweep** the aim across to the
 bomblet rather than cutting to it. Measured 9° off the flight at the peak,
 against 0.4° before.
 
-### 5. The AI with a mortar (B18)
+### 5. THE BLAST'S THROW IS HALF WHAT IT WAS (B24)
+
+Play measured it: "граната откидывает через чур далеко, раза в 3-4 дальше чем
+надо." The throw stopped riding the damage and is the exe's own `force / mass`
+now — a grenade launches at 86.7 a frame against 180, and because a throw is
+ballistic that is about a QUARTER of the ground. On the bench a flat 45° toss
+lands at 560 where it used to reach 1884.
+
+So the thing to judge is whether it is now too SHORT. Everything else moved
+with it: a mine throws harder than a grenade (it always did in the exe), TNT
+harder again, and **the gases and the medicine ball throw nobody at all**,
+which is a real zero in their own column rather than a special case.
+
+### 6. The AI with a mortar (B18)
 
 A machine BOMBARDIER now solves its PITCH where every other lob solves the
 gauge, and the turn's hand-shake moved onto the pitch with it. Two failure
@@ -2417,6 +2430,34 @@ So neither is a regression, and neither is written down anywhere else.
 
 Neither has been touched: they are timing in the SPECS, not behaviour, and the
 fix is a measurement each rather than a tuned number.
+
+### B24. THE BLAST'S THROW IS THE EXE'S NOW — 2026-09-01
+
+`flingSpeed` was `6 × the damage in points` capped at 200, a `[play]`-tuned
+invention; play measured it three or four times too long and the exe's own
+figure was already written down in `blast.ts`'s own comment. It is
+`force × share / 30` now. `docs/history/weapons.md` has the session and the
+before/after table.
+
+What it costs and buys, so nothing here is re-litigated:
+
+- **Only the magnitude moved.** The falloff was already the damage's own ramp
+  and the DIRECTION is still `hurlVelocity`'s — four passes of play shaped
+  that. The exe's DOUBLED VERTICAL is deliberately not taken: the 45°-family
+  pitch with its footprint exception already answers the "toss up" it exists
+  for, and it is play's.
+- **The throw no longer tracks the damage**, which is the half that could not
+  be expressed before: the medicine ball heals at force 0, the gases hurt at
+  force 0, and a mine out-throws a grenade while hurting less.
+- Every blast got its column read: the lob rows, `MINE_FORCE` 3900, the land
+  and water deaths 3250/2600, the suicide's 5200.
+
+**Open, and worth a play ruling**: whether it is now too SHORT. The old model
+was tuned UP twice by play ("толчёк очень мелкий", then "отбрасывание миной
+всё ещё кажется слабым") before it was tuned down once — so the honest state is
+that the exe's number has never been felt. If it reads weak, the knob is not
+`flingSpeed` but the exe's own doubled vertical, which is the one term of the
+formula still left out.
 
 ### B23. THE HERO'S FIVE, READ — 2026-09-01, and two of them are not weapons
 

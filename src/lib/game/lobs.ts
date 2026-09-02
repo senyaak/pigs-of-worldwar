@@ -195,7 +195,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       { x: shot.x, y: shot.y, z: shot.z },
       // The row's own effect id where it has one — the bomblet's 0x47 dry
       // crack; everything else takes the family's 0x54 default.
-      { damage: row.damage, reach: blastRange(row), effect: row.effect },
+      { damage: row.damage, reach: blastRange(row), effect: row.effect, force: row.force },
       world,
       emit,
       shot.owner

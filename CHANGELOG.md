@@ -20,6 +20,11 @@ one.
   points at the pig's own feet that it does not survive. Both were in shipped
   kits already and both did nothing at all when the fire key went down.
 
+- **A blast no longer throws pigs half across the map.** The knock is the
+  original's own arithmetic now, which is about a quarter of the distance the
+  remake was giving it — and a mine throws harder than a grenade, while a gas
+  or a medicine ball throws nobody at all.
+
 - **A thrown grenade no longer sits pinned to the middle of the screen.** The
   original's camera chases the flight rather than locking on to it, so a lob
   climbs out of the top of the frame and the view pans up after it.

@@ -1208,7 +1208,9 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         .find((pig) => pig !== game.currentPig && pig.health > 0)
       if (!other) return null
       const from = { pig: other.id, x: other.position.x, z: other.position.z }
-      battle.fling(other, flingVelocity(flingSpeed(30), 0))
+      // A grenade's own throw at the core — the debug shove is measured
+      // against the same weapon a spec would use (lib/game/blast.ts).
+      battle.fling(other, flingVelocity(flingSpeed(lobOf(19)?.force ?? 0, 1), 0))
       return from
     },
     hotseat: (on) => {

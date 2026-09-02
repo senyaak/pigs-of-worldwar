@@ -128,10 +128,21 @@ export interface Lob {
    *
    * The grenade's spawn is `0x487AD0(x, z, 0x54, row+0x04, 1, row+0x08,
    * row+0x0C)`, so the range is row **+0x04 = 1024** and not the 2600 of
-   * +0x08 that a first reading took. What +0x08 is — Init's arg 9 — is not
-   * followed.
+   * +0x08 that a first reading took. **And +0x08 is followed now**: it is the
+   * FORCE (`force` below), which nothing but the throw reads.
    */
   blast: number
+  /**
+   * Row **+0x08** — the FORCE, which is how hard the burst THROWS and is a
+   * column of its own rather than anything derived from the damage
+   * (lib/game/blast.ts, `flingSpeed`). `0x487AD0`'s sixth argument, kept at
+   * `[effect+0x64]` and read by the phantom sweep alone.
+   *
+   * **It is 0 on everything that must not shove**: the three gases and the
+   * MEDICINE BALL carry a real zero there, which is the same fact as their
+   * phantom's push flag being clear.
+   */
+  force: number
   /** Row **+0x20** and **+0x22** — the projectile body's OWN physics material,
    * set in the constructor (0x4323e2) and multiplied by the surface's the way
    * a pig's is. See `lobBounce`. */
@@ -233,35 +244,35 @@ export interface Lob {
 const LOBS: Record<number, Lob> = {
   /** 19 GRENADE — the plain one. Friction 0.30, restitution 0.80, so 0.12 and
    * 0.32 against grass: a few hops and then a long roll. */
-  19: { id: 412, kind: 24, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
+  19: { id: 412, kind: 24, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, force: 2600, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
   /** 20 CLUSTER GRENADE — a grenade's own flight and blast, plus the five
    * bomblets its destructor lets go (`scatter` above). Its own pop is effect
    * **0x46** (0x43290E), which resolves to parameter row 0 like the
    * grenade's 0x54, so the picture is the same and the id is kept for
    * faithfulness' sake. Worst case on one body: 30 + 5×15. */
-  20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false, effect: 0x46, scatter: { child: 0x100, count: 4, aim: 0x3e8, step: 0x400, upright: 0x400, seeded: false, lift: 40 } },
+  20: { id: 413, kind: 25, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, force: 2600, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false, effect: 0x46, scatter: { child: 0x100, count: 4, aim: 0x3e8, step: 0x400, upright: 0x400, seeded: false, lift: 40 } },
   /** 21 HIGH EXPLOSIVE — sixty points at the core over a 1536 field: the
    * heaviest thing a pig throws. */
-  21: { id: 417, kind: 29, speed: 300, fuse: 150, arming: 3, damage: 7680, blast: 1536, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  21: { id: 417, kind: 29, speed: 300, fuse: 150, arming: 3, damage: 7680, blast: 1536, force: 3900, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
   /** 22 ROLLER — a grenade's forty points on a material of 0.001/0.001:
    * nothing bounces and nothing slows, so it ROLLS, which is the weapon. */
-  22: { id: 419, kind: 31, speed: 300, fuse: 150, arming: 3, damage: 5120, blast: 1024, friction: 4 / FIXED, restitution: 4 / FIXED, contact: false },
+  22: { id: 419, kind: 31, speed: 300, fuse: 150, arming: 3, damage: 5120, blast: 1024, force: 2600, friction: 4 / FIXED, restitution: 4 / FIXED, contact: false },
   /** 23 CONFUSION — id 416, the SAME projectile as 26 POISON (the status is
    * not built; until it is, this bursts as a stand-in). */
-  23: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
-  24: { id: 414, kind: 26, speed: 300, fuse: 150, arming: 3, damage: 2560, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
-  25: { id: 415, kind: 27, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  23: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, force: 0, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  24: { id: 414, kind: 26, speed: 300, fuse: 150, arming: 3, damage: 2560, blast: 512, force: 0, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
+  25: { id: 415, kind: 27, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, force: 0, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false },
   /** 26 POISON — the canister that STREAMS (`gas` above): fifteen flat at the
    * touch, the poison bit after, and no blast at the pop. */
-  26: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false, gas: true },
-  27: { id: 420, kind: 32, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
+  26: { id: 416, kind: 28, speed: 300, fuse: 150, arming: 3, damage: 1920, blast: 512, force: 0, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false, gas: true },
+  27: { id: 420, kind: 32, speed: 300, fuse: 150, arming: 3, damage: 3840, blast: 1024, force: 2600, friction: 1228 / FIXED, restitution: 3276 / FIXED, contact: false },
   /** 33 MEDICINE BALL — the MEDIC's thrown AREA heal, every field read out of
    * the exe's own row (kind 37, VA 0x4C25F8, 2026-08-28): a grenade's throw
    * (gauge, clip 19) on a BOUNCIER material (0.5/0.8 against the grenade's
    * 0.3/0.8), arming 2 under the same 150-frame fuse, and forty points over a
    * 2048 field that HEAL (`heals` above) — full inside the 512 core, down to
    * a quarter at the rim, clamped to each body's own deficit. */
-  33: { id: 425, kind: 37, speed: 300, fuse: 150, arming: 2, damage: 5120, blast: 2048, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false, heals: true },
+  33: { id: 425, kind: 37, speed: 300, fuse: 150, arming: 2, damage: 5120, blast: 2048, force: 0, friction: 2048 / FIXED, restitution: 3276 / FIXED, contact: false, heals: true },
   /**
    * **37 TNT — PLANTED, not thrown**, and its row says so in three places: a
    * speed of 50 where a grenade has 300 and no power gauge to multiply it by, so
@@ -277,7 +288,7 @@ const LOBS: Record<number, Lob> = {
    * Fifty points at the core over 2048 of blast — twice a grenade's reach, and
    * enough to kill a grunt outright where a grenade takes thirty off it.
    */
-  37: { id: 441, kind: 53, speed: 50, fuse: 125, arming: 50, damage: 6400, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED, contact: false },
+  37: { id: 441, kind: 53, speed: 50, fuse: 125, arming: 50, damage: 6400, blast: 2048, force: 5200, friction: 409 / FIXED, restitution: 409 / FIXED, contact: false },
   /**
    * **29 BAZOOKA — the one thing here that goes off on TOUCH.** Play asked for
    * it whole: "продектайл со своей анимацией, звук выстрела, урон при касании —
@@ -296,7 +307,7 @@ const LOBS: Record<number, Lob> = {
    * is index **0x24 `L_BAZOO`** at 100/100, straight off the fire arm
    * (0x47ae9d..0x47aea3).
    */
-  29: { id: 398, kind: 10, speed: 500, fuse: 0, arming: 0, damage: 5120, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true },
+  29: { id: 398, kind: 10, speed: 500, fuse: 0, arming: 0, damage: 5120, blast: 2048, force: 3900, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true },
   /**
    * **28 MORTAR — the BOMBARDIER's own weapon, and it is an AIRBURST that is
    * thrown rather than a grenade.** Kind **42** (record +0x10 is 430), read
@@ -323,17 +334,17 @@ const LOBS: Record<number, Lob> = {
    * again (lib/game/ammo.ts) — and the report is index **0x29** at 100/100
    * off the fire arm (0x47ade5).
    */
-  28: { id: 430, kind: 42, speed: 500, fuse: 0, arming: 0, damage: 6400, blast: 2048, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true, effect: 0x58, scatter: { child: 0x101, count: 3, aim: 0x3b6, step: 0x555, upright: 0, seeded: true, lift: 40 } },
+  28: { id: 430, kind: 42, speed: 500, fuse: 0, arming: 0, damage: 6400, blast: 2048, force: 3900, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true, effect: 0x58, scatter: { child: 0x101, count: 3, aim: 0x3b6, step: 0x555, upright: 0, seeded: true, lift: 40 } },
   /** The CLUSTER's bomblet, keyed by the `BOMBLET` pseudo-skill (0x100,
    * declared below the table — a literal key because the table comes first).
    * Kind 33's own row: fifteen points over 1300, a 0.40/0.80 material. */
-  0x100: { id: 421, kind: 33, speed: 250, fuse: 150, arming: 3, damage: 1920, blast: 1300, friction: 1638 / FIXED, restitution: 3276 / FIXED, contact: false, effect: 0x47 },
+  0x100: { id: 421, kind: 33, speed: 250, fuse: 150, arming: 3, damage: 1920, blast: 1300, force: 1300, friction: 1638 / FIXED, restitution: 3276 / FIXED, contact: false, effect: 0x47 },
   /** …and the MORTAR's sub-shell, `SUB_SHELL` (0x101), on kind **11**'s row:
    * twenty points over 1024, the same 0.0999 material as the shell that made
    * it, and ONE frame of arming under no fuse at all — so it goes off on
    * whatever it touches from the second frame of its own flight. Effect
    * **0x4A** (0x433249), the dry crack the bomblet draws. */
-  0x101: { id: 399, kind: 11, speed: 250, fuse: 0, arming: 1, damage: 2560, blast: 1024, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true, effect: 0x4a }
+  0x101: { id: 399, kind: 11, speed: 250, fuse: 0, arming: 1, damage: 2560, blast: 1024, force: 1300, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true, effect: 0x4a }
 }
 
 /**

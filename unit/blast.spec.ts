@@ -34,7 +34,12 @@ import { createBus } from '../src/lib/game/events'
 const BODY = { footOffset: 100, crownRise: 80 }
 
 /** Thirty points at the core — a grenade's own charge. */
-const CHARGE = { damage: 30 * DAMAGE_UNIT, reach: blastReach(1024) }
+// A GRENADE's own row: thirty points over 1024, thrown with its FORCE of
+// 2600 (lib/game/blast.ts — the throw is the force's, not the damage's).
+const GRENADE_FORCE = 2600
+const CHARGE = { damage: 30 * DAMAGE_UNIT, reach: blastReach(1024), force: GRENADE_FORCE }
+/** What that charge throws with at the core. */
+const CORE_FLING = flingSpeed(GRENADE_FORCE, 1)
 
 /**
  * One pig standing at the origin (soles at y = 0, centre at y = −100), a
@@ -74,7 +79,7 @@ test('a charge UNDER the trotters throws the pig straight UP', { tag: '@nodata' 
   expect(Math.abs(v.vx)).toBeLessThan(1e-6)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
   // …and as hard as thirty points throw: the full core impulse.
-  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
+  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(CORE_FLING, 6)
 })
 
 test('OFFSET but still under the trotters: straight up all the same', { tag: '@nodata' }, () => {
@@ -87,7 +92,7 @@ test('OFFSET but still under the trotters: straight up all the same', { tag: '@n
   expect(v.vy).toBeLessThan(0)
   expect(Math.abs(v.vx)).toBeLessThan(1e-6)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
-  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
+  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(CORE_FLING, 6)
 })
 
 test('just PAST the trotters: the full 45° knock away — no vertical window beyond the body', { tag: '@nodata' }, () => {
@@ -100,7 +105,7 @@ test('just PAST the trotters: the full 45° knock away — no vertical window be
   expect(v.vy).toBeLessThan(0)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
   expect(-v.vy).toBeCloseTo(v.vx, 6)
-  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
+  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(CORE_FLING, 6)
 })
 
 test('a SHALLOW line takes the knock\'s own 45° — nothing is ever thrown flat', { tag: '@nodata' }, () => {
@@ -113,7 +118,7 @@ test('a SHALLOW line takes the knock\'s own 45° — nothing is ever thrown flat
   expect(v.vy).toBeLessThan(0)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
   expect(-v.vy).toBeCloseTo(v.vx, 6)
-  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
+  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(CORE_FLING, 6)
 })
 
 test('level with the centre: the same 45° knock away', { tag: '@nodata' }, () => {
@@ -134,12 +139,12 @@ test('a charge ABOVE AND BEHIND knocks the pig 45° away — never swallowed', {
   expect(v.vx).toBeGreaterThan(0)
   expect(-v.vy).toBeCloseTo(v.vx, 6)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
-  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
+  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(CORE_FLING, 6)
 })
 
 test('a charge DEAD OVERHEAD slams straight down — the landing does the rest', { tag: '@nodata' }, () => {
   const v = thrown({ x: 0, y: -400, z: 0 })!
-  expect(v.vy).toBeCloseTo(flingSpeed(30), 6)
+  expect(v.vy).toBeCloseTo(CORE_FLING, 6)
   expect(Math.abs(v.vx)).toBeLessThan(1e-6)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
 })
@@ -149,7 +154,7 @@ test('…and OVERHEAD is the whole footprint, not the axis: offset above still s
   // BODY. Fifty off the axis, four hundred up: inside the trotters' circle,
   // so down it goes, on the spot.
   const v = thrown({ x: -50, y: -400, z: 0 })!
-  expect(v.vy).toBeCloseTo(flingSpeed(30), 6)
+  expect(v.vy).toBeCloseTo(CORE_FLING, 6)
   expect(Math.abs(v.vx)).toBeLessThan(1e-6)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
 })
@@ -161,7 +166,7 @@ test('a burst INSIDE the body has one way to send it: straight up', { tag: '@nod
   expect(v.vy).toBeLessThan(0)
   expect(Math.abs(v.vx)).toBeLessThan(1e-6)
   expect(Math.abs(v.vz)).toBeLessThan(1e-6)
-  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(flingSpeed(30), 6)
+  expect(Math.hypot(v.vx, v.vy, v.vz)).toBeCloseTo(CORE_FLING, 6)
 })
 
 test('the farther pig is thrown slower — the impulse rides the falloff', { tag: '@nodata' }, () => {
@@ -187,7 +192,7 @@ test('the farther pig is thrown slower — the impulse rides the falloff', { tag
     createBus().emit
   )
   const [near, far] = pigs
-  expect(speeds.get(near.id)!).toBeCloseTo(flingSpeed(30), 6)
+  expect(speeds.get(near.id)!).toBeCloseTo(CORE_FLING, 6)
   expect(speeds.get(far.id)!).toBeGreaterThan(0)
   expect(speeds.get(far.id)!).toBeLessThan(speeds.get(near.id)!)
 })

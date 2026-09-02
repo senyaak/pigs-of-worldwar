@@ -51,12 +51,16 @@ export const SACRIFICE_DAMAGE = 6400
  * …and the field it falls off over, `0x800` = 2048 — argument 4, the one the
  * repo has counted as the RANGE everywhere else (lib/game/grenade.ts,
  * `Lob.blast`). Twice a grenade's, the same as TNT's.
- *
- * The 5200 beside it (`0x1450`, argument 6) is the field this engine does not
- * read for any other blast either; it is written down in the quote above and
- * nowhere applied, the way every row's +0x08 is.
  */
 export const SACRIFICE_BLAST = 2048
+
+/**
+ * …and how hard it THROWS: `0x1450` = **5200**, argument 6 — the FORCE
+ * column, which was written down here as "the field this engine does not
+ * read" for one afternoon and is read now (lib/game/blast.ts, `flingSpeed`).
+ * TNT's own, which is the right company for a fifty-point charge.
+ */
+export const SACRIFICE_FORCE = 5200
 
 export interface SacrificeWorld extends BlastWorld {
   /** How long every clip runs — the gesture is timed off clip 81 the way a
@@ -103,7 +107,8 @@ export function createSacrifice(world: SacrificeWorld, emit: Emit): Sacrifice {
       {
         damage: SACRIFICE_DAMAGE,
         reach: blastReach(SACRIFICE_BLAST),
-        effect: SUICIDE_EFFECT_ID
+        effect: SUICIDE_EFFECT_ID,
+        force: SACRIFICE_FORCE
       },
       world,
       emit,

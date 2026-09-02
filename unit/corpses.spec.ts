@@ -16,10 +16,12 @@ import {
   DEATH_EFFECT,
   DEATH_QUIET,
   LAND_DEATH_DAMAGE,
+  LAND_DEATH_FORCE,
   LAND_DEATH_RANGE,
   SINK_SPEED,
   WET_DEATH_DAMAGE,
   WET_DEATH_EFFECT,
+  WET_DEATH_FORCE,
   WET_DEATH_RANGE
 } from '../src/lib/game/corpses'
 import { burst } from '../src/lib/game/blast'
@@ -172,7 +174,12 @@ test('a death on land: the ride, THEN the clip, then the bang, then the boots', 
   // …and the bang is a REAL one — twenty points at the exe's own range
   // (0x4688ad), not a picture (lib/game/corpses.ts).
   expect(bang.charges).toEqual([
-    { damage: LAND_DEATH_DAMAGE, reach: blastReach(LAND_DEATH_RANGE), effect: DEATH_EFFECT }
+    {
+      damage: LAND_DEATH_DAMAGE,
+      reach: blastReach(LAND_DEATH_RANGE),
+      effect: DEATH_EFFECT,
+      force: LAND_DEATH_FORCE
+    }
   ])
   // The picture carries the DEATH's own effect id — 0x56, whose parameter row
   // (7) is not transcribed, so the field falls back on the grenade's row 0.
@@ -234,7 +241,12 @@ test('an overkill skips the CLIP — and its bang is wider and weaker', { tag: '
   // own (0x468a5f), half a whole body's damage over twice its reach.
   expect(events.map((one) => one.kind)).toEqual(['blasted', 'remains'])
   expect(bang.charges).toEqual([
-    { damage: WET_DEATH_DAMAGE, reach: blastReach(WET_DEATH_RANGE), effect: DEATH_EFFECT }
+    {
+      damage: WET_DEATH_DAMAGE,
+      reach: blastReach(WET_DEATH_RANGE),
+      effect: DEATH_EFFECT,
+      force: WET_DEATH_FORCE
+    }
   ])
   expect(pig.gone).toBe(true)
 })
@@ -286,7 +298,12 @@ test('a death in the water sinks WHILE the clip plays and goes off down there', 
   // A drowned body's bang is the weaker, wider one (0x468927) and wears its
   // own effect id.
   expect(bang.charges).toEqual([
-    { damage: WET_DEATH_DAMAGE, reach: blastReach(WET_DEATH_RANGE), effect: WET_DEATH_EFFECT }
+    {
+      damage: WET_DEATH_DAMAGE,
+      reach: blastReach(WET_DEATH_RANGE),
+      effect: WET_DEATH_EFFECT,
+      force: WET_DEATH_FORCE
+    }
   ])
   expect(pig.gone).toBe(true)
 })

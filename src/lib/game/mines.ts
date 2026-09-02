@@ -77,6 +77,10 @@ import type { Emit } from './events'
  */
 export const MINE_DAMAGE = 2560
 export const MINE_BLAST = 1024
+/** …and its FORCE, row +0x08 of the same two rows: **3900**, half again the
+ * grenade's 2600, which is why a mine throws harder than a grenade while
+ * hurting less (lib/game/blast.ts, `flingSpeed`). */
+export const MINE_FORCE = 3900
 /**
  * Row +0x18, in engine frames — and it is a FUSE rather than a delay before
  * anything is decided.
@@ -310,7 +314,12 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
         // effect 0x4c, which reads parameter row 14 (lib/game/effects.ts).
         burst(
           mine,
-          { damage: MINE_DAMAGE, reach: blastReach(MINE_BLAST), effect: MINE_EFFECT_ID },
+          {
+            damage: MINE_DAMAGE,
+            reach: blastReach(MINE_BLAST),
+            effect: MINE_EFFECT_ID,
+            force: MINE_FORCE
+          },
           world,
           emit
         )

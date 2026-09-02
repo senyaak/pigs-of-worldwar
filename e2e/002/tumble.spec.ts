@@ -16,12 +16,12 @@ import path from 'node:path'
 import { GAME_DIR } from '../launch'
 import { parsePmg, TILE_MINE, TILE_STEP } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
-import { MINE_DAMAGE, createMines } from '../../src/lib/game/mines'
+import { MINE_DAMAGE, MINE_FORCE, createMines } from '../../src/lib/game/mines'
 import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
-import { FLING_CAP, FLING_PER_POINT, burst, flingSpeed } from '../../src/lib/game/blast'
+import { PIG_MASS, burst, flingSpeed } from '../../src/lib/game/blast'
 import { BARGE_SPEED, PITCH, createTumbles, flingVelocity } from '../../src/lib/game/tumble'
 import { NO_OBSTACLES, PIG_RADIUS, withPigs } from '../../src/lib/game/obstacles'
-import { BLAST_CORE, blastReach, blastShare } from '../../src/lib/game/grenade'
+import { BLAST_CORE, blastReach, blastShare, lobOf } from '../../src/lib/game/grenade'
 import { fromExeSpeed } from '../../src/lib/game/ballistics'
 import { Game } from '../../src/lib/game/game'
 import type { Pig } from '../../src/lib/game/game'
@@ -143,22 +143,27 @@ test('the MELEE throws 45° UP along its bearing — the exe\'s own pitch', () =
   expect(east.vx).toBeGreaterThan(0)
   expect(east.vz).toBeCloseTo(0, 6)
 
-  // …and how HARD: SIX times the damage in points, capped at the cattle prod's 200
-  // a frame, which is the hardest knock anything in the exe hands out. Play twice —
-  // "толчёк очень мелкий" against the flat 0x40 that was less than a punch, and then
-  // "отбрасывание миной всё ещё кажется слабым" against four times. At six a mine
-  // lands on the engine's other decoded knock.
-  expect(FLING_PER_POINT).toBe(6)
-  expect(flingSpeed(20), "a mine's core is 0x78").toBeCloseTo(fromExeSpeed(0x78), 6)
-  expect(flingSpeed(30), "a grenade's is 180").toBeCloseTo(fromExeSpeed(180), 6)
-  expect(flingSpeed(50), "TNT's fifty are held at the prod's 200").toBeCloseTo(
-    fromExeSpeed(200),
-    6
-  )
-  // Monotone up to the cap, and the cap is the hardest knock in the exe.
-  expect(flingSpeed(20)).toBeLessThan(flingSpeed(30))
-  expect(flingSpeed(30)).toBeLessThan(flingSpeed(50))
-  expect(flingSpeed(500), 'nothing throws harder than the cap').toBe(FLING_CAP)
+  // …and how HARD: **the row's own FORCE over the body's MASS**, which is the
+  // exe's arithmetic (0x40A500) and not this repo's any more. The model it
+  // replaced was `6 × the damage in points`, and play measured that in the
+  // one unit that shows: "граната откидывает через чур далеко, раза в 3-4
+  // дальше чем надо". A throw is ballistic, so the distance goes as the
+  // SQUARE of the launch speed — 180 against 86.7 is 4.3 times the ground.
+  expect(PIG_MASS).toBe(30)
+  expect(flingSpeed(MINE_FORCE, 1), "a mine's core").toBeCloseTo(fromExeSpeed(3900 / 30), 6)
+  expect(flingSpeed(lobOf(19)!.force, 1), "a grenade's").toBeCloseTo(fromExeSpeed(2600 / 30), 6)
+  expect(flingSpeed(lobOf(37)!.force, 1), "TNT's").toBeCloseTo(fromExeSpeed(5200 / 30), 6)
+  // **The MINE throws harder than the GRENADE while hurting less** — twenty
+  // points against thirty — which is the whole point of the force being a
+  // column of its own.
+  expect(flingSpeed(lobOf(19)!.force, 1)).toBeLessThan(flingSpeed(MINE_FORCE, 1))
+  expect(flingSpeed(MINE_FORCE, 1)).toBeLessThan(flingSpeed(lobOf(37)!.force, 1))
+  // …and the falloff is the damage's own, so standing back saves the footing.
+  expect(flingSpeed(lobOf(19)!.force, 0.25)).toBeCloseTo(flingSpeed(lobOf(19)!.force, 1) / 4, 6)
+  // A weapon with no force throws NOBODY: the gases and the medicine ball
+  // carry a real zero in that column.
+  expect(flingSpeed(lobOf(26)!.force, 1), 'the poison canister').toBe(0)
+  expect(flingSpeed(lobOf(33)!.force, 1), 'the medicine ball').toBe(0)
 })
 
 test('a mine THROWS the pig that trod on it — straight UP, and down again', () => {
@@ -181,8 +186,9 @@ test('a mine THROWS the pig that trod on it — straight UP, and down again', ()
   expect(launch.vy, 'it was not thrown upward').toBeLessThan(0)
   expect(Math.abs(launch.vx), 'a charge under the trotters has no sideways to give').toBeLessThan(1)
   expect(Math.abs(launch.vz)).toBeLessThan(1)
-  // Twenty points at the core, so six times that a frame — 0x78.
-  expect(Math.hypot(launch.vx, launch.vy, launch.vz)).toBeCloseTo(flingSpeed(20), 4)
+  // The mine's own FORCE at the core, over the pig's mass: 3900 / 30 = 130 a
+  // frame, and the twenty points it takes off do not come into it.
+  expect(Math.hypot(launch.vx, launch.vy, launch.vz)).toBeCloseTo(flingSpeed(MINE_FORCE, 1), 4)
 
   // …and then it FLIES. Game space is Y-down, so off the ground is a smaller y.
   let highest = pig.position.y
@@ -232,12 +238,12 @@ test('…and the pig NEXT to it is thrown too, away from the blast and less hard
   // doing: the one under it keeps the whole impulse.
   const share = blastShare(apart, blastReach(1024))
   expect(share).toBeLessThan(1)
-  // The impulse rides the DAMAGE, and the damage is already the share for the
-  // distance — so the far pig is thrown by four times whatever it lost. Under
-  // the flat-distance figure, because the falloff is measured in three dimensions
-  // from the blast to the body's own origin, which stands above the soles
-  // (lib/game/body.ts).
-  const flat = flingSpeed(Math.round((MINE_DAMAGE * share) / DAMAGE_UNIT))
+  // The impulse rides the row's FORCE through the SAME falloff the damage
+  // runs, so the far pig is thrown by the mine's own 3900 cut to its share.
+  // Under the flat-distance figure, because the falloff is measured in three
+  // dimensions from the blast to the body's own origin, which stands above the
+  // soles (lib/game/body.ts).
+  const flat = flingSpeed(MINE_FORCE, share)
   const got = Math.hypot(other.vx, other.vy, other.vz)
   // Within a normalisation's float dust: `hurlVelocity` scales a unit line.
   expect(got).toBeLessThanOrEqual(flat + 1e-6)
@@ -309,14 +315,14 @@ test("a body in the air BOWLS OVER the pig it runs into — 0x40 at 45°, the ex
   // type 0x1357 throws it, `0x4A9100(0x40, 0x200, own heading + rand & 0xFF, 0)`
   // at 0x477842. So a pig blown into his mate takes the mate with him, and the
   // knock is a fifth of what a core hit hands out (`BARGE_SPEED` against
-  // `flingSpeed(30)`).
+  // `flingSpeed(lobOf(19)!.force, 1)`).
   const { tumbles, pigs, heard } = fielded(2 * PIG_RADIUS + 15)
   const flyer = pigs()[1]
   const bowled = pigs()[0]
   const stood = { ...bowled.position }
   const from = { ...flyer.position }
 
-  tumbles.fling(flyer, flingVelocity(flingSpeed(30), -Math.PI / 2))
+  tumbles.fling(flyer, flingVelocity(flingSpeed(lobOf(19)!.force, 1), -Math.PI / 2))
   for (let i = 0; i < 400 && tumbles.live() > 0; i++) tumbles.update(STEP)
 
   const shove = heard.filter(
@@ -361,8 +367,8 @@ test('…but a body ALREADY IN THE AIR is not bowled over — two pigs of one bl
   const [one, two] = pigs()
   const first = { x: one.position.x, z: one.position.z }
   const second = { x: two.position.x, z: two.position.z }
-  tumbles.fling(one, flingVelocity(flingSpeed(30), Math.PI / 2))
-  tumbles.fling(two, flingVelocity(flingSpeed(30), Math.PI / 2))
+  tumbles.fling(one, flingVelocity(flingSpeed(lobOf(19)!.force, 1), Math.PI / 2))
+  tumbles.fling(two, flingVelocity(flingSpeed(lobOf(19)!.force, 1), Math.PI / 2))
 
   // Half a second, which is the part of the arc that matters: both are up, both
   // are overlapping, and neither may touch the other's velocity. What happens
@@ -415,7 +421,7 @@ test('a body thrown AT another still travels — a pig is not a WALL in the air'
   ).toBeGreaterThan(2 * PIG_RADIUS)
 
   // Thrown straight AT the other one: bearing −x, which is where it stands.
-  tumbles.fling(thrown, flingVelocity(flingSpeed(30), -Math.PI / 2))
+  tumbles.fling(thrown, flingVelocity(flingSpeed(lobOf(19)!.force, 1), -Math.PI / 2))
   for (let i = 0; i < 400 && tumbles.live() > 0; i++) tumbles.update(STEP)
   const went = Math.hypot(thrown.position.x - from.x, thrown.position.z - from.z)
   expect(went, 'the knock was delivered, not eaten by the mate it was aimed at').toBeGreaterThan(
@@ -449,7 +455,7 @@ test('a body thrown while it is INSIDE another still travels', () => {
     'the body it is inside is not in its way'
   ).toBe(false)
 
-  tumbles.fling(thrown, flingVelocity(flingSpeed(30), Math.PI / 2))
+  tumbles.fling(thrown, flingVelocity(flingSpeed(lobOf(19)!.force, 1), Math.PI / 2))
   for (let i = 0; i < 200 && tumbles.live() > 0; i++) tumbles.update(STEP)
   const went = Math.hypot(thrown.position.x - from.x, thrown.position.z - from.z)
   expect(went, 'it was thrown, not held').toBeGreaterThan(PIG_RADIUS * 4)

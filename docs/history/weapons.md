@@ -2348,3 +2348,62 @@ is a claim each test makes about itself, so the rule now skips describes — and
 in the same edit it started matching INDENTED tests, which the old column-0
 pattern never did. It is a strengthening: an untagged test inside a describe is
 caught where before an untagged test at any indent was not.
+
+## The blast's throw stopped riding the damage — 2026-09-01
+
+Play, one line: "граната откидывает через чур далеко — думаю раза в 3-4 дальше
+чем надо." The number was already in this repo waiting to be believed.
+
+`flingSpeed` was `6 × the damage in points`, capped at the cattle prod's 200 —
+an invention `[play]` had tuned twice, and `blast.ts`'s own comment said what
+would replace it: *"the exe's own throw is READ … this model stays
+`[play]`-tuned until play asks for the exe's numbers."*
+
+**The arithmetic matches the report exactly.** The exe's phantom sweep
+(0x40A500) is `force × (1 − 3d/4R) / mass`, and a pig's mass is 30:
+
+| | old, 6×points | the exe |
+| - | - | - |
+| a grenade at the core | 180 | **86.7** |
+| TNT | 200, at the cap | **173** |
+| a mine | 120 | **130** |
+
+A throw is ballistic, so the DISTANCE goes as the square of the launch speed:
+`(180 / 86.7)² = 4.3`. The mine and TNT were close all along — it was the
+grenade, the thing thrown most, that was double and therefore four times the
+ground. Measured on the bench after the change: a flat 45° toss touches down at
+**560** where it used to reach 1884.
+
+### What actually changed, and what deliberately did not
+
+Only the MAGNITUDE. The falloff was already `blastShare`, the same ramp the
+damage runs, and the DIRECTION is `hurlVelocity`'s — four passes of play shaped
+that and none of them was about how hard. The exe's doubled vertical is not
+taken either, for the same reason: the 45°-family pitch with its footprint
+exception is play's, and it already answers the "toss UP" the doubling exists
+for.
+
+**The second half of the shape is that the throw no longer rides the damage at
+all.** FORCE is a column of its own (row +0x08), and the two do not track: the
+MEDICINE BALL heals forty points at force **0**, the three gases hurt at force
+0, and the MINE throws harder than the grenade while hurting less. So a weapon
+that heals or poisons now cannot shove — which used to be true only because
+`mend` and the gas took a different seam.
+
+Every blast in the game got its own column read out of the exe: the lob rows,
+`MINE_FORCE` 3900, the land death 3250 and the water death 2600
+(`effects/notes.md`), and the SUICIDE's 5200 — which had been written down that
+same afternoon as "the field this engine does not read for any other blast
+either", and was read a few hours later.
+
+### The specs that had to move
+
+Four, and each was pinning the old model rather than a behaviour:
+`unit/fling.spec.ts`'s three travel floors (measured again and re-floored at
+about 0.8 of the new figures), the `6 × points` ladder in
+`e2e/002/tumble.spec.ts` (now the force table, plus two new assertions the old
+model could not make — that a mine out-throws a grenade, and that force 0
+throws nobody), `e2e/002/knockback.spec.ts`'s derived floor, and
+`unit/corpses.spec.ts`'s charge equality. 528 unit tests green; the two e2e
+specs that measure real displacement were run and pass.
+
