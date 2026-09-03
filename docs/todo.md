@@ -80,7 +80,15 @@ with it: a mine throws harder than a grenade (it always did in the exe), TNT
 harder again, and **the gases and the medicine ball throw nobody at all**,
 which is a real zero in their own column rather than a special case.
 
-### 6. The AI with a mortar (B18)
+### 6. SUPER TNT, if you want to see it (B25)
+
+Skill 38 — which the repo used to call the FIRECRACKER and the game calls
+**SUPER TNT** — is built: TNT's charge with **200 points** and the hardest
+shove in the game. Nothing hands it out in the original either, so
+`pow.give(38)` is the only way to hold one. Worth a look precisely because the
+throw just changed: it is the loudest case there is.
+
+### 7. The AI with a mortar (B18)
 
 A machine BOMBARDIER now solves its PITCH where every other lob solves the
 gauge, and the turn's hand-shake moved onto the pitch with it. Two failure
@@ -2430,6 +2438,26 @@ So neither is a regression, and neither is written down anywhere else.
 
 Neither has been touched: they are timing in the SPECS, not behaviour, and the
 fix is a measurement each rather than a tuned number.
+
+### B25. 38 IS **SUPER TNT**, AND IT IS BUILT — 2026-09-01
+
+Play named it: "супер тнт — там огромный отброс и урон". Both halves were
+findings.
+
+**The repo had the name wrong.** Skill 38 was called FIRECRACKER off its art
+name `firecrac`; `gtext` 134 says SUPER TNT. Renamed everywhere.
+
+**And it is the biggest weapon in the game**: kind 52 is TNT's row bar two
+columns — **200 points** against fifty and a force of **6500** against 5200,
+the largest of either in the table. Two hundred is a LEGEND's whole health.
+Built by giving it its `LOBS` row; it had been inert on the same
+`isLobbed || isMine` disagreement B22 wrote down as latent that morning.
+
+**OPEN, and it is play's call: nothing can be given one.** No kit carries 38
+and the crate byte table skips it (byte 34 → 37, byte 35 → 39), in the original
+as much as here. `pow.give(38)` is the only door. If it should be reachable,
+the honest ways are a crate byte the remake adds (a divergence) or a kit entry
+(a bigger one) — neither is invented here.
 
 ### B24. THE BLAST'S THROW IS THE EXE'S NOW — 2026-09-01
 

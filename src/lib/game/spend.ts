@@ -9,7 +9,7 @@
 // Which skills are the exception is MEASURED over the shipped exe, all 67
 // records, and not read off a summary: `+0x1c` is 0 on thirteen of them and 1 on
 // everything else, `+0x18` (the wait the exception plays on) is 0 everywhere but
-// TNT and FIRECRACKER, where it is 400 hundredths — four seconds. Plant it and
+// TNT and SUPER TNT, where it is 400 hundredths — four seconds. Plant it and
 // run.
 //
 // Pure, and a table: nothing here knows what a weapon does, only what using one
@@ -24,7 +24,7 @@
  * | 35 | MINE | 60 | `in-out` |
  * | 36 | ANTI-P MINE | 61 | `pbox` |
  * | 37 | TNT | 62 | `getout` |
- * | 38 | FIRECRACKER | 63 | MAP VIEW |
+ * | 38 | SUPER TNT | 63 | MAP VIEW |
  * | 52 | HEALING HANDS | 64 | BINOCULARS |
  * | | | 66 | SURRENDER |
  *
@@ -47,7 +47,7 @@ export const endsTurn = (skill: number | null): boolean =>
  * **PLANT IT AND RUN**: the seconds the clock is cut to instead of the turn
  * ending, `+0x18` of the record over a hundred.
  *
- * 400 hundredths on TNT and the firecracker and nil on everything else, and the
+ * 400 hundredths on the two TNTs and nil on everything else, and the
  * mode machine spends it the same way for both: a wait above zero raises
  * `[game+0x516]`, which is the arm at 0x4945a5 — back to NORMAL mode with the
  * turn's deadline re-stamped, so the pig keeps the controls and has four seconds

@@ -107,7 +107,7 @@ export interface Lob {
   /**
    * Row **+0x14** — the frames of state 0 the thing spends before its fuse
    * starts, and it is per-row rather than the constant this used to be: three
-   * for every grenade, **fifty for TNT and the firecracker**. Row +0x14 is also
+   * for every grenade, **fifty for both TNTs**. Row +0x14 is also
    * the switch: nil sends the constructor straight into the fuse, which is what
    * a tripped mine does (lib/game/mines.ts).
    */
@@ -335,6 +335,32 @@ const LOBS: Record<number, Lob> = {
    * off the fire arm (0x47ade5).
    */
   28: { id: 430, kind: 42, speed: 500, fuse: 0, arming: 0, damage: 6400, blast: 2048, force: 3900, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true, effect: 0x58, scatter: { child: 0x101, count: 3, aim: 0x3b6, step: 0x555, upright: 0, seeded: true, lift: 40 } },
+  /**
+   * **38 SUPER TNT — the biggest thing in the game, and the exe's own name for
+   * it.** The repo called it FIRECRACKER for months off its ART name
+   * (`firecrac`, `SKILL_ICON`); `gtext` 134 says SUPER TNT, which is the same
+   * trap the SHOTGUN's rows were in (CLAUDE.md: "gtext 108/109 — not rifle
+   * bell"). Play named it before the table was looked at: "супер тнт — там
+   * огромный отброс и урон".
+   *
+   * Kind **52**, and it is TNT's row (53) to the byte bar two columns:
+   * **25600 = TWO HUNDRED points** against TNT's fifty, and a FORCE of
+   * **6500** against 5200 — the largest of either in the weapon table. Two
+   * hundred is the LEGEND's whole health, so it kills anything in the game
+   * outright at the core and gibs it (`GIB_BELOW`, lib/game/health.ts).
+   *
+   * Everything else is TNT's: speed 50 with no gauge so it goes down at the
+   * trotters, fifty frames of arming under a 125-frame fuse, the 0.0999
+   * material, clip 77 and the same four seconds to get clear
+   * (lib/game/spend.ts). Only the hand model differs — record +0x0C is 26,
+   * `WE_BANG`, where TNT holds 15 `WE_TNT`.
+   *
+   * **Nothing hands it out.** No class kit carries it and the crate byte table
+   * (0x4D9DC8) skips 38 entirely — byte 34 gives 37 and byte 35 gives 39 — so
+   * it is a complete weapon with no door, in the original as much as here.
+   * `pow.give(38)` is the only way to hold one.
+   */
+  38: { id: 440, kind: 52, speed: 50, fuse: 125, arming: 50, damage: 25600, blast: 2048, force: 6500, friction: 409 / FIXED, restitution: 409 / FIXED, contact: false },
   /** The CLUSTER's bomblet, keyed by the `BOMBLET` pseudo-skill (0x100,
    * declared below the table — a literal key because the table comes first).
    * Kind 33's own row: fifteen points over 1300, a 0.40/0.80 material. */
@@ -416,7 +442,7 @@ export function shardsOf(row: Lob, heading: number): Shard[] | null {
 
 /**
  * The explosives a pig PLANTS rather than throws — 35 MINE, 36 ANTI-PERSONNEL
- * MINE, 37 TNT, 38 FIRECRACKER.
+ * MINE, 37 TNT, 38 SUPER TNT.
  *
  * A real family with two witnesses in the exe rather than a convenience: they
  * are the four skills whose record clears the "go into WALK AWAY" flag, and the

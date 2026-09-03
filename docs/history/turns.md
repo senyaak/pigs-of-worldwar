@@ -207,7 +207,7 @@ shipped exe over all 67 records, `+0x1c` is **1 on everything but thirteen**:
 | - | - |
 | 0 | NONE |
 | 35, 36 | MINE, ANTI-P MINE |
-| 37, 38 | TNT, FIRECRACKER — and these two alone carry `+0x18` = 400, four seconds of ordinary play instead of a handover: plant it and run |
+| 37, 38 | TNT, SUPER TNT — and these two alone carry `+0x18` = 400, four seconds of ordinary play instead of a handover: plant it and run |
 | 52, 54 | HEALING HANDS, PICKPOCKET |
 | 60, 61, 62 | the vehicle skills (`in-out`, `pbox`, `getout`) |
 | 63, 64 | MAP VIEW, BINOCULARS |
@@ -216,7 +216,7 @@ shipped exe over all 67 records, `+0x1c` is **1 on everything but thirteen**:
 Two families and nothing else — the explosives a pig PLANTS, and the skills that
 are not blows. **65 SKIP TURN is not among them**, which is the check that the
 reading is the right way round. `lib/game/spend.ts` is that set and one predicate;
-the four-second wait is not modelled, because neither TNT nor the firecracker is a
+the four-second wait is not modelled, because neither of the two TNTs is a
 weapon in this engine yet and a timer nothing can start is a guess with no way to
 be wrong.
 

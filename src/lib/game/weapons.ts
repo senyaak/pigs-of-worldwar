@@ -123,7 +123,7 @@ export const WEAPON_TABLE: [number, number, number, number, number, number][] = 
   [20, 0, 17, 77, 0, 0], // 35 MINE
   [20, 0, 17, 77, 0, 0], // 36 ANTI-PERSONNEL MINE
   [15, 0, 17, 77, 0, 0], // 37 TNT
-  [26, 0, 17, 77, 0, 0], // 38 FIRECRACKER
+  [26, 0, 17, 77, 0, 0], // 38 SUPER TNT — `WE_BANG` in the hand, gtext 134
   [0, 26, 15, -1, 1, 1], // 39
   [0, 26, 15, -1, 1, 1], // 40
   [0, 26, 15, -1, 1, 1], // 41

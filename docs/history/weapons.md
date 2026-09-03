@@ -2407,3 +2407,41 @@ throws nobody), `e2e/002/knockback.spec.ts`'s derived floor, and
 `unit/corpses.spec.ts`'s charge equality. 528 unit tests green; the two e2e
 specs that measure real displacement were run and pass.
 
+## 38 is SUPER TNT, not the FIRECRACKER — and it is built now, 2026-09-01
+
+Play, while the blast was open: "стоит посмотреть на супер тнт — там огромный
+отброс и урон". Two things were wrong before the row was even looked at.
+
+**The NAME.** The repo had called skill 38 the FIRECRACKER since the planted
+family was written, off its ART name `firecrac` in `SKILL_ICON`. Its own text
+is `gtext` 134, and the game calls it **SUPER TNT** — the same trap the shotgun
+rows were in ("gtext 108/109 — not rifle bell", CLAUDE.md). Renamed everywhere:
+`grenade.ts`, `spend.ts`, `weapons.ts`, the turns history and the weapons suite.
+
+**The NUMBERS, and play was right about both.** Kind **52**, and it is TNT's
+row (53) to the byte bar two columns:
+
+| | 37 TNT | 38 SUPER TNT |
+| - | - | - |
+| damage | 6400 = 50 pts | **25600 = 200 pts** |
+| force | 5200 | **6500** |
+
+Two hundred points is the LEGEND's whole health — it kills anything in the game
+outright at the core and gibs it — and 6500 is the largest force in the weapon
+table, which is exactly "огромный отброс и урон". Everything else is TNT's:
+speed 50 with no gauge so it goes down at the trotters, fifty frames of arming
+under a 125-frame fuse, the 0.0999 material, clip 77 and the same four seconds
+to get clear. Only the hand model differs — record +0x0C is 26, `WE_BANG`.
+
+**Built by adding the row.** It was INERT for the same reason the mortar was —
+`weaponLayer` put it in the charge family through `isPlanted`, but `attack.ts`
+opens that branch on `isLobbed || isMine` and 38 had no `LOBS` entry. That
+disagreement was written down in `unclaimed.spec.ts` this morning as "latent:
+no kit and no crate byte reaches it"; it is a weapon now.
+
+**And nothing hands it out, in the original either.** No class kit carries 38
+and the crate byte table skips it — byte 34 gives 37 and byte 35 gives 39. So
+it is a complete weapon with no door, and `pow.give(38)` is the only way to
+hold one. That is a fact about the shipped data, not a gap in the remake; what
+to DO about it is play's call.
+

@@ -7,13 +7,14 @@
 // per-class files cannot — **what can end up in a pig's trotters that the fire
 // key does not answer?**
 //
-// The answer is fifteen things, and they are listed by name below.
+// The answer is sixteen things, and they are listed by name below — plus one
+// that was in the list until this session and is a weapon now: 38 SUPER TNT.
 
 import { test, expect } from '@playwright/test'
 
 import { SKILL, SKILL_COUNT, skillFromCrate } from '../../src/lib/game/skills'
 import { isPlanted, lobOf } from '../../src/lib/game/grenade'
-import { isGun } from '../../src/lib/game/projectile'
+import { DAMAGE_UNIT, isGun } from '../../src/lib/game/projectile'
 import { weaponLayer } from '../../src/lib/game/controls'
 import { endsTurn } from '../../src/lib/game/spend'
 import { CARRIED, press, skillLabel } from './kit'
@@ -118,23 +119,47 @@ test.describe('the TOOLS, which are skills and are not weapons', () => {
   })
 })
 
-test.describe('38 FIRECRACKER — the one skill whose two tables disagree', () => {
-  test('it is PLANTED by the control set and inert at the fire key', { tag: '@nodata' }, () => {
-    // `weaponLayer` puts it in the charge family with the mines and TNT
-    // (`isPlanted`), so it would get the plant control set — but `attack.ts`
-    // opens that branch on `isLobbed || isMine`, and 38 is neither: it has no
-    // row in `LOBS` and is not one of the two mines. So the layer promises a
-    // door the ladder does not have.
+test.describe('38 SUPER TNT — the biggest weapon in the game, and nothing carries it', () => {
+  test('it is PLANTED, and it answers the fire key like the TNT it is', { tag: '@nodata' }, () => {
+    // It sat INERT for months: `weaponLayer` put it in the charge family
+    // through `isPlanted`, but `attack.ts` opens that branch on
+    // `isLobbed || isMine` and 38 had no row in `LOBS`. Play named it —
+    // "супер тнт — там огромный отброс и урон" — and the row was there all
+    // along.
     expect(weaponLayer(38)).toBe('charge')
     expect(isPlanted(38)).toBe(true)
-    expect(lobOf(38)).toBeNull()
-    expect(routeOf(38)).toBe('inert')
+    expect(lobOf(38)).not.toBeNull()
+    expect(routeOf(38)).toBe('lob')
+    // The same four seconds to get clear, and it keeps the turn to spend them.
+    expect(endsTurn(38)).toBe(false)
   })
 
-  test('nobody can reach it, which is why it has never shown', { tag: '@nodata' }, () => {
-    // No kit and no crate byte — so the disagreement is a latent one. It
-    // becomes real the day 38 is given a row or a kit.
+  test('TWO HUNDRED points and the hardest shove in the table', { tag: '@nodata' }, () => {
+    const superTnt = lobOf(38)!
+    const tnt = lobOf(37)!
+    expect(superTnt.damage).toBe(200 * DAMAGE_UNIT)
+    expect(superTnt.force).toBe(6500)
+    // Four times TNT's damage, and harder again than its 5200 — the largest
+    // of either column in the whole weapon table.
+    expect(superTnt.damage).toBe(tnt.damage * 4)
+    expect(superTnt.force).toBeGreaterThan(tnt.force)
+    // Everything else is TNT's row to the byte: it goes down at the trotters
+    // on the same clock.
+    expect([superTnt.speed, superTnt.arming, superTnt.fuse, superTnt.blast]).toEqual([
+      tnt.speed,
+      tnt.arming,
+      tnt.fuse,
+      tnt.blast
+    ])
+  })
+
+  test('…and NOBODY can be given one — no kit, no crate byte', { tag: '@nodata' }, () => {
+    // The crate table skips it: byte 34 hands over 37 and byte 35 hands over
+    // 39. So it is a complete weapon with no door, in the original as much as
+    // here, and `pow.give(38)` is the only way to hold one.
     expect(CARRIED).not.toContain(38)
     expect(FROM_CRATE).not.toContain(38)
+    expect(skillFromCrate(34)).toBe(37)
+    expect(skillFromCrate(35)).toBe(39)
   })
 })

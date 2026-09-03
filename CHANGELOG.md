@@ -20,6 +20,10 @@ one.
   points at the pig's own feet that it does not survive. Both were in shipped
   kits already and both did nothing at all when the fire key went down.
 
+- **SUPER TNT works** — the game's biggest charge, two hundred points and a
+  shove to match. Nothing in the original hands one out, so it is a curiosity
+  rather than a weapon you will meet.
+
 - **A blast no longer throws pigs half across the map.** The knock is the
   original's own arithmetic now, which is about a quarter of the distance the
   remake was giving it — and a mine throws harder than a grenade, while a gas
