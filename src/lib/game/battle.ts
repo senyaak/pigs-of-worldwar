@@ -60,6 +60,8 @@ import type { Building, Indoors } from './indoors'
 import { INOUT_CLIP } from './buildings'
 import { mountArmed, mountBarrel } from './mounts'
 import { barrelMuzzle } from './barrel'
+import { driveStep, hullTurn } from './drive'
+import { ramOver } from './ram'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
 import { isMine } from './mines'
@@ -1946,11 +1948,20 @@ export function createBattle(parts: BattleParts): Battle {
     // nowhere to walk to.
     const housing = indoors.inside(acting)
     const emplaced = housing && mountArmed(housing.mount, housing.kind) ? housing : null
+    /**
+     * …and a VEHICLE is the one mount that goes somewhere. The keys drive the
+     * HULL rather than the pig: the walk is the throttle and the turn is the
+     * tracks, and the pig's own heading follows the hull so the gun points
+     * where the tank does (lib/game/drive.ts).
+     */
+    const driving = housing?.mount === 'vehicle' ? housing : null
     /** How far this mount's gun elevates — half a pig's in a pillbox, and a
      * tank's turret twice that but only upwards (lib/game/mounts.ts). */
     const barrel = emplaced ? mountBarrel(emplaced.mount, emplaced.kind) : null
     const walking = committed() || sheltered ? 0 : intent.walk
-    const turning = committed() || (sheltered && !emplaced) ? 0 : intent.turn
+    // A pig at a pillbox's gun turns on the spot; one in a VEHICLE does not
+    // turn at all — the hull does, and the pig comes round with it.
+    const turning = committed() || driving || (sheltered && !emplaced) ? 0 : intent.turn
     // The SIGHTS are a different control set, not a locked one. The one thing
     // the aim view does take away is the JUMP: the exe routes input through its
     // own branch while the aim bit is down (0x4928dc).
@@ -2034,6 +2045,54 @@ export function createBattle(parts: BattleParts): Battle {
     // Only one that is actually inside stops — it is not on the map at all then.
     if (indoors.inside(acting) === null) {
       game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
+    } else if (driving && !committed()) {
+      // **THE HULL IS WHAT MOVES**, and the pig is carried by it. The box in
+      // the collision world moves too, or a driven tank would go on blocking
+      // the tile it was parked in and pass through everything else
+      // (lib/game/obstacles.ts, `moveTo`).
+      const hull = {
+        x: driving.box.x,
+        z: driving.box.z,
+        // The box's yaw is the model's, a quarter turn off the heading this
+        // engine walks along — `hullTurn` is the pair of them.
+        heading: driving.box.turn + Math.PI / 2
+      }
+      const went = driveStep(
+        hull,
+        {
+          query,
+          // Anything solid that is not the hull itself. A point test where the
+          // exe has a body, which is the first pass and not the last.
+          blocked: (x, z) => {
+            const hit = scenery.obstacles.stopper(x, acting.position.y, z)
+            return hit !== null && hit !== driving.id
+          }
+        },
+        { walk: intent.walk, turn: intent.turn },
+        delta
+      )
+      const turned = hullTurn(hull.heading)
+      indoors.driveTo(driving, hull.x, hull.z, turned, everyone())
+      scenery.obstacles.moveTo(driving.id, hull.x, hull.z, turned)
+      game.moveCurrentPig(hull.x, acting.position.y, hull.z, hull.heading)
+      // **Only a MOVING hull touches anybody** — the exe's own rule, and it is
+      // one instruction there: the ram arm bails unless `[veh+0xC0]` is
+      // non-zero (lib/game/ram.ts).
+      if (went.moved) {
+        ramOver(
+          driving.box,
+          driving.kind,
+          acting,
+          {
+            pigs: everyone,
+            training: parts.training,
+            fling: (pig, velocity) => tumbles.fling(pig, velocity, false, true),
+            friendly: (pig) => game.currentPlayer.pigs.includes(pig),
+            board: (pig) => indoors.board(pig, driving, createLocomotion(query, pig.position.x, pig.position.z, pig.heading))
+          },
+          emit
+        )
+      }
     } else if (emplaced) {
       // …and one at a gun turns where it sits: the heading follows, the
       // POSITION is the building's and stays exactly where the door put it.

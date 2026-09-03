@@ -91,6 +91,32 @@ export interface Indoors {
    * leaving can put it back rather than derive a new one.
    */
   enter(pig: Pig, footing: LocomotionState): boolean
+  /**
+   * Put a pig aboard a NAMED mount, with no reach test.
+   *
+   * The door's own `enter` asks `reachable` and refuses anything the pig is
+   * not standing against. A TROOP CARRIER does not ask: the manual's rule is
+   * "just drive into one of your team-mates and he will oblige by jumping in
+   * with you" (lib/game/ram.ts), and the hull has already established the
+   * contact. Capacity still holds — the tenth is the last.
+   */
+  board(pig: Pig, building: Building, footing: LocomotionState): boolean
+  /**
+   * **Move a mount.** Only a VEHICLE ever does (lib/game/drive.ts), and only
+   * its own footprint copy is moved here — the COLLISION world keeps its own
+   * and the caller moves that too (`ObstacleField.moveTo`), because a box that
+   * drove without re-bucketing would block the tile it was parked in and pass
+   * through everything else.
+   *
+   * Whoever is inside rides along: their position is the hull's.
+   */
+  driveTo(
+    building: Building,
+    x: number,
+    z: number,
+    turn: number,
+    everyone: readonly Pig[]
+  ): void
   /** …and back out, onto the footing it came from — which is handed back, so
    * the battle can stand on it again. Null when the pig was not inside. */
   leave(pig: Pig): LocomotionState | null
@@ -190,6 +216,26 @@ export function createIndoors(objects: readonly MapObject[], emit: Emit): Indoor
       pig.position.z = building.box.z
       emit({ kind: 'wentIn', pig: pig.id, building: building.id })
       return true
+    },
+    board(pig, building, footing) {
+      if (held.has(pig.id)) return false
+      if (countIn(building.id) >= mountRoom(building.mount, building.kind)) return false
+      held.set(pig.id, { building: building.id, footing: copyLocomotion(footing) })
+      pig.position.x = building.box.x
+      pig.position.z = building.box.z
+      emit({ kind: 'wentIn', pig: pig.id, building: building.id })
+      return true
+    },
+    driveTo(building, x, z, turn, everyone) {
+      building.box.x = x
+      building.box.z = z
+      building.box.turn = turn
+      for (const rider of everyone) {
+        const step = held.get(rider.id)
+        if (!step || step.building !== building.id) continue
+        rider.position.x = x
+        rider.position.z = z
+      }
     },
     leave(pig) {
       const step = held.get(pig.id)

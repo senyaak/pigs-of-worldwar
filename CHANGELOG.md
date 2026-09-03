@@ -18,9 +18,13 @@ one.
   carriers and BAY's amphibious launch are things a pig gets into now, through
   the same door a shelter uses. A tank hands over its own three weapons and its
   turret swings ninety degrees up — twice a pillbox's reach, though it cannot
-  point below the horizon at all, so nothing downhill is a target. **They do
-  not drive yet**, which also means they do not run anybody over and the
-  carriers cannot pick anybody up.
+  point below the horizon at all, so nothing downhill is a target.
+- **…and they drive.** The walk keys are the throttle and the turn keys the
+  tracks. Drive a tank into somebody, friend or foe, and it hurts them as much
+  as a rifle round and throws them further; drive a troop carrier into one of
+  your own and he climbs aboard. A parked vehicle is harmless — it has to be
+  moving. Getting a passenger back OUT of a carrier is not built yet, so he
+  rides until his own turn comes round.
 
 - **A PILLBOX is a gun now, not just cover.** Climb into one and its own two
   weapons are in the menu — HEAVY M-GUN and FLAME THROWER, unlimited — and a

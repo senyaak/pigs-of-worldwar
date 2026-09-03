@@ -865,3 +865,56 @@ sit, is most of what a tank is for anyway.
 `unit/vehicles.spec.ts`, seventeen tests. The one that would have caught the
 real bug is the dispatch test: `mountSkills('building', 3)` is empty and
 `mountSkills('vehicle', 3)` is the tank's three.
+
+### …and then they drive
+
+Play: "давай добивай". So the moving half, the same day, and the interesting
+part of it is a NEGATIVE that took most of the effort.
+
+**The drive is not in the exe as far as this session could read it**, and the
+list of places looked is worth as much as a find would have been: every call
+from the pig's region (0x466000..0x47E000) into the vehicle class; every
+non-pig caller of that class; every read and write of `[veh+0xC0]`, `[+0xEC]`
+and `[+0xF0]` across the whole of `.text`; the vtable diff against the building
+class; and the pig's own riding arm at 0x46E112 — which is state 3 AND state 4
+sharing one handler, and turns out to be the door glide plus the animation
+player and nothing else. `0x473350`, which looked like a turn, is the clip
+phase.
+
+What IS visible: `[veh+0xC0]` is a motion register with four request bits (4
+and 8 a direction, 0x10 and 0x20 the turret), 0x49B9E0 sets the direction pair
+off a signed argument, and **the ram refuses outright unless that register is
+non-zero** — which is the exe's own definition of "is it moving" and would be
+dead code if nothing ever drove. The manual settles it from the other side, in
+three separate sentences. So this is a place not read, not a mechanic absent —
+the rule this repo already had, applied to its largest case yet.
+
+`lib/game/drive.ts` therefore carries the search in its head comment, so the
+next person does not repeat it, and says plainly that **the SPEED is invented**:
+half again a pig's walk, turning at six tenths of its rate. Everything else is
+read.
+
+**The ram is not invented.** 0x4780BB hands the pig `0xA00` — twenty points, a
+rifle round — and shoves it 0x78 at 0x200: 120 units at forty-five degrees, in
+a game where a bullet shoves 48 and a knife 125. And 0x4781F3, the carriers'
+arm, opens on `[pig+0x194]` against the driver's and returns when they differ,
+so **a carrier picks up its own side and nobody else** where a tank knocks
+friend or foe. The manual says exactly that, twice, in those words.
+
+### What driving cost the engine
+
+One thing, and it was the thing: **a collision box that moves**. `ObstacleField`
+buckets its boxes at 512 and a tank's is 640 by 384, so a hull that drove
+without re-filing would go on blocking the tile it was parked in and pass clean
+through everything else. `moveTo` re-buckets, and `Obstacle.x`/`z`/`turn` are
+mutable now for exactly one caller.
+
+The rest fell out cheaply because the pieces were already decoupled:
+`movement.ts`'s `step` takes no pig at all, so `drive.ts` is forty lines around
+it, and the hull's yaw against the walk's heading is one `hullTurn` — a quarter
+turn, because a model's +x runs along `(cos t, −sin t)` where forward is
+`(sin h, cos h)`, and a hull longer than it is wide has to carry the difference
+or its collider sits across the way it is driving.
+
+`unit/drive.spec.ts`, thirteen tests. The one that earns its place is the
+rebucket: move the tank four tiles and the old tile has to come back clear.

@@ -184,6 +184,9 @@ export interface Obstacle {
   /** The POG record's own id, so one can be taken out of the world again —
    * a crate that has been collected. */
   id: number
+  /** Mutable, and only for the one kind of box that moves: a VEHICLE being
+   * driven, through `ObstacleField.moveTo` (lib/game/drive.ts). Everything
+   * else is placed once at load and never touched. */
   x: number
   z: number
   /** The box's upper face: SMALLER than `bottom`, because Y counts down. */
@@ -438,6 +441,45 @@ export class ObstacleField implements Obstruction {
   /** Take a record out of the collision world for good. */
   remove(id: number): void {
     this.gone.add(id)
+  }
+
+  /**
+   * **Move one.** The first thing in this world that is not nailed down: a
+   * VEHICLE is a solid box that drives (lib/game/drive.ts), so its bucket
+   * membership has to follow it or it would go on blocking the tile it was
+   * parked in and pass clean through everything else.
+   *
+   * Buckets are 512 across and a tank's box is 640 by 384, so this is not a
+   * refinement — one tile of driving and a field that only re-pointed the
+   * obstacle would be wrong in both directions at once.
+   *
+   * Cheap enough at the rate it is called: one vehicle, on the frames a player
+   * is actually driving it. It leaves the box's own dimensions alone and
+   * re-files it under the cells its new footprint can reach.
+   */
+  moveTo(id: number, x: number, z: number, turn: number): void {
+    const box = this.obstacles.find((one) => one.id === id)
+    if (!box) return
+    for (const [key, list] of this.buckets) {
+      const at = list.indexOf(box)
+      if (at >= 0) {
+        const kept = [...list]
+        kept.splice(at, 1)
+        this.buckets.set(key, kept)
+      }
+    }
+    box.x = x
+    box.z = z
+    box.turn = turn
+    const span = Math.hypot(box.halfX, box.halfZ) + PIG_RADIUS
+    const from = this.cell(box.x - span, box.z - span)
+    const to = this.cell(box.x + span, box.z + span)
+    for (let col = from.col; col <= to.col; col++) {
+      for (let row = from.row; row <= to.row; row++) {
+        const key = col * 65536 + row
+        this.buckets.set(key, [...(this.buckets.get(key) ?? []), box])
+      }
+    }
   }
 
   /** …and put one back, which is what the map SCRIPT does when it places an
