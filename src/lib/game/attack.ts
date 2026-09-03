@@ -231,6 +231,9 @@ export function createAttack(parts: AttackParts): Attack {
       // (lib/game/mines.ts).
       if (isLobbed(holding) || isMine(holding)) {
         if (gauge || firing || laying !== null) return 'none'
+        // The TANK's three are lobs AND emplaced, so the gate belongs on both
+        // branches: off a mount they are as silent as the pillbox's pair.
+        if (isEmplaced(holding) && !parts.mount?.(acting)) return 'none'
         // **A GAUGE IS THE WEAPON'S, not the throw's.** The record's +0x14 is
         // what says whether one fills (`weapons/fire.md`, and it is 1 on the
         // grenades and 0 on TNT), and the split at 0x493796 goes by that byte:
@@ -336,7 +339,12 @@ export function createAttack(parts: AttackParts): Attack {
           // Where the sights were actually pointing — the drift is part of the
           // aim, not a decoration over it.
           const away = isLobbed(holding)
-            ? grenades.throwOne(acting, sights.angle(), thrownWith)
+            ? grenades.throwOne(
+                acting,
+                sights.angle(),
+                thrownWith,
+                parts.mount?.(acting) ?? undefined
+              )
             : shots.fire(acting, sights.angle(), parts.mount?.(acting) ?? undefined)
           if (!away) firing = null
           else {

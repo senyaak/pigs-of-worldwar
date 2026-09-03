@@ -89,7 +89,7 @@ export interface LobWorld extends BlastWorld {
 export interface Lobs {
   /** Throw one from this pig at `aim`, with the gauge's `charge` behind it.
    * False if what it holds is not lobbed, or there is no hand to throw from. */
-  throwOne(pig: Pig, aim: number, charge: number): boolean
+  throwOne(pig: Pig, aim: number, charge: number, from?: Point): boolean
   /**
    * PUT one down instead: at the pig's own feet, on the ground, not moving.
    *
@@ -308,10 +308,13 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
   }
 
   return {
-    throwOne(pig, aim, charge) {
+    throwOne(pig, aim, charge, mounted) {
       const skill = pig.holding
       if (skill === null || !lobOf(skill)) return false
-      const from = world.pose.boneToWorld(pig, HAND_BONE, THROW_FROM)
+      // A TANK's three come out of the turret, not the trotters — and they have
+      // to, because the pig is sitting in the middle of a solid box
+      // (lib/game/barrel.ts).
+      const from = mounted ?? world.pose.boneToWorld(pig, HAND_BONE, THROW_FROM)
       if (!from) return false
       const shot = lob(skill, from, pig.heading, aim, charge, world.random)
       if (!shot) return false

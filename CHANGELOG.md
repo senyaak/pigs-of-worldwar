@@ -14,6 +14,14 @@ one.
 
 ## Unreleased
 
+- **Tanks can be climbed into and fired.** OASIS's six tanks, SNAKE's two troop
+  carriers and BAY's amphibious launch are things a pig gets into now, through
+  the same door a shelter uses. A tank hands over its own three weapons and its
+  turret swings ninety degrees up — twice a pillbox's reach, though it cannot
+  point below the horizon at all, so nothing downhill is a target. **They do
+  not drive yet**, which also means they do not run anybody over and the
+  carriers cannot pick anybody up.
+
 - **A PILLBOX is a gun now, not just cover.** Climb into one and its own two
   weapons are in the menu — HEAVY M-GUN and FLAME THROWER, unlimited — and a
   pig at the gun turns to aim where before it could only sit. The barrel points

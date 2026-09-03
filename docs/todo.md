@@ -2446,6 +2446,60 @@ So neither is a regression, and neither is written down anywhere else.
 Neither has been touched: they are timing in the SPECS, not behaviour, and the
 fix is a measurement each rather than a tuned number.
 
+### B28. A VEHICLE IS A MOUNT NOW, AND IT DOES NOT DRIVE — 2026-09-03
+
+Play asked for the machines, stationary first. The parked half is built and the
+moving half is not, which is a deliberate line and not a stall: a parked tank
+IS a pillbox with a different table, and that table is now read
+(`objects/vehicles.md`, which opened a class the notes had listed as never
+touched, plus the stat table at 0x4D94A0 that nothing had found).
+
+**What works.** A TANK, CARRY or AMLAUNCH record is a thing a pig gets into,
+with the shelter's own door and glide. A tank offers its three weapons —
+47 TANK AIRBURST, 48 TANK BAZOOKA, 49 TANK MORTAR — and the turret elevates
+**0..1024**, twice a pillbox's reach and with no depression at all. `indoors.ts`
+holds both classes now and `mounts.ts` is the dispatch, so nothing can read a
+vehicle kind off the building table (kind 3 means M_TENT2 to one and TANK to
+the other — that is the bug the dispatch exists to stop).
+
+**Where it can be MET.** Nine vehicles in the whole campaign, measured over the
+61 shipped POGs: **six TANKs on OASIS (mission 8)**, **two CARRYs on SNAKE
+(18)**, **one AMLAUNCH on BAY (16)**. AM_TANK is only on the `GEN*` templates,
+and BOAT, AIRSHIP1 and PP1 are on no map at all. So the first tank a player
+meets is on OASIS and there is nothing before it.
+
+**What is NOT built, all of it read or stated:**
+
+- **DRIVING.** The manual is explicit that vehicles drive, and the exe's own
+  ram test refuses unless `[veh+0xC0]` — the motion register — is non-zero. But
+  where the input sets its bits 4 and 8 has not been found; 0x49ED70, which
+  displaces the hull `arg * 2` along its heading, has no caller either. This is
+  a place not yet read, not a mechanic that is missing.
+- **The RAM.** `Pig::OnHit`'s 0x1358 arm switches on the kind: AM_TANK, BOAT
+  and TANK knock a pig flying, AMLAUNCH and CARRY pick one up. Needs driving
+  first — a parked vehicle never touches anybody.
+- **EJECT, skill 62.** The manual's way of getting a passenger back out of a
+  carrier. It has no fire-table entry at all, so it lives in the
+  inventory-SELECT table at 0x4935EC and is a different mechanism from every
+  weapon. Until it exists the two carriers offer an EMPTY menu — a shelter with
+  room for ten.
+- **Breaking one.** 150 points in the table, read and not applied, exactly as a
+  building's is. The manual: "it's best to abandon a vehicle before it is
+  destroyed. Its death throes can cause you a large amount of damage."
+- **Amphibious.** "Don't drive vehicles on water unless they are amphibious."
+  Which kinds those are is only the NAMES saying it — no flag column was found,
+  and the stat table's three columns are health, capacity and a constant 30.
+
+**What reads as a bug and is not:**
+
+- **A tank cannot shoot downhill.** The turret's minimum is a hard zero.
+- **The turret follows the PIG.** In the exe a tank's gun points where the
+  TURRET points (`[[pig+0x170]+0xA0]`), where a pillbox's points where the pig
+  does — and the remake uses the pig for both. `[CHECK — remake]`.
+- **49 TANK MORTAR is the weakest lob in the game**, fifteen points, and 48 is
+  the carried BAZOOKA with a softer shove. Only 47 is worth the turret.
+- Nothing on screen turns, and the pig is not drawn — the same B27 hole.
+
 ### B27. THE PILLBOX HAS ITS GUN, AND NOTHING SHOWS IT — 2026-09-03
 
 The first of the MACHINES: play asked for the stationary ones before the ones
@@ -3077,9 +3131,9 @@ The SHELTER is done end to end. What is left round it:
   where a gun takes 0x0E (`three/chase.ts` already carries the note). Down the
   sights in a pillbox the remake uses the gun's, which is the wrong shoulder to
   look over when the pig is not drawn.
-- **A VEHICLE is the other half** — skill 60 VEHICLE INOUT, `[pig+0x2ec] = 3`,
-  body type 0x1358, through `0x49a320` instead of the building's `0x43f7f0`.
-  None of it is built.
+- ~~**A VEHICLE is the other half**~~ — **the parked half is built,
+  2026-09-03** (B28): `vehicles.ts`, `mounts.ts`, and `indoors.ts` holding both
+  classes. What is left is DRIVING, the ram, and skill 62 EJECT.
 - **Some pigs START inside**: `0x47d4e0` runs once from the map loader, walks the
   object list for every pig whose `[+0x3c0]` is 1, and boards the nearest thing
   within **4096** units. Which marker bit fills `[+0x3c0]` is not decoded (the

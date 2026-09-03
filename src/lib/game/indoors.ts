@@ -21,14 +21,10 @@
 //
 // Pure, and game space (Y-down) like the rest of lib/game.
 
-import {
-  ENTER_REACH,
-  TENT_BOOST,
-  buildingHeal,
-  buildingKind,
-  buildingRoom,
-  buildingSkills
-} from './buildings'
+import { ENTER_REACH, TENT_BOOST, buildingKind } from './buildings'
+import { mountHeal, mountRoom, mountSkills } from './mounts'
+import type { MountClass } from './mounts'
+import { vehicleKind } from './vehicles'
 import { heal, maxHealthFor } from './health'
 import { originY } from './body'
 import { copyLocomotion } from './locomotion'
@@ -39,11 +35,20 @@ import type { MapObject } from '../formats/pog'
 import type { Pig } from './game'
 import type { Emit } from './events'
 
-/** One building on the map, as the rules need it. */
+/**
+ * One thing on the map a pig can get into.
+ *
+ * A BUILDING or a VEHICLE — the exe's two classes, 0x1359 and 0x1358, which
+ * share this whole file and differ only in their tables (lib/game/mounts.ts).
+ * The name stays `Building` because that is what the rest of the engine calls
+ * it and a rename buys nothing; `mount` is what tells the two apart.
+ */
 export interface Building {
   /** The POG record's own id. */
   id: number
-  /** 1..6 — the exe's own kind (lib/game/buildings.ts). */
+  /** Which class it is — and therefore which table its `kind` indexes. */
+  mount: MountClass
+  /** A building's 1..6, or a vehicle's 0..6 (lib/game/vehicles.ts). */
   kind: number
   /** Its footprint, the same box the collision world uses. */
   box: Obstacle
@@ -108,9 +113,19 @@ export interface Indoors {
 export function createIndoors(objects: readonly MapObject[], emit: Emit): Indoors {
   const buildings: Building[] = []
   for (const object of objects) {
-    const kind = buildingKind(object.name)
-    if (kind === null) continue
-    buildings.push({ id: object.id, kind, box: boxOf(object) })
+    // A building first, then a vehicle: the two name lists do not overlap, and
+    // the exe's own loader asks the same question in the same order (0x4a58f6
+    // takes name-table entries 1..6 as buildings; everything else falls
+    // through).
+    const built = buildingKind(object.name)
+    const driven = built === null ? vehicleKind(object.name) : null
+    if (built === null && driven === null) continue
+    buildings.push({
+      id: object.id,
+      mount: built === null ? 'vehicle' : 'building',
+      kind: built ?? driven!,
+      box: boxOf(object)
+    })
   }
   const byId = new Map(buildings.map((one) => [one.id, one]))
   /** Where each pig inside came from, by pig id. */
@@ -155,7 +170,7 @@ export function createIndoors(objects: readonly MapObject[], emit: Emit): Indoor
       let best: Building | null = null
       let nearest = ENTER_REACH
       for (const building of buildings) {
-        if (countIn(building.id) >= buildingRoom(building.kind)) continue
+        if (countIn(building.id) >= mountRoom(building.mount, building.kind)) continue
         const gap = gapTo(building, pig)
         if (gap > nearest) continue
         nearest = gap
@@ -190,7 +205,7 @@ export function createIndoors(objects: readonly MapObject[], emit: Emit): Indoor
     turnStarted(pig) {
       const building = this.inside(pig)
       if (!building) return
-      const worth = buildingHeal(building.kind)
+      const worth = mountHeal(building.mount, building.kind)
       if (worth === 'none') return
       // `deficit = [pig+0x3B8] - [pig+0x4C]` (0x470354), the pig's own ceiling
       // less what it has left. A pig already topped up is healed by nothing,
@@ -231,4 +246,4 @@ export const choosableIn = (
 ): { skill: number; amount: number }[] =>
   inside === null
     ? [...carrying]
-    : buildingSkills(inside.kind).map((skill) => ({ skill, amount: -1 }))
+    : mountSkills(inside.mount, inside.kind).map((skill) => ({ skill, amount: -1 }))

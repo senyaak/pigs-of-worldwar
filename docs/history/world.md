@@ -795,3 +795,73 @@ appears at the wall and flies. The camera is the gun's rather than the barrel's
 
 `unit/pillbox.spec.ts`, eighteen tests. The two that earn their place are the
 negatives: the pair is inert on foot, and neither of them moves anybody.
+
+## 2026-09-03 — a VEHICLE is a mount, and the class it belongs to gets opened
+
+Same day, the second half of play's order: "сначало стационарные — потом те что
+ездят". The reading turned the two halves out to be much less different than
+expected — and the difference that remains is exactly the one that makes the
+second half expensive.
+
+### The class
+
+`objects/notes.md` had the VEHICLE class listed as never opened, naming five
+addresses and reading none of them. `objects/vehicles.md` opens it, and the
+find that matters is a table nobody had looked for: **0x4D94A0, twelve bytes a
+kind**, loaded straight by the constructor. Health, capacity, and a third
+column that is 30 on all seven kinds and therefore separates nothing.
+
+**Everything on the ground takes a hundred and fifty points** — half again what
+a PILLBOX takes, fifty short of a BIG_GUN — and the two kinds that FLY take
+one. That is not an oddity: AIRSHIP1 and PP1 are on no shipped map at all,
+because they are not scenery. They are what an AIR STRIKE spawns to carry the
+bomb in.
+
+The second column is the capacity, and it is worth saying how that was settled,
+because no single source states it. The table says ten for AMLAUNCH and CARRY
+and one for the rest. The ram switch at 0x478580 sends **exactly those two
+kinds** to a different arm from the other three. And the manual says "the troop
+**carriers** can be handy for picking up a group of your chums… just drive into
+one of your team-mates and he will oblige by jumping in with you". Three
+independent statements of one split.
+
+### The turret, and the one structural difference
+
+`Vehicle::ChangeAim` (0x49b6e0) is `Building::ChangeAim` with a different
+clamp: **[0, 0x400] for AM_TANK and TANK, [0, 0] for everything else.** So a
+turret reaches ninety degrees where a pillbox's barrel reaches forty-five —
+and its minimum is a hard zero. **The PILLBOX is the only mount in the game
+that can look down.**
+
+The difference that costs: a pillbox's gun takes its heading from the PIG,
+through the ordinary aim helper, and a tank's takes it from `[[pig+0x170]+0xA0]`
+— **the turret's own object**. That is why the pillbox was a day's work and the
+tank is not: one borrows machinery this engine has, the other wants machinery
+it does not.
+
+### Built
+
+- `vehicles.ts` — the names, the kinds, the stat table, the three weapons and
+  the turret range. Small and pure, like `buildings.ts` beside it.
+- `mounts.ts` — the dispatch, and it earns its place with one fact: **kind 3
+  means M_TENT2 to a building and TANK to a vehicle.** Before it, `battle.ts`
+  asked `barrelRange(kind)` with a number and no class, which would have read a
+  tank's turret out of the tent table and typechecked clean.
+- `indoors.ts` holds both classes now. The change was small because the file
+  was already right: the door, the glide, the footing and the occupant count
+  never cared what they were the door TO. Only three lines asked a
+  building-shaped question, and they now ask a mount-shaped one.
+- 47, 48 and 49 as LOBS rather than guns — the records say so (+0x14 is 1 on
+  the first two) and the ladder needed the emplaced gate on that branch too, or
+  a tank shell would have come out of a pig's trotters.
+
+### Deliberately not built
+
+**Driving**, and with it the ram, the carriers' pick-up, and skill 62 EJECT.
+`docs/todo.md` B28 has the whole of it. The honest state is that a vehicle is a
+gun emplacement that happens to have tracks — which on OASIS, where six of them
+sit, is most of what a tank is for anyway.
+
+`unit/vehicles.spec.ts`, seventeen tests. The one that would have caught the
+real bug is the dispatch test: `mountSkills('building', 3)` is empty and
+`mountSkills('vehicle', 3)` is the tank's three.

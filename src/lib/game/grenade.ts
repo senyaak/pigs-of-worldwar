@@ -336,6 +336,29 @@ const LOBS: Record<number, Lob> = {
    */
   28: { id: 430, kind: 42, speed: 500, fuse: 0, arming: 0, damage: 6400, blast: 2048, force: 3900, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true, effect: 0x58, scatter: { child: 0x101, count: 3, aim: 0x3b6, step: 0x555, upright: 0, seeded: true, lift: 40 } },
   /**
+   * **THE TANK'S THREE — 47, 48 and 49**, the only weapons in the game a pig
+   * cannot carry: model 0 and attack clip -1 in every record, and an arm that
+   * does nothing unless the pig is sitting in something (lib/game/barrel.ts,
+   * `isEmplaced`). `weapons/emplaced.md` is the read.
+   *
+   * They are LOBS and not guns, which the records say and the pillbox's pair
+   * do not: 47 and 48 carry the POWER GAUGE (record +0x14 is 1), so a press
+   * fills and the release throws. **49 TANK MORTAR has none** — it is the hand
+   * mortar's arrangement, where the PITCH is the whole of the range.
+   *
+   * Against what a pig carries: 48 is the BAZOOKA's row with a softer shove
+   * (2600 against 3900) and everything else identical, and 49 is the weakest
+   * lob in the game at fifteen points. Only 47 is worth the turret — forty
+   * points at a grenade's blast, with a five-second fuse under it.
+   *
+   * They fire from a TANK, which is the two kinds with a turret that moves
+   * (lib/game/vehicles.ts) — six of them on OASIS and nowhere else in the
+   * campaign.
+   */
+  47: { id: 436, kind: 48, speed: 500, fuse: 125, arming: 0, damage: 5120, blast: 1024, force: 2600, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true },
+  48: { id: 437, kind: 49, speed: 500, fuse: 0, arming: 0, damage: 5120, blast: 2048, force: 2600, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true },
+  49: { id: 439, kind: 51, speed: 500, fuse: 0, arming: 0, damage: 1920, blast: 1024, force: 1300, friction: 409 / FIXED, restitution: 409 / FIXED, contact: true },
+  /**
    * **38 SUPER TNT — the biggest thing in the game, and the exe's own name for
    * it.** The repo called it FIRECRACKER for months off its ART name
    * (`firecrac`, `SKILL_ICON`); `gtext` 134 says SUPER TNT, which is the same

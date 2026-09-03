@@ -57,7 +57,8 @@ import type { TerrainQuery } from './terrain'
 import type { Anim } from './anim'
 import type { Scenery } from './scenery'
 import type { Building, Indoors } from './indoors'
-import { INOUT_CLIP, barrelRange, buildingArmed } from './buildings'
+import { INOUT_CLIP } from './buildings'
+import { mountArmed, mountBarrel } from './mounts'
 import { barrelMuzzle } from './barrel'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
@@ -363,7 +364,7 @@ export function createBattle(parts: BattleParts): Battle {
     // the pig is sitting in rather than at the hand bone (lib/game/barrel.ts).
     mount: (pig) => {
       const housing = indoors.inside(pig)
-      if (!housing || !buildingArmed(housing.kind)) return null
+      if (!housing || !mountArmed(housing.mount, housing.kind)) return null
       return barrelMuzzle(housing.box, pig.heading)
     },
     anim,
@@ -1102,7 +1103,7 @@ export function createBattle(parts: BattleParts): Battle {
     holding = pig.holding
     {
       const housing = indoors.inside(pig)
-      sights.rearm(pig.holding, housing ? barrelRange(housing.kind) : null)
+      sights.rearm(pig.holding, housing ? mountBarrel(housing.mount, housing.kind) : null)
     }
     readying = 0
     // A charge belongs to the pig that started it: a turn handed over mid-hold
@@ -1944,9 +1945,10 @@ export function createBattle(parts: BattleParts): Battle {
     // a pillbox's gun still turns on the spot. It still does not WALK: there is
     // nowhere to walk to.
     const housing = indoors.inside(acting)
-    const emplaced = housing && buildingArmed(housing.kind) ? housing : null
-    /** How far this mount's barrel elevates — half a pig's, in a pillbox. */
-    const barrel = emplaced ? barrelRange(emplaced.kind) : null
+    const emplaced = housing && mountArmed(housing.mount, housing.kind) ? housing : null
+    /** How far this mount's gun elevates — half a pig's in a pillbox, and a
+     * tank's turret twice that but only upwards (lib/game/mounts.ts). */
+    const barrel = emplaced ? mountBarrel(emplaced.mount, emplaced.kind) : null
     const walking = committed() || sheltered ? 0 : intent.walk
     const turning = committed() || (sheltered && !emplaced) ? 0 : intent.turn
     // The SIGHTS are a different control set, not a locked one. The one thing
