@@ -118,8 +118,12 @@ export interface Bullets {
    * Loose one from this pig, pointed at `aim` — the angle in the engine's
    * 4096-to-the-turn units (lib/game/aim.ts). False when what it holds is not
    * a gun, or when there is no posed hand to fire it from.
+   *
+   * `from` overrides the muzzle for a gun that is not IN the hand: an EMPLACED
+   * weapon's barrel belongs to the building, and its round has to be born
+   * outside the box the pig is sitting in (lib/game/barrel.ts).
    */
-  fire(pig: Pig, aim: number): boolean
+  fire(pig: Pig, aim: number, from?: Point): boolean
   /** One frame of every bullet in the air. */
   update(delta: number): void
   /** Every bullet still flying — what a renderer draws and the camera rides. */
@@ -291,13 +295,14 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
   }
 
   return {
-    fire(pig, aim) {
+    fire(pig, aim, mounted) {
       const skill = pig.holding
       const row = skill === null ? null : projectileOf(skill)
       if (skill === null || !row) return false
       const offset = MUZZLE[skill] ?? { x: 0, y: 0, z: 0 }
-      // A gun that cannot find its own barrel does not go off.
-      const from = world.pose.boneToWorld(pig, HAND_BONE, offset)
+      // A gun that cannot find its own barrel does not go off — unless the
+      // barrel is not the pig's at all, and the caller has handed one in.
+      const from = mounted ?? world.pose.boneToWorld(pig, HAND_BONE, offset)
       if (!from) return false
       // ONE press, ONE report — however many pellets it looses.
       emit({ kind: 'fired', skill })

@@ -12,6 +12,13 @@
 // twice what this file said an hour ago: the table had been transcribed 46
 // entries long and play knew better ("это в ящиках находится"). Every byte
 // from 46 up was answering nothing at all.
+//
+// **Two of the twenty-nine are now inert ON PURPOSE.** 45 HEAVY M-GUN and 46
+// FLAME THROWER are built and fire — from inside a PILLBOX, which is the only
+// place their arm does anything in the exe either. Crate bytes 41 and 42 hand
+// them over all the same, and a pig standing in a field with one is exactly
+// the case the exe answers with silence (lib/game/barrel.ts, `isEmplaced`).
+// `unit/pillbox.spec.ts` is the other half: the same two, from a seat.
 
 import { test, expect } from '@playwright/test'
 

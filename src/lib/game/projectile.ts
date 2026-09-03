@@ -141,6 +141,23 @@ const GUNS: Record<number, Projectile> = {
   13: { id: 407, kind: 19, speed: 300, life: 15, damage: 384, blast: 0, pellets: 10, spread: 16, burst: 5, shove: 6 },
   14: { id: 411, kind: 23, speed: 150, life: 20, damage: 768, blast: 0 },
   15: { id: 434, kind: 46, speed: 300, life: 1000, damage: 6400, blast: 3900 },
+  /**
+   * **45 HEAVY M-GUN and 46 FLAME THROWER — the PILLBOX's own two**, and they
+   * are the weakest rows in the table (`weapons/emplaced.md`).
+   *
+   * The HMG fires the RIFLE's own bullet model, `BULL1`, at the rifle's own
+   * speed, for **eight points where the rifle does twenty**. The flamethrower
+   * is **four**, at half that speed. Row +0x08 is zero on both, so neither
+   * throws anybody — an emplaced gun does not knock, whatever the name
+   * suggests. A pillbox is a cheap position that never has to walk, not a hard
+   * one, and that is worth watching for in play.
+   *
+   * Both kinds are past the lifetime switch's `cmp edi, 0x2a` (0x4320c2), so
+   * they take its default of **a thousand frames** — the rocket's, which is
+   * "until it hits something" rather than a range.
+   */
+  45: { id: 432, kind: 44, speed: 300, life: 1000, damage: 1024, blast: 0 },
+  46: { id: 433, kind: 45, speed: 150, life: 1000, damage: 512, blast: 0 },
   /** 17 MEDIC DART — damage 0 ("it heals, so it must not hurt") and the heal
    * arm's own cap of forty points (`heal` above). */
   17: { id: 424, kind: 36, speed: 300, life: 30, damage: 0, blast: 0, heal: 0x1400 },

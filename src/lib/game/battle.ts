@@ -57,7 +57,8 @@ import type { TerrainQuery } from './terrain'
 import type { Anim } from './anim'
 import type { Scenery } from './scenery'
 import type { Building, Indoors } from './indoors'
-import { INOUT_CLIP } from './buildings'
+import { INOUT_CLIP, barrelRange, buildingArmed } from './buildings'
+import { barrelMuzzle } from './barrel'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
 import { isMine } from './mines'
@@ -358,6 +359,13 @@ export function createBattle(parts: BattleParts): Battle {
     sacrifice,
     mines,
     sights,
+    // An EMPLACED gun is the BUILDING's, so its round is born outside the box
+    // the pig is sitting in rather than at the hand bone (lib/game/barrel.ts).
+    mount: (pig) => {
+      const housing = indoors.inside(pig)
+      if (!housing || !buildingArmed(housing.kind)) return null
+      return barrelMuzzle(housing.box, pig.heading)
+    },
     anim,
     clips: parts.clips,
     bark: () =>
@@ -1092,7 +1100,10 @@ export function createBattle(parts: BattleParts): Battle {
     carry = null
     doorstep = null
     holding = pig.holding
-    sights.rearm(pig.holding)
+    {
+      const housing = indoors.inside(pig)
+      sights.rearm(pig.holding, housing ? barrelRange(housing.kind) : null)
+    }
     readying = 0
     // A charge belongs to the pig that started it: a turn handed over mid-hold
     // must not throw for whoever comes next.
@@ -1925,8 +1936,19 @@ export function createBattle(parts: BattleParts): Battle {
     // Nobody DRIVES through a door: in, out, or already inside.
     const sheltered =
       indoors.inside(acting) !== null || climbing === acting || leaving?.pig === acting
+    // **…except at a gun.** A PILLBOX puts a weapon in the hands of whoever is
+    // inside it (lib/game/buildings.ts, `buildingSkills`), and the exe takes
+    // that gun's heading off the PIG rather than off the building — the two
+    // emplaced arms call the ordinary aim helper, where the vehicle's three
+    // read the turret's own angle instead (`weapons/emplaced.md`). So a pig at
+    // a pillbox's gun still turns on the spot. It still does not WALK: there is
+    // nowhere to walk to.
+    const housing = indoors.inside(acting)
+    const emplaced = housing && buildingArmed(housing.kind) ? housing : null
+    /** How far this mount's barrel elevates — half a pig's, in a pillbox. */
+    const barrel = emplaced ? barrelRange(emplaced.kind) : null
     const walking = committed() || sheltered ? 0 : intent.walk
-    const turning = committed() || sheltered ? 0 : intent.turn
+    const turning = committed() || (sheltered && !emplaced) ? 0 : intent.turn
     // The SIGHTS are a different control set, not a locked one. The one thing
     // the aim view does take away is the JUMP: the exe routes input through its
     // own branch while the aim bit is down (0x4928dc).
@@ -1942,6 +1964,7 @@ export function createBattle(parts: BattleParts): Battle {
       committed: committed(),
       firing: attack.firing() !== null,
       turning,
+      barrel,
       delta
     })
 
@@ -2009,6 +2032,15 @@ export function createBattle(parts: BattleParts): Battle {
     // Only one that is actually inside stops — it is not on the map at all then.
     if (indoors.inside(acting) === null) {
       game.moveCurrentPig(loco.x, loco.y, loco.z, loco.heading)
+    } else if (emplaced) {
+      // …and one at a gun turns where it sits: the heading follows, the
+      // POSITION is the building's and stays exactly where the door put it.
+      game.moveCurrentPig(
+        acting.position.x,
+        acting.position.y,
+        acting.position.z,
+        loco.heading
+      )
     }
     // Walking INTO a crate is how one is collected; there is no button — and a
     // pig standing in a shelter is not walking into anything.
@@ -2067,8 +2099,9 @@ export function createBattle(parts: BattleParts): Battle {
     if (acting.holding !== holding) {
       holding = acting.holding
       // A weapon comes up pointing where its own record says: a rifle level, a
-      // grenade already lobbing at 45°.
-      sights.rearm(holding)
+      // grenade already lobbing at 45° — and no further than the mount it is
+      // bolted to allows.
+      sights.rearm(holding, barrel)
       readying = weapon.readyClip > 0 ? clipSeconds(parts.clips[weapon.readyClip]) : 0
       if (readying > 0) anim.playOnce(acting, weapon.readyClip)
     }
@@ -2081,6 +2114,7 @@ export function createBattle(parts: BattleParts): Battle {
       committed: committed(),
       firing: attack.firing() !== null,
       turning,
+      barrel,
       delta
     })
 

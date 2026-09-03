@@ -39,6 +39,13 @@ export interface SightsFrame {
   /** The turn keys, which drive the scope sideways rather than the pig. */
   turning: number
   delta: number
+  /**
+   * The MOUNT's elevation range, when the weapon is bolted to one — a
+   * pillbox's ±512 against the pig's own ±1023 (lib/game/buildings.ts,
+   * `barrelRange`). Absent or null for a pig on its feet, which is every
+   * other frame in the game.
+   */
+  barrel?: readonly [number, number] | null
 }
 
 export interface Sights {
@@ -53,7 +60,7 @@ export interface Sights {
   push(direction: number): void
   /** A new weapon is in hand: it comes up pointing where its own record says —
    * a rifle level, a grenade already lobbing at 45°. */
-  rearm(holding: number | null): void
+  rearm(holding: number | null, barrel?: readonly [number, number] | null): void
   /**
    * How far the pig TURNS this frame on the sights' account: the scope's own
    * sideways step, plus the tremor's yaw.
@@ -126,8 +133,8 @@ export function createSights(random: Random = Math.random): Sights {
     push(direction) {
       push = direction
     },
-    rearm(holding) {
-      aim = createAim(holding)
+    rearm(holding, barrel = null) {
+      aim = createAim(holding, barrel)
     },
     turnStep({ holding, firing, turning, delta }) {
       const sighted = held && isGun(holding)
@@ -145,7 +152,7 @@ export function createSights(random: Random = Math.random): Sights {
       // …and the tremor's other axis, as the LAST frame left it.
       return swung + shivered
     },
-    advance({ holding, committed, firing, delta }) {
+    advance({ holding, committed, firing, delta, barrel = null }) {
       const sighted = held && isGun(holding)
       // NOTHING moves the sights once the trigger is down. `Pig::Aim`
       // (0x46a7f0) calls `Pig::MayAct` before it does anything and bails when
@@ -160,7 +167,8 @@ export function createSights(random: Random = Math.random): Sights {
         (step) => (zoomsIn(holding) ? zoomedStep(zoom, step, SIGHT_RAMP) : step),
         // Down the sights the aim view's own arm drives it, and it is slower.
         sighted ? SIGHT_RAMP : AIM_RAMP,
-        sighted ? SIGHT_TOP : AIM_TOP
+        sighted ? SIGHT_TOP : AIM_TOP,
+        barrel
       )
 
       // The tremor steps once an ENGINE frame at fifteen a second, which is
@@ -172,7 +180,7 @@ export function createSights(random: Random = Math.random): Sights {
       const frames = delta / FRAME_SECONDS
       if (sighted) {
         const shiver = wobbleStep(wobble, frames, random)
-        aim.angle = clampAim(holding, aim.angle + shiver.pitch)
+        aim.angle = clampAim(holding, aim.angle + shiver.pitch, barrel)
         shivered = shiver.yaw
       } else {
         shivered = 0

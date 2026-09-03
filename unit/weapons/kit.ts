@@ -102,8 +102,13 @@ export function pigOf(pigClass: number): Pig {
  * The pig is a real one of `pigClass` so its own kit is what it holds; a
  * skill it does not carry is put in its hand anyway, because what is under
  * test is the ladder and not the inventory.
+ *
+ * `seated` puts the pig in a MOUNT — a pillbox, in practice. It is the only
+ * thing the emplaced skills 45..49 answer to: their arms bail unless the pig
+ * is inside something (lib/game/barrel.ts, `isEmplaced`), so pressing one on
+ * foot is `inert` by design rather than by omission.
  */
-export function press(pigClass: number, skill: number): Route {
+export function press(pigClass: number, skill: number, seated = false): Route {
   let route: Route | null = null
   const took = (which: Route) => (): boolean => {
     route = which
@@ -129,6 +134,9 @@ export function press(pigClass: number, skill: number): Route {
     sacrifice: { begin: took('sacrifice') },
     mines: { lay: () => true },
     sights: { refuse: () => {} } as unknown as Sights,
+    // A barrel to fire from, when the pig is meant to be sitting at one. The
+    // POINT is never used here — the ladder only asks whether there is one.
+    mount: () => (seated ? { x: 0, y: 0, z: 0 } : null),
     anim: {} as unknown as Anim,
     clips: [],
     bark: () => {

@@ -121,15 +121,69 @@ export const TENT_BOOST = 0x1900 / 128
  * пропустить ход." So the menu indoors is not what the pig carries — it is what
  * the BUILDING offers, and a shelter offers nothing but sitting there.
  *
- * The PILLBOX's two are read and deliberately empty here: skills **45 HEAVY
- * M-GUN** and **46 FLAME THROWER** are its own weapons (0x4cf0d0 into `gtext`
- * 106 and 110), and neither is built. Putting them in the menu now would put an
- * entry there that does nothing, which is the one thing a menu must not do.
- * `objects/notes.md` keeps the numbers so they are not looked up twice.
+ * **The PILLBOX's two are filled in now**, and the exe never states the pairing
+ * as a table — it states it three times as a fact about the kind. `weapons/
+ * emplaced.md` is the read:
+ *
+ * - the barrel only elevates for `kind − 1` of 0 and 3, BIG_GUN and PILLBOX
+ *   (`Building::ChangeAim`, 0x4401d0), and the other four clamp to [0, 0];
+ * - the AI's own "fire from where you are" branch tests `kind − 1 == 3` and
+ *   nothing else (0x445029);
+ * - and skills 45 and 46 are the two whose fire arm bails unless the pig is
+ *   inside something at all (`[pig+0x170]`, 0x47b5ec / 0x47b6b7).
+ *
+ * The BIG_GUN's barrel moves too and its weapon is NOT established: the AI
+ * scores 39 ARTILLERY RANGE differently for a pig inside one (0x4429c9), which
+ * is a hint and not a reading. `[gap]` — it stays empty until that is read.
  */
-const BUILDING_SKILLS: readonly (readonly number[])[] = [[], [], [], [], [], []]
+const BUILDING_SKILLS: readonly (readonly number[])[] = [
+  [], // 1 BIG_GUN — a barrel that elevates and no weapon read for it yet
+  [], // 2 M_TENT1
+  [], // 3 M_TENT2
+  [45, 46], // 4 PILLBOX — HEAVY M-GUN and FLAME THROWER
+  [], // 5 SHELTER — "у бомбоубежища это только пропустить ход"
+  [] // 6 TENT_S
+]
 
 export const buildingSkills = (kind: number): number[] => [...(BUILDING_SKILLS[kind - 1] ?? [])]
+
+/** Whether this kind puts a weapon in the hands of whoever is inside it. */
+export const buildingArmed = (kind: number): boolean => buildingSkills(kind).length > 0
+
+/**
+ * **How far the building's own barrel will point, in the engine's 4096-unit
+ * circle** — and it belongs to the BUILDING, not to the pig.
+ *
+ * `Building::ChangeAim` (0x4401d0) adds the pig's aim delta to `[building+0xe2]`
+ * and then clamps it on `[building+0xd4]`, the kind less one:
+ *
+ * ```
+ * 0 (BIG_GUN):  [0,      0x200]     ; level to 45° up, and it cannot depress
+ * 3 (PILLBOX):  [-0x200, 0x200]     ; a full 45° each way
+ * else:         [0,      0]         ; no barrel — the table's way of saying so
+ * ```
+ *
+ * So **sitting in a pillbox costs half the elevation** a pig has on its feet:
+ * `AIM_LIMIT` is 1023 either way and this is 512. The clamp is the mount's and
+ * runs after the weapon's own (lib/game/aim.ts, `clampAim`).
+ *
+ * The exe keeps the angle on the building, so it stays where the last occupant
+ * left it, and a skill whose record byte +0x15 is zero snaps it back to level.
+ * Neither survives here: the remake's aim is the pig's, and 45 and 46 are the
+ * only two skills that ever reach a barrel. `[deliberate]`.
+ */
+const BARREL_RANGE: readonly (readonly [number, number] | null)[] = [
+  [0, 512], // 1 BIG_GUN
+  null, // 2 M_TENT1
+  null, // 3 M_TENT2
+  [-512, 512], // 4 PILLBOX
+  null, // 5 SHELTER
+  null // 6 TENT_S
+]
+
+/** How far this kind's barrel elevates, or null where it has none. */
+export const barrelRange = (kind: number): readonly [number, number] | null =>
+  BARREL_RANGE[kind - 1] ?? null
 
 /**
  * **The clip a pig plays getting IN or OUT — and it is READ.**

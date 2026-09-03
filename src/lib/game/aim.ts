@@ -126,11 +126,27 @@ export function readyAim(skill: number | null): number {
  * player does with it here, so it aims like everything else until the fire
  * half of the mode is built and there is something else to do with it.
  */
-export function clampAim(skill: number | null, angle: number): number {
+export function clampAim(
+  skill: number | null,
+  angle: number,
+  /**
+   * The MOUNT's own range, where the weapon is bolted to one — a pillbox's
+   * ±512 rather than the pig's ±1023 (lib/game/buildings.ts, `barrelRange`).
+   * The exe runs the two clamps in this order too: `Pig::ChangeAimAngle` does
+   * the pig's, then hands the same delta to `Building::ChangeAim`, which does
+   * the barrel's on top (0x46a8c1).
+   */
+  barrel: readonly [number, number] | null = null
+): number {
   const limited = Math.max(-AIM_LIMIT, Math.min(AIM_LIMIT, angle))
-  if (skill !== null && FLOOR_LOB.includes(skill)) return Math.max(AIM_LOB, limited)
-  if (skill === 50) return Math.max(0, limited)
-  return limited
+  const held =
+    skill !== null && FLOOR_LOB.includes(skill)
+      ? Math.max(AIM_LOB, limited)
+      : skill === 50
+        ? Math.max(0, limited)
+        : limited
+  if (!barrel) return held
+  return Math.max(barrel[0], Math.min(barrel[1], held))
 }
 
 /** Whether the weapon has an aiming pose the angle scrubs. */
@@ -156,8 +172,11 @@ export interface AimState {
   rate: number
 }
 
-export const createAim = (skill: number | null): AimState => ({
-  angle: clampAim(skill, readyAim(skill)),
+export const createAim = (
+  skill: number | null,
+  barrel: readonly [number, number] | null = null
+): AimState => ({
+  angle: clampAim(skill, readyAim(skill), barrel),
   rate: 0
 })
 
@@ -177,7 +196,9 @@ export function updateAim(
   /** The ramp to use: the ordinary handler's by default, the aim view's own
    * `SIGHT_RAMP`/`SIGHT_TOP` when the sights are up. */
   step = AIM_RAMP,
-  top = AIM_TOP
+  top = AIM_TOP,
+  /** The mount's range, where the weapon is bolted to one (`clampAim`). */
+  barrel: readonly [number, number] | null = null
 ): void {
   // Letting go drops the accumulator, so the next press starts slow again; a
   // fresh press is worth the step itself, not nothing, because the exe writes
@@ -185,6 +206,7 @@ export function updateAim(
   // in `rampedStep`, which the scope's sideways turn borrows.
   aim.angle = clampAim(
     skill,
-    aim.angle + scale(rampedStep(aim, direction, deltaSeconds, step, top))
+    aim.angle + scale(rampedStep(aim, direction, deltaSeconds, step, top)),
+    barrel
   )
 }

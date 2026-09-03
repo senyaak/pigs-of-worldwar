@@ -14,6 +14,14 @@ one.
 
 ## Unreleased
 
+- **A PILLBOX is a gun now, not just cover.** Climb into one and its own two
+  weapons are in the menu — HEAVY M-GUN and FLAME THROWER, unlimited — and a
+  pig at the gun turns to aim where before it could only sit. The barrel points
+  through half the arc a pig manages on its feet, which is the price of the
+  walls. Neither weapon is strong: eight points and four, against a rifle's
+  twenty, and neither knocks anybody over. A pillbox is a cheap place to shoot
+  from that nobody has to walk out of.
+
 - **The second rank of classes plays.** The BOMBARDIER's **mortar** — a shell
   that bursts into three more, and whose ANGLE is its range, because it has no
   power gauge to hold — and the ENGINEER's and SNIPER's **suicide**, fifty

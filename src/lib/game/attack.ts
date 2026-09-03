@@ -31,6 +31,8 @@ import type { Lobs } from './lobs'
 import type { Strikes } from './strikes'
 import type { Heals } from './healing'
 import type { Sights } from './sights'
+import type { Point } from './pose'
+import { isEmplaced } from './barrel'
 import type { Anim } from './anim'
 
 /** What answering the button came to. */
@@ -69,6 +71,15 @@ export interface AttackParts {
   mines: { lay(pig: Pig, skill: number): boolean }
   /** Firing drops the sights, and the aim it leaves is what the shot takes. */
   sights: Sights
+  /**
+   * Where this pig's barrel is, when the gun is not in its trotters — the
+   * PILLBOX's two are the building's rather than the pig's, so the round has
+   * to be born outside the box it is sitting in (lib/game/barrel.ts).
+   *
+   * Null for a pig on its feet, which is every other shot in the game, and
+   * absent in a spec that has no buildings to sit in.
+   */
+  mount?: (pig: Pig) => Point | null
   anim: Anim
   /** How long every clip runs: a planted charge appears at a PHASE of its own
    * laying clip, which is a fraction of that clip's length
@@ -244,6 +255,18 @@ export function createAttack(parts: AttackParts): Attack {
         return 'used'
       }
       if (isGun(holding)) {
+        // **AN EMPLACED GUN IS THE BUILDING'S, and a pig on its feet holding
+        // one does nothing at all.** That is the exe's whole gate on skills
+        // 45..49 — the first three instructions of every one of their arms
+        // test `[pig+0x170]`, the thing the pig is inside, and jump to the
+        // "nothing happened" tail when it is null (`weapons/emplaced.md`).
+        // No sound, no clip, no refusal message: the press is simply not
+        // answered.
+        //
+        // It is reachable: crate bytes 41 and 42 hand over 45 and 46
+        // (lib/game/skills.ts), so a pig really can be stood in a field with a
+        // pillbox gun in its trotters.
+        if (isEmplaced(holding) && !parts.mount?.(acting)) return 'none'
         // A gun is a SEQUENCE, and a press while one is running is refused —
         // `Pig::MayAct` is false from `Pig::Fire` until `Pig::Attack`. That
         // refusal is the whole of why a rifle is not a machine gun.
@@ -314,7 +337,7 @@ export function createAttack(parts: AttackParts): Attack {
           // aim, not a decoration over it.
           const away = isLobbed(holding)
             ? grenades.throwOne(acting, sights.angle(), thrownWith)
-            : shots.fire(acting, sights.angle())
+            : shots.fire(acting, sights.angle(), parts.mount?.(acting) ?? undefined)
           if (!away) firing = null
           else {
             // **THE ROUND IS SPENT AS IT LEAVES THE HAND** — play, 2026-08-25:

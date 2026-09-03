@@ -124,10 +124,11 @@ test("the SHELTER is a BUILDING, and a building carries its own health and room"
   expect(buildingHealth(6) / DAMAGE_UNIT, 'a small tent twenty-five').toBe(25)
 
   // And a shelter offers NOTHING to do — which is what makes the menu inside it
-  // one entry long. The pillbox's own 45 and 46 are read and deliberately absent
-  // until they are built (lib/game/buildings.ts).
+  // one entry long. The PILLBOX is the other half of the same table and it
+  // offers two: 45 HEAVY M-GUN and 46 FLAME THROWER, built now
+  // (`weapons/emplaced.md`, lib/game/buildings.ts).
   expect(buildingSkills(5)).toEqual([])
-  expect(buildingSkills(4)).toEqual([])
+  expect(buildingSkills(4)).toEqual([45, 46])
 })
 
 test("a pig at the shelter's wall can get in, and one a tile away cannot", () => {

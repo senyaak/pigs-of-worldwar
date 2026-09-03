@@ -710,3 +710,88 @@ the head and the sigh under it come for free.
 `unit/tents.spec.ts` pins all of it, TENT_S included: seven tests, and the one
 that matters most is the negative — the tent a player meets first pays
 nothing.
+
+## 2026-09-03 — the PILLBOX gets its gun, and the first machine is stationary
+
+Play set the order: "сначала стационарные — потом те что ездят". It is the right
+one, and the reading says why. A pillbox's gun points where the PIG points — its
+arm calls the ordinary aim helper, `0x46A960` — where the vehicle's three read
+the turret's own angle out of `[[pig+0x170]+0xA0]` instead. So a building
+borrows machinery this engine already has, and a vehicle needs machinery it
+does not.
+
+### What the exe actually says
+
+Five arms `weapons/fire.md` had SIZED and never opened, read this day into
+`weapons/emplaced.md`: 45, 46, the vehicle's 47/48/49, and both halves of the
+in/out toggle at 60 and 61.
+
+The design is one instruction. Every firing arm opens
+
+```
+mov  eax, [esi+0x170]      ; the thing this pig is inside
+test eax, eax
+je   0x47CD88              ; ...and if there is none, nothing happens at all
+```
+
+No class gates them, no kit, no menu — **`[pig+0x170]` and nothing else**. And
+nothing happens loudly: no sound, no clip, no refusal. That matters here because
+a CRATE hands 45 and 46 over (bytes 41 and 42), so a pig really can stand in a
+field holding a pillbox gun, and the honest answer to the fire key is silence.
+
+What comes out is an ordinary row through the ordinary constructor — there is no
+emplaced-weapon machinery in the exe at all. The rows are the surprise:
+
+| | speed | damage | pts | row +0x08 |
+| - | - | - | - | - |
+| 45 HEAVY M-GUN | 300 | 1024 | **8** | **0** |
+| 46 FLAME THROWER | **150** | 512 | **4** | **0** |
+| 7 RIFLE, for scale | 300 | 2560 | 20 | 0 |
+
+The HMG fires the rifle's own bullet model at the rifle's own speed for less
+than half its damage, and **neither throws anybody**. A pillbox is a cheap
+position that never has to walk, not a hard-hitting one. That reads like a bug
+and is not, which is why B27 says so in the play block.
+
+`Building::ChangeAim` (0x4401D0) is the other half and it is the whole aiming
+mechanic. `Pig::ChangeAimAngle` does the pig's own clamp and the per-skill
+floors, then hands the same delta on: state 3 to the vehicle, state 4 to the
+building. The building adds it to `[+0xE2]` — the elevation lives on the
+BUILDING — and clamps it on the kind:
+
+- **BIG_GUN**: [0, 0x200]. Level to 45° up, and it cannot depress.
+- **PILLBOX**: [−0x200, 0x200], a full 45° each way.
+- everything else: [0, 0], which is the table saying "no gun here" without a
+  flag for it.
+
+So **sitting in a pillbox costs half the elevation** a pig has on its feet.
+
+### Built
+
+- `buildingSkills(4) = [45, 46]` — the table that had been empty on purpose
+  since the shelter was built. The exe never states the pairing as a table; it
+  states it three times as a fact about the kind (the barrel elevates for kinds
+  1 and 4, the AI's fire-from-cover branch tests kind 4, and 45/46 are the two
+  whose arms want a mount).
+- `barrelRange` beside it, and `clampAim` grew a MOUNT argument that runs after
+  the weapon's own — the same order the exe stacks the two clamps in.
+- `lib/game/barrel.ts`, new and small: `isEmplaced`, and `barrelMuzzle`, which
+  is where the round is born. **This one is the remake's.** The exe's muzzle
+  table is only consulted for skills 6..38, so 45 and 46 have no offset in it;
+  and in this engine the pig sits at the building's box middle, the box is
+  solid, and a bullet is stopped by the first box it is inside of — so a round
+  born at the hand bone would die against the pillbox's own wall on the frame it
+  left. It leaves through the wall the pig is facing, found in the box's own
+  turned frame, a quarter of the way down from the roof.
+- `battle.ts` lets a pig at a gun TURN where `sheltered` used to take the whole
+  of its input, and moves its heading without moving it.
+
+### What is deliberately not there
+
+The pig inside is not drawn — that is the exe's own rule and it predates this —
+and the GUN_BARRELS group is unread, so **nothing on screen turns**. The round
+appears at the wall and flies. The camera is the gun's rather than the barrel's
+0x11. Both are in section C, and both are art rather than mechanism.
+
+`unit/pillbox.spec.ts`, eighteen tests. The two that earn their place are the
+negatives: the pair is inert on foot, and neither of them moves anybody.
