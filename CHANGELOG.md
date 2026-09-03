@@ -21,8 +21,12 @@ one.
   kits already and both did nothing at all when the fire key went down.
 
 - **SUPER TNT works** — the game's biggest charge, two hundred points and a
-  shove to match. Nothing in the original hands one out, so it is a curiosity
-  rather than a weapon you will meet.
+  shove to match. It comes out of a crate, on four of the maps.
+
+- **Crates that used to be empty hand something over again.** A quarter of the
+  table that turns a crate into a weapon had been left out, which quietly
+  emptied every crate carrying a jetpack, an air strike or a super TNT — the
+  jetpack one stands on twenty-one maps.
 
 - **A blast no longer throws pigs half across the map.** The knock is the
   original's own arithmetic now, which is about a quarter of the distance the

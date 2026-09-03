@@ -84,9 +84,16 @@ which is a real zero in their own column rather than a special case.
 
 Skill 38 — which the repo used to call the FIRECRACKER and the game calls
 **SUPER TNT** — is built: TNT's charge with **200 points** and the hardest
-shove in the game. Nothing hands it out in the original either, so
-`pow.give(38)` is the only way to hold one. Worth a look precisely because the
-throw just changed: it is the loudest case there is.
+shove in the game. It comes out of a **CRATE**, on DESVAL, GUNS, SEPIA1 and
+TWIN. Worth a look precisely because the throw just changed: it is the loudest
+case there is.
+
+**And the crate fix is the bigger thing to watch (B26)**: every crate byte
+past 45 used to hand over NOTHING, which included the **JETPACK crate on
+twenty-one maps** and both AIR STRIKES. Those now hand over a skill — and the
+jetpack and the air strikes are still UNBUILT, so what you will meet is a
+crate that gives you something the fire key ignores rather than a crate that
+gives you nothing. That is the honest state, not a regression.
 
 ### 7. The AI with a mortar (B18)
 
@@ -2439,6 +2446,32 @@ So neither is a regression, and neither is written down anywhere else.
 Neither has been touched: they are timing in the SPECS, not behaviour, and the
 fix is a measurement each rather than a tuned number.
 
+### B26. THE CRATE TABLE WAS 46 ENTRIES LONG AND IS 72 — fixed 2026-09-01
+
+Play, in one line, against a spec of ours that had just asserted the opposite:
+"это в ящиках находится". `CRATE_SKILL` (exe 0x4D9DC8) was short by 26 entries,
+so **every crate byte from 46 up handed over NOTHING**.
+
+Measured over the 61 shipped POGs, what those bytes really are:
+
+| byte | skill | maps |
+| - | - | - |
+| 51 | **50 JETPACK** | **21** |
+| 58 | 58 AIR STRIKE | 11 |
+| 59 | 59 CLUSTER AIR STRIKE | 3 |
+| 67 | **38 SUPER TNT** | 4 — DESVAL, GUNS, SEPIA1, TWIN |
+| 70 | 27 SHRAPNEL GRENADE | 1 — RIDGE |
+
+**Follow-on, and it is the real work this creates**: four of those five are
+UNBUILT skills (50, 58, 59 — and 27 is fine). So a crate on twenty-one maps now
+hands over a JETPACK that does nothing when fired. It is not a regression — an
+empty crate was worse — but it moves 50 JETPACK and 58/59 from "the HERO's kit
+only" to "a third of the campaign", which is a much better reason to build
+them. B23 priced 58/59 at 44 and 47 bytes.
+
+Not read: what indices 46..50 mean. They hand over 68..72, past the 67 skills
+entirely, and no shipped map places one.
+
 ### B25. 38 IS **SUPER TNT**, AND IT IS BUILT — 2026-09-01
 
 Play named it: "супер тнт — там огромный отброс и урон". Both halves were
@@ -2453,11 +2486,10 @@ the largest of either in the table. Two hundred is a LEGEND's whole health.
 Built by giving it its `LOBS` row; it had been inert on the same
 `isLobbed || isMine` disagreement B22 wrote down as latent that morning.
 
-**OPEN, and it is play's call: nothing can be given one.** No kit carries 38
-and the crate byte table skips it (byte 34 → 37, byte 35 → 39), in the original
-as much as here. `pow.give(38)` is the only door. If it should be reachable,
-the honest ways are a crate byte the remake adds (a divergence) or a kit entry
-(a bigger one) — neither is invented here.
+**CLOSED by play the same hour, and it took a real bug with it.** "Это в
+ящиках находится" — right: `CRATE_SKILL` had been transcribed 46 entries long
+against a table of 72, and 38 is byte **67**, on DESVAL, GUNS, SEPIA1 and TWIN.
+See B26.
 
 ### B24. THE BLAST'S THROW IS THE EXE'S NOW — 2026-09-01
 

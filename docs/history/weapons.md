@@ -2439,9 +2439,43 @@ opens that branch on `isLobbed || isMine` and 38 had no `LOBS` entry. That
 disagreement was written down in `unclaimed.spec.ts` this morning as "latent:
 no kit and no crate byte reaches it"; it is a weapon now.
 
-**And nothing hands it out, in the original either.** No class kit carries 38
-and the crate byte table skips it — byte 34 gives 37 and byte 35 gives 39. So
-it is a complete weapon with no door, and `pow.give(38)` is the only way to
-hold one. That is a fact about the shipped data, not a gap in the remake; what
-to DO about it is play's call.
+**And then play corrected the last paragraph of this section within the hour**
+— see below. It had said no crate reaches it; a crate reaches it on four maps.
+
+## …and the crate table was 46 entries long — 2026-09-01, corrected by play
+
+I had just written, and a spec had just asserted, that nothing in the game can
+hand a pig a SUPER TNT. Play: **"это в ящиках находится - всё норм."**
+
+`CRATE_SKILL` — the exe's 0x4D9DC8, a crate's stored byte turned into a skill —
+had been transcribed **46 entries long**, and the table is **72**. The four
+skills that looked skipped are not skipped: 13, 27, 30 and 38 step out of the
+runs and are collected at the END, indices 67..71, with 55 beside them. SUPER
+TNT is **byte 67**.
+
+**What the short table cost is much bigger than the one weapon.** Every byte
+from 46 up answered `undefined`, so those crates handed over NOTHING. Measured
+over all 61 shipped POGs:
+
+| byte | skill | maps |
+| - | - | - |
+| 51 | **50 JETPACK** | **21** |
+| 58 | 58 AIR STRIKE | 11 |
+| 59 | 59 CLUSTER AIR STRIKE | 3 |
+| 67 | **38 SUPER TNT** | 4 — DESVAL, GUNS, SEPIA1, TWIN |
+| 70 | 27 SHRAPNEL GRENADE | 1 — RIDGE |
+
+A jetpack crate stands on a third of the game and was empty. That is a live
+bug fixed, not a curiosity.
+
+It also nearly doubles the CRATE HOLE the weapons suite pins: twenty-nine
+skills a pickup can put in a pig's hands that the fire key ignores, against the
+sixteen it counted this morning — and seven of them are in somebody's KIT as
+well, where the old list had one.
+
+**The lesson, and it is the twin of one this repo already carries.** "An arm is
+not read until its own last instruction" has a table version: **a table is not
+read until its END is found.** Forty-six was where the shipped maps' bytes
+happened to stop being interesting, not where the data stopped. What caught it
+was play knowing the game.
 

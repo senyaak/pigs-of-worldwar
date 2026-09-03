@@ -14,7 +14,9 @@
 //   means. It is not the skill id — the loader reads the crate's byte and
 //   looks it up (`movsx edi,[eax+4D9DC8h]` at 0x4A5B7A). Crate byte 18 is
 //   skill 19, GRENADE; 27 is 29, BAZOOKA; 34 is 37, TNT. Without it CAMP's
-//   crates read one weapon short of what they are.
+//   crates read one weapon short of what they are — and it is **72 entries
+//   long**, which cost the remake a third of the game's crates until play
+//   caught it (`CRATE_SKILL`).
 
 /** `gtext` index of each skill's name, by skill id (exe 0x4CF0D0). */
 const SKILL_LINE = [
@@ -24,10 +26,40 @@ const SKILL_LINE = [
   149, 150, 151, 152, 153, 154, 155, 156, 157
 ]
 
-/** What a crate's stored byte hands over, as a skill id (exe 0x4D9DC8). */
+/**
+ * What a crate's stored byte hands over, as a skill id (exe 0x4D9DC8).
+ *
+ * **This was transcribed 46 entries long and the table is 72**, which is not a
+ * tidy mistake: the four skills the short version appeared to "skip" —
+ * 13 SUPER SHOTGUN, 27 SHRAPNEL GRENADE, 30 GRENADE LAUNCHER and **38 SUPER
+ * TNT** — are not skipped at all. They sit at the END, at indices 67..71,
+ * after a run that walks 50..66. Play caught it in one line ("это в ящиках
+ * находится") against a spec of ours that had just asserted the opposite.
+ *
+ * What the short table cost: every byte from 46 up answered `undefined`, so
+ * **those crates handed over NOTHING**. Measured over the 61 shipped POGs, the
+ * bytes actually placed include 51 (twenty-one maps), 58 (eleven), 59 (three),
+ * 67 (four) and 70 (one) — a JETPACK crate on a third of the game, both AIR
+ * STRIKES, the SUPER TNT and the SHRAPNEL GRENADE, all of them silently empty.
+ *
+ * Indices 46..50 hand over 68..72, which are past the 67 skills and mean
+ * nothing here; no shipped map places one, so they are transcribed as they
+ * stand rather than guessed at. Index 72 is 126 and everything after it 255 —
+ * the table's own end.
+ */
 const CRATE_SKILL = [
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28,
-  29, 31, 32, 33, 34, 35, 36, 37, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49
+  // 0..12 — the skills at their own index
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+  // 13..25 — 13 SUPER SHOTGUN steps out of line here and reappears at 69
+  14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+  // 26..45 — and 27, 30 and 38 step out the same way
+  28, 29, 31, 32, 33, 34, 35, 36, 37, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+  // 46..50 — past the skill list, and no shipped map places one
+  68, 69, 70, 71, 72,
+  // 51..66 — the late skills and the tools, 55 HIDE stepping out to 68
+  50, 51, 52, 53, 54, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66,
+  // 67..71 — THE FIVE THAT STEPPED OUT, collected at the end
+  38, 55, 13, 27, 30
 ]
 
 /**

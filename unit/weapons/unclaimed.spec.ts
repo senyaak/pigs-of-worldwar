@@ -1,14 +1,17 @@
 // WEAPONS — the skills NO CLASS CARRIES.
 //
-// Thirty-one of the sixty-seven are in nobody's kit (`CLASS_KIT`), and "not in
-// a kit" is NOT the same as "unreachable": a CRATE hands skills over by its own
+// Thirty of the sixty-seven are in nobody's kit (`CLASS_KIT`), and "not in a
+// kit" is NOT the same as "unreachable": a CRATE hands skills over by its own
 // byte table (0x4D9DC8, `skillFromCrate`), and that table is wider than every
-// kit put together. So this file is where the suite asks the question the
-// per-class files cannot — **what can end up in a pig's trotters that the fire
-// key does not answer?**
+// kit put together — **72 entries, reaching every skill but the two the
+// dispatchers do not fire.** So this file is where the suite asks the question
+// the per-class files cannot — **what can end up in a pig's trotters that the
+// fire key does not answer?**
 //
-// The answer is sixteen things, and they are listed by name below — plus one
-// that was in the list until this session and is a weapon now: 38 SUPER TNT.
+// The answer is twenty-nine things and they are listed below, which is nearly
+// twice what this file said an hour ago: the table had been transcribed 46
+// entries long and play knew better ("это в ящиках находится"). Every byte
+// from 46 up was answering nothing at all.
 
 import { test, expect } from '@playwright/test'
 
@@ -27,7 +30,7 @@ const UNCLAIMED = Array.from({ length: SKILL_COUNT }, (_, skill) => skill).filte
 /** …and every skill a CRATE's byte can hand over. */
 const FROM_CRATE = [
   ...new Set(
-    Array.from({ length: 64 }, (_, byte) => skillFromCrate(byte)).filter(
+    Array.from({ length: 80 }, (_, byte) => skillFromCrate(byte)).filter(
       (skill): skill is number => skill !== null
     )
   )
@@ -66,28 +69,43 @@ test.describe('THE CRATE HOLE — what a pickup can put in a hand that does noth
   // is read-and-not-built rather than unknown — the artillery family (39..44)
   // has no delivery at all, the emplaced weapons (45..49) belong to the
   // pillbox and the vehicle, and 16/32/34 are rows with no arm here.
-  const HOLE = [0, 16, 31, 32, 34, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
+  const HOLE = [
+    0, 16, 30, 31, 32, 34, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 53, 56, 57, 58, 59,
+    // …and the tools, which answer somewhere else or nowhere yet.
+    60, 61, 62, 63, 64, 66,
+    // 68..72 are what indices 46..50 hand over: past the skill list entirely,
+    // and no shipped map places one.
+    68, 69, 70, 71, 72
+  ]
 
-  test('a crate can hand over sixteen things the fire key ignores', { tag: '@nodata' }, () => {
+  test('a crate can hand over twenty-nine things the fire key ignores', { tag: '@nodata' }, () => {
     const inert = FROM_CRATE.filter((skill) => routeOf(skill) === 'inert')
     // Named, not counted: when one is built this fails with the list, and
     // whoever built it deletes a number.
     expect(inert.map(skillLabel)).toEqual(HOLE.map(skillLabel))
   })
 
-  test('…and only ONE of them is also in somebody kit', { tag: '@nodata' }, () => {
-    // 31 AIRBURST — PYROTECH, COMMANDO, HERO and up carry it, so it is the
-    // one a player meets without a crate (docs/todo.md B18).
-    expect(HOLE.filter((skill) => CARRIED.includes(skill))).toEqual([31])
+  test('and now SEVEN of them are in somebody kit too', { tag: '@nodata' }, () => {
+    // The short table made this list one long. With the whole of it, the
+    // JETPACK and the HERO's four unbuilt skills are crate-reachable as well
+    // as carried (docs/todo.md B18, B23).
+    expect(HOLE.filter((skill) => CARRIED.includes(skill))).toEqual([31, 50, 53, 56, 57, 58, 59])
   })
 
-  test('whether a shipped MAP actually places such a crate is not asked here', { tag: '@nodata' }, () => {
-    // The byte table says it CAN; which bytes the 61 POGs really carry is a
-    // measurement over the installation, which is `e2e/`'s half of the suite
-    // and not this one. What is pinned here is the table.
+  test('THE TABLE IS 72 LONG, and the five that look skipped are at its END', { tag: '@nodata' }, () => {
+    // The head, which was never in doubt.
     expect(skillFromCrate(0)).toBe(SKILL.NONE)
     expect(skillFromCrate(18)).toBe(SKILL.GRENADE)
     expect(skillFromCrate(34)).toBe(SKILL.TNT)
+    // …and the tail, which is what a 46-entry transcription lost: 38 SUPER
+    // TNT, 55 HIDE, 13 SUPER SHOTGUN, 27 SHRAPNEL GRENADE, 30 GRENADE
+    // LAUNCHER. Play knew: "это в ящиках находится".
+    expect([67, 68, 69, 70, 71].map((byte) => skillFromCrate(byte))).toEqual([38, 55, 13, 27, 30])
+    // The JETPACK is byte 51 and stands on a third of the shipped maps; under
+    // the short table it handed over nothing at all.
+    expect(skillFromCrate(51)).toBe(50)
+    // And 72 is where it ends.
+    expect(skillFromCrate(72)).toBeNull()
   })
 })
 
@@ -111,15 +129,23 @@ test.describe('the TOOLS, which are skills and are not weapons', () => {
     }
   })
 
-  test('…and none of the six is in a kit or a crate', { tag: '@nodata' }, () => {
+  test('no kit carries one — but the CRATE table reaches every one of them', { tag: '@nodata' }, () => {
+    // Which is a curiosity of the exe's own table rather than a mistake here:
+    // it runs 51..66 straight through, so bytes exist that would hand a pig
+    // MAP VIEW or SURRENDER out of a box. No shipped map places one — the
+    // bytes measured over the 61 POGs stop at 34 and then jump to 51, 58, 59,
+    // 67 and 70 — so nothing turns on it either way.
     for (const skill of [60, 61, 62, 63, 64, 65, 66]) {
       expect(CARRIED, skillLabel(skill)).not.toContain(skill)
-      expect(FROM_CRATE, skillLabel(skill)).not.toContain(skill)
+      expect(FROM_CRATE, skillLabel(skill)).toContain(skill)
     }
+    // 65 SKIP TURN is the one of the seven that ANSWERS, so it is not in the
+    // hole above.
+    expect(routeOf(65)).toBe('skip')
   })
 })
 
-test.describe('38 SUPER TNT — the biggest weapon in the game, and nothing carries it', () => {
+test.describe('38 SUPER TNT — the biggest weapon in the game, and it is IN THE CRATES', () => {
   test('it is PLANTED, and it answers the fire key like the TNT it is', { tag: '@nodata' }, () => {
     // It sat INERT for months: `weaponLayer` put it in the charge family
     // through `isPlanted`, but `attack.ts` opens that branch on
@@ -153,13 +179,13 @@ test.describe('38 SUPER TNT — the biggest weapon in the game, and nothing carr
     ])
   })
 
-  test('…and NOBODY can be given one — no kit, no crate byte', { tag: '@nodata' }, () => {
-    // The crate table skips it: byte 34 hands over 37 and byte 35 hands over
-    // 39. So it is a complete weapon with no door, in the original as much as
-    // here, and `pow.give(38)` is the only way to hold one.
+  test('no kit carries one — a CRATE is the only door, and four maps have it', { tag: '@nodata' }, () => {
+    // This test asserted the opposite for about an hour, off a crate table
+    // transcribed 46 entries long. Play: "это в ящиках находится". Byte
+    // **67** is the door, and DESVAL, GUNS, SEPIA1 and TWIN place one
+    // (measured over the 61 shipped POGs).
     expect(CARRIED).not.toContain(38)
-    expect(FROM_CRATE).not.toContain(38)
-    expect(skillFromCrate(34)).toBe(37)
-    expect(skillFromCrate(35)).toBe(39)
+    expect(FROM_CRATE).toContain(38)
+    expect(skillFromCrate(67)).toBe(38)
   })
 })
