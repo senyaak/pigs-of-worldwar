@@ -61,7 +61,7 @@ import { INOUT_CLIP } from './buildings'
 import { mountArmed, mountBarrel } from './mounts'
 import { barrelMuzzle } from './barrel'
 import { driveStep, hullTurn } from './drive'
-import { ramOver } from './ram'
+import { ramOver, ramWasAttack } from './ram'
 import type { Bullets } from './bullets'
 import type { Lobs } from './lobs'
 import { isMine } from './mines'
@@ -2079,7 +2079,7 @@ export function createBattle(parts: BattleParts): Battle {
       // one instruction there: the ram arm bails unless `[veh+0xC0]` is
       // non-zero (lib/game/ram.ts).
       if (went.moved) {
-        ramOver(
+        const over = ramOver(
           driving.box,
           driving.kind,
           acting,
@@ -2088,10 +2088,31 @@ export function createBattle(parts: BattleParts): Battle {
             training: parts.training,
             fling: (pig, velocity) => tumbles.fling(pig, velocity, false, true),
             friendly: (pig) => game.currentPlayer.pigs.includes(pig),
-            board: (pig) => indoors.board(pig, driving, createLocomotion(query, pig.position.x, pig.position.z, pig.heading))
+            board: (pig) =>
+              indoors.board(
+                pig,
+                driving,
+                createLocomotion(query, pig.position.x, pig.position.z, pig.heading)
+              )
           },
           emit
         )
+        // **RUNNING SOMEBODY OVER IS AN ATTACK.** Play: "если наехать на когото
+        // — будет урон и конец хода — считается атакой." So it spends the
+        // turn's one blow and ends the turn, exactly as firing a weapon does —
+        // and it needs saying here because nothing else about it goes through
+        // `attack.ts`: there is no skill in hand, no `used` answer, and the
+        // ladder never runs. Twenty points arrive from the hull instead.
+        //
+        // **Picking a chum up does NOT**, and the manual is why: "the troop
+        // carriers can be handy for picking up a group of your chums and
+        // driving them all across the map in one go." A group, in one go — so
+        // the first pickup cannot be the end of the turn. Only the knock is a
+        // blow. `[play]` + `[manual]`.
+        if (ramWasAttack(over)) {
+          struck = true
+          spent = true
+        }
       }
     } else if (emplaced) {
       // …and one at a gun turns where it sits: the heading follows, the

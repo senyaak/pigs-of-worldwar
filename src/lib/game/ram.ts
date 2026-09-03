@@ -146,3 +146,19 @@ export function ramOver(
   }
   return out
 }
+
+/**
+ * **Whether this frame's ram counts as the turn's BLOW** — and therefore ends
+ * the turn, the way firing a weapon does.
+ *
+ * Play, of driving into somebody: "будет урон и конец хода — считается
+ * атакой." Nothing about a ram goes through `attack.ts` — there is no skill in
+ * hand, no `used` answer and the fire ladder never runs — so the rule has to
+ * be stated here or it would silently not exist.
+ *
+ * **Picking a chum up is not a blow**, and the manual is the reason: "the
+ * troop carriers can be handy for picking up a group of your chums and driving
+ * them all across the map in one go." A group, in one go — so the first pickup
+ * cannot be the end of the turn. `[play]` + `[manual]`.
+ */
+export const ramWasAttack = (out: RamOutcome): boolean => out.struck.length > 0

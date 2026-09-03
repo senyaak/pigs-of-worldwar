@@ -8,7 +8,7 @@
 import { test, expect } from '@playwright/test'
 
 import { DRIVE_SPEED, DRIVE_TURN, driveStep, hullTurn } from '../src/lib/game/drive'
-import { RAM_DAMAGE, RAM_SHOVE, ramOver, rammed } from '../src/lib/game/ram'
+import { RAM_DAMAGE, RAM_SHOVE, ramOver, ramWasAttack, rammed } from '../src/lib/game/ram'
 import { WALK_SPEED } from '../src/lib/game/movement'
 import { ObstacleField } from '../src/lib/game/obstacles'
 import { Game } from '../src/lib/game/game'
@@ -272,5 +272,80 @@ test.describe('the RAM', () => {
     )
     expect(out.boarded).toEqual([])
     expect(out.struck).toEqual([])
+  })
+})
+
+test.describe('RUNNING SOMEBODY OVER IS AN ATTACK', () => {
+  // Play: "если наехать на когото — будет урон и конец хода — считается
+  // атакой." Nothing about a ram goes through the fire ladder — no skill in
+  // hand, no `used` answer — so the rule lives in `ramWasAttack` and the
+  // battle spends the turn on it.
+  const squad2 = (): { mine: Pig[]; theirs: Pig[] } => {
+    const game = new Game({
+      players: [
+        { name: 'A', pigNames: ['driver', 'chum'] },
+        { name: 'B', pigNames: ['enemy'] }
+      ],
+      spawns: [
+        { x: 0, z: 0, heading: 0, pigClass: 0 },
+        { x: 0, z: 0, heading: 0, pigClass: 0 },
+        { x: 0, z: 0, heading: 0, pigClass: 0 }
+      ]
+    })
+    return { mine: game.players[0].pigs, theirs: game.players[1].pigs }
+  }
+
+  test('a TANK that knocks somebody has used the turn', { tag: '@nodata' }, () => {
+    const { mine, theirs } = squad2()
+    const [driver] = mine
+    const enemy = theirs[0]
+    driver.position.x = 0
+    driver.position.z = 0
+    enemy.position.x = 100
+    enemy.position.z = 0
+    const out = ramOver(
+      hull(),
+      3,
+      driver,
+      { pigs: () => [driver, enemy], training: false, friendly: (pig) => mine.includes(pig) },
+      () => {}
+    )
+    expect(out.struck).toEqual([enemy.id])
+    expect(ramWasAttack(out)).toBe(true)
+  })
+
+  test('…and one that touched nobody has not', { tag: '@nodata' }, () => {
+    const { mine } = squad2()
+    const [driver] = mine
+    driver.position.x = 0
+    driver.position.z = 0
+    const out = ramOver(hull(), 3, driver, { pigs: () => [driver], training: false }, () => {})
+    expect(ramWasAttack(out)).toBe(false)
+  })
+
+  test('PICKING A CHUM UP IS NOT A BLOW — a carrier fills up in one turn', { tag: '@nodata' }, () => {
+    // The manual: "picking up a group of your chums and driving them all
+    // across the map in one go." A group, in one go — so the first pickup
+    // cannot end the turn, or a carrier could never hold more than one.
+    const { mine } = squad2()
+    const [driver, chum] = mine
+    driver.position.x = 0
+    driver.position.z = 0
+    chum.position.x = 100
+    chum.position.z = 0
+    const out = ramOver(
+      hull(),
+      4,
+      driver,
+      {
+        pigs: () => [driver, chum],
+        training: false,
+        friendly: () => true,
+        board: () => true
+      },
+      () => {}
+    )
+    expect(out.boarded).toEqual([chum.id])
+    expect(ramWasAttack(out)).toBe(false)
   })
 })

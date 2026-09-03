@@ -2488,6 +2488,15 @@ exe's own `[veh+0xC0]` test. A carrier instead picks up, and only its own side
 (0x4781F9 compares `[pig+0x194]`), which is the manual's "one of your
 team-mates" against the tank's "friend or foe".
 
+**And a ram is an ATTACK.** Play: "если наехать на когото — будет урон и конец
+хода — считается атакой." It spends the turn's one blow and ends the turn, the
+way firing does — which had to be stated explicitly, because nothing about a
+ram goes through `attack.ts`: no skill in hand, no `used` answer, and the fire
+ladder never runs. `ram.ts`'s `ramWasAttack` is the rule and `battle.ts` reads
+it. **Picking a chum up is NOT a blow**, on the manual's own word: "picking up
+a group of your chums and driving them all across the map in one go" — a group,
+in one go, so the first pickup cannot end the turn.
+
 **What is still NOT built:**
 
 - **EJECT, skill 62.** The manual's way of getting a passenger back out of a

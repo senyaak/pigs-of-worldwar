@@ -918,3 +918,22 @@ or its collider sits across the way it is driving.
 
 `unit/drive.spec.ts`, thirteen tests. The one that earns its place is the
 rebucket: move the tank four tiles and the old tile has to come back clear.
+
+### A ram is an attack
+
+Play, straight after: "если наехать на когото — будет урон и конец хода —
+считается атакой."
+
+Worth recording because of WHERE it had to go. Every other blow in the game
+reaches the turn's bookkeeping through `attack.ts`: the fire key is pressed, the
+ladder answers `'used'`, and the frame sets `struck` and asks `endsTurn` of what
+is in hand. A ram has none of that — no skill in hand, no press, no ladder — so
+the twenty points arrive from the hull and the turn would simply have gone on.
+Nothing would have looked broken; it would just have been free.
+
+So the rule is named rather than inlined: `ramWasAttack` in `ram.ts`, which the
+battle reads to set `struck` and `spent` together. And the answer for a CARRIER
+is the opposite, on the manual's own word — "picking up a group of your chums
+and driving them all across the map in one go". A group, in one go: if the
+first pickup ended the turn, a carrier could never hold more than one, and the
+capacity of ten in the exe's own table would be decoration.

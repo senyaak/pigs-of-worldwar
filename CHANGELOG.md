@@ -21,8 +21,10 @@ one.
   point below the horizon at all, so nothing downhill is a target.
 - **…and they drive.** The walk keys are the throttle and the turn keys the
   tracks. Drive a tank into somebody, friend or foe, and it hurts them as much
-  as a rifle round and throws them further; drive a troop carrier into one of
-  your own and he climbs aboard. A parked vehicle is harmless — it has to be
+  as a rifle round and throws them further — **and that is your attack for the
+  turn**, the same as if you had shot them. Drive a troop carrier into one of
+  your own instead and he climbs aboard, which costs nothing: a carrier can
+  fill up and drive off in one go. A parked vehicle is harmless — it has to be
   moving. Getting a passenger back OUT of a carrier is not built yet, so he
   rides until his own turn comes round.
 
