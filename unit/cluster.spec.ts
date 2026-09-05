@@ -88,6 +88,26 @@ test('a cluster bursts into its own pop and five bomblets, vertical first', { ta
   }
 })
 
+test("the camera's seat is the canister, then the vertical bomblet, then nobody", { tag: '@nodata' }, () => {
+  const { throwIt, lobs } = field()
+  expect(lobs.head()).toBeNull()
+  throwIt()
+  // What left the hand is what the camera rides…
+  const canister = lobs.head()!
+  expect(canister.skill).toBe(CLUSTER)
+  lobs.detonateNow()
+  // …and the burst hands the seat to the head shard, the vertical one — NOT
+  // to whichever was pushed last. Play caught the renderer taking the tail
+  // and the camera parking on the burst (three/battle.ts).
+  const seat = lobs.head()!
+  expect(seat).not.toBe(canister)
+  expect(seat).toBe(lobs.all()[0])
+  expect(Math.abs(seat.vx) + Math.abs(seat.vz)).toBeLessThan(1e-6)
+  // A childless burst leaves nothing to ride.
+  lobs.detonateNow()
+  expect(lobs.head()).toBeNull()
+})
+
 test('each bomblet then bursts as its own 0x47 crack', { tag: '@nodata' }, () => {
   const { throwIt, lobs, events } = field()
   throwIt()

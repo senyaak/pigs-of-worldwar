@@ -2479,3 +2479,29 @@ read until its END is found.** Forty-six was where the shipped maps' bytes
 happened to stop being interesting, not where the data stopped. What caught it
 was play knowing the game.
 
+## The throw leaves at clip 19's own event — 2026-09-05
+
+Play, on the cluster: "она вылетает раньше чем анимация броска кончается —
+проверь всё ли там норм." Not norm, and not the cluster's: every lob did it.
+`attack.ts` made the grenade and started clip 19 in the same statement the
+frame the ten-frame fuse ran out, so the canister was in the air on frame 0 of
+the wind-up and the arm swung behind it. Skills 19 and 20 have byte-identical
+records, so the cluster only made it LOUD.
+
+The exe's shape was already written down for the charge: `Pig::Attack` puts
+the attack clip on and what has a clip waits for the clip's own key-frame
+event (`weapons/fire.md`; `PLANT_PHASE` 1314 of clip 77 is the same id 65 →
+`Pig::Shoot`). Clip 19's rows were simply never dumped. `anim/key-events.js 19`:
+**1638 of 4096 carries id 65**, frame 14 of 35, so `THROW_PHASE = 1638` sits
+beside `PLANT_PHASE` in lib/game/grenade.ts.
+
+Built as a third phase of the shot sequence, `wind` (lib/game/shot.ts): the
+fuse runs out → clip on, `windUp` for `clipSeconds(19) * 1638 / 4096`; the
+wind-up runs out → `throwOne`, the round spent, `flight`. A gun has no attack
+clip and still looses on the fuse; a charge still takes its own `laying` road.
+What keeps the turn from ending in the gap is that `firing` stays non-null
+through `wind` — `settled()` asks for `flight` — and the camera has nothing to
+ride until the lob exists, which is right: the exe re-seats on the projectile
+when `Pig::Shoot` makes it. `e2e/002/cluster.spec.ts` now holds until the
+sequence reports `wind`, checks the hand is still full, and measures the
+appearance against the phase to within two steps.

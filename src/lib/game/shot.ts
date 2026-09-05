@@ -42,13 +42,18 @@ export const FIRE_FUSE = FIRE_FUSE_FRAMES * FRAME_SECONDS
  * Where a shot has got to.
  *
  * - `fuse` — pressed, not yet fired. `[pig+0x230] = 1`.
+ * - `wind` — the fuse ran out and the ATTACK CLIP is on, but the thing has
+ *   not left the hand yet: a thrown weapon leaves on the clip's own key-frame
+ *   event, not when the clip starts (`THROW_PHASE`, lib/game/grenade.ts). A
+ *   gun never sits here — it has no attack clip and looses on the fuse.
  * - `flight` — the bullet is up and the camera is riding it.
  */
-export type FirePhase = 'fuse' | 'flight'
+export type FirePhase = 'fuse' | 'wind' | 'flight'
 
 export interface Firing {
   phase: FirePhase
-  /** Seconds left of the fuse; meaningless once the phase is `flight`. */
+  /** Seconds left of the fuse — or of the wind-up, once the clip is on;
+   * meaningless once the phase is `flight`. */
   fuse: number
 }
 
@@ -83,6 +88,28 @@ export function advanceFiring(firing: Firing, delta: number, speaking = false): 
   if (firing.phase !== 'fuse') return false
   firing.fuse -= delta
   if (firing.fuse > 0 || speaking) return false
+  firing.phase = 'flight'
+  return true
+}
+
+/**
+ * The fuse has run out and the attack clip is on, but what is in the hand
+ * leaves at the clip's own event, `seconds` from now — the throw's read is
+ * `THROW_PHASE` of clip 19 (lib/game/grenade.ts). The camera does not ride
+ * anything yet: nothing is up.
+ */
+export function windUp(firing: Firing, seconds: number): void {
+  firing.phase = 'wind'
+  firing.fuse = seconds
+}
+
+/** One frame of the wind-up. True the frame the clip's event lands — the
+ * caller's cue to loose the thing, which is what `Pig::Shoot` does there.
+ * Nothing holds it: the pig has already said its line over the fuse. */
+export function advanceWind(firing: Firing, delta: number): boolean {
+  if (firing.phase !== 'wind') return false
+  firing.fuse -= delta
+  if (firing.fuse > 0) return false
   firing.phase = 'flight'
   return true
 }

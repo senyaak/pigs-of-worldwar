@@ -504,6 +504,32 @@ export const isPlanted = (skill: number | null): boolean =>
  */
 export const PLANT_PHASE = 1314
 
+/**
+ * WHEN in the throwing animation the grenade actually leaves the hand — phase
+ * **1638** of 4096, frame 14 of clip 19's thirty-five.
+ *
+ * Play: "кидаю кластер гранату — она вылетает раньше чем анимация броска
+ * кончается." It was leaving on frame 0: the fuse ran out, the lob was made
+ * and clip 19 "Using Grenade" was started in the same statement, so the arm
+ * wound up behind a grenade already in the air. The exe does what it does for
+ * the charge above — `Pig::Attack` puts the clip on and the throw waits for the
+ * clip's own event (`weapons/fire.md`: "then on the attack clip's own key-frame
+ * events"). Clip 19's six rows, out of the same table (`anim/key-events.js 19`):
+ *
+ * ```
+ * 1170  id 22         ; f10
+ * 1638  id 2 + 65     ; f14 -- a footstep, AND THE THROW (id 65 -> Pig::Shoot)
+ * 3159  id 5          ; f27  footstep
+ * 3627  id 1          ; f31  footstep
+ * 3978  id 5          ; f34  footstep
+ * ```
+ *
+ * Every lobbed skill in `WEAPON_TABLE` carries attack clip 19 (the record's
+ * +0x20), so one number serves the whole family; a lob whose record has no
+ * clip would leave on the fuse the way a gun does.
+ */
+export const THROW_PHASE = 1638
+
 /** What this skill lobs, or null for everything that does not lob. */
 export const lobOf = (skill: number | null): Lob | null =>
   skill === null ? null : (LOBS[skill] ?? null)

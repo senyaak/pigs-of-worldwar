@@ -32,6 +32,9 @@ import { buildQuery, createEngine, STEP_SECONDS } from '../../src/lib/game/engin
 import { createBus } from '../../src/lib/game/events'
 import { bodyExtent } from '../../src/lib/game/body'
 import { give } from '../../src/lib/game/inventory'
+import { clipSeconds } from '../../src/lib/game/clips'
+import { THROW_PHASE } from '../../src/lib/game/grenade'
+import { PHASE_UNITS } from '../../src/lib/game/melee'
 
 /** Skill 20 — the CLUSTER GRENADE, the canister that scatters five
  * (lib/game/grenade.ts, `Lob.cluster`). */
@@ -95,16 +98,35 @@ test('a scattered cluster still answers the fire key', async () => {
   engine.battle.warp(6400, -8600, 0)
   step(200)
 
-  // Held to the top, which throws by itself (lib/game/gauge.ts).
+  // Held to the top, which throws by itself (lib/game/gauge.ts) — and "throws"
+  // is the fuse running out and clip 19 going ON, not the grenade leaving.
+  // That waits on the clip's own event (lib/game/grenade.ts `THROW_PHASE`), so
+  // the hold is kept until the sequence says it is winding up…
   engine.battle.setFiring(true, true)
-  for (let f = 0; f < 200; f++) {
+  let held = 0
+  while (engine.battle.view().firing?.phase !== 'wind' && held < 400) {
     engine.update(STEP_SECONDS)
     engine.battle.setFiring(true, false)
+    held++
   }
   engine.battle.setFiring(false, false)
-  step(5)
+  expect(engine.battle.view().firing?.phase, 'the clip is winding up').toBe('wind')
+  expect(engine.grenades.live(), 'and nothing has left the hand yet').toBe(0)
+  // …and the canister appears `THROW_PHASE` of clip 19 later, not before.
+  const release = (clipSeconds(clips[19]) * THROW_PHASE) / PHASE_UNITS
+  let wound = 0
+  while (engine.grenades.live() === 0 && wound < 400) {
+    engine.update(STEP_SECONDS)
+    wound++
+  }
   expect(engine.grenades.live(), 'the canister left the hand').toBe(1)
+  expect(Math.abs(wound * STEP_SECONDS - release), "at the clip's own event").toBeLessThan(
+    2 * STEP_SECONDS
+  )
   expect(engine.battle.situation().armed, 'and the fire key is a detonator now').toBe(true)
+  // Let it get clear of the thrower: cut on the frame it is born, the
+  // canister's own thirty points land on the hand that threw it.
+  step(30)
 
   // A second press cuts its fuse where it flies: its own blast, and FIVE
   // bomblets in the air (lib/game/lobs.ts, the `cluster` arm).

@@ -148,6 +148,10 @@ export interface BattleSnapshot {
   dropping: boolean
   bullets: FlightShot[]
   lobs: FlightShot[]
+  /** Which of `lobs` the camera rides — its id, or null (lib/game/lobs.ts
+   * `head`). Not the array's tail: a cluster's burst hands the seat to its
+   * vertical bomblet, which is pushed FIRST of the five. */
+  tracked: number | null
   crates: DescentShot[]
   /** Every disguise standing (lib/game/hide.ts). */
   decoys: DecoyShot[]

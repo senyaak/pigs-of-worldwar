@@ -252,8 +252,9 @@ export interface DebugHooks {
   /** How full the power gauge is, 0..1, or null when nothing is charging
    * (lib/game/gauge.ts). */
   charging(): number | null
-  /** Where the shot sequence has got to — 'fuse', 'flight', or null when the
-   * pig is its own again (lib/game/shot.ts). */
+  /** Where the shot sequence has got to — 'fuse', 'wind' (a throw's clip is
+   * on and the grenade not yet out), 'flight', or null when the pig is its
+   * own again (lib/game/shot.ts). */
   firing(): string | null
   /** Every voice line the pigs have said, in order (audio/pigVoice.ts). */
   barks(): string[]

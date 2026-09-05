@@ -12,10 +12,10 @@
 
 import { GAUGE_FULL, beginGauge, chargeGauge, gaugeFraction } from './gauge'
 import type { Gauge } from './gauge'
-import { advanceFiring, beginFiring } from './shot'
+import { advanceFiring, advanceWind, beginFiring, windUp } from './shot'
 import type { Firing } from './shot'
 import { isGun } from './projectile'
-import { PLANT_PHASE, isLobbed, isPlanted } from './grenade'
+import { PLANT_PHASE, THROW_PHASE, isLobbed, isPlanted } from './grenade'
 import { isMine } from './mines'
 import { weaponOf } from './weapons'
 import { PHASE_UNITS } from './melee'
@@ -323,7 +323,15 @@ export function createAttack(parts: AttackParts): Attack {
       // runs out is the frame it leaves — unless the pig is still saying its
       // line, which holds the trigger down until it has finished (play's rule,
       // lib/game/shot.ts).
-      if (firing && advanceFiring(firing, delta, speaking)) {
+      //
+      // …the frame a GUN's leaves. `Pig::Attack` starts the attack clip at that
+      // moment (0x46971a) and what has a clip waits for the clip's own event
+      // (`weapons/fire.md`): a charge for its laying clip's, a THROW for clip
+      // 19's (`THROW_PHASE`, lib/game/grenade.ts). Play caught the throw leaving
+      // on frame 0 of the clip — "вылетает раньше чем анимация броска
+      // кончается" — so the fuse now puts the clip on and the wind-up looses.
+      const wound = firing !== null && advanceWind(firing, delta)
+      if (firing && (wound || advanceFiring(firing, delta, speaking))) {
         const firearm = weaponOf(holding)
         // A PLANTED charge is the one thing the fuse does not loose. `Pig::Attack`
         // starts the clip either way (0x46971a); what a gun does at that moment,
@@ -335,6 +343,13 @@ export function createAttack(parts: AttackParts): Attack {
           // Nothing was loosed, so the sequence has nothing left to watch: the
           // charge itself is what holds the pig now.
           firing = null
+        } else if (!wound && isLobbed(holding) && firearm.attackClip >= 0) {
+          // The fuse ran out on a THROW: the clip goes on now and the grenade
+          // leaves at its event, `THROW_PHASE` of the way in. Whether the shot
+          // sequence is still `firing` is what `busy` and `settled` read, so it
+          // stays one — in its wind-up — and the camera has nothing to ride yet.
+          anim.playOnce(acting, firearm.attackClip)
+          windUp(firing, (clipSeconds(parts.clips[firearm.attackClip]) * THROW_PHASE) / PHASE_UNITS)
         } else {
           // Where the sights were actually pointing — the drift is part of the
           // aim, not a decoration over it.
@@ -371,8 +386,9 @@ export function createAttack(parts: AttackParts): Attack {
             // in the air.
             spend(acting.carrying, holding ?? -1)
             // `Pig::Attack` puts the weapon's own attack clip on at the same
-            // moment (0x46971a), the way a swing's does.
-            if (firearm.attackClip >= 0) anim.playOnce(acting, firearm.attackClip)
+            // moment (0x46971a), the way a swing's does — for a GUN, which has
+            // none; a throw's has been running since the fuse ran out.
+            if (!wound && firearm.attackClip >= 0) anim.playOnce(acting, firearm.attackClip)
           }
         }
       }

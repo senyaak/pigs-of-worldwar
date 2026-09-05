@@ -491,3 +491,24 @@ round: it fails at 0.4 and passes at 9.
 
 `keepClear` still measures against the SUBJECT and not the aim — the point of
 that rule is not to end up inside the thing being watched.
+
+## The camera rides the lob the ENGINE names, and a cluster hands it the vertical bomblet — 2026-09-05
+
+Play: "кидаю кластер гранату — она при разлетании не следует за гранатками
+которые вылетели, а остаётся на месте взрыва — должна вроде как за одной
+следовать." Right on both counts, and the exe agrees (`weapons/cluster.md`:
+the canister's destructor re-seats the camera on the LAST — vertical —
+bomblet, mode 0x0B). The engine had built exactly that: `shardsOf` pushes the
+vertical child first and `lobs.head()` was `flying[0]`. The renderer never
+asked it. `three/battle.ts` took `lobs[lobs.length - 1]` — the NEWEST, right
+for a bullet and right for a single grenade, and after a burst the last ring
+bomblet, which lands back near the burst point at ~88° with the mode-0x0D aim
+only a third of the way up from the ground: a camera that looks parked.
+
+Two halves fixed. `lobs.ts` now keeps a `tracked` lob of its own — the newest
+to leave the hand, thrown or planted; a burst with children hands the seat to
+the head shard; a childless one to the newest still flying, so the second and
+third bomblets going off do not drop the camera — and `head()` is that. The
+snapshot carries its id as `tracked`, and the renderer's pursuit finds the lob
+by id instead of by position in the array. Pinned in `unit/cluster.spec.ts`:
+canister, then the vertical shard, then nobody.

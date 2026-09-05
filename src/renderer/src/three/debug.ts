@@ -318,6 +318,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       decoys: () => parts.decoys(),
       charging: () => parts.charging(),
       /** Where the shot sequence is: 'fuse' while the ten frames run down,
+       * 'wind' while a throw's clip runs up to its release event,
        * 'flight' while the camera rides the bullet, null when the pig is its
        * own again (lib/game/shot.ts). */
       firing: () => parts.firing(),

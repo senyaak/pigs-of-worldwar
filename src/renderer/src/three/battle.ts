@@ -590,9 +590,17 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // GUN asks for mode 1, which stands still and TURNS after the bullet; a
     // THROWN weapon asks for mode 0x0B, whose handler this build has lost and
     // whose row is 3000 straight behind at the flight's own height. The NEWEST
-    // projectile is the one it answers for.
-    const flying = now.bullets.length > 0 ? now.bullets : now.lobs
-    const bullet = now.firing?.phase === 'flight' ? (flying[flying.length - 1] ?? null) : null
+    // bullet is the one it answers for; which LOB is the engine's own call
+    // (`tracked`, lib/game/lobs.ts `head`), because after a cluster bursts the
+    // exe re-seats on the VERTICAL bomblet and that one is pushed first — play
+    // caught the camera taking the tail instead and parking on the burst:
+    // "при разлетании не следует за гранатками… а остаётся на месте взрыва".
+    const bullet =
+      now.firing?.phase !== 'flight'
+        ? null
+        : now.bullets.length > 0
+          ? (now.bullets[now.bullets.length - 1] ?? null)
+          : (now.lobs.find((one) => one.id === now.tracked) ?? null)
     if (bullet && acting) {
       const at = drawnAt(`${now.bullets.length > 0 ? 'shot' : 'lob'}:${bullet.id}`, bullet)
       const thrown = weaponLayer(pigShot(soldier.pig.id)?.holding ?? null) === 'lob'

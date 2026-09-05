@@ -736,6 +736,7 @@ export function createEngine(parts: EngineParts): Engine {
         dropping: dropIn.running(),
         bullets: shots.live().map(flightOf),
         lobs: grenades.all().map(flightOf),
+        tracked: grenades.head()?.id ?? null,
         crates: airDrops.live().map((one): DescentShot => ({ id: one.id, y: one.drop.y })),
         decoys: hides.decoys().map((one) => ({ ...one })),
         effects: [...effects.all()],

@@ -132,7 +132,15 @@ export interface Lobs {
    * with, since a grenade that lands short looks exactly like a blast that does
    * not reach. */
   at(): { x: number; y: number; z: number; fuse: number }[]
-  /** Where the newest one is, for the camera to ride — null when none is up. */
+  /**
+   * The one the camera rides — null when none is up.
+   *
+   * The newest to leave the pig's hand, thrown or planted; and when it BURSTS
+   * INTO CHILDREN the head shard takes its place, which is the exe re-seating
+   * its camera on the cluster's vertical bomblet (`weapons/cluster.md`, mode
+   * 0x0B at 0x432BA8). One that goes off childless hands the seat to the
+   * newest still flying, so a burst among five does not drop the camera.
+   */
   head(): Lobbed | null
   clear(): void
 }
@@ -141,6 +149,14 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
   const flying: Lobbed[] = []
   /** Named in the order they were thrown (lib/game/bullets.ts). */
   let named = 0
+  /** The one `head()` answers with (see the interface). */
+  let tracked: Lobbed | null = null
+  /** `shot` is gone: whoever it made takes its seat — `born` is where they
+   * begin in `flying` — else the newest left, else nobody. */
+  const reseat = (shot: Lobbed, born: number): void => {
+    if (shot !== tracked) return
+    tracked = flying[born] ?? flying[flying.length - 1] ?? null
+  }
 
   /** Everything within reach takes its share (lib/game/blast.ts). */
   const detonate = (shot: Lobbed): void => {
@@ -169,8 +185,8 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
     // CLUSTER's five bomblets, the MORTAR's three sub-shells
     // (lib/game/grenade.ts, `scatter`; the destructor arms 0x43290E and
     // 0x4339A6 read whole). `shardsOf` hands them over HEAD FIRST, which is
-    // the one the exe's camera re-seats on, so `head()` rides the right thing
-    // just by pushing them in order. Each is born its own `rise` above the
+    // the one the exe's camera re-seats on, so `reseat` puts `head()` on the
+    // right thing just by pushing them in order. Each is born its own `rise` above the
     // burst so none is inside the one before it (Y-down: higher is smaller),
     // flies at FULL charge on its own row, and credits the same thrower.
     const shards = shardsOf(row, shot.heading)
@@ -321,6 +337,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       shot.id = named++
       shot.owner = pig.id
       flying.push(shot)
+      tracked = shot
       // …and the barrel is heard. Every weapon's fire arm plays a sound of its
       // own — the bazooka's is decoded (audio/battle.ts) — and a lob whose sound
       // nobody has read simply makes none.
@@ -355,6 +372,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       // and a resting lob is what the renderer draws lying still.
       shot.resting = true
       flying.push(shot)
+      tracked = shot
       // **AND IT IS NOT A WEAPON FIRING.** `fired` was emitted here for one
       // commit and play threw it out on sight — "какой ещё файред на динамит".
       // Right: nothing is loosed, nothing reports, and the noise a charge makes
@@ -414,8 +432,12 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
           if (!shot.doused && shot.y > floor) shot.y = floor
         }
         if (!spent) continue
+        // The children a burst pushes begin where `flying` ends now, less the
+        // one about to go.
+        const born = flying.length - 1
         detonate(shot)
         flying.splice(i, 1)
+        reseat(shot, born)
       }
     },
     detonateNow() {
@@ -433,17 +455,21 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
         // counting it down. What ends it is touching something (0x437F2C). A
         // hand-detonator is the FUSE being cut, and this one has none.
         if (lobOf(flying[i].skill)?.contact) continue
-        detonate(flying[i])
+        const shot = flying[i]
+        const born = flying.length - 1
+        detonate(shot)
         flying.splice(i, 1)
+        reseat(shot, born)
       }
     },
     live: () => flying.filter((one) => !one.doused).length,
     thrown: () => flying.filter((one) => !one.doused && !isPlanted(one.skill)).length,
     all: () => flying,
     at: () => flying.map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
-    head: () => flying[0] ?? null,
+    head: () => tracked,
     clear() {
       flying.length = 0
+      tracked = null
     }
   }
 }
