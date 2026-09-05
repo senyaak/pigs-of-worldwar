@@ -34,7 +34,9 @@ test('turns rotate players; each squad cycles through its pigs', () => {
 
   game.endTurn()
   expect(game.currentPlayer.name).toContain('Kaiser')
-  expect(game.currentPig.name).toBe('Hans')
+  // A side's FIRST turn falls on its SECOND pig — the exe's `NextPig` on an
+  // empty cursor (lib/game/game.ts, `NO_CURSOR`; unit/rotation.spec.ts).
+  expect(game.currentPig.name).toBe('Fritz')
 
   game.endTurn()
   // Back to player 1 — their SECOND pig now; a full rotation bumps the turn.
@@ -42,10 +44,10 @@ test('turns rotate players; each squad cycles through its pigs', () => {
   expect(game.currentPig.name).toBe('Wilson')
 
   // Nine more half-turns land on turn 6's second player: squads of 4 have
-  // wrapped once (11 handovers total: P2's pig index = (11-1)/2 % 4 = 1).
+  // wrapped once (11 handovers total: P2's pig index = 1 + (11-1)/2 % 4 = 2).
   for (let i = 0; i < 9; i++) game.endTurn()
   expect(game.currentPlayer.name).toContain('Kaiser')
-  expect(game.currentPig.name).toBe('Fritz')
+  expect(game.currentPig.name).toBe('Otto')
 })
 
 test('the turn does not begin at once — the clock waits out a beat first', () => {

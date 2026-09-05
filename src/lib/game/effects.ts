@@ -397,24 +397,31 @@ export const GAS_EFFECT: HitEffect = {
  * what a heal should be. No clouds, no fireball. Row 4 also carries
  * authored-but-off stages (G, D, E, C, I, J hold data under flag 0); the
  * flags, not the data, decide, so nothing of them is built.
+ *
+ * **THE RING IS OUT, AND A CLOUD IS IN — `[play]`, 2026-09-06.** "Лечащий шар
+ * — анимация взрыва странная — вместо облака газа какой-то круг расходится
+ * очень далеко." Built to the row, the ring is the one in the whole table
+ * with age step 1, so it runs the full hundred frames at 75 a frame: 7520
+ * units out, a band 6000 wide, three times past the field the ball heals
+ * (`blastReach(2048)` = 1621). What play remembers of the original is a
+ * CLOUD, and play's memory of the screen outranks a read whose picture
+ * nobody has put beside the original's (CLAUDE.md, `[play]`). So the ring
+ * stage is dropped and the burst gets the gas's own cloud grammar
+ * (`GAS_EFFECT`): four stages of eight blobs five frames apart, MATTER, in
+ * the row's own blue-violet, spread `out` 40 so that over a cloud's twenty
+ * frames the blobs reach 800..1600 — the heal field, not the map. The two
+ * mote bursts are the read and stay. `[CHECK — remake]` for the cloud's
+ * numbers; `[play]` for there being one.
  */
 export const HEAL_EFFECT: HitEffect = {
   id: 0x60,
   kind: 4,
-  rings: [
-    {
-      at: 1,
-      radius: 20,
-      growth: 75,
-      drift: 0,
-      width: 20,
-      spread: 60,
-      step: 1,
-      colour: [4, 2, 10],
-      // The row says +100 and +y is up in the engine, so it sits 100 ABOVE
-      // the burst — flipped on the way in, the same way MINE_EFFECT's is.
-      lift: -100
-    }
+  rings: [],
+  clouds: [
+    { at: 1, count: 8, colour: [12, 8, 28], up: 4, out: 40, gravity: 0, size: 18, matter: true },
+    { at: 6, count: 8, colour: [12, 8, 28], up: 4, out: 40, gravity: 0, size: 18, matter: true },
+    { at: 11, count: 8, colour: [12, 8, 28], up: 4, out: 40, gravity: 0, size: 18, matter: true },
+    { at: 16, count: 8, colour: [12, 8, 28], up: 4, out: 40, gravity: 0, size: 18, matter: true }
   ],
   bursts: [
     { at: 1, count: 10, colour: [4, 1, 16], out: 10, up: 10, jitter: 15, gravity: 2, step: 1 },

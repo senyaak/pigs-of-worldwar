@@ -1436,3 +1436,31 @@ modelled and neither needs to be while nothing can reach them.
 One half of the exe's own arm is NOT modelled and is written down rather than
 guessed: on the TRAINING GROUND the floor at one point (0x467c76) hands the turn
 on whatever the cause was.
+
+## The enemy's first turn falls on its SECOND pig — 2026-09-06, and the 08-29 "dissolved" was wrong
+
+Play, TRENCH (the card's MISSION 03), twice now: "должен ходить артиллерист
+первый, а ходит обычный свин." The 08-29 pass closed it — `Team::NextPig` is
+the same round-robin in marker order the remake runs — and that was true and
+not the answer. The read stopped at the walk and never asked what the walk
+does with NOTHING to walk from.
+
+Read to the last instruction this time (`Map::Load` 0x4A5250..0x4A6867,
+`Team::AddPig` 0x498DE0, `Team::NextPig` 0x499370, `StartGame` 0x496850,
+`NextTurn` 0x48F7E1): a pig per marker in POG order, appended to the tail;
+`NextPig` with an empty `[team+0x10]` takes `FirstAlive` (0x4992D0) and
+returns the node AFTER it; and the only seeding of a cursor at the start is
+`StartGame`'s `SetCurrentPig(head)` on the side that opens. So the player
+goes slot 0, 1, 2, 3, 4 and the AI goes marker 1, 2, 3, 0 — on TRENCH, whose
+enemy is GR, **HV**, GR, GR in the file, the gunner first. Not a class rule:
+the class-matching pass in `Map::Load` (0x4A64E5..0x4A6802, the one the
+notes had as "not decoded") only PERMUTES the PLAYER's pigs across the
+player's markers by rank (tables 0x4D9600 / 0x4D9648) and never touches the
+list, the cursor or the AI's side. The disasm has the whole read now,
+`turns/notes.md`.
+
+Built as `NO_CURSOR` on every side but the opening one, seated at the
+handover on the pig after the first standing — a squad of one comes round to
+itself, and a side whose first pig has fallen is seated one past its first
+LIVING pig, which is what `FirstAlive` gives. `unit/rotation.spec.ts` pins
+it; `e2e/002/game-logic.spec.ts` moved from Hans to Fritz.

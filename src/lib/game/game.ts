@@ -122,9 +122,24 @@ export interface Player {
    */
   nation: number
   pigs: Pig[]
-  /** Which pig acts the next time this player's turn comes up. */
+  /** Which pig acts the next time this player's turn comes up — or
+   * `NO_CURSOR` for a side that has not had one yet (`seat`). */
   activePig: number
 }
+
+/**
+ * A side that has never been handed a turn — the exe's `[team+0x10] = 0`.
+ *
+ * It matters because of what `Team::NextPig` (0x499370) does with an empty
+ * cursor: it takes the first LIVING pig (0x4992D0) and returns the one AFTER
+ * it. Only the side that opens the game has its cursor seeded — `StartGame`
+ * (0x496918) sets the head of the list — so the player goes slot 0, 1, 2…
+ * and every other side's first turn falls on its SECOND pig, then the third,
+ * round to the first. Play, on TRENCH, whose enemy is GR, HV, GR, GR in the
+ * POG: "должен ходить артиллерист первый, а ходит обычный свин" — right, the
+ * gunner is pig 1 and pig 1 is where an unseeded side starts.
+ */
+export const NO_CURSOR = -1
 
 export interface GameConfig {
   /**
@@ -229,7 +244,9 @@ export class Game {
       return {
         name: player.name,
         nation: player.nation ?? side,
-        activePig: 0,
+        // The opening side starts on its first pig; the others are seated
+        // when their turn first comes (`NO_CURSOR`).
+        activePig: side === 0 ? 0 : NO_CURSOR,
         pigs: player.pigNames.map((name, index) => {
           const at = config.spawns[spawn++]
           const pigClass = at.pigClass ?? GRUNT
@@ -364,6 +381,18 @@ export class Game {
     return player.pigs.some((pig) => !isDead(pig))
   }
 
+  /** The first pig of a squad still standing, or −1 for one wiped out. */
+  private firstStanding(player: Player): number {
+    return player.pigs.findIndex((pig) => !isDead(pig))
+  }
+
+  /** Where an unseated side's first turn falls: the pig AFTER its first
+   * standing one — `Team::NextPig` on an empty cursor (`NO_CURSOR`). A squad
+   * of one comes round to that one. */
+  private seat(player: Player): number {
+    return this.nextStanding(player, this.firstStanding(player))
+  }
+
   /** The next pig of a squad still standing after `from`, or −1 for a side
    * that has been wiped out. A squad of one answers with the same pig. */
   private nextStanding(player: Player, from: number): number {
@@ -396,10 +425,13 @@ export class Game {
       const at = (this.currentPlayerIndex + step) % this.players.length
       const next = this.players[at]
       if (!this.standing(next)) continue
+      // A side's FIRST turn is seated now, and it is not on its first pig
+      // (`NO_CURSOR`).
+      if (next.activePig === NO_CURSOR) next.activePig = this.seat(next)
       // The pig THIS side left off on may have fallen since — it advances
       // when its own turn ends, so a squad coming back up can be pointing at
       // a body. Step it on before handing anything over.
-      if (isDead(next.pigs[next.activePig])) {
+      else if (isDead(next.pigs[next.activePig])) {
         next.activePig = this.nextStanding(next, next.activePig)
       }
       // Coming back round to a side we have already had is a new turn — the

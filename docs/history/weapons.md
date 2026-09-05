@@ -2505,3 +2505,21 @@ ride until the lob exists, which is right: the exe re-seats on the projectile
 when `Pig::Shoot` makes it. `e2e/002/cluster.spec.ts` now holds until the
 sequence reports `wind`, checks the hand is still full, and measures the
 appearance against the phase to within two steps.
+
+## The medicine ball's burst is a cloud, by play's ruling — 2026-09-06
+
+Play: "лечащий шар — анимация взрыва странная — вместо облака газа какой-то
+круг расходится очень далеко." The remake was drawing parameter row 4 to the
+number — one ring, twenty motes, every stage at age step 1 — and that ring is
+the thing: 75 a frame for the hundred frames a step-1 stage lives is 7520
+units, a band 6000 wide, when the ball heals to 1621. The exe fades a ring's
+colour by `400/(age+1)`, so on the original's screen the far end of that sweep
+may be nearly black; nobody has put the two screens side by side, and play's
+memory of the original is a cloud.
+
+So the ring is out and a cloud is in, in the gas canister's own grammar
+(`GAS_EFFECT`): four trickled stages of eight MATTER blobs, the row's
+blue-violet brightened to a cloud's channel, spread so they cover the heal
+field and no more. The motes stay — they are the read. Recorded in CLAUDE.md
+as a `[play]` divergence with `[CHECK — remake]` on the cloud's numbers; the
+row-4 read in effects/notes.md stands as read.

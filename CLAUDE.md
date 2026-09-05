@@ -244,6 +244,13 @@ reasoning, the false starts and the sessions behind them are in
   (`afGetKeyFrameList`, 0x1002c778 + clip*88), which is where footsteps, the
   grenade release, the blade's strikes and the doorway's glide all come from.
   `lib/game/footsteps.ts`, `lib/game/melee.ts`. `[exe]`
+- **A side's FIRST turn falls on its SECOND pig.** The team is a linked list
+  in POG-marker order and the turn is a round-robin over it, dead-skipped
+  (`Team::NextPig`, 0x499370) — but `NextPig` with an EMPTY cursor takes the
+  first living pig and returns the one AFTER it, and only the side that opens
+  the game has its cursor seeded (`StartGame`, 0x496918). So the player goes
+  slot 0, 1, 2… and every other side goes 1, 2, 3, …, 0. `lib/game/game.ts`,
+  `NO_CURSOR`. `[exe]`
 
 ## Rules that follow from them
 
@@ -556,6 +563,11 @@ and the weakest of them were invented here:
 
 - `[play]` **`HEIGHT_SCALE` is 1** though the exe doubles. Answered in play
   twice; the doubling is above.
+- `[play]` **The MEDICINE BALL bursts as a CLOUD, not row 4's ring.** The row
+  is read and validated (`effects/notes.md`), and its ring — the only one with
+  age step 1 — runs a hundred frames to 7520 units, three times past the heal
+  field. Play remembers a gas-like cloud and threw the ring out; the cloud's
+  own numbers are `[CHECK — remake]`. `lib/game/effects.ts`, `HEAL_EFFECT`.
 - `[play]` **The PAUSE menu is printed in CHARS2**, and the exe prints it in
   `FETEXT\small` — read twice, and not in doubt: every line of 0x45A9B0 goes
   through the object at `[0x51BA54]`, thirty-nine times, and the big one at
