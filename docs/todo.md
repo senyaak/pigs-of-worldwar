@@ -16,6 +16,22 @@ built this day. This block is the handover: what changed, where it can be MET
 in the campaign, and what a bug would look like against what is deliberate.
 Each item names the section with the full story.
 
+### 0. A GRENADE SETS OFF A MINE HERE AND CANNOT IN THE EXE (2026-09-06)
+
+Found while reading the plant pass, not built, and it is an INVERSION rather
+than a gap. `lobs.ts` calls `mines.tread` where a lob lands, so a grenade
+thrown onto a mine tile sets it off; nothing in `bullets.ts` does, so a rifle
+round cannot. The exe is the other way round. Its in-flight trigger, 0x437a50,
+is a projectile's Move override, and `Projectile::Update` only calls that
+override when `[proj+0xc7]` is 1 — row field **+0x26**, which is **1 for
+bullets, darts and rockets and 0 for every grenade (rows 24–33, 37) and every
+mine and charge (38–41, 52–53)**. So in the original you can SHOOT a mine to
+set it off and you cannot grenade one, and the bazooka's rocket can.
+
+The build wants +0x26 carried on the projectile and lob rows and the trip
+moved behind it. The reason it is not done here is scope: this session's mine
+work was the plant pass, and this touches every row table.
+
 ### 1. TRENCH's two tents give NOTHING, and that is correct (B20)
 
 The first thing to expect is a negative. TRENCH carries two `TENT_S` and a

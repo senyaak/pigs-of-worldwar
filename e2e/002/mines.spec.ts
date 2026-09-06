@@ -10,6 +10,7 @@
 // under the ground the pig walks on" cannot be asked of the rules alone.
 
 import { expect, test } from '../app'
+import { NO_POSE } from '../../src/lib/game/pose'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -110,7 +111,10 @@ const fielded = (
       present: () => true,
       training: true,
       query,
-      random: () => 0
+      random: () => 0,
+      // A pure spec draws nobody, so a charge falls back on the feet
+      // (lib/game/mines.ts, `lay`).
+      pose: NO_POSE
     },
     bus.emit
   )

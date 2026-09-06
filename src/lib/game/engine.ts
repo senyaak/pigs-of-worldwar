@@ -525,7 +525,7 @@ export function createEngine(parts: EngineParts): Engine {
    * in a tile rather than anything anybody put there (lib/game/mines.ts). Before
    * the grenades, because a thrown thing sets one off the same way a foot does. */
   const mines = createMines(
-    { pigs, targets, present, query, training, random, fling, groundNormal, soak },
+    { pigs, targets, present, query, training, random, fling, groundNormal, soak, pose },
     bus.emit
   )
   /** The gas's bit on a pig, and the ten points a turn it costs — before the

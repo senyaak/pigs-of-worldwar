@@ -8,8 +8,9 @@
 // one spot bed into ONE bit.
 
 import { test, expect } from '@playwright/test'
+import { NO_POSE } from '../src/lib/game/pose'
 
-import { ARM_FRAMES, createMines, isMine } from '../src/lib/game/mines'
+import { ARM_FRAMES, MINE_DAMAGE, createMines, isMine } from '../src/lib/game/mines'
 import { fromExeFrames } from '../src/lib/game/ballistics'
 import { NO_BODY } from '../src/lib/game/body'
 import type { Pig } from '../src/lib/game/game'
@@ -17,6 +18,8 @@ import type { BattleEvent } from '../src/lib/game/events'
 import { terrain } from './fixture'
 
 const MINE = 35
+/** 36 ANTI-PERSONNEL — row 39, the one whose refused blast is 3200. */
+const AP_MINE = 36
 
 const pigAt = (x: number, z: number, id = 1): Pig =>
   ({
@@ -48,7 +51,10 @@ const field = (): {
       present: () => true,
       training: false,
       query: terrain(() => 0),
-      random: () => 0
+      random: () => 0,
+      // A pure spec draws nobody, so a charge falls back on the feet
+      // (lib/game/mines.ts, `lay`).
+      pose: NO_POSE
     },
     (event) => heard.push(event)
   )
@@ -74,14 +80,14 @@ test('a laid mine arms with the click and stays FURNITURE through the turn', { t
   expect(mines.tread(256, 256)).toBe(false)
 })
 
-test('the turn ends: it beds in — and goes off under whoever STANDS there', { tag: '@nodata' }, () => {
+test('the turn ends and the layer never walked away: it CANNOT plant, so it blows', { tag: '@nodata' }, () => {
   const { mines, pigs, heard } = field()
   const sapper = pigAt(256, 256)
   pigs.push(sapper)
   mines.lay(sapper, MINE)
-  // The layer never walked away: the end-of-turn bed-in finds a live pig on
-  // the tile and the mine goes off under it — the layer's own foot counts,
-  // no side is checked anywhere.
+  // The plant pass refuses a mine with any pig inside `PLANT_CLEAR` — no
+  // owner exclusion, so the layer refuses his own — and a refusal is a bang
+  // where it lies, not a shrug (lib/game/mines.ts, the exe's 0x4370c5).
   mines.bedAll()
   expect(mines.laid()).toHaveLength(0)
   expect(heard.some((one) => one.kind === 'mineTripped')).toBe(true)
@@ -112,21 +118,73 @@ test('bedded clear of everyone it waits in the ground, revealed to detectors', {
   expect(mines.buried(256, 256)).toBe(false)
 })
 
-test('two mines on ONE spot bed into one bit and one bang', { tag: '@nodata' }, () => {
-  // Play: "2 мины можно в 1 место поставить - там урон вроде не как от
-  // двух будет." The tile carries a bit, not a count: the second lay is
-  // absorbed at the bed-in.
+test('two mines on ONE spot: the first plants, the SECOND is refused and blows', { tag: '@nodata' }, () => {
+  // Play: "2 ложишь и 2 взрываются." Right, and it is the tile bit that makes
+  // it so rather than in spite of it: the tile carries a bit and not a count,
+  // so the second lay reads that bit, is refused, and its own destructor runs
+  // (lib/game/mines.ts, the exe's 0x4371ee -> 0x4374e4).
   const { mines, pigs, heard } = field()
   const sapper = pigAt(256, 256)
   pigs.push(sapper)
   expect(mines.lay(sapper, MINE)).toBe(true)
   expect(mines.lay(sapper, MINE)).toBe(true)
   expect(mines.laid()).toHaveLength(2)
+  // Clear of them both, or neither would plant at all.
   sapper.position.x = 9000
   mines.bedAll()
+  // One went into the ground…
   expect(mines.buried(256, 256)).toBe(true)
-  expect(mines.tread(256, 256)).toBe(true)
-  expect(mines.tread(256, 256), 'the second was absorbed, not stacked').toBe(false)
+  // …and the other is already counting down where it lay.
+  expect(mines.live()).toBe(1)
   mines.update(1)
   expect(heard.filter((one) => one.kind === 'blasted')).toHaveLength(1)
+  // The bit is still there, and it is the one-shot it always was.
+  expect(mines.tread(256, 256)).toBe(true)
+  expect(mines.tread(256, 256), 'one bit, and it is spent').toBe(false)
+})
+
+test('an ANTI-PERSONNEL that could not plant hits harder than a trodden one', { tag: '@nodata' }, () => {
+  // Rows 38 and 39 differ in one field, +0x0C: 2560 against 3200. A trodden
+  // tile is rows 40/41, 2560 either way — so the anti-personnel does MORE
+  // refused than stepped on.
+  const { mines, pigs } = field()
+  const sapper = pigAt(256, 256)
+  pigs.push(sapper)
+  mines.lay(sapper, AP_MINE)
+  mines.bedAll()
+  expect(mines.at()).toHaveLength(1)
+  expect(mines.at()[0].damage).toBe(3200)
+  // …and the plain one, refused the same way, is the tile's own figure.
+  const plain = field()
+  const other = pigAt(256, 256)
+  plain.pigs.push(other)
+  plain.mines.lay(other, MINE)
+  plain.mines.bedAll()
+  expect(plain.mines.at()[0].damage).toBe(MINE_DAMAGE)
+})
+
+test('a charge is laid IN FRONT, off the hand, and not under the soles', { tag: '@nodata' }, () => {
+  // `Pig::Shoot` spawns skills 35, 36 and 37 at bone 5 plus the muzzle
+  // table's row 2, (0, 0, 100) — play: "свин ставит не под себя, чуть вперёд".
+  const heard: BattleEvent[] = []
+  const pigs: Pig[] = []
+  const mines = createMines(
+    {
+      pigs: () => pigs,
+      targets: [],
+      present: () => true,
+      training: false,
+      query: terrain(() => 0),
+      random: () => 0,
+      // A hand a whole tile in front of the pig, so the difference is
+      // unmistakable in the answer.
+      pose: { boneToWorld: (pig) => ({ x: pig.position.x + 512, y: 0, z: pig.position.z }) }
+    },
+    (event) => heard.push(event)
+  )
+  const sapper = pigAt(256, 256)
+  pigs.push(sapper)
+  expect(mines.lay(sapper, MINE)).toBe(true)
+  expect(mines.laid()[0].x).toBe(256 + 512)
+  expect(mines.laid()[0].z).toBe(256)
 })

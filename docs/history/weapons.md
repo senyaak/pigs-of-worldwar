@@ -2551,3 +2551,50 @@ bar. The sound was borrowed from the neighbour when it was added, which is
 fine and stays — what was wrong was calling it a read. Both comments now say
 where it really comes from. The trap is the repo's own standing one, one door
 along: an address is not the arm you found it near.
+
+## The mine's PLANT PASS, and "the second is absorbed" was wrong — 2026-09-06
+
+Play, on two mines in one spot: "под врага 2 ложишь и 2 взрываются вроде как —
+или я путаю?" He was not, and this engine was. The old model came from his own
+earlier guess, "2 мины можно в 1 место поставить — там урон вроде не как от
+двух будет", which a session took for a rule and built as "the second lay is
+absorbed". The bytes say the opposite, and they were there to be read.
+
+`Map::SetMine` is not called by a mine touching the ground. It is the tail of
+a global pass, **0x436e40**, whose single caller (0x4952b7) runs it only when
+every projectile is at rest AND the turn's clock has expired
+(`[game+0x518]`, written at 0x49004e) — the bed-in play had already ruled from
+memory. The pass keeps a flag and five tests clear it: off the ground, **a pig
+within the row's own radius** (field +0x00 = 512, one tile, no owner
+exclusion), **the tile already mined**, the anti-personnel flavour already
+there, and water. And the refusal branch is not a shrug — it clicks, writes
+`{state 1, counter 0}`, which is byte for byte what the EXPLOSIVE arm writes,
+cuts the camera to the mine, and 25 frames later runs a destructor that the
+table at 0x435a6c points at the SAME handlers the trodden tile uses. A mine
+that cannot plant **explodes where it lies**.
+
+So both of play's memories are one mechanism. Two on a spot: the first plants,
+the second reads the bit and blows. One laid beside a standing pig: refused by
+the pig test, blows at the turn's end — which is the tactic, and which is why
+a planted skill grants the extra seconds, since the layer is inside his own
+512 until he walks off.
+
+Built: `PLANT_CLEAR`, `laidDamage`, `LAID_FUSE_FRAMES` and a `refused`
+predicate in `lib/game/mines.ts`; `bedAll` now plants or detonates rather than
+planting unconditionally, and the old "goes off under whoever STANDS there"
+special case is gone because the pig test subsumes it. A refused mine takes
+its OWN row's damage, +0x0C: 2560, or **3200 for the anti-personnel**, where a
+trodden tile is 2560 either way — so an AP mine hurts more refused than
+stepped on. Water used to drown a mine quietly, which was this engine's
+invention; it is one of the five refusals and it bangs like the rest.
+
+And the charge is laid **in front**, off the hand. Play: "свин ставит не под
+себя — чуть вперёд." `Pig::Shoot` sends skills 35, 36 and 37 to one arm
+(0x47a07d), which spawns at bone 5 plus the muzzle table's row 2,
+`0x4d0ee0 + 2*8` = (0, 0, 100) — the same table `bullets.ts` already takes
+every muzzle from. The mine was the one charge in the game coming out of the
+soles; TNT was already right.
+
+`unit/mines.spec.ts` carries the new shape, including the AP's 3200 and the
+hand. The half NOT built is in todo.md item 0: our grenades trip a mine tile
+and our bullets do not, and the exe is the other way round.

@@ -30,9 +30,16 @@
 // **The mine WEAPON is the same mechanic from the other end**, and it lands
 // here (2026-08-26, read out of the exe end to end for the sapper):
 //
-// Skills 35 and 36 lay a VISIBLE OBJECT at the layer's own feet (the lay
-// clip's key-frame drops it, the same phase TNT's charge goes down at), and
-// the object arms after 25 frames with the L_MINETR click (0x43699d).
+// Skills 35 and 36 lay a VISIBLE OBJECT (the lay clip's key-frame drops it,
+// the same phase TNT's charge goes down at), and the object arms after 25
+// frames with the L_MINETR click (0x43699d).
+//
+// **IN FRONT, off the HAND, exactly as TNT is.** `Pig::Shoot` (0x479f60)
+// sends skills 35, 36 and 37 to ONE arm, 0x47a07d, which spawns at bone 5
+// plus the vector at `0x4d0ee0 + 2*8` = **(0, 0, 100)** — the same table
+// `bullets.ts` takes every muzzle from. Play: "свин ставит не под себя —
+// чуть вперёд." It was at `pig.position`, the soles, which made the mine
+// the one charge in the game that did not come out of the trotters.
 //
 // **WHEN it becomes the ground is `[play]`, over the disassembly's own
 // reading.** The exe's bed-in walker (0x436e55) was read as "sinks the
@@ -45,9 +52,39 @@
 // From the bed-in on, the ordinary tread above takes over, no side checked
 // anywhere — the layer's own later foot included.
 //
-// Two on one spot is allowed and is ONE bit — play again: "2 мины можно в
-// 1 место поставить - там урон вроде не как от двух будет." The tile
-// carries a bit, not a count, and the second lay is simply absorbed.
+// **THE PLANT CAN BE REFUSED, AND A REFUSED MINE EXPLODES** — read end to
+// end 2026-09-06, and it overturns "the second lay is simply absorbed".
+// `Map::SetMine` is the tail of a global pass, `0x436e40`, whose one caller
+// (0x4952b7) runs it only when every projectile is at rest AND the turn's
+// clock has expired (`[game+0x518]`, written at 0x49004e) — which is the
+// bed-in play already ruled. That pass keeps a flag at `[esp+0x13]`, and
+// five tests clear it: off the ground, **a pig within the row's own radius**
+// (field +0x00 = 512, one whole tile — 0x436f9c, 0x4370c5), **the tile
+// already mined** (0x4371ee), the AP flavour already there (0x437266), and
+// water (0x4372cf). The refusal branch (0x4374e4) is not a shrug:
+//
+// ```
+// 437596  Sound::Play(0x28)      ; the L_MINETR click
+// 43759d  [proj+0xb4] = 1        ; STATE 1 -- the fuse, byte for byte what
+// 4375a7  [proj+0xa8] = 0        ; ...the EXPLOSIVE arm writes at 0x4369e3
+// 4375b8  0x49EC20(proj)         ; and the camera cuts to it
+// ```
+//
+// 25 frames later its destructor runs, and the table at 0x435a6c sends rows
+// 38/39 to the SAME handlers as the trodden 40/41. So it blows on its own
+// row's numbers.
+//
+// Two things a player sees follow, and play had both from memory before the
+// pass was read. **Two mines on one spot BOTH go off**: the first plants, the
+// second reads the bit and is refused. **A mine laid beside a standing pig
+// cannot plant at all** and blows where it lies at the turn's end — which is
+// the whole tactic, "ставишь на свина — она сразу взводится и детонирует в
+// конце хода", and it is also why a planted skill grants the extra seconds:
+// they are for the layer to walk clear of his own 512.
+//
+// The old reading of this file — "two on one spot bed into ONE bit and one
+// bang" — was play's own guess ("там урон вроде не как от двух будет") taken
+// for a rule, and the bytes say otherwise.
 //
 // 35 against 36 is a FLAVOUR (SetMine's fourth argument, the slip byte's bit
 // 7): trigger kinds 40/41, identical damage (2560) and blast (1024), only
@@ -62,6 +99,8 @@ import { MINE_EFFECT_ID, burst } from './blast'
 import type { BlastWorld } from './blast'
 import { fromExeFrames } from './ballistics'
 import { isDead } from './health'
+import { HAND_BONE } from './pose'
+import type { Point, Pose } from './pose'
 import type { Pig } from './game'
 import type { Random } from './random'
 import type { TerrainQuery } from './terrain'
@@ -131,8 +170,35 @@ export const isMine = (skill: number | null): boolean => skill === 35 || skill =
  * frame knob like every count. */
 export const ARM_FRAMES = 25
 
-/** One mine LAID this turn and not yet part of the ground: furniture at
- * the layer's feet until the turn ends (`bedAll`). Drawn to EVERYBODY — it
+/** Where a charge leaves the hand: bone 5's own space, the muzzle table's
+ * row 2 (`0x4d0ee0 + 2*8`), which skills 35, 36 and 37 share. */
+export const LAY_FROM: Point = { x: 0, y: 0, z: 100 }
+
+/**
+ * How near a pig stops a mine from planting — the projectile row's field
+ * +0x00, read at 0x436f9c, which for rows 38 and 39 is **512**: one whole
+ * tile, in each of x, y and z separately (0x436fd0..0x4370c5).
+ *
+ * There is no owner exclusion in that loop, so the LAYER refuses his own
+ * mine while he stands over it. Inferred rather than read only in the sense
+ * that nothing says "and this is why": the four extra seconds a planted
+ * skill grants (lib/game/spend.ts) are what he walks clear with.
+ */
+export const PLANT_CLEAR = 512
+
+/** A mine that could NOT plant runs its own row's fuse, +0x18 = 25 frames,
+ * against the trodden tile's twelve. */
+export const LAID_FUSE_FRAMES = 25
+
+/**
+ * …and its own row's DAMAGE, +0x0C: 2560 for the MINE and **3200 for the
+ * ANTI-PERSONNEL**, where a trodden tile is 2560 either way. So the
+ * anti-personnel hurts more when it is refused than when it is stepped on.
+ */
+export const laidDamage = (skill: number): number => (skill === 36 ? 3200 : MINE_DAMAGE)
+
+/** One mine LAID this turn and not yet part of the ground: furniture in
+ * front of the layer until the turn ends (`bedAll`). Drawn to EVERYBODY — it
  * is a visible object in the original too. */
 export interface Laid {
   x: number
@@ -144,17 +210,22 @@ export interface Laid {
   arming: number
 }
 
-/** One mine that has been trodden on and has not gone off yet. */
+/** One mine counting down: trodden on, or laid and REFUSED its tile. */
 export interface Tripped {
   x: number
   y: number
   z: number
   /** Seconds left. */
   fuse: number
+  /** What it will take off — the tile's own 2560, or a refused mine's own
+   * row (`laidDamage`). */
+  damage: number
 }
 
 export interface MineWorld extends BlastWorld {
   query: TerrainQuery
+  /** Where the hand is — a charge is laid from it (lib/game/pose.ts). */
+  pose: Pose
   /** The battle's own stream: the fuse takes the same `rand() & 7` of jitter a
    * grenade's does (lib/game/grenade.ts), so it is a roll everyone must agree
    * on (lib/game/random.ts). */
@@ -171,20 +242,21 @@ export interface Mines {
    */
   tread(x: number, z: number): boolean
   /**
-   * Lay one at the pig's own feet — the lay clip's key-frame calls this the
-   * way TNT's calls `plant` (lib/game/attack.ts). Never refused on ground:
-   * two on one spot is allowed and beds into ONE bit (`[play]`).
+   * Lay one IN FRONT of the pig — the lay clip's key-frame calls this the
+   * way TNT's calls `plant` (lib/game/attack.ts), and out of the same hand
+   * (`LAY_FROM`). Never refused here: whether it can become the ground is
+   * the bed-in's question, and its answer to "no" is a bang (`bedAll`).
    */
   lay(pig: Pig, skill: number): boolean
   /** The mines laid and not yet bedded — furniture on the ground, for the
    * renderer and the specs. */
   laid(): readonly Laid[]
   /**
-   * THE TURN ENDS: every laid mine beds into its tile's bit — and one with a
-   * live pig STANDING on the tile goes off under it then and there, the
-   * ordinary tread with no side checked (`[play]`: "мина взрывается когда
-   * ход кончается"). Called from the end-of-turn beat, whose wait already
-   * holds for the fuses this sets counting (lib/game/battle.ts).
+   * THE TURN ENDS: every laid mine tries to become its tile's bit, and one
+   * that CANNOT explodes where it lies instead — a pig inside `PLANT_CLEAR`,
+   * a tile already mined, or water (the exe's plant pass, top of this file).
+   * Called from the end-of-turn beat, whose wait already holds for the fuses
+   * this sets counting (lib/game/battle.ts).
    */
   bedAll(): void
   /** Burn the fuses down, blast whatever runs out — and walk the laid mines
@@ -252,9 +324,37 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
       z: tile.z,
       // On the ground at the tile's middle, which is where the exe samples it.
       y: query.height(tile.x, tile.z),
-      fuse: fromExeFrames(MINE_FUSE_FRAMES + Math.floor(world.random() * (FUSE_JITTER + 1)))
+      fuse: fromExeFrames(MINE_FUSE_FRAMES + Math.floor(world.random() * (FUSE_JITTER + 1))),
+      damage: MINE_DAMAGE
     })
     return true
+  }
+
+  /**
+   * Whether the plant pass turns this one down — the exe's five tests, less
+   * the one this engine has nothing to ask (a charge off the ground: nothing
+   * here can lay one in the air).
+   *
+   * Order does not matter, they all clear the same flag. What matters is
+   * that a "no" is an EXPLOSION and not a shrug (top of this file).
+   */
+  const refused = (mine: Laid): boolean => {
+    // WATER. It used to drown quietly, which was this engine's own idea; the
+    // refusal branch is shared by all five tests, so it bangs like the rest.
+    if (query.isWater(mine.x, mine.z)) return true
+    // ANYBODY too close, in each axis separately, and the layer counts
+    // against his own (`PLANT_CLEAR`). The exe's test is "drawn or
+    // concealed", so a HIDDEN pig refuses it too — a bush is still a body.
+    for (const pig of world.pigs()) {
+      if (pig.gone || isDead(pig)) continue
+      if (Math.abs(pig.position.x - mine.x) >= PLANT_CLEAR) continue
+      if (Math.abs(pig.position.y - mine.y) >= PLANT_CLEAR) continue
+      if (Math.abs(pig.position.z - mine.z) >= PLANT_CLEAR) continue
+      return true
+    }
+    // …and a tile that already carries one, which is how the SECOND of two
+    // laid on one spot comes to go off.
+    return liveTile(mine.x, mine.z) !== null
   }
 
   return {
@@ -263,37 +363,47 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
     },
     tread: trip,
     lay(pig, skill) {
-      const { x, z } = pig.position
+      // The hand, not the soles (`LAY_FROM`) — and a battle nobody is drawing
+      // has no hand to ask (`NO_POSE`), which is what the fallback is for.
+      const hand = world.pose.boneToWorld(pig, HAND_BONE, LAY_FROM)
+      const x = hand?.x ?? pig.position.x
+      const z = hand?.z ?? pig.position.z
       if (query.tileCentre(x, z) === null) return false
+      // The HEIGHT is the ground under it: a charge rests on what is beneath
+      // it, and the hand is holding it above that (lib/game/lobs.ts `plant`
+      // argues the same for TNT).
       laid.push({ x, y: query.height(x, z), z, skill, arming: fromExeFrames(ARM_FRAMES) })
       return true
     },
     laid: () => laid,
     bedAll() {
       for (const mine of laid.splice(0, laid.length)) {
-        // A mine in the water simply drowns: no bit under a swimmer's feet.
-        if (query.isWater(mine.x, mine.z)) continue
         const tile = query.tileCentre(mine.x, mine.z)
+        // Off the grid there is nothing to plant into and nothing read for
+        // it — and `lay` already refused that ground, so it cannot happen.
         if (tile === null) continue
         const k = key(tile.col, tile.row)
-        // ONE bit a tile, however many were laid on it — the second is
-        // absorbed, and a spent map tile is live again under a fresh mine.
+        if (refused(mine)) {
+          // **IT BLOWS WHERE IT LIES**, on its own row and not the tile's —
+          // the click, then 25 frames (top of this file). The blast is at the
+          // MINE, not at the tile's centre: this is a projectile's own
+          // destructor rather than the ground going off.
+          emit({ kind: 'mineTripped', at: { x: mine.x, y: mine.y, z: mine.z } })
+          counting.push({
+            x: mine.x,
+            y: mine.y,
+            z: mine.z,
+            fuse: fromExeFrames(
+              LAID_FUSE_FRAMES + Math.floor(world.random() * (FUSE_JITTER + 1))
+            ),
+            damage: laidDamage(mine.skill)
+          })
+          continue
+        }
+        // …and one that CAN plant becomes the ground: a spent map tile is
+        // live again under a fresh mine.
         spent.delete(k)
         planted.set(k, { x: tile.x, y: query.height(tile.x, tile.z), z: tile.z, skill: mine.skill })
-        // …and bedded under somebody's FEET it goes off then and there — the
-        // ordinary tread, no side checked, the layer's own included.
-        const stood = world.pigs().some((pig) => {
-          if (pig.gone || isDead(pig)) return false
-          const under = query.tileCentre(pig.position.x, pig.position.z)
-          return under !== null && under.col === tile.col && under.row === tile.row
-        })
-        if (stood) {
-          emit({
-            kind: 'mineTripped',
-            at: { x: tile.x, y: query.height(tile.x, tile.z), z: tile.z }
-          })
-          trip(tile.x, tile.z)
-        }
       }
     },
     update(delta) {
@@ -315,7 +425,7 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
         burst(
           mine,
           {
-            damage: MINE_DAMAGE,
+            damage: mine.damage,
             reach: blastReach(MINE_BLAST),
             effect: MINE_EFFECT_ID,
             force: MINE_FORCE

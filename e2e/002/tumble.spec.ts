@@ -10,6 +10,7 @@
 // is up.
 
 import { expect, test } from '../app'
+import { NO_POSE } from '../../src/lib/game/pose'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -110,6 +111,9 @@ function fielded(apart: number): {
       present: () => true,
       training: true,
       query,
+      // A pure spec draws nobody, so a charge falls back on the feet
+      // (lib/game/mines.ts, `lay`).
+      pose: NO_POSE,
       random: () => 0,
       // Every pig here is a pig nobody is driving, which is the whole case this
       // spec is about — the battle's own seam sends the ACTING one to `loco`
