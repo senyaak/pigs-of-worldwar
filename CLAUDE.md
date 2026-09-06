@@ -563,6 +563,15 @@ and the weakest of them were invented here:
 
 - `[play]` **`HEIGHT_SCALE` is 1** though the exe doubles. Answered in play
   twice; the doubling is above.
+- `[deliberate]` **A REFUSED HEAL says so — sound and words — and the
+  original says nothing.** The skill-52 arm's failure exits are blank: no
+  string, and its one `Sound::Play` is P_HEAL on the success path. The game
+  DOES have the machinery — the briefing bar — and its neighbour PICK POCKET
+  prints both of its refusals on it with a P_OWW, so the remake follows that
+  idiom rather than the heal arm's silence: P_OWW, and one of two lines of
+  the remake's own writing (`HEAL_NOBODY` / `HEAL_ALREADY_WELL` in
+  `ui/battle.ts`). Play asked for it. The 0x47c6f0 an earlier pass cited as
+  "the heal arm's failure exit" is pick pocket's; corrected in place.
 - `[play]` **A FLIGHT is kept inside the middle 60% of the frame.** Mode
   0x0D's aim point is the exe's (a sixth a frame toward a third of the
   flight's height) and has no vertical bound of its own, so a rocket or a

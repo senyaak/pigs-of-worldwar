@@ -190,10 +190,23 @@ export type BattleEvent =
    * the points land later, at the clip's own beat (lib/game/healing.ts,
    * HEAL_PHASE). `at` is the healer. */
   | { kind: 'healBegan'; pig: PigId; at: Point }
-  /** …and a press with nothing to lay on — nobody in the cone, or a body at
-   * its ceiling: the exe's failure exit plays P_OWW (0x47c6f0) and spends
-   * nothing. `at` is the healer. */
-  | { kind: 'healFailed'; pig: PigId; at: Point }
+  /**
+   * …and a press with nothing to lay on. `reason` is which of the two: no
+   * body in the cone at all, or the nearest one already at its ceiling
+   * (lib/game/healing.ts) — the split the bar's line needs, and the same
+   * shape `stealFailed` already carries.
+   *
+   * **The exe says NOTHING here, by either road.** The skill-52 arm
+   * (0x47B894..0x47BF48) reaches the screen with no string and no sound on
+   * its failure exits: its one `Sound::Play` is P_HEAL on the SUCCESS path
+   * (0x47be11) and its one `.data` reference is a developer `printf`. The
+   * P_OWW this event plays and the line it prints are both the remake's
+   * (CLAUDE.md, `[deliberate]`), borrowed from the PICK POCKET arm next
+   * door, whose refusals do print and do complain (0x47c6cd / 0x47c6f0 —
+   * an address an earlier pass in this repo mis-filed as the heal's).
+   * `at` is the healer.
+   */
+  | { kind: 'healFailed'; pig: PigId; at: Point; reason: 'nobody' | 'full' }
   /** …or had no room for: "THIS LITTLE PIG ALREADY HAS TOO MANY TOYS". */
   | { kind: 'refused'; skill: number | null; amount: number; pig: PigId }
   /**

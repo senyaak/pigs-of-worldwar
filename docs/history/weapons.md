@@ -2523,3 +2523,31 @@ blue-violet brightened to a cloud's channel, spread so they cover the heal
 field and no more. The motes stay — they are the read. Recorded in CLAUDE.md
 as a `[play]` divergence with `[CHECK — remake]` on the cloud's numbers; the
 row-4 read in effects/notes.md stands as read.
+
+## A refused heal says why, and 0x47c6f0 was never the heal's — 2026-09-06
+
+Play: "если полечить не получилось руками — то нет текста что нет цели —
+надо бы добавить как думаешь?" Worth adding, and worth being straight about
+what it is: **the original prints nothing there.** The skill-52 arm
+(0x47B894..0x47BF48) was read byte by byte for this — its only `.data`
+reference is a developer `printf` ("Medic healing angle diff is good!!!!"),
+it never calls any of the briefing bar's three entry points, and its one
+`Sound::Play` is P_HEAL on the SUCCESS path (0x47be11). A refused heal in the
+original is silence.
+
+The game has the machinery, though, and uses it one arm over: PICK POCKET
+prints both of its refusals on the briefing bar as literal `.data` strings
+with a P_OWW behind them ("Your arms don't reach that far...", 0x4D16D0). So
+the heal now does the same in that voice — `HEAL_NOBODY` and
+`HEAL_ALREADY_WELL` in `ui/battle.ts`, the remake's own words, off a `reason`
+the `healFailed` event now carries the way `stealFailed` always has. Tagged
+`[deliberate]` in CLAUDE.md; the wording is there to be changed in play.
+
+**And a correction that came out of the same read.** This file and
+`audio/battle.ts` both said the heal's P_OWW was "the arm's own failure exit
+(0x47c6f0)". It is not: 0x47c6f0 sits inside the PICK POCKET arm, eight bytes
+past the push of "Your arms don't reach that far..." that queues it on the
+bar. The sound was borrowed from the neighbour when it was added, which is
+fine and stays — what was wrong was calling it a read. Both comments now say
+where it really comes from. The trap is the repo's own standing one, one door
+along: an address is not the arm you found it near.

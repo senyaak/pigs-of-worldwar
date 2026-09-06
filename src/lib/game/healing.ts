@@ -204,9 +204,13 @@ export function createHealing(world: HealWorld, emit: Emit): Heals {
       }
       const at = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
       if (!chosen || amount <= 0) {
-        // The pig complains (P_OWW, the exe's own failure exit) and nothing
-        // is spent.
-        emit({ kind: 'healFailed', pig: pig.id, at })
+        // Nothing is spent, and the press SAYS SO — which is the remake's
+        // own, not the arm's: the exe's failure exits are silent and blank
+        // (lib/game/events.ts, `healFailed`). Play: "если полечить не
+        // получилось руками — то нет текста что нет цели." Which of the two
+        // refusals it was travels with the event, because "nobody there" and
+        // "he is already well" want different words on the bar.
+        emit({ kind: 'healFailed', pig: pig.id, at, reason: chosen ? 'full' : 'nobody' })
         return false
       }
       spend(pig.carrying, SKILL.HEALING_HANDS)

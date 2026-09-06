@@ -372,11 +372,19 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
   healed: { sound: 'P_SIGH', volume: 100, pitch: 100 },
   /**
    * The HEALING HANDS going on, and a press that had nothing to lay on.
-   * DECODED, mix and all: the skill-52 arm plays index **0x43 at 100/100**
-   * right at the charge's own decrement (0x47be0f) — index 67 of
-   * `Audio/sfxday.srl` is **P_HEAL**, "the heal SKILL, done by hand" — and
-   * its failure exit plays **0x4F at 100/100** (0x47c6f0), the same P_OWW
-   * the full-pockets refusal complains with, only at full volume here.
+   *
+   * The FIRST is decoded, mix and all: the skill-52 arm plays index **0x43
+   * at 100/100** right at the charge's own decrement (0x47be0f) — index 67
+   * of `Audio/sfxday.srl` is **P_HEAL**, "the heal SKILL, done by hand".
+   *
+   * **The SECOND is the remake's, and this comment used to claim otherwise.**
+   * 0x47c6f0 is not in the heal arm at all (0x47B894..0x47BF48): it is eight
+   * bytes past the PICK POCKET arm's "Your arms don't reach that far..."
+   * (0x47c6c8 → the bar at 0x47c6cd → `push 79` → `Sound::Play`), and the
+   * heal arm's only `Sound::Play` is the P_HEAL above. A refused heal is
+   * SILENT in the original. The P_OWW is borrowed from the neighbour and
+   * kept — a press that does nothing must say something — and it is
+   * `[deliberate]` in CLAUDE.md beside the line the bar now prints.
    */
   healHands: { sound: 'P_HEAL', volume: 100, pitch: 100 },
   healRefused: { sound: 'P_OWW', volume: 100, pitch: 100 },

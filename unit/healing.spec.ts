@@ -104,7 +104,11 @@ test('a heal that lands spends the charge; a refused press spends nothing', { ta
   expect(heals.begin(medic)).toBe(false)
   expect(amountOf(medic.carrying, SKILL.HEALING_HANDS)).toBe(3)
   expect(heals.lastAttempt()?.amount).toBe(0)
-  expect(events).toContainEqual(expect.objectContaining({ kind: 'healFailed', pig: medic.id }))
+  // …and WHY it refused travels with it, because the bar prints a different
+  // line for each (ui/battle.ts). A body at its ceiling is `full`.
+  expect(events).toContainEqual(
+    expect.objectContaining({ kind: 'healFailed', pig: medic.id, reason: 'full' })
+  )
 
   grunt.health = 25
   expect(heals.begin(medic)).toBe(true)
@@ -148,4 +152,27 @@ test('the last charge puts the hands away, and none of it spends the turn', { ta
   expect(medic.holding).toBeNull()
   // HEALING HANDS is on the keeps-the-turn list (lib/game/spend.ts).
   expect(endsTurn(SKILL.HEALING_HANDS)).toBe(false)
+})
+
+test('a press with NOBODY in the cone refuses for a different reason', { tag: '@nodata' }, () => {
+  // The other half of the split the bar reads: no body in front at all, as
+  // against one that is simply already well. The exe says nothing either way
+  // — the words are the remake's (CLAUDE.md, `[deliberate]`).
+  const pigs = field([
+    { x: 0, z: 0, pigClass: 11 },
+    // Well behind the healer, so the cone cannot reach: HEAL_ARC is 45° off
+    // the facing and this one is at 180°.
+    { x: 0, z: -3000, pigClass: 0 }
+  ])
+  pigs[1].health = 1
+  const events: BattleEvent[] = []
+  const clips = Array.from({ length: 83 }, () => ({ frameCount: 25 }))
+  const heals = createHealing({ pigs: () => pigs, clips }, (event) => events.push(event))
+
+  expect(heals.begin(pigs[0])).toBe(false)
+  expect(amountOf(pigs[0].carrying, SKILL.HEALING_HANDS)).toBe(3)
+  expect(events).toContainEqual(
+    expect.objectContaining({ kind: 'healFailed', pig: pigs[0].id, reason: 'nobody' })
+  )
+  expect(events.some((one) => one.kind === 'healBegan')).toBe(false)
 })

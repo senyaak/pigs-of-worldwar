@@ -90,6 +90,15 @@ const FOUND_PROVISIONS = 172
 const STEAL_NO_REACH = "Your arms don't reach that far..."
 const STEAL_NOTHING = 'This pig has nothing left to steal....poor little porker.'
 
+/** …and the HEALING HANDS' two, which are the REMAKE'S OWN WORDS — the exe
+ * prints nothing at all when a heal finds nobody (CLAUDE.md, `[deliberate]`;
+ * lib/game/events.ts carries the read). Written in the pickpocket's voice
+ * above, because that is the only refusal the game itself puts on this bar
+ * and it is the register to match. Play asked for the first one: "если
+ * полечить не получилось руками — то нет текста что нет цели". */
+const HEAL_NOBODY = 'Nobody there to lay a trotter on...'
+const HEAL_ALREADY_WELL = 'This pig is in the pink already....nothing to mend.'
+
 /**
  * "GET READY >S..." — `gtext 168`, and it is the game's own answer to the beat at
  * the top of a turn.
@@ -838,6 +847,12 @@ export function initBattle(
         },
         stealFailed: ({ reason }) => {
           hud.say(reason === 'reach' ? STEAL_NO_REACH : STEAL_NOTHING)
+        },
+        // …and the same courtesy for the HANDS, which the exe does not do
+        // (`HEAL_NOBODY`): a press that laid on nobody used to be a grunt of
+        // pain and no reason at all.
+        healFailed: ({ reason }) => {
+          hud.say(reason === 'nobody' ? HEAL_NOBODY : HEAL_ALREADY_WELL)
         },
         // FLING TELEMETRY — play has twice reported a knocked pig that went
         // nowhere, and three headless probes could not reproduce it. These two

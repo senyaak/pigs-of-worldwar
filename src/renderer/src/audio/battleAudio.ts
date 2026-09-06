@@ -213,8 +213,9 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       // arrives beside the cheer the crate already made.
       healed: () => playCue(bank(), BATTLE_SOUNDS.healed),
       // The healing hands: P_HEAL as they go ON — the act, before any points
-      // move — and P_OWW for a press with nothing to lay on (audio/battle.ts,
-      // both decoded off the skill-52 arm).
+      // move, and that one IS the skill-52 arm's — and P_OWW for a press with
+      // nothing to lay on, which is the remake's own (audio/battle.ts says
+      // which address that came from and why it is not the heal's).
       healBegan: () => playCue(bank(), BATTLE_SOUNDS.healHands),
       healFailed: () => playCue(bank(), BATTLE_SOUNDS.healRefused),
       // The pocket picked: the thief sniggers — the exe's own rand%3 over
