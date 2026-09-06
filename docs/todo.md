@@ -2101,16 +2101,16 @@ by play. In the order they turn up:
    walk on, not hop. And the same half-turn was the last suspect for "летящая
    свинья крутится вокруг своей оси" — see whether that is gone too.
 
-10. **G WITH A BAYONET OR EMPTY HANDS — play says it moved the camera, the code
-    says it cannot.** `sighting` is "held AND the weapon's layer has an aim
-    view", and only `gun` and `lob` do; the camera picks its two lob views off
-    the layer as well, so a blade can reach neither. That is the exe's own shape
-    too — its aim branch gives a blade no camera, and `0x493BB0` moves the view
-    for a blade only when it is TAKEN IN HAND (mode 4 at 1500/19.7°, closer and
-    lower than the chase, which is a real change and may be what was seen).
-    `002/sights.spec.ts` pins the rule. If it still moves on this build, the next
-    step is measuring `pow.debug.view()` and `pow.debug.camera()` with a bayonet
-    out rather than reasoning about it again.
+10. ~~**G WITH A BAYONET OR EMPTY HANDS — play says it moved the camera, the
+    code says it cannot.**~~ CLOSED 2026-09-06, and the entry had the exe
+    backwards: the aim branch's last arm is the TR cam for ANYTHING `MayAct`
+    turns away — an empty hand makes `MayAct` false by `[pig+0x2F4] == 0`
+    (0x467a49), a blade is simply "anything else" (0x492e7a). Built: the view
+    key opens the TR cam over any hand and the scope over a gun; the aim SET
+    still goes only to a weapon that aims, so the walk keys keep walking under
+    it. `unit/sights.spec.ts` (not `002/sights.spec.ts`, which never existed);
+    docs/history/view.md. The player-driven PITCH of the TR cam (±700 of 4096,
+    `[cam+0x76]`) is still not bound to anything.
 
 ## B. PLAY'S REPORTS, still open
 

@@ -129,8 +129,8 @@ export interface BattleSnapshot {
    * doing about it. */
   aimAngle: number
   scoped: boolean
-  /** Whether the aim view is up at all — every weapon that aims gets one and a
-   * THROWN weapon's is its own camera (lib/game/sights.ts, three/chase.ts). */
+  /** Whether the VIEW key is held — the TR cam for any hand, the scope over
+   * it for a gun (`scoped`); lib/game/sights.ts, three/chase.ts. */
   sighting: boolean
   zoom: number
   readying: number

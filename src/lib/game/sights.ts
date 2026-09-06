@@ -25,7 +25,6 @@ import type { Random } from './random'
 import { createZoom, updateZoom, zoomFraction, zoomedStep, zoomsIn } from './zoom'
 import { FRAME_SECONDS } from './ballistics'
 import { isGun } from './projectile'
-import { layerSights, weaponLayer } from './controls'
 import { weaponOf } from './weapons'
 
 export interface SightsFrame {
@@ -190,7 +189,13 @@ export function createSights(random: Random = Math.random): Sights {
     },
     angle: () => aim.angle,
     scoped: (holding) => held && isGun(holding),
-    sighting: (holding) => held && layerSights(weaponLayer(holding)),
+    // Held is enough. The exe's aim branch is entered on the pad bit alone
+    // (0x4928dc); `Pig::MayAct` — false with an empty hand, false from the
+    // press to the attack — only picks WHICH arm, and the last arm is the TR
+    // cam for anything at all (0x492e7a, `weapons/fire.md`). Play, TRENCH:
+    // "клавиша G при пустой руке не двигает камеру за спину… в оригинале
+    // вроде g всегда работает." It does, and now it does here.
+    sighting: () => held,
     zoom: () => zoomFraction(zoom)
   }
 }

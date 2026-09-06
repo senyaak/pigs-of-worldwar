@@ -512,3 +512,30 @@ third bomblets going off do not drop the camera — and `head()` is that. The
 snapshot carries its id as `tracked`, and the renderer's pursuit finds the lob
 by id instead of by position in the array. Pinned in `unit/cluster.spec.ts`:
 canister, then the vertical shard, then nobody.
+
+## The VIEW key works with nothing in hand — 2026-09-06
+
+Play, TRENCH: "клавиша G при пустой руке не двигает камеру за спину, чтобы
+лучше рассмотреть даль — в оригинале вроде g всегда работает." It does, and
+the disasm had said so all along in a sentence nobody had read for this:
+`weapons/fire.md` — the aim branch is entered on the pad BIT alone
+(0x4928dc), `Pig::MayAct` is asked twice and only the FIRST TWO arms are
+behind it (the rifle cam for guns, the barrel cam for the emplacements), so
+a pig `MayAct` turns away "takes the TR cam whatever it is holding". An empty
+hand is exactly such a pig — `MayAct` reads `[pig+0x2F4]`, the weapon in
+hand, and 0 fails it (0x467a49). A blade is the same arm by the other road:
+not in the 0x0E list, so "anything else".
+
+Two earlier rulings stood in the way and both survive. "G, когда целиться
+нельзя, останавливает ходьбу — БАГ" (the reason `layerSights` gated the key
+to `gun`/`lob`) is about the CONTROL SET: entering the sights hands the walk
+keys to the aim, and with nothing to aim that only stopped the pig. And
+todo.md's item 10 had concluded the exe gives a blade no camera, which was
+the wrong half of the dispatch. The build keeps the two apart: the `battle`
+set now passes the key's state through as a fact about the camera (it used
+to write `sighting: false`), `sights.sighting` is simply "held", the renderer
+puts the TR cam over any acting pig with the key down and the scope over a
+gun as before — and `layerSights` still decides the SET, so with an empty
+hand W and S go on walking under the new view. `unit/sights.spec.ts` inverted
+its own "inert" test; `e2e/002/battle.spec.ts`'s "G did not stop the walk" is
+unchanged and is the other half of the rule.

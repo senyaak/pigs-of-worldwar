@@ -93,6 +93,11 @@ test('the ENDING drives nothing, and any key puts the battle away', { tag: '@nod
 test('in the BATTLE all three axes drive', { tag: '@nodata' }, () => {
   const intent = readControls('battle', driving({ aim: 1 }))
   expect(intent).toMatchObject({ walk: 1, turn: 1, aim: 1, sighting: false })
+  // …and the VIEW key held over a hand that does not aim: the set is still
+  // the walk's, and the key goes through as a fact about the CAMERA — the TR
+  // cam over an empty hand (lib/game/sights.ts, docs/history/view.md).
+  const looking = readControls('battle', driving({ sighting: true }))
+  expect(looking).toMatchObject({ walk: 1, turn: 1, sighting: true })
 })
 
 test('down the SIGHTS the walk POINTS instead, and the turn still turns', { tag: '@nodata' }, () => {

@@ -140,7 +140,14 @@ export interface Situation {
  */
 export type WeaponLayer = 'none' | 'skill' | 'melee' | 'gun' | 'lob' | 'charge'
 
-/** Whether this layer has an aim view — a set where the walk POINTS instead. */
+/**
+ * Whether this layer has an aim SET — one where the walk keys POINT instead.
+ *
+ * It is the SET and not the view: the view key opens a camera for any hand
+ * (lib/game/sights.ts `sighting`); only a weapon that aims turns the axes
+ * over to it. The exe's `Pig::Aim` bails on `MayAct`, which is false with
+ * nothing in hand, while the camera branch beside it does not.
+ */
 export const layerSights = (layer: WeaponLayer): boolean => layer === 'gun' || layer === 'lob'
 
 /**
@@ -314,11 +321,18 @@ export function readControls(mode: ControlMode, held: Held): Intent {
       cursor: { x: 0, y: 0 }
     }
   }
+  // The VIEW key still says what the camera is, whatever is in the hands —
+  // the exe's aim branch is entered on the pad bit alone and its last arm,
+  // the TR cam (0x492e7a), takes an empty hand, a blade and a charge alike;
+  // what a hand that does not aim never gets is the SET above, so the axes
+  // keep walking. Play, both halves: "нажатие g когда нельзя прицеливаться
+  // всё ещё отменяет движение — БАГ" and "в оригинале вроде g всегда
+  // работает" — the walk goes on, and the camera comes in over the shoulder.
   return {
     walk: held.walk,
     turn: held.turn,
     aim: held.aim,
-    sighting: false,
+    sighting: held.sighting,
     firing: held.firing,
     fired: held.fired,
     cursor: { x: 0, y: 0 }

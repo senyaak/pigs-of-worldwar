@@ -138,24 +138,30 @@ test('a weapon brings its own LAYER, and only two of them have an aim view', { t
   expect(layerSights('lob')).toBe(true)
 })
 
-test('the VIEW key is inert unless the weapon aims', { tag: '@nodata' }, () => {
-  // Play: "g, по-моему, для без оружия и для штыка например — вроде тоже двигало
-  // камеру." It must not, and this is the rule that says so: `sighting` is what
-  // the camera reads (three/battle.ts picks `lob`/`throw` off it and off the
-  // weapon's own layer), and it answers for the two layers that HAVE an aim view
-  // and no others — which is the exe's own dispatch, where a blade is not among
-  // the weapons the aim-bit branch gives a camera to.
+test('the VIEW key opens a camera for ANY hand, and the scope only over a gun', { tag: '@nodata' }, () => {
+  // Play, twice: "g, по-моему, для без оружия и для штыка например — вроде
+  // тоже двигало камеру", then "в оригинале вроде g всегда работает." Right
+  // both times, and the exe says why: its aim branch is entered on the pad
+  // bit alone and the last arm — the TR cam — takes anything `MayAct` turns
+  // away, an empty hand first of all (0x492e7a). What a hand that does not
+  // aim never gets is the aim SET (`layerSights`), so the walk keys go on
+  // walking under the new view — which is the other half of play's ruling,
+  // "G, когда целиться нельзя, останавливает ходьбу — БАГ".
   const sights = createSights(() => 0.5)
   sights.setHeld(true)
   for (const [skill, what] of [
     [null, 'empty hands'],
     [SKILL.BAYONET, 'a bayonet'],
     [SKILL.SKIP_TURN, 'SKIP TURN'],
-    [SKILL.TNT, 'a planted charge']
+    [SKILL.TNT, 'a planted charge'],
+    [SKILL.GRENADE, 'a grenade']
   ] as const) {
-    expect(sights.sighting(skill), `${what} answered the view key`).toBe(false)
+    expect(sights.sighting(skill), `${what} answered the view key`).toBe(true)
     expect(sights.scoped(skill), `${what} went first person`).toBe(false)
   }
   expect(sights.sighting(SKILL.RIFLE), 'a rifle').toBe(true)
-  expect(sights.sighting(SKILL.GRENADE), 'a grenade').toBe(true)
+  expect(sights.scoped(SKILL.RIFLE), 'a rifle goes first person').toBe(true)
+  // …and letting go is letting go, whatever was held.
+  sights.setHeld(false)
+  expect(sights.sighting(null)).toBe(false)
 })

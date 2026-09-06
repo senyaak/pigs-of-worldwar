@@ -672,7 +672,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
           // the melee camera is gated on, which is false through a swing.
           acting && now.scoped
           ? 'scope'
-          : lobbing && now.sighting
+          : // …and the VIEW key held over anything else is the TR cam — an
+            // empty hand and a blade included, the exe's own last arm
+            // (lib/game/sights.ts `sighting`).
+            acting && now.sighting
             ? 'throw'
             : lobbing
               ? 'lob'
