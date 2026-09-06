@@ -2595,6 +2595,15 @@ And the charge is laid **in front**, off the hand. Play: "свин ставит 
 every muzzle from. The mine was the one charge in the game coming out of the
 soles; TNT was already right.
 
+**And the sequence play actually meant is the PIG test, not the tile bit** —
+corrected the same evening: "ты ставишь одну — она взводится если есть чужой
+свин — потом ставишь ещё 1 — остаётся 3-5 секунд на конец хода и уже 2
+взведены — и когда ход кончился, взрываются — не сразу." With an enemy inside
+`PLANT_CLEAR`, NEITHER mine may plant, so the tile bit never comes into it:
+both stay up, both come to their arming click during the turn, and both burn
+their own 25 frames after the bed-in. The "first plants, second is refused"
+case is the other one, where nobody is near. Pinned as its own test.
+
 `unit/mines.spec.ts` carries the new shape, including the AP's 3200 and the
 hand. The half NOT built is in todo.md item 0: our grenades trip a mine tile
 and our bullets do not, and the exe is the other way round.

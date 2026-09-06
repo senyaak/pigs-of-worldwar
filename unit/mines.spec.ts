@@ -10,7 +10,13 @@
 import { test, expect } from '@playwright/test'
 import { NO_POSE } from '../src/lib/game/pose'
 
-import { ARM_FRAMES, MINE_DAMAGE, createMines, isMine } from '../src/lib/game/mines'
+import {
+  ARM_FRAMES,
+  LAID_FUSE_FRAMES,
+  MINE_DAMAGE,
+  createMines,
+  isMine
+} from '../src/lib/game/mines'
 import { fromExeFrames } from '../src/lib/game/ballistics'
 import { NO_BODY } from '../src/lib/game/body'
 import type { Pig } from '../src/lib/game/game'
@@ -141,6 +147,42 @@ test('two mines on ONE spot: the first plants, the SECOND is refused and blows',
   // The bit is still there, and it is the one-shot it always was.
   expect(mines.tread(256, 256)).toBe(true)
   expect(mines.tread(256, 256), 'one bit, and it is spent').toBe(false)
+})
+
+test('TWO laid beside an enemy: both arm, both stay up, and both blow when the turn ENDS', { tag: '@nodata' }, () => {
+  // Play, correcting the sequence: "ты ставишь одну — она взводится если есть
+  // чужой свин — потом ставишь ещё 1 — остаётся 3-5 секунд на конец хода и уже
+  // 2 взведены — и когда ход кончился, взрываются — не сразу." That is the
+  // PIG test doing it, not the tile bit: the enemy is inside `PLANT_CLEAR`, so
+  // NEITHER can go into the ground and both take their own fuse at the bed-in.
+  const { mines, pigs, heard } = field()
+  const sapper = pigAt(256, 256)
+  const enemy = pigAt(320, 256, 2)
+  pigs.push(sapper, enemy)
+
+  expect(mines.lay(sapper, MINE)).toBe(true)
+  expect(mines.lay(sapper, MINE)).toBe(true)
+  // …and both come up to the click while the turn still runs. Furniture until
+  // it ends: nothing has gone off yet.
+  mines.update(fromExeFrames(ARM_FRAMES) + 0.01)
+  expect(heard.filter((one) => one.kind === 'mineArmed')).toHaveLength(2)
+  expect(mines.laid().every((one) => one.arming === 0)).toBe(true)
+  expect(heard.some((one) => one.kind === 'blasted'), 'nothing goes off during the turn').toBe(
+    false
+  )
+
+  // THE TURN ENDS. Neither may plant, so neither becomes the ground…
+  mines.bedAll()
+  expect(mines.buried(256, 256), 'no bit was written').toBe(false)
+  expect(mines.live(), 'both are counting').toBe(2)
+  // …and NOT IMMEDIATELY: each has its own row's 25 frames to burn first.
+  expect(heard.some((one) => one.kind === 'blasted')).toBe(false)
+  mines.update(fromExeFrames(LAID_FUSE_FRAMES) - 0.01)
+  expect(heard.some((one) => one.kind === 'blasted'), 'still burning').toBe(false)
+
+  mines.update(0.02)
+  expect(heard.filter((one) => one.kind === 'blasted'), 'both of them').toHaveLength(2)
+  expect(mines.live()).toBe(0)
 })
 
 test('an ANTI-PERSONNEL that could not plant hits harder than a trodden one', { tag: '@nodata' }, () => {
