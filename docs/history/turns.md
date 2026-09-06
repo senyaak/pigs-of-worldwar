@@ -1464,3 +1464,55 @@ handover on the pig after the first standing — a squad of one comes round to
 itself, and a side whose first pig has fallen is seated one past its first
 LIVING pig, which is what `FirstAlive` gives. `unit/rotation.spec.ts` pins
 it; `e2e/002/game-logic.spec.ts` moved from Hans to Fritz.
+
+## The mine that froze the game, and what the log could and could not say — 2026-09-06
+
+Play, TRENCH: "свин врага встал на мину и игра зависла." The session log
+(`_tmp/telemetry-2026-09-05T21-35-57.log`) ends on it — `[blast] … effect
+0x4c`, `[fling] pig 8 … v -1239,-1379,-605 flat 1379` for ABRAHAM, the
+machine's acting pig, and then nothing: no `[fling-end]`, no `[turn]`, no
+`[perf]`. The `[fling-end]` line is the one that matters. It is written by a
+three-second `setTimeout` in the renderer, and a timer that never fires means
+the renderer's JavaScript THREAD never got back to its event loop — a
+synchronous loop, not an engine waiting on a state that never comes (a wait
+would have let the timer run and the log go on).
+
+The engine's half was reproduced headless and does not hang:
+`e2e/002/machine-mine.spec.ts` puts the machine's acting pig on that mine
+tile, mid-order, in its own turn, and the trip, the fuse, the throw and the
+handover all come — in 2 s of wall clock. Every `while` in `lib/game` was
+audited bounded on top of that. What the renderer was doing in that frame is
+the unread half, and a thread inside a loop cannot write it down. Three
+things follow, and the middle one is the deliverable:
+
+- **The plate stack could spin, and cannot now.** `ui/hud.ts` de-overlapped
+  the name plates in a `while (bumped)` over screen rectangles; a plate whose
+  screen position was NaN — every comparison false, so never "apart" — placed
+  first, kept every later plate on that spot bumping for ever. A NaN screen
+  position is one `Vector3.project` of a point exactly on the camera plane
+  away, and the camera's subject in that frame was a pig thrown through the
+  air near the lens. Not proven to be the loop; proven to BE a loop. It is
+  `ui/plateStack.ts` now — finite inputs only, bounded by one move per plate
+  placed, pinned in `unit/plateStack.spec.ts` on the exact input — and
+  `three/squad.ts` drops a non-finite projection before it becomes a plate.
+- **The next freeze names its loop.** `src/main/watchdog.ts`: main pings the
+  page every two seconds, the preload answers on the page's own thread, three
+  misses and the debugger — attached and enabled at start-up, because
+  `Debugger.enable` queues behind a busy thread while `Debugger.pause` is
+  delivered by interrupt — pauses the page, the top sixteen frames of the
+  stack go to the session log, and the page is resumed. Off under the e2e
+  harness, which drives the same page over CDP itself, and under
+  `POW_WATCHDOG=0`.
+- **The machine does not think without control.** Play: "при потере
+  контроля — никаких думаний!" The AI block had no gate on the acting pig
+  being in the air, getting up or dead: the actuator went on stepping its
+  walk order — writing walk and turn keys — through the whole flight. Now a
+  pig in the air, getting up or dead drops its order, stills the controls and
+  starts its mull over when it is its own again. `Pig::MayAct` is false
+  through a fall in the exe (0x467a10), so this is the original's own shape.
+
+The lag report from the same session — "при начале хода нпс пролаг 1
+секунда" — is in the same log as `[perf] engine.update` 517/419/418/397 ms
+on the first decisions and 132–148 ms later on, one step each: the brain's
+whole-map flood at ~400 ms a plan (docs/todo.md, the settled item on the
+brain-as-a-player road). Not touched here.

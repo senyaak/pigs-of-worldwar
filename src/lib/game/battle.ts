@@ -1396,6 +1396,22 @@ export function createBattle(parts: BattleParts): Battle {
         // pacing is theatre (lib/game/ai.ts). `beginTurn` only OFFERS the
         // press, same as a player's key.
         if ((cardSeconds += delta) >= AI_START_SECONDS) game.beginTurn()
+      } else if (
+        loco.airborne !== null ||
+        loco.getUp > 0 ||
+        tumbles.has(acting) ||
+        isDead(acting)
+      ) {
+        // **NO CONTROL, NO THINKING.** Play, after the mine: "при потере
+        // контроля — никаких думаний!" A pig in the air, getting up or dead
+        // is not a pig whose hands can take an order, and the walk it was
+        // carrying out is not something to go on pressing keys for from
+        // inside a flight — it is dropped, the controls stilled, and the
+        // mull starts over when the pig is its own again. The exe's own
+        // shape: `Pig::MayAct` is false through a fall and the AI's step
+        // never reaches its think from there (0x467a10).
+        if (!actuator.idle()) actuator.reset()
+        mullSeconds = 0
       } else if (!actuator.idle()) {
         actuator.step(delta)
         mullSeconds = 0

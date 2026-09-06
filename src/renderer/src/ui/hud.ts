@@ -23,6 +23,7 @@
 // since a wide window is wider than 640 of these units.
 
 import { MODEL_SCALE } from '../../../lib/game/scale'
+import { stackPlates } from './plateStack'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { aimRadians } from '../../../lib/game/aim'
 import { BATTLE_STRETCH, loadFont } from './font'
@@ -1006,26 +1007,9 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
             poisoned: plate.poisoned
           })
         }
-        blocks.sort((a, b) => a.top - b.top)
-        const placed: Block[] = []
-        for (const block of blocks) {
-          let bumped = true
-          while (bumped) {
-            bumped = false
-            for (const other of placed) {
-              const apart =
-                block.left >= other.left + other.width ||
-                other.left >= block.left + block.width ||
-                block.top >= other.top + other.height + PLATE.gap ||
-                other.top >= block.top + block.height + PLATE.gap
-              if (!apart) {
-                block.top = other.top - block.height - PLATE.gap
-                bumped = true
-              }
-            }
-          }
-          placed.push(block)
-        }
+        // Stacked so none sits on another — a bounded pass of its own
+        // (ui/plateStack.ts), because this is a loop on a draw path.
+        const placed = stackPlates(blocks, PLATE.gap)
         for (const block of placed) {
           letters(block.font, block.name, Math.round(block.x - block.nameWidth / 2), Math.round(block.top))
           const healthLeft = Math.round(block.x - block.healthWidth / 2)

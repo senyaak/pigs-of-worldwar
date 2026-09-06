@@ -6,6 +6,7 @@ import path from 'node:path'
 
 import { resolveGameDir } from './gameDir'
 import { registerIpc } from './ipc'
+import { watchRenderer, watchdogWanted } from './watchdog'
 
 /**
  * Electron's own menu, minus ONE accelerator: **F11**.
@@ -83,6 +84,10 @@ function createWindow(): void {
   if (process.argv.includes('--mute') || process.env['POW_MUTE'] === '1') {
     window.webContents.setAudioMuted(true)
   }
+
+  // The renderer's thread is watched from here, because a thread inside a
+  // synchronous loop cannot report on itself (src/main/watchdog.ts).
+  if (watchdogWanted()) watchRenderer(window)
 
   window.on('ready-to-show', () => {
     if (!noFocus) {

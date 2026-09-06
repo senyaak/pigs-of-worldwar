@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+// The watchdog's heartbeat (src/main/watchdog.ts). It is answered HERE, on
+// the page's own thread, so a page stuck in a loop cannot answer — which is
+// the whole measurement.
+ipcRenderer.on('watchdog:ping', () => {
+  ipcRenderer.send('watchdog:pong')
+})
+
 contextBridge.exposeInMainWorld('api', {
   getGameDir: (): Promise<string | null> => ipcRenderer.invoke('game:getDir'),
   selectGameDir: (): Promise<string | null> => ipcRenderer.invoke('game:selectDir'),

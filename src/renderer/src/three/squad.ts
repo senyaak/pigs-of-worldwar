@@ -297,6 +297,10 @@ export function fieldSquad(
         at.y += soldier.mesh.crownRise + lift
         at.project(camera)
         if (at.z > 1) continue // behind the camera
+        // …and a point ON the camera plane divides by zero on the way
+        // through the projection. It has no place on the screen, and a
+        // plate with NaN for a place is not something the HUD can stack.
+        if (!Number.isFinite(at.x) || !Number.isFinite(at.y)) continue
         out.push({
           x: (at.x * 0.5 + 0.5) * width,
           y: (-at.y * 0.5 + 0.5) * height,
