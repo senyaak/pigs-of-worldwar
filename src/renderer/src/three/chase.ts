@@ -598,6 +598,35 @@ const FLIGHT_ROOM = 1.25
 const FLIGHT_ROOM_RATE = 4
 
 /**
+ * **THE FLIGHT STAYS IN FRAME** — `[play]`, and the number is play's too.
+ *
+ * "Снаряд базуки вообще улетает за экран — надо сделать чтобы камера ехала
+ * за ним, скажем максимум 20% от верха или низа экрана." The exe's aim point
+ * (above) climbs a sixth a frame toward a THIRD of the flight's height, and
+ * the camera itself rides 17.6° above the flight, so a high, fast shot — the
+ * rocket at 500 a frame, a lob thrown steep — climbs straight out of the top
+ * of a 45° frame while the lens is still looking at the ground under it.
+ * Nothing in mode 0x0D bounds that (its only vertical limits are the
+ * elevation spring's own and the map's ±12288), so this is the remake's rule
+ * over the exe's: the aim point is lifted (or lowered) just enough that the
+ * flight never sits closer than this fraction of the screen's HEIGHT to its
+ * top or bottom edge. Written into the aim's own state, so the spring lets
+ * it back down at its own rate and there is no cut when the limit releases.
+ * An ordinary grenade peaks about 9° above the axis and never touches it
+ * (`e2e/002/grenade-aim.spec.ts`); the rocket does, and
+ * `e2e/002/bazooka-aim.spec.ts` measures the ceiling holding.
+ */
+const FRAME_KEEP = 0.2
+
+/**
+ * How far above or below the look axis the flight may sit, in radians, for
+ * a camera of vertical `fov` degrees: the edge is `tan(fov/2)`, and the
+ * band the flight is kept inside is the middle `1 − 2·FRAME_KEEP` of it.
+ */
+const frameLimit = (fov: number): number =>
+  Math.atan((1 - 2 * FRAME_KEEP) * Math.tan((fov * Math.PI) / 360))
+
+/**
  * **THE DEATH DRIFTS BACK.** `[play]`, 2026-08-25: "при смерти камера отъезжает
  * назад потихоньку." The camera still arrives at the dying pig's face (the
  * `face` rig, three/battle.ts's `dyingWatch`); what it does then is give the
@@ -1104,6 +1133,18 @@ export function createChase(
       // The lens is kept off the SUBJECT and not off the aim: the point of
       // that rule is not to end up inside the thing being watched.
       keepClear(position, eye)
+      // …and the flight is kept IN FRAME (`FRAME_KEEP`): the elevation the
+      // lens would take to the aim against the elevation to the flight, and
+      // the aim lifted or lowered until the two are within the band.
+      const toAim = Math.hypot(aim.x - position.x, aim.z - position.z)
+      const toEye = Math.hypot(eye.x - position.x, eye.z - position.z)
+      if (toAim > 1 && toEye > 1) {
+        const limit = frameLimit(camera.fov)
+        const eyeUp = Math.atan2(eye.y - position.y, toEye)
+        const aimUp = Math.atan2(aim.y - position.y, toAim)
+        if (eyeUp - aimUp > limit) aim.y = position.y + toAim * Math.tan(eyeUp - limit)
+        else if (aimUp - eyeUp > limit) aim.y = position.y + toAim * Math.tan(eyeUp + limit)
+      }
       at.copy(position)
       snapped = true
       camera.position.copy(at)

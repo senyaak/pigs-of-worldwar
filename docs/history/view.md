@@ -539,3 +539,31 @@ gun as before — and `layerSights` still decides the SET, so with an empty
 hand W and S go on walking under the new view. `unit/sights.spec.ts` inverted
 its own "inert" test; `e2e/002/battle.spec.ts`'s "G did not stop the walk" is
 unchanged and is the other half of the rule.
+
+## The flight stays in frame — 2026-09-06
+
+Play: "камера за гранатой как-то медленно по вертикали следует — или слишком
+к краю экрана подходит; а снаряд базуки вообще улетает за экран — надо
+сделать чтобы камера ехала за ним, скажем максимум 20% от верха или низа
+экрана." The slowness is the exe's own, read on 09-01: the aim point springs
+a sixth a frame toward a height a third of the way up from the ground under
+the flight, and the camera itself rides 17.6° above the flight — so a high
+flight is 17.6° under the lens's horizontal while the aim is far below it,
+and the further up it goes the further above the axis it sits. A grenade
+peaks about 9° above; a rocket fired high, at 500 a frame, goes past the
+22.5° half-frame and out. Mode 0x0D has no vertical bound of its own (the
+elevation spring's ceiling and floor, and the map's ±12288 — nothing about
+where the subject lands in frame), and the bazooka IS on this rig: skill 29 is
+a lob, `weaponLayer` says so, and `pursue` is what it gets — the "mode 1
+stands still" theory was checked and is not it.
+
+So the bound is the remake's, at play's number: `FRAME_KEEP = 0.2` in
+three/chase.ts. After the exe's springs have moved the aim, the elevation the
+lens would take to the aim is compared with the elevation to the flight, and
+the aim is lifted (or lowered) until the flight is no closer than a fifth of
+the screen's height to the top or bottom edge — written into the aim's own
+state, so the spring lets it back down at its own rate and nothing cuts when
+the limit lets go. `e2e/002/bazooka-aim.spec.ts` fires a rocket with the
+barrel up and a full charge and reads `pow.debug.facing()` against the
+rocket every frame; `grenade-aim.spec.ts`'s floors (3° off, 2° above) stand,
+because the grenade's 9° is inside the band.

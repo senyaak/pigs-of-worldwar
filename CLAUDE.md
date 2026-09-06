@@ -563,6 +563,13 @@ and the weakest of them were invented here:
 
 - `[play]` **`HEIGHT_SCALE` is 1** though the exe doubles. Answered in play
   twice; the doubling is above.
+- `[play]` **A FLIGHT is kept inside the middle 60% of the frame.** Mode
+  0x0D's aim point is the exe's (a sixth a frame toward a third of the
+  flight's height) and has no vertical bound of its own, so a rocket or a
+  steep lob climbs out of the top of the frame. Play ruled a fifth of the
+  screen from either edge; `FRAME_KEEP` in `three/chase.ts` lifts the aim
+  point that far and no further, and the ordinary grenade's 9° never
+  touches it. `e2e/002/bazooka-aim.spec.ts`.
 - `[play]` **The MEDICINE BALL bursts as a CLOUD, not row 4's ring.** The row
   is read and validated (`effects/notes.md`), and its ring — the only one with
   age step 1 — runs a hundred frames to 7520 units, three times past the heal
