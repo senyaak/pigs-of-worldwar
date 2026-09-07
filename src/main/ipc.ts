@@ -10,6 +10,7 @@ import { parseArchive } from '../lib/formats/mad'
 import { getGameDir, insideGameDir, setGameDir, walkDir } from './gameDir'
 import { deleteSave, listSaves, readSave, savesDir, writeSave } from './saves'
 import { logTelemetry } from './telemetry'
+import { BRAIN_SEND, sendToBrain } from './brainHost'
 import {
   loadArchiveBmps,
   loadClips,
@@ -35,6 +36,14 @@ export function registerIpc(): void {
   // human, and dropping a malformed one costs nothing (src/main/telemetry.ts).
   ipcMain.on('telemetry:log', (_event, line: unknown) => {
     if (typeof line === 'string' && line.length <= 512) logTelemetry(line)
+  })
+
+  // The AI's own process (src/main/brainHost.ts). One way in both
+  // directions: the seat asks and picks the answer up when it comes, so
+  // neither side is ever waiting on a reply here.
+  ipcMain.on(BRAIN_SEND, (event, message: unknown) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window !== null) sendToBrain(window, message)
   })
 
   ipcMain.handle('game:getDir', () => getGameDir())

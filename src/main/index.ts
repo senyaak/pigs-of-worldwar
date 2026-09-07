@@ -7,6 +7,7 @@ import path from 'node:path'
 import { resolveGameDir } from './gameDir'
 import { registerIpc } from './ipc'
 import { watchRenderer, watchdogWanted } from './watchdog'
+import { stopBrain } from './brainHost'
 
 /**
  * Electron's own menu, minus ONE accelerator: **F11**.
@@ -120,5 +121,10 @@ void app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  // The AI's process outlives no window: it is forked for a battle and there
+  // is nobody left to ask it anything (src/main/brainHost.ts).
+  stopBrain()
   if (process.platform !== 'darwin') app.quit()
 })
+
+app.on('before-quit', stopBrain)

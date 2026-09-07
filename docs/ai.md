@@ -50,16 +50,50 @@ with what actually happened, and an honest miss is born in that gap.
 
 **Not the renderer's `Controller`.** It is the same five verbs wearing key
 names — giving it to the AI adds nothing and drags the brain into the
-presentation layer, which breaks the two things the seat was built for:
-headless runs (`unit/`, `engine-headless`) and lockstep (`net` feeds this
-seam on every peer, so the brain must be simulated identically everywhere).
-The brain is separate LOGIC — module, facade, orders — inside the same tick.
+presentation layer, which breaks the thing the seat was built for: headless
+runs (`unit/`, `engine-headless`).
 
-**Determinism, restated from todo item 5:** the brain is a pure function of
-stepped time and draws chance only from the battle's seeded stream. And one
-trap with a name: when the brain DRY-RUNS a candidate shot (`advanceShot`,
-`advanceLob` are pure — integrate and look), it hands the prediction a
-THROWAWAY rng, or the lookahead eats the battle's stream and net diverges.
+**AND THE BRAIN IS NOT IN THE TICK — 2026-09-07.** It was, and the line here
+used to say so. What moved it out is one number: a turn's plan floods the
+whole map, about 25 000 cells and a few hundred milliseconds, and it did that
+inside one 1/60 step, which is inside the renderer's frame callback, which is
+the same JS task as `renderer.render`. Play watched the picture stop dead
+every time a pig started thinking — "провисание рендера на 1 секунду… это
+отдельный нод процесс должен быть: получил данные — вернул план".
+
+So the seat is now ASK and ANSWER (`lib/game/brainPort.ts`), and the app's
+brain lives in a Node process of its own (`src/brain/`, forked by
+`src/main/brainHost.ts`). The shape:
+
+- **What the brain is TOLD is data** — `AiFacts`, and it crosses a pipe:
+  positions, health, kit, crates, the clock. Small, and at most once a second.
+- **What the brain ASKS is a model** — `AiOracles`: four terrain and collision
+  lookups the searches make tens of thousands of times per plan, plus a random
+  stream. Those can never be messages, so each side keeps its own copy of the
+  map and builds its oracles from ONE function (`lib/game/aiGround.ts`), which
+  is what stops the two drifting apart. The far side reads the same `.PMG` and
+  `.PTG` off disk; the OBJECTS are sent, because the engine's list is the
+  authority.
+- **The pig standing still while it thinks is the MULL**, which the seat
+  already had. A thought longer than the beat makes the beat longer, and
+  nothing else waits: the clock runs, the world moves, the frame draws.
+- **A local brain is still the default** and answers on the step it is asked.
+  `unit/` and `e2e/` have no Electron to put a process in, and a spec that had
+  to pump frames waiting for a pipe would be testing the pipe.
+
+**Determinism, restated:** the brain is a pure function of the world it is
+shown and never of the wall clock. What CHANGED with the process is where its
+chance comes from — a brain answering whenever it is done cannot draw from a
+shared stream in a fixed order, so it has one of its own, seeded off the
+battle's seed (`brainSeedFor`). **Lockstep is kept a rung up instead: the
+brain's ORDERS are inputs, exactly like a player's keys**, so peers agree by
+replaying the same orders rather than by re-thinking the same thoughts. That
+is the "brain is a PLAYER" design this file and `docs/todo.md` had already
+written down for the `net` worktree's day, and it arrived early because the
+frame needed it. And one trap with a name survives untouched: when the brain
+DRY-RUNS a candidate shot (`advanceShot`, `advanceLob` are pure — integrate
+and look), it hands the prediction a THROWAWAY rng, or the lookahead eats the
+stream it is standing on.
 
 ## The evaluation: one currency, the HP differential
 

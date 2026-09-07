@@ -52,5 +52,20 @@ contextBridge.exposeInMainWorld('api', {
   logTelemetry: (line: string): void => {
     ipcRenderer.send('telemetry:log', line)
   },
+  // THE AI'S PROCESS (src/main/brainHost.ts, src/brain/). Both ways are
+  // fire-and-forget: the engine's seat asks and picks the answer up on a
+  // later step, so there is no promise here to await and nothing on the page
+  // thread ever blocks on a thought. The messages themselves are typed on
+  // both real ends (lib/game/brainPort.ts); the bridge only carries them.
+  brainSend: (message: unknown): void => {
+    ipcRenderer.send('brain:send', message)
+  },
+  onBrainReply: (handler: (message: unknown) => void): (() => void) => {
+    const listener = (_event: unknown, message: unknown): void => handler(message)
+    ipcRenderer.on('brain:reply', listener)
+    return () => {
+      ipcRenderer.off('brain:reply', listener)
+    }
+  },
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit')
 })

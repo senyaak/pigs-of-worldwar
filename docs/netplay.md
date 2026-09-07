@@ -90,6 +90,19 @@ only in plain data, **replacing the engine is replacing one side of the
 bridge** — which is what makes a mod possible, and is why the boundary is
 worth having even though a module boundary alone would give determinism.
 
+**THE FIRST TENANT MOVED IN ON 2026-09-07, and it is the AI** (`src/brain/`,
+forked by `src/main/brainHost.ts`). It went first because the frame could not
+wait — a plan cost 400–538 ms on the step the picture was drawn from — and it
+is the easy half of this page's job: a brain owns nothing, so nothing had to
+be taken away from the renderer to move it. What it proves for the rest is the
+SHAPE. The brain's world was split into what it is TOLD (plain data, over the
+pipe) and what it ASKS (a map model, kept on both sides and built from one
+function), which is the same split an engine in `main` needs between intents
+and snapshots. And it settled the determinism question the way this page will
+have to: **the brain's ORDERS are inputs**, so peers agree by replaying orders
+rather than by re-thinking thoughts, and the brain needs no shared random
+stream at all. `docs/ai.md` and `docs/history/turns.md`, the 09-07 entry.
+
 ```
 renderer  ── intents ──▶  main / engine     tick at STEP = 1/30
    │                          │

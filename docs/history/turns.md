@@ -1552,3 +1552,70 @@ guaranteed hit out to 1500 units and leaves the mid-range shot a real
 question, which is the "чуть-чуть" that was asked for. `unit/grunt.spec.ts`
 pins both halves off the same rigged roll; nothing pinned `AIM_WOBBLE` before.
 
+## 2026-09-07 — THE BRAIN LEFT THE TICK, AND THE FRAME STOPPED WAITING FOR IT
+
+Play, for the third time and this time as an order: "провисание от мыслей ии —
+каждый раз когда план строится провисание рендера на 1 секунду, потому что это
+считается в рендере, и я уже много раз говорил что это отдельный нод процесс
+должен быть: получил данные — вернул план".
+
+MEASURED, and the old verdict was wrong. `docs/todo.md` had twice written the
+node process off — "it buys nothing at 27 ms", "a ≤107 ms hitch once per long
+march, not worth a lockstep hole". The telemetry of one suite run says
+otherwise, and it had been saying so all along:
+
+    18:24:14 [perf] engine.update 538ms (1 steps, delta 7ms)
+    18:25:17 [perf] engine.update 430ms (1 steps, delta 13ms)
+    …twelve of them, 400–538 ms, one per plan
+
+One STEP, not one frame — the whole of it is `brain.decide` inside
+`battle.update`, inside `engine.update`, inside the renderer's frame callback,
+which is the same JS task as `renderer.render`. The 27 ms that bought the
+write-off was the water memo's effect on a cold PROBE; a real plan floods
+24 000–30 000 cells and costs what it costs.
+
+**What the split actually is.** The brain's world was one interface with two
+kinds of thing in it, and the process boundary runs exactly along that seam:
+
+- `AiFacts` is what the brain is TOLD — positions, health, kit, crates, the
+  clock. Plain data, structured-cloneable, a few KB at most once a second.
+- `AiOracles` is what the brain ASKS — `route`, `reach`, `groundAt`, `wet` and
+  a random stream. Four of those are terrain and collision lookups the
+  searches make tens of thousands of times per plan, so they can never be
+  messages. Each side keeps its own map and builds them from ONE function
+  (`lib/game/aiGround.ts`) — that is what stops the two answering differently.
+
+So the seat is `ask` and `answer` (`lib/game/brainPort.ts`), the app's brain is
+`src/brain/index.ts` — a plain Node process forked by `src/main/brainHost.ts`,
+reading the same `.PMG`/`.PTG` off disk and taking the OBJECTS over the pipe,
+because the engine's list is the authority. Every ask carries an id and every
+answer quotes it: an answer to a question nobody is asking any more is dropped
+unread, which is what makes losing control mid-thought safe.
+
+**The pig standing still while it thinks is the MULL**, which the seat already
+had (`AI_MULL_SECONDS`). A thought longer than the beat makes the beat longer,
+and nothing else waits.
+
+**What it cost.** The brain draws chance from a stream of its OWN now, seeded
+off the battle's seed (`brainSeedFor`) — a brain that answers whenever it is
+done cannot take numbers out of a shared stream in a fixed order. Lockstep
+moves a rung up with it: peers replay the same ORDERS, not the same thoughts,
+which is the "brain is a PLAYER" design `docs/ai.md` had already written down
+for the `net` worktree's day. It arrived early because the frame needed it.
+
+**Both seats are kept and both are load-bearing.** `localBrain` thinks on the
+step it is asked, which is what `unit/` and `e2e/`'s headless runs want —
+there is no Electron there to put a process in, and a spec that had to pump
+frames waiting for a pipe would be testing the pipe. The app hands in
+`remoteBrain`. `e2e/002/brain-process.spec.ts` is the one that proves the real
+thing: it hands the turn over and waits for `pow.debug.brain().answered` to
+climb, which cannot happen unless the process started, read the map, ran a
+plan and replied.
+
+AFTER, on runs that still flood 30 865 cells: **zero `[perf]` lines.**
+
+One thing found on the way and not caused here: `e2e/002/battle.spec.ts`
+expected the French side to open on BASTILLE, and it opens on LE CONT — the
+2026-09-06 `Team::NextPig` ruling ("the enemy's first turn is its second pig")
+left that line behind. Corrected with the reason written beside it.
+

@@ -14,6 +14,11 @@ one.
 
 ## Unreleased
 
+- **The enemy thinks in its own process, and the game stops freezing while it
+  does.** Working out a turn floods the whole map and took the better part of a
+  second, and it did that on the thread the picture is drawn from — so every
+  time an enemy pig started thinking, everything stopped. It now happens beside
+  the game instead: the pig pauses, nothing else does.
 - **The camera stays on a cluster's bomblets.** A body thrown by the first one
   to go off no longer takes the lens off the four still falling — a blow only
   claims the camera once nothing is in the air.

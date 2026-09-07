@@ -209,6 +209,12 @@ export interface Api {
   deleteSave(name: string): Promise<WriteSaveResult>
   /** One line into _tmp/telemetry.log — fire-and-forget (src/main/telemetry.ts). */
   logTelemetry(line: string): void
+  /** One message to the AI's own process (src/main/brainHost.ts). It is a
+   * `BrainRequest` (lib/game/brainPort.ts); the bridge carries it untyped
+   * because a preload may not import the engine. */
+  brainSend(message: unknown): void
+  /** …and what comes back, a `BrainReply`. Returns the unsubscribe. */
+  onBrainReply(handler: (message: unknown) => void): () => void
   quit(): Promise<void>
 }
 

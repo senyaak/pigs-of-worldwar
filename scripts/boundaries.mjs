@@ -54,6 +54,11 @@ const RULES = [
     dir: 'main',
     banned: [/^three$/, /\/renderer\//],
     why: 'the main process has no scene and no DOM.'
+  },
+  {
+    dir: 'brain',
+    banned: [/^three$/, /^electron$/, /\/renderer\//, /\/main\//, /^\.\.\/main\//],
+    why: 'the AI process is a PLAIN NODE process: lib/ and node: builtins, nothing else. It is forked by main, it is not part of it, and the day it runs on a dedicated server there is no Electron to import.'
   }
 ]
 

@@ -11,8 +11,28 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 
 ## P0. WHAT TO CHECK IN PLAY — the 2026-09-07 batch
 
-Three off one play report. TRENCH passes, the second-level medic works — what
-was left is below.
+Three off one play report, plus the ARCHITECTURE change that followed it.
+TRENCH passes, the second-level medic works — what was left is below.
+
+### 0. THE MACHINE THINKS IN ITS OWN PROCESS
+
+The one thing to feel rather than look at: **the picture must not stop when an
+enemy pig starts thinking.** It used to, for the better part of a second, once
+per plan — twelve `engine.update` frames of 400–538 ms in one suite run, all
+of them the flood, all of them on the thread the frame is drawn from. The
+brain is now `src/brain/`, a Node process of its own, and the same runs print
+no `[perf]` line at all.
+
+**What is deliberate and must NOT be read as a bug**: the pig itself stands
+still while it thinks, and on a big map that beat is longer than the old
+one-second mull. Nothing else pauses with it — the clock runs, the camera
+moves, the frame draws. **What WOULD be a bug**: the machine standing and
+never acting (the process died — `_tmp/telemetry-*.log` carries `[brain] the
+AI process exited`), or the machine acting on something stale, like walking
+off towards where a pig was before a blast moved it.
+
+The full story, the measurement and what it cost in determinism are in
+`docs/history/turns.md`, the 09-07 entry; the design is `docs/ai.md`.
 
 ### 1. A CLUSTER'S FIRST VICTIM DOES NOT TAKE THE CAMERA
 
@@ -1712,12 +1732,13 @@ Non-AI bugs from the same session, queued after the AI:
    half-second he saw was plausibly SEVERAL routes in one frame (the
    playable-fallback can run one per candidate), which the memo also
    collapses, but the tap is what settles it. A NODE
-   PROCESS is deliberately NOT taken: it buys nothing at 27 ms, and the
-   lockstep-clean way to free the brain from the frame — if it is ever
-   needed — is "the brain is a PLAYER": its ORDERS become inputs on the
-   net's own input path, decided by the machine's owner and broadcast, so
-   the brain need not be deterministic at all. Written down for the `net`
-   worktree's day.
+   PROCESS was deliberately NOT taken here — "it buys nothing at 27 ms" —
+   and **that verdict did not survive contact**: the 27 ms was the memo's
+   effect on a cold PROBE, not on a plan, and the tap went on printing
+   400–538 ms `engine.update` frames for a fortnight afterwards. **BUILT
+   2026-09-07**, down the road this very item named: "the brain is a
+   PLAYER", its ORDERS as inputs. `src/brain/`, and the 09-07 entry in
+   `docs/history/turns.md`.
 3. ~~"Третий свин стрельнул через гору — пуля попала в землю."~~ The gun's
    pricing never asked the terrain. `clearShot` (evaluate.ts) samples the
    line every 128 units at the exe-ish muzzle height; a blocked shot
@@ -1769,11 +1790,12 @@ are worth doing:
    "brain is a PLAYER" design already written down at the fourth
    session's item 2: the brain runs OFF the engine's step (worker or
    host process), its ORDERS become inputs on the net's own input path,
-   so it need not be deterministic at all. **That lands with the `net`
-   worktree's input layer, not before** — in-process cost today is a
-   ≤107 ms hitch once per long march, not worth a lockstep hole. The
-   >100 ms frame-GAP detector never firing beside a 107 ms engine frame
-   still wants a look when next in three/battle.ts.
+   so it need not be deterministic at all. **BUILT 2026-09-07, and it did
+   NOT wait for the `net` worktree.** The "≤107 ms hitch" this line rested
+   on was out by four times: one suite run of 2026-09-07 carries TWELVE
+   `engine.update` frames between 400 ms and 538 ms, one per plan, and play
+   was watching the picture stop for about a second every time a pig
+   thought. `docs/history/turns.md`, the 09-07 entry.
 3. ~~**The elected option is not the top-believed one for a whole
    turn.**~~ **DIAGNOSED AND FIXED 2026-08-24 (929026b) — the election
    was honest, the DISPLAY lied twice.** The head order provably carried

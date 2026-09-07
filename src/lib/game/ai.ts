@@ -112,9 +112,24 @@ export interface Thought {
   }
 }
 
-/** What the brain is shown: the read-only face of the battle. It GROWS with
- * the brain — nothing goes on it until a decision reads it. */
-export interface AiWorld {
+/**
+ * **What the brain is TOLD** — the half of its world that is plain data.
+ *
+ * The split is the process boundary, and it is the whole reason this
+ * interface exists apart from `AiWorld`. Everything here survives a
+ * structured clone: numbers, strings and bags of them, nothing live. So a
+ * brain on the other side of a pipe is shown exactly what a brain in the
+ * tick is (lib/game/brainPort.ts, src/brain/).
+ *
+ * The other half — `AiOracles` — is five QUESTIONS about a world model, and
+ * a model is not something to send down a pipe forty thousand cells at a
+ * time. The far side keeps its own copy of the map and answers them itself
+ * (lib/game/aiGround.ts builds them, and both sides build them from THAT so
+ * the two cannot drift).
+ *
+ * It GROWS with the brain — nothing goes on it until a decision reads it.
+ */
+export interface AiFacts {
   /** The turn clock, seconds. */
   timeLeft: number
   /** …and how long a WHOLE turn is on this map (lib/game/turns.ts) — what
@@ -125,11 +140,6 @@ export interface AiWorld {
    * (lib/game/wits.ts). It slides weights (the crate appetite, the
    * misjudgment); it never picks behaviours. */
   wits: number
-  /** The battle's ONE random stream (lib/game/random.ts) — what the brain's
-   * misjudgment draws from (lib/game/grunt.ts, `MISJUDGE`), because a
-   * lockstep battle rolls the same on both machines and the brain gets no
-   * stream of its own. */
-  roll(): number
   /** How the last order ended — `blocked` is the world saying no, and the
    * cue to think of something else. Null before the first order finishes. */
   previous: Outcome | null
@@ -160,6 +170,64 @@ export interface AiWorld {
   foes: Seen[]
   /** Everybody alive on this side, the acting pig excepted. */
   friends: Seen[]
+  /** Whether the acting pig is IN the water right now. Water KILLS a
+   * non-swimmer by degrees (docs/ai.md), so a swimming brain has exactly
+   * one thought: the shore (lib/game/grunt.ts). */
+  swimming: boolean
+  /** Whether the acting pig's CLASS crosses water alive — the commando
+   * family (lib/game/drowning.ts, `SWIMMERS`). Play's rule on what that
+   * buys: water is TRANSIT, never a destination — "в воде делать нечего,
+   * максимум сократить путь". The route may cross it; nothing is ever done
+   * in it, because the engine empties swimming hands. */
+  swims: boolean
+  /** The machine's own grenade still in the air or rolling, or null. While
+   * one is live the fire key is the DETONATOR (lib/game/lobs.ts), and the
+   * brain's business is timing it. `rim` is the blast's own outer edge
+   * (lib/game/grenade.ts, `blastRange` of the thrown skill) — the dumbest
+   * brain presses the moment a foe is merely inside it
+   * (lib/game/grunt.ts, the detonation window). */
+  thrown: {
+    x: number
+    z: number
+    resting: boolean
+    rim: number
+    speed: number
+    /** Seconds since the throw left the hand — what the PLANNED press is
+     * measured against (lib/game/grunt.ts). */
+    age: number
+  } | null
+  /** A charge PLANTED and armed — the brain's business is being somewhere
+   * else when it goes off (lib/game/grunt.ts, the flee). */
+  planted: { x: number; z: number } | null
+  /** The crates still on the ground: what walking over one would hand out —
+   * a skill and rounds, or health when `skill` is null. */
+  crates: { x: number; z: number; skill: number | null; amount: number }[]
+}
+
+/**
+ * **What the brain ASKS** — five questions the world model answers, and the
+ * half that does NOT cross a pipe.
+ *
+ * Four of them are terrain and collision lookups the searches make tens of
+ * thousands of times a plan; one is a random stream. Both sides build these
+ * from the same function (lib/game/aiGround.ts, `oraclesFor`) over their own
+ * copy of the map, so a brain in another process asks the same map the
+ * engine walks on.
+ */
+export interface AiOracles {
+  /**
+   * The brain's random stream — its misjudgment, its whim and its shaky
+   * hands (lib/game/grunt.ts).
+   *
+   * **It is the BRAIN's own, not the battle's**, and that is the price of
+   * the brain leaving the tick: a stream shared with the world can only be
+   * drawn from in a fixed order, and a brain answering whenever it is done
+   * has no fixed order. What keeps lockstep is one rung up — the brain's
+   * ORDERS are inputs, the same as a player's keys, so peers agree because
+   * they replay the same orders, not because they re-think the same
+   * thoughts (docs/ai.md, "the brain is a PLAYER").
+   */
+  roll(): number
   /**
    * The route from where the acting pig stands to a point, as the corners
    * of a walk — BEST EFFORT, the nearest reachable approach when the goal
@@ -195,39 +263,10 @@ export interface AiWorld {
   groundAt(x: number, z: number): number
   /** Whether a point is WATER — a glance any player takes. */
   wet(x: number, z: number): boolean
-  /** Whether the acting pig is IN the water right now. Water KILLS a
-   * non-swimmer by degrees (docs/ai.md), so a swimming brain has exactly
-   * one thought: the shore (lib/game/grunt.ts). */
-  swimming: boolean
-  /** Whether the acting pig's CLASS crosses water alive — the commando
-   * family (lib/game/drowning.ts, `SWIMMERS`). Play's rule on what that
-   * buys: water is TRANSIT, never a destination — "в воде делать нечего,
-   * максимум сократить путь". The route may cross it; nothing is ever done
-   * in it, because the engine empties swimming hands. */
-  swims: boolean
-  /** The machine's own grenade still in the air or rolling, or null. While
-   * one is live the fire key is the DETONATOR (lib/game/lobs.ts), and the
-   * brain's business is timing it. `rim` is the blast's own outer edge
-   * (lib/game/grenade.ts, `blastRange` of the thrown skill) — the dumbest
-   * brain presses the moment a foe is merely inside it
-   * (lib/game/grunt.ts, the detonation window). */
-  thrown: {
-    x: number
-    z: number
-    resting: boolean
-    rim: number
-    speed: number
-    /** Seconds since the throw left the hand — what the PLANNED press is
-     * measured against (lib/game/grunt.ts). */
-    age: number
-  } | null
-  /** A charge PLANTED and armed — the brain's business is being somewhere
-   * else when it goes off (lib/game/grunt.ts, the flee). */
-  planted: { x: number; z: number } | null
-  /** The crates still on the ground: what walking over one would hand out —
-   * a skill and rounds, or health when `skill` is null. */
-  crates: { x: number; z: number; skill: number | null; amount: number }[]
 }
+
+/** The whole of it: what a brain is shown and what it may ask. */
+export type AiWorld = AiFacts & AiOracles
 
 export interface Brain {
   /** One decision. Asked only while the actuator is idle and the seat has

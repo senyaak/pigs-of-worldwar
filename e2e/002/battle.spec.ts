@@ -185,9 +185,15 @@ test('New Game: squads on the map, turns rotate, the scene draws', async ({ app 
   // so the enemy IS the Garlic Grunts (lib/game/teams.ts) — and it wears
   // that NATION's name, which is the other half of the split above: only side
   // 0 is named out of the save.
+  // …on its SECOND pig, which is not a typo. `Team::NextPig` on an empty
+  // cursor returns the pig AFTER the first living one, and only the side that
+  // OPENS the game has its cursor seeded — so the side that comes second
+  // starts one along (docs/todo.md, the 2026-09-06 batch). This line said
+  // BASTILLE, the first French name in `fetext`, and was left behind by that
+  // ruling.
   await expect
     .poll(() => hud(page))
-    .toMatchObject({ turn: 1, side: 'GARLIC GRUNTS', pig: 'BASTILLE' })
+    .toMatchObject({ turn: 1, side: 'GARLIC GRUNTS', pig: 'LE CONT' })
   // …and the MACHINE plays them: the GRUNT brain takes its rifle out, closes
   // on the nearest pig and shoots — or passes when it cannot — and either
   // road ends the turn on its own (lib/game/grunt.ts). Nothing is pressed

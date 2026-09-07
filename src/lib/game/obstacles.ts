@@ -407,6 +407,9 @@ export class ObstacleField implements Obstruction {
   /** Records taken out of the world since it was built: a crate a pig has
    * collected is no longer something to push against. */
   private readonly gone = new Set<number>()
+  /** …and the ones that have been DRIVEN off their filed position, so a field
+   * elsewhere can be told (`changes`). */
+  private readonly shifted = new Set<number>()
   readonly obstacles: Obstacle[] = []
 
   constructor(objects: MapObject[]) {
@@ -444,6 +447,28 @@ export class ObstacleField implements Obstruction {
   }
 
   /**
+   * What has been taken out, and what has MOVED — the whole difference
+   * between this field and the one built from the same objects.
+   *
+   * It is here for the AI's process, which keeps a field of its own and is
+   * sent this snapshot with every ask (lib/game/brainPort.ts, `SceneryDelta`).
+   * A snapshot rather than a stream of events because replaying a snapshot
+   * twice is a no-op and a missed event is forever.
+   */
+  changes(): {
+    gone: number[]
+    moved: { id: number; x: number; z: number; turn: number }[]
+  } {
+    return {
+      gone: [...this.gone],
+      moved: [...this.shifted].flatMap((id) => {
+        const box = this.obstacles.find((one) => one.id === id)
+        return box ? [{ id, x: box.x, z: box.z, turn: box.turn }] : []
+      })
+    }
+  }
+
+  /**
    * **Move one.** The first thing in this world that is not nailed down: a
    * VEHICLE is a solid box that drives (lib/game/drive.ts), so its bucket
    * membership has to follow it or it would go on blocking the tile it was
@@ -471,6 +496,7 @@ export class ObstacleField implements Obstruction {
     box.x = x
     box.z = z
     box.turn = turn
+    this.shifted.add(id)
     const span = Math.hypot(box.halfX, box.halfZ) + PIG_RADIUS
     const from = this.cell(box.x - span, box.z - span)
     const to = this.cell(box.x + span, box.z + span)

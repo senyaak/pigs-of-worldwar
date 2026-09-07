@@ -62,6 +62,7 @@ import { createBattle } from './battle'
 import type { Battle } from './battle'
 import { witsFor } from './wits'
 import { DEFAULT_SEED, seeded } from './random'
+import type { BrainPort } from './brainPort'
 import { createBonePose } from './bonePose'
 import type { BonePose } from './bonePose'
 import type { BattleSnapshot, DescentShot, FlightShot, PigShot } from './snapshot'
@@ -148,6 +149,16 @@ export interface EngineParts {
    * assembled without it is the hotseat the pure specs drive.
    */
   computer?: (side: number) => boolean
+  /**
+   * WHERE the brain thinks (lib/game/brainPort.ts).
+   *
+   * Left out, the engine seats a brain of its own that thinks on the step it
+   * is asked — which is what every headless run wants and what the whole
+   * engine did until the brain got a process. The app hands in a port to the
+   * brain process so a 400 ms plan does not stand on the frame the renderer
+   * was about to draw.
+   */
+  brain?: BrainPort
 }
 
 /**
@@ -169,6 +180,20 @@ export interface EngineParts {
  * would let this drop to the engine's own frame.
  */
 export const STEP_SECONDS = 1 / 60
+
+/** What the brain's seed is the battle's seed XOR'd with, so the two streams
+ * are different sequences from one number. Arbitrary and fixed. */
+const BRAIN_SEED_SALT = 0x42_52_41_4e
+
+/**
+ * The BRAIN's seed for a battle with this one.
+ *
+ * Exported because a brain in another process has to be seeded to the same
+ * number the engine would have seeded a local one with — one function so the
+ * two cannot answer differently (src/renderer/src/three/battle.ts hands it
+ * over, src/brain/ takes it).
+ */
+export const brainSeedFor = (seed?: number): number => (seed ?? DEFAULT_SEED) ^ BRAIN_SEED_SALT
 
 /**
  * The most steps one call will run.
@@ -606,6 +631,17 @@ export function createEngine(parts: EngineParts): Engine {
     bus,
     random,
     computer: parts.computer,
+    brain: parts.brain,
+    /**
+     * The BRAIN's own random stream, and it is not the battle's.
+     *
+     * A brain that answers whenever it is done cannot draw from a shared
+     * stream in a fixed order (lib/game/brainPort.ts argues it), so it gets
+     * one seeded off the battle's own seed — same seed, same battle, and the
+     * world's stream is no longer perturbed by how much the machine happened
+     * to think.
+     */
+    brainSeed: brainSeedFor(parts.seed),
     // How well the machine thinks HERE: the campaign ramp's own dial
     // (lib/game/wits.ts).
     wits: witsFor(world.map)

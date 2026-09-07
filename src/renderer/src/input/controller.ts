@@ -316,6 +316,10 @@ export interface DebugHooks {
    * the two a thrown weapon gets — `lob` and `throw` — or `ride`, which is the
    * camera off the pig altogether (three/chase.ts). */
   view(): string
+  /** WHERE the machine is thinking, and how much of it has come back
+   * (lib/game/brainPort.ts, src/brain/). `remote` is whether the battle was
+   * built with a port to the AI's own process at all. */
+  brain(): { remote: boolean; asked: number; answered: number }
   /** Which building the acting pig is in and which it could jump into, by record
    * id, plus whether its model is drawn (three/battle.ts). */
   shelter(): { inside: number | null; doorway: number | null; drawn: boolean }

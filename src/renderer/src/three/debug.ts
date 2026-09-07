@@ -164,6 +164,15 @@ export interface DebugParts {
    * lift and a distance, which the terrain clamp can eat on a slope.
    */
   view: () => string
+  /**
+   * **WHERE THE MACHINE IS THINKING**, and how much of it has come back.
+   *
+   * The whole point of the AI's own process is invisible from the picture:
+   * the game simply stops stuttering. So the counts are the evidence — an
+   * `answered` that climbs is a brain in `src/brain/` that is being asked and
+   * is replying, and a spec can hold the app to it (lib/game/brainPort.ts).
+   */
+  brain: () => { remote: boolean; asked: number; answered: number }
   /** The beat at the END of a turn, and how many pigs are still in the water
    * (lib/game/walkAway.ts). Null while a turn is being played. */
   walkAway: () => { swimming: number } | null
@@ -399,6 +408,7 @@ export function exposeBattleDebug(parts: DebugParts): void {
       camera: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
       /** …and which of the rig's views put it there (three/chase.ts). */
       view: () => parts.view(),
+      brain: () => parts.brain(),
       /**
        * Where the camera is LOOKING, as a unit vector.
        *

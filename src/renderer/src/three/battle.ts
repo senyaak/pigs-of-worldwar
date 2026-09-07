@@ -11,7 +11,10 @@
 import * as THREE from 'three'
 import type { Bone, Clip, MapObject, MapProp, Model, Sky, TerrainBlock, TerrainTexture, Texture, TimImage } from '../api'
 import type { Game, Pig } from '../../../lib/game/game'
-import { createEngine } from '../../../lib/game/engine'
+import { brainSeedFor, createEngine } from '../../../lib/game/engine'
+import { remoteBrain } from '../../../lib/game/brainPort'
+import type { BrainReply } from '../../../lib/game/brainPort'
+import type { ObstacleField } from '../../../lib/game/obstacles'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { aimRadians } from '../../../lib/game/aim'
 import { weaponModelName } from '../../../lib/game/weapons'
@@ -468,6 +471,48 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * lives in the scene and the next battle builds a fresh one, machine on.
    */
   let hotseat = false
+  /** The reply subscription, dropped with the battle. */
+  let unsubscribeBrain: (() => void) | null = null
+  /**
+   * **THE MACHINE THINKS IN ITS OWN PROCESS** (lib/game/brainPort.ts,
+   * src/brain/).
+   *
+   * A turn's plan floods the whole map — about 25 000 cells, a few hundred
+   * milliseconds — and it used to do it inside one engine step, which is
+   * inside this file's `onFrame`, which is the same JS task as
+   * `renderer.render`. So the picture stopped dead every time a pig started
+   * thinking: "провисание рендера на 1 секунду… это отдельный нод процесс
+   * должен быть — получил данные, вернул план".
+   *
+   * Now it is: the seat posts the facts and picks the order up on a later
+   * step, the pig standing still meanwhile exactly as it stands through the
+   * ordinary mull. The field is read at ASK time rather than captured here,
+   * because the engine that owns it does not exist until the next statement.
+   */
+  let field: ObstacleField | null = null
+  /** Asks out and orders back — the only visible proof the process is doing
+   * the thinking (three/debug.ts, `brain`). */
+  const brainTally = { asked: 0, answered: 0 }
+  const brain = remoteBrain(
+    {
+      post: (message) => {
+        if (message.kind === 'ask') brainTally.asked++
+        window.api.brainSend(message)
+      },
+      onMessage: (handler) => {
+        unsubscribeBrain = window.api.onBrainReply((message) => {
+          brainTally.answered++
+          handler(message as BrainReply)
+        })
+      },
+      close: () => {
+        unsubscribeBrain?.()
+        unsubscribeBrain = null
+      }
+    },
+    { kind: 'battle', map, objects: assets.objects, seed: brainSeedFor() },
+    () => field?.changes() ?? { gone: [], moved: [] }
+  )
   const engine = createEngine({
     world: {
       game,
@@ -491,10 +536,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // latches the answer at each turn's start, so `pow.hotseat()` above
     // lands on the NEXT handover (play's call: "достаточно только на начале
     // хода").
-    computer: (side) => side > 0 && !hotseat
+    computer: (side) => side > 0 && !hotseat,
+    brain
   })
   const { battle, scenery, obstacles, anim, swings, heals, shots, grenades, mines, effects, numbers, airDrops, dropIn } =
     engine
+  field = obstacles
   /** The mixers, brought into line once a frame with what the engine says each
    * pig is wearing (three/wear.ts). */
   const wear = createWear(squad, assets.clips)
@@ -1293,6 +1340,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     },
     frame: () => lastFrame,
     view: () => lastView,
+    brain: () => ({ remote: true, ...brainTally }),
     aftermath: () => battle.view().aftermath !== null,
     /**
      * The acting pig's POSE, from BOTH ends of the chain.
@@ -1375,6 +1423,10 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     trainingStep,
     dispose() {
       host.onFrame.delete(onFrame)
+      // The AI's process is told the battle is over and the reply
+      // subscription goes with it (lib/game/brainPort.ts). The process itself
+      // stays up for the next battle; main kills it with the window.
+      brain.close()
       host.scene.remove(root)
       sky?.dispose()
       weather?.dispose()

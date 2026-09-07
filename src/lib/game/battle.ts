@@ -14,8 +14,7 @@
 // Game space (Y-down) throughout.
 
 import { ANIM, copyLocomotion, createLocomotion, inWater, updateLocomotion } from './locomotion'
-import { createWaterMemo, flood, route } from './pathfind'
-import type { RouteAsk } from './pathfind'
+import { createWaterMemo } from './pathfind'
 import { advanceCarry, carryIn, carryOut, doorwayStart } from './doorway'
 import type { Carry } from './doorway'
 import type { LocomotionState } from './locomotion'
@@ -31,6 +30,9 @@ import { CLOCK_WARNING } from './turns'
 import { createActuator } from './actuator'
 import type { Order } from './orders'
 import { createGruntBrain } from './grunt'
+import type { BrainPort } from './brainPort'
+import { localBrain } from './brainPort'
+import type { AiFacts } from './ai'
 import { beginWalkAway } from './walkAway'
 import {
   SARGE_FLOOR,
@@ -83,6 +85,7 @@ import type { Pockets } from './pickpocket'
 import type { Poison } from './poison'
 import type { Point } from './pose'
 import type { Random } from './random'
+import { DEFAULT_SEED, seeded } from './random'
 import { handling } from './events'
 import type { BattleBus, Emit } from './events'
 
@@ -148,6 +151,12 @@ export interface BattleParts {
    * a battle assembled without it is the hotseat every pure spec drives.
    */
   computer?: (side: number) => boolean
+  /** WHERE the brain thinks (lib/game/brainPort.ts). Left out, one is seated
+   * that thinks on the step it is asked. */
+  brain?: BrainPort
+  /** The seed for the brain's OWN stream — not the battle's (see the engine,
+   * `BRAIN_SEED_SALT`). */
+  brainSeed?: number
   /** …and how well it thinks here, 0..1 — the campaign ramp's dial
    * (lib/game/wits.ts). Absent is 0: the dumbest machine there is. */
   wits?: number
@@ -325,7 +334,6 @@ export function createBattle(parts: BattleParts): Battle {
    * GRUNT: nearest foe, close to range, do not shoot through a friend, fire
    * (lib/game/grunt.ts; the seat's shape is lib/game/ai.ts). */
   const computer = parts.computer ?? (() => false)
-  const brain = createGruntBrain()
   /** …LATCHED at the turn's start (`focus`), not re-asked every frame: whose
    * hands a turn is in is decided when it is handed over, so a mid-turn flip
    * of the predicate (`pow.hotseat`) waits for the next turn. Play's call. */
@@ -458,6 +466,22 @@ export function createBattle(parts: BattleParts): Battle {
   /** The battle's one water memo for the machine's routes — water never
    * changes inside a battle (lib/game/pathfind.ts, `WaterMemo`). */
   const waterMemo = createWaterMemo()
+  /**
+   * **THE BRAIN'S SEAT**, and it is a PORT now rather than a call
+   * (lib/game/brainPort.ts).
+   *
+   * Left out by the caller, one is seated here that thinks on the step it is
+   * asked — which is exactly what the engine did before the brain got a
+   * process of its own, so every headless run reads the same. The app hands
+   * in a port to that process instead.
+   */
+  const brain: BrainPort =
+    parts.brain ??
+    localBrain(
+      createGruntBrain(),
+      { query, obstacles: scenery.obstacles, water: waterMemo },
+      seeded(parts.brainSeed ?? DEFAULT_SEED)
+    )
   /** …and the beat at the END of a turn: the exe's mode 13, WALK AWAY. Nobody
    * is driving and anyone in the water is swimming out (lib/game/walkAway.ts). */
   let walkAway: WalkAway | null = null
@@ -1390,6 +1414,52 @@ export function createBattle(parts: BattleParts): Battle {
     // `endTurnBeat` stays one road), and the THINKING pose is the ordinary
     // skill-in-hand rule further down. If the brain ever stalls, the clock
     // above still runs the turn out.
+    /**
+     * **PICK UP A DECISION THAT HAS COME BACK** — the second half of the ask
+     * (lib/game/brainPort.ts).
+     *
+     * A local brain answers on the step it was asked; a brain in another
+     * process answers whenever it is done, and this runs on every step of
+     * the machine's turn until it does. What was true at the ask is re-read
+     * HERE — the outcome and the refusal — because the seat only ever waits
+     * with the hands idle, so neither can have changed, and one reading is
+     * one story for the brain and the telemetry both.
+     */
+    const takeAnswer = (pig: Pig, step: number): void => {
+      const decision = brain.answer()
+      if (decision === null) return
+      const decided = decision.order
+      const previous = actuator.outcome()
+      const refusal = actuator.refusal()
+      // THE DECISION, ANNOUNCED — telemetry first, the same road `flung`
+      // took (lib/game/events.ts): the session log is what a "he's acting
+      // stupid" report gets settled against. Nothing in the engine listens.
+      emit({
+        kind: 'aiDecided',
+        pig: pig.id,
+        name: pig.name,
+        at: { ...pig.position },
+        heading: pig.heading,
+        health: pig.health,
+        previous,
+        refusal,
+        order: decided,
+        thought: decision.thought
+      })
+      if (typeof process !== 'undefined' && process.env?.AI_LOG === '1') {
+        console.log(
+          `[ai] ${pig.name} @${Math.round(pig.position.x)},${Math.round(pig.position.z)} y=${Math.round(pig.position.y)} h=${pig.heading.toFixed(2)} hp=${pig.health} prev=${previous}${refusal ? `(${refusal})` : ''} -> ${JSON.stringify(decided)}`
+        )
+      }
+      actuator.take(decided)
+      lastOrder = decided.kind
+      // …and the mull starts OVER: without this an instant order (watch,
+      // hold) left the counter full and the brain re-decided every frame —
+      // 904 decisions in a 185-second battle, measured before the reset.
+      mullSeconds = 0
+      actuator.step(step)
+    }
+
     if (computerTurn()) {
       if (game.starting) {
         // The card is read out by the SEAT, not decided by the brain —
@@ -1411,10 +1481,23 @@ export function createBattle(parts: BattleParts): Battle {
         // shape: `Pig::MayAct` is false through a fall and the AI's step
         // never reaches its think from there (0x467a10).
         if (!actuator.idle()) actuator.reset()
+        // …and a thought STILL IN THE POST is dropped with the order it
+        // would have become: a walk decided from where this pig stood
+        // before the blast is an order about a world that is gone
+        // (lib/game/brainPort.ts, `drop`).
+        brain.drop()
         mullSeconds = 0
       } else if (!actuator.idle()) {
         actuator.step(delta)
         mullSeconds = 0
+      } else if (brain.thinking()) {
+        // **THE BRAIN IS OUT, AND THE BATTLE IS NOT WAITING FOR IT.** With a
+        // brain in another process the ask and the answer are different
+        // steps, and every step between them lands here: the hands stay
+        // still — which is the mull, and looks like one — while the clock
+        // runs, the world moves and the frame draws. A local brain never
+        // reaches this branch at all; it answers on the step it was asked.
+        takeAnswer(acting, delta)
       } else if (spent && grenades.thrown() === 0) {
         // **THE WEAPON HAS SPENT THE TURN: the seat is DONE.** Without this
         // the mull ran on through the blow's own beat and the brain started
@@ -1434,9 +1517,12 @@ export function createBattle(parts: BattleParts): Battle {
             ? 0
             : AI_MULL_SECONDS)
       ) {
-        // Hands free and the mulling beat spent: one decision, and the
-        // hands take it up the same step. The world handed over is the
-        // brain's whole view — read-only copies, nothing live (docs/ai.md).
+        // Hands free and the mulling beat spent: ASK. The facts handed over
+        // are the brain's whole view — read-only copies, nothing live
+        // (docs/ai.md) — and they are DATA, because the brain may not be in
+        // this process at all (lib/game/brainPort.ts). The answer is picked
+        // up in the branch above, which may be this same step (a local
+        // brain) or a dozen steps later (a brain down a pipe).
         const AI_LOG = typeof process !== 'undefined' && process.env?.AI_LOG === '1'
         const actingSide = game.players.indexOf(game.currentPlayer)
         const seen = (
@@ -1457,48 +1543,12 @@ export function createBattle(parts: BattleParts): Battle {
         // telemetry's story must be the same reading.
         const previous = actuator.outcome()
         const refusal = actuator.refusal()
-        /** Where the acting pig stands, feet and all — the start of every
-         * route and of the turn's one flood. */
-        const here = (): { x: number; z: number; y: number } => ({
-          x: acting.position.x,
-          z: acting.position.z,
-          y: acting.position.y
-        })
-        /**
-         * What the searches ask of the world (lib/game/pathgrid.ts): the
-         * props are both the walls and the WALKWAYS — a bridge deck is
-         * stood on the way the walk stands on it — and `swims` is the pig's
-         * CLASS (lib/game/drowning.ts), so a swimmer's route may cross
-         * water, priced at the swim's own slowness, where a grunt's never
-         * does.
-         *
-         * **THE SQUAD IS IN IT.** Play watched what leaving it out costs:
-         * "он не обходит свина, а толкается в него". Only OUR OWN pigs,
-         * though — a foe is what the walk is aimed AT, and a body you mean
-         * to reach cannot be a wall — and the actuator's `blocked` still
-         * guards the difference between the plan and the ground truth.
-         */
-        const ground = (): RouteAsk => ({
-          ground: query,
-          obstruction: scenery.obstacles,
-          swims: !drowns(acting.pigClass),
-          // The battle's one water memo: the probes that made the turn's
-          // first decision a 130 ms hitch run once a cell per BATTLE now
-          // (lib/game/pathgrid.ts, WaterMemo).
-          water: waterMemo,
-          bodies: game.currentPlayer.pigs
-            .filter((pig) => pig !== acting && !isDead(pig))
-            .map((pig) => ({ x: pig.position.x, z: pig.position.z }))
-        })
-        const decided = brain.decide({
+        const facts: AiFacts = {
             timeLeft: game.timeLeft,
             // …and how long a whole turn is here, so the price list can cost
             // a walk in TURNS rather than in an opinion (evaluate.ts).
             turnSeconds: game.turnSeconds,
             wits: parts.wits ?? 0,
-            // The battle's one stream: the brain's misjudgment rolls from
-            // it, so lockstep stays lockstep (lib/game/grunt.ts, MISJUDGE).
-            roll: parts.random,
             previous,
             acting: {
               x: acting.position.x,
@@ -1522,30 +1572,6 @@ export function createBattle(parts: BattleParts): Battle {
             friends: game.currentPlayer.pigs
               .filter((pig) => pig !== acting && !isDead(pig))
               .map(seen),
-            // The route round the world (lib/game/pathfind.ts): the props
-            // are both the walls and the WALKWAYS — a bridge deck is stood
-            // on the way the walk stands on it. The squad is not in the
-            // plan: pigs move between the plan and the walk, and the
-            // actuator's `blocked` guards that difference. `swims` is the
-            // pig's CLASS (lib/game/drowning.ts): a swimmer's route may
-            // cross water — priced at the swim's own slowness, so only
-            // when crossing is QUICKER than walking round — a grunt's
-            // never does.
-            route: (to) => route(ground(), here(), to),
-            // …and THE GROUND FLOODED ONCE (lib/game/pathfind.ts): the
-            // turn's plan asks a ring of firing marks round every target
-            // what the legs pay to reach it, and one flood answers all of
-            // them (lib/game/plan.ts). Fifteen A* searches a turn is what
-            // the `[perf]` frames were.
-            reach: (budget) => flood(ground(), here(), budget),
-            // What a dry-run throw lands against: over water that is the
-            // SURFACE, not the seabed under it — the engine douses a lob at
-            // the waterline (lib/game/grenade.ts), and a dry run that flew
-            // on to the basin floor once priced an 8700-unit "arc" off a
-            // clifftop and threw grenades into the bay every turn for a
-            // simulated hour (the machine-mission stall guard caught it).
-            groundAt: (x, z) => (query.isWater(x, z) ? query.surface(x, z) : query.height(x, z)),
-            wet: swimAt,
             swimming: loco.swimming,
             swims: !drowns(acting.pigClass),
             // The machine's own live grenade: the newest lob while any
@@ -1582,34 +1608,9 @@ export function createBattle(parts: BattleParts): Battle {
               .remaining()
               .filter((one) => one.kind === 'crate')
               .map((one) => ({ x: one.x, z: one.z, skill: one.skill, amount: one.amount }))
-          })
-        // THE DECISION, ANNOUNCED — telemetry first, the same road `flung`
-        // took (lib/game/events.ts): the session log is what a "he's acting
-        // stupid" report gets settled against. Nothing in the engine listens.
-        emit({
-          kind: 'aiDecided',
-          pig: acting.id,
-          name: acting.name,
-          at: { ...acting.position },
-          heading: acting.heading,
-          health: acting.health,
-          previous,
-          refusal,
-          order: decided,
-          thought: brain.explain?.() ?? null
-        })
-        if (AI_LOG) {
-          console.log(
-            `[ai] ${acting.name} @${Math.round(acting.position.x)},${Math.round(acting.position.z)} y=${Math.round(acting.position.y)} h=${acting.heading.toFixed(2)} hp=${acting.health} prev=${previous}${refusal ? `(${refusal})` : ''} -> ${JSON.stringify(decided)}`
-          )
-        }
-        actuator.take(decided)
-        lastOrder = decided.kind
-        // …and the mull starts OVER: without this an instant order (watch,
-        // hold) left the counter full and the brain re-decided every frame —
-        // 904 decisions in a 185-second battle, measured before the reset.
-        mullSeconds = 0
-        actuator.step(delta)
+          }
+        brain.ask(facts)
+        takeAnswer(acting, delta)
       }
     }
 

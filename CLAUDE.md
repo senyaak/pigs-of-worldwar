@@ -312,9 +312,15 @@ every breach the repo has had compiled cleanly.
   the two polls the scene owes sound.
 - `src/main/` — `index.ts` lifecycle only, `gameDir.ts` locating the install,
   `assets.ts` loading through the readers, `saves.ts` the campaign saves,
-  `ipc.ts` the IPC surface. **A save crosses as TEXT**: the shape is
+  `ipc.ts` the IPC surface, `brainHost.ts` forking the AI's process and
+  relaying its two channels. **A save crosses as TEXT**: the shape is
   `lib/game/save.ts` and neither the main process nor the preload parses one,
   so a new field never reaches either.
+- `src/brain/` — **a PLAIN NODE PROCESS, and the third one the app runs.** It
+  is the enemy AI and nothing else: facts in, one order out. It imports `lib/`
+  and `node:` builtins and may import neither Electron nor `main/`, because
+  the day it runs on a dedicated server there is nothing to import them from.
+  Why it exists at all is the frame — see below.
 
 **The engine steps in FIXED quanta, and rolls from ONE stream.**
 `engine.update(delta)` accumulates real time and runs whole `STEP_SECONDS`
@@ -324,6 +330,20 @@ like any other — `lib/game/random.ts`, seeded per battle, threaded to the drop
 stagger, the sights' tremor and the smoke. Both together are what lockstep
 needs: same seed, same inputs, same battle, proved in
 `e2e/000/engine-headless.spec.ts`. Never reach for `Math.random` in `lib/game`.
+
+**THE MACHINE THINKS IN ANOTHER PROCESS, and its orders are INPUTS.** A
+turn's plan floods the whole map — about 25 000 cells, a few hundred
+milliseconds — and it used to do that inside one engine step, which the
+renderer runs inside its frame callback, which is the same JS task as
+`renderer.render`: the picture stopped dead every time a pig thought. So the
+seat is ASK and ANSWER (`lib/game/brainPort.ts`), the app's brain lives in
+`src/brain/`, and the pig standing still meanwhile is the MULL the seat always
+had. Two consequences worth knowing before touching any of it: the brain draws
+chance from a stream OF ITS OWN (a brain that answers whenever it is done
+cannot take numbers out of a shared stream in a fixed order), and what keeps
+lockstep is therefore one rung up — peers replay the same ORDERS, not the same
+thoughts. A battle built without a port seats a brain that thinks on the step
+it is asked, which is what every headless run does. `docs/ai.md`.
 
 **The renderer draws a SNAPSHOT, not the engine.** `engine.snapshot()` is one
 flat reading of the battle — numbers, strings and arrays of those, nothing live
