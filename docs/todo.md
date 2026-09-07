@@ -9,28 +9,101 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 
 ---
 
+## P0. WHAT TO CHECK IN PLAY — the 2026-09-06 batch
+
+Nine changes went in on the 6th, all off play reports made while testing
+TRENCH. This block is the handover: what to look at, and what a bug would look
+like against what is deliberate. The full story of each is in
+`docs/history/` — weapons, view and turns.
+
+### 0. THE ONE THING READ AND NOT BUILT — a grenade sets off a mine here and cannot in the exe
+
+An INVERSION rather than a gap, found while reading the plant pass. `lobs.ts`
+calls `mines.tread` where a lob lands, so a grenade thrown onto a mine tile
+sets it off; nothing in `bullets.ts` does, so a rifle round cannot. The exe is
+the other way round: its in-flight trigger, 0x437a50, is a projectile's Move
+override, and `Projectile::Update` calls that override only when
+`[proj+0xc7]` is 1 — row field **+0x26**, which is **1 for bullets, darts and
+rockets, 0 for every grenade (rows 24–33, 37) and every mine and charge
+(38–41, 52–53)**. So the original lets you SHOOT a mine and not grenade one,
+and the bazooka's rocket sets one off.
+
+The build wants +0x26 carried on the projectile and lob rows and the trip put
+behind it. Not done because it touches every row table and the session's mine
+work was the plant pass.
+
+### 1. MINES — the plant pass, and both of play's memories in one mechanism
+
+`Map::SetMine` is the tail of a global pass that runs only at the turn's end,
+and it can REFUSE: a pig within 512 (no owner exclusion), a tile already
+mined, water. **A refusal is an explosion where the mine lies**, on its own
+row: 2560, or 3200 for the anti-personnel, where a trodden tile is 2560 either
+way. What to see in play: lay two beside an enemy and neither goes into the
+ground — both arm during the turn and both blow about a second after it ends.
+Lay two clear of everyone and the first plants while the second blows. A mine
+now leaves the HAND, a hundred units in front, not the soles. Water used to
+drown one quietly and now bangs.
+
+### 2. THE ENEMY'S FIRST TURN IS ITS SECOND PIG
+
+On TRENCH the enemy is GR, **HV**, GR, GR in the file, so the GUNNER opens.
+`Team::NextPig` on an empty cursor returns the pig AFTER the first living one,
+and only the side that opens the game has its cursor seeded. The player still
+goes slot 0, 1, 2. If a side ever opens on its FIRST pig, that is the bug.
+
+### 3. THE THROW LEAVES AT THE CLIP'S OWN EVENT
+
+Every lob now leaves the hand at phase 1638 of clip 19, frame 14 of 35 —
+about half a second into the wind-up, not on its first frame. The camera has
+nothing to ride until then, which is right. A grenade that appears before the
+arm swings is the regression.
+
+### 4. THE CAMERA AFTER A CLUSTER BURST
+
+It re-seats on the VERTICAL bomblet, which is the one pushed first, and the
+renderer now finds it by id instead of taking the array's tail. A camera that
+parks on the burst point is the old bug.
+
+### 5. A FLIGHT STAYS INSIDE THE MIDDLE 60% OF THE FRAME
+
+Play's own number, over the exe, which has no vertical bound at all. The
+rocket used to leave the top of the screen. The ordinary grenade still rides
+about 9° above the axis and must NOT look locked to the middle.
+
+### 6. THE MEDICINE BALL IS A CLOUD
+
+Row 4's ring is read and correct and ran to 7520 units, three times the heal
+field; play remembered a cloud and it is one now, in the row's blue-violet.
+The cloud's own numbers are `[CHECK — remake]`.
+
+### 7. G WORKS WITH ANY HAND
+
+The view key opens the TR cam over an empty hand and a blade, which is the
+exe's own last arm. What it must NOT do is take the walk keys away when there
+is nothing to aim — that half is play's older ruling and still stands.
+
+### 8. A REFUSED HEAL SAYS WHY
+
+The bar prints one of two lines. The words are the remake's own — the exe
+prints nothing there — and they are there to be changed on sight.
+
+### 9. THE FREEZE — a watchdog, not a fix
+
+The mine freeze was never reproduced: the engine's half is headless in
+`e2e/002/machine-mine.spec.ts` and hands the turn over. Two things went in
+around it — a bounded plate stack (the old one could spin on a NaN screen
+position) and the machine no longer thinking while its pig is in the air. If
+it freezes again, `_tmp/telemetry-<stamp>.log` now carries the renderer's own
+call stack: main pings the page, three misses, the debugger takes it.
+
+---
+
 ## P0. WHAT TO CHECK IN PLAY — the 2026-09-01 batch, written for the session that tests it
 
 Play is going to a fresh chat to test **TRENCH (mission 3)** and everything
 built this day. This block is the handover: what changed, where it can be MET
 in the campaign, and what a bug would look like against what is deliberate.
 Each item names the section with the full story.
-
-### 0. A GRENADE SETS OFF A MINE HERE AND CANNOT IN THE EXE (2026-09-06)
-
-Found while reading the plant pass, not built, and it is an INVERSION rather
-than a gap. `lobs.ts` calls `mines.tread` where a lob lands, so a grenade
-thrown onto a mine tile sets it off; nothing in `bullets.ts` does, so a rifle
-round cannot. The exe is the other way round. Its in-flight trigger, 0x437a50,
-is a projectile's Move override, and `Projectile::Update` only calls that
-override when `[proj+0xc7]` is 1 — row field **+0x26**, which is **1 for
-bullets, darts and rockets and 0 for every grenade (rows 24–33, 37) and every
-mine and charge (38–41, 52–53)**. So in the original you can SHOOT a mine to
-set it off and you cannot grenade one, and the bazooka's rocket can.
-
-The build wants +0x26 carried on the projectile and lob rows and the trip
-moved behind it. The reason it is not done here is scope: this session's mine
-work was the plant pass, and this touches every row table.
 
 ### 1. TRENCH's two tents give NOTHING, and that is correct (B20)
 
