@@ -14,6 +14,14 @@ one.
 
 ## Unreleased
 
+- **The camera stays on a cluster's bomblets.** A body thrown by the first one
+  to go off no longer takes the lens off the four still falling — a blow only
+  claims the camera once nothing is in the air.
+- **The minimap's acting pig flashes once every two seconds** instead of once
+  every five.
+- **The enemy shoots straighter.** A gun in AI hands now carries half the
+  bearing error a thrown weapon does, which takes a guaranteed hit out from
+  five body-widths to eight; close-range fire is no longer a lottery.
 - **Tanks can be climbed into and fired.** OASIS's six tanks, SNAKE's two troop
   carriers and BAY's amphibious launch are things a pig gets into now, through
   the same door a shelter uses. A tank hands over its own three weapons and its

@@ -9,6 +9,49 @@ are in the **disasm repo**, never in this tree (see CLAUDE.md).
 
 ---
 
+## P0. WHAT TO CHECK IN PLAY — the 2026-09-07 batch
+
+Three off one play report. TRENCH passes, the second-level medic works — what
+was left is below.
+
+### 1. A CLUSTER'S FIRST VICTIM DOES NOT TAKE THE CAMERA
+
+The `flung` camera now waits for the sky to empty: while `inFlight()` still
+names a shot the subject stays the acting pig, so the four bomblets still
+falling keep the lens and the body the FIRST one threw does not steal it.
+Play's own line: "это должно происходить только когда нет прожектайлов
+которые можно взорвать". `docs/history/view.md`, the 2026-09-07 entry.
+
+**What a bug looks like**: the camera cutting to a thrown body mid-scatter
+(the old one), or the opposite — an ORDINARY grenade's victim no longer being
+followed, which must still happen because the grenade is gone by the time it
+throws anybody. The body the LAST bomblet throws is followed too; the ones
+thrown early are not, because by the time the fifth lands they have been
+still for a second and the latch has let go. That is deliberate.
+
+### 2. THE MINIMAP FLASHES ONCE EVERY TWO SECONDS
+
+A second white, a second in the team's colour. It was 5.12 s a cycle.
+`BLINK_TICK_SECONDS` in `lib/game/scanner.ts` is the knob and the exe's own
+bit (0x40) is untouched — `docs/history/status.md`, the 2026-09-07 entry.
+
+### 3. THE AI IS HALF AS SHAKY WITH A GUN
+
+`GUN_STEADY = 0.5` (grunt.ts) halves the AI's held bearing error for a gun
+and leaves a thrown weapon alone. **Measured first, and three obvious
+suspects were cleared**: the muzzle is only 18 units off the pig's centre
+(the box is 85), bullets have no gravity, and the sniper's row has no spread.
+The whole error is angular, and at TRENCH's wits it guaranteed a hit only
+inside 913 units — a foe five of its own widths away. Now 1500.
+
+**What to judge**: whether close-range fire still misses (it should be rare
+now) and whether the mid-range shot is still a real question (it should be —
+at 2000 units the pig is still better than a coin toss but not much). If it
+now feels too sharp, the dial is that one constant. `docs/history/turns.md`,
+the 2026-09-07 entry.
+
+---
+
 ## P0. WHAT TO CHECK IN PLAY — the 2026-09-06 batch
 
 Nine changes went in on the 6th, all off play reports made while testing

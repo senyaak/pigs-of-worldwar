@@ -1347,3 +1347,25 @@ that tests it; this is the record.
 **And two skills turn out not to exist** — 23 CONFUSION GAS and 57 SPECIAL OPS
 have no arm in either dispatcher. Anything the remake does for them is its own
 invention.
+
+## 2026-09-07 — THE MAP'S BLINK IS TWO SECONDS, AND THE COUNTER TICKS 64 TO THE SECOND
+
+Play: "мигание активного игрока на миникарте надо сделать быстрее, раз в 2
+секунды или как-то так."
+
+`Pig::Draw` picks the marker off **bit 0x40** of `[0x520878]` (0x440C48), so
+the period is 64 ticks of that counter and the flip is exactly halfway. The
+exe's bit is read; what the counter COUNTS never was. It has been read two
+ways already — first as milliseconds (64 ms, eight flashes a second, which
+play threw out), then as exe frames (5.12 s a cycle, which is what play has
+now thrown out — the entry above).
+
+So the third reading, and this one is play's number rather than a guess at
+the unit: **64 ticks to the second**. `BLINK_TICK_SECONDS = 1/64` in
+`lib/game/scanner.ts`, which puts the flip at one second and the cycle at the
+two that were asked for. It also reads the counter's OTHER user straight:
+0x45A612 takes `(c >> 4) & 3` as a four-phase animation, and at this tick
+that is a quarter-second a phase and a second round — a sane loop, where the
+frame reading made it 0.64 s a phase and the millisecond reading a 60 Hz
+flicker. `unit/scanner.spec.ts` pins the second, not just "slow".
+

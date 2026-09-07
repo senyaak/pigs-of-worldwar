@@ -47,7 +47,7 @@ import type { Blip, Eye } from '../../../lib/game/scanner'
 import { createTween } from './tween'
 import { createWear } from './wear'
 import type { Point } from '../../../lib/game/pose'
-import type { PigShot } from '../../../lib/game/snapshot'
+import type { FlightShot, PigShot } from '../../../lib/game/snapshot'
 import { projectDamage } from './damageNumbers'
 import { createEffectArt } from './effects'
 import { createAirDropArt } from './airDrop'
@@ -428,7 +428,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       // the last one it reached, which is the one still moving.
       flung: ({ pig, at }) => {
         if (pig === dyingWatch) return
-          flungWatch = { pig, x: at.x, z: at.z, still: 0, age: 0 }
+        flungWatch = { pig, x: at.x, z: at.z, still: 0, age: 0 }
         sawFling = true
       },
       // A death has finished playing out: the body comes off the scene for
@@ -583,24 +583,34 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * a spec can tell the rig's views apart (three/debug.ts, `view`). */
   let lastView = 'chase'
 
+  /**
+   * The shot in the air the camera would ride, or null when nothing is flying.
+   *
+   * Something of the acting pig's is in the air, and the two families answer
+   * differently — the whole table is `TRACKS_ITS_SHOT` in three/chase.ts. A
+   * GUN asks for mode 1, which stands still and TURNS after the bullet; a
+   * THROWN weapon asks for mode 0x0B, whose handler this build has lost and
+   * whose row is 3000 straight behind at the flight's own height. The NEWEST
+   * bullet is the one it answers for; which LOB is the engine's own call
+   * (`tracked`, lib/game/lobs.ts `head`), because after a cluster bursts the
+   * exe re-seats on the VERTICAL bomblet and that one is pushed first — play
+   * caught the camera taking the tail instead and parking on the burst:
+   * "при разлетании не следует за гранатками… а остаётся на месте взрыва".
+   *
+   * It is asked TWICE a frame: once here, and once by the subject chain, which
+   * refuses to hand the camera to a flung body while this is not null. The one
+   * function is the point — the two must never disagree about what is flying.
+   */
+  const inFlight = (): FlightShot | null =>
+    now.firing?.phase !== 'flight'
+      ? null
+      : now.bullets.length > 0
+        ? (now.bullets[now.bullets.length - 1] ?? null)
+        : (now.lobs.find((one) => one.id === now.tracked) ?? null)
+
   const watch = (soldier: Soldier, delta: number | null): void => {
     const acting = soldier.pig.id === now.acting
-    // Something of the acting pig's is in the air, and the two families answer
-    // differently — the whole table is `TRACKS_ITS_SHOT` in three/chase.ts. A
-    // GUN asks for mode 1, which stands still and TURNS after the bullet; a
-    // THROWN weapon asks for mode 0x0B, whose handler this build has lost and
-    // whose row is 3000 straight behind at the flight's own height. The NEWEST
-    // bullet is the one it answers for; which LOB is the engine's own call
-    // (`tracked`, lib/game/lobs.ts `head`), because after a cluster bursts the
-    // exe re-seats on the VERTICAL bomblet and that one is pushed first — play
-    // caught the camera taking the tail instead and parking on the burst:
-    // "при разлетании не следует за гранатками… а остаётся на месте взрыва".
-    const bullet =
-      now.firing?.phase !== 'flight'
-        ? null
-        : now.bullets.length > 0
-          ? (now.bullets[now.bullets.length - 1] ?? null)
-          : (now.lobs.find((one) => one.id === now.tracked) ?? null)
+    const bullet = inFlight()
     if (bullet && acting) {
       const at = drawnAt(`${now.bullets.length > 0 ? 'shot' : 'lob'}:${bullet.id}`, bullet)
       const thrown = weaponLayer(pigShot(soldier.pig.id)?.holding ?? null) === 'lob'
@@ -1006,8 +1016,15 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
         // …and under a DYING the subject is the dying pig itself — the exe's
         // mode 16 subject swap. `remains` buries it and hands the camera back.
         (dyingWatch !== null ? squad.of(dyingWatch) : null) ??
-        // …under a FLING, the body in the air — play's rule, above.
-        (flungWatch !== null ? squad.of(flungWatch.pig) : null) ??
+        // …under a FLING, the body in the air — play's rule, above — but ONLY
+        // once the sky is empty. A cluster's first bomblet hurts somebody
+        // while four more are still falling, and the body was stealing the
+        // camera off them: "когда они дамажат кого-то — камера перехватывается
+        // свином которого побили — а это должно происходить только когда нет
+        // прожектайлов которые можно взорвать". So the latch is KEPT (it goes
+        // on ageing, and takes the camera the moment the last one lands) and
+        // merely outranked while `inFlight()` still names a shot.
+        (flungWatch !== null && inFlight() === null ? squad.of(flungWatch.pig) : null) ??
         active,
       delta
     )

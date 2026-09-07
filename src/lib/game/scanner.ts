@@ -25,7 +25,6 @@
 // the dashboard's (ui/battleMap.ts), and what the ground looks like is
 // lib/game/mapRaster.ts.
 
-import { fromExeFrames } from './ballistics'
 import { skinOf } from './nations'
 import type { MapObject } from '../formats/pog'
 import type { Player } from './game'
@@ -249,12 +248,20 @@ export const BLIP_WHITE: [number, number, number] = [255, 255, 255]
  * four-phase animation, which at 16 ms a phase would be a 60 Hz flicker and at
  * 16 frames is half a second a phase.
  *
- * So: the exe's own bit, counted in the exe's own frames, and `[play]` for the
- * unit. Nudge the period here if it still reads wrong.
+ * So: the exe's own bit, and `[play]` for the unit. The first build counted
+ * the ticks as EXE FRAMES (1/25 s), which put a whole cycle at 5.12 seconds,
+ * and play called that too slow: "мигание активного игрока на миникарте надо
+ * сделать быстрее, раз в 2 секунды". So the counter ticks 64 to the SECOND,
+ * which puts the flip at a second and the cycle at the two play asked for --
+ * and that unit reads the rest of the counter's users straight too, since
+ * 0x45A612's `(c >> 4) & 3` becomes a four-phase animation a quarter-second
+ * a phase. Nudge the period here if it still reads wrong.
  */
 export const BLINK_FRAMES = 0x40
-/** …in seconds, which is what a drawer has. */
-export const BLINK_SECONDS = fromExeFrames(BLINK_FRAMES)
+/** `[play]`: the counter's tick, 64 to the second. */
+export const BLINK_TICK_SECONDS = 1 / 64
+/** …in seconds, which is what a drawer has. One second lit, one dark. */
+export const BLINK_SECONDS = BLINK_FRAMES * BLINK_TICK_SECONDS
 
 /**
  * **The espionage classes are not on the enemy's map.** `Pig::Draw` at

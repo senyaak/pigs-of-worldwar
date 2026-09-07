@@ -135,6 +135,29 @@ export const AIM_WOBBLE = 0.08
 export const CHARGE_WOBBLE = 0.15
 
 /**
+ * **How much of that shake a pig keeps when it is looking down a SIGHT.**
+ *
+ * The wobble is an ANGLE, so what it costs on the ground grows with the range
+ * — and a gun is the one family that shoots at range. At TRENCH's wits (3/26
+ * dialled, `swing` 0.914) the full `AIM_WOBBLE` is ±4.19°, which only
+ * GUARANTEES a hit inside 913 units against the 85-unit body box: a pig seven
+ * of its own widths away is already a coin toss, and that is what play met —
+ * "свины на 3 уровне слишком косые по поводу оружия с прицелами… 3 раза
+ * подряд мимо выстрелили почти в плотную". Three in a row is a 7% run at that
+ * range, so it was not bad luck.
+ *
+ * Halving it takes the guaranteed hit out to 1500 units — point-blank stops
+ * being a lottery — and leaves the mid-range shot a real question, which is
+ * the "чуть-чуть" play asked for and not a marksman. It rides on the GUN
+ * only: a thrown weapon is not sighted and keeps the whole shake, and the
+ * charge wobble is untouched in both.
+ *
+ * `[play]` — the dial, and the third place docs/ai.md allows a level to live
+ * (doing it), not a fourth.
+ */
+export const GUN_STEADY = 0.5
+
+/**
  * **THE DUMB EYE: at the bottom of the scale a judgment is NEARNESS AND
  * CHANCE, and the worth is not in it at all.**
  *
@@ -636,7 +659,11 @@ export function createGruntBrain(): Brain {
           charge: (2 * world.roll() - 1) * CHARGE_WOBBLE * swing
         }
       }
-      const bearing = Math.atan2(dx, dz) + shaky.heading
+      // …and a SIGHTED weapon steadies them (GUN_STEADY). Same roll, half the
+      // swing — the turn's error is still ONE error, just a smaller one down
+      // a barrel than off a throwing arm.
+      const shake = option.kind === 'gun' ? shaky.heading * GUN_STEADY : shaky.heading
+      const bearing = Math.atan2(dx, dz) + shake
       if (Math.abs(shortest(bearing - me.heading)) > FACING) {
         return say('turn', { kind: 'turnTo', heading: bearing })
       }

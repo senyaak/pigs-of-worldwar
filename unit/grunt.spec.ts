@@ -14,7 +14,9 @@ import {
   SIDE_STEP,
   FRIEND_CLEARANCE,
   PITCH_WITHIN,
-  TURN_IN
+  TURN_IN,
+  AIM_WOBBLE,
+  GUN_STEADY
 } from '../src/lib/game/grunt'
 import { ARRIVE_WITHIN } from '../src/lib/game/actuator'
 import { CLOSE_TO, MELEE_NEAR, SHELTER_FROM, SHELTER_NEAR, STAND_RINGS } from '../src/lib/game/evaluate'
@@ -802,4 +804,34 @@ test('a mark missed by a hair is CLOSED, never passed', { tag: '@nodata' }, () =
   // out of reach with the route walked out orders `close-in`, never a pass
   // (lib/game/grunt.ts). That half is what play's report was.
   expect(brain.explain?.()?.rung).not.toBe('pass-hopeless')
+})
+
+test('a SIGHTED gun steadies the hands, and a throwing arm does not', { tag: '@nodata' }, () => {
+  // Play, on TRENCH: "свины на 3 уровне слишком косые по поводу оружия с
+  // прицелами… 3 раза подряд мимо выстрелили почти в плотную". The shake is
+  // an ANGLE, so it costs more the further the shot goes, and a gun is what
+  // shoots far — GUN_STEADY halves it there and leaves the throw alone.
+  //
+  // A roll of 1 is the wobble at its worst, and a foe straight down +z puts
+  // the true bearing at zero — so whatever heading the grunt turns to IS the
+  // error it is carrying.
+  const shot = createGruntBrain().decide(
+    world({
+      holding: SKILL.RIFLE,
+      carrying: [{ skill: SKILL.RIFLE, amount: UNLIMITED }],
+      foes: [foe({ z: 1200 })],
+      roll: () => 1
+    })
+  )
+  expect(shot).toEqual({ kind: 'turnTo', heading: AIM_WOBBLE * GUN_STEADY })
+
+  const throwing = createGruntBrain().decide(
+    world({
+      holding: SKILL.GRENADE,
+      carrying: [{ skill: SKILL.GRENADE, amount: UNLIMITED }],
+      foes: [foe({ z: 1200 })],
+      roll: () => 1
+    })
+  )
+  expect(throwing).toEqual({ kind: 'turnTo', heading: AIM_WOBBLE })
 })

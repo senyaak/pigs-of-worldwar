@@ -58,10 +58,11 @@ test('a dead pig has no blip', { tag: '@nodata' }, () => {
   expect(pigBlips([squad], 0, 0)).toHaveLength(1)
 })
 
-test('the acting pig flashes white, slowly, and nobody else does', { tag: '@nodata' }, () => {
-  // Play: much slower than the 64 ms a millisecond reading of the exe's own
-  // bit would give. A state lasts a couple of seconds.
-  expect(BLINK_SECONDS).toBeGreaterThan(1)
+test('the acting pig flashes white, once every two seconds, and nobody else does', { tag: '@nodata' }, () => {
+  // Play twice: much slower than the 64 ms a millisecond reading of the exe's
+  // own bit would give, and faster than the 5.12 s the exe-frame reading gave
+  // -- "раз в 2 секунды". So a state is a second and a cycle is two.
+  expect(BLINK_SECONDS).toBeCloseTo(1, 6)
   const squad = team('MINE', [pig('ACTING', 0), pig('OTHER', 0)], 0)
   const dark = pigBlips([squad], 0, 0)
   const lit = pigBlips([squad], 0, BLINK_SECONDS)

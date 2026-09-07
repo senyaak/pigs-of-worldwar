@@ -1516,3 +1516,39 @@ The lag report from the same session — "при начале хода нпс п
 on the first decisions and 132–148 ms later on, one step each: the brain's
 whole-map flood at ~400 ms a plan (docs/todo.md, the settled item on the
 brain-as-a-player road). Not touched here.
+
+## 2026-09-07 — A SIGHTED GUN STEADIES THE HANDS
+
+Play, after TRENCH: "свины на 3 уровне слишком косые по поводу оружия с
+прицелами — чуть чуть надо метче чтобы были; 3 раза подряд мимо выстрелили
+почти в плотную, это уж слишком."
+
+MEASURED before touching anything, because the obvious suspect was not it:
+
+- The muzzle is NOT off to one side. A round leaves the rifle at
+  `lateral -18.6, forward +310.8, rise -218.5` from the pig's own centre
+  (a real pose on ESTU, `engine.shots.live()` on the frame it is born) — 18
+  units against an 85-unit body box, and the rise is inside `HIT_RISE` 320.
+  A systematic sideways offset would have missed at EVERY range; there is
+  none.
+- Bullets do not fall. No gravity anywhere in `bullets.ts`, so the AI's
+  pitch — which corrects for height difference only — is not shooting low.
+- The sniper's row carries no `spread`, and `scoped` is a first-person VIEW
+  the machine never opens. There is no scoped-weapon penalty to remove.
+
+So the whole of the AI's error is angular: `AIM_WOBBLE` (±4.58° at wits 0,
+rolled once a turn) plus `FACING`'s ±1.15° slack, and the actuator can point
+to about ±0.0123 rad, which is under `FACING` and therefore not the floor.
+At TRENCH's dialled wits the worst case is ±5.33°, which guarantees a hit
+only inside **913 units** — a foe five of its own widths away. At 1200 units
+the worst case is 112 against an 85 box, and at 2000 the shot is a coin toss;
+three misses in a row there is a 7% run, so what play saw was the dial, not
+luck.
+
+`GUN_STEADY = 0.5` (grunt.ts) halves the held bearing error for
+`option.kind === 'gun'` and leaves a throwing arm at the full swing. Same
+roll, half the swing — the turn still carries ONE error. It takes the
+guaranteed hit out to 1500 units and leaves the mid-range shot a real
+question, which is the "чуть-чуть" that was asked for. `unit/grunt.spec.ts`
+pins both halves off the same rigged roll; nothing pinned `AIM_WOBBLE` before.
+

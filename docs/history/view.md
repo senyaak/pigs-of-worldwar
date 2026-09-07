@@ -567,3 +567,36 @@ the limit lets go. `e2e/002/bazooka-aim.spec.ts` fires a rocket with the
 barrel up and a full charge and reads `pow.debug.facing()` against the
 rocket every frame; `grenade-aim.spec.ts`'s floors (3° off, 2° above) stand,
 because the grenade's 9° is inside the band.
+
+## 2026-09-07 — A FLUNG BODY WAITS FOR THE SKY TO EMPTY
+
+Play, on the cluster: "когда они дамажат кого-то — камера перехватывается
+свином которого побили — а это должно происходить только когда нет
+прожектайлов которые можно взорвать или ещё что."
+
+The `flung` latch (2026-08-2x, above) sat in the subject chain above the
+acting pig with nothing between them. A canister scatters five, the FIRST
+bomblet to go off catches somebody, `flung` fires, and from that frame the
+subject is the body — so `watch()` fails its own `bullet && acting` gate and
+the four bomblets still falling are drawn by nobody. The camera the
+2026-09-06 batch had just re-seated onto the vertical bomblet was being taken
+off it by the first thing that bomblet hit.
+
+The fix is one term, and it is deliberately NOT a new priority system: the
+flight test the view ladder already runs is now the function `inFlight()`,
+asked twice a frame — once by the view and once by the subject chain, which
+refuses the flung body while it returns a shot. One function so the two can
+never disagree about what is in the air.
+
+The latch is KEPT, not dropped, and it goes on ageing under the suppression
+(`FLUNG_SETTLE`, `FLUNG_LINGER`, `FLUNG_LIMIT` all run). That is the whole
+behaviour in one line: the body the LAST bomblet throws is watched, because
+the sky empties on the same frame; a body thrown by the first is not, because
+by the time the fifth lands it has been still for a second and the latch has
+already let go. Which is right — the fling camera is for a body in motion.
+
+`firing` survives the whole scatter (`attack.settled()` holds it at phase
+`flight` until `shots.live()` and `grenades.live()` are both empty), so
+`inFlight()` stays true across the burst and does not flicker between
+bomblets.
+
