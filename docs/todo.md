@@ -260,7 +260,13 @@ AI that never misses (the shake did not move).
   key is inert, and it draws a power gauge that can never fill (B18).
 - **50 JETPACK does nothing** (COMMANDO and up).
 - **The HERO's and ACE's kits are half dead**: 53, 56, 58, 59 are read and
-  unbuilt, and 57 turns out not to be a weapon at all (B23).
+  unbuilt, and ~~57 turns out not to be a weapon at all (B23)~~ **57 is an
+  AIRLIFT — the pig rides the airship to the point it aimed at and is dropped
+  there** (read 2026-09-15, `objects/airship.md`; the earlier read had opened
+  two dispatchers and missed the third). Also read that day: what the airship
+  delivers for 58 (five 50-point contact bombs) and 59 (three bombs that burst
+  in the air into four burning droplets each), the hover, the leaving, and the
+  crate a shot-down airship drops.
 - **23 CONFUSION GAS bursts as a plain grenade** — and the exe never fires it
   at all, so our stand-in is an invention rather than a port accident (B22).
   Play's call whether it stays.
@@ -2816,13 +2822,20 @@ follows is what it means for the build.
   in ONE argument, and what the airship does with it lives in the vehicle
   constructor 0x499870 — **the next thing to read**, and it is also where the
   ARTILLERY's delivery must live, since the routine is general.
-- **57 SPECIAL OPS is not a weapon.** No arm in the fire table (it points at the
+- ~~**57 SPECIAL OPS is not a weapon.** No arm in the fire table (it points at the
   shared tail) and a SHOUT in `Pig::Fire` (sound 0x5C) and nothing else. Both
-  dispatchers read to their last instruction.
+  dispatchers read to their last instruction.~~ **WRONG — there is a THIRD
+  dispatcher** (2026-09-15): the after-fire routine 0x469610, reached ten
+  frames after the press, spends the slot and switches on the skill, and its
+  arm for 57 sends an AIRSHIP with the pig aboard to the targeted point.
+  `objects/airship.md`. The lesson is the file's own: two dispatchers read to
+  their last instruction are not the dispatchers.
 
 So the HERO's kit is smaller than it looks: of the five that made it half dead,
-**two are real, one is a delivery that needs the vehicle read, and two do not
-exist** (57 here, and 23 CONFUSION which B22 had already found).
+~~**two are real, one is a delivery that needs the vehicle read, and two do not
+exist** (57 here, and 23 CONFUSION which B22 had already found).~~ **four are
+real and one does not exist** — 53, 56, 57 (the airlift), 58/59 (the airship
+is read now) — and only 23 CONFUSION is the one the exe never fires.
 
 Also mapped on the way: `Pig::Fire`'s own switch over all 62 weapons, eight
 entries of which two are the epilogue.
