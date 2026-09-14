@@ -651,7 +651,12 @@ and the weakest of them were invented here:
   Knife", 22 plays "Using Grenade", and record 0 (no weapon) is empty, which is
   why an unarmed pig falls straight through it. So it lands with the weapons,
   not before. What a pig does while it stands about — the "Choosing idle anim
-  from scratch" string — is still undecoded.
+  from scratch" string — is READ (2026-09-15, `anim/idle.md`): one frame in
+  eight the standing state re-picks, and an armed healthy pig gets clip 27
+  every time; the variety (a look around, the second standing cycle, the hero
+  classes' pose, a shiver or a fan on a cold or hot map, a sneeze when
+  poisoned, the cower near a ticking charge, VERY WOUNDED under ten points)
+  belongs to empty hands and to state. Still `[gap]` here.
 - `[gap]` **Open water is punched, where the original blends it.** The library
   punches water texels only out of MIXED art (kind 1); a kind-2 tile keeps its
   texture and is drawn translucent over the water. `three/terrain.ts` cuts
