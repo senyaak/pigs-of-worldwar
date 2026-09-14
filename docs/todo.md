@@ -2846,9 +2846,14 @@ fell out of making the list:
   never fires it. The sharing is a fact about the DATA. Our stand-in burst for
   23 is therefore a remake INVENTION rather than a port accident to preserve —
   play's call whether it stays.
-- **The artillery is not a subsystem to read, it is 203 bytes.** 39/41/42/43/44
+- ~~**The artillery is not a subsystem to read, it is 203 bytes.** 39/41/42/43/44
   share one arm and 40 has its own of the same size. "Nothing delivers a
-  called-in shell" (B16) is a BUILD gap; the read is an hour.
+  called-in shell" (B16) is a BUILD gap; the read is an hour.~~ **READ
+  2026-09-15 — and there is no called-in shell to deliver.** Skills 39..44 are
+  the six shells of the BIG_GUN emplacement (LONG RANGE ×3, MINE, GAS, FIRE
+  RAIN, 1000 LBS, SHOCK ×1 each), held by the BUILDING and fired from inside it
+  exactly like the pillbox's two — `weapons/artillery.md`, and the correction
+  under B16 below.
 
 **The cheapest unread block, and the one that finishes the top of the tree**:
 53 MEDIC, 56 SHOCKWAVE, 58 AIR STRIKE, 59 CLUSTER AIR STRIKE come to **323
@@ -3096,6 +3101,23 @@ already says as much for its sibling ("Skill 41 GAS SHELL … lands with the
 artillery, whenever that is"). So the cluster's five mines are twenty lines
 sitting behind a subsystem, and the subsystem is the job. Every number for the
 shell itself is in `cluster.md`.
+
+**CORRECTED 2026-09-15 — the subsystem is the BIG_GUN, and it is the
+pillbox's design, not a new one.** `weapons/artillery.md` in the disasm repo,
+read whole. There is no off-map arrival and no bombardier: skills 39..44 are
+the six shells a BIG_GUN building carries in its own magazine (`[bld+0x84]`,
+six 12-byte slots — 39 LONG RANGE SHELL ×3 and one each of 40 MINE SHELL, 41
+GAS SHELL, 42 FIRE RAIN SHELL, 43 1000 LBS SHELL, 44 SHOCK SHELL), the
+inventory menu lists the gun's magazine ahead of the pig's kit while it sits
+inside (skill 61), the shot decrements the GUN's slot, the aim is the barrel's
+`[bld+0xE2]` (level to 45° up, with the ordinary power gauge), and the shell
+leaves from the barrel's tip, 819 units down BIGBAR's local x. Eighteen guns
+stand on twelve shipped maps (ARTGUN 4, BHILL/GUNS/ICE/KEEP/MEDIX 2, one on
+each generator template). So the build is: the building's magazine and the
+menu merge, the barrel as the muzzle, and six lob rows — the `mines.ts` work
+for 40 and the gas stream for 41 are already read, and 42 is the fire-rain
+droplet `fire.md` has had since 2026-08-24. No class ever holds these skills
+and no shipped crate carries them; `CLASS_KIT` is right to leave them out.
 
 The AIRBURST pair is closer to buildable and bigger than it read: both are
 **CONTACT, not timed** (the constructor's state machine, 0x43200C — the fuse of
