@@ -2861,15 +2861,28 @@ bytes and about ninety instructions between them** — and 57, the fifth of that
 set, does not exist. Those five are what makes a HERO's and an ACE's kit half
 dead (B18).
 
-Then, by size: 31/32 AIRBURST (188, and already read from the destructor end —
+~~Then, by size: 31/32 AIRBURST (188, and already read from the destructor end —
 this is only the fire arm), 30 GRENADE LAUNCHER (188), 45/46 the pillbox's two
 (203/186), 15 ROCKET (244), 16 GUIDED MISSILE (246), 34 HOMING MISSILE (296),
-47/48/49 the vehicle's three (291), 50 JETPACK (412), 60 VEHICLE IN-OUT (621).
+47/48/49 the vehicle's three (291), 50 JETPACK (412), 60 VEHICLE IN-OUT (621).~~
+**ALL READ — the fire table is finished 2026-09-15** (`weapons/fire.md`'s
+sized list carries a pointer per row). What the last pass found, for the
+build list: 30 is a bazooka that throws a grenade (`fire.md`); 15 ROCKET is a
+fifty-point contact bullet with mode 1; **16 GUIDED MISSILE is FLOWN BY THE
+PAD** for thirty seconds at 5.6° a frame with mode 4 on it; **34 HOMING
+MISSILE seeks a POINT placed through a targeting view** (the aim press opens
+camera mode 9 and `[game+0x51A]`, the fire press places the target, snapped
+onto a pig within 1024, the next press fires) and bursts within 512 of it —
+`missiles.md`, with the hand-detonate rule (row +0x1D) that also settles which
+second press does what; **50 JETPACK is a sixty-frame fixed-line ride** that
+explodes for twenty points and ends the turn when it runs dry, or drops the
+pilot under a PARACHUTE when the fire button is pressed — `jetpack.md`.
 
-**And a standing warning after B21**: two camera arms were decoded from the
+~~**And a standing warning after B21**: two camera arms were decoded from the
 MIDDLE and both are unbuilt — 0x0A (34, 50 JETPACK) and mode 2 (51 SUICIDE).
-Re-open them from the top before building on either. Same for anything else in
-the notes whose section starts mid-function.
+Re-open them from the top before building on either.~~ Both re-opened from
+the top 2026-09-15: 0x0A in `missiles.md`, mode 2 in `fire.md`. Same still
+goes for anything else in the notes whose section starts mid-function.
 
 Smaller threads this session left, none blocking: the per-turn pass's own gate
 `[[0x537f24]+0x510]` and the `0x47D080(0)` at its tail (B20); `0x49F6D0(0xFA0)`
