@@ -673,10 +673,13 @@ and the weakest of them were invented here:
   record says most of it — field 11 picks the collision shape and only kind 0
   is a box, so every bridge and step piece is bodiless in the original too, and
   a crate is a pickup exactly when it carries something. What the data does NOT
-  say is whether grass belongs in the collision world at all (0x406bb0, the
-  test itself, is still undecoded), so `lib/game/obstacles.ts` draws its own
+  say is whether grass belongs in the collision world at all — and the sweep
+  (0x406bb0, read 2026-09-15, `movement/sweep.md`) does not say either: every
+  kind-0 record gets its box and the sweep walks every box, so in the exe a
+  one-unit grass box IS a body, and `lib/game/obstacles.ts` still draws its own
   line at a box two units across — which drops grass, flowers and the swimming
-  fish, each of which carries a box exactly one unit wide.
+  fish, each of which carries a box exactly one unit wide. Still the remake's
+  call; now a divergence from a known original rather than from an unread one.
 - `[CHECK — remake]` **Two numbers on the dashboard are the remake's own**,
   and each says so where it lives: the GREEN the dial's face is filled in (the
   archive ships the beaded RIM and no disc behind it, so the face is a filled
@@ -1010,10 +1013,16 @@ and the weakest of them were invented here:
   record that picks the dome loads `snow.mtd` for the ten cold maps and
   `rain.mtd` for everything else, and starts one only for cold and ominous
   (0x4854CE). `sky/notes.md`.
-- `[CHECK — remake]` **The wall envelope is an inference.** Whether wall
-  geometry sits in the exe's collision world is still open (0x406bb0
-  undecoded); the remake builds the play-observed behaviour from the decoded
-  step-up/sidestep constants instead.
+- `[exe]` **The wall envelope is a STAND-IN for a known original, no longer
+  an inference.** The sweep is read (0x406bb0, 2026-09-15, `movement/sweep.md`):
+  wall geometry is NOT in the exe's collision world — a wall is a face of the
+  landscape heightfield wearing friction 0.01 / restitution 0.99, the sweep
+  never reads a tile flag, and the step-up / sidestep pair is reached only by
+  hitting an OBJECT. What refuses the climb in the original is the pig's own
+  blocked-tile reactions (eject, the wedge counter, the landing fork —
+  `movement/notes.md`), on a body that slides. The remake still refuses a
+  step at a wall tile and walks the decoded step-up envelope instead; that is
+  now `[deliberate]`, and the honest replacement is the slippery contact.
 - `[play]` **EVERYONE drops in together.** The POG's parachute bit picks out
   one side of a campaign map — the player's, with the enemy standing on the
   ground, which is what the exe builds — and play rules otherwise: "все
