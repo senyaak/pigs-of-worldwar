@@ -894,12 +894,19 @@ and the weakest of them were invented here:
   out at their deck's own walking surface with the yaw picking which way they
   climb. Untilted the pieces are 725 across a 512 spacing, overlap by 213, and
   sit 256 BELOW the deck. `e2e/002/ramp.spec.ts` pins all of it.
-- `[CHECK — remake]` **A RAMP is WALKED UP, and that half is the remake's
-  own.** The exe's answer is not found — the only thing seen so far that lets
-  an object touch the ground a pig walks on is a 3×3 block of TILE values an
-  object saves at `[obj+0x182]` and stamps back through `Map::SetTile`
-  (0x4767a0 saves, 0x4768c0 and 0x476ba5 stamp, gated on `[obj+0x19C]` being 4,
-  5..7 or 0x0E), and that is a tile TYPE with no height in it. So the shape
+- `[deliberate]` **A RAMP is WALKED UP, and the SHAPE it is walked on is the
+  remake's own — the exe's answer is FOUND (2026-09-15, `objects/notes.md`,
+  the field-11 correction).** In the original a field-11 = 1 piece (every
+  bridge, every ramp, every step) is an ELLIPSOID body the size of its own
+  box, built by `Object::MakeCollider`'s second stage (0x4AAAD4, class
+  0x4BC070 — the same class as the pig's own sphere) and swept like any
+  object, so the walk climbs it through the step-up. A deck in the original
+  is therefore the top of an ellipsoid, not a plane; the remake's
+  box-with-a-sloped-top is the smoother stand-in and stays. ~~The exe's answer
+  is not found — the only thing seen so far that lets an object touch the
+  ground a pig walks on is a 3×3 block of TILE values~~ (that block is the
+  MINE REVEAL; `[obj+0x182]`, `Map::SetTile`, 0x4767a0 / 0x4768c0 /
+  0x476ba5). So the shape
   comes off the record instead, where it already is: a ramp joins the collision
   world with the box the record carries and a top that CLIMBS across it,
   `bottom` at the box's local −x end to `top` at its +x (`sloped` in
