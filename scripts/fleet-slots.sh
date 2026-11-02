@@ -35,11 +35,13 @@ for n in $(seq 1 "$count"); do
   # The slot's own permissions, rewritten on every run. A fleet session has no
   # one to answer a prompt, so everything a role does must be pre-allowed: the
   # game folder as a working directory (the disasm worktree, the exe and the
-  # e2e lock are all in it), and the Bash commands the roles use. Kept out of
-  # git because the path is this machine's.
+  # e2e lock are all in it), and the Bash commands the roles use. FLEET_SLOT
+  # tells the fleet's guard this is a fleet session (.claude/fleet/guard.md).
+  # Kept out of git because the path is this machine's.
   mkdir -p "$slot/.claude"
   cat > "$slot/.claude/settings.local.json" <<SETTINGS
 {
+  "env": { "FLEET_SLOT": "$n" },
   "permissions": {
     "additionalDirectories": ["$(cygpath -m "$game" 2>/dev/null || echo "$game")"],
     "allow": [

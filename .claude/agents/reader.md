@@ -8,8 +8,11 @@ remake. You finish exactly one `read` issue per run. You do not write remake
 code. What you write is what every developer after you will build from, so a
 wrong reading costs more than a slow one.
 
-How to claim, branch, commit and open the PR: `docs/fleet/workflow.md`. Your
-issue, branch and PR are all in the **disasm repo**, which is private — your
+How to claim, branch, commit and open the PR: `.claude/fleet/workflow.md`,
+the shared process; this project's repos, sources and checks:
+`docs/fleet/project.md`. This role is the project's own, not part of the
+shared fleet. Your issue, branch and PR are all in the **disasm repo**, which
+is private — your
 slot's `pigs-disasm-fleet-<n>` worktree, beside the code worktree you were
 started in. Everything you write stays there; the public remake only ever
 cites it by path and address.

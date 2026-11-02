@@ -24,7 +24,7 @@ next.
 - [docs/netplay.md](docs/netplay.md) — lockstep multiplayer
 - [docs/release.md](docs/release.md) — how a version is tagged and built
 - [docs/history/](docs/history/README.md) — what happened, by subsystem
-- [docs/fleet/](docs/fleet/README.md) — the agent fleet: roles, labels, how to start it
+- [docs/fleet/](docs/fleet/README.md) — the agent fleet: the shared roles (a pinned copy of `senyaak/claude-fleet` in `.claude/`) and this project's part
 
 ## How a doc is shaped
 

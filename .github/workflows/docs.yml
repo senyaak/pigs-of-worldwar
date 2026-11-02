@@ -1,4 +1,5 @@
-# The docs gate: every relative link in the repo's markdown lands on a file.
+# The docs gate: every relative link in the repo's markdown lands on a file,
+# and the fleet's pinned copy is unedited.
 #
 # Separate from ci.yml because that one skips doc-only changes on purpose, and
 # a doc-only change is exactly where a link breaks: a file is split, moved or
@@ -25,3 +26,7 @@ jobs:
           node-version: 24
 
       - run: node scripts/links.mjs
+
+      # The fleet's roles and process are a pinned copy of senyaak/claude-fleet;
+      # an edit made here instead of there would be lost on the next update.
+      - run: node .claude/fleet/fleet.mjs verify
