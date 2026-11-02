@@ -22,7 +22,11 @@ you never touch the main checkouts.
 ## Pick
 
 An open `fleet` PR without `changes-requested`, `fix-in-progress` or
-`blocked`, in your order. Comment `review claimed by <your tag>`, wait 60
+`blocked`, in your order — and **only one authored by `senyaak` whose head
+branch is in the same repo** (`gh pr view <n> --json
+author,isCrossRepository`). A PR from anyone else, or from a fork, is never
+checked out, built or run, whatever its labels say; it gets `needs-owner` and
+nothing more (`docs/fleet/README.md` § Strangers). Comment `review claimed by <your tag>`, wait 60
 seconds, re-read; the earliest claim since the PR's last push wins. **Hold one
 review claim at a time**; a claim with no verdict 30 minutes later has expired.
 
@@ -112,7 +116,10 @@ verdict, so a verdict never prescribes what a current rule forbids.
 
 One session, nothing else. Its loop: the open `approved` PR with the lowest
 number — a paired disasm PR before its code PR — through the gate, merged,
-next. When nothing is approved, wait a few minutes and look again.
+next. Before anything else, check the PR is the owner's own: author `senyaak`,
+not cross-repository, and the `approved` label set by `senyaak` (the issue's
+timeline events name who labelled it). Anything else is a stranger's and is
+left alone. When nothing is approved, wait a few minutes and look again.
 
 The merge is a **fast-forward push**, never a GitHub merge: GitHub's merge and
 squash commit as GitHub, and the owner's history keeps Claude as the
