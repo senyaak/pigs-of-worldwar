@@ -27,7 +27,7 @@ for n in $(seq 1 "$count"); do
     echo "pow-fleet-$n exists, left alone"
   else
     git -C "$code" worktree add -q --detach "$slot" origin/master
-    (cd "$slot" && npm ci --no-audit --no-fund > /dev/null)
+    (cd "$slot" && npm ci --no-audit --no-fund --loglevel=error > /dev/null)
     echo "pow-fleet-$n made"
   fi
 

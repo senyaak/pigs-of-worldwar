@@ -122,6 +122,13 @@ scripts/fleet-slots.sh 3
 That makes `pow-fleet-1..3` and `pigs-disasm-fleet-1..3` beside the main
 checkouts, detached at `origin/master`, and installs the dependencies.
 
+**Made 2026-11-02: five slots**, and the labels in both repos. Slots 1–3 are
+for readers and developers, 4 and 5 for the two reviewers. Slot 1 was checked
+end to end: typecheck, boundaries, links, the unit suite, one e2e spec against
+the installation at `..`, and `tools/xdis.py` from its disasm worktree. A
+slot's detached HEAD does not matter; every piece of work branches from fresh
+`origin/master`.
+
 **Then one local Claude Code session per worker**, each opened in its own
 slot's code worktree (`pow-fleet-<n>`), except the planner and the merger,
 which need no slot and run in the main checkout:
