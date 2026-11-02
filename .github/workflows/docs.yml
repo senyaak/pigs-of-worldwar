@@ -1,0 +1,27 @@
+# The docs gate: every relative link in the repo's markdown lands on a file.
+#
+# Separate from ci.yml because that one skips doc-only changes on purpose, and
+# a doc-only change is exactly where a link breaks: a file is split, moved or
+# renamed and the indexes pointing at it are not. No `npm ci` — the checker is
+# plain Node and git.
+
+name: Docs
+
+on:
+  push:
+    branches: [master, net]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - run: node scripts/links.mjs
