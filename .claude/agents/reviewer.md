@@ -26,8 +26,9 @@ An open `fleet` PR without `changes-requested`, `fix-in-progress` or
 branch is in the same repo** (`gh pr view <n> --json
 author,isCrossRepository`). A PR from anyone else, or from a fork, is never
 checked out, built or run, whatever its labels say; it gets `needs-owner` and
-nothing more (`docs/fleet/README.md` § Strangers). Comment `review claimed by <your tag>`, wait 60
-seconds, re-read; the earliest claim since the PR's last push wins. **Hold one
+nothing more (`docs/fleet/README.md` § Strangers). Comment `review claimed by
+<your tag>`, let 60 seconds pass while you read, re-read; the earliest claim
+since the PR's last push wins. **Hold one
 review claim at a time**; a claim with no verdict 30 minutes later has expired.
 
 Note the head sha when you claim; if it moves before your verdict, the review
@@ -36,6 +37,12 @@ restarts. Check for a conflict locally, not through GitHub's
 origin/master <head-sha>` (non-zero exit means a conflict). Read the linked
 issue first: it says what should exist. Check that the PR's `Closes` number
 matches the number in its branch name.
+
+**A PR back after a verdict** is reviewed on the diff from the head you last
+reviewed (`git diff <old>..<new>`, `git range-diff` if it was rebased): check
+every point of the last verdict is resolved and nothing else moved, and re-run
+what that diff touches — typecheck, links and the unit suite always, the e2e
+specs only when behaviour changed.
 
 ## A READ (a disasm PR) — check in this order
 
@@ -106,7 +113,13 @@ account, so a verdict is a label plus a COMMENT review.
    disasm repo, and label the PR `blocked`.
 3. **All good** → check it still applies to master (the local merge-tree test);
    if it conflicts, post `Verdict: rebase only (round <k>)` instead. Otherwise
-   label it `approved`.
+   post a COMMENT review whose first line is `Approved (round <k>)` and which
+   lists what you checked and the counts you ran, then label it `approved`.
+
+**What blocks.** Anything that lands on master: code, specs, docs, commit
+messages. An inaccuracy only in the PR body does not block; list it in the
+verdict or the approval note as non-blocking, for the author to correct in
+the body.
 4. **Label hygiene**: `changes-requested` removes `approved`, and a PR never
    carries `approved` with `fix-in-progress`.
 
@@ -123,7 +136,7 @@ next. When nothing is approved, wait with Monitor for a PR to gain the label
 way. Before anything else, check the PR is the owner's own: author `senyaak`,
 not cross-repository, and the `approved` label set by `senyaak` (the issue's
 timeline events name who labelled it). Anything else is a stranger's and is
-left alone. When nothing is approved, wait a few minutes and look again.
+left alone.
 
 The merge is a **fast-forward push**, never a GitHub merge: GitHub's merge and
 squash commit as GitHub, and the owner's history keeps Claude as the
@@ -146,10 +159,17 @@ committer.
    at>`.
 3. **CI green on exactly that head**, then `git push origin <head-sha>:master`.
    Never force. A refused push means master moved: back to step 1.
-4. **Close the loop**: delete the branch (`git push origin --delete
-   <branch>`), close the issue with `Merged as <repo>@<sha>`, and label it
-   `needs-play` when the PR's `## Play` section is not empty. If GitHub has not
-   marked the PR merged after a minute, close it with the same comment.
+4. **Close the loop, in this order:**
+   1. Confirm GitHub marked the PR merged (`gh api repos/<repo>/pulls/<n>
+      --jq .merged`). It does so in the same second as the fast-forward push
+      (seen on the first merge, PR #3); if it has not after a minute, close
+      the PR with `Merged as <repo>@<sha>`. Only then
+   2. delete the branch (`git push origin --delete <branch>`) — deleted
+      first, it can leave the PR closed as unmerged.
+   3. The issue closes itself through `Closes #<n>`; if it did not, close it
+      with the same comment.
+   4. On the issue, remove `in-progress`, and add `needs-play` when the PR's
+      `## Play` section is not empty.
 5. **Watch master's CI once.** Red → open `[ci] master is red: <step>`
    (`fleet` + `bug` + `ready`) before merging anything else.
 

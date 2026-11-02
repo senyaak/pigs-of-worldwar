@@ -60,7 +60,8 @@ are the answer, in whatever language they are written.
 2. **One kind.** `read` (the exe is read and a note written; no remake code),
    `build` (remake code from notes that already exist), `test` (specs only),
    `bug` (a reported misbehaviour, diagnosed before it is fixed).
-3. **Self-contained.** Title `[<area>] <what>` — `[weapons] 31 AIRBURST`,
+3. **Self-contained.** Title `[<area>] <what>`, the area a free short name for
+   the subject (the work-list file's name will do) — `[weapons] 31 AIRBURST`,
    `[read] who sends the ambient airship`. Body sections:
    1. `Source` — the work-list file it came from (`docs/todo/<file>.md`) and
       the notes it rests on (disasm paths and exe addresses). A `build` with no

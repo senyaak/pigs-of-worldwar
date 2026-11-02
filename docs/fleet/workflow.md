@@ -31,7 +31,27 @@ comments, issue comments and commit messages as much as code.
   <specs>` takes a lock in the game folder that every slot shares, and waits
   inside Node while another slot holds it. Run it with `run_in_background`
   and read its log when you are notified; the wait can outlast a foreground
-  command's ten minutes. The unit suite needs no lock.
+  command's ten minutes.
+- **The unit suite needs no lock, but never runs beside an e2e run in the
+  same slot.** `e2e/scratch.ts` clears `_tmp/saves` and `_tmp/profile` at
+  the start and end of every Playwright run, whatever the project, so a unit
+  run pulls the saves out from under a running app and fails on the busy
+  profile. In one slot, one after the other.
+- **A spec in `e2e/001` or `e2e/002` needs `e2e/000/foundation.spec.ts` first
+  in the same run** — it writes the `.env` the later phases read. Name it
+  first in the list you hand `e2e:locked`.
+- **Traps on this machine:**
+  - `git show <rev>:<path>` has its argument mangled by Git Bash's path
+    conversion; prefix it with `MSYS_NO_PATHCONV=1`.
+  - `gh issue view <n> --comments` can print nothing in the Bash tool; read
+    comments with `gh api repos/<repo>/issues/<n>/comments`, which also gives
+    each comment's author.
+  - `gh pr view --json` has no `merged` field; use `state` and `mergedAt`, or
+    `gh api repos/<repo>/pulls/<n> --jq .merged`.
+- **A one-off measurement over the game's files** (re-checking an index, a
+  record, a table) is a script under `_tmp/`, never committed: Python for raw
+  bytes, or a throwaway Playwright config under `_tmp/measure/` to use the
+  repo's own TypeScript readers.
 
 ## Claim
 
@@ -48,8 +68,9 @@ comments, issue comments and commit messages as much as code.
    claimed by <tag> for round <k>` on a PR (`k` from its latest verdict). That
    is the **whole first line**; a branch name goes on the next. **Let 60
    seconds pass after your claim's own timestamp, then re-read every
-   comment** — read the issue's sources meanwhile, and wait out the rest with
-   Monitor (§ Commands and waiting). The earliest claim wins. A claim on
+   comment.** Fill them with the read-only work the task needs anyway; for
+   what is left, Monitor or a re-read once the minute is up both do (§
+   Commands and waiting). The earliest claim wins. A claim on
    an issue counts only if it was posted after the issue last became `ready`;
    on a PR, only if it names the current round and was posted after that
    round's verdict. Yield only to an earlier claim that has not itself

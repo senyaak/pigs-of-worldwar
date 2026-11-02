@@ -9,8 +9,11 @@ docs rule.
 - **Finishing an item** deletes its file and its line, in the same change that
   does the work. What happened goes into the PR, and the facts it established
   go into [facts/](facts/) or the disasm notes.
+- **Finishing part of an item** keeps its file and rewrites it to what is
+  still open, in the same change; the index line is updated to match. An item
+  the planner cut into several issues loses its file with the last of them.
 - **With the fleet**, the planner turns items into GitHub issues; the issue
-  links the file, and the PR that closes the issue deletes it
+  links the file, and the PR that finishes the item deletes it
   ([fleet/README.md](fleet/README.md)).
 
 Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form

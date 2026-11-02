@@ -164,9 +164,12 @@ it with it. Put the refusable part in a function of its own.
 Specs run against the real installation, read-only, with counts asserted as
 floors where savegame churn could move them and exactly where it cannot.
 
-**Never write a wall-clock duration into a spec that drives a walk.** It goes
-stale silently the next time a speed moves; size a drive by the DISTANCE it has
-to cover.
+**Never size a walk by wall-clock time when the spec depends on where it
+ends.** A drive that must reach a place, cross a gap or stop at a wall goes
+stale silently the next time a speed moves; size it by the DISTANCE it has to
+cover. A walk whose only job is to move at all — `hold(page, 'walkForward',
+400)` and then "the pig moved" — may hold for a duration, since no speed
+change can make it wrong.
 
 ## Drive the game through its controller, not through keys
 
