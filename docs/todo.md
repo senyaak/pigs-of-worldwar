@@ -16,6 +16,11 @@ docs rule.
 Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 `weapons/fire.md` are in the **disasm repo**, never in this tree.
 
+## Housekeeping — before the fleet builds in parallel
+
+- [disasm-notes-cleanup.md](todo/disasm-notes-cleanup.md) — split the notes past 500 lines, fold their corrections in
+- [split-hot-modules.md](todo/split-hot-modules.md) — the battle's five hot modules, one chained issue each
+
 ## Play checks — what only play can judge
 
 - [play/2026-08-11.md](todo/play/2026-08-11.md) — the first batch: the ending, the fade, the lens, the shot's timing, the door, TNT, the rocket, the thrown weapon's cameras, the eject

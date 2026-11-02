@@ -73,6 +73,10 @@ the answer, in whatever language they are written.
 
 The owner's order, until the owner changes it:
 
+0. The housekeeping items (`docs/todo/split-hot-modules.md`,
+   `docs/todo/disasm-notes-cleanup.md`), because parallel builds in an
+   unsplit hot module conflict on every merge. They may run alongside the
+   proving ground's reads, never alongside builds in the module being split.
 1. The proving ground (`docs/todo/proving-ground.md`) — it is where everything
    after it gets tested.
 2. What the campaign meets, in campaign order: a weapon, building or vehicle a
