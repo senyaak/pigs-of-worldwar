@@ -144,6 +144,16 @@ export type LoadMapObjectsResult =
   | { ok: true; objects: MapObject[]; props: MapProp[] }
   | { ok: false; error: string }
 
+/** The proving ground: a built map, in the shapes a shipped map's ground and
+ * records come in (main/provingGround.ts). */
+export type LoadProvingGroundResult =
+  | {
+      ok: true
+      terrain: { blocks: TerrainBlock[]; textures: TerrainTexture[] }
+      objects: { objects: MapObject[]; props: MapProp[] }
+    }
+  | { ok: false; error: string }
+
 export interface SoundEntry {
   id: number
   path: string
@@ -187,6 +197,7 @@ export interface Api {
   loadClips(relPath: string): Promise<LoadClipsResult>
   loadTerrain(relPath: string): Promise<LoadTerrainResult>
   loadMapObjects(relPath: string): Promise<LoadMapObjectsResult>
+  loadProvingGround(): Promise<LoadProvingGroundResult>
   loadSoundBank(relPath: string): Promise<LoadSoundBankResult>
   loadSound(relPath: string): Promise<LoadSoundResult>
   loadFrontendImages(entryNames: string[]): Promise<FrontendImagesResult>

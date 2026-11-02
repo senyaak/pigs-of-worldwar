@@ -52,6 +52,7 @@ import { HAT_ARCHIVE, HAT_CLASSES, SKIN_ARCHIVES, SKIN_HATS, skinOf } from '../.
 import { give } from '../../../lib/game/inventory'
 import { skyArchiveFor, weatherFor } from '../../../lib/game/sky'
 import { byId } from './dom'
+import { BUILT_MAPS, loadMapData } from './mapData'
 
 // The training ground — the first map the original ever shows a player, and
 // the friendliest to test on: barely any water, one big usable field.
@@ -647,10 +648,10 @@ export function initBattle(
       console.log(scene ? `stayed on ${map}: ${error}` : `could not open ${name}: ${error}`)
       return false
     }
-    const [terrainResult, objectsResult, clipsResult, textResult, battleTextResult] =
+    const [[terrainResult, objectsResult], clipsResult, textResult, battleTextResult] =
       await Promise.all([
-        window.api.loadTerrain(`Maps/${name}.PMG`),
-        window.api.loadMapObjects(`Maps/${name}.POG`),
+        // A shipped map's own files — or the proving ground, which is built.
+        loadMapData(name),
         window.api.loadClips(CHAR_ARCHIVE),
         window.api.loadGameText('fetext'),
         // The battle's own strings: the mission titles and, next, everything
@@ -1108,7 +1109,10 @@ export function initBattle(
           .map((f) => f.path.match(/^Maps[\\/](.+)\.PMG$/i)?.[1])
           .filter((n): n is string => n !== undefined)
           .sort()
-        console.log(`usage: pow.swapMap('ARTGUN') — shipping maps: ${maps.join(', ')}`)
+        console.log(
+          `usage: pow.swapMap('ARTGUN') — shipping maps: ${maps.join(', ')}; ` +
+            `built: ${BUILT_MAPS.join(', ')}`
+        )
         return false
       }
       if (!scene) {

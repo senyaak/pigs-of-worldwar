@@ -26,6 +26,7 @@ import {
   loadTerrain,
   loadTims
 } from './assets'
+import { loadProvingGround } from './provingGround'
 
 function fail(context: string, error: unknown): { ok: false; error: string } {
   return { ok: false, error: `${context}: ${error instanceof Error ? error.message : String(error)}` }
@@ -197,6 +198,16 @@ export function registerIpc(): void {
       return { ok: true, ...(await loadMapObjects(insideGameDir(relPath))) }
     } catch (error) {
       return fail(relPath, error)
+    }
+  })
+
+  // The proving ground has no files of its own: it is built, and dressed out
+  // of the install's archives (main/provingGround.ts).
+  ipcMain.handle('provingGround:load', async () => {
+    try {
+      return { ok: true, ...(await loadProvingGround(insideGameDir)) }
+    } catch (error) {
+      return fail('proving ground', error)
     }
   })
 

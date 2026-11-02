@@ -50,6 +50,7 @@ of the form `weapons/fire.md` are in the **disasm repo**, never in this tree.
 - [nations.md](nations.md) — nation against skin, the enemy's nation, hats, repaints
 - [pause.md](pause.md) — the pause, its flying camera, its menu and font, ABORT, a battle stepping only once shown
 - [pigmap.md](pigmap.md) — territories are grey masks added to the map
+- [proving-ground.md](proving-ground.md) — the remake's own test map: its layout, where its ground, records and models come from
 - [saves.md](saves.md) — a save is repaired at the parser
 - [scanner.md](scanner.md) — the battle map: the library's scanner, tilt, colours, filtering, who shows, minefields
 - [sky.md](sky.md) — the sky dome, its size, snow and rain
