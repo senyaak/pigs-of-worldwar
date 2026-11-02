@@ -124,10 +124,11 @@ export const MOUNT_SOURCES: readonly SourceRecord[] = [
 /**
  * The fields a record's SCRIPT COMMAND is built from — field 14 the opcode,
  * 15 and 16 its operands, 25 and 27 a tile column and row (`script/notes.md`,
- * the loader at 0x4a6287) and 26 the height between them. A copy that must
- * not bring a command along clears these.
+ * the loader at 0x4a6287). A copy that must not bring a command along clears
+ * these. Field 26, between the two coordinates, is not read by the loader
+ * and has no read meaning, so it is copied like every other unread field.
  */
-export const COMMAND_FIELDS = [14, 15, 16, 25, 26, 27] as const
+export const COMMAND_FIELDS = [14, 15, 16, 25, 27] as const
 
 /**
  * Which archive draws which model. Texture indices are PER ARCHIVE — a face

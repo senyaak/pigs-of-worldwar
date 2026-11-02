@@ -32,8 +32,10 @@
   open ground is texture 2 with type byte 0x09 (all 714 such tiles), open water
   texture 44 with 0x24 (all 110 of CAMP's water tiles carry 0x24; 44, 45 and 46
   are the only all-translucent palettes, water kind 2, dll 0x10007b6c), and a
-  wall texture 153 with 0x85 and the solid-half byte 0 (CAMP's wall tiles wear
-  153..156, every one 0x85). The baked shade is `249·n_y + 5`, the fit of a
+  wall texture 153 with 0x85 and the solid-half byte 0 (562 of CAMP's 614
+  wall-flagged tiles wear 153..156, and every one of those is 0x85 with the
+  solid-half byte 0; the other 52 wear six other textures, one of them 0xC5,
+  wall plus mine). The baked shade is `249·n_y + 5`, the fit of a
   shipped map's shade to its own normals (`lib/formats/pmg.ts`), so flat ground
   is 254 and the slopes darken.
 
@@ -44,8 +46,9 @@
   game: CRATE1 record 7, SIGN 54 and the grunt marker GR_ME 3 from CAMP; TANK
   12 from OASIS; AM_TANK 7, PILLBOX 5 and BIG_GUN 4 from GENMUD; CARRY 20 from
   SNAKE; AMLAUNCH 16 from BAY. `lib/game/provingSources.ts`.
-  - A copy carries **no script command**: fields 14..16 and 25..27, which the
-    loader builds one from (0x4a6287, `script/notes.md`), are cleared. OASIS's
+  - A copy carries **no script command**: fields 14, 15, 16, 25 and 27, which
+    the loader builds one from (0x4a6287, `script/notes.md`), are cleared.
+    Field 26 is read by nothing known and is copied as stored. OASIS's
     records 9..11 and both of SNAKE's CARRYs carry opcode 14 there, and the
     three GENMUD records opcode 13 (a health crate when the thing is wrecked,
     0x4aa4c8). OASIS's 12..14 carry none, which is why TANK comes from 12.

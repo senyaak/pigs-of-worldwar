@@ -37,9 +37,9 @@ export const WATER_TEXTURE = 44
 export const WATER_TYPE = TILE_WATER | 0x04
 
 /**
- * CAMP's walls: the tiles wearing textures 153..156 are its wall tiles, and
- * every one carries type byte 0x85 — the wall bit 0x80 over terrain type 5 —
- * with the solid-half byte 0, the whole tile (`MapTileSlip`,
+ * CAMP's walls: 562 of its 614 wall-flagged tiles wear textures 153..156,
+ * and every one of those carries type byte 0x85 — the wall bit 0x80 over
+ * terrain type 5 — with the solid-half byte 0, the whole tile (`MapTileSlip`,
  * docs/facts/terrain.md; `WALL_SHAPES` 0 in lib/game/terrain.ts).
  */
 export const WALL_TEXTURE = 153
