@@ -209,8 +209,9 @@ function bashReasons(command, cwd, fleet, processEnv) {
 export function isFleetSession(input, processEnv) {
   if (processEnv.FLEET_SLOT) return true
   if (input.agent_type && ROLES.has(String(input.agent_type).replace(/^.*:/, ''))) return true
-  const dir = processEnv.CLAUDE_PROJECT_DIR || input.cwd || ''
-  return /-fleet-\d+$/.test(basename(dir.replace(/[\\/]+$/, '')))
+  // the two slot layouts in use: `<name>-fleet-<n>`, and `slot-<n>/<checkout>`
+  const dir = (processEnv.CLAUDE_PROJECT_DIR || input.cwd || '').replace(/[\\/]+$/, '')
+  return /-fleet-\d+$/.test(basename(dir)) || dir.split(/[\\/]/).some((part) => /^slot-\d+$/.test(part))
 }
 
 // The decision for one hook input: null to let the call through, or the reason

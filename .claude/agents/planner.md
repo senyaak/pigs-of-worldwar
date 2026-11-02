@@ -78,7 +78,10 @@ else — are the answer, in whatever language they are written.
    it by concern first.
 6. **Play-only items are not issues**; `project.md` § Work list says which.
 7. **Labels**: `fleet` + the kind + `ready`, or `blocked` when something it
-   depends on is open; `area:<part>` where 5 asks for it.
+   depends on is open; `area:<part>` where 5 asks for it; a `priority:<level>`
+   only on the owner's word, or the level of the issue it unblocks
+   (`.claude/fleet/workflow.md` § Priority). An item the owner marked
+   `priority:never` is not filed.
 
 ## Order of work
 

@@ -38,8 +38,11 @@ in English.
 Every repo of the project carries the same set: `fleet`, the kinds of
 `project.md` § Kinds, `ready`, `in-progress`, `blocked`, `changes-requested`,
 `fix-in-progress`, `approved`, `needs-owner`, `answered`, `needs-play`,
-`fleet-process`, and `area:<part>` labels as the planner needs them. A role
-that finds one missing creates it (`gh label create <name> --repo <repo>`).
+`fleet-process`, the six `priority:<level>` labels
+([workflow.md](workflow.md) § Priority), and `area:<part>` labels as the
+planner needs them. `node .claude/fleet/fleet.mjs doctor --fix` creates the
+missing ones in every repo of the project; a role that finds one missing
+creates it (`gh label create <name> --repo <repo>`).
 
 ## Guard rails
 

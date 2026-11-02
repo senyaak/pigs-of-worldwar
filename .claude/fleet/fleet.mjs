@@ -4,6 +4,8 @@
 //   node .claude/fleet/fleet.mjs check            is a newer version out?
 //   node .claude/fleet/fleet.mjs update [vX.Y.Z]  take it (default: the newest)
 //   node .claude/fleet/fleet.mjs verify           the copy matches its lock (CI)
+//   node .claude/fleet/fleet.mjs doctor [--fix]   everything the fleet needs is in
+//                                                 place, GitHub labels included
 //   node bin/fleet.mjs install <project> [--ref vX.Y.Z] [--from <dir>]
 //                                                 first install, from a fleet checkout
 //
@@ -11,7 +13,7 @@
 // `payload/` tree into the project at the same paths, records the version and a
 // hash of every file in .claude/fleet/fleet.lock.json, registers the guard hook
 // in .claude/settings.json, and writes docs/fleet/project.md from the template
-// the first time (it is the project's own file from then on). The copied files
+// (.claude/fleet/project-template.md) the first time (it is the project's own file from then on). The copied files
 // are not edited in the project: a change goes to the fleet repo and comes back
 // as a version, and `verify` fails CI on a local edit.
 //
@@ -24,6 +26,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+
+import { doctor, TEMPLATE } from './doctor.mjs'
 
 export const DEFAULT_SOURCE = 'https://github.com/senyaak/claude-fleet.git'
 export const LOCK = '.claude/fleet/fleet.lock.json'
@@ -165,7 +169,7 @@ export function apply(project, fetched, source, { force = false } = {}) {
   writeFileSync(join(project, LOCK), JSON.stringify(lock, null, 2) + '\n')
   const hooked = registerHook(project)
   let projectFile = false
-  const template = join(fetched.dir, 'template', 'project.md')
+  const template = join(fetched.dir, 'payload', TEMPLATE)
   if (!existsSync(join(project, PROJECT_FILE)) && existsSync(template)) {
     mkdirSync(dirname(join(project, PROJECT_FILE)), { recursive: true })
     writeFileSync(join(project, PROJECT_FILE), readFileSync(template, 'utf8'))
@@ -174,13 +178,25 @@ export function apply(project, fetched, source, { force = false } = {}) {
   return { from: old?.version ?? null, to: lock.version, written: Object.keys(files), removed, hooked, projectFile, notes: changelogBetween(fetched.dir, old?.version, lock.version) }
 }
 
+// What `verify` reports: copied files missing or edited, a trial version, the
+// guard not registered.
+export function verifyProblems(project, lock) {
+  const problems = drift(project, lock)
+  if (!/^v\d+\.\d+\.\d+$/.test(lock.version)) problems.push(`${LOCK}: ${lock.version} is a trial install, not a released version`)
+  const settings = join(project, '.claude/settings.json')
+  if (!existsSync(settings) || !hookInstalled(JSON.parse(readFileSync(settings, 'utf8')))) {
+    problems.push('.claude/settings.json: the guard hook is not registered')
+  }
+  return problems
+}
+
 function report(result) {
   console.log(`fleet ${result.from ? `${result.from} -> ` : ''}${result.to}: ${result.written.length} files written`)
   for (const f of result.removed) console.log(`  removed ${f} (no longer in the fleet)`)
   if (result.hooked) console.log('  guard hook registered in .claude/settings.json')
   if (result.projectFile) console.log(`  ${PROJECT_FILE} written from the template: fill it in, it is this project's own file`)
   if (result.notes) console.log(`\n${result.notes}\n`)
-  console.log('Review the diff and commit it as one change: "Fleet <version>".')
+  console.log('Then `node .claude/fleet/fleet.mjs doctor --fix`, review the diff, and commit it as one change: "Fleet <version>".')
 }
 
 function option(args, name) {
@@ -220,15 +236,17 @@ export async function main(argv) {
   }
 
   if (command === 'verify') {
-    const problems = drift(project, lock)
-    if (!/^v\d+\.\d+\.\d+$/.test(lock.version)) problems.push(`${LOCK}: ${lock.version} is a trial install, not a released version`)
-    const settings = join(project, '.claude/settings.json')
-    if (!existsSync(settings) || !hookInstalled(JSON.parse(readFileSync(settings, 'utf8')))) {
-      problems.push('.claude/settings.json: the guard hook is not registered')
-    }
+    const problems = verifyProblems(project, lock)
     for (const p of problems) console.log(p)
     console.log(problems.length ? `fleet ${lock.version}: ${problems.length} problem(s)` : `fleet ${lock.version}: intact`)
     return problems.length ? 1 : 0
+  }
+
+  if (command === 'doctor') {
+    const gh = (ghArgs) => execFileSync('gh', ghArgs, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    console.log(`fleet ${lock.version} in ${project}:`)
+    const left = doctor(project, { gh, verifyProblems: () => verifyProblems(project, lock), fix: args.includes('--fix') })
+    return left ? 1 : 0
   }
 
   if (command === 'check') {
@@ -248,7 +266,7 @@ export async function main(argv) {
     return 0
   }
 
-  console.error('usage: fleet.mjs check | update [vX.Y.Z] | verify | install <project> [--ref vX.Y.Z] [--from <dir>]')
+  console.error('usage: fleet.mjs check | update [vX.Y.Z] | verify | doctor [--fix] | install <project> [--ref vX.Y.Z] [--from <dir>]')
   return 1
 }
 

@@ -1,20 +1,22 @@
 {
   "source": "https://github.com/senyaak/claude-fleet.git",
-  "version": "v1.0.0",
-  "commit": "b59e2e259a33b64c479ed31db2fa614ef53698eb",
+  "version": "v1.1.0",
+  "commit": "cce2580d7363474438d6978030af2bbda07bfdeb",
   "files": {
     ".claude/agents/developer.md": "23013f2943a028be",
-    ".claude/agents/planner.md": "c263d79e328e5af3",
-    ".claude/agents/reviewer.md": "8d5e1bbd7f3133fe",
-    ".claude/fleet/README.md": "7a3acc76c4f8ded0",
-    ".claude/fleet/fleet.mjs": "2842be8e6d7e3596",
-    ".claude/fleet/guard.md": "d8c86ff23793611e",
-    ".claude/fleet/guard.mjs": "102708b0657a3a28",
+    ".claude/agents/planner.md": "37768b3127fe8c87",
+    ".claude/agents/reviewer.md": "fea10d48c28199a6",
+    ".claude/fleet/README.md": "c1d36f22bdc2b013",
+    ".claude/fleet/doctor.mjs": "37f20066d00a86cc",
+    ".claude/fleet/fleet.mjs": "36904d5002dc2b70",
+    ".claude/fleet/guard.md": "fa48f99496528e0b",
+    ".claude/fleet/guard.mjs": "15a584b3ac0f6ea8",
     ".claude/fleet/lessons.md": "6ca881d1a99fa2dc",
-    ".claude/fleet/lifecycle.md": "82307fbb52890e21",
+    ".claude/fleet/lifecycle.md": "c69139b1b265b047",
+    ".claude/fleet/project-template.md": "14cd0cadafb666b6",
     ".claude/fleet/starting.md": "ee2cbbc70affb664",
     ".claude/fleet/strangers.md": "875344fad15472ef",
-    ".claude/fleet/updating.md": "7da479ff26313261",
-    ".claude/fleet/workflow.md": "6b13da34337d9e15"
+    ".claude/fleet/updating.md": "15aca4e7d5bea299",
+    ".claude/fleet/workflow.md": "541a127103ceebff"
   }
 }

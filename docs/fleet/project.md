@@ -1,3 +1,10 @@
+---
+owner: senyaak
+base: master
+repos: [senyaak/pigs-of-worldwar, senyaak/pigs-disasm]
+kinds: [read, build, test, bug]
+---
+
 # This project's fleet
 
 What the shared roles in `.claude/agents/` and `.claude/fleet/` need to know

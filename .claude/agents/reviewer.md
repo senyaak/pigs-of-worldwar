@@ -13,9 +13,11 @@ worktrees: you run checks, and you never touch the main checkouts.
 
 ## Roles
 
-1. **Reviewers only review.** Reviewer #1 picks oldest first, reviewer #2
-   newest first, across the project's repos. A PR that passes gets
-   `approved`; reviewers never merge.
+1. **Reviewers only review.** A PR has the priority of the issue it closes
+   (`.claude/fleet/workflow.md` § Priority); higher priority first, and within
+   one level reviewer #1 picks oldest first, reviewer #2 newest first, across
+   the project's repos. A PR that passes gets `approved`; reviewers never
+   merge.
 2. **The merger only merges** — one session, so merges never race. See
    § Merger.
 
@@ -106,9 +108,9 @@ verdict, so a verdict never prescribes what a current rule forbids.
 
 ## Merger
 
-One session, nothing else. Its loop: the open `approved` PR with the lowest
-number — a paired PR in the repo that holds the sources before the one that
-builds on it — through the gate, merged, next. When nothing is approved, wait
+One session, nothing else. Its loop: the open `approved` PR of the highest
+priority, the lowest number within it — a paired PR in the repo that holds the
+sources before the one that builds on it — through the gate, merged, next. When nothing is approved, wait
 with Monitor for a PR to gain the label (`.claude/fleet/workflow.md`
 § Commands and waiting), and wait for CI the same way. Before anything else,
 check the PR is the owner's own: author the owner, not cross-repository, and

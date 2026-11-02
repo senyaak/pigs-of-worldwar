@@ -34,10 +34,12 @@ own sessions included:
 
 ## In a fleet session
 
-A session is a fleet session when `FLEET_SLOT` is set in its environment, when
-it runs in a slot directory (`<name>-fleet-<n>`), or when the hook fires
-inside a subagent of a fleet role (`planner`, `developer`, `reviewer`,
-`merger`, `reader`). There, also:
+A session is a fleet session when `FLEET_SLOT` is set in its environment (a
+slot's `.claude/settings.local.json` sets it under `env`, and a cloud
+environment can set it too), when it runs in a slot directory
+(`<name>-fleet-<n>`, or `slot-<n>/<checkout>`), or when the hook fires inside
+a subagent of a fleet role (`planner`, `developer`, `reviewer`, `merger`,
+`reader`). There, also:
 
 | refused | why |
 | - | - |

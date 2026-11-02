@@ -8,6 +8,7 @@ hash of every file it put here.
 node .claude/fleet/fleet.mjs check
 node .claude/fleet/fleet.mjs update
 node .claude/fleet/fleet.mjs verify
+node .claude/fleet/fleet.mjs doctor --fix
 ```
 
 - **`check`** says whether a newer version is out.
@@ -18,10 +19,18 @@ node .claude/fleet/fleet.mjs verify
   <version>`, through a PR like any other.
 - **`verify`** checks every copied file against the lock and the guard's
   registration, and exits 1 on a difference. The project's CI runs it.
+- **`doctor`** checks everything else the fleet needs: `docs/fleet/project.md`
+  filled in (its front matter and every section of
+  [project-template.md](project-template.md)), `CLAUDE.md` pointing at the
+  fleet, CI running `verify`, `gh` logged in as the owner, every repo reachable
+  with its base branch, and every label the roles use. `--fix` creates the
+  missing labels; the rest it reports. Run it after every update — a new
+  version may bring a new label.
 
 A **major** version changes what the roles expect of `docs/fleet/project.md`;
 its changelog entry says what to add or rename there, in the same commit as
-the update. A minor or patch version needs nothing from the project.
+the update. A minor or patch version needs nothing from the project for the
+roles to work; `doctor` may still list something new to do.
 
 ## Changing the rules
 

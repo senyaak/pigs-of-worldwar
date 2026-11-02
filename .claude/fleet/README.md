@@ -21,7 +21,9 @@ is this project's own is in [docs/fleet/project.md](../../docs/fleet/project.md)
 
 ## The copy itself
 
-- [fleet.mjs](fleet.mjs) — `check`, `update`, `verify`: the fleet as a pinned dependency
+- [doctor.mjs](doctor.mjs) — `fleet.mjs doctor [--fix]`: everything the fleet needs, the project file and the GitHub labels included
+- [fleet.mjs](fleet.mjs) — `check`, `update`, `verify`, `doctor`: the fleet as a pinned dependency
 - [guard.md](guard.md) — the hook that refuses what the rules forbid, and why it is Node
 - [lessons.md](lessons.md) — the process problems the shared rules came from
+- [project-template.md](project-template.md) — what `docs/fleet/project.md` must hold; the installer starts it from this
 - [updating.md](updating.md) — taking a new version, and where a change to the rules is made
