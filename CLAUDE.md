@@ -26,40 +26,19 @@ next.
 - [docs/history/](docs/history/README.md) — what happened, by subsystem
 - [docs/fleet/](docs/fleet/README.md) — the agent fleet: the shared roles (a pinned copy of `senyaak/claude-fleet` in `.claude/`) and this project's part
 
-## How a doc is shaped
+## Shared rules
 
-**A markdown file describes ONE thing, or it is an INDEX.** An index is a list
-of links, each to a file that describes one thing or to another index, with a
-one-line summary per link. Nothing else goes in an index. This file is the
-root index plus the working rules.
-
-- **A file that grows a second subject is split**, and the old file becomes the
-  index of its pieces at the same path, so every citation of it still lands.
-  Past about 500 lines a one-thing file almost always holds two.
-- **An index is one entry per line, sorted by file name within its group.** Add
-  an entry at its sorted place, never at the end, never on someone else's line,
-  and never reflow the neighbours. That is what lets two changes touch one
-  index without conflicting.
-- **A correction REPLACES the wrong text.** No strike-through and no "~~old~~
-  new": a reader skimming takes the struck line for a fact, and git keeps the
-  old version. The frozen records under `docs/history/` are left as written.
-- **A record of work is a new file, never an append.** Two changes appending to
-  one file conflict every time; see [docs/history/](docs/history/README.md).
-- **`npm run links` must pass.** It checks every relative link in this repo's
-  markdown; CI runs it on every change.
-
-The same rule holds in the disasm repo, which carries its own copy of the
-checker.
+The working rules every session follows here — code, commits, docs, failures,
+investigating, testing — are the shared ones in `.claude/rules/`, which Claude
+Code loads by itself; this file only adds what is this project's. The docs
+rule's link check is `npm run links`, and the disasm repo carries its own copy
+of the checker. The frozen records under `docs/history/` are left as written.
 
 ## Working rules
 
-**Committing is standing permission, in both repos — do not ask.** Finish a
-piece of work and commit it, with the attribution the global rules give
-(author Senyaak, committer Claude via `GIT_COMMITTER_*`, no `Co-Authored-By`
-trailer). Never `git add -A` over a tree you did not leave: check `git status`
-first and stage only your own files, because work in progress from another
-session lives here regularly. Pushing is allowed too (the owner, 2026-11-02);
-the fleet's roles push their own branches and only the merger pushes master.
+**Committing is standing permission, in both repos — do not ask**, and so is
+pushing (the owner, 2026-11-02); the fleet's roles push their own branches and
+only the merger pushes master.
 
 **This repo is PUBLIC and the disasm repo is PRIVATE, on purpose.** What is
 read out of the exe stays in the disasm repo. This repo — its code, docs,
@@ -75,35 +54,17 @@ in the disasm repo, not here.
 reading comes first. What the exe gives is what the PLAYER SEES; the mechanism
 under it is ours to choose.
 
-**Search the disasm notes before reading the exe, and before saying anything
-is not there.** The answer has more than once been written down already.
-
-**"I could not find it" is never "it is not there".** The grenade's trail was
-declared absent because both of the projectile update's dispatches skip a plain
-grenade, and it is in the CONSTRUCTOR (0x43247b). The water skip was declared
-absent with a physics argument for why it could not exist, and it was the last
-instruction of an arm that had been skimmed (`0x4A9260(scalar/5, 0x400, 0, 0)`,
-a kick straight up). Read every arm from its first instruction to its last
-before concluding anything about it. A field in the data means nothing until
-code is found reading it.
+**The disasm notes are what is already written**: search them before reading
+the exe, and before saying anything is not there. An arm of a routine is read
+from its first instruction to its last.
 
 **Play's memory of the original beats an ambiguous reading.** Record it
 verbatim and tag it `[play]`. `[deliberate]` and `[CHECK — remake]` are open
 questions, not decisions (the legend is in
 [docs/facts/](docs/facts/README.md)).
 
-**No leftovers.** A stand-in is deleted the moment the real thing lands; it is
-never kept as a fallback.
-
-**The mouse works every menu.** A screen the pointer cannot drive reads as
-broken, however faithful it is ([docs/facts/menu.md](docs/facts/menu.md)).
-
-**Keep modules small and single-purpose.** `battle.ts` reached 1365 lines doing
-every job in the game and was taken apart; do that again rather than let one
-file grow a second concern.
-
-**In a session with the owner, do not run suites unasked**; run the spec a
-change touches when it matters. The fleet's roles say what they run.
+**The mouse works every menu**, however faithful a keyboard-only screen would
+be ([docs/facts/menu.md](docs/facts/menu.md)).
 
 ## Traps worth knowing before touching the code
 

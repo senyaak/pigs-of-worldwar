@@ -1,14 +1,15 @@
-// Every relative link in a markdown file must land on a file that
-// exists. Moving or splitting a doc is how links rot, and nothing else in the
-// repo would notice: TypeScript does not read prose and a broken link renders
-// as an ordinary one.
+// Every relative link in a markdown file must land on a file that exists
+// (.claude/rules/docs.md). Moving or splitting a doc is how links rot, and
+// nothing else in the repo would notice: a compiler does not read prose and a
+// broken link renders as an ordinary one.
 //
-//   node scripts/links.mjs [root]
+//   node .claude/fleet/links.mjs [root]
 //
+// Checks the markdown git tracks or would track under `root` (default: the
+// current directory), so it also checks a sibling repo when pointed at it.
 // Prints each broken link as `file:line: target` and exits 1 if there is one.
 // Links inside code fences and inline code are not links; http(s) and
-// anchor-only links are not checked. `root` defaults to the current directory,
-// so the same script checks the disasm repo when pointed at it.
+// anchor-only links are not checked.
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'

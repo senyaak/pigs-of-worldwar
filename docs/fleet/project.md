@@ -147,9 +147,14 @@ Within that, reads before the builds that need them.
 - **A visible change gets an e2e spec** when unit cannot see it, and a drawn
   subject is asserted on the canvas, not on a debug read
   ([../testing.md](../testing.md)).
-- **Every new screen, overlay or clickable element works with the mouse**, in
-  the same change ([../facts/menu.md](../facts/menu.md)).
-- **Modules stay small and single-purpose** ([../../CLAUDE.md](../../CLAUDE.md)).
+- **The mouse drives every menu**, however faithful a keyboard-only screen
+  would be ([../facts/menu.md](../facts/menu.md)).
+- **Failure reporters** (`.claude/rules/failures.md`): not built yet. There is
+  no reporter per layer, no `Refusal` or `UnknownFailure`, and no guard over
+  the catches; bringing the code to the rule is
+  [failures-and-actions.md](../todo/failures-and-actions.md). Until then a
+  new catch in a change still hands the error on, or is marked `not a
+  failure: <why>`.
 - `CHANGELOG.md` is written when a version is cut ([../release.md](../release.md)),
   never by a PR.
 
@@ -160,8 +165,7 @@ Within that, reads before the builds that need them.
    facts file plus one line in [../facts/README.md](../facts/README.md).
 2. The issue's work-list file is deleted or rewritten (§ Work list).
 3. Nothing is appended to `docs/history/`. The PR body is the record.
-4. The doc rule of [../../CLAUDE.md](../../CLAUDE.md): one subject per file,
-   or an index.
+4. The doc rule, `.claude/rules/docs.md`: one subject per file, or an index.
 
 ## Verify
 
@@ -187,6 +191,12 @@ npm run e2e:locked -- <each e2e spec the change touches or adds> > _tmp/e2e.log 
 - **The unit suite never runs beside an e2e run in the same slot**:
   `e2e/scratch.ts` clears `_tmp/saves` and `_tmp/profile` at the start and
   end of every Playwright run, so a unit run beside it fails on the profile.
+- **The harness** (`.claude/rules/testing.md`): `e2e/launch.ts` collects the
+  renderer's uncaught errors and `console.error` into `errors`, and a spec
+  checks them at its end — not yet at the moment one happens. Gestures are
+  not actions yet: a spec waits on what it can observe. Both are
+  [failures-and-actions.md](../todo/failures-and-actions.md). **The queue** is
+  `npm run e2e:locked`.
 - CI runs typecheck, boundaries, build, the unit suite, the link check and
   `fleet.mjs verify`; the e2e suite only runs locally.
 - A disasm PR: `node tools/links.mjs .` in the disasm worktree.

@@ -2,7 +2,7 @@
 //
 // It checks the project — the copy against its lock, the guard's registration,
 // docs/fleet/project.md filled in, CLAUDE.md pointing at the fleet, CI running
-// `verify` — and GitHub: the owner logged in to `gh`, every repo of the
+// `verify` and the link check — and GitHub: the owner logged in to `gh`, every repo of the
 // project reachable with its base branch, and every label the roles use. With
 // --fix it creates the missing labels; everything else it only reports, since
 // each is a decision of the project's.
@@ -114,14 +114,27 @@ export function diagnose(project, { gh, verifyProblems }) {
   }
 
   const claude = join(project, 'CLAUDE.md')
-  if (existsSync(claude) && /\.claude\/fleet|docs\/fleet/.test(readFileSync(claude, 'utf8'))) ok('CLAUDE.md points at the fleet')
+  const claudeText = existsSync(claude) ? readFileSync(claude, 'utf8') : ''
+  if (/\.claude\/fleet|docs\/fleet/.test(claudeText)) ok('CLAUDE.md points at the fleet')
   else bad('CLAUDE.md does not point at the fleet (.claude/fleet/README.md or docs/fleet/)')
+  // The working rules need no pointer: Claude Code loads .claude/rules/ into
+  // every session by itself.
 
   const workflows = join(project, '.github/workflows')
-  const ci = existsSync(workflows)
-    ? readdirSync(workflows).some((f) => /\.ya?ml$/.test(f) && readFileSync(join(workflows, f), 'utf8').includes('fleet.mjs verify'))
-    : false
-  ci ? ok('CI runs fleet.mjs verify') : bad('no workflow under .github/workflows runs `node .claude/fleet/fleet.mjs verify`')
+  const ciText = existsSync(workflows)
+    ? readdirSync(workflows)
+        .filter((f) => /\.ya?ml$/.test(f))
+        .map((f) => readFileSync(join(workflows, f), 'utf8'))
+        .join('\n')
+    : ''
+  ciText.includes('fleet.mjs verify') ? ok('CI runs fleet.mjs verify') : bad('no workflow under .github/workflows runs `node .claude/fleet/fleet.mjs verify`')
+  // .claude/rules/docs.md: CI checks every relative link, directly or through
+  // a package script that runs links.mjs
+  const pkg = join(project, 'package.json')
+  const scripts = existsSync(pkg) ? JSON.parse(readFileSync(pkg, 'utf8')).scripts ?? {} : {}
+  const linkScripts = Object.entries(scripts).filter(([, cmd]) => String(cmd).includes('links.mjs')).map(([name]) => name)
+  const linked = ciText.includes('links.mjs') || linkScripts.some((name) => ciText.split(/\s+/).join(' ').includes(`npm run ${name}`))
+  linked ? ok('CI checks the markdown links') : bad('no workflow checks the markdown links (`node .claude/fleet/links.mjs`, .claude/rules/docs.md)')
 
   let login = null
   try {

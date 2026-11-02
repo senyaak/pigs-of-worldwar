@@ -12,7 +12,7 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "boundaries": "node scripts/boundaries.mjs",
-    "links": "node scripts/links.mjs",
+    "links": "node .claude/fleet/links.mjs",
     "e2e:locked": "node scripts/e2e-lock.mjs",
     "test:unit": "playwright test --project=unit --project=weapons",
     "test:weapons": "playwright test --project=weapons",

@@ -5,6 +5,8 @@ GitHub issues and pull requests. This folder and the role files in
 `.claude/agents/` are a **copy of a version of `senyaak/claude-fleet`**, pinned
 in `fleet.lock.json` and never edited here ([updating.md](updating.md)). What
 is this project's own is in [docs/fleet/project.md](../../docs/fleet/project.md).
+The working rules every session follows, a fleet role or not, are beside this
+folder: [../rules/README.md](../rules/README.md).
 
 ## How it works
 
@@ -25,5 +27,6 @@ is this project's own is in [docs/fleet/project.md](../../docs/fleet/project.md)
 - [fleet.mjs](fleet.mjs) — `check`, `update`, `verify`, `doctor`: the fleet as a pinned dependency
 - [guard.md](guard.md) — the hook that refuses what the rules forbid, and why it is Node
 - [lessons.md](lessons.md) — the process problems the shared rules came from
+- [links.mjs](links.mjs) — every relative markdown link lands; CI runs it (`../rules/docs.md`)
 - [project-template.md](project-template.md) — what `docs/fleet/project.md` must hold; the installer starts it from this
 - [updating.md](updating.md) — taking a new version, and where a change to the rules is made

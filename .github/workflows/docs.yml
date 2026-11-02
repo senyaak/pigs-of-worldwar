@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: 24
 
-      - run: node scripts/links.mjs
+      - run: node .claude/fleet/links.mjs
 
       # The fleet's roles and process are a pinned copy of senyaak/claude-fleet;
       # an edit made here instead of there would be lost on the next update.
