@@ -17,9 +17,10 @@ What play asked for that it does not do yet:
   ONE PLAYER screen gets a third bar under NEW GAME and LOAD GAME that opens
   the proving ground, so testing does not start with
   `pow.swapMap('PROVING')`. The screen is the bar machine with two items
-  today (`ui/onePlayer.ts`, record 14, kind 1); a third row is the remake's
-  own and its words are ours, since `fetext` carries no such string, so it is
-  `[play]` in the facts. It drives with the mouse like every row
+  today (`ui/onePlayer.ts`, record 14, kind 1). The bar reads **PROVING
+  GROUND**. The original has no such row and `fetext` no such string, so the
+  facts tag it `[play]` — the mark that keeps a later pass from "correcting"
+  the menu back to the exe's two rows. It drives with the mouse like every row
   (`docs/facts/menu.md`), and the battle it opens needs no campaign save.
 - **Training dummies that come back.** The dummies should be real enemy pigs
   that skip their turns and stand up at full health at the start of a turn.
