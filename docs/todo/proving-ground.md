@@ -13,6 +13,14 @@ every piece comes from: [../facts/proving-ground.md](../facts/proving-ground.md)
 
 What play asked for that it does not do yet:
 
+- **A way in from the menu, not only the console.** `[play]`, 2026-11-02: the
+  ONE PLAYER screen gets a third bar under NEW GAME and LOAD GAME that opens
+  the proving ground, so testing does not start with
+  `pow.swapMap('PROVING')`. The screen is the bar machine with two items
+  today (`ui/onePlayer.ts`, record 14, kind 1); a third row is the remake's
+  own and its words are ours, since `fetext` carries no such string, so it is
+  `[play]` in the facts. It drives with the mouse like every row
+  (`docs/facts/menu.md`), and the battle it opens needs no campaign save.
 - **Training dummies that come back.** The dummies should be real enemy pigs
   that skip their turns and stand up at full health at the start of a turn.
   Then reactions, deaths, damage numbers and dropped crates get tested too.

@@ -1,23 +1,23 @@
 # Fleet lessons
 
-Process problems the fleet ran into and the rule change that fixed each.
+Problems the fleet's PROCESS ran into, and the rule change that fixed each.
 Agents report them as `fleet-process` issues; the orchestrator changes the
-roles and adds a line here. One line per lesson, newest at the top of its
-table, numbered from L1 in this repo.
+roles and adds a line here. A flaw found in one of the repo's own rules along
+the way is fixed in that rule and not recorded here. One line per lesson,
+newest at the top; numbers are never reused, because issues cite them.
 
 ## This fleet
 
 | # | Problem | Fix | Where |
 | - | ------- | --- | ----- |
-| L9 | The first run (issue #1 → PR #3) put the testing rule "no wall-clock duration in a spec that drives a walk" against about ten specs that hold a walk key for 400 ms; the new spec copied them. | The rule names what it protects: a walk the spec depends on the END of is sized by distance; a walk that only has to move may hold for a time. | `docs/testing.md` |
-| L8 | The merger's step order deleted the branch before checking GitHub had marked the PR merged, which can leave it closed as unmerged; `in-progress` stayed on the closed issue. The fast-forward itself worked: GitHub marked PR #3 merged in the push's second and `Closes #1` fired. | Confirm merged, then delete the branch; the merger removes `in-progress`. | `reviewer.md` § Merger 4 |
-| L7 | Reviewer: no line between blocking and non-blocking (two errors lived only in the PR body), no rule for re-reviewing a new head, an approval with no record of what was checked. | Only what lands on master blocks; a PR back after a verdict is reviewed on the diff since the last reviewed head; an approval is an `Approved (round k)` comment plus the label. | `reviewer.md` § Pick, § Decide |
-| L6 | The planner cut one work-list item into two issues and found no rule for the item's file in between (#1, #2). The developer role had one; the index did not say it. | Finishing part of an item rewrites its file to what is open; the last issue deletes it. Issue areas are free names. | `docs/todo.md`, `planner.md` |
+| L8 | The merger's steps deleted the branch before confirming GitHub had marked the PR merged, which can leave it closed as unmerged; `in-progress` stayed on the closed issue. | Confirm merged, then delete the branch; the merger removes `in-progress`. | `reviewer.md` § Merger |
+| L7 | The reviewer had no line between blocking and non-blocking (two errors lived only in the PR body), no rule for a PR back after a verdict, and an approval left no record of what was checked. | Only what lands on master blocks; a returned PR is reviewed on the diff since the last reviewed head; an approval is an `Approved (round k)` comment plus the label. | `reviewer.md` § Pick, § Decide |
+| L6 | The planner cut one work-list item into two issues and found no rule for the item's file in between (#1, #2). | Finishing part of an item rewrites its file to what is still open; the last issue deletes it. | `docs/todo.md` |
 | L5 | Shell traps cost the first run's agents several retries: Git Bash mangles `git show <rev>:<path>`, `gh issue view --comments` printed nothing, `gh pr view --json` has no `merged`, and re-measuring an index had no sanctioned way to run the repo's TS readers. | Written down with the workaround for each, and where a one-off measurement goes. | `workflow.md` § Commands and waiting |
 | L4 | In one slot a unit run beside an e2e run pulled `_tmp/saves` from under the app and failed on the profile (`e2e/scratch.ts` runs for every project); a phase-002 spec run alone failed for want of the `.env` that `e2e/000/foundation.spec.ts` writes (#4). | Unit and e2e one after the other in a slot; foundation first in any e2e list. | `workflow.md` § Commands and waiting |
 | L3 | Found before the start, by a review of a sibling fleet: five slots running Electron e2e at once would starve each other into false reds against the suite's short timeouts. | `npm run e2e:locked`, one machine-wide lock in the game folder; tested under contention. | `workflow.md` § Commands and waiting, `developer.md`, `reviewer.md` |
 | L2 | Found before the start: only `Bash(...)` was pre-allowed, sessions sit in `pow-fleet-<n>` while the notes and the exe are one level up, and PowerShell or a plain `cd`/`ls` would each stop a session on a prompt. | Each slot gets its own `.claude/settings.local.json` from `fleet-slots.sh`: the game folder as a working directory and a broad Bash list; the roles use Bash only. | `scripts/fleet-slots.sh`, `workflow.md` § Commands and waiting |
-| L1 | Found before the start: the claim's "wait 60 seconds" cannot be a `sleep`, which the desktop app refuses; a session would skip the wait and race, or stall. | Read the sources first, wait out the rest with Monitor; the same for CI and the merger's idle wait. A stranger's issue is triaged on its number and author alone, so its text never enters a context. | `workflow.md` § Claim, `planner.md` § Strangers, `reviewer.md` § Merger |
+| L1 | Found before the start: the claim's "wait 60 seconds" cannot be a `sleep`, which the desktop app refuses; a session would skip the wait and race, or stall. | Fill the minute with the reading the task needs anyway; for the rest, Monitor or a re-read once it is up. The same tools for CI and the merger's idle wait. | `workflow.md` § Commands and waiting, § Claim |
 
 ## Inherited from the pcktor fleet
 
@@ -29,7 +29,7 @@ are already folded in. What each became here:
 | - | - | - |
 | L1, L14, L17 | the cloud proxy refuses GraphQL and some REST calls | not needed: the sessions are local, `gh issue` / `gh pr` work |
 | L2, L10 | a looping session drags old tasks along; subagents sharing a checkout clobber it | `workflow.md` § Dispatcher and subagent |
-| L3 | sessions stalled on permission prompts | `.claude/settings.json` |
+| L3 | sessions stalled on permission prompts | `.claude/settings.json`, and each slot's own permissions (this fleet's L2) |
 | L4, L9, L15, L16, L24, L39 | claim races on issues and PR fixes | `workflow.md` § Claim and § Branch |
 | L5, L37 | parallel PRs took the same next number | nothing in this repo is numbered by count; files are named by subject |
 | L6 | friction seen only by chance | every role § Process problems |
