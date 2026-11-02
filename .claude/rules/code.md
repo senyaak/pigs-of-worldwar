@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.{ts,tsx,js,jsx,mjs,cjs}"
+---
+
 # Code
 
 - Modules stay small and single-purpose: split a file before it takes a

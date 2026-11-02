@@ -1,7 +1,7 @@
 {
   "source": "https://github.com/senyaak/claude-fleet.git",
-  "version": "v1.2.0",
-  "commit": "7a4d9b96f775663c36d1b07b5be8200b3dd1c89c",
+  "version": "v1.3.0",
+  "commit": "42f5a08b438b014eda5d14472c537f31b31b8538",
   "files": {
     ".claude/agents/developer.md": "23013f2943a028be",
     ".claude/agents/planner.md": "37768b3127fe8c87",
@@ -19,13 +19,15 @@
     ".claude/fleet/strangers.md": "875344fad15472ef",
     ".claude/fleet/updating.md": "15aca4e7d5bea299",
     ".claude/fleet/workflow.md": "541a127103ceebff",
-    ".claude/rules/README.md": "b09c026c8e41d114",
-    ".claude/rules/code.md": "e5eec7b619cb89e9",
+    ".claude/rules/README.md": "0ce27a94d5c069e1",
+    ".claude/rules/code.md": "d604f5bf216e69b5",
     ".claude/rules/commits.md": "71104f8c32a36f1c",
-    ".claude/rules/docs.md": "94779c7504bf5d8a",
-    ".claude/rules/failures.md": "4b92690430da8a4b",
+    ".claude/rules/docs.md": "1627a1e18e3b2ea8",
+    ".claude/rules/failures.md": "635ed28cee04d891",
     ".claude/rules/investigating.md": "4ff0052e278db104",
-    ".claude/rules/testing.md": "15b05710416674b7",
-    ".claude/rules/writing-rules.md": "4546a2768f018d31"
+    ".claude/rules/running-tests.md": "bb96c87e2620a90e",
+    ".claude/rules/testing.md": "dc31e08fa36881ca",
+    ".claude/rules/writing-rules.md": "03076d4861972d4a",
+    ".claude/skills/failures-pass/SKILL.md": "6ce03b9dd34113db"
   }
 }

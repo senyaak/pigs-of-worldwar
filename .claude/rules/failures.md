@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.{ts,tsx,js,jsx,mjs,cjs}"
+---
+
 # Failures: caught, said, never swallowed
 
 When a catch drops an error, a broken gesture becomes nothing at all: the
@@ -43,9 +48,4 @@ write saves back — throws instead: the next write would replace what is there
 with nothing. Where the owner decided a loss is acceptable, the loss is
 reported.
 
-## Bringing a project to this
-
-Two passes. First, mechanically: every catch gets one of the three, and what
-is not understood on sight becomes `UnknownFailure`. Then, as the runs show
-where they land, each one gets its kind — the refusals first, since the tests
-of refusals are the first to go red.
+Bringing a project to this rule is the `failures-pass` skill.

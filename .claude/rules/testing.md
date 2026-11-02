@@ -1,3 +1,13 @@
+---
+paths:
+  - "**/*.{spec,test}.{ts,tsx,js,jsx,mjs,cjs}"
+  - "**/e2e/**"
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/unit/**"
+  - "**/__tests__/**"
+---
+
 # Tests: fail at the moment, wait for the end
 
 A test that waits out a timeout when something broke costs minutes and names
@@ -50,16 +60,3 @@ the app reports what happened and the test listens.
 - A check done by hand in a console goes into a test in the same change.
 - A slow wait is shown while the run is going (a reporter listing every wait
   over two seconds, and every timeout a test went on past, with its line).
-
-## Running
-
-- Run the tests of what was touched, at once; the whole suite only for a
-  shared change or a release. In a session with the owner, nothing runs
-  unasked beyond the test of what the change touches.
-- Write a run's output to a file and read the file: a tail hides the error
-  that matters.
-- On a machine shared by several sessions, one heavy run at a time, in a
-  queue every run waits in; start such a run in the background and read its
-  log when it ends.
-- `project.md` § Verify names the project's commands, its harness and its
-  queue.

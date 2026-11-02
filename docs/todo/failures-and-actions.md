@@ -9,9 +9,9 @@ have yet:
   report it through its layer's one reporter, or be marked `not a failure:
   <why>`; a guard over every catch keeps it so. The layers here are the
   renderer, the main process and `lib/`, which has no I/O of its own. The
-  rule's two passes: first mechanically, `UnknownFailure` where the kind is
-  not clear, then the kinds as runs show them — a `Refusal` where the game
-  says no by its own rules.
+  procedure is the shared `failures-pass` skill: first mechanically,
+  `UnknownFailure` where the kind is not clear, then the kinds as runs show
+  them — a `Refusal` where the game says no by its own rules.
 - **Tests that fail at once.** `e2e/launch.ts` already collects the renderer's
   uncaught errors and `console.error` into `errors`; a spec reads them at its
   end. The rule wants the first unexpected report to end the test with that

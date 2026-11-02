@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.md"
+---
+
 # Docs: one thing per file, or an index
 
 - A markdown file describes ONE thing, or it is an INDEX: a list of links,
