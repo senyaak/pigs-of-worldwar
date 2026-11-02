@@ -1,0 +1,4 @@
+# Shell scripts keep LF on every checkout: with core.autocrlf a Windows
+# checkout writes CRLF, and bash outside Git for Windows reads the \r as part
+# of each command.
+*.sh text eol=lf
