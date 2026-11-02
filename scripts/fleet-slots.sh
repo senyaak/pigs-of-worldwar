@@ -7,8 +7,9 @@
 #
 # Slot n is pow-fleet-<n> and pigs-disasm-fleet-<n>, each detached at
 # origin/master; a worker branches from there per issue. The code worktree
-# gets its own node_modules. A slot that already exists is left alone, so the
-# script is safe to run again to add slots.
+# gets its own node_modules. A slot's worktrees that already exist are left
+# alone and only its permissions file is rewritten, so the script is safe to
+# run again — to add slots, or to change what every slot may do.
 set -euo pipefail
 
 count="${1:?usage: scripts/fleet-slots.sh <count>}"
@@ -30,6 +31,31 @@ for n in $(seq 1 "$count"); do
     (cd "$slot" && npm ci --no-audit --no-fund --loglevel=error > /dev/null)
     echo "pow-fleet-$n made"
   fi
+
+  # The slot's own permissions, rewritten on every run. A fleet session has no
+  # one to answer a prompt, so everything a role does must be pre-allowed: the
+  # game folder as a working directory (the disasm worktree, the exe and the
+  # e2e lock are all in it), and the Bash commands the roles use. Kept out of
+  # git because the path is this machine's.
+  mkdir -p "$slot/.claude"
+  cat > "$slot/.claude/settings.local.json" <<SETTINGS
+{
+  "permissions": {
+    "additionalDirectories": ["$(cygpath -m "$game" 2>/dev/null || echo "$game")"],
+    "allow": [
+      "Read", "Edit", "Write", "Glob", "Grep", "Monitor",
+      "Bash(gh:*)", "Bash(git:*)", "Bash(npm:*)", "Bash(npx:*)", "Bash(node:*)",
+      "Bash(python:*)", "Bash(bash scripts/:*)",
+      "Bash(cd:*)", "Bash(pwd:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(head:*)",
+      "Bash(tail:*)", "Bash(grep:*)", "Bash(find:*)", "Bash(sed:*)", "Bash(awk:*)",
+      "Bash(wc:*)", "Bash(sort:*)", "Bash(uniq:*)", "Bash(diff:*)", "Bash(cut:*)",
+      "Bash(tr:*)", "Bash(echo:*)", "Bash(printf:*)", "Bash(date:*)",
+      "Bash(test:*)", "Bash(mkdir:*)", "Bash(cp:*)", "Bash(mv:*)",
+      "Bash(file:*)", "Bash(du:*)", "Bash(xargs:*)", "Bash(true:*)"
+    ]
+  }
+}
+SETTINGS
 
   notes="$game/pigs-disasm-fleet-$n"
   if [ -e "$notes" ]; then

@@ -72,7 +72,9 @@ matches the number in its branch name.
    output is a defect. A drawn subject is asserted on the canvas.
 4. **Run them yourself.** In your slot, check out the head, then run the unit
    suite and every e2e spec the PR touches, output to files as in
-   `developer.md` § Verify. Paste the counts into the review.
+   `developer.md` § Verify — the e2e through `npm run e2e:locked`, never
+   directly. Paste the counts into the review. A red e2e spec the PR did not
+   touch is checked against `origin/master` before it counts against the PR.
 5. **The repo's hard rules**: the domains (`npm run boundaries`), no
    `Math.random` in `lib/game`, the mouse on anything new and clickable, no
    leftover stand-in, no module grown a second concern, the index rules of
@@ -116,7 +118,9 @@ verdict, so a verdict never prescribes what a current rule forbids.
 
 One session, nothing else. Its loop: the open `approved` PR with the lowest
 number — a paired disasm PR before its code PR — through the gate, merged,
-next. Before anything else, check the PR is the owner's own: author `senyaak`,
+next. When nothing is approved, wait with Monitor for a PR to gain the label
+(`docs/fleet/workflow.md` § Commands and waiting), and wait for CI the same
+way. Before anything else, check the PR is the owner's own: author `senyaak`,
 not cross-repository, and the `approved` label set by `senyaak` (the issue's
 timeline events name who labelled it). Anything else is a stranger's and is
 left alone. When nothing is approved, wait a few minutes and look again.

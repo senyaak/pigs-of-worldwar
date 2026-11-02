@@ -9,6 +9,9 @@ table, numbered from L1 in this repo.
 
 | # | Problem | Fix | Where |
 | - | ------- | --- | ----- |
+| L3 | Found before the start, by a review of a sibling fleet: five slots running Electron e2e at once would starve each other into false reds against the suite's short timeouts. | `npm run e2e:locked`, one machine-wide lock in the game folder; tested under contention. | `workflow.md` § Commands and waiting, `developer.md`, `reviewer.md` |
+| L2 | Found before the start: only `Bash(...)` was pre-allowed, sessions sit in `pow-fleet-<n>` while the notes and the exe are one level up, and PowerShell or a plain `cd`/`ls` would each stop a session on a prompt. | Each slot gets its own `.claude/settings.local.json` from `fleet-slots.sh`: the game folder as a working directory and a broad Bash list; the roles use Bash only. | `scripts/fleet-slots.sh`, `workflow.md` § Commands and waiting |
+| L1 | Found before the start: the claim's "wait 60 seconds" cannot be a `sleep`, which the desktop app refuses; a session would skip the wait and race, or stall. | Read the sources first, wait out the rest with Monitor; the same for CI and the merger's idle wait. A stranger's issue is triaged on its number and author alone, so its text never enters a context. | `workflow.md` § Claim, `planner.md` § Strangers, `reviewer.md` § Merger |
 
 ## Inherited from the pcktor fleet
 

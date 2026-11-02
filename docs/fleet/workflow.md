@@ -15,6 +15,24 @@ in words, the numbers the code needs, citations by disasm path and address,
 and at most one instruction quoted as evidence. That covers PR bodies, review
 comments, issue comments and commit messages as much as code.
 
+## Commands and waiting
+
+- **Use the Bash tool for every command, never PowerShell.** Only Bash
+  commands are pre-allowed in a slot (`scripts/fleet-slots.sh` writes the
+  list), and PowerShell mangles UTF-8 on this machine. A command that asks
+  for permission stops the session until the owner comes back, so a command
+  outside the list is a `fleet-process` report, not a reason to wait.
+- **A foreground `sleep` is refused in the desktop app.** To wait for time to
+  pass or for something to change, use the **Monitor** tool with an
+  until-loop over the condition — `until [ $(date +%s) -ge <deadline> ]`,
+  `until gh pr checks <n> | grep -qv pending`, a label appearing. Do useful
+  read-only work first and wait only for what is left.
+- **e2e runs one at a time on the whole machine**: `npm run e2e:locked --
+  <specs>` takes a lock in the game folder that every slot shares, and waits
+  inside Node while another slot holds it. Run it with `run_in_background`
+  and read its log when you are notified; the wait can outlast a foreground
+  command's ten minutes. The unit suite needs no lock.
+
 ## Claim
 
 0. **Only the owner's account counts.** Take only issues and PRs authored by
@@ -28,8 +46,10 @@ comments, issue comments and commit messages as much as code.
    the oldest.
 2. **Claim it.** Comment `claimed by <your session tag>` on an issue, or `fix
    claimed by <tag> for round <k>` on a PR (`k` from its latest verdict). That
-   is the **whole first line**; a branch name goes on the next. **Wait 60
-   seconds, then re-read every comment.** The earliest claim wins. A claim on
+   is the **whole first line**; a branch name goes on the next. **Let 60
+   seconds pass after your claim's own timestamp, then re-read every
+   comment** — read the issue's sources meanwhile, and wait out the rest with
+   Monitor (§ Commands and waiting). The earliest claim wins. A claim on
    an issue counts only if it was posted after the issue last became `ready`;
    on a PR, only if it names the current round and was posted after that
    round's verdict. Yield only to an earlier claim that has not itself

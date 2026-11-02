@@ -82,11 +82,14 @@ npm run boundaries > _tmp/boundaries.log 2>&1
 npm run links > _tmp/links.log 2>&1
 npm run test:unit > _tmp/unit.log 2>&1
 npm run build > _tmp/build.log 2>&1
-npx playwright test --project=e2e <each e2e spec the change touches or adds> > _tmp/e2e.log 2>&1
+npm run e2e:locked -- <each e2e spec the change touches or adds> > _tmp/e2e.log 2>&1
 ```
 
-`npx playwright test` alone does not build; the build line comes first. The
-e2e run needs the installed game, which is `..` from the worktree. If an e2e
+The e2e run goes through the machine-wide lock and in the background
+(`docs/fleet/workflow.md` § Commands and waiting); never call `npx playwright
+test --project=e2e` directly. Playwright does not build, so the build line
+comes first. The e2e run needs the installed game, which is `..` from the
+worktree. If an e2e
 spec you did not touch fails, check it against `origin/master` before calling
 it yours or not yours, and say which in the PR.
 

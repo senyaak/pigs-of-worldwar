@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "boundaries": "node scripts/boundaries.mjs",
     "links": "node scripts/links.mjs",
+    "e2e:locked": "node scripts/e2e-lock.mjs",
     "test:unit": "playwright test --project=unit --project=weapons",
     "test:weapons": "playwright test --project=weapons",
     "test:e2e": "npm run boundaries && electron-vite build && playwright test --project=e2e",
