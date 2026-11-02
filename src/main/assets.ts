@@ -426,6 +426,13 @@ export interface LoadedProp {
   /** The POG name this geometry answers to. */
   name: string
   model: Model
+  /**
+   * The texture archive of the .MAD the model came out of. A face group
+   * indexes its OWN archive's `.mtd`, so a model keeps the list it was read
+   * with — every prop of a shipped map shares one, and a map built out of
+   * several archives (the proving ground, main/provingGround.ts) does not.
+   */
+  textures: (Tim & { name: string })[]
 }
 
 export interface LoadedMapObjects {
@@ -434,29 +441,19 @@ export interface LoadedMapObjects {
    * `*_ME` spawn markers have no geometry there and so are absent — the
    * caller matches by name and skips what it cannot draw. */
   props: LoadedProp[]
-  /** The map's one texture archive, shared by every prop on it. */
-  textures: (Tim & { name: string })[]
 }
 
 /**
- * A map's placed objects: the .POG list, the geometry each record names out
- * of the sibling .MAD, and the map's textures — parsed ONCE and shared,
- * rather than per model as `loadModel` would.
+ * The named models out of one map archive, each dressed in that archive's
+ * paired textures — parsed ONCE and shared by every model, rather than per
+ * model as `loadModel` would. A name the archive does not carry is skipped.
  *
  * No skeleton is passed on purpose. Maps ship no .HIR, and prop vertices are
  * already absolute; their VTX bone field carries something else (it runs
  * 0..14 on static crates and trees alike) and adding offsets for it would
  * scatter them.
  */
-export async function loadMapObjects(full: string): Promise<LoadedMapObjects> {
-  const objects = parsePog(await fs.readFile(full))
-  const dir = path.dirname(full)
-  const stem = path.basename(full).replace(/\.pog$/i, '')
-  const siblings = await fs.readdir(dir)
-  const madName = siblings.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.mad`)
-  if (!madName) return { objects, props: [], textures: [] }
-
-  const madPath = path.join(dir, madName)
+export async function loadProps(madPath: string, names: Iterable<string>): Promise<LoadedProp[]> {
   const data = await fs.readFile(madPath)
   const { entries } = parseArchive(data)
   const byName = new Map(entries.map((entry) => [entry.name.toLowerCase(), entry]))
@@ -464,19 +461,34 @@ export async function loadMapObjects(full: string): Promise<LoadedMapObjects> {
     const entry = byName.get(name.toLowerCase())
     return entry ? data.subarray(entry.offset, entry.offset + entry.size) : null
   }
-
+  const textures = await pairedTextures(madPath)
   const props: LoadedProp[] = []
-  // Every model a RECORD names, plus the handful the ENGINE spawns and no record
-  // places — a mine on the ground is `WE_APMIN` out of this same archive and
-  // nothing in the .POG mentions it (lib/game/ammo.ts).
-  for (const name of new Set([...objects.map((object) => object.name), ...SPAWNED_MODELS])) {
+  for (const name of new Set(names)) {
     const vtx = bytes(`${name}.VTX`)
     const no2 = bytes(`${name}.NO2`)
     const fac = bytes(`${name}.FAC`)
     if (!vtx || !no2 || !fac) continue
-    props.push({ name, model: parseModel(vtx, no2, fac) })
+    props.push({ name, model: parseModel(vtx, no2, fac), textures })
   }
-  return { objects, props, textures: await pairedTextures(madPath) }
+  return props
+}
+
+/**
+ * A map's placed objects: the .POG list and the geometry each record names out
+ * of the sibling .MAD, with the map's own textures.
+ */
+export async function loadMapObjects(full: string): Promise<LoadedMapObjects> {
+  const objects = parsePog(await fs.readFile(full))
+  const dir = path.dirname(full)
+  const stem = path.basename(full).replace(/\.pog$/i, '')
+  const siblings = await fs.readdir(dir)
+  const madName = siblings.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.mad`)
+  if (!madName) return { objects, props: [] }
+  // Every model a RECORD names, plus the handful the ENGINE spawns and no record
+  // places — a mine on the ground is `WE_APMIN` out of this same archive and
+  // nothing in the .POG mentions it (lib/game/ammo.ts).
+  const names = [...objects.map((object) => object.name), ...SPAWNED_MODELS]
+  return { objects, props: await loadProps(path.join(dir, madName), names) }
 }
 
 /**

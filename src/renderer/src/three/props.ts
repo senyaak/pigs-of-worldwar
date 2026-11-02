@@ -9,7 +9,7 @@
 // TESTER, but only a couple of dozen models.
 
 import * as THREE from 'three'
-import type { MapObject, MapProp, Texture } from '../api'
+import type { MapObject, MapProp } from '../api'
 import { buildModelGeometry, buildTextureMaterials, disposeMesh } from './modelMesh'
 import { modelRotationY } from '../../../lib/formats/pog'
 import { RAMP_TILT, isRamp } from '../../../lib/game/ramps'
@@ -100,23 +100,22 @@ export interface MapProps {
   dispose(): void
 }
 
-export function buildMapProps(
-  objects: MapObject[],
-  props: MapProp[],
-  textures: Texture[]
-): MapProps {
+export function buildMapProps(objects: MapObject[], props: MapProp[]): MapProps {
   const group = new THREE.Group()
   const built = new Map<string, { geometry: THREE.BufferGeometry; materials: THREE.Material[] }>()
   for (const prop of props) {
     built.set(prop.name, {
-      geometry: buildModelGeometry(prop.model, textures),
+      // Each in its OWN archive's textures: a face group's texture index is a
+      // place in the .mtd the model was read with, and the proving ground
+      // draws out of four of them (main/provingGround.ts).
+      geometry: buildModelGeometry(prop.model, prop.textures),
       // **UNLIT, and `modelMesh.ts` says why in full**: half of what a prop's
       // NO2 holds is not normals but fragments of the game's own machine code,
       // and a quad's normal indices are its vertex indices, so the faces point
       // straight into it. The original cannot be lighting props off that. This
       // puts them on the same footing as the ground, which has always been unlit
       // because the art carries its own light.
-      materials: buildTextureMaterials(prop.model, textures, { lit: false })
+      materials: buildTextureMaterials(prop.model, prop.textures, { lit: false })
     })
   }
 

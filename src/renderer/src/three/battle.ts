@@ -104,7 +104,6 @@ export interface BattleAssets {
    * map whose objects failed to load still plays. */
   objects: MapObject[]
   props: MapProp[]
-  propTextures: Texture[]
   /** `gtext`, the battle's own strings — the skill names among them
    * (lib/game/skills.ts). Empty is fine: a battle plays without them. */
   strings: string[]
@@ -260,7 +259,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
 
   // Whatever the map stands on its ground: trees, crates, bridges, and on
   // the training map the dummies and the gate.
-  const props = buildMapProps(assets.objects, assets.props, assets.propTextures)
+  const props = buildMapProps(assets.objects, assets.props)
   root.add(props.group)
   /** Every box that could hide the pig from the camera (lib/game/seeThrough.ts),
    * built once — the records do not move. The boxes are grown to the ART the

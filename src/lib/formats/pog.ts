@@ -120,7 +120,7 @@ export interface MapObject {
 }
 
 const NAME_SIZE = 16
-const FIELD_COUNT = 31
+export const FIELD_COUNT = 31
 export const POG_RECORD_SIZE = NAME_SIZE * 2 + FIELD_COUNT * 2
 
 /** The collision shape kinds field 11 selects (exe jump table 0x4AAFE0). */
@@ -244,6 +244,34 @@ const PARACHUTES = 0x40
 export const parachutesIn = (object: MapObject): boolean =>
   (object.flags & PARACHUTES) !== 0
 
+/**
+ * One record out of its two halves: the model's name and the 31 fields as
+ * stored. What `parsePog` does to every record of a file, and what a map
+ * built in code (lib/game/provingGround.ts) does to the fields it writes —
+ * so a built record and a read one are decoded by the same lines.
+ */
+export function objectFromFields(name: string, fields: Int16Array): MapObject {
+  const angle = (units: number): number => (units / TURN) * Math.PI * 2
+  return {
+    name,
+    id: fields[3],
+    type: fields[7],
+    x: fields[0],
+    y: fields[1],
+    // Stored as-is: the file's z IS the world's, now that the map is no
+    // longer mirrored. See `modelRotationY` above.
+    z: fields[2],
+    pitch: angle(fields[4]),
+    yaw: angle(fields[5]),
+    roll: angle(fields[6]),
+    shape: fields[11],
+    box: { x: fields[10] * BOX_UNIT, y: fields[9] * BOX_UNIT, z: fields[8] * BOX_UNIT },
+    flags: fields[13],
+    contents: fields[14] === CARRIES ? { weapon: weaponOf(fields[15]), amount: fields[16] } : null,
+    fields
+  }
+}
+
 export function parsePog(data: Uint8Array): MapObject[] {
   if (data.byteLength < 2) throw new Error(`POG is ${data.byteLength} bytes, too short for a count`)
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
@@ -258,25 +286,7 @@ export function parsePog(data: Uint8Array): MapObject[] {
     const base = 2 + i * POG_RECORD_SIZE
     const fields = new Int16Array(FIELD_COUNT)
     for (let f = 0; f < FIELD_COUNT; f++) fields[f] = view.getInt16(base + NAME_SIZE * 2 + f * 2, true)
-    const angle = (units: number): number => (units / TURN) * Math.PI * 2
-    objects.push({
-      name: readName(data, base),
-      id: fields[3],
-      type: fields[7],
-      x: fields[0],
-      y: fields[1],
-      // Stored as-is: the file's z IS the world's, now that the map is no
-      // longer mirrored. See `modelRotationY` above.
-      z: fields[2],
-      pitch: angle(fields[4]),
-      yaw: angle(fields[5]),
-      roll: angle(fields[6]),
-      shape: fields[11],
-      box: { x: fields[10] * BOX_UNIT, y: fields[9] * BOX_UNIT, z: fields[8] * BOX_UNIT },
-      flags: fields[13],
-      contents: fields[14] === CARRIES ? { weapon: weaponOf(fields[15]), amount: fields[16] } : null,
-      fields
-    })
+    objects.push(objectFromFields(readName(data, base), fields))
   }
   return objects
 }

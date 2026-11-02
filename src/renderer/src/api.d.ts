@@ -135,10 +135,13 @@ export interface MapObject {
 export interface MapProp {
   name: string
   model: Model
+  /** The textures of the archive the model came out of — a face indexes its
+   * own archive's `.mtd` (main/assets.ts, `LoadedProp`). */
+  textures: Texture[]
 }
 
 export type LoadMapObjectsResult =
-  | { ok: true; objects: MapObject[]; props: MapProp[]; textures: Texture[] }
+  | { ok: true; objects: MapObject[]; props: MapProp[] }
   | { ok: false; error: string }
 
 export interface SoundEntry {

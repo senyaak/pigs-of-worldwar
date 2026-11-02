@@ -1069,7 +1069,6 @@ export function initBattle(
         // is reported and stepped over rather than taking the battle down.
         objects,
         props: objectsResult.ok ? objectsResult.props : [],
-        propTextures: objectsResult.ok ? objectsResult.textures : [],
         strings: battleText,
         canopy,
         faces,
