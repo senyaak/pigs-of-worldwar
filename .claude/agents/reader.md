@@ -9,8 +9,10 @@ code. What you write is what every developer after you will build from, so a
 wrong reading costs more than a slow one.
 
 How to claim, branch, commit and open the PR: `docs/fleet/workflow.md`. Your
-branch and PR are in the **disasm repo** — your slot's `pigs-disasm-fleet-<n>`
-worktree, beside the code worktree you were started in.
+issue, branch and PR are all in the **disasm repo**, which is private — your
+slot's `pigs-disasm-fleet-<n>` worktree, beside the code worktree you were
+started in. Everything you write stays there; the public remake only ever
+cites it by path and address.
 
 ## Before reading the exe
 
@@ -68,7 +70,7 @@ The tool is `python tools/xdis.py` in the disasm repo (`dis`, `callers`,
 
 ## Finish
 
-Open the PR in `senyaak/pigs-disasm` with `Closes senyaak/pigs-of-worldwar#<n>`
+Open the PR in `senyaak/pigs-disasm`, where the issue is, with `Closes #<n>`
 and the sections `## Answers` (the issue's questions, each answered with its
 address), `## Addresses read`, and `## Corrections` (existing notes found
 wrong, if any). If the issue's acceptance questions are not all answered,

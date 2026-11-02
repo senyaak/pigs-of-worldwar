@@ -78,6 +78,12 @@ matches the number in its branch name.
 7. **Docs**: the facts file for the subject is updated with the source; the
    work-list file is deleted or rewritten; nothing is appended to
    `docs/history/`.
+8. **Nothing private went public.** A listing, pseudocode or a transcribed
+   routine anywhere in the PR — code, docs, body, commit messages — is a
+   defect. Your own re-reading of the addresses stays out of the public
+   review too: there you write which citations you checked and whether they
+   agree, and a disagreement names the note and address, with the detail in
+   a comment on the disasm side.
 
 ## Decide
 
@@ -90,8 +96,8 @@ account, so a verdict is a label plus a COMMENT review.
    of what is still open — file, what is wrong, what the source says — and
    which earlier points no longer apply. A fixer reads only this verdict. Then
    label the PR `changes-requested`.
-2. **A question only the owner can answer** → a `needs-owner` issue, and label
-   the PR `blocked`.
+2. **A question only the owner can answer** → a `needs-owner` issue in the
+   disasm repo, and label the PR `blocked`.
 3. **All good** → check it still applies to master (the local merge-tree test);
    if it conflicts, post `Verdict: rebase only (round <k>)` instead. Otherwise
    label it `approved`.

@@ -5,8 +5,15 @@ this says how a piece of work is taken, carried and handed over without two
 sessions colliding. Every rule here was bought by a collision in the pcktor
 fleet; [LESSONS.md](LESSONS.md) names them.
 
-The sessions are local, so `gh issue` and `gh pr` work; issues live in
-`senyaak/pigs-of-worldwar`, disasm PRs in `senyaak/pigs-disasm`.
+The sessions are local, so `gh issue` and `gh pr` work. A `read` issue and its
+PR are in the private `senyaak/pigs-disasm`; a `build`, `test` or `bug` issue
+and its PR in the public `senyaak/pigs-of-worldwar` ([README.md](README.md)
+§ Which repo carries what).
+
+**Nothing read out of the exe goes into the public repo** beyond the behaviour
+in words, the numbers the code needs, citations by disasm path and address,
+and at most one instruction quoted as evidence. That covers PR bodies, review
+comments, issue comments and commit messages as much as code.
 
 ## Claim
 
@@ -70,10 +77,10 @@ Bash on this machine. Stage only your own files, never `git add -A`.
 1. Rebase on fresh `origin/master` right before pushing, and re-run the checks
    if master moved.
 2. Title it like the issue and write the body **from this issue**, never from
-   another PR's text. It holds `Closes senyaak/pigs-of-worldwar#<n>` (the
-   same number as the branch), a short summary, the role's required sections,
-   and `Pairs with <repo>#<n>` when the work spans both repos. Label it
-   `fleet`.
+   another PR's text. It holds `Closes #<n>` (the issue is in the same repo,
+   and the number matches the branch), a short summary, the role's required
+   sections, and `Pairs with senyaak/<repo>#<n>` when the work spans both
+   repos. Label it `fleet`.
 3. If part of the issue was left out, write `Part of` instead of `Closes`, and
    comment on the issue what is still open.
 4. **Fixing a PR**: push, wait for CI on the new head, and remove

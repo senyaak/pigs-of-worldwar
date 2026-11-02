@@ -58,8 +58,16 @@ piece of work and commit it, with the attribution the global rules give
 (author Senyaak, committer Claude via `GIT_COMMITTER_*`, no `Co-Authored-By`
 trailer). Never `git add -A` over a tree you did not leave: check `git status`
 first and stage only your own files, because work in progress from another
-session lives here regularly. Pushing is a separate question, except for the
-fleet, whose roles push their own branches.
+session lives here regularly. Pushing is allowed too (the owner, 2026-11-02);
+the fleet's roles push their own branches and only the merger pushes master.
+
+**This repo is PUBLIC and the disasm repo is PRIVATE, on purpose.** What is
+read out of the exe stays in the disasm repo. This repo — its code, docs,
+issues, pull requests and reviews — carries the behaviour in words, the
+numbers the code needs, and citations (a disasm path and an exe address), and
+at most a single instruction quoted as evidence. Never a listing, pseudocode,
+a transcribed routine or a dump. A question about how to read the exe is asked
+in the disasm repo, not here.
 
 **The original is the spec, and every behaviour cites where it was read.**
 `[exe]` cites a disasm note and an exe address, `[measured]` the script,

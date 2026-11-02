@@ -27,8 +27,14 @@ remake produces it is yours to design, inside the code's domains
    `tools/xdis.py` under the reader's rules (`.claude/agents/reader.md`
    § Reading and § Writing the note) and open a disasm PR beside the code PR,
    same branch name. The code PR says `Pairs with senyaak/pigs-disasm#<n>`.
-3. **Bigger** — ask the dispatcher to open a `read` issue, list it under this
-   issue's `Depends on`, relabel this one `blocked`, and move on.
+3. **Bigger** — ask the dispatcher to open a `read` issue in
+   `senyaak/pigs-disasm`, list it under this issue's `Depends on` in full
+   (`senyaak/pigs-disasm#12`), relabel this one `blocked`, and move on.
+
+**This repo is public.** Code comments, specs, docs, the PR body and every
+comment carry the behaviour, the numbers and the citation — never a listing,
+pseudocode or a transcribed routine (`docs/fleet/workflow.md`). What you read
+for yourself goes into the disasm note.
 
 Never fill the gap with a plausible number. A `[CHECK — remake]` invention is
 not allowed in new work; an existing `[deliberate]` or `[CHECK — remake]` you
@@ -86,7 +92,7 @@ it yours or not yours, and say which in the PR.
 
 ## Finish
 
-Open the PR with `Closes senyaak/pigs-of-worldwar#<n>` and these sections:
+Open the PR with `Closes #<n>` and these sections:
 
 - `## Sources` — every behaviour the PR builds, one line each, with its
   citation.
