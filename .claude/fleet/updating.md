@@ -25,9 +25,10 @@ node .claude/fleet/fleet.mjs doctor --fix
   filled in (its front matter and every section of
   [project-template.md](project-template.md)), `CLAUDE.md` pointing at the
   fleet, CI running `verify`, `gh` logged in as the owner, every repo reachable
-  with its base branch, and every label the roles use. `--fix` creates the
-  missing labels; the rest it reports. Run it after every update — a new
-  version may bring a new label.
+  with its base branch, and every label the roles use. `--fix` registers the
+  fleet's missing hooks and creates the missing labels; the rest it reports.
+  Run it after every update — a new version may bring a new label or hook,
+  and `update` runs the old copy's code, which knows only its own hooks.
 
 **At session start** an owner session is told, in one line, when a newer
 version is out: the version check hook ([guard.md](guard.md) § The version

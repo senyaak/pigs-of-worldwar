@@ -4,8 +4,10 @@
 // docs/fleet/project.md filled in, CLAUDE.md pointing at the fleet, CI running
 // `verify` and the link check — and GitHub: the owner logged in to `gh`, every repo of the
 // project reachable with its base branch, and every label the roles use. With
-// --fix it creates the missing labels; everything else it only reports, since
-// each is a decision of the project's.
+// --fix it registers the fleet's missing hooks (an update run by an older
+// copy writes the new files but knows only its own hooks) and creates the
+// missing labels; everything else it only reports, since each is a decision of
+// the project's.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -94,13 +96,17 @@ export function projectFileProblems(text, template) {
 
 // Every check, as { ok, what, fix? } findings. `gh(args)` runs the GitHub CLI
 // and returns its stdout, or throws; it is passed in so tests need no network.
-export function diagnose(project, { gh, verifyProblems }) {
+// `registerHooks()` adds the fleet's hooks missing from the settings.
+export function diagnose(project, { gh, verifyProblems, registerHooks }) {
   const findings = []
   const ok = (what) => findings.push({ ok: true, what })
   const bad = (what, fix) => findings.push({ ok: false, what, fix })
 
   const verify = verifyProblems()
-  verify.length ? verify.forEach((p) => bad(p)) : ok('the copy matches its lock, and the guard and the version check are registered')
+  const hookFix = registerHooks && (() => registerHooks())
+  verify.length
+    ? verify.forEach((p) => bad(p, p.endsWith(' is not registered') ? hookFix : undefined))
+    : ok('the copy matches its lock, and the guard and the version check are registered')
 
   const file = join(project, PROJECT_FILE)
   const template = join(project, TEMPLATE)
@@ -185,9 +191,9 @@ export function diagnose(project, { gh, verifyProblems }) {
 
 // Print the findings, applying the fixable ones when asked. Returns the number
 // of problems left.
-export function doctor(project, { gh, verifyProblems, fix = false, log = console.log }) {
+export function doctor(project, { gh, verifyProblems, registerHooks, fix = false, log = console.log }) {
   let left = 0
-  for (const f of diagnose(project, { gh, verifyProblems })) {
+  for (const f of diagnose(project, { gh, verifyProblems, registerHooks })) {
     if (f.ok) {
       log(`  ok    ${f.what}`)
       continue

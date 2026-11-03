@@ -127,7 +127,7 @@ export function hookInstalled(settings, hook = HOOKS[0]) {
 }
 
 // Adds the fleet's hooks that are not registered yet; returns their names.
-function registerHooks(project) {
+export function registerHooks(project) {
   const path = join(project, '.claude/settings.json')
   const settings = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}
   const added = HOOKS.filter((hook) => !hookInstalled(settings, hook))
@@ -265,7 +265,12 @@ export async function main(argv) {
   if (command === 'doctor') {
     const gh = (ghArgs) => execFileSync('gh', ghArgs, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
     console.log(`fleet ${lock.version} in ${project}:`)
-    const left = doctor(project, { gh, verifyProblems: () => verifyProblems(project, lock), fix: args.includes('--fix') })
+    const left = doctor(project, {
+      gh,
+      verifyProblems: () => verifyProblems(project, lock),
+      registerHooks: () => registerHooks(project),
+      fix: args.includes('--fix'),
+    })
     return left ? 1 : 0
   }
 
