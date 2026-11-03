@@ -23,6 +23,10 @@ import { initArchiveView } from './ui/archiveView'
 import { initModelViewer } from './ui/modelViewer'
 import { initTerrainViewer } from './ui/terrainViewer'
 import { initBattle } from './ui/battle'
+import { normalizeMap } from './ui/battle/open'
+import { animationFrames, filter, firstValueFrom } from 'rxjs'
+import { ActionName, runAction } from './actions/actions'
+import type { ActionEnd } from './actions/actions'
 import { feText } from './ui/barScreen'
 import { installSargeConsole } from './audio/sarge'
 import { installSoundConsole } from './audio/console'
@@ -287,7 +291,7 @@ function toBriefing(replayAt?: number, fought?: FoughtPig[]): void {
         }))
       }
     : undefined
-  briefing.show(position, enemy, battle.open(level, wearing, own))
+  briefing.show(position, enemy, battle.open(level, true, wearing, own))
 }
 
 // The world map → region → flags sequence, the exe's 0x482C30. Skippable —
@@ -622,10 +626,41 @@ async function startCampaign(name: string, nation: number): Promise<void> {
 const multiPlayer = initMultiPlayer({
   onStart: (map) => {
     campaignBattle = false
-    void battle.open(map).then((ok) => ok && show('battle'))
+    void battle.open(map, true).then((ok) => ok && show('battle'))
   },
   onBack: () => show('menu')
 })
+
+/**
+ * How long opening a battle may keep the person waiting: the map's files, the
+ * art its squads wear and the scene built over them. A ceiling, not a
+ * measurement — the timing reporter (`e2e/timing.ts`) prints what each open
+ * really took, and this comes down to what it shows for the heaviest map.
+ */
+const OPEN_BUDGET_MS = 5_000
+
+/**
+ * STRAIGHT ONTO A MAP, past every menu — the battle a spec starts from
+ * (`e2e/load.ts`), which tests a move from one state to the next instead of
+ * walking the menus to reach it every time. No campaign is behind it, so it
+ * leaves to the main menu the way a skirmish does. `drop` is whether the
+ * squads come down under canopies first; the drop has specs of its own.
+ *
+ * It ends when the DASHBOARD has arrived, not when the view is up: the map
+ * slides in over twenty frames and gets its picture a moment after the scene,
+ * and a spec that reads the screen before then reads it half-built. The drop
+ * used to hide that — five seconds of it, every time.
+ */
+const openBattle = (map: string, drop: boolean): Promise<ActionEnd> =>
+  runAction(ActionName.OpenBattle, OPEN_BUDGET_MS, async () => {
+    campaignBattle = false
+    if (!(await battle.open(map, drop))) {
+      return { done: false, refusal: `${map} did not open — the console says why` }
+    }
+    show('battle')
+    await firstValueFrom(animationFrames().pipe(filter(() => battle.arrived())))
+    return { done: true }
+  })
 
 /** The frontend's screens, by the view that shows them. Only one of them may
  * be drawing and hearing the controller at a time. */
@@ -693,6 +728,7 @@ if (window.pow) {
   // map stands in and whether the briefing would take a key.
   window.pow.pigMap = { phase: pigMap.phase, patches: pigMap.patches, flags: pigMap.flags }
   window.pow.briefing = { ready: briefing.ready }
+  window.pow.open = (map, drop = false) => openBattle(normalizeMap(map), drop)
   window.pow.teamScreen = view(teamScreen)
   window.pow.nameScreen = { ...view(nameScreen), typed: nameScreen.typed, type: nameScreen.type }
   // …and the SQUAD screen carries one more read than the rack does: what its

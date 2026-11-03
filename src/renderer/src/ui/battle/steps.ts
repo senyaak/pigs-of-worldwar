@@ -49,7 +49,7 @@ export const goToStep = async (core: UiCore, want: number): Promise<boolean> => 
   // the battle it belongs to exists.
   if (back) {
     state.reloading = true
-    const opened = await start(core, state.map)
+    const opened = await start(core, state.map, true)
     state.reloading = false
     if (!opened) {
       state.stepWanted = null

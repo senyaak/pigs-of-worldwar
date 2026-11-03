@@ -40,9 +40,21 @@ export interface BattleView {
    * that take the field, each under its own name and rank-class
    * (lib/game/muster.ts). Left out, side 0 is dressed from `fetext` like
    * everybody else.
+   *
+   * `drop` is whether the level opens with its squads coming down under
+   * canopies, as every level does; false stands them on their markers at once,
+   * which is what `pow.open` asks for.
    */
-  open(name?: string, wearing?: readonly number[], own?: OwnSquad): Promise<boolean>
+  open(
+    name: string | undefined,
+    drop: boolean,
+    wearing?: readonly number[],
+    own?: OwnSquad
+  ): Promise<boolean>
   close(): void
+  /** Whether the dashboard has finished arriving over the battle — what the
+   * person is still waiting on once the view is up. */
+  arrived(): boolean
 }
 
 /**
@@ -150,7 +162,8 @@ export function initBattle(
     // MULTI-PLAYER screen made a MENU action change it, and then ONE PLAYER
     // opened CAMP's squad on LIBERATE's terrain. It cost a spec three phases
     // away — the pig walked into water it should never have been near.
-    open: (name, wearing, own) => start(core, name ?? DEFAULT_MAP, wearing, own),
+    open: (name, drop, wearing, own) => start(core, name ?? DEFAULT_MAP, drop, wearing, own),
+    arrived: () => hud.arrived(),
     close() {
       state.scene?.dispose()
       state.scene = null

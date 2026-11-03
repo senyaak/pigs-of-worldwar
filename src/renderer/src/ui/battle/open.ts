@@ -54,10 +54,12 @@ export const normalizeMap = (name: string): string =>
     .toUpperCase()
 
 /** (Re)start the battle on `name` — fresh spawns, fresh turn order. A load
- * failure leaves whatever battle was running untouched. */
+ * failure leaves whatever battle was running untouched. `drop` is whether the
+ * squads come down under canopies or stand on their markers at once. */
 export const start = async (
   core: UiCore,
   name: string,
+  drop: boolean,
   wearing: readonly number[] = [],
   own?: OwnSquad
 ): Promise<boolean> => {
@@ -260,6 +262,7 @@ export const start = async (
     game: state.game,
     onGameChanged: () => updateTileText(core),
     map: name,
+    drop,
     onCollected: (one) => collected(core, one),
     bus,
     sound: state.sound,

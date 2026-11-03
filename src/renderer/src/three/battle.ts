@@ -181,6 +181,10 @@ export interface BattleSceneParts {
   /** Which map this is — the training ground hands out its crates on its own
    * terms (lib/game/pickups.ts). */
   map: string
+  /** Whether the squads come down under canopies, as a level opens. False
+   * stands them on their markers at once — a spec that is not about the
+   * drop starts from the ground (`pow.open`). */
+  drop: boolean
   /** Called once per crate the acting pig walks into. */
   onCollected: (collected: Collected) => void
   /** The battle's own bus, already carrying whatever else listens. */
@@ -213,6 +217,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     game,
     onGameChanged,
     map,
+    drop,
     onCollected,
     bus,
     sound: sounds,
@@ -311,7 +316,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       // A map with no canopy art stands its squad on the markers instead: a pig
       // hanging from nothing is worse than one that starts where it was going
       // to end up (three/dropIn.ts).
-      parachutes: assets.canopy !== null
+      parachutes: drop && assets.canopy !== null
     },
     query,
     onChanged: onGameChanged,

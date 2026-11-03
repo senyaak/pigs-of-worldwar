@@ -75,6 +75,9 @@ export interface BattleMap {
   draw(context: CanvasRenderingContext2D, viewWidth: number, viewHeight: number, state: BattleMapState): void
   /** Back to the entrance — the next battle plays it again. */
   reset(): void
+  /** Whether the board is in its place with the level's picture on it: the
+   * entrance played out and the ground handed over. */
+  arrived(): boolean
 }
 
 const key = (icon: BlipIcon, colour: readonly number[]): string => `${icon}|${colour.join(',')}`
@@ -132,6 +135,8 @@ export function createBattleMap(): BattleMap {
     reset() {
       entered = 0
     },
+
+    arrived: () => entered >= SLIDE_FRAMES && ground !== null,
 
     draw(context, viewWidth, viewHeight, state) {
       if (!state.eye) return

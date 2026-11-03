@@ -37,6 +37,10 @@ every breach the repo has had compiled cleanly.
 - `src/renderer/src/ui/` — one module per view, and `battle.ts` is the
   COMPOSITION ROOT: it builds the bus and hangs the domains off it, with its
   parts in `battle/`. The dashboard is `hud.ts`, its parts in `hud/`.
+- `src/renderer/src/actions/` — the ACTION stream (RxJS): a gesture a spec
+  waits on runs as one named action that ends once — done, refused or
+  failed — with its time, and an overrun of its budget is reported as an
+  error. Opening a battle straight onto a map (`pow.open`) is the first.
 - `src/renderer/src/contracts/` — the shapes two domains share, importing
   nobody: `overlay.ts` what the scene projects for the dashboard, `sound.ts`
   the two polls the scene owes sound.

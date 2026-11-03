@@ -35,7 +35,7 @@ export const exposeConsole = (core: UiCore): void => {
         console.log('no battle is up — start one from the menu first')
         return false
       }
-      return start(core, normalizeMap(name))
+      return start(core, normalizeMap(name), true)
     },
     // The bar has no script driving it yet, so this is how it is watched:
     // any line, or the tutorial's own long one by default.

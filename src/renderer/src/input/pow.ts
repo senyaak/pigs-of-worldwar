@@ -3,6 +3,7 @@
 // commands. The controller module puts it on the window (input/controller.ts);
 // every view hangs its own part off it.
 
+import type { ActionEnd } from '../actions/actions'
 import type { Controller } from './controller'
 
 export interface DebugHooks {
@@ -368,6 +369,11 @@ declare global {
       /** Console command: restart the battle on another map —
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
       swapMap?(name?: string): Promise<boolean>
+      /** Open a battle on `map` from wherever the app is — `pow.open('ARTGUN')`
+       * — with no campaign behind it and, unless `drop`, the squads already
+       * standing. Resolves with the action's end: how it went and how long it
+       * took (actions/actions.ts). The specs start here (`e2e/load.ts`). */
+      open?(map: string, drop?: boolean): Promise<ActionEnd>
       /** Console command: hand the machine's sides to the keyboard for THIS
        * battle — `pow.hotseat()` toggles, a boolean sets, and it lands on the
        * NEXT turn (the seat is decided at each handover). The next battle is

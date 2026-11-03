@@ -130,6 +130,9 @@ export interface Hud {
   speaking(): boolean
   /** Wipe it — the battle is no longer the view. */
   clear(): void
+  /** Whether the dashboard has finished arriving: the map's entrance is the
+   * last of it to play out (ui/battleMap.ts). */
+  arrived(): boolean
 }
 
 export function createHud(canvas: HTMLCanvasElement): Hud {
@@ -232,6 +235,7 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
     ground: (raster) => battleMap.ground(raster),
     skills,
     speaking: () => bar.busy(),
+    arrived: () => battleMap.arrived(),
 
     clear() {
       bar.clear()
