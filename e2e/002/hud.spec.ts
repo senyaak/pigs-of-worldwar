@@ -23,7 +23,7 @@ import { parseTab } from '../../src/lib/formats/tab'
 import { parseBmp } from '../../src/lib/formats/bmp'
 import { parseText } from '../../src/lib/formats/text'
 import { nations } from '../../src/lib/game/teams'
-import { PLATE_DELAY } from '../../src/renderer/src/ui/hud'
+import { PLATE_DELAY } from '../../src/renderer/src/ui/hud/layout'
 import { MAX_TEAMS } from '../../src/lib/game/spawns'
 
 const DASH = path.join(GAME_DIR, 'Language', 'Tims', 'dashtims.mad')
