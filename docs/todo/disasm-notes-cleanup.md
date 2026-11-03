@@ -1,24 +1,50 @@
-# THE DISASM NOTES — split the big ones, and fold their corrections in
+# THE DISASM NOTES — the rest of the cleanup
 
-The notes grew as journals, and two habits from that time now cost every
-reader: pages that hold many subjects, and corrections written beside the
-wrong text instead of over it. The disasm repo's README states the rule both
-violate.
+The five notes past 500 lines are split: `movement/`, `effects/`, `objects/`,
+`scanner/` and `tutorial/` are each an index of one-subject pieces now, with
+their corrections folded in, and the water, the height and the library's
+registry moved to `water/mask.md`, `water/drawing.md`, `terrain/height.md` and
+`library/function-names.md` (disasm repo, merged to its master). What the
+re-checks changed for the remake is its own item:
+[corrected-readings.md](corrected-readings.md).
 
-## Split the notes past about 500 lines
+## Fold the corrections in, in the other notes
 
-Measured 2026-11-02: `movement/notes.md` 1265, `effects/notes.md` 1057,
-`objects/notes.md` 873, `scanner/notes.md` 744, `tutorial/notes.md` 516. Each
-becomes the index of its pieces at the same path, the way `weapons/fire.md`
-and `frontend/notes.md` were split on 2026-11-02, so the remake's citations
-still land. One issue per note.
+About 45 notes still carry `~~struck~~` lines, "WRONG, see below" or dated
+"corrected" headings (`grep -rn "~~\|WRONG\|see below\|RETRACTED\|OVERTURNED"`
+in the disasm repo). For each: rewrite into what is true, with the addresses,
+and delete what was overturned; an address that survives is re-checked with
+`tools/xdis.py` on the way. The heaviest are `weapons/fire/fire-table-sized.md`,
+`damage/notes.md`, `army/notes.md`, `speech/pigs.md`, `weapons/cluster.md`,
+`turns/notes.md`, `water/notes.md` and `weapons/emplaced.md`.
 
-## Fold the corrections in
+`weapons/fire.md`'s five blast-throw pieces and its two OVERTURNED pieces go:
+what still stands in them moves into the piece that is right, and the index
+loses its "superseded" lines.
 
-`weapons/fire.md`'s index marks the pieces a later one overturned — the
-bounce, the water bounce, and four passes at whether a blast throws a pig — and
-many notes still carry `~~struck~~` lines and "WRONG, see below". For each:
-rewrite the piece into what is true, with the addresses, and delete what was
-overturned. The answer is already written; this is editing, not reading, but
-every address that survives is re-checked with `tools/xdis.py` on the way.
-One issue per note or per group of pieces.
+## Stale text the split found beside it
+
+- `weapons/fire/weapon-in-hand-camera.md` sends skill 63 to arm 0x493C82; it
+  never reaches that dispatch (`scanner/map-view.md`, arm 0x4935A0).
+- `weapons/mines.md` says nothing draws a mine; the battle map and the
+  class-gated reveal at 0x4767A0 both do (`scanner/visibility.md`).
+- `weapons/emplaced.md` cites a "PE section map" rule `scanner/notes.md` never
+  had.
+- `water/notes.md` and `weapons/gas.md` still call 0x4700de / 0x467f2a the
+  Scramble; it is the sneeze (`movement/clips.md`).
+- `weapons/fire/blast-visual-row.md` has ids 0x5d/0x5f reading row 18; they
+  take 0x489083, which reads no row, and row 18 is id 0x40's
+  (`effects/rows.md`).
+- `weapons/espionage.md` and `objects/airship.md` are still journals.
+- Notes citing a section of an old note (`objects/notes.md` from
+  `movement/sweep.md`, `terrain/notes.md`, `scale/notes.md`, `water/notes.md`,
+  `damage/notes.md`, `weapons/emplaced.md`, `anim/audio-events.md`,
+  `script/notes.md`, `weapons/mines.md`, two `weapons/fire/` pieces; and
+  `tutorial/notes.md` from `skills/notes.md`, `turns/notes.md`) land on the
+  index; point each at its piece.
+
+## Then the remake's citations
+
+The remake cites `movement/notes.md` 25 times, `objects/notes.md` 21,
+`effects/notes.md` 16, `scanner/notes.md` and `tutorial/notes.md` 11 each, and
+`weapons/fire.md` 72: each lands on an index now and should name its piece.
