@@ -7,83 +7,67 @@
 // the level's opening, `marker.ts` the pointer, `debug.ts` the window the
 // e2e suite looks through. The rules themselves are pure and live in
 // `lib/game`; this scene feeds them intents and draws what they say.
+//
+// The parts it wires live in `battle/`, sharing one core (`battle/core.ts`).
 
-import * as THREE from 'three'
-import type { Bone, Clip, MapObject, MapProp, Model, Sky, TerrainBlock, TerrainTexture, Texture, TimImage } from '../api'
+import type { Battle } from '../../../lib/game/battle'
+import { createEngine } from '../../../lib/game/engine'
+import type { BattleBus } from '../../../lib/game/events'
 import type { Game, Pig } from '../../../lib/game/game'
-import { brainSeedFor, createEngine } from '../../../lib/game/engine'
-import { remoteBrain } from '../../../lib/game/brainPort'
-import type { BrainReply } from '../../../lib/game/brainPort'
-import type { ObstacleField } from '../../../lib/game/obstacles'
+import type { Blip, Eye } from '../../../lib/game/scanner'
+import type { Collected } from '../../../lib/game/scenery'
+import { skyFogFor } from '../../../lib/game/sky'
 import type { TerrainQuery } from '../../../lib/game/terrain'
-import { aimRadians } from '../../../lib/game/aim'
-import { weaponModelName } from '../../../lib/game/weapons'
-import { isPlanted, lobOf } from '../../../lib/game/grenade'
-import { meleeOf } from '../../../lib/game/melee'
-import { flingVelocity } from '../../../lib/game/tumble'
-import { ANIM } from '../../../lib/game/locomotion'
-import { HEAL_EFFECT_ID, flingSpeed } from '../../../lib/game/blast'
+import type {
+  Bone,
+  Clip,
+  MapObject,
+  MapProp,
+  Model,
+  Sky,
+  TerrainBlock,
+  TerrainTexture,
+  Texture,
+  TimImage
+} from '../api'
+import type { FloatingNumber, PigPlate } from '../contracts/overlay'
+import type { SceneSound } from '../contracts/sound'
+import { createAirDropArt } from './airDrop'
+import { createBrainLink, remoteBrainFor } from './battle/brainLink'
+import type { SceneCore } from './battle/core'
+import { exposeDebug } from './battle/debugSurface'
+import { drawnAt, marks, stanceNow } from './battle/drawn'
+import { focus, trainingStep } from './battle/jumps'
+import { listen } from './battle/listeners'
+import { blips, eye } from './battle/mapReadout'
+import { buildBlockers, fadeBlockers } from './battle/seeThrough'
+import { show } from './battle/show'
+import { createSceneState } from './battle/state'
+import { createSubject } from './battle/subject'
+import { survey } from './battle/survey'
+import { createChase } from './chase'
+import { projectDamage } from './damageNumbers'
+import { createDecoyArt } from './decoyArt'
+import { createDropInArt } from './dropIn'
+import { createEffectArt } from './effects'
+import { createFaces } from './faces'
+import { createGrenadeArt } from './grenades'
+import { createHeldWeapons } from './heldWeapon'
+import { buildMarker } from './marker'
+import { createMineArt } from './mineArt'
+import { buildMapProps } from './props'
+import { createRemainsArt } from './remains'
+import type { SceneHost } from './scene'
+import { createBulletArt } from './shots'
+import { buildSky } from './sky'
+import { fieldSquad } from './squad'
+import type { SoldierArt } from './squad'
 import { buildTerrain } from './terrain'
 import type { Terrain } from './terrain'
-import { buildMapProps } from './props'
-import { buildSky } from './sky'
-import { buildWeather } from './weather'
-import { skyFogFor } from '../../../lib/game/sky'
-import { fieldSquad } from './squad'
-import type { Soldier, SoldierArt } from './squad'
-import {
-  DYING_DRIFT,
-  DYING_DRIFT_MAX,
-  SCOPE_BONE,
-  SCOPE_MAGNIFY,
-  SCOPE_MOUNT,
-  createChase
-} from './chase'
-import type { View } from './chase'
-import { createDropInArt } from './dropIn'
-import { createFaces } from './faces'
-import { buildMarker } from './marker'
-import { createHeldWeapons } from './heldWeapon'
-import type { Battle } from '../../../lib/game/battle'
-import { objectBlips, pigBlips } from '../../../lib/game/scanner'
-import type { Blip, Eye } from '../../../lib/game/scanner'
 import { createTween } from './tween'
 import { createWear } from './wear'
-import type { Point } from '../../../lib/game/pose'
-import type { FlightShot, PigShot } from '../../../lib/game/snapshot'
-import { projectDamage } from './damageNumbers'
-import { createEffectArt } from './effects'
-import { createAirDropArt } from './airDrop'
-import { handling } from '../../../lib/game/events'
-import type { BattleBus } from '../../../lib/game/events'
-import type { SceneSound } from '../contracts/sound'
-import type { Collected } from '../../../lib/game/scenery'
-import { EXE_FRAME_SECONDS, FRAME_SECONDS } from '../../../lib/game/ballistics'
-import { createBulletArt } from './shots'
-import { crossedTowards, sightBlockers, silhouetteOf } from '../../../lib/game/seeThrough'
-import type { ArtExtent } from '../../../lib/game/seeThrough'
-import { MODEL_SCALE } from '../../../lib/game/scale'
-import { createGrenadeArt } from './grenades'
-import { createMineArt } from './mineArt'
-import { createRemainsArt } from './remains'
-import { createDecoyArt } from './decoyArt'
-import { PIG_HEIGHT, PIG_HOLD, PIG_RADIUS } from '../../../lib/game/obstacles'
-import { weaponLayer } from '../../../lib/game/controls'
-import { advanceTraining, nextBreak } from '../../../lib/game/training'
-import { exposeBattleDebug } from './debug'
-import {
-  DWELL_FRAMES,
-  FLOOR_CLEARANCE,
-  LOOK_EASE,
-  MOVE_EASE_XZ,
-  MOVE_EASE_Y,
-  NEAR_ENOUGH,
-  advanceBearing,
-  easeOver,
-  orbitPoint
-} from '../../../lib/game/mapView'
-import type { FloatingNumber, PigPlate } from '../contracts/overlay'
-import type { SceneHost } from './scene'
+import { buildWeather } from './weather'
+import * as THREE from 'three'
 
 export type { SoldierArt } from './squad'
 
@@ -261,72 +245,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   // the training map the dummies and the gate.
   const props = buildMapProps(assets.objects, assets.props)
   root.add(props.group)
-  /** Every box that could hide the pig from the camera (lib/game/seeThrough.ts),
-   * built once — the records do not move. The boxes are grown to the ART the
-   * player actually sees, measured off each model's own vertices the way
-   * `bodyExtent` measures a pig: a tree's collider is its trunk and its crown
-   * is what hides things ("текстуры листвы не делаются прозрачными"). */
-  const artExtents = new Map<string, ArtExtent>()
-  for (const prop of assets.props) {
-    const positions = prop.model.positions
-    if (positions.length === 0) continue
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity
-    for (let i = 0; i < positions.length; i += 3) {
-      minX = Math.min(minX, positions[i]); maxX = Math.max(maxX, positions[i])
-      minY = Math.min(minY, positions[i + 1]); maxY = Math.max(maxY, positions[i + 1])
-      minZ = Math.min(minZ, positions[i + 2]); maxZ = Math.max(maxZ, positions[i + 2])
-    }
-    // The mesh is drawn at MODEL_SCALE about the record's centre and turned
-    // only about the vertical, so the flat halves are safe as the larger of
-    // the two reaches (three/props.ts).
-    artExtents.set(prop.name.toUpperCase(), {
-      halfX: Math.max(Math.abs(minX), Math.abs(maxX)) * MODEL_SCALE,
-      halfZ: Math.max(Math.abs(minZ), Math.abs(maxZ)) * MODEL_SCALE,
-      topOffset: minY * MODEL_SCALE,
-      bottomOffset: maxY * MODEL_SCALE
-    })
-  }
-  const blockers = sightBlockers(assets.objects, (name) => artExtents.get(name) ?? null)
-  /** Scratch for the camera's position in GAME space: the root is turned half a
-   * turn about x, so the world's y and z are the game's negated. */
-  const eyeInGame = new THREE.Vector3()
-  /** …and the map's own pair, so asking for the eye between frames cannot
-   * disturb what the see-through test is holding. */
-  const mapEye = new THREE.Vector3()
-  const mapLook = new THREE.Vector3()
-
-  /**
-   * Where the camera is and which way it looks, GAME space — what the
-   * dashboard's map is centred on and turned by.
-   *
-   * The root is turned half a turn about x, so a point taken back into its
-   * space IS in game space; that is the same trip the see-through test makes.
-   * The look is taken as a second POINT rather than as a direction, because a
-   * direction taken through `worldToLocal` would come back rotated and
-   * translated both.
-   */
-  const eye = (): Eye => {
-    root.worldToLocal(mapEye.copy(host.camera.position))
-    host.camera.getWorldDirection(mapLook)
-    root.worldToLocal(mapLook.add(host.camera.position))
-    // `atan2(z, x)` and not the other way round: the library's yaw is the one
-    // whose `(cos, sin)` in world (x, z) points UP the widget
-    // (lib/game/scanner.ts).
-    return { x: mapEye.x, z: mapEye.z, heading: Math.atan2(mapLook.z - mapEye.z, mapLook.x - mapEye.x) }
-  }
-
-  /**
-   * Everything the map draws a marker for.
-   *
-   * Whose turn it is decides what is on it: an espionage pig is on its own
-   * team's map and on nobody else's (lib/game/scanner.ts). A crate's marker
-   * belongs to the OBJECT in the original and dies with it, so the art is
-   * asked whether the record is still standing.
-   */
-  const blips = (): Blip[] => [
-    ...pigBlips(game.players, game.players.indexOf(game.currentPlayer), performance.now() / 1000),
-    ...objectBlips(assets.objects, (id) => !props.drawn(id))
-  ]
+  // What could stand between the camera and the pig (`battle/seeThrough.ts`).
+  const blockers = buildBlockers(assets)
   const squad = fieldSquad(assets, game.players.map((player) => player.pigs), query, root)
   // The level opens with whoever the map's markers say drops in. Built after
   // the squad because it LIFTS them off it.
@@ -346,51 +266,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // buried in it.
     return y - query.surface(x, z) > 100
   })
-
-  /** The pig whose DYING the camera is on — set by the `dying` event, cleared
-   * by its `remains`. One at a time, like the engine's own watch
-   * (lib/game/corpses.ts, `watching`). */
-  let dyingWatch: number | null = null
-  /** …and how long it has been on it, seconds: the death view walks BACKWARDS
-   * out of the face while the clip runs (three/chase.ts, `DYING_DRIFT`). */
-  let dyingFor = 0
-
-  /**
-   * The pig an ATTACK has just thrown, and how long it has been still since.
-   *
-   * **The camera goes with a body a blow moves** — `[play]`, 2026-08-25: "если
-   * атака как-то передвигает свина — камера к нему прицепляется." That is not
-   * where the camera was: the subject is the ACTING pig, so a grenade that
-   * threw somebody across the beach was watched from the thrower, and the
-   * acting pig's own fling was watched from a rig deliberately PARKED for half
-   * a second (`chase.hold`).
-   *
-   * The engine announces the throw (`flung`) and nothing announces the
-   * landing, so the settle is measured here, where it is a camera question
-   * rather than a rule: the body is followed until it has held still for
-   * `FLUNG_SETTLE`, and never past `FLUNG_LIMIT` whatever it is doing — a roll
-   * that will not end must not take the turn's camera with it for ever.
-   */
-  let flungWatch: { pig: number; x: number; z: number; still: number; age: number } | null = null
-  /**
-   * Whether THIS blow threw somebody. The aftermath ride is the camera going
-   * back to where the blow happened (mode 0 on the crate), and when a body
-   * flew there is nothing there any more — an empty crater after the thing
-   * worth watching has already landed. Cleared when the aftermath is.
-   */
-  let sawFling = false
-  const FLUNG_SETTLE = 0.4
-  /**
-   * …and how long the camera STAYS on the body after it has stopped moving.
-   * Play, 2026-08-25: "ты показываешь место взрыва гранаты после того, как
-   * свинки перестали летать — лучше задерживай камеру на секунду на свине и
-   * потом иди дальше, без возвращения к месту взрыва пустому."
-   */
-  const FLUNG_LINGER = 1
-  const FLUNG_LIMIT = 6
-  /** How far a body may drift in a second and still count as settled — under
-   * the bleed the engine calls a stop (lib/game/tumble.ts). */
-  const FLUNG_CREEP = 40
+  const subject = createSubject()
 
   /**
    * The SCENE's subscription: everything the engine announces that has to be
@@ -402,60 +278,18 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * listener hung afterwards misses both, and the map comes up with the eight
    * dummies standing on it that the script has not placed yet.
    */
-  bus.on(
-    handling({
-      shown: ({ id, visible }) => props.show(id, visible),
-      taken: ({ id }) => props.take(id),
-      dropOpened: ({ pig }) => {
-        dropInArt.open(pig)
-        faces.scare(pig)
-      },
-      // The canopy goes on a CUT and on the ground alike; the face only calms
-      // on landing — a pig falling free has even more to be scared of.
-      dropCut: ({ pig }) => dropInArt.cut(pig),
-      dropLanded: ({ pig }) => faces.calm(pig),
-      // A DYING has begun: the camera comes to the pig's FACE for the length
-      // of the clip — play's word on the original ("камера на свинью С ЛИЦА,
-      // и она умирает"). The exe re-points its subject the same way (mode 16,
-      // WATCHING DYING PIG); the FRAMING is play's, on the rig the canopy
-      // already uses. The frame loop reads this id (see `watch`).
-      dying: ({ pig }) => {
-        dyingWatch = pig
-        dyingFor = 0
-        // A death outranks a fling, and a dying pig is usually both.
-        flungWatch = null
-      },
-      // A BLOW HAS THROWN A BODY: the camera goes with it (see `flungWatch`).
-      // The newest throw wins — a blast that catches two pigs is watched on
-      // the last one it reached, which is the one still moving.
-      flung: ({ pig, at }) => {
-        if (pig === dyingWatch) return
-        flungWatch = { pig, x: at.x, z: at.z, still: 0, age: 0 }
-        sawFling = true
-      },
-      // A death has finished playing out: the body comes off the scene for
-      // good and the boots go down where it lay (lib/game/corpses.ts). The
-      // blast that goes with it arrives as an ordinary `blasted`.
-      remains: ({ pig, at, heading }) => {
-        if (dyingWatch === pig) dyingWatch = null
-        squad.bury(pig)
-        remainsArt.leave(at, heading)
-      },
-      // A BANG SHAKES THE LENS, and this is the exe's own reaction to an
-      // explosion — the only one it has (three/chase.ts, `SHAKE_REACH`).
-      // …and the MEDICINE BALL's 0x60 does not: a heal is not a bang — its
-      // effect carries no force at all (lib/game/blast.ts, `mend`).
-      blasted: ({ at, effect }) => {
-        if (effect !== HEAL_EFFECT_ID) chase.shake(at)
-      },
-      crateSent: ({ id }) => airDropArt.open(id),
-      crateLanded: ({ id }) => airDropArt.land(id),
-      canopiesCut: () => airDropArt.cutAll(),
-      cameraReset: () => chase.reset(),
-      collected: (one) => onCollected({ ...one, result: 'taken' }),
-      refused: (one) => onCollected({ ...one, given: 0, result: 'full' })
-    })
-  )
+  listen({
+    bus,
+    props,
+    dropInArt,
+    faces,
+    squad,
+    chase,
+    airDropArt,
+    onCollected,
+    subject,
+    remainsArt: () => remainsArt
+  })
   /**
    * The battle itself, assembled: the terrain, the map's script, the
    * projectiles, the effects, the drop-in and the frame's own order of events —
@@ -463,55 +297,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    *
    * What this file does below is feed it art and READ what it did.
    */
-  /**
-   * Console: `pow.hotseat()` hands the machine's sides to the keyboard —
-   * hotseat, the way the pure specs already play — so play can drive the
-   * enemy and test weapons from both ends. FOR THIS BATTLE ONLY: the flag
-   * lives in the scene and the next battle builds a fresh one, machine on.
-   */
-  let hotseat = false
-  /** The reply subscription, dropped with the battle. */
-  let unsubscribeBrain: (() => void) | null = null
-  /**
-   * **THE MACHINE THINKS IN ITS OWN PROCESS** (lib/game/brainPort.ts,
-   * src/brain/).
-   *
-   * A turn's plan floods the whole map — about 25 000 cells, a few hundred
-   * milliseconds — and it used to do it inside one engine step, which is
-   * inside this file's `onFrame`, which is the same JS task as
-   * `renderer.render`. So the picture stopped dead every time a pig started
-   * thinking: "провисание рендера на 1 секунду… это отдельный нод процесс
-   * должен быть — получил данные, вернул план".
-   *
-   * Now it is: the seat posts the facts and picks the order up on a later
-   * step, the pig standing still meanwhile exactly as it stands through the
-   * ordinary mull. The field is read at ASK time rather than captured here,
-   * because the engine that owns it does not exist until the next statement.
-   */
-  let field: ObstacleField | null = null
-  /** Asks out and orders back — the only visible proof the process is doing
-   * the thinking (three/debug.ts, `brain`). */
-  const brainTally = { asked: 0, answered: 0 }
-  const brain = remoteBrain(
-    {
-      post: (message) => {
-        if (message.kind === 'ask') brainTally.asked++
-        window.api.brainSend(message)
-      },
-      onMessage: (handler) => {
-        unsubscribeBrain = window.api.onBrainReply((message) => {
-          brainTally.answered++
-          handler(message as BrainReply)
-        })
-      },
-      close: () => {
-        unsubscribeBrain?.()
-        unsubscribeBrain = null
-      }
-    },
-    { kind: 'battle', map, objects: assets.objects, seed: brainSeedFor() },
-    () => field?.changes() ?? { gone: [], moved: [] }
-  )
+  const link = createBrainLink()
+  const brain = remoteBrainFor(link, map, assets.objects)
   const engine = createEngine({
     world: {
       game,
@@ -535,12 +322,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // latches the answer at each turn's start, so `pow.hotseat()` above
     // lands on the NEXT handover (play's call: "достаточно только на начале
     // хода").
-    computer: (side) => side > 0 && !hotseat,
+    computer: (side) => side > 0 && !link.hotseat,
     brain
   })
   const { battle, scenery, obstacles, anim, swings, heals, shots, grenades, mines, effects, numbers, airDrops, dropIn } =
     engine
-  field = obstacles
+  link.field = obstacles
   /** The mixers, brought into line once a frame with what the engine says each
    * pig is wearing (three/wear.ts). */
   const wear = createWear(squad, assets.clips)
@@ -553,15 +340,6 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   host.camera.far = 100_000
   host.camera.updateProjectionMatrix()
 
-  let time = 0
-  /** `[0x4bd6c8]` — how far toward the hand the camera's HEIGHT moves in one
-   * engine frame (0x4a3072). A third, and no more. */
-  const EYE_LAG = 0.333
-  /** The eye as of the last ENGINE frame, and which frame that was. */
-  let heldEye = { x: 0, y: 0, z: 0 }
-  let eyeFrame = -1
-  /** Whether there is a previous height for the lag below to come from. */
-  let settled = false
   /** The weapons in hand, one mesh per pig that has one out. */
   const weapons = createHeldWeapons()
   /** The bands, puffs and sprites that show what the engine's effect field is
@@ -582,287 +360,6 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * (three/decoyArt.ts). */
   const decoyArt = createDecoyArt(root, (name) => props.spawn(name))
   /**
-   * Camera and marker onto a pig, wherever it happens to be standing — or
-   * hanging: a pig still on its canopy is watched from the front, face on,
-   * and one mid-swing from the side, which is the original's own camera mode
-   * for a hand-to-hand attack and the only thing that uses it (three/chase).
-   */
-  /**
-   * Where the scope looks FROM: `SCOPE_MOUNT` in the hand bone's space, in
-   * game space. The exe's rifle cam is bolted there (0x4a2ec0) and that is
-   * where its wobble comes from — the hand rides a breathing chest.
-   */
-  const scopeEye = (soldier: Soldier): { x: number; y: number; z: number } => {
-    // ONCE AN ENGINE FRAME, and held in between. The exe places this camera
-    // once per game frame at fifteen a second; sampling an interpolated
-    // skeleton at sixty turns the same breath into a glide, which is exactly
-    // what play saw — "щас плавает, а в оригинале прям дрожит". The pose
-    // itself still interpolates, so the pig moves smoothly and the view it is
-    // holding does not.
-    const frame = Math.floor(time / FRAME_SECONDS)
-    if (frame === eyeFrame) return heldEye
-    // A gap means the sights were down in between; start the lag afresh.
-    if (frame > eyeFrame + 1) settled = false
-    eyeFrame = frame
-    const eyeAt = engine.pose.boneToWorld(soldier.pig, SCOPE_BONE, SCOPE_MOUNT) ?? heldEye
-    // …and the HEIGHT LAGS. The exe does not put the camera at the hand's y —
-    // it moves a THIRD of the way there each frame and no further:
-    //
-    //   4a304e  eax = boneY - cameraY
-    //   4a3072  ...times the double at 0x4bd6c8, which is 0.333
-    //   4a3082  bp += that
-    //
-    // x and z are taken outright. So the picture snaps sideways with the hand
-    // and drags vertically behind it, which is a good deal less steady than
-    // either axis is on its own. `eyeFrame < 0` is the first frame of a
-    // sighting, where there is nothing to lag from.
-    heldEye = {
-      x: eyeAt.x,
-      y: settled ? heldEye.y + (eyeAt.y - heldEye.y) * EYE_LAG : eyeAt.y,
-      z: eyeAt.z
-    }
-    settled = true
-    return heldEye
-  }
-
-  /** Which view the ACTING pig was last watched from — the debug surface's, so
-   * a spec can tell the rig's views apart (three/debug.ts, `view`). */
-  let lastView = 'chase'
-
-  /**
-   * The shot in the air the camera would ride, or null when nothing is flying.
-   *
-   * Something of the acting pig's is in the air, and the two families answer
-   * differently — the whole table is `TRACKS_ITS_SHOT` in three/chase.ts. A
-   * GUN asks for mode 1, which stands still and TURNS after the bullet; a
-   * THROWN weapon asks for mode 0x0B, whose handler this build has lost and
-   * whose row is 3000 straight behind at the flight's own height. The NEWEST
-   * bullet is the one it answers for; which LOB is the engine's own call
-   * (`tracked`, lib/game/lobs.ts `head`), because after a cluster bursts the
-   * exe re-seats on the VERTICAL bomblet and that one is pushed first — play
-   * caught the camera taking the tail instead and parking on the burst:
-   * "при разлетании не следует за гранатками… а остаётся на месте взрыва".
-   *
-   * It is asked TWICE a frame: once here, and once by the subject chain, which
-   * refuses to hand the camera to a flung body while this is not null. The one
-   * function is the point — the two must never disagree about what is flying.
-   */
-  const inFlight = (): FlightShot | null =>
-    now.firing?.phase !== 'flight'
-      ? null
-      : now.bullets.length > 0
-        ? (now.bullets[now.bullets.length - 1] ?? null)
-        : (now.lobs.find((one) => one.id === now.tracked) ?? null)
-
-  const watch = (soldier: Soldier, delta: number | null): void => {
-    const acting = soldier.pig.id === now.acting
-    const bullet = inFlight()
-    if (bullet && acting) {
-      const at = drawnAt(`${now.bullets.length > 0 ? 'shot' : 'lob'}:${bullet.id}`, bullet)
-      const thrown = weaponLayer(pigShot(soldier.pig.id)?.holding ?? null) === 'lob'
-      if (thrown) chase.pursue(at, Math.atan2(bullet.vx, bullet.vz), delta)
-      else chase.watch(at, delta)
-      soldier.node.visible = true
-      lastView = thrown ? 'pursue' : 'watch'
-      return
-    }
-    // A DYING pig is looked in the FACE for the length of its clip — before
-    // the aftermath's ride, because the engine keeps the aftermath alive
-    // under a death and play wants the face, not the point ("камера на
-    // свинью С ЛИЦА"). The rig is the canopy's own face view (three/chase.ts).
-    if (soldier.pig.id === dyingWatch) {
-      // …and it BACKS AWAY while it watches — play's rule, the numbers and the
-      // reasoning in three/chase.ts (`DYING_DRIFT`).
-      dyingFor += delta ?? 0
-      chase.follow(
-        drawnStance(soldier),
-        soldier.node.position.y,
-        dropInArt.riseOver(soldier.pig.id),
-        delta,
-        'face',
-        0,
-        0,
-        null,
-        Math.min(DYING_DRIFT_MAX, 1 + DYING_DRIFT * dyingFor)
-      )
-      soldier.node.visible = true
-      lastView = 'face'
-      return
-    }
-    // A BODY A BLOW THREW is WATCHED, and the camera does not follow it —
-    // it stands where it is and TURNS, the way a man watches a ball. Play,
-    // 2026-08-25: "камера на свина при атаке переключается, но она меняет
-    // ракурс — а на самом деле должна оставаться на месте и только
-    // поворачиваться за свином." That is the exe's own mode 1 to the letter
-    // (three/chase.ts, `watch`): no position is written, no spring stepped,
-    // the ground floor never consulted. Following it was this repo's first
-    // reading of "камера к нему прицепляется" and it was the wrong half of
-    // the sentence — the camera attaches its GAZE, not its feet.
-    if (flungWatch !== null && soldier.pig.id === flungWatch.pig) {
-      chase.watch(drawnStance(soldier), delta)
-      soldier.node.visible = true
-      lastView = 'watch'
-      return
-    }
-    // …and so does what the blow left behind. Mode 0 on the crate, which is
-    // the ordinary chase rig with something other than a pig in it
-    // (0x4661c2).
-    if (now.aftermath && acting && !sawFling) {
-      chase.ride(drawnAt('aftermath', now.aftermath.at), soldier.pig.heading, delta)
-      soldier.node.visible = true
-      lastView = 'ride'
-      return
-    }
-    // A THROWN weapon has a camera of its own, and two of them — BOTH the exe's
-    // (three/chase.ts). Taking one in HAND is what changes the view, which is
-    // 0x493BB0's own dispatch and mode 4; holding the VIEW key is the TR cam,
-    // mode 0x12. **The fire button has nothing to do with either of them**, and
-    // a gun changes nothing on either count — 0x493BB0 skips it outright.
-    const lobbing = acting && weaponLayer(pigShot(soldier.pig.id)?.holding ?? null) === 'lob'
-    const view: View = pigShot(soldier.pig.id)?.underCanopy
-      ? 'face'
-      : acting && now.swinging
-        ? 'melee'
-        : // The aim view, held, and only for something that shoots — the exe
-          // picks mode 0x0E by WEAPON (0x492dfa) and gates it on the same test
-          // the melee camera is gated on, which is false through a swing.
-          acting && now.scoped
-          ? 'scope'
-          : // …and the VIEW key held over anything else is the TR cam — an
-            // empty hand and a blade included, the exe's own last arm
-            // (lib/game/sights.ts `sighting`).
-            acting && now.sighting
-            ? 'throw'
-            : lobbing
-              ? 'lob'
-              : 'chase'
-    if (acting) lastView = view
-    chase.follow(
-      drawnStance(soldier),
-      soldier.node.position.y,
-      dropInArt.riseOver(soldier.pig.id),
-      delta,
-      view,
-      // The camera looks along the AIM, tremor and all — the picture FOLLOWS the
-      // sight, which is what play asked for and what makes it honest.
-      aimRadians(now.aimAngle),
-      0,
-      view === 'scope' ? scopeEye(soldier) : null
-    )
-    // The pig's own body is IN the way of its own eye. Hide the acting model
-    // while the scope is up — every other pig stays, because those are what
-    // is being aimed at.
-    soldier.node.visible = view !== 'scope'
-    // …**and a pig inside a SHELTER is not drawn at all**, which is the engine's
-    // own word rather than a flourish: the exe clears `[pig+0x30]`, the byte its
-    // draw loop gates every object on (lib/game/indoors.ts). The camera stays
-    // where it is — pointed at the building he is in.
-    // …and a DISGUISED one the same way — the decoy stands in for it
-    // (lib/game/hide.ts).
-    const shot = pigShot(soldier.pig.id)
-    if (shot?.sheltered || shot?.hidden) soldier.node.visible = false
-  }
-
-  /** Take the battle to a pig, and the camera and marker with it. */
-  const focus = (pig: Pig): void => {
-    battle.focus(pig)
-    // A different pig is not a movement: both ends of the tween become where
-    // this one is standing.
-    settle()
-    sounds.reset()
-    marker.moveTo(pig.position.x, query.height(pig.position.x, pig.position.z), pig.position.z)
-    const soldier = squad.of(pig.id)
-    if (soldier) watch(soldier, null)
-  }
-
-  /**
-   * The last reading of the battle, and the ONLY thing below draws from it
-   * (lib/game/snapshot.ts).
-   *
-   * Held rather than asked for again: the dashboard asks for plates and numbers
-   * between frames, and two readings of one frame would be two different
-   * pictures.
-   */
-  let now = engine.snapshot()
-  const pigShot = (id: number): PigShot | undefined => now.pigs.find((one) => one.id === id)
-
-  /** Where the acting pig stood at a step boundary — the two the picture is
-   * drawn between. */
-  interface Stance {
-    x: number
-    y: number
-    z: number
-    heading: number
-    /** Whose stance it is: the battle hands the turn on inside a step, and one
-     * pig's place is not the next one's to be drawn between. */
-    pig: number
-    /** The engine's own word on whether it is in the water (three/chase.ts). */
-    swimming: boolean
-  }
-  const stanceNow = (): Stance => {
-    const at = engine.snapshot()
-    const { x, y, z, heading, swimming } = at.loco
-    return { x, y, z, heading, swimming, pig: at.acting }
-  }
-  let before: Stance = stanceNow()
-  let after: Stance = before
-  /** A jump in the state is not a movement to draw: a new turn, a warp, the
-   * moment the squad lands. Both ends become the same place, so nothing is
-   * tweened across the map. */
-  const settle = (): void => {
-    after = stanceNow()
-    before = after
-  }
-
-  /**
-   * Put the acting pig somewhere, and the picture with it — the debug surface's
-   * ONE write (three/debug.ts), and the training jump below uses the same one.
-   */
-  const warp = (x: number, z: number, heading: number): void => {
-    battle.warp(x, z, heading)
-    settle()
-    const pig = game.currentPig
-    squad.of(pig.id)?.place(pig.position.x, pig.position.y, pig.position.z, pig.heading)
-  }
-
-  /**
-   * **Jump the training ground to one of its steps** — the console's and F11/F12's
-   * (ui/battle.ts). The chain itself is `lib/game/training.ts`; what belongs here
-   * is the standing and the collecting, since a warp is a picture as well as a
-   * position.
-   *
-   * The crate is COLLECTED rather than conjured: the pig is stood on it and
-   * `Scenery.collect` is the very call the frame makes, so the inventory, the
-   * briefing bar and the sergeant's line all come out of the ordinary path. What
-   * IS the remake's own is putting the thing in the pig's hands afterwards —
-   * the original wants the skill menu for that, and a jump exists to skip the
-   * walking, not to make a point.
-   */
-  const trainingStep = (step: number): boolean => {
-    if (!engine.training) return false
-    const at = advanceTraining(step, { targets: engine.targets, scenery, airDrops })
-    if (!at) return true
-    // Facing whatever the step asks to be broken next, so the jump lands looking
-    // at the job rather than at the sky.
-    const target = engine.targets.find((one) => one.id === nextBreak(step))
-    const heading = target
-      ? Math.atan2(target.x - at.x, target.z - at.z)
-      : game.currentPig.heading
-    warp(at.x, at.z, heading)
-    // Whatever that just handed over goes into the hands — a health crate hands
-    // over nothing to hold, and leaves them empty. **It is what `collect`
-    // ANSWERS, not the last slot of the inventory**: that guess held only while
-    // a pig carried nothing but the crate, and every pig has spawned with its
-    // CLASS KIT since `a7412e9`. A grunt's ends in three grenades and `give`
-    // merges rather than appends, so the jump to step 1 — the BAYONET — put a
-    // grenade in the trainee's hands and `e2e/002/trainingStep.spec.ts` had
-    // been saying so ever since.
-    game.currentPig.holding = scenery.collect(game.currentPig)
-    onGameChanged()
-    return true
-  }
-
-  /**
    * …and everything else the engine moves that has an IDENTITY: what is in the
    * air, what is coming down under a canopy, and the spot a blow left behind
    * (three/tween.ts). The camera rides these, and it eases where it stands but
@@ -870,309 +367,56 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
    * aim, which is the shake play reported.
    */
   const tween = createTween()
-  const marks = (): [unknown, Point][] => {
-    const at = engine.snapshot()
-    const out: [unknown, Point][] = []
-    for (const shot of at.bullets) out.push([`shot:${shot.id}`, shot])
-    for (const lob of at.lobs) out.push([`lob:${lob.id}`, lob])
-    // A crate only moves DOWN, and `raise` is the only thing that reads it.
-    for (const one of at.crates) out.push([`crate:${one.id}`, { x: 0, y: one.y, z: 0 }])
-    for (const one of at.pigs) if (one.arriving) out.push([`drop:${one.id}`, one])
-    // There is only ever one beat, so it needs no number of its own.
-    if (at.aftermath) out.push(['aftermath', at.aftermath.at])
-    return out
-  }
-  /** Where to DRAW something the engine moves. */
-  const drawnAt = (key: unknown, now: Point): Point => tween.at(key, now, engine.alpha())
-
-  /**
-   * Where a pig is being DRAWN — which is what the camera frames, never the
-   * engine's own numbers.
-   *
-   * Three ways a pig gets a position, and each has its own history: one still
-   * on a canopy is coming down under it, the acting one is walking, and
-   * anything else is standing exactly where it stands.
-   */
-  const drawnStance = (soldier: Soldier): Omit<Stance, 'pig'> => {
-    // Only the acting pig is DRIVEN, so only it has a locomotion state to ask
-    // whether it is in the water; nothing else is followed closely enough for
-    // the swim framing to matter (three/chase.ts).
-    const swimming = soldier.pig.id === now.acting && now.loco.swimming
-    const shot = pigShot(soldier.pig.id)
-    if (shot?.arriving) {
-      const at = drawnAt(`drop:${shot.id}`, shot)
-      return { ...at, heading: shot.heading, swimming }
-    }
-    if (soldier.pig.id === now.acting) return stanceAt(engine.alpha())
-    const at = shot ?? soldier.pig.position
-    return { x: at.x, y: at.y, z: at.z, heading: shot?.heading ?? soldier.pig.heading, swimming }
-  }
-
-  /** Where to draw it, `alpha` of the way from the one to the other. Heading
-   * takes the SHORT way round, or a pig crossing north spins the long way. */
-  const stanceAt = (alpha: number): Omit<Stance, 'pig'> => {
-    const turn = ((after.heading - before.heading + Math.PI) % (2 * Math.PI)) - Math.PI
-    return {
-      x: before.x + (after.x - before.x) * alpha,
-      y: before.y + (after.y - before.y) * alpha,
-      z: before.z + (after.z - before.z) * alpha,
-      heading: before.heading + turn * alpha,
-      // Not a thing to interpolate: it is where the pig ENDED the step.
-      swimming: after.swimming
-    }
-  }
-
-  /**
-   * Everything the frame LOOKS like, read back off the battle once it has run.
-   *
-   * Every branch the engine takes — the drop, the beat after a blow, an
-   * ordinary frame — ends up watching the SAME pig, the acting one, so the
-   * camera is placed once here rather than at each of the engine's own exits.
-   */
-  const show = (delta: number): void => {
-    const arriving = now.pigs.filter((one) => one.arriving)
-    // The squad coming down: each pig where its own descent has got to, and
-    // the canopies heard the first frame the bank can play them.
-    dropInArt.draw(arriving, (one) => drawnAt(`drop:${one.id}`, one))
-    sounds.chuteOverhead(now.dropping)
-    // …and a planted charge burning, which is a noise for as long as the fuse
-    // lasts rather than a moment (audio/battleAudio.ts, `FUSE_TICK`).
-    sounds.fuseBurning(
-      // …still BURNING: a charge doused in the water has stopped counting and
-      // travels as −1 (lib/game/snapshot.ts).
-      now.lobs.filter((one) => isPlanted(one.skill) && one.fuse >= 0).map((one) => one.fuse),
-      delta
-    )
-    // …and a GAS canister streaming: the hiss runs while one is live and a
-    // doused one (fuse −1) has gone quiet (lib/game/gas.ts).
-    sounds.gasHissing(
-      now.lobs.some((one) => lobOf(one.skill)?.gas === true && one.fuse >= 0),
-      delta
-    )
-    // …and the war beyond the map's edge, which nothing on the field causes
-    // and so nothing announces (audio/ambience.ts). It stops with the world:
-    // `show` runs on a delta of zero under a pause.
-    sounds.ambient(delta, !now.over)
-    const active = squad.of(now.acting)
-    if (!active) return
-    if (!now.dropping && !now.starting && !now.over) {
-      // The acting pig stands where the locomotion state says, and the camera
-      // stops holding the moment the player drives (three/chase.ts).
-      chase.hold(
-        now.loco.airborne?.bouncing === true || now.loco.airborne?.ejected === true,
-        now.driving,
-        delta
-      )
-      sounds.follow(now.loco, now.loco.swimming)
-      // BETWEEN the last two steps. The rules move in fixed quanta and the
-      // screen does not, so what is drawn is the pig partway from where it
-      // stood to where it now stands (lib/game/engine.ts, STEP_SECONDS). The
-      // pig itself is not moved by this — `place` draws (three/squad.ts).
-      const at = stanceAt(engine.alpha())
-      active.place(at.x, at.y, at.z, at.heading)
-      marker.moveTo(at.x, query.height(at.x, at.z), at.z)
-      // The model is not in the hand until the getting-it-out clip has run.
-      for (const soldier of squad.members) {
-        const reaching = soldier === active && now.readying > 0
-        const held = pigShot(soldier.pig.id)?.holding ?? null
-        weapons.show(soldier.mesh, reaching ? null : weaponModelName(held))
-      }
-    }
-    // **THE MISSION IS OVER: EVERY PIG PUTS ITS WEAPON DOWN.** Play: "анимация
-    // победы играется в позе вытащенного оружия — все оружия надо убрать у всех
-    // свинов." The engine empties the hands (lib/game/battle.ts), but the block
-    // above that takes the model off the arm does not run once the battle is in
-    // its ending — so the mesh stayed where it was.
-    if (now.ending) {
-      for (const soldier of squad.members) weapons.show(soldier.mesh, null)
-    }
-    // …and every pig in a building — or under a DISGUISE — is gone from the
-    // picture, acting or not. The other direction matters too: this loop
-    // only ever CLEARED visibility, and the sole writer of true was the
-    // watch, for the acting pig — so a pig that shed its disguise while not
-    // acting stayed invisible for good. The snapshot's word is written both
-    // ways now, with the acting pig left to the watch (the scope view hides
-    // it deliberately).
-    for (const soldier of squad.members) {
-      const shot = pigShot(soldier.pig.id)
-      if (!shot) continue
-      if (shot.sheltered || shot.hidden) soldier.node.visible = false
-      else if (soldier.pig.id !== now.acting) soldier.node.visible = true
-    }
-    // EVERY pig that is not being drawn by somebody else follows its own
-    // body. This loop was corpses-only — "nothing else places a pig that is
-    // not acting" — and that line WAS the bug play hunted across a whole
-    // session: a blast throws a LIVING non-acting pig 1700 units in the
-    // engine (the tumbles write its position every step), the bounce clip
-    // plays, and the mesh stood where the squad was built — "он на месте
-    // катился". The engine's word on where a body is is this snapshot, for
-    // the living exactly as for the dead. Two exceptions keep their own
-    // painters: the interpolated acting placement above (alpha between
-    // steps), and a pig still on its parachute, which the drop draws.
-    for (const one of now.pigs) {
-      if (one.arriving) continue
-      if (one.id === now.acting && one.health > 0) continue
-      squad.of(one.id)?.place(one.x, one.y, one.z, one.heading)
-    }
-    // A magnified view really is magnified. Where 0x1000 of `afSetZoom` puts a
-    // field of view is the library's and the library is not in the install, so
-    // SCOPE_MAGNIFY is the remake's pick and three/chase.ts says so.
-    const magnified = openFov / (1 + now.zoom * (SCOPE_MAGNIFY - 1))
-    if (Math.abs(host.camera.fov - magnified) > 1e-4) {
-      host.camera.fov = magnified
-      host.camera.updateProjectionMatrix()
-    }
-    // **THE MISSION IS OVER**, and the camera is no longer the acting pig's: the
-    // exe's END OF GAME walks the survivors, one every two seconds, and hands
-    // each to the camera as its subject (lib/game/endOfGame.ts). Which pig is the
-    // engine's to say; all this does is point the ordinary chase at it.
-    // A BODY A BLOW THREW settles, and the camera lets it go when it does
-    // (`flungWatch`). Measured off the snapshot, which is where a thrown pig's
-    // position honestly is (the engine writes it every step), and in the
-    // FRAME's own time so a pause holds the shot instead of ending it.
-    // The blow is over: the next one gets its aftermath back.
-    if (!now.aftermath) sawFling = false
-    if (flungWatch) {
-      const body = now.pigs.find((one) => one.id === flungWatch?.pig)
-      const step = delta ?? 0
-      if (!body) flungWatch = null
-      else {
-        const moved = Math.hypot(body.x - flungWatch.x, body.z - flungWatch.z)
-        flungWatch.x = body.x
-        flungWatch.z = body.z
-        flungWatch.age += step
-        // A body KNOCKED INTO THE WATER stops moving sideways the instant it
-        // splashes down, which read as "settled" and the camera walked off a
-        // pig still afloat (play: "надо чтобы за свином камера следовала
-        // дальше"). Swimming is not settled — the still clock holds while the
-        // SWIM clip is on — and only the hard cap (FLUNG_LIMIT) still ends
-        // the watch, because a floater that neither drowns nor swims off is
-        // not a show; a drowning hands the camera to the dying watch anyway.
-        const afloat = body.clip === ANIM.SWIM
-        flungWatch.still = afloat || moved > FLUNG_CREEP * step ? 0 : flungWatch.still + step
-        // The settle is the flight ending; the LINGER on top is play's second
-        // (FLUNG_LINGER), and the camera holds the body through it.
-        if (flungWatch.still >= FLUNG_SETTLE + FLUNG_LINGER || flungWatch.age >= FLUNG_LIMIT) {
-          flungWatch = null
-        }
-      }
-    }
-    watch(
-      (now.ending ? squad.of(now.ending.watching) : null) ??
-        // …and under a DYING the subject is the dying pig itself — the exe's
-        // mode 16 subject swap. `remains` buries it and hands the camera back.
-        (dyingWatch !== null ? squad.of(dyingWatch) : null) ??
-        // …under a FLING, the body in the air — play's rule, above — but ONLY
-        // once the sky is empty. A cluster's first bomblet hurts somebody
-        // while four more are still falling, and the body was stealing the
-        // camera off them: "когда они дамажат кого-то — камера перехватывается
-        // свином которого побили — а это должно происходить только когда нет
-        // прожектайлов которые можно взорвать". So the latch is KEPT (it goes
-        // on ageing, and takes the camera the moment the last one lands) and
-        // merely outranked while `inFlight()` still names a shot.
-        (flungWatch !== null && inFlight() === null ? squad.of(flungWatch.pig) : null) ??
-        active,
-      delta
-    )
-  }
-
-
-  /** The last frame's own length, seconds — kept only so a spec can pair a
-   * displacement with the time that produced it (three/debug.ts, `frame`). */
-  let lastFrame = 0
-
-  /**
-   * THE PAUSE'S OWN CAMERA — the exe's mode 7, entered at 0x49205F and put
-   * back on the way out.
-   *
-   * A paused mission is not a still picture in the original: the world stops
-   * and the camera goes FLYING. The path is a figure-eight — `x = R·cos(θ)`,
-   * `z = R·sin(2θ)`, the sine's index doubled at 0x4A4E67 — about the world
-   * origin at the height of the map's own highest ground, with the bearing
-   * advancing six of 4096 EVERY frame whether or not anything else changes
-   * (lib/game/mapView.ts carries every number and where it was read).
-   *
-   * What it LOOKS at is a pig, and that half is a lagged copy: the look-at
-   * point eases toward the subject at a thirteenth a frame, which is what
-   * makes a change of subject a sweep rather than a cut.
-   *
-   * Play caught the first attempt at this: switching subject pig by pig with
-   * a still camera is the VICTORY camera (lib/game/endOfGame.ts), not this.
-   */
-  let bearing = 0
-  let watching = -1
-  let dwell = 0
-  let flying = false
-  /** The flight and its aim, both in GAME space; the camera is world space. */
-  const flightAt = new THREE.Vector3()
-  const lookingAt = new THREE.Vector3()
-  const worldPoint = new THREE.Vector3()
-
-  const survey = (delta: number): void => {
-    const shown = now.pigs.filter((pig) => pig.health > 0 && !pig.sheltered && !pig.hidden)
-    if (shown.length === 0) return
-    const frames = delta / EXE_FRAME_SECONDS
-    const first = !flying
-    if (first) {
-      flying = true
-      bearing = 0
-      dwell = 0
-      watching = shown[0].id
-    }
-    bearing = advanceBearing(bearing, frames)
-    dwell += frames
-    const point = orbitPoint(bearing)
-    const away = (pig: { x: number; z: number }): number =>
-      Math.hypot(pig.x - point.x, pig.z - point.z)
-
-    // The subject changes when the look has run out OR when the flight comes
-    // too near the pig it is on — the routine's one early-out. The next one is
-    // the next pig far enough away, and a full lap keeps whoever it is on.
-    const standing = shown.find((pig) => pig.id === watching) ?? shown[0]
-    if (dwell >= DWELL_FRAMES || away(standing) < NEAR_ENOUGH) {
-      const at = shown.findIndex((pig) => pig.id === standing.id)
-      for (let step = 1; step <= shown.length; step++) {
-        const candidate = shown[(at + step) % shown.length]
-        if (away(candidate) >= NEAR_ENOUGH || step === shown.length) {
-          watching = candidate.id
-          break
-        }
-      }
-      dwell = 0
-    }
-
-    // WHERE IT FLIES. The nominal height is the map's own peak, and the mover
-    // holds it clear of the ground under it by 0x300 — which on a map with any
-    // relief never fires.
-    const subject = shown.find((pig) => pig.id === watching) ?? standing
-    const wantY = Math.min(query.peak, query.height(point.x, point.z) - FLOOR_CLEARANCE)
-    if (first) {
-      flightAt.set(point.x, wantY, point.z)
-      lookingAt.set(subject.x, subject.y, subject.z)
-    } else {
-      flightAt.x += (point.x - flightAt.x) * easeOver(MOVE_EASE_XZ, frames)
-      flightAt.z += (point.z - flightAt.z) * easeOver(MOVE_EASE_XZ, frames)
-      flightAt.y += (wantY - flightAt.y) * easeOver(MOVE_EASE_Y, frames)
-      const look = easeOver(LOOK_EASE, frames)
-      lookingAt.x += (subject.x - lookingAt.x) * look
-      lookingAt.y += (subject.y - lookingAt.y) * look
-      lookingAt.z += (subject.z - lookingAt.z) * look
-    }
-    host.camera.position.copy(root.localToWorld(worldPoint.copy(flightAt)))
-    host.camera.lookAt(root.localToWorld(worldPoint.copy(lookingAt)))
-    lastView = 'map'
+  const state = createSceneState(engine)
+  const core: SceneCore = {
+    host,
+    assets,
+    query,
+    game,
+    onGameChanged,
+    sounds,
+    root,
+    sky,
+    weather,
+    props,
+    blockers,
+    squad,
+    dropInArt,
+    marker,
+    chase,
+    subject,
+    link,
+    engine,
+    battle,
+    scenery,
+    swings,
+    heals,
+    shots,
+    grenades,
+    mines,
+    effects,
+    airDrops,
+    dropIn,
+    weapons,
+    openFov,
+    grenadeArt,
+    mineArt,
+    remainsArt,
+    decoyArt,
+    tween,
+    state
   }
 
   const onFrame = (delta: number): void => {
     // The mission's clock does not start until the mission is on screen — but
     // a PAUSE is not that: the world stops and the camera goes touring.
     if (!running()) {
-      if (paused()) survey(delta)
+      if (paused()) survey(core, delta)
       return
     }
-    flying = false
-    time += delta
-    lastFrame = delta
+    state.flying = false
+    state.time += delta
+    state.lastFrame = delta
     // A GAP between two frames says a stall happened SOMEWHERE — render,
     // GC, IPC, the engine — where the engine.update line below says how
     // much of it was the engine's. The two together are what play's
@@ -1194,8 +438,8 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // drawn from (lib/game/engine.ts).
     const updateBegan = performance.now()
     const steps = engine.update(delta, () => {
-      before = stanceNow()
-      tween.from(marks())
+      state.before = stanceNow(core)
+      tween.from(marks(core))
     })
     // **THE HITCH MEASURED, not guessed.** Play keeps feeling stalls while
     // the machine thinks ("пролаги пока свин думает"); a frame whose ENGINE
@@ -1210,21 +454,21 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     }
     // ONE reading of the battle, and everything below draws from it
     // (lib/game/snapshot.ts).
-    now = engine.snapshot()
+    state.now = engine.snapshot()
     if (steps > 0) {
-      after = stanceNow()
-      if (before.pig !== after.pig) before = after
-      tween.to(marks())
+      state.after = stanceNow(core)
+      if (state.before.pig !== state.after.pig) state.before = state.after
+      tween.to(marks(core))
     }
     // …and then everything that SHOWS it. Every mixer is brought into line with
     // what the engine now says each pig wears (three/wear.ts).
-    wear.apply(now.pigs, engine.alpha())
-    show(delta)
-    marker.bob(time)
+    wear.apply(state.now.pigs, engine.alpha())
+    show(core, delta)
+    marker.bob(state.time)
     // …and what the engine says is in the air gets drawn where it now is. Once
     // a frame, after everything that could have moved or spent one.
-    bulletArt.draw(now.bullets, delta, (shot) => drawnAt(`shot:${shot.id}`, shot))
-    grenadeArt.draw(now.lobs, delta, (lob) => drawnAt(`lob:${lob.id}`, lob))
+    bulletArt.draw(state.now.bullets, delta, (shot) => drawnAt(core, `shot:${shot.id}`, shot))
+    grenadeArt.draw(state.now.lobs, delta, (lob) => drawnAt(core, `lob:${lob.id}`, lob))
     // The minefield, through the eyes of whoever's turn it is: a buried mine is
     // shown to the side that has somebody near it who can see one, and to nobody
     // else (lib/game/mines.ts).
@@ -1234,7 +478,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // two lists go in separately.
     mineArt.draw(mines.revealed(game.currentPlayer.pigs), mines.at(), mines.laid())
     // …and the disguises, straight off the snapshot (lib/game/hide.ts).
-    decoyArt.draw(now.decoys)
+    decoyArt.draw(state.now.decoys)
     // **AND WHATEVER STANDS BETWEEN THE CAMERA AND THE PIG GOES SEE-THROUGH.**
     // Play: "здание не просвечивает когда свинья внутри." Indoors the camera has
     // nowhere to swing to — every heading is a wall (lib/game/sightline.ts) — so
@@ -1244,182 +488,35 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     // an infinite dome drawn at a size a depth buffer can hold (three/sky.ts) —
     // and the see-through test measures from it. AFTER `show`, which is what
     // moved the camera this frame.
-    root.worldToLocal(eyeInGame.copy(host.camera.position))
-    sky?.follow(eyeInGame)
+    root.worldToLocal(state.eyeInGame.copy(host.camera.position))
+    sky?.follow(state.eyeInGame)
     // The weather rides the camera the same way, and takes its own drift off
     // how far the camera turned this frame — so it goes after `show` too.
     weather?.draw(delta)
-    const watched = squad.of(game.currentPig.id)
-    if (watched) {
-      const { x, y, z } = game.currentPig.position
-      props.fade(
-        crossedTowards(
-          blockers,
-          eyeInGame,
-          // HIS OWN SILHOUETTE — nine points of it, each ray stopped at his
-          // NEAR SIDE, and a box has to cover half of them to be in the way
-          // (lib/game/seeThrough.ts). Nothing is grown before the test: the
-          // margin that used to be here faded whatever stood BESIDE him.
-          silhouetteOf(eyeInGame, { x, y, z }, PIG_HEIGHT, PIG_RADIUS, PIG_HOLD / 2)
-        )
-      )
-    }
-    effectArt.draw(now.effects)
-    airDropArt.draw(now.crates, (one) => drawnAt(`crate:${one.id}`, { x: 0, y: one.y, z: 0 }).y)
+    fadeBlockers(core)
+    effectArt.draw(state.now.effects)
+    airDropArt.draw(state.now.crates, (one) => drawnAt(core, `crate:${one.id}`, { x: 0, y: one.y, z: 0 }).y)
   }
   host.onFrame.add(onFrame)
 
-  exposeBattleDebug({
-    game,
-    query,
-    obstruction: engine.obstacles,
-    squad,
-    dropIn,
-    props,
-    flingOther: () => {
-      const other = game.players
-        .flatMap((player) => player.pigs)
-        .find((pig) => pig !== game.currentPig && pig.health > 0)
-      if (!other) return null
-      const from = { pig: other.id, x: other.position.x, z: other.position.z }
-      // A grenade's own throw at the core — the debug shove is measured
-      // against the same weapon a spec would use (lib/game/blast.ts).
-      battle.fling(other, flingVelocity(flingSpeed(lobOf(19)?.force ?? 0, 1), 0))
-      return from
-    },
-    hotseat: (on) => {
-      hotseat = on ?? !hotseat
-      console.info(
-        hotseat
-          ? 'pow: hotseat ON from the next turn — the enemy is on the keyboard until this battle ends'
-          : 'pow: hotseat off — the machine plays the enemy again from the next turn'
-      )
-      return hotseat
-    },
-    objectCount: assets.objects.length,
-    camera: host.camera,
-    // Measured against the eye as it stood at the end of the last frame,
-    // which is what `follow` was given.
-    sky: () => sky?.state(eyeInGame) ?? null,
-    weather: () => weather?.state() ?? null,
-    sounds: () => sounds.played(),
-    barks: () => sounds.spoken(),
-    still: () => battle.view().still,
-    strings: () => assets.strings,
-    swinging: () => swings.running(),
-    strike: () => swings.lastStrike(),
-    // Why a heal did or did not land: the healing hands' own report, the same
-    // rule the blade's is (lib/game/healing.ts).
-    heal: () => heals.lastAttempt(),
-    effects: () => effects.rings(),
-    smoke: () => effects.smoke(),
-    fire: () => effects.fire(),
-    script: () => ({ absent: scenery.waiting(), falling: airDrops.falling() }),
-    shots: () => shots.live().length,
-    aim: () => battle.aim(),
-    grenades: () => grenades.at(),
-    charges: () => grenadeArt.charges(),
-    burning: () => grenadeArt.burning(),
-    mines: () => mines.at().map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
-    mineMarkers: () => mineArt.shown(),
-    map: () => ({ eye: eye(), blips: blips() }),
-    minesTripped: () => mineArt.tripped(),
-    // How many pairs of boots are DRAWN — the renderer's own count, not the
-    // engine's `remains` event. It exists because the two disagreed silently:
-    // the event fired and `spawn('BOOTS')` answered null (lib/game/ammo.ts).
-    remains: () => remainsArt.standing(),
-    decoys: () => decoyArt.standing(),
-    charging: () => battle.charging(),
-    firing: () => battle.view().firing?.phase ?? null,
-
-    shelter: () => {
-      const view = battle.view()
-      const drawn = squad.of(game.currentPig.id)?.node.visible === true
-      return { inside: view.inside?.id ?? null, doorway: view.doorway?.id ?? null, drawn }
-    },
-    frame: () => lastFrame,
-    view: () => lastView,
-    brain: () => ({ remote: true, ...brainTally }),
-    aftermath: () => battle.view().aftermath !== null,
-    /**
-     * The acting pig's POSE, from BOTH ends of the chain.
-     *
-     * Play: "реально не двигается у нас" — the body does not move while it walks,
-     * and there is no way to tell by eye which half is at fault. `foot` is the
-     * engine's own sampler (lib/game/bonePose.ts) reading the ankle relative to
-     * the hip, so the pig's own travel is out of it; `drawn` is the quaternion
-     * that same bone is actually WEARING on the skinned mesh. If `foot` moves and
-     * `drawn` does not, it is the renderer; if neither moves, it is the clip.
-     */
-    pose: () => {
-      const pig = game.currentPig
-      const worn = now.pigs.find((one) => one.id === pig.id)
-      const hip = engine.pose.boneToWorld(pig, 0, { x: 0, y: 0, z: 0 })
-      const ankle = engine.pose.boneToWorld(pig, 11, { x: 0, y: 0, z: 0 })
-      // …and EVERY bone the mesh is wearing, in HIR order, because "that part of
-      // the body does not move at all" is a question about which bones are dead
-      // and no summary answers it.
-      const bones = squad.of(pig.id)?.mesh.bones ?? []
-      const bone = bones[11]
-      return {
-        clip: worn?.clip ?? null,
-        elapsed: worn?.clipElapsed ?? 0,
-        // What the keyframe head is doing to the whole body — the bob, on the
-        // root bone (lib/game/clipPose.ts).
-        lift: bones[0]?.position.y ?? 0,
-        bones: bones.map(
-          (one) =>
-            [one.quaternion.x, one.quaternion.y, one.quaternion.z, one.quaternion.w] as [
-              number,
-              number,
-              number,
-              number
-            ]
-        ),
-        foot:
-          hip && ankle
-            ? ([ankle.x - hip.x, ankle.y - hip.y, ankle.z - hip.z] as [number, number, number])
-            : null,
-        drawn: bone
-          ? ([bone.quaternion.x, bone.quaternion.y, bone.quaternion.z, bone.quaternion.w] as [
-              number,
-              number,
-              number,
-              number
-            ])
-          : null
-      }
-    },
-    walkAway: () => battle.view().walkAway,
-    sergeant: () => battle.view().sergeant,
-    sargeSpoken: () => sounds.sargeSpoken(),
-    ending: () => {
-      const ending = battle.view().ending
-      return ending === null
-        ? null
-        : { won: ending.won, watching: ending.watching, elapsed: ending.elapsed }
-    },
-    targetsLeft: () => engine.targetsLeft(),
-    cutTurnBeat: () => battle.cutTurnBeat(),
-    warp
-  })
+  exposeDebug(core)
 
   return {
     battle,
-    focus,
-    dropping: () => now.dropping,
+    focus: (pig) => focus(core, pig),
+    dropping: () => state.now.dropping,
     plates: (width, height, lift) =>
       squad.plates(host.camera, width, height, lift, game.players.indexOf(game.currentPlayer), (pig) =>
         engine.poison.poisoned(pig)
       ),
-    numbers: (width, height) => projectDamage(now.numbers, host.camera, root, width, height),
-    still: () => now.still,
-    eye,
-    blips,
+    numbers: (width, height) => projectDamage(state.now.numbers, host.camera, root, width, height),
+    still: () => state.now.still,
+    eye: () => eye(core),
+    blips: () => blips(core),
     charging: battle.charging,
-    scoped: () => now.scoped,
+    scoped: () => state.now.scoped,
     aim: battle.aim,
-    trainingStep,
+    trainingStep: (step) => trainingStep(core, step),
     dispose() {
       host.onFrame.delete(onFrame)
       // The AI's process is told the battle is over and the reply
