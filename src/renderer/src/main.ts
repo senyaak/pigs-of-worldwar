@@ -3,7 +3,7 @@
 
 import { byId } from './ui/dom'
 import { controller } from './input/controller'
-import type { BarScreenView } from './input/controller'
+import type { BarScreenView } from './input/pow'
 import { initWelcome } from './ui/welcome'
 import { initMenu } from './ui/menu'
 import { initOnePlayer } from './ui/onePlayer'
