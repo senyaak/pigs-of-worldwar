@@ -15,7 +15,8 @@ every breach the repo has had compiled cleanly.
   parsed map data in, something that steps with `update(delta)` out — so a
   battle can be assembled with no scene to assemble it in, which
   `e2e/000/engine-headless.spec.ts` runs in plain Node to prove;
-  `battle.ts` is one frame's order of events; `attack.ts` the fire button, the gauge and the
+  `battle.ts` is one frame's order of events, and `battle/` its phases — one
+  module each, sharing one core and one state; `attack.ts` the fire button, the gauge and the
   fuse; `sights.ts` the aim, the tremor and the zoom; `bullets.ts`, `lobs.ts`,
   `strikes.ts` the weapons and every verdict about what they hit; `scenery.ts`
   the crates, the map script and the collision world; `airDrop.ts`/`dropIn.ts`
@@ -24,15 +25,18 @@ every breach the repo has had compiled cleanly.
 - `src/renderer/src/three/` — **graphics, and only that**. It builds art around
   an engine and reads `battle.view()` once the frame has run. It ticks nothing
   (`engine.update(delta)` is the whole game frame) and it ANIMATES nothing: the
-  pose is the engine's and `wear.ts` writes it onto the bones. It may not
-  import `ui/` or `audio/` at all.
+  pose is the engine's and `wear.ts` writes it onto the bones. `battle.ts`
+  wires the scene and runs its frame; `battle/` holds the parts it wires. It
+  may not import `ui/` or `audio/` at all.
 - `src/renderer/src/audio/` — **sound, and only that**. `battleSound.ts`
   assembles the domain and subscribes it to the bus; it knows nothing about
   what is drawn.
 - `src/renderer/src/input/` — drives the ENGINE (`Battle`), never the scene,
-  and plays nothing.
+  and plays nothing. `pow.ts` is the shape of `window.pow`, the console and
+  the specs' surface.
 - `src/renderer/src/ui/` — one module per view, and `battle.ts` is the
-  COMPOSITION ROOT: it builds the bus and hangs the domains off it.
+  COMPOSITION ROOT: it builds the bus and hangs the domains off it, with its
+  parts in `battle/`. The dashboard is `hud.ts`, its parts in `hud/`.
 - `src/renderer/src/contracts/` — the shapes two domains share, importing
   nobody: `overlay.ts` what the scene projects for the dashboard, `sound.ts`
   the two polls the scene owes sound.
@@ -87,5 +91,7 @@ battle waits on them and a wait is a rule: the crate's descent, the pose port
 forward kinematics), and the two polls in `contracts/sound.ts`.
 
 Keep modules small and single-purpose; that split was an explicit request.
-`battle.ts` reached 1365 lines doing every job in the game and was taken apart
-— do that again rather than letting one file grow a second concern.
+`battle.ts` reached 1365 lines doing every job in the game and was taken apart,
+grew back to 2421 and was taken apart again into `battle/` — and the scene,
+the battle view and the dashboard with it. A phase of the frame is a module of
+its own; a new one goes in its own file, not into the order.

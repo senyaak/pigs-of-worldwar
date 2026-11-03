@@ -23,7 +23,6 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 
 - [disasm-notes-cleanup.md](todo/disasm-notes-cleanup.md) — split the notes past 500 lines, fold their corrections in
 - [failures-and-actions.md](todo/failures-and-actions.md) — the shared failure and testing rules: reporters, a catch guard, tests that fail at once and wait on actions
-- [split-hot-modules.md](todo/split-hot-modules.md) — the battle's five hot modules, one chained issue each
 
 ## Play checks — what only play can judge
 

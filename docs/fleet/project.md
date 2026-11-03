@@ -115,11 +115,10 @@ issues.
 
 The owner's order, until the owner changes it:
 
-0. The housekeeping items ([split-hot-modules.md](../todo/split-hot-modules.md),
-   [disasm-notes-cleanup.md](../todo/disasm-notes-cleanup.md)), because
-   parallel builds in an unsplit hot module conflict on every merge. They may
-   run alongside the proving ground's reads, never alongside builds in the
-   module being split.
+0. The housekeeping item
+   [disasm-notes-cleanup.md](../todo/disasm-notes-cleanup.md), because a
+   reader in a note past 500 lines collides with every other reader in it. It
+   may run alongside the proving ground's reads and builds.
 1. The proving ground ([proving-ground.md](../todo/proving-ground.md)) — it is
    where everything after it gets tested.
 2. What the campaign meets, in campaign order: a weapon, building or vehicle a
@@ -133,11 +132,12 @@ Within that, reads before the builds that need them.
 - **Indexes, one entry per line, sorted:** [../todo.md](../todo.md), the
   indexes under [../facts/](../facts/README.md) and
   [../history/](../history/README.md), and the disasm repo's `README.md`.
-- **Hot modules:** the engine's battle loop (`lib/game/battle.ts`), the
-  renderer's (`three/battle.ts`), the controller and the HUD are touched by
-  almost everything. Issues that would edit one of them are chained or share
-  an `area:<module>` label until
-  [split-hot-modules.md](../todo/split-hot-modules.md) has taken them apart.
+- **The frame orders:** the engine's battle loop (`lib/game/battle.ts`), the
+  scene's (`three/battle.ts`), the battle view (`ui/battle.ts`) and the
+  dashboard (`ui/hud.ts`) each keep only their ORDER and wiring; the work is
+  in the folder beside each. A change adds or edits a module there and
+  touches the order by one line, so two issues editing the same order file
+  are chained.
 
 ## Build rules
 
