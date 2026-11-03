@@ -11,8 +11,8 @@
 // scene while the flight runs.
 
 import { expect, test } from '../app'
-import { startGame } from '../menu'
 import { swapMap } from '../controller'
+import { openBattle } from '../load'
 
 type Page = import('@playwright/test').Page
 
@@ -40,10 +40,9 @@ const withDebug = (page: Page): { throwOther(): Promise<{ pig: number; x: number
 test('a flung pig MOVES on screen — the mesh follows the flying body', async ({ app }) => {
   test.setTimeout(60_000)
   const { page } = app
-  await startGame(page)
   // The training ground fields ONE pig and a fling needs somebody else:
   // LIBERATE fields two full sides.
-  expect(await swapMap(page, 'LIBERATE')).toBe(true)
+  await openBattle(page, 'LIBERATE')
 
   const pow = withDebug(page)
   const thrown = await pow.throwOther()

@@ -28,7 +28,7 @@
 
 import { expect, test } from '../app'
 import { beginTurn } from '../controller'
-import { startGame } from '../menu'
+import { openBattle } from '../load'
 
 type Pose = {
   clip: number | null
@@ -43,7 +43,7 @@ const spread = (values: number[]): number => Math.max(...values) - Math.min(...v
 
 test('walking moves the bones, in the sampler and on the mesh alike', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await beginTurn(page)
 
   // Sampled IN THE PAGE, every animation frame for a second of held W: a walk

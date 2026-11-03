@@ -17,12 +17,12 @@ import { existsSync } from 'node:fs'
 import { expect, test } from '../app'
 import { PHASE_ENV, GAME_DIR } from '../launch'
 import { hold, swapMap } from '../controller'
-import { startGame } from '../menu'
 import type { Page } from '@playwright/test'
 import { MAP_SKY, SKY_ARCHIVES, skyArchiveFor, weatherFor } from '../../src/lib/game/sky'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseModel } from '../../src/lib/formats/model'
 import { parseTim } from '../../src/lib/formats/tim'
+import { openBattle } from '../load'
 
 test.beforeAll(() => {
   if (!existsSync(PHASE_ENV)) {
@@ -161,7 +161,7 @@ const weatherState = (page: Page): Promise<WeatherReading | null> =>
 
 test('the battle comes up under it, and it rides the eye', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // How much of the dome a screenshot catches is whatever the terrain does not

@@ -16,7 +16,6 @@ import path from 'node:path'
 
 import { GAME_DIR } from '../launch'
 import { debugState, hold, hud, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePmg, TILE_MINE, TILE_STEP } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import {
@@ -44,6 +43,7 @@ import { Game } from '../../src/lib/game/game'
 import { NO_BODY } from '../../src/lib/game/body'
 import { createBus } from '../../src/lib/game/events'
 import type { BattleEvent } from '../../src/lib/game/events'
+import { openBattle } from '../load'
 
 const TNT = 37
 /** Clip 77 of `Chars/mcap.mad` — the record's attack clip for all four planted
@@ -456,7 +456,7 @@ const trippedShown = (page: Page): Promise<number> =>
 
 test('a pig that walks onto a MINE hears it and then loses twenty points', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   const before = await hud(page)
   expect(before.health).toBe(50)
 
@@ -525,7 +525,7 @@ test('a pig that walks onto a MINE hears it and then loses twenty points', async
 
 test('TNT goes down IN FRONT of the pig, keeps the turn, and leaves four seconds', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   const before = await hud(page)
   expect(before.seconds, 'CAMP gives 99 seconds').toBeGreaterThan(50)
 

@@ -20,11 +20,11 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { tap } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { GUARDED_OPCODES, commandOf } from '../../src/lib/game/script'
 import { LAST_TRAINING_STEP, TRAINING_STEPS } from '../../src/lib/game/training'
 import { SKILL } from '../../src/lib/game/skills'
+import { openBattle } from '../load'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const record = (id: number): (typeof CAMP)[number] => {
@@ -123,7 +123,7 @@ test('the step table is CAMP\'s own chain', () => {
 
 test('F12 goes on, pow.step lands on the bazooka, F11 goes back', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
 
   // THE KEYS, and pressed straight away — the squad is still coming down, so the
   // jump has to be remembered and paid once the canopies are off. Two presses

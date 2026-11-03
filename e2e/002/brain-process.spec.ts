@@ -17,8 +17,8 @@ import { existsSync } from 'node:fs'
 
 import { PHASE_ENV } from '../launch'
 import { expect, leaveBattle, test } from '../app'
-import { skipTurn, swapMap } from '../controller'
-import { startGame } from '../menu'
+import { skipTurn } from '../controller'
+import { openBattle } from '../load'
 
 /** A map with somebody to fight — the training ground has nobody, so nothing
  * on it is ever the machine's turn. */
@@ -33,8 +33,7 @@ test.beforeAll(() => {
 test('the AI process answers, and the battle runs on what it says', async ({ app }) => {
   test.setTimeout(90_000)
   const { page } = app
-  await startGame(page)
-  expect(await swapMap(page, MAP), `${MAP} did not load`).toBe(true)
+  await openBattle(page, MAP)
 
   const brain = (): Promise<{ remote: boolean; asked: number; answered: number }> =>
     page.evaluate(() => {

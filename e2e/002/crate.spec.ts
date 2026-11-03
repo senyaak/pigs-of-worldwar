@@ -27,11 +27,11 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { GAME_DIR } from '../launch'
-import { beginTurn, chooseSkill, press, release, swapMap, warp } from '../controller'
-import { startGame } from '../menu'
+import { beginTurn, chooseSkill, press, release, warp } from '../controller'
 import { parsePog } from '../../src/lib/formats/pog'
 import { pickupsOf } from '../../src/lib/game/pickups'
 import { UNLIMITED } from '../../src/lib/game/inventory'
+import { openBattle } from '../load'
 
 const mapOf = (name: string): ReturnType<typeof parsePog> =>
   parsePog(readFileSync(path.join(GAME_DIR, 'Maps', `${name}.POG`)))
@@ -132,7 +132,7 @@ const crates = (page: Page): Promise<number> =>
 
 test('a crate is walked into, takes nothing away, and on CAMP never runs out', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await beginTurn(page)
 
   // Something in the pockets first, so that collecting has something it could
@@ -176,8 +176,7 @@ test('a crate is walked into, takes nothing away, and on CAMP never runs out', a
 
 test('a finite crate STACKS onto the kit, and spending takes one off', async ({ app }) => {
   const { page } = app
-  await startGame(page)
-  expect(await swapMap(page, 'GUNS'), 'GUNS opens').toBe(true)
+  await openBattle(page, 'GUNS')
 
   const crate = pickupsOf(mapOf('GUNS')).find((pickup) => pickup.skill === TNT)
   expect(crate, 'GUNS carries a TNT crate').toBeDefined()

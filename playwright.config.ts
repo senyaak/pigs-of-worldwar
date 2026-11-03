@@ -23,7 +23,12 @@ import { defineConfig } from '@playwright/test'
 // collect it, and after, so the tree is left as it was found. It never touches
 // `_tmp/` itself: that folder is the project's scratch space and most of what
 // is in it was put there on purpose.
+//
+// WHERE THE TIME WENT: `e2e/timing.ts` prints, after an e2e run, how long each
+// spec spent in the fixture, in LOADING its starting state and in the test
+// itself.
 export default defineConfig({
+  reporter: [[process.env.CI ? 'dot' : 'list'], ['./e2e/timing.ts']],
   globalSetup: './e2e/scratch.ts',
   globalTeardown: './e2e/scratch.ts',
   timeout: 30_000,

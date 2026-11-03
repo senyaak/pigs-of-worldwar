@@ -15,7 +15,6 @@ import path from 'node:path'
 
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
-import { TEST_TEAM, startGame } from '../menu'
 import { hud, press, release, tap } from '../controller'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseTim } from '../../src/lib/formats/tim'
@@ -25,6 +24,7 @@ import { parseText } from '../../src/lib/formats/text'
 import { nations } from '../../src/lib/game/teams'
 import { PLATE_DELAY } from '../../src/renderer/src/ui/hud/layout'
 import { MAX_TEAMS } from '../../src/lib/game/spawns'
+import { openBattle } from '../load'
 
 const DASH = path.join(GAME_DIR, 'Language', 'Tims', 'dashtims.mad')
 
@@ -99,7 +99,7 @@ test('the squads are the game\'s own six nations, out of fetext', () => {
 
 test('the dashboard is painted over the battle, and it counts down', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // The overlay canvas covers the view and is really drawn on: the brass is
@@ -156,10 +156,10 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
   const before = await hud(page)
   // Fifty, not a hundred: health is the pig's CLASS's and NOBBY is a grunt
   // (lib/game/health.ts, out of the table at exe 0x4d02e0).
-  // The player's own side wears the TEAM's name: side 0 is fielded from the
-  // SAVE, every other side out of `fetext` (lib/game/muster.ts, and
-  // 002/battle.spec.ts carries the same note beside the swap that undoes it).
-  expect(before).toMatchObject({ turn: 1, side: TEST_TEAM, pig: 'NOBBY', health: 50 })
+  // No campaign is behind this battle, so side 0 wears its nation's own name
+  // out of `fetext` like every other side (lib/game/muster.ts); the campaign's
+  // TEAM name is `002/battle.spec.ts`'s to check, on the walk from NEW GAME.
+  expect(before).toMatchObject({ turn: 1, side: "TOMMY'S TROTTERS", pig: 'NOBBY', health: 50 })
   expect(before.seconds).toBeGreaterThan(40)
   await expect
     .poll(async () => (await hud(page)).seconds, { message: 'the clock running down' })
@@ -174,7 +174,7 @@ test('the dashboard is painted over the battle, and it counts down', async ({ ap
 
 test('a pig wears its name while it rests, and drops it while it walks', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // What is painted BELOW THE BRIEFING BAR, in pixels. The clock and the dial

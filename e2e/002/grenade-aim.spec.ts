@@ -20,9 +20,9 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { beginTurn, press, release, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { DUMMY_MODEL, targetsOf } from '../../src/lib/game/targets'
+import { openBattle } from '../load'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const GRENADE = 19
@@ -82,7 +82,7 @@ const aimOff = (page: Page): Promise<Sample | null> =>
 
 test('a thrown grenade rides ABOVE the middle of the frame, not in it', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await warp(page, FIRST.x, FIRST.z - 900, 0)
   await beginTurn(page)
   expect(await give(page, GRENADE)).toBe(true)

@@ -36,7 +36,7 @@ import {
   tap,
   warp
 } from '../controller'
-import { startGame } from '../menu'
+import { openBattle } from '../load'
 
 const bank = (relPath: string): ReturnType<typeof parseSrl> =>
   parseSrl(readFileSync(path.join(GAME_DIR, relPath)))
@@ -88,7 +88,7 @@ test('the sound banks are numbered lists of files', () => {
 
 test('the pig is heard jumping and landing', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const heard = (): Promise<string[]> => page.evaluate(() => window.pow!.debug!.sounds())
@@ -131,7 +131,7 @@ test('the pig is heard jumping and landing', async ({ app }) => {
 
 test('a walking pig sounds like the ground it is on', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const heard = (): Promise<string[]> => page.evaluate(() => window.pow!.debug!.sounds())
@@ -179,7 +179,7 @@ test('…and on a BRIDGE it sounds like the bridge, not like the ditch', async (
   // the ditch, and ISLAND's spans splash. This is the remake's line
   // (lib/game/underfoot.ts), and it is one table to correct in play.
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const heard = (): Promise<string[]> => page.evaluate(() => window.pow!.debug!.sounds())
@@ -231,7 +231,7 @@ test('a level plays MUSIC, and the TURN is what asks for it', async ({ app }) =>
   // is the pig's LANGUAGE, `Team::SkinOf(nation)` — so the whole arithmetic
   // is the exe's now, and that is what this pins.
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const music = (): Promise<{ clip: number | null; track: string | null; played: number[] }> =>
@@ -268,7 +268,7 @@ test('the bank SURVIVES a mission restart — the second battle still sounds', a
   // was closed. The sergeant already had the rule this pins: BORROWED things
   // are stopped, never disposed.
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const heard = (): Promise<string[]> => page.evaluate(() => window.pow!.debug!.sounds())
@@ -307,7 +307,7 @@ test('moving the highlight in the weapon menu CLICKS', async ({ app }) => {
   // cursor's step now rides the bus (`menuMoved`, input/battleInput.ts) and
   // the cue is a name pick beside menuOpen's (audio/battle.ts `menuMove`).
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const heard = (): Promise<string[]> => page.evaluate(() => window.pow!.debug!.sounds())

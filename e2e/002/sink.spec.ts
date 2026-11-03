@@ -17,10 +17,10 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { beginTurn, hold, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import { WATER_SINK_SECONDS, WATER_SINK_SPEED } from '../../src/lib/game/grenade'
+import { openBattle } from '../load'
 
 const GRENADE = 19
 
@@ -88,7 +88,7 @@ test('dropped in the drink it SINKS, for a couple of seconds, and never goes off
 }) => {
   const { page } = app
   const at = bank()
-  await startGame(page)
+  await openBattle(page)
   // On the bank, LOOKING at the water — see `bank` for why not in it.
   await warp(page, at.x, at.z, at.heading)
   await beginTurn(page)

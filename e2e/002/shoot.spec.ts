@@ -12,7 +12,6 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { beginTurn, chooseSkill, nextTurn, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { pickupsOf } from '../../src/lib/game/pickups'
@@ -25,6 +24,7 @@ import { parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import { Game } from '../../src/lib/game/game'
 import { NO_BODY } from '../../src/lib/game/body'
+import { openBattle } from '../load'
 
 const campQuery = (): TerrainQuery =>
   new TerrainQuery(parsePmg(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.PMG'))))
@@ -169,7 +169,7 @@ test("a bullet that a TARGET's own box stops knocks that target down", () => {
 
 test('a rifle shot knocks a dummy down from across the yard', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
 
   // Collect the bayonet, break the first dummy with it: that is what the map
   // script says drops the rifle in (e2e/002/script.spec.ts).

@@ -34,8 +34,8 @@ import { createBus } from '../../src/lib/game/events'
 import type { BattleEvent } from '../../src/lib/game/events'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
-import { startGame } from '../menu'
 import { beginTurn, press, release, warp } from '../controller'
+import { openBattle } from '../load'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 
@@ -225,7 +225,7 @@ test('…but WATER takes what cannot skip: it sinks, and nothing goes off', () =
 
 test('IN THE APP: it is fired with the gauge, and the rocket flattens a dummy', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
 
   // No crate on the way to it carries one — the bazooka's own crate is behind
   // the door (e2e/002/tutorial.spec.ts) — so the console hands it over.

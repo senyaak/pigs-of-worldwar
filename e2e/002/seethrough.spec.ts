@@ -36,7 +36,6 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
@@ -50,6 +49,7 @@ import {
   silhouetteOf
 } from '../../src/lib/game/seeThrough'
 import { PIG_HEIGHT, PIG_HOLD, PIG_RADIUS } from '../../src/lib/game/obstacles'
+import { openBattle } from '../load'
 
 type Page = import('@playwright/test').Page
 
@@ -120,7 +120,7 @@ test('the app fades the house round a pig inside it, and nothing in the open', a
   app
 }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   // Out on the map first: nothing between the camera and the pig.
   await warp(page, 3000, 3000, 0)
   await page.waitForTimeout(700)

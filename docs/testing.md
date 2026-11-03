@@ -102,6 +102,28 @@ first (`000/foundation.spec.ts` before `000/model-viewer.spec.ts`).
   standalone utilities: they build their own sandbox and must not depend on
   any phase.
 
+## A spec LOADS its starting state — it never walks to it
+
+A spec checks that one state goes correctly to the next. The state it starts
+from is put in place directly: the code is ours, so `openBattle(page, map)`
+(`e2e/load.ts`) opens a battle on the map the spec wants from wherever the app
+stands — squads already on their markers, the first turn running — through
+`pow.open`, the app's own entry for it. No campaign is behind that battle, so
+leaving it lands on the main menu.
+
+The walk from the menu — ONE PLAYER → NEW GAME → army → name → squad →
+briefing — and the parachute drop are each the SUBJECT of their own specs and
+are walked only there (`startGame` and `toBattle` in `e2e/menu.ts`): the
+campaign landing in `002/battle.spec.ts`, the abort's way back to the squad in
+`002/pause.spec.ts`, the drop in `002/parachute.spec.ts`. Every other battle
+spec walking them first spent most of a 22-minute run re-testing the menus.
+
+`pow.open` is an ACTION (`src/renderer/src/actions/actions.ts`): it ends once,
+done or refused or failed, with how long it took, and going over its budget is
+an error the spec fails on. The load runs as a `test.step` titled `load …`, and
+`e2e/timing.ts` prints after every e2e run how long each spec spent in the
+fixture, in its load and in the test itself — slowest load first.
+
 ## Fail fast — no waiting out timeouts
 
 The rule: **a test fails the moment something goes wrong, not when a timeout
@@ -185,8 +207,7 @@ const { x, z, heading } = await debugState(page)
 
 The menu is the same story. It draws on a canvas, so there is no button to
 click: `e2e/menu.ts` moves the lit bar with `menuUp`/`menuDown`/`menuSelect`
-and reads the screen back through `window.pow.menu` — `startGame(page)` is
-what every battle spec opens with.
+and reads the screen back through `window.pow.menu`.
 
 Synthesising key events instead would test a parallel path: a broken
 keybinding, a controller regression, or a view that forgot to subscribe would

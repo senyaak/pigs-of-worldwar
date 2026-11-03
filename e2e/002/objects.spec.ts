@@ -16,7 +16,6 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { debugState, hold, warp } from '../controller'
-import { startGame } from '../menu'
 import { BOX_UNIT, POG_RECORD_SIZE, modelRotationY, parsePog } from '../../src/lib/formats/pog'
 import type { MapObject } from '../../src/lib/formats/pog'
 import { parsePmg } from '../../src/lib/formats/pmg'
@@ -29,6 +28,7 @@ import { hurt, isDead } from '../../src/lib/game/health'
 import { meleeOf } from '../../src/lib/game/melee'
 import { lobOf } from '../../src/lib/game/grenade'
 import { DAMAGE_UNIT } from '../../src/lib/game/projectile'
+import { openBattle } from '../load'
 
 
 const mapFile = (name: string): Buffer => readFileSync(path.join(GAME_DIR, 'Maps', name))
@@ -290,7 +290,7 @@ test("the SHELTER's box is the shelter, not 96 units of thin air round it", () =
 
 test('the battle draws the map objects where the file puts them', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const drawn = await page.evaluate(() => window.pow!.debug!.props())
@@ -323,7 +323,7 @@ test('the battle draws the map objects where the file puts them', async ({ app }
 
 test('a drawn object is also one to walk into', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // The training dummy on the green path, approached from the path's side —

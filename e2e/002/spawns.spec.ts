@@ -15,13 +15,13 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { swapMap } from '../controller'
 import { GAME_DIR } from '../launch'
-import { startGame } from '../menu'
 import { existsForPlayers, parsePog } from '../../src/lib/formats/pog'
 import { MAX_TEAMS, battleSides, mapSpawns, spawnTeams } from '../../src/lib/game/spawns'
 import { PLAYERS, fielded } from '../../src/lib/game/muster'
 import { CAMPAIGN, MAP_NAMES } from '../../src/lib/game/missions'
 import type { SpawnPoint } from '../../src/lib/game/spawns'
 import { classArt } from '../../src/renderer/src/three/soldiers'
+import { openBattle } from '../load'
 
 const pog = (name: string): ReturnType<typeof parsePog> =>
   parsePog(readFileSync(path.join(GAME_DIR, 'Maps', `${name}.POG`)))
@@ -152,7 +152,7 @@ test('a marker carries the class, and the class picks the art', () => {
 
 test('the battle fields the map’s own squads, dressed by class', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // The training ground fields exactly what it carries: one side, one pig,

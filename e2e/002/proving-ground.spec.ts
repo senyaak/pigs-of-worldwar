@@ -11,8 +11,8 @@ import { existsSync } from 'node:fs'
 import { PHASE_ENV } from '../launch'
 import { expect, test } from '../app'
 import { debugState, hold, hud, swapMap } from '../controller'
-import { startGame } from '../menu'
 import type { Page } from '@playwright/test'
+import { openBattle } from '../load'
 
 /** Everything the map places that has art: 48 crates, a sign by each, four
  * vehicles and two emplacements — the five pig markers have none
@@ -75,7 +75,7 @@ test.beforeAll(() => {
 
 test('pow.swapMap opens the proving ground: a battle, a walking pig, every record drawn', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // The bare call lists it beside the shipping maps.

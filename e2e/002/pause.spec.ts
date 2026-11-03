@@ -13,6 +13,7 @@ import { expect, test } from '../app'
 import { startGame } from '../menu'
 import { debugState, hud, press, release, tap } from '../controller'
 import type { Page } from '@playwright/test'
+import { openBattle } from '../load'
 
 /** The menu's own state, or null when the game is running. */
 const menu = (
@@ -31,16 +32,27 @@ const menu = (
  * noises, and nothing was painted — the plates' early `return` sat between
  * `draw` and the pause block and swallowed the whole rest of the frame. A
  * spec that reads only the state cannot tell a drawn menu from a silent one.
+ *
+ * MEASURED, both numbers. The title's ink is pure green multiplied into the
+ * glyph's own shading, so it peaks at G 164 — the floor of 200 this used to
+ * have never saw the title at all, and passed only because the sergeant's
+ * opening line was up in the briefing bar by the time a five-second drop had
+ * landed. A battle opened straight onto its feet (`openBattle`) has nobody
+ * talking yet, and that is what showed it. Below the bar's band, pure green
+ * is the title and nothing else: 0 pixels before the pause, 1067 during it,
+ * every one inside the title's own box.
  */
 const greenPixels = (page: Page): Promise<number> =>
   page.evaluate(() => {
+    const BAR_BAND = 0.18
     const canvas = document.getElementById('battle-hud') as HTMLCanvasElement | null
     const context = canvas?.getContext('2d')
     if (!canvas || !context) return -1
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+    const top = Math.ceil(canvas.height * BAR_BAND)
+    const pixels = context.getImageData(0, top, canvas.width, canvas.height - top).data
     let green = 0
     for (let i = 0; i < pixels.length; i += 4) {
-      if (pixels[i] < 40 && pixels[i + 1] > 200 && pixels[i + 2] < 40 && pixels[i + 3] > 200) green++
+      if (pixels[i] < 40 && pixels[i + 1] > 100 && pixels[i + 2] < 40 && pixels[i + 3] > 200) green++
     }
     return green
   })
@@ -53,7 +65,7 @@ const paused = (page: Page): Promise<boolean> =>
 
 test('escape freezes the mission, and nothing in it moves', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
 
   const before = await debugState(page)
   const clockBefore = (await hud(page)).seconds
@@ -101,7 +113,7 @@ test('escape freezes the mission, and nothing in it moves', async ({ app }) => {
 
 test('the menu walks its five rows and arms the abort on NO', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await tap(page, 'pause')
 
   // The walking keys are the cursor's while the pause is up — the same
@@ -139,7 +151,7 @@ test('the menu walks its five rows and arms the abort on NO', async ({ app }) =>
 
 test('the volumes step in fives and stop at both ends', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await tap(page, 'pause')
   await tap(page, 'walkBack')
 
@@ -191,7 +203,7 @@ test('confirming the abort ends the mission on the LOSS debrief', async ({ app }
 test('the pause hands the camera to the MAP VIEW, and it FLIES', async ({ app }) => {
   const { page } = app
   test.setTimeout(90_000)
-  await startGame(page)
+  await openBattle(page)
 
   const eye = (): Promise<{ view: string; cam: number[] }> =>
     page.evaluate(() => {

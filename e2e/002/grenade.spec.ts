@@ -17,7 +17,6 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { beginTurn, press, release, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { DUMMY_MODEL, targetsOf } from '../../src/lib/game/targets'
 import { GAUGE_SECONDS } from '../../src/lib/game/gauge'
@@ -25,6 +24,7 @@ import { BLAST_CORE } from '../../src/lib/game/grenade'
 import { AIM_LOB } from '../../src/lib/game/aim'
 import { fromExeFrames } from '../../src/lib/game/ballistics'
 import { STEP_SECONDS } from '../../src/lib/game/engine'
+import { openBattle } from '../load'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const GRENADE = 19
@@ -81,7 +81,7 @@ const give = (page: Page, skill: number): Promise<boolean> =>
 
 /** Stand `backBy` short of the first dummy, holding a grenade, clock running. */
 const armed = async (page: Page, backBy: number): Promise<void> => {
-  await startGame(page)
+  await openBattle(page)
   await warp(page, FIRST.x, FIRST.z - backBy, 0)
   await beginTurn(page)
   expect(await give(page, GRENADE)).toBe(true)

@@ -14,7 +14,6 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { press, release, warp } from '../controller'
-import { startGame } from '../menu'
 import { TILE_STEP, parsePmg } from '../../src/lib/formats/pmg'
 import { parsePtg } from '../../src/lib/formats/ptg'
 import { buildWaterMask } from '../../src/lib/game/watermask'
@@ -22,6 +21,7 @@ import { TerrainQuery } from '../../src/lib/game/terrain'
 import { parsePog } from '../../src/lib/formats/pog'
 import { ObstacleField } from '../../src/lib/game/obstacles'
 import { SWIM_SINK, WALL_CLIMB } from '../../src/lib/game/locomotion'
+import { openBattle } from '../load'
 
 /**
  * How far the camera holds itself ABOVE the acting pig, once it has stopped
@@ -102,7 +102,7 @@ function shoreOnCamp(): { x: number; z: number; query: TerrainQuery } {
 
 test('the camera holds a swimming pig up by its whole sink', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   const shore = shoreOnCamp()

@@ -21,11 +21,11 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { beginTurn, hud, press, release, tap, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePmg } from '../../src/lib/formats/pmg'
 import { TerrainQuery } from '../../src/lib/game/terrain'
 import { TRAINING_FLOOR } from '../../src/lib/game/health'
 import { WALK_AWAY_QUIET } from '../../src/lib/game/walkAway'
+import { openBattle } from '../load'
 
 type Page = import('@playwright/test').Page
 
@@ -112,7 +112,7 @@ const beatSeconds = (page: Page, ms = 30_000): Promise<number> =>
 test('standing in it costs health, and the training ground still will not kill', async ({ app }) => {
   const { page } = app
   const at = camp()
-  await startGame(page)
+  await openBattle(page)
   await warp(page, at.wet.x, at.wet.z, 0)
   await beginTurn(page)
   expect((await hud(page)).swimming, 'the warp put it in the water').toBe(true)
@@ -136,7 +136,7 @@ test('standing in it costs health, and the training ground still will not kill',
 test('the turn ends with a BEAT, and it swims a pig out of the water first', async ({ app }) => {
   const { page } = app
   const at = camp()
-  await startGame(page)
+  await openBattle(page)
 
   // On dry land the beat is the wait and nothing else — about a second.
   await warp(page, at.dry.x, at.dry.z, 0)

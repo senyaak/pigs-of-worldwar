@@ -21,9 +21,9 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { beginTurn, press, release, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { DUMMY_MODEL, targetsOf } from '../../src/lib/game/targets'
+import { Opening, openBattle } from '../load'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const GRENADE = 19
@@ -135,7 +135,11 @@ test('the view comes down with the squad smoothly', async ({ app }) => {
   // come down, face on. Straight-line VERTICAL motion, which is the case play
   // named — and the descent is the engine's, so the art that lifts the pig is
   // drawn between steps like everything else (three/dropIn.ts).
-  await startGame(page)
+  //
+  // OPENED DROPPING. This used to open through `startGame`, which waits for
+  // the landing before it hands back — so the sampler watched a pig already
+  // standing, scored the stillness 0 and passed without ever seeing a canopy.
+  await openBattle(page, 'CAMP', Opening.Dropping)
   const { score, frames, fps } = await roughness(page, 900)
   console.log(
     `opening drop: view roughness ${score.toFixed(3)} over ${frames} frames at ${fps.toFixed(0)} fps`
@@ -155,7 +159,7 @@ test('the view comes down with the squad smoothly', async ({ app }) => {
 
 test('the view follows a walking pig smoothly', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await warp(page, FIRST.x, FIRST.z - 2000, 0)
   await beginTurn(page)
 
@@ -177,7 +181,7 @@ test('the view follows a walking pig smoothly', async ({ app }) => {
 
 test('the view rides a grenade smoothly — no step in what it is pointed at', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await warp(page, FIRST.x, FIRST.z - 900, 0)
   await beginTurn(page)
   expect(await give(page, GRENADE)).toBe(true)

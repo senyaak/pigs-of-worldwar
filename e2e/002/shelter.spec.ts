@@ -31,7 +31,6 @@ import {
   tap,
   warp
 } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { parseArchive } from '../../src/lib/formats/mad'
 import { parseMcapClip } from '../../src/lib/formats/mcap'
@@ -60,6 +59,7 @@ import { Game } from '../../src/lib/game/game'
 import { NO_BODY } from '../../src/lib/game/body'
 import { createBus } from '../../src/lib/game/events'
 import type { BattleEvent } from '../../src/lib/game/events'
+import { openBattle } from '../load'
 
 type Page = import('@playwright/test').Page
 
@@ -316,7 +316,7 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
   app
 }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
 
   // Up against its long face. A warp is how a spec reaches a spot without
   // testing the walk on the way (docs/testing.md).

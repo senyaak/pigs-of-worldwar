@@ -17,9 +17,9 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { beginTurn, hold, press, release, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { DUMMY_MODEL, targetsOf } from '../../src/lib/game/targets'
+import { openBattle } from '../load'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 const BAZOOKA = 29
@@ -64,7 +64,7 @@ const above = (page: Page): Promise<number | null> =>
 
 test('a rocket fired high never leaves the top fifth of the frame', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await warp(page, FIRST.x, FIRST.z - 2200, 0)
   await beginTurn(page)
   expect(await give(page, BAZOOKA)).toBe(true)

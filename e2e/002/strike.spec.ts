@@ -15,11 +15,11 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { beginTurn, chooseSkill, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { pickupsOf } from '../../src/lib/game/pickups'
 import { restingPlaceOf } from '../../src/lib/game/scenery'
+import { openBattle } from '../load'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 /** 3 BAYONET — the training ground's first weapon (lib/game/skills.ts). */
@@ -137,7 +137,7 @@ const push = (page: Page, action: string): Promise<void> =>
 
 test('a bayonet swung at a dummy knocks it down', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
 
   // The bayonet's crate, straight out of the shipped map.
   const crate = pickupsOf(CAMP).find((pickup) => pickup.skill === BAYONET)

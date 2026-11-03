@@ -29,6 +29,7 @@ import { TerrainQuery, WORLD_LIMIT } from '../../src/lib/game/terrain'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { GAME_DIR } from '../launch'
+import { openBattle } from '../load'
 
 /**
  * The center of a whole-tile wall on the battle map with dry open ground due
@@ -270,7 +271,7 @@ test('a turn waits a beat before it starts, and any input cuts it short', async 
 
 test('USING A WEAPON ends the turn — one shot and the pig hands over', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   const before = await hud(page)
   // The clock is not what ends this turn: CAMP gives 99 seconds and the whole
   // test spends about three (lib/game/turns.ts).
@@ -299,7 +300,7 @@ test('USING A WEAPON ends the turn — one shot and the pig hands over', async (
 
 test('the controller drives the pig: walking moves it, turning aims it', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // Walking moves the pig вЂ” position read off the scene, the ground truth
@@ -353,7 +354,7 @@ test('the controller drives the pig: walking moves it, turning aims it', async (
 
 test('opening the inventory STOPS the pig, with the key still down', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // Play's own bug, twice over: "при открытии инвентаря продолжаю идти", and the
@@ -399,7 +400,7 @@ test('opening the inventory STOPS the pig, with the key still down', async ({ ap
 
 test('G with nothing that points does nothing, and losing focus lets go', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // A pig fresh off the drop holds nothing, so the aim view is not reachable and
@@ -442,7 +443,7 @@ test('G with nothing that points does nothing, and losing focus lets go', async 
 
 test('walk into a wall long enough and the pig is thrown out of it', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // A real wall on the battle map with the ground falling away behind it:
@@ -503,7 +504,7 @@ test('walk into a wall long enough and the pig is thrown out of it', async ({ ap
 
 test('a jump cannot be started from inside a wall, so it is no ladder', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await expect(page.locator('#battle')).toBeVisible()
 
   // Riding a jump into a cliff face, landing higher up it and going again is
@@ -542,7 +543,7 @@ test('a jump cannot be started from inside a wall, so it is no ladder', async ({
 
 test('NOTHING IS FIRED FROM THE AIR — a jump swallows the fire key', async ({ app }) => {
   const { page } = app
-  await startGame(page)
+  await openBattle(page)
   await beginTurn(page)
 
   // Something with a GAUGE in hand, so "did it start charging" is a number.

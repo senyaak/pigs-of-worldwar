@@ -21,7 +21,6 @@ import path from 'node:path'
 import { expect, test } from '../app'
 import { GAME_DIR } from '../launch'
 import { beginTurn, debugState, hold, hud, releaseAll, skipTurn, tap, warp } from '../controller'
-import { startGame } from '../menu'
 import { BOX_UNIT, modelRotationY, parsePog } from '../../src/lib/formats/pog'
 import type { MapObject } from '../../src/lib/formats/pog'
 import { parseArchive } from '../../src/lib/formats/mad'
@@ -33,6 +32,7 @@ import { ObstacleField, PIG_HOLD } from '../../src/lib/game/obstacles'
 import { RAMP_TILT, isRamp } from '../../src/lib/game/ramps'
 import { MODEL_SCALE } from '../../src/lib/game/scale'
 import { HEIGHT_SCALE, TerrainQuery } from '../../src/lib/game/terrain'
+import { openBattle } from '../load'
 
 const mapFile = (name: string): Buffer => readFileSync(path.join(GAME_DIR, 'Maps', name))
 
@@ -419,7 +419,7 @@ test('…and the APP hands the turn over on the deck, which is where play watche
   // Measured with the walk above: the near deck's z, and 1.4 s of walking west
   // from the bank puts the pig well onto it and well short of the gap.
   const onto = { x: 800, z: 7424, heading: -Math.PI / 2 }
-  await startGame(page)
+  await openBattle(page)
   await warp(page, onto.x, onto.z, onto.heading)
   await beginTurn(page)
   await hold(page, 'walkForward', 1400)

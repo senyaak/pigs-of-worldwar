@@ -25,7 +25,6 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { beginTurn, chooseSkill, press, warp } from '../controller'
-import { startGame } from '../menu'
 import { parsePog } from '../../src/lib/formats/pog'
 import { targetsOf } from '../../src/lib/game/targets'
 import { pickupsOf } from '../../src/lib/game/pickups'
@@ -38,6 +37,7 @@ import {
   clipForPlacement
 } from '../../src/lib/game/tutorial'
 import { createScript } from '../../src/lib/game/script'
+import { openBattle } from '../load'
 
 const CAMP = parsePog(readFileSync(path.join(GAME_DIR, 'Maps', 'CAMP.POG')))
 /** 3 BAYONET, 7 RIFLE, 29 BAZOOKA, 37 TNT — the weapons the script hands out. */
@@ -140,7 +140,7 @@ test('the training script moves: collected, chosen, and then PLACED', async ({ a
   // The MARK first: everything below is read from here on, because the bank is
   // the app's and this test is not the first thing to talk into it.
   const mark = (await spoken(page)).length
-  await startGame(page)
+  await openBattle(page)
 
   // The opening two beats are not an object's doing — the level starting, and
   // the round starting under it (lib/game/tutorial.ts, `CLIP_FOR`).
@@ -203,7 +203,7 @@ test('BLOWING THE DOOR drops the bazooka, and the sergeant says so', async ({ ap
   const { page } = app
   // Its own mark in the app-wide speech bank, for the reason `since` gives.
   const mark = (await spoken(page)).length
-  await startGame(page)
+  await openBattle(page)
 
   // CAMP's door is record #46, `STW04_D2`, and it is the one object on the map
   // whose command is the guarded opcode 22: it waits on label 89, which nothing
