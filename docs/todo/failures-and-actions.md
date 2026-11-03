@@ -19,7 +19,9 @@ have yet:
 - **Actions.** Every gesture a spec touches (a menu bar, a key the controller
   takes, a shot) runs as an action with an end — done, refused or failed —
   and a budget, on one stream the spec waits on instead of a guessed timeout.
-  Which gestures and how the stream is shaped is this item's design.
+  The stream exists (`src/renderer/src/actions/actions.ts`, RxJS) with one
+  action on it, opening a battle (`pow.open`); the gestures are still to
+  move onto it, each with the specs that wait on it.
 
 Order: the failure reporters and the catch guard first, since the tests fail
 on what they report; then the harness; then actions, gesture by gesture, with
