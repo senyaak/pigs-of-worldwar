@@ -245,7 +245,10 @@ makes `pow-fleet-<n>` and `pigs-disasm-fleet-<n>` in the game folder beside
 the main checkouts, detached at `origin/master`, with `node_modules`, and
 rewrites each slot's `.claude/settings.local.json`: the game folder as a
 working directory (the disasm worktree, the exe and the e2e lock are in it),
-a broad Bash allow list, and `FLEET_SLOT` for the guard. Safe to run again.
+a broad Bash allow list, and `FLEET_SLOT` for the guard. Safe to run again;
+a slot that already exists is left alone. A slot brought to the base
+(`.claude/fleet/workflow.md` § Start from the base) runs `npm ci` in the code
+worktree when the move changed `package-lock.json`.
 
 **Made 2026-11-02: five slots.** Slots 1–3 are for readers and developers, 4
 and 5 for the two reviewers. The planner and the merger need no slot and run
