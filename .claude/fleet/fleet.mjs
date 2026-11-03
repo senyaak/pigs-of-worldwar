@@ -11,8 +11,8 @@
 //
 // A version is a git tag of the fleet repo. Installing copies the repo's
 // `payload/` tree into the project at the same paths, records the version and a
-// hash of every file in .claude/fleet/fleet.lock.json, registers the guard hook
-// in .claude/settings.json, and writes docs/fleet/project.md from the template
+// hash of every file in .claude/fleet/fleet.lock.json, registers the guard and
+// the version check as hooks in .claude/settings.json, and writes docs/fleet/project.md from the template
 // (.claude/fleet/project-template.md) the first time (it is the project's own file from then on). The copied files
 // are not edited in the project: a change goes to the fleet repo and comes back
 // as a version, and `verify` fails CI on a local edit.
@@ -33,6 +33,24 @@ export const DEFAULT_SOURCE = 'https://github.com/senyaak/claude-fleet.git'
 export const LOCK = '.claude/fleet/fleet.lock.json'
 export const PROJECT_FILE = 'docs/fleet/project.md'
 const GUARD_ARG = '${CLAUDE_PROJECT_DIR}/.claude/fleet/guard.mjs'
+const VERSION_CHECK_ARG = '${CLAUDE_PROJECT_DIR}/.claude/fleet/version-check.mjs'
+
+// The hooks the fleet registers once in .claude/settings.json: the event, the
+// entry it adds, and what `verify` calls it when it is missing.
+export const HOOKS = [
+  {
+    event: 'PreToolUse',
+    arg: GUARD_ARG,
+    name: 'the guard hook',
+    entry: { matcher: 'Bash|PowerShell', hooks: [{ type: 'command', command: 'node', args: [GUARD_ARG], timeout: 10 }] },
+  },
+  {
+    event: 'SessionStart',
+    arg: VERSION_CHECK_ARG,
+    name: 'the version check hook',
+    entry: { matcher: 'startup|resume', hooks: [{ type: 'command', command: 'node', args: [VERSION_CHECK_ARG], timeout: 10 }] },
+  },
+]
 
 const posix = (p) => p.split(sep).join('/')
 
@@ -102,25 +120,26 @@ export function drift(project, lock) {
   return out
 }
 
-export function hookInstalled(settings) {
-  return (settings.hooks?.PreToolUse ?? []).some((entry) =>
-    (entry.hooks ?? []).some((h) => (h.args ?? []).includes(GUARD_ARG)),
+export function hookInstalled(settings, hook = HOOKS[0]) {
+  return (settings.hooks?.[hook.event] ?? []).some((entry) =>
+    (entry.hooks ?? []).some((h) => (h.args ?? []).includes(hook.arg)),
   )
 }
 
-function registerHook(project) {
+// Adds the fleet's hooks that are not registered yet; returns their names.
+function registerHooks(project) {
   const path = join(project, '.claude/settings.json')
   const settings = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}
-  if (hookInstalled(settings)) return false
+  const added = HOOKS.filter((hook) => !hookInstalled(settings, hook))
+  if (!added.length) return []
   settings.hooks ??= {}
-  settings.hooks.PreToolUse ??= []
-  settings.hooks.PreToolUse.push({
-    matcher: 'Bash|PowerShell',
-    hooks: [{ type: 'command', command: 'node', args: [GUARD_ARG], timeout: 10 }],
-  })
+  for (const hook of added) {
+    settings.hooks[hook.event] ??= []
+    settings.hooks[hook.event].push(hook.entry)
+  }
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, JSON.stringify(settings, null, 2) + '\n')
-  return true
+  return added.map((hook) => hook.name)
 }
 
 function changelogBetween(dir, from, to) {
@@ -167,7 +186,7 @@ export function apply(project, fetched, source, { force = false } = {}) {
   }
   const lock = { source, version: fetched.version, commit: fetched.commit, files }
   writeFileSync(join(project, LOCK), JSON.stringify(lock, null, 2) + '\n')
-  const hooked = registerHook(project)
+  const hooked = registerHooks(project)
   let projectFile = false
   const template = join(fetched.dir, 'payload', TEMPLATE)
   if (!existsSync(join(project, PROJECT_FILE)) && existsSync(template)) {
@@ -178,14 +197,15 @@ export function apply(project, fetched, source, { force = false } = {}) {
   return { from: old?.version ?? null, to: lock.version, written: Object.keys(files), removed, hooked, projectFile, notes: changelogBetween(fetched.dir, old?.version, lock.version) }
 }
 
-// What `verify` reports: copied files missing or edited, a trial version, the
-// guard not registered.
+// What `verify` reports: copied files missing or edited, a trial version, a
+// hook of the fleet's not registered.
 export function verifyProblems(project, lock) {
   const problems = drift(project, lock)
   if (!/^v\d+\.\d+\.\d+$/.test(lock.version)) problems.push(`${LOCK}: ${lock.version} is a trial install, not a released version`)
-  const settings = join(project, '.claude/settings.json')
-  if (!existsSync(settings) || !hookInstalled(JSON.parse(readFileSync(settings, 'utf8')))) {
-    problems.push('.claude/settings.json: the guard hook is not registered')
+  const path = join(project, '.claude/settings.json')
+  const settings = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}
+  for (const hook of HOOKS) {
+    if (!hookInstalled(settings, hook)) problems.push(`.claude/settings.json: ${hook.name} is not registered`)
   }
   return problems
 }
@@ -193,7 +213,7 @@ export function verifyProblems(project, lock) {
 function report(result) {
   console.log(`fleet ${result.from ? `${result.from} -> ` : ''}${result.to}: ${result.written.length} files written`)
   for (const f of result.removed) console.log(`  removed ${f} (no longer in the fleet)`)
-  if (result.hooked) console.log('  guard hook registered in .claude/settings.json')
+  for (const name of result.hooked) console.log(`  ${name} registered in .claude/settings.json`)
   if (result.projectFile) console.log(`  ${PROJECT_FILE} written from the template: fill it in, it is this project's own file`)
   if (result.notes) console.log(`\n${result.notes}\n`)
   console.log('Then `node .claude/fleet/fleet.mjs doctor --fix`, review the diff, and commit it as one change: "Fleet <version>".')

@@ -1,5 +1,7 @@
 # Running tests
 
+- Auto-fix first (`eslint --fix`, `cargo clippy --fix` on what changed), then
+  type-check and test: what is left is real.
 - Run the tests of what was touched, at once; the whole suite only for a
   shared change or a release. In a session with the owner, nothing runs
   unasked beyond the test of what the change touches.

@@ -40,6 +40,15 @@ A guard checks every catch of the project's code and fails on anything else
 - **"The file is not there"** is the one failure a "may not exist yet" catch
   is about: test for exactly that (`ENOENT`); anything else goes on.
 
+## What reaches a client
+
+- Never a raw error: no subprocess stderr, exception message, SQL error,
+  stack trace or file path. Log the detail on the server; send a short
+  message from a fixed vocabulary.
+- An expected failure gets its precise status — 400 bad input, 404 missing,
+  409 conflict, 422 unprocessable, 502 / 504 upstream. 500 is a real bug only,
+  never the default.
+
 ## Where a loop meets a bad item
 
 One unreadable item among many is reported and skipped; the scan goes on. A

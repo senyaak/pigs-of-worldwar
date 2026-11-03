@@ -25,12 +25,13 @@ own sessions included:
 | refused | why |
 | - | - |
 | `git add -A`, `--all`, `.`, `:/`, `-u` | other sessions leave work in progress in the tree; stage by name |
-| `git commit`, `rebase`, `cherry-pick`, `revert`, `am`, `merge` without `GIT_COMMITTER_NAME="Claude …"` and `GIT_COMMITTER_EMAIL="noreply@anthropic.com"` | Claude is the committer of every commit it writes ([workflow.md](workflow.md) § Commit) |
+| `git commit`, `rebase`, `cherry-pick`, `revert`, `am`, `merge`, and a `git pull` that rebases (`--rebase`, `-r`, `-c pull.rebase=…`), without `GIT_COMMITTER_NAME="Claude …"` and `GIT_COMMITTER_EMAIL="noreply@anthropic.com"` | Claude is the committer of every commit it writes ([workflow.md](workflow.md) § Commit) |
 | a `Co-Authored-By` trailer in `-m` or in the `-F` file | Claude is already the committer |
 | `--no-verify`, `git commit -n` | the repo's own checks are fixed, not skipped |
-| `gh pr merge` | a GitHub merge commits as GitHub; the merger fast-forwards |
+| `gh pr merge`, and `gh api -X PUT …/pulls/<n>/merge` (or `--method PUT`) | a GitHub merge commits as GitHub; the merger fast-forwards |
 
-`git merge --ff-only` and `--abort`/`--skip`/`--quit` write no commit and pass.
+`git merge --ff-only`, `git pull --no-rebase` / `--rebase=false`, and
+`--abort`/`--skip`/`--quit` are not refused by this rule.
 
 ## In a fleet session
 
@@ -39,7 +40,9 @@ slot's `.claude/settings.local.json` sets it under `env`, and a cloud
 environment can set it too), when it runs in a slot directory
 (`<name>-fleet-<n>`, or `slot-<n>/<checkout>`), or when the hook fires inside
 a subagent of a fleet role (`planner`, `developer`, `reviewer`, `merger`,
-`reader`). There, also:
+`reader`), or when it is a cloud session (`CLAUDE_CODE_REMOTE=true`) and
+`docs/fleet/project.md` has `cloud: fleet` in its front matter. Without that
+key a cloud session is an owner session. There, also:
 
 | refused | why |
 | - | - |
@@ -48,6 +51,23 @@ a subagent of a fleet role (`planner`, `developer`, `reviewer`, `merger`,
 | a forced push to the base, `+<sha>:<base>`, deleting it | the base only moves forward |
 | a plain `--force` / `-f` push | a fix rewrites its branch with `--force-with-lease=<branch>:<head>` only |
 | `--mirror`, `--all` | a session pushes its own branch by name |
+
+## The version check
+
+[version-check.mjs](version-check.mjs) is registered beside the guard, once,
+as a `SessionStart` hook in the same exec form:
+
+```json
+{ "matcher": "startup|resume",
+  "hooks": [{ "type": "command", "command": "node",
+              "args": ["${CLAUDE_PROJECT_DIR}/.claude/fleet/version-check.mjs"], "timeout": 10 }] }
+```
+
+In an owner session it asks the fleet repo for its tags (`git ls-remote`, at
+most 3 seconds, never prompting for a credential) and, when a newer release
+than the lock's is out, prints one line into the session's context. A fleet
+session, as defined above, gets nothing; so does any failure. It never
+updates anything ([updating.md](updating.md)).
 
 ## What it cannot see
 

@@ -64,7 +64,10 @@ else — are the answer, in whatever language they are written.
    2. `What the user sees` — the behaviour in plain words. The mechanism is
       the developer's to choose.
    3. `Reuse` — existing modules to build on. Every path named here exists on
-      the base branch today; grep before filing.
+      the base branch today; grep before filing. It must also work for this
+      use: check it against the open issues that report a gap in it and the
+      open `needs-owner` ones, and list a blocking one under `Depends on`, or
+      plan the part as a known gap that links it.
    4. `Acceptance` — the specs that must exist and pass, each tied to a
       source.
    5. `Depends on` — issue numbers, written in full across repos
@@ -81,7 +84,8 @@ else — are the answer, in whatever language they are written.
    depends on is open; `area:<part>` where 5 asks for it; a `priority:<level>`
    only on the owner's word, or the level of the issue it unblocks
    (`.claude/fleet/workflow.md` § Priority). An item the owner marked
-   `priority:never` is not filed.
+   `priority:never` is not filed. You alone create `area:<part>` labels
+   (`.claude/fleet/lifecycle.md` § Labels).
 
 ## Order of work
 

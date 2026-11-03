@@ -17,5 +17,6 @@ paths:
 - A correction replaces the wrong text: no strike-through, no "~~old~~ new",
   no "see below". Git keeps the old version.
 - A record of work is a new file, never an append to a shared one.
+- A finished work-list item is deleted, not ticked.
 - Every relative link lands: `node .claude/fleet/links.mjs` checks the repo's
   markdown, and CI runs it.

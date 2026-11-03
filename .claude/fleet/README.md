@@ -11,7 +11,7 @@ folder: [../rules/README.md](../rules/README.md).
 ## How it works
 
 - [lifecycle.md](lifecycle.md) — the roles, an issue's way from the work list to the base branch, labels, guard rails
-- [starting.md](starting.md) — slots, and the prompt each session is started with
+- [starting.md](starting.md) — slots, a slot in the owner's checkout, and the prompt each session is started with
 - [strangers.md](strangers.md) — only the owner's account is ever acted on
 - [workflow.md](workflow.md) — claiming, waiting, three strikes, branching, committing, opening a PR, hot files
 
@@ -25,8 +25,9 @@ folder: [../rules/README.md](../rules/README.md).
 
 - [doctor.mjs](doctor.mjs) — `fleet.mjs doctor [--fix]`: everything the fleet needs, the project file and the GitHub labels included
 - [fleet.mjs](fleet.mjs) — `check`, `update`, `verify`, `doctor`: the fleet as a pinned dependency
-- [guard.md](guard.md) — the hook that refuses what the rules forbid, and why it is Node
+- [guard.md](guard.md) — the hook that refuses what the rules forbid, why it is Node, and the version check beside it
 - [lessons.md](lessons.md) — the process problems the shared rules came from
 - [links.mjs](links.mjs) — every relative markdown link lands; CI runs it (`../rules/docs.md`)
 - [project-template.md](project-template.md) — what `docs/fleet/project.md` must hold; the installer starts it from this
 - [updating.md](updating.md) — taking a new version, and where a change to the rules is made
+- [version-check.mjs](version-check.mjs) — at an owner session's start, one line when a newer version is out ([guard.md](guard.md) § The version check)

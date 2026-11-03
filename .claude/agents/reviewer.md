@@ -110,7 +110,9 @@ verdict, so a verdict never prescribes what a current rule forbids.
 
 One session, nothing else. Its loop: the open `approved` PR of the highest
 priority, the lowest number within it — a paired PR in the repo that holds the
-sources before the one that builds on it — through the gate, merged, next. When nothing is approved, wait
+sources before the one that builds on it — through the gate, merged, next.
+An approved PR that adds a repo-wide sweep test (a check over every entity of
+a kind) lands first within its priority. When nothing is approved, wait
 with Monitor for a PR to gain the label (`.claude/fleet/workflow.md`
 § Commands and waiting), and wait for CI the same way. Before anything else,
 check the PR is the owner's own: author the owner, not cross-repository, and

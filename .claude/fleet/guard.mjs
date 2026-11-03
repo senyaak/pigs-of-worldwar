@@ -10,8 +10,9 @@
 // commit rules: they are the owner's rules wherever the fleet is. A FLEET
 // session also keeps master to the merger's form and stays off PowerShell. A
 // session is a fleet session when FLEET_SLOT is set, when it runs in a slot
-// (`<anything>-fleet-<n>`), or when the hook fires inside one of the fleet's
-// role subagents.
+// (`<anything>-fleet-<n>`), when the hook fires inside one of the fleet's
+// role subagents, or when it is a cloud session (CLAUDE_CODE_REMOTE=true) of a
+// project whose docs/fleet/project.md says `cloud: fleet`.
 //
 // A guard that fails must not stop the session: unreadable input is allowed
 // through, and the rules are tested in the fleet repo instead.
@@ -19,6 +20,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+
+import { frontMatter, PROJECT_FILE } from './doctor.mjs'
 
 const BASES = new Set(['master', 'main'])
 const ROLES = new Set(['planner', 'developer', 'reviewer', 'merger', 'reader'])
@@ -94,15 +97,48 @@ function splitEnv(words) {
   return { env, rest: words.slice(i) }
 }
 
-// `git [global options] <subcommand> <args>` → { sub, args }
+// `git [global options] <subcommand> <args>` → { sub, args, config }, config
+// the `-c name=value` settings of the call, names lower-cased
 function gitCall(words) {
   if (words[0] !== 'git' && !/[\\/]git(\.exe)?$/.test(words[0] ?? '')) return null
+  const config = {}
   let i = 1
   while (i < words.length && words[i].startsWith('-')) {
+    if (words[i] === '-c') {
+      const m = /^([^=]+)(?:=(.*))?$/s.exec(words[i + 1] ?? '')
+      if (m) config[m[1].toLowerCase()] = m[2] ?? 'true'
+    }
     i += GIT_VALUE_OPTIONS.has(words[i]) ? 2 : 1
   }
   if (i >= words.length) return null
-  return { sub: words[i], args: words.slice(i + 1) }
+  return { sub: words[i], args: words.slice(i + 1), config }
+}
+
+// `git pull` rebases with --rebase / -r / --rebase=<not false>, or with
+// pull.rebase set by -c; --no-rebase and --rebase=false merge.
+function pullRebases(args, config) {
+  let rebase = config['pull.rebase'] !== undefined && config['pull.rebase'] !== 'false'
+  for (const a of args) {
+    if (a === '--rebase' || a === '-r') rebase = true
+    else if (a.startsWith('--rebase=')) rebase = a.slice(9) !== 'false'
+    else if (a === '--no-rebase') rebase = false
+  }
+  return rebase
+}
+
+// `gh api <path> -X PUT` on `…/pulls/<n>/merge` is `gh pr merge` by another name.
+function ghApiMerge(words) {
+  if (words[0] !== 'gh' || words[1] !== 'api') return false
+  let method = null
+  const positional = []
+  for (let i = 2; i < words.length; i++) {
+    const a = words[i]
+    if (a === '-X' || a === '--method') method = words[++i] ?? ''
+    else if (a.startsWith('--method=')) method = a.slice(9)
+    else if (/^-X./.test(a)) method = a.slice(2)
+    else if (!a.startsWith('-')) positional.push(a)
+  }
+  return String(method).toUpperCase() === 'PUT' && positional.some((p) => /(^|\/)pulls\/[^/]+\/merge\/?(\?.*)?$/.test(p))
 }
 
 function messages(args, cwd) {
@@ -126,8 +162,11 @@ function messages(args, cwd) {
   return found
 }
 
-function committerReason(sub, args, env, processEnv) {
-  if (!COMMITTING.has(sub)) return null
+function committerReason(sub, args, config, env, processEnv) {
+  if (sub === 'pull') {
+    if (!pullRebases(args, config)) return null
+    sub = 'pull --rebase'
+  } else if (!COMMITTING.has(sub)) return null
   const passive = ['--abort', '--quit', '--skip', '--edit-todo', '--show-current-patch']
   if (args.some((a) => passive.includes(a))) return null
   if (sub === 'merge' && args.includes('--ff-only')) return null
@@ -177,13 +216,13 @@ function bashReasons(command, cwd, fleet, processEnv) {
   const reasons = []
   for (const words of simpleCommands(command)) {
     const { env, rest } = splitEnv(words)
-    if (rest[0] === 'gh' && rest[1] === 'pr' && rest[2] === 'merge') {
-      reasons.push('gh pr merge commits as GitHub, not as Claude: the merger fast-forwards instead (reviewer.md § Merger).')
+    if ((rest[0] === 'gh' && rest[1] === 'pr' && rest[2] === 'merge') || ghApiMerge(rest)) {
+      reasons.push('A GitHub merge commits as GitHub, not as Claude: the merger fast-forwards instead (reviewer.md § Merger).')
       continue
     }
     const git = gitCall(rest)
     if (!git) continue
-    const { sub, args } = git
+    const { sub, args, config } = git
     if (sub === 'add' && args.some((a) => ['-A', '--all', '.', ':/', '-u', '--update'].includes(a))) {
       reasons.push('Stage your own files by name: other sessions leave work in progress in this tree (.claude/fleet/workflow.md § Commit).')
     }
@@ -193,7 +232,7 @@ function bashReasons(command, cwd, fleet, processEnv) {
     if (sub === 'commit' && args.includes('-n')) {
       reasons.push('git commit -n skips the repo\'s own checks: fix what they report instead.')
     }
-    const committer = committerReason(sub, args, env, processEnv)
+    const committer = committerReason(sub, args, config, env, processEnv)
     if (committer) reasons.push(committer)
     if (sub === 'commit' && messages(args, cwd).some((m) => /co-authored-by:/i.test(m))) {
       reasons.push('No Co-Authored-By trailer: Claude is already the committer.')
@@ -206,12 +245,23 @@ function bashReasons(command, cwd, fleet, processEnv) {
   return reasons
 }
 
+// A cloud session is a fleet session only where the project says so.
+export function cloudIsFleet(dir) {
+  try {
+    const path = join(dir, PROJECT_FILE)
+    return existsSync(path) && frontMatter(readFileSync(path, 'utf8'))?.cloud === 'fleet'
+  } catch {
+    return false
+  }
+}
+
 export function isFleetSession(input, processEnv) {
   if (processEnv.FLEET_SLOT) return true
   if (input.agent_type && ROLES.has(String(input.agent_type).replace(/^.*:/, ''))) return true
   // the two slot layouts in use: `<name>-fleet-<n>`, and `slot-<n>/<checkout>`
   const dir = (processEnv.CLAUDE_PROJECT_DIR || input.cwd || '').replace(/[\\/]+$/, '')
-  return /-fleet-\d+$/.test(basename(dir)) || dir.split(/[\\/]/).some((part) => /^slot-\d+$/.test(part))
+  if (/-fleet-\d+$/.test(basename(dir)) || dir.split(/[\\/]/).some((part) => /^slot-\d+$/.test(part))) return true
+  return processEnv.CLAUDE_CODE_REMOTE === 'true' && dir !== '' && cloudIsFleet(dir)
 }
 
 // The decision for one hook input: null to let the call through, or the reason

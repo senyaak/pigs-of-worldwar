@@ -26,3 +26,23 @@ When a worker stops because its queue is empty, nudge it later with
 **How many.** Three to five workers per repo is the useful range. Past that,
 the reviewers and the one merger are the limit, not the workers, and
 parallel work in one repo starts to collide.
+
+## A slot in the owner's checkout
+
+Some work runs only where the owner works: an open editor, a running app,
+assets a slot does not copy. That work is a kind of its own (`project.md`
+§ Kinds), and its slot is the owner's checkout itself (`project.md` § Slots):
+
+1. **One worker at a time.** Every issue of the kind carries one
+   `area:<part>` label, so a second worker never claims one while another is
+   in progress ([workflow.md](workflow.md) § Claim).
+2. **No copy, no second instance.** The worker uses what is open; it works on
+   its own branch and goes back to the base when its PR is open. The owner
+   leaves the checkout to it while it runs.
+3. **The guard still knows it.** The work runs in the role's subagent, which
+   the [guard](guard.md) knows by its type. The dispatching session is known
+   only when started with the variable set at launch, `FLEET_SLOT=<n> claude`;
+   set in the checkout's settings, it would make the owner's own sessions
+   fleet sessions too.
+4. **The owner checks what only running it shows**: the merger labels such an
+   issue `needs-play` ([lifecycle.md](lifecycle.md) § An issue's way).

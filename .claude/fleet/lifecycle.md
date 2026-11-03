@@ -41,8 +41,10 @@ Every repo of the project carries the same set: `fleet`, the kinds of
 `fleet-process`, the six `priority:<level>` labels
 ([workflow.md](workflow.md) § Priority), and `area:<part>` labels as the
 planner needs them. `node .claude/fleet/fleet.mjs doctor --fix` creates the
-missing ones in every repo of the project; a role that finds one missing
-creates it (`gh label create <name> --repo <repo>`).
+missing ones in every repo of the project; a role that finds one of them
+missing creates it (`gh label create <name> --repo <repo>`). Only the planner
+creates an `area:<part>` label; another role that needs a missing one reports
+it as `fleet-process`.
 
 ## Guard rails
 

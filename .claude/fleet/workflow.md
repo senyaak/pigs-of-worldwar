@@ -31,6 +31,24 @@ the process; a real clash is a process problem (§ Process problems).
   Bash tool; read comments with `gh api repos/<repo>/issues/<n>/comments`,
   which also gives each comment's author. `gh pr view --json` has no `merged`
   field; use `gh api repos/<repo>/pulls/<n> --jq .merged`.
+- **`project.md` § Traps may forbid `gh issue …` / `gh pr …`, `--paginate`
+  or search** (a proxy that blocks GraphQL, pagination or the search API).
+  Then use the REST form through `gh api`, a page at a time
+  (`?per_page=100&page=<k>` until a page comes back short), filtered with
+  `--jq`; a body goes in with `-F body=@<file>`:
+
+  | instead of | REST |
+  | - | - |
+  | `gh issue list` / `gh pr list` | `gh api 'repos/<repo>/issues?state=open&labels=<a>,<b>&per_page=100&page=<k>'` (PRs carry `.pull_request`) / `…/pulls?state=open&…` |
+  | `gh issue view <n>` / `gh pr view <n> --json author,isCrossRepository` | `gh api repos/<repo>/issues/<n>` / `…/pulls/<n> --jq '{user: .user.login, cross: (.head.repo.full_name != .base.repo.full_name)}'` |
+  | `gh issue comment` / `gh pr comment` | `gh api repos/<repo>/issues/<n>/comments -F body=@<file>` |
+  | `gh issue edit --add-label` / `--remove-label` | `gh api repos/<repo>/issues/<n>/labels -f 'labels[]=<label>'` / `gh api -X DELETE repos/<repo>/issues/<n>/labels/<label>` |
+  | `gh label create` | `gh api repos/<repo>/labels -f name=<label> -f color=<hex>` |
+  | `gh pr create` | `gh api repos/<repo>/pulls -f title=<t> -f head=<branch> -f base=<base> -F body=@<file>` |
+  | `gh pr review --comment` | `gh api repos/<repo>/pulls/<n>/reviews -f event=COMMENT -F body=@<file>` |
+  | `gh pr checks <n>` | `gh api repos/<repo>/commits/<head-sha>/check-runs --jq '.check_runs[] \| {name, status, conclusion}'` |
+  | `gh issue close` | `gh api -X PATCH repos/<repo>/issues/<n> -f state=closed` |
+  | `gh search` | list and filter with `--jq` |
 - The project's own commands and locks are in `project.md` § Verify, and its
   machine traps in `project.md` § Traps.
 
@@ -68,7 +86,8 @@ the process; a real clash is a process problem (§ Process problems).
    a PR labelled `fix-in-progress`.
 4. **The latest verdict is the whole task.** A PR's current round is its
    newest review whose body starts `Verdict:`. It lists every open point and
-   supersedes the earlier rounds.
+   supersedes the earlier rounds. A point that clashes with a rule newer than
+   the verdict: do whichever of the two is cheaper, and say in the PR which.
 5. **A claim expires.** A session that dies leaves its claim and its label
    behind, and nothing else would ever free the item. An issue `in-progress`
    for two hours whose branch has no push in the last hour, or a PR
@@ -121,6 +140,9 @@ report.
   --force-with-lease=<branch>:<head sha named in the verdict>` is allowed only
   while you hold the fix claim. Re-read the claims right before the first
   push; an earlier non-yielded claim for the same round means you yield.
+- A push the lease refuses: fetch and read the other push. Equivalent to
+  yours → keep it; otherwise rebase onto it and push again. Then set the
+  labels to what is now true.
 
 ## Commit
 
@@ -143,7 +165,9 @@ progress in the tree. The guard refuses the commands that break these rules.
 2. **The split is fixed**: the subagent writes, runs the checks, commits and
    pushes the branch, then reports. The **dispatcher** owns everything on
    GitHub — claims, labels, opening the PR, waiting for CI.
-3. While a subagent works, the dispatcher does not touch the working tree.
+3. While a subagent works, the dispatcher does not touch the working tree. A
+   Stop-hook warning about uncommitted changes while a subagent runs is not a
+   reason to commit.
 4. An action refused by a permission check or by the guard is reported as a
    `fleet-process` issue. **Never hand a refused action to another agent** to
    do instead.
@@ -158,7 +182,8 @@ progress in the tree. The guard refuses the commands that break these rules.
    sections, and `Pairs with <owner>/<repo>#<n>` when the work spans two
    repos. Label it `fleet`.
 3. If part of the issue was left out, write `Part of` instead of `Closes`, and
-   comment on the issue what is still open.
+   comment on the issue what is still open. A known gap or a left-out part
+   always links the issue that owns it, never only the issue the PR closes.
 4. **Fixing a PR**: push, wait for CI on the new head, and remove
    `fix-in-progress` only when CI is green. A red run is still your claim.
    Never set `approved` yourself. While waiting, check the PR still applies:

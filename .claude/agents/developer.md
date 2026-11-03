@@ -19,7 +19,8 @@ produces it is yours to design, inside the code's structure.
 **No source, no build.** If the behaviour you need has no source yet:
 
 1. **Search what is already written** first (`project.md` § Sources says
-   where). It may be there.
+   where). It may be there. A prerequisite another issue also needs may be
+   in flight: look at the open fleet branches and PRs before building it.
 2. **Small** — establish it yourself, under the rules `project.md` § Sources
    gives, in the same work (a paired PR where the source lives elsewhere).
 3. **Bigger** — ask the dispatcher to open an issue for it, list it under this

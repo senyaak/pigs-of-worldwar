@@ -26,6 +26,21 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/fleet/version-check.mjs"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

@@ -1,6 +1,6 @@
 // Is everything the fleet needs in place? `fleet.mjs doctor [--fix]`.
 //
-// It checks the project — the copy against its lock, the guard's registration,
+// It checks the project — the copy against its lock, the hooks' registration,
 // docs/fleet/project.md filled in, CLAUDE.md pointing at the fleet, CI running
 // `verify` and the link check — and GitHub: the owner logged in to `gh`, every repo of the
 // project reachable with its base branch, and every label the roles use. With
@@ -100,7 +100,7 @@ export function diagnose(project, { gh, verifyProblems }) {
   const bad = (what, fix) => findings.push({ ok: false, what, fix })
 
   const verify = verifyProblems()
-  verify.length ? verify.forEach((p) => bad(p)) : ok('the copy matches its lock, and the guard is registered')
+  verify.length ? verify.forEach((p) => bad(p)) : ok('the copy matches its lock, and the guard and the version check are registered')
 
   const file = join(project, PROJECT_FILE)
   const template = join(project, TEMPLATE)

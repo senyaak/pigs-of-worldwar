@@ -3,6 +3,7 @@ owner: <github login>
 base: <base branch, e.g. master>
 repos: [<owner>/<repo>]
 kinds: [build, test, bug]
+# cloud: fleet   (optional: a cloud session, CLAUDE_CODE_REMOTE=true, is a fleet session)
 ---
 
 # This project's fleet
@@ -12,7 +13,10 @@ about this project. They cite it as `project.md § <section>`, so every section
 below must exist under exactly this name; a section that does not apply says
 so in one line. The front matter above is the same facts in a form
 `fleet.mjs doctor` reads: it checks each repo and creates the labels the
-roles use. This file is the project's own: the installer writes it once from
+roles use. `cloud: fleet`, when set, makes every cloud session of the
+project a fleet session for the guard (`.claude/fleet/guard.md` § In a fleet
+session); without it a cloud session is an owner session. This file is the
+project's own: the installer writes it once from
 `.claude/fleet/project-template.md` and never touches it again; `doctor` says
 which sections still hold the template's text.
 
@@ -85,7 +89,8 @@ merge besides the shared steps.
 ## Slots
 
 How this project's slots are made, where they are, which role uses which, and
-what each slot pre-allows.
+what each slot pre-allows; a kind that runs in the owner's checkout
+(`.claude/fleet/starting.md` § A slot in the owner's checkout).
 
 ## Traps
 

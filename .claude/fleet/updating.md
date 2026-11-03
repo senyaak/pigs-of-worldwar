@@ -13,12 +13,14 @@ node .claude/fleet/fleet.mjs doctor --fix
 
 - **`check`** says whether a newer version is out.
 - **`update [vX.Y.Z]`** takes it (default: the newest). It rewrites the copied
-  files, removes the ones the fleet dropped, keeps the guard registered, and
+  files, removes the ones the fleet dropped, keeps the guard and the version
+  check registered, and
   prints the changelog between the two versions. It refuses when a copied
   file was edited here. Review the diff and commit it as one change, `Fleet
   <version>`, through a PR like any other.
-- **`verify`** checks every copied file against the lock and the guard's
-  registration, and exits 1 on a difference. The project's CI runs it.
+- **`verify`** checks every copied file against the lock and the hooks'
+  registration (the guard and the version check), and exits 1 on a
+  difference. The project's CI runs it.
 - **`doctor`** checks everything else the fleet needs: `docs/fleet/project.md`
   filled in (its front matter and every section of
   [project-template.md](project-template.md)), `CLAUDE.md` pointing at the
@@ -26,6 +28,12 @@ node .claude/fleet/fleet.mjs doctor --fix
   with its base branch, and every label the roles use. `--fix` creates the
   missing labels; the rest it reports. Run it after every update — a new
   version may bring a new label.
+
+**At session start** an owner session is told, in one line, when a newer
+version is out: the version check hook ([guard.md](guard.md) § The version
+check). It only says so; the owner decides when to `update`. A fleet session
+is not told, and an offline session or one without access to the fleet repo
+starts as if nothing were out.
 
 A **major** version changes what the roles expect of `docs/fleet/project.md`;
 its changelog entry says what to add or rename there, in the same commit as

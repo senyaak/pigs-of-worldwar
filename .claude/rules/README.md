@@ -19,14 +19,17 @@ own docs.
 
 - [commits.md](commits.md) — the owner authors, Claude commits, staged by name, no trailer
 - [investigating.md](investigating.md) — search before reading, a negative is a list of searches, prove the cause
+- [owner.md](owner.md) — English in the repo, the owner's language in chat; terms explained, lists citable, plain reports, no estimates
 - [running-tests.md](running-tests.md) — only what changed, output to a file, one heavy run at a time
 
 ## With matching files
 
-- [code.md](code.md) — source files: small single-purpose modules, no leftovers, the mouse drives every control
+- [angular.md](angular.md) — Angular sources: three files a component, constructor DI, signals by default, reactive forms
+- [code.md](code.md) — source files: small single-purpose modules, no leftovers, one code path, the task and nothing beside it
 - [docs.md](docs.md) — markdown: one thing per file or an index; sorted one-line entries; corrections replace
-- [failures.md](failures.md) — source files: every catch hands the error on, reports it, or says why it is none
+- [failures.md](failures.md) — source files: every catch hands the error on, reports it, or says why it is none; no raw error reaches a client
 - [testing.md](testing.md) — test files: a test fails at the moment something goes wrong; a gesture is an action it waits on
+- [typescript.md](typescript.md) — TypeScript sources: types from their definitions, no `any` or `Record<string, …>`, enums, no `?.` / `!` shortcuts
 - [writing-rules.md](writing-rules.md) — rules, roles, skills, CLAUDE.md: a rule is a protocol, loaded when it is needed
 
 The procedures run now and then are skills in `.claude/skills/`, loaded when a
