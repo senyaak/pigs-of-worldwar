@@ -19,11 +19,24 @@ every shipped map's `.POG`, `.MAD` and `.mtd`. The paint check is
   hangs past the wall's end and paints nothing. The other wall families do the
   same with `BRIC018`/`019` and `MET018`/`019`.
 
-- `[measured]` **One face painted on another of its own model is a fact of the art
-  across the game.** 44 of the 673 models the shipped maps place have a texture
-  group lying in a plane with another group and overlapping it: the wall families
-  above, and `BIG_GUN`, `TANK`, `SWILL2`, `BUSH2` and some trees. So the rule in
-  `lib/formats/paintLayers.ts` is the geometry's, not a list of names.
+- `[measured]` **A keyed group painted on an opaque one of its own model is a fact
+  of the art across the game.** Counting a model once per map that places it, 77 of
+  the 673 the shipped maps place have one; counting distinct names, 31 of 142. All
+  of them are wall families: `ST`, `BR`, `M1` and `W1`. The models in `Chars/` have
+  none. So the rule in `lib/formats/paintLayers.ts` is the art's and the geometry's,
+  not a list of names, and not the model's group order: `M1W05PPP` lists its stones
+  after its wall on five maps and before it on SEPIA1.
+
+- `[measured]` **Two other kinds of group share a plane and overlap, and the art
+  does not say which one the player sees.** Opaque on opaque: 18 of the 673, or 3 of
+  the 142 names (`TANK`, `BIG_GUN`, `SWILL2`). Keyed on keyed: 116 of the 673, or 10
+  of the 142 (`BUSH2`, `BUSH2H`, `TREEG`, `TREEGH`, `TREEGH1`, `TREEGH2`, `TREEPH`,
+  `TREEPH1`, `TREEPH2`, `TREEW`). They get no bias and stay as they were, because a
+  bias picks a winner: on OASIS's `TANK`, `TANK1011` over `TANK1001` turns the ends of
+  the tracks from a light riveted plate with stipple at its edges to a dark face all
+  over, 1 to 5100 pixels across 8 views. Without one, those 8 views match
+  `polygonOffset: false` to the pixel. [#170](https://github.com/senyaak/pigs-of-worldwar/issues/170)
+  owns them.
 
 - `[play]` "Всё ещё текстуры странно себя ведут на стыках дома." **It was the
   stones against their OWN wall.** The two are different triangles in one plane, so
@@ -43,10 +56,10 @@ every shipped map's `.POG`, `.MAD` and `.mtd`. The paint check is
   seen edge-on, and at close range it is 0 or 1 pixels. There is no atlas for a UV
   edge to bleed across here either: each TIM is its own texture, clamped.
 
-- `[deliberate]` **The fix is a depth bias, ours.** A group painted on another of
-  its model's is pulled one layer toward the eye (`LAYER_DEPTH_STEPS`,
-  `three/modelMesh.ts`), which keeps whichever group was already on top, since a
-  mesh draws its groups in order. What the player sees is the art as authored; how
+- `[deliberate]` **The fix is a depth bias, ours.** A keyed group painted on an opaque
+  one of its model's is pulled one layer toward the eye (`LAYER_DEPTH_STEPS`,
+  `three/modelMesh.ts`), wherever the model lists it. Which face wins there is the
+  art's own answer, since a texture's holes are there to show what is under it; how
   the original keeps the two apart is not read and need not be.
 
 - `[gap]` **The stones reach about 3 units past the wall's end**, a fin 1 to 2

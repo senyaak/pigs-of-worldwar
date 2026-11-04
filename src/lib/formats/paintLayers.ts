@@ -7,13 +7,20 @@
 // STW07PWW's quads in CAMP.MAD and every shipped map's models after it
 // (docs/facts/wall-art.md).
 //
-// Nothing here knows those names, because the rule is the geometry's: two faces
-// of one model that share a plane and overlap with some area. The later group is
-// the one that wins today (a mesh draws its groups in order and the depth test is
-// less-or-equal), so the later group is the one on top. Same-group overlaps, a
-// doubled leaf quad, are the same texture and have nothing to settle.
+// Nothing here knows those names, because the rule is the art's and the geometry's:
+// a group of KEYED texture, lying in a plane with an opaque group of its model and
+// overlapping it. A hole in a texture is there to show what is under it, so that pair
+// means one thing only: the keyed group is on top, wherever the model lists it, and
+// SEPIA1's `M1W05PPP` lists its stones before their wall.
+//
+// Nothing else is settled by the art, so nothing else gets a layer. Of two opaque
+// groups (`TANK`, `BIG_GUN`, `SWILL2`) or two keyed ones (the trees, `BUSH2`), which
+// one the player sees is not known, and the group list does not say: a bias on the
+// later one changes the TANK's picture. They stay as they were (#170). Same-group
+// overlaps, a doubled leaf quad, are one texture and have nothing to settle.
 
 import type { Model, ModelGroup } from './model'
+import type { Tim } from './tim'
 
 type Vector = readonly [number, number, number]
 
@@ -77,22 +84,33 @@ function overlap(a: Face, b: Face): boolean {
   return !separated(a, b, across, along) && !separated(b, a, across, along)
 }
 
-/**
- * One number per group, in group order: 0 for a group on nothing, and one more
- * than the highest group it is painted on otherwise. Only a group's own model is
- * looked at, so what two placed records do to each other is not in this.
- */
-export function paintLayers(model: Model): number[] {
-  const faces = model.groups.map((group) => facesOf(model, group))
-  const layers = model.groups.map(() => 0)
-  for (let upper = 1; upper < faces.length; upper++) {
-    for (let lower = 0; lower < upper; lower++) {
-      if (layers[lower] < layers[upper]) continue
-      const painted = faces[upper].some((one) =>
-        faces[lower].some((other) => samePlane(one, other) && overlap(one, other))
-      )
-      if (painted) layers[upper] = layers[lower] + 1
-    }
+/** Whether a texture has key holes: a TIM's fully transparent colour (lib/formats/tim.ts). */
+function hasHoles(texture: Pick<Tim, 'rgba'>): boolean {
+  for (let alpha = 3; alpha < texture.rgba.length; alpha += 4) {
+    if (texture.rgba[alpha] === 0) return true
   }
-  return layers
+  return false
+}
+
+/**
+ * One number per group, in group order: 1 for a keyed group painted on an opaque one
+ * of its model, 0 for any other. `textures` is what a group's `texture` indexes, and a
+ * group whose texture is missing is drawn opaque. Only a group's own model is looked
+ * at, so what two placed records do to each other is not in this.
+ */
+export function paintLayers(model: Model, textures: readonly Pick<Tim, 'rgba'>[]): number[] {
+  const keyed = model.groups.map((group) => {
+    const texture = textures[group.texture]
+    return texture !== undefined && hasHoles(texture)
+  })
+  const faces = model.groups.map((group) => facesOf(model, group))
+  return model.groups.map((_, upper) => {
+    if (!keyed[upper]) return 0
+    const painted = faces.some(
+      (under, lower) =>
+        !keyed[lower] &&
+        faces[upper].some((one) => under.some((other) => samePlane(one, other) && overlap(one, other)))
+    )
+    return painted ? 1 : 0
+  })
 }

@@ -60,7 +60,7 @@ export function buildTextureMaterials(
   { lit = true }: { lit?: boolean } = {}
 ): THREE.Material[] {
   const fallback = new THREE.MeshStandardMaterial({ color: 0xe8a2a2, side: THREE.DoubleSide })
-  const layers = paintLayers(model)
+  const layers = paintLayers(model, textures)
   return model.groups.map((group, index) => {
     const texture = textures[group.texture]
     return texture ? textureMaterial(texture, lit, layers[index]) : fallback

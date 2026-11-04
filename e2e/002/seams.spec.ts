@@ -356,7 +356,7 @@ test('the corner stones of each wall piece are the one thing painted on it', () 
   expect(WALLS.length, 'the house has its wall pieces').toBeGreaterThanOrEqual(12)
   for (const name of new Set(WALLS.map((wall) => wall.name))) {
     const model = modelOf(name)
-    const layers = paintLayers(model)
+    const layers = paintLayers(model, TEXTURES.map((_, index) => textureOf(index).tim))
     model.groups.forEach((group, index) => {
       const texture = textureOf(group.texture).name
       expect(layers[index], `${name}'s ${texture}`).toBe(isStones(group) ? 1 : 0)
