@@ -60,7 +60,13 @@ every shipped map's `.POG`, `.MAD` and `.mtd`. The paint check is
   one of its model's is pulled one layer toward the eye (`LAYER_DEPTH_STEPS`,
   `three/modelMesh.ts`), wherever the model lists it. Which face wins there is the
   art's own answer, since a texture's holes are there to show what is under it; how
-  the original keeps the two apart is not read and need not be.
+  the original keeps the two apart is not read and need not be. Four steps is the
+  remake's own margin, on top of one step of the face's slope. `[measured]`, on the
+  house drawn alone, one step and four differ at one pixel in `north-joint-far` (of
+  163625) and one in `south-far` (of 151545), and at none in the other eight views:
+  `along-east`, `along-north`, `ne-corner`, `ne-corner-near`, `north-joint-near`,
+  `north-joint-oblique`, `south-near`, `sw-corner`. At both pixels one step draws what
+  no bias draws, and four does not.
 
 - `[gap]` **The stones reach about 3 units past the wall's end**, a fin 1 to 2
   pixels wide up the wall's full height, and that is the sliver at a joint where

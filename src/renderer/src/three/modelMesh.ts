@@ -18,9 +18,10 @@ import { paintLayers } from '../../../lib/formats/paintLayers'
  * and rounds it its own way: at every pixel one or the other is a step nearer, and
  * the wall's stone comes through the corner stones in stripes and stipple that
  * move with the camera. Play: "Всё ещё текстуры странно себя ведут на стыках дома."
- * The rounding is worth a step or so, and one step and four draw the same to a
- * pixel (docs/facts/wall-art.md); four has room, and the walls being 64 units thick
- * it is nowhere near showing through anything.
+ * The rounding is worth a step or so: one step and four differ at one pixel in each
+ * of 2 of the house's 10 views, and at none in the other 8 (docs/facts/wall-art.md).
+ * Four is the remake's own margin, and the walls being 64 units thick it is nowhere
+ * near showing through anything.
  *
  * A fade's clones copy all of this, so its depth prepass settles the same way.
  */
