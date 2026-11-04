@@ -8,9 +8,11 @@
 // (`effects/cloud.md`, 0x489FA0), and play's "в оригинале там не дым а искры когда
 // он горит".
 //
-// The exe's records and sizes are world units and a pig is the same 320 in both
-// worlds (docs/facts/space-and-scale.md), so neither is scaled here. That is not the
-// fireball's split (`three/effects.ts`, `RING_SCALE`), whose reason predates that fact.
+// The exe's records and sizes are world units, and the exe draws its models at half
+// size as the remake does (docs/facts/space-and-scale.md, 0x45de90, 0x45e443), so its
+// pig is this one: five box units, 320 (`PIG_HEIGHT`, `lib/game/obstacles.ts`). So
+// neither is scaled here, by `MODEL_SCALE` or by `fromExeY` (docs/facts/effects.md).
+// The fireball's halving (`three/effects.ts`, `RING_SCALE`) is the remake's own.
 //
 // Game space (Y-down), under the battle's converted root.
 

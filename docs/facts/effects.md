@@ -19,7 +19,13 @@
   5500/480 world units wide, about 11: the library divides the size by the
   depth and nothing else, while a position also goes through the focal length, 480
   in the battle's 640x480 (`library/notes.md`, § The SIZE unit, `_d3d.dll`
-  0x1000F1B4). So they are specks, and what reads as a flame is ten of them.
+  0x1000F1B4). So they are specks, and what reads as a flame is ten of them. The
+  flame's size and flight are drawn in world units with no `MODEL_SCALE` and no
+  `fromExeY`: the exe's pig is this one, five box units at half size
+  ([space-and-scale.md](space-and-scale.md), `PIG_HEIGHT`), and `fromExeY` keeps a
+  number meaning the same against the terrain, while this flame is measured against
+  the pig, so a rise of 64 is a fifth of a pig in both worlds and through `fromExeY`
+  it would be a tenth.
 - **A cloud's sprite has an exe size the fireball does not use yet.** `cloudWidth`
   (`lib/game/cloud.ts`) is the reading above; the fireball keeps its own
   `BLOB_UNIT` until [b0-black-smoke.md](../todo/b0-black-smoke.md).

@@ -24,15 +24,15 @@ import type { Blob, Cloud } from '../../../lib/game/cloud'
 import { MODEL_SCALE } from '../../../lib/game/scale'
 
 /**
- * A ring's sizes ride the model scale.
+ * A ring's sizes ride the model scale, and that halving is the remake's own.
  *
  * The exe computes the radius in WORLD units — it adds it straight to the
- * effect's position, no matrix involved — but the world it computes it in
- * holds pigs twice the size of the remake's. A bayonet's 175 units is a
- * quarter of an original pig's height and would be half of one here, so the
- * band would read as twice the blow. This is a rig around a BODY, exactly
- * like the chase camera's distances (`three/chase.ts`), and it halves with
- * one. The terrain does not (`HEIGHT_SCALE`), and that is the standing split.
+ * effect's position, no matrix involved — and that world holds the same pig as
+ * this one: its models are drawn at half size too (`MODEL_SCALE`,
+ * docs/facts/space-and-scale.md), and a pig stands 320 in both (`PIG_HEIGHT`,
+ * `lib/game/obstacles.ts`). So a bayonet's 175 units is over half a pig in the
+ * original and about a quarter of one here. The exe does not halve it; the
+ * remake still does.
  */
 const RING_SCALE = MODEL_SCALE
 
@@ -67,8 +67,8 @@ const PUFF_GROWTH = 1
  * saturation hangs on size and count (docs/todo/b0-black-smoke.md).
  *
  * The positions and the velocities are NOT in this unit: those go straight
- * onto `[effect+0xa8]`, which is the world's own packed position, so they ride
- * `MODEL_SCALE` like a ring for the same reason a ring does.
+ * onto `[effect+0xa8]`, which is the world's own packed position. They ride
+ * `MODEL_SCALE` like a ring, and like a ring's that halving is the remake's own.
  */
 const BLOB_UNIT = 1 / 64
 const BLOB_SCALE = MODEL_SCALE
@@ -294,8 +294,8 @@ export function createEffectArt(root: THREE.Object3D): EffectArt {
   const kindle = (sprite: THREE.Sprite, one: Cloud, blob: Blob, at: Spot): void => {
     // The OFFSET rides the scale, not the position: where the blast happened
     // is a world coordinate and stays one, while how far a sprite has flown
-    // from it is a rig around a body and halves with it. Same split as the
-    // ring's radius, and the reason this is not `blob.x * BLOB_SCALE`.
+    // from it is what the remake halves. Same split as the ring's radius, and
+    // the reason this is not `blob.x * BLOB_SCALE`.
     sprite.position.set(
       at.x + (blob.x - at.x) * BLOB_SCALE,
       at.y + (blob.y - at.y) * BLOB_SCALE,
