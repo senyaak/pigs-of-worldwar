@@ -13,7 +13,7 @@ import { existsForPlayers, modelRotationY, parachutesIn } from '../src/lib/forma
 import { TILE_WALL, TILE_WATER, TILES_PER_SIDE, TILE_STEP } from '../src/lib/formats/pmg'
 import { WALL_CLIMB } from '../src/lib/game/locomotion'
 import { fielded, mapSquads } from '../src/lib/game/muster'
-import { ObstacleField } from '../src/lib/game/obstacles'
+import { ObstacleField, boxOf } from '../src/lib/game/obstacles'
 import { mapSpawns } from '../src/lib/game/spawns'
 import { pickupsOf, reached } from '../src/lib/game/pickups'
 import { skillFromCrate } from '../src/lib/game/skills'
@@ -21,7 +21,7 @@ import { createScript } from '../src/lib/game/script'
 import { createScenery } from '../src/lib/game/scenery'
 import { vehicleKind } from '../src/lib/game/vehicles'
 import { buildingKind } from '../src/lib/game/buildings'
-import { TerrainQuery } from '../src/lib/game/terrain'
+import { TerrainQuery, WORLD_LIMIT, clampToWorld } from '../src/lib/game/terrain'
 import {
   CRATE_SKILLS,
   DUMMIES_AT,
@@ -202,6 +202,48 @@ test('a pig fits between any two neighbouring signposts', { tag: '@nodata' }, ()
   })
   expect(shut, 'the z of each sign with no room for a pig on its +z side').toEqual([])
   expect(stopped).toEqual([])
+})
+
+test('a pig can stand somewhere that reaches every crate, inside the world', { tag: '@nodata' }, () => {
+  // exe 0x3000 (WORLD_LIMIT, lib/game/terrain.ts): `clampToWorld` holds a pig
+  // inside it, walking or flying, so a standing point it would move is not one.
+  // [play] 2026-11-02, docs/facts/proving-ground.md: "One map to test every
+  // weapon and machine on", so no crate may be out of reach.
+  const field = new ObstacleField(objects)
+  const crates = pickupsOf(objects)
+  expect(crates.length).toBe(CRATE_SKILLS.length)
+  const step = 8
+  const around = 400
+  const unreachable = crates
+    .filter((crate) => {
+      for (let x = crate.x - around; x <= crate.x + around; x += step) {
+        for (let z = crate.z - around; z <= crate.z + around; z += step) {
+          if (!reached(crate, x, z)) continue
+          const held = clampToWorld(x, z)
+          if (held.x !== x || held.z !== z) continue
+          if (!field.blocks(x, z, ground.height(x, z), WALL_CLIMB)) return false
+        }
+      }
+      return true
+    })
+    .map((crate) => crate.skill)
+  expect(unreachable, 'the skills of the crates no standing point reaches').toEqual([])
+})
+
+test('every signpost stands whole inside the world', { tag: '@nodata' }, () => {
+  // exe 0x3000 (WORLD_LIMIT, lib/game/terrain.ts), and [deliberate]
+  // docs/facts/proving-ground.md: the row keeps inside what a pig is held to.
+  // SIGN_YAW leaves the box unturned ('every signpost shows its board…' above),
+  // so its half-extents are its reach along the world's axes.
+  const signs = objects.filter((one) => one.name === 'SIGN')
+  expect(signs.length).toBe(CRATE_SKILLS.length)
+  const outside = signs
+    .filter((sign) => {
+      const box = boxOf(sign)
+      return Math.abs(box.x) + box.halfX > WORLD_LIMIT || Math.abs(box.z) + box.halfZ > WORLD_LIMIT
+    })
+    .map((sign) => `sign ${sign.id} at z ${sign.z}`)
+  expect(outside).toEqual([])
 })
 
 test('one of each vehicle and each emplacement', { tag: '@nodata' }, () => {
