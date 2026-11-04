@@ -64,7 +64,7 @@ so a slot left on an old commit works to old rules and old code.
    `project.md` § Merge). In the owner's checkout, which stands on the base
    branch itself, `git pull --ff-only`.
 3. **Started work stays where it is:** a branch under your claim meets the
-   base when it is rebased before the push (§ Open the PR).
+   base when the base is merged in before the push (§ Open the PR).
 4. **A dirty tree with no claim of yours behind it** is somebody's work: leave
    it untouched and report it as a `fleet-process` issue (§ Process problems).
 
@@ -152,17 +152,19 @@ report.
   in your slot's worktree: `fleet/<issue-number>-<short-slug>`, in whichever
   repo the work is in. Work that spans two repos uses the same branch name in
   both.
-- Fixing a PR: work on its branch. Rebasing and `git push
-  --force-with-lease=<branch>:<head sha named in the verdict>` is allowed only
-  while you hold the fix claim. Re-read the claims right before the first
-  push; an earlier non-yielded claim for the same round means you yield.
-- A push the lease refuses: fetch and read the other push. Equivalent to
-  yours → keep it; otherwise rebase onto it and push again. Then set the
-  labels to what is now true.
+- **Nothing is forced and nothing published is rewritten.** The base comes
+  into a branch with `git merge origin/<base>`; the guard refuses a forced
+  push.
+- Fixing a PR: work on its branch, while you hold the fix claim. Re-read the
+  claims right before the first push; an earlier non-yielded claim for the
+  same round means you yield.
+- A refused push: fetch and read the other push. Equivalent to yours → keep
+  it; otherwise merge it and push again. Then set the labels to what is now
+  true.
 
 ## Commit
 
-Every commit, a rebase's included:
+Every commit, a merge's included:
 
 ```bash
 GIT_COMMITTER_NAME="Claude <the model actually running>" GIT_COMMITTER_EMAIL="noreply@anthropic.com" git commit -F <message file>
@@ -190,7 +192,7 @@ progress in the tree. The guard refuses the commands that break these rules.
 
 ## Open the PR
 
-1. Rebase on fresh `origin/<base>` right before pushing, and re-run the checks
+1. Merge fresh `origin/<base>` in right before pushing, and re-run the checks
    if the base moved.
 2. Title it like the issue and write the body **from this issue**, never from
    another PR's text. It holds `Closes #<n>` (the issue is in the same repo,
@@ -205,7 +207,7 @@ progress in the tree. The guard refuses the commands that break these rules.
    Never set `approved` yourself. While waiting, check the PR still applies:
    GitHub runs no CI on a conflicted PR, and its `mergeable_state` lags, so
    fetch and run `git merge-tree --write-tree origin/<base> <head>` (non-zero
-   exit means a conflict) — then rebase again, push, wait again.
+   exit means a conflict) — then merge the base in again, push, wait again.
 
 ## Hot files
 
