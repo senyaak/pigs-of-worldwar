@@ -3,7 +3,9 @@
 // commands. The controller module puts it on the window (input/controller.ts);
 // every view hangs its own part off it.
 
+import type { Pig } from '../../../lib/game/game'
 import type { ActionEnd } from '../actions/actions'
+import type { PigPlate } from '../contracts/overlay'
 import type { Controller } from './controller'
 
 type Spot = { x: number; y: number; z: number }
@@ -19,6 +21,10 @@ export interface DebugHooks {
    * the flung-pig paint spec's trigger (three/battle.ts). Returns who was
    * thrown and from where, or null on a one-pig map. */
   flingOther(): { pig: number; x: number; z: number } | null
+  /** Bring this pig down with nobody's blow behind it, and the turn unspent. */
+  fell(pig: Pig['id']): void
+  /** Each living pig's plate in a view this big, with no lift over the crown. */
+  plates(width: number, height: number): PigPlate[]
   /** The terrain TYPE the acting pig is standing on — the tile byte's low five
    * bits (lib/game/terrain.ts). What its footsteps are picked by, and the only
    * way a spec can tell a stone one from a grass one (audio/battle.ts). */

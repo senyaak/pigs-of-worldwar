@@ -88,6 +88,10 @@ export type BattleEvent =
    * `at` is the soles, `heading` the way the pig faced — where and which way
    * the boots stand. The pig stops being drawn from here. */
   | { kind: 'remains'; pig: PigId; at: Point; heading: number }
+  /** …and on the proving ground its body is BACK: a dummy on its feet at the
+   * start of a turn (lib/game/provingDummies.ts). `at` is the soles, `heading`
+   * the way it faces. The boots stay where they were left. */
+  | { kind: 'stoodUp'; pig: PigId; at: Point; heading: number }
   /** Something went off here, and WHICH effect id it spawns: a grenade and a
    * mine do not look alike (lib/game/blast.ts, `Charge.effect`). */
   | { kind: 'blasted'; at: Point; effect: number }

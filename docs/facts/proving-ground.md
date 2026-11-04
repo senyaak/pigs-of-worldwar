@@ -122,6 +122,23 @@
   face the other way for an icon; `e2e/002/proving-ground.spec.ts` reads both
   sides off the canvas.
 
+- `[play]` **A dummy that was killed comes back**: they "stand up at full health
+  at the start of a turn", so that reactions, deaths and damage numbers get
+  tested, 2026-11-02. The death itself is the original's and plays out whole,
+  corpse blast and boots included (`lib/game/corpses.ts`); at the first turn
+  start after it has finished, whoever's turn that is, the dummy stands at the
+  full health of its class with its class's kit and no poison. Bringing all four
+  down in one turn does not end the battle, and the player's own pig dying still
+  loses it. One only wounded keeps its wounds where the blow left it: play's
+  words are about a dummy that went down. `lib/game/provingDummies.ts`, asked by
+  `handOver` in `lib/game/battle/handover.ts`.
+  - `[deliberate]` **Where it stands up is not in play's words.** The layout is
+    the remake's own, so it is the dummy's own place on the strip, facing the way
+    it faced at the start: the ranges down the strip stay what they were laid out
+    to be, and a body that drowned or was thrown has no other safe spot to return
+    to. No getting-up clip was asked for, so it is simply standing there; the
+    boots stay down where it fell.
+
 - `[gap]` **What it does not do yet** is listed in
-  [../todo/proving-ground.md](../todo/proving-ground.md): a dummy brought down
-  stays down and a taken crate stays taken.
+  [../todo/proving-ground.md](../todo/proving-ground.md): a taken crate stays
+  taken.

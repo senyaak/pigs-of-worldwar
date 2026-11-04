@@ -10,7 +10,8 @@
 // controller would test the walk rather than the wall.
 
 import type * as THREE from 'three'
-import type { Game } from '../../../lib/game/game'
+import type { Game, Pig } from '../../../lib/game/game'
+import type { PigPlate } from '../contracts/overlay'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { controller } from '../input/controller'
 import { inWater } from '../../../lib/game/locomotion'
@@ -226,6 +227,13 @@ export interface DebugParts {
    * demand. Returns who was thrown and from where, or null on a one-pig
    * map. */
   flingOther: () => { pig: number; x: number; z: number } | null
+  /** Bring this pig down with nobody's blow behind it: the turn is not spent, so
+   * a paint spec can look at the empty spot from the view it had
+   * (e2e/002/proving-dummies.spec.ts). */
+  fell: (pig: Pig['id']) => void
+  /** Each living pig's plate, in a view this big and with no lift over the
+   * crown (three/squad.ts): where a pig stands on the screen. */
+  plates: (width: number, height: number) => PigPlate[]
 }
 
 /** Hang the battle's debug surface off `window.pow`, keeping whatever else
@@ -249,6 +257,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
       flingOther: parts.flingOther,
+      fell: parts.fell,
+      plates: parts.plates,
       // What a hoof landing NOW would sound like — the deck under the pig where
       // there is one and the tile it is over otherwise, which is the footstep's
       // own question (lib/game/footsteps.ts).

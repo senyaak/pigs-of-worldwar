@@ -58,6 +58,20 @@ export const exposeDebug = (core: SceneCore): void => {
       battle.fling(other, flingVelocity(flingSpeed(lobOf(19)?.force ?? 0, 1), 0))
       return from
     },
+    // Dead with nobody's blow behind it, so the acting pig's turn is not spent
+    // and its camera comes back: the one way to see the spot with the body gone
+    // and the view as it was. What happens next is the ordinary `killed`
+    // (lib/game/corpses.ts).
+    fell: (id) => {
+      const pig = game.players.flatMap((player) => player.pigs).find((one) => one.id === id)
+      if (!pig) throw new Error(`no pig ${id} to fell`)
+      pig.health = 0
+      battle.announce({ kind: 'killed', pig: id })
+    },
+    plates: (width, height) =>
+      squad.plates(host.camera, width, height, 0, game.players.indexOf(game.currentPlayer), (pig) =>
+        engine.poison.poisoned(pig)
+      ),
     hotseat: (on) => {
       link.hotseat = on ?? !link.hotseat
       console.info(

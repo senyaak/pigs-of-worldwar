@@ -114,11 +114,14 @@ export interface Squad {
   ): PigPlate[]
   /**
    * This pig's body is GONE — its death has finished playing out
-   * (lib/game/corpses.ts, `remains`) — so its model comes off the scene for
-   * good. What stays on the spot is the boots, and those are not this
-   * module's (three/remains.ts).
+   * (lib/game/corpses.ts, `remains`) — so its model comes off the scene. What
+   * stays on the spot is the boots, and those are not this module's
+   * (three/remains.ts).
    */
   bury(pig: number): void
+  /** …and this one is back: a proving-ground dummy on its feet
+   * (lib/game/provingDummies.ts), on the scene and among the members again. */
+  raise(pig: number): void
   dispose(): void
 }
 
@@ -327,6 +330,19 @@ export function fieldSquad(
       // but its GPU resources live until the battle's own teardown, with
       // everyone else's.
       fallen.push(gone)
+    },
+    raise(pig) {
+      const at = fallen.findIndex((soldier) => soldier.pig.id === pig)
+      if (at < 0) {
+        console.warn(`the squad was told pig ${pig} stood up, and it is not among the fallen`)
+        return
+      }
+      const [back] = fallen.splice(at, 1)
+      root.add(back.node)
+      // Back in its place in the list, which is the order the squads were
+      // fielded in and pig ids are handed out in (lib/game/game.ts).
+      const next = members.findIndex((soldier) => soldier.pig.id > pig)
+      members.splice(next < 0 ? members.length : next, 0, back)
     },
     dispose() {
       for (const { mesh } of [...members, ...fallen]) mesh.dispose()
