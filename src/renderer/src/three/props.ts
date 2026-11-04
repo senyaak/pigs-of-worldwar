@@ -244,10 +244,11 @@ export function buildMapProps(objects: MapObject[], props: MapProp[]): MapProps 
     // **A FIXED DRAW ORDER, and that is what stops the house flickering.**
     //
     // Play: "дом имеет мерцающие текстуры." Measured, and it is the MAP's own
-    // art: CAMP's house is eighteen wall, floor and roof pieces, and at every
-    // corner two wall pieces overlap by exactly 64 units — the wall's own
-    // thickness — so their big faces are COPLANAR. Twelve such pairs, each
-    // 64×512×64 (the same measurement over the AABBs of the placed models).
+    // art: CAMP's house is eighteen wall, floor and roof pieces, and the corner
+    // stones of two neighbouring wall pieces meet at their joint with a sliver
+    // of each lying on the other, in one plane (docs/facts/wall-art.md). The
+    // walls themselves butt and do not overlap: the 64 units by which their
+    // bounding boxes do is the KEYED flank of those stones, which paints nothing.
     //
     // The original never minded, because it has no depth buffer to fight over: a
     // PSX-style renderer sorts its polygons and draws them in that order, so the
@@ -255,6 +256,9 @@ export function buildMapProps(objects: MapObject[], props: MapProp[]): MapProps 
     // z-buffer and `LessEqualDepth`, so at equal depth the LAST one drawn wins —
     // and its opaque sort falls back to distance from the camera, which reorders
     // the pair as the camera moves. That flip, once a frame, IS the flicker.
+    //
+    // Inside ONE record this cannot help: a wall and its own stones are decided
+    // by a depth bias instead (`LAYER_DEPTH_STEPS`, three/modelMesh.ts).
     //
     // `renderOrder` is the first key of that sort, ahead of the material and the
     // distance, so one distinct value per record makes the order the map's own

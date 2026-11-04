@@ -17,6 +17,8 @@ import type { Pig } from '../game'
 import { createGruntBrain } from '../grunt'
 import { mountArmed } from '../mounts'
 import { createWaterMemo } from '../pathfind'
+import { createProvingDummies } from '../provingDummies'
+import type { ProvingDummies } from '../provingDummies'
 import { DEFAULT_SEED, seeded } from '../random'
 import { createSights } from '../sights'
 import type { Sights } from '../sights'
@@ -38,6 +40,9 @@ export interface BattleCore extends BattleParts {
   attack: Attack
   actuator: Actuator
   brain: BrainPort
+  /** The proving ground's dummies, and each one's place on the strip
+   * (lib/game/provingDummies.ts). */
+  dummies: ProvingDummies
   state: BattleState
 }
 
@@ -193,6 +198,10 @@ export function createCore(parts: BattleParts): BattleCore {
     attack,
     actuator,
     brain,
+    dummies: createProvingDummies(
+      { game, anim, tumbles: parts.tumbles, poison: parts.poison },
+      emit
+    ),
     state
   }
 }

@@ -14,10 +14,6 @@ and wall. What it is and where every piece comes from:
 
 What play asked for that it does not do yet:
 
-- **Training dummies that come back.** The dummies skip their turns; they should
-  also stand up at full health at the start of a turn. Then reactions, deaths,
-  damage numbers and dropped crates get tested too. Until then a dummy brought
-  down stays down, and bringing every dummy down ends the battle as a win.
 - **A crate that was taken is back at the start of the next turn** — one round
   per crate per turn.
 

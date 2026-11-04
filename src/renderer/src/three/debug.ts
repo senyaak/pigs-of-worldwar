@@ -10,7 +10,8 @@
 // controller would test the walk rather than the wall.
 
 import type * as THREE from 'three'
-import type { Game } from '../../../lib/game/game'
+import type { Game, Pig } from '../../../lib/game/game'
+import type { PigPlate } from '../contracts/overlay'
 import type { TerrainQuery } from '../../../lib/game/terrain'
 import { controller } from '../input/controller'
 import { inWater } from '../../../lib/game/locomotion'
@@ -36,6 +37,10 @@ export interface DebugParts {
   /** How many .POG records the map carried, against how many were drawn. */
   objectCount: number
   camera: THREE.Camera
+  /** Draw the scene once through another lens, and the canvas it lands on: a paint
+   * check's own look at something (e2e/002/seams.spec.ts). */
+  drawThrough(lens: THREE.Camera): void
+  canvas: HTMLCanvasElement
   /** Every sound the battle has played, in order — out of the sound domain
    * (contracts/sound.ts), because a spec cannot listen. */
   sounds: () => string[]
@@ -222,12 +227,27 @@ export interface DebugParts {
    * demand. Returns who was thrown and from where, or null on a one-pig
    * map. */
   flingOther: () => { pig: number; x: number; z: number } | null
+  /** Bring this pig down with nobody's blow behind it: the turn is not spent, so
+   * a paint spec can look at the empty spot from the view it had
+   * (e2e/002/proving-dummies.spec.ts). */
+  fell: (pig: Pig['id']) => void
+  /** Each living pig's plate, in a view this big and with no lift over the
+   * crown (three/squad.ts): where a pig stands on the screen. */
+  plates: (width: number, height: number) => PigPlate[]
 }
 
 /** Hang the battle's debug surface off `window.pow`, keeping whatever else
  * is already there (the controller, the map selector, the HUD layout). */
 export function exposeBattleDebug(parts: DebugParts): void {
   const { game, query, obstruction, squad, dropIn, props, camera } = parts
+  /** The chase's own lens, stood somewhere else: the chase is not touched. */
+  const lookFrom = (eye: { x: number; y: number; z: number }, at: { x: number; y: number; z: number }): THREE.Camera => {
+    const lens = camera.clone()
+    lens.position.set(eye.x, eye.y, eye.z)
+    lens.lookAt(at.x, at.y, at.z)
+    lens.updateMatrixWorld(true)
+    return lens
+  }
   window.pow = {
     ...(window.pow ?? { controller }),
     // Beside `debug`, not in it: it is a play convenience like `pow.swapMap`,
@@ -237,6 +257,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
       currentPig: () => ({ x: game.currentPig.position.x, z: game.currentPig.position.z }),
       currentHeading: () => game.currentPig.heading,
       flingOther: parts.flingOther,
+      fell: parts.fell,
+      plates: parts.plates,
       // What a hoof landing NOW would sound like — the deck under the pig where
       // there is one and the tile it is over otherwise, which is the footstep's
       // own question (lib/game/footsteps.ts).
@@ -421,6 +443,30 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** Where the chase camera actually is, world space — the only way a
        * spec can tell "swimming" from "the view has gone under the water". */
       camera: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
+      lensFrom: (eye, at) => {
+        const lens = lookFrom(eye, at)
+        return {
+          view: [...lens.matrixWorldInverse.elements],
+          projection: [...lens.projectionMatrix.elements],
+          width: parts.canvas.width,
+          height: parts.canvas.height
+        }
+      },
+      pixelsFrom: (eye, at, spots) => {
+        parts.drawThrough(lookFrom(eye, at))
+        const { canvas } = parts
+        const copy = document.createElement('canvas')
+        copy.width = canvas.width
+        copy.height = canvas.height
+        const context = copy.getContext('2d', { willReadFrequently: true })
+        if (!context) throw new Error('no 2d context to read the canvas back with')
+        context.drawImage(canvas, 0, 0)
+        const { data } = context.getImageData(0, 0, copy.width, copy.height)
+        return spots.map(([x, y]): [number, number, number] => {
+          const pixel = (y * copy.width + x) * 4
+          return [data[pixel], data[pixel + 1], data[pixel + 2]]
+        })
+      },
       /** …and which of the rig's views put it there (three/chase.ts). */
       view: () => parts.view(),
       brain: () => parts.brain(),

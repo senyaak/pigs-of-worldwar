@@ -7,6 +7,25 @@
 
 import * as THREE from 'three'
 import type { Model, Texture } from '../api'
+import { paintLayers } from '../../../lib/formats/paintLayers'
+
+/**
+ * How far one painted layer is pulled toward the eye, in the depth buffer's own
+ * smallest steps, on top of one step of the face's own slope.
+ *
+ * A wall's corner stones lie exactly on the wall's plane (lib/formats/paintLayers.ts),
+ * and the two are different triangles, so each works out its own depth at a pixel
+ * and rounds it its own way: at every pixel one or the other is a step nearer, and
+ * the wall's stone comes through the corner stones in stripes and stipple that
+ * move with the camera. Play: "Всё ещё текстуры странно себя ведут на стыках дома."
+ * The rounding is worth a step or so: one step and four differ at one pixel in each
+ * of 2 of the house's 10 views, and at none in the other 8 (docs/facts/wall-art.md).
+ * Four is the remake's own margin, and the walls being 64 units thick it is nowhere
+ * near showing through anything.
+ *
+ * A fade's clones copy all of this, so its depth prepass settles the same way.
+ */
+const LAYER_DEPTH_STEPS = 4
 
 /**
  * One material per model group, in group order — which is also the order
@@ -42,14 +61,16 @@ export function buildTextureMaterials(
   { lit = true }: { lit?: boolean } = {}
 ): THREE.Material[] {
   const fallback = new THREE.MeshStandardMaterial({ color: 0xe8a2a2, side: THREE.DoubleSide })
-  return model.groups.map((group) => {
+  const layers = paintLayers(model, textures)
+  return model.groups.map((group, index) => {
     const texture = textures[group.texture]
-    return texture ? textureMaterial(texture, lit) : fallback
+    return texture ? textureMaterial(texture, lit, layers[index]) : fallback
   })
 }
 
-/** One face group's material, its map named after its texture. */
-export function textureMaterial(texture: Texture, lit: boolean): THREE.Material {
+/** One face group's material, its map named after its texture, `layer` painted
+ * layers toward the eye. */
+export function textureMaterial(texture: Texture, lit: boolean, layer = 0): THREE.Material {
   const map = new THREE.DataTexture(texture.rgba, texture.width, texture.height, THREE.RGBAFormat)
   map.name = texture.name
   // TIM rows are top-down; the V flip in the UV build assumes the data is
@@ -59,7 +80,14 @@ export function textureMaterial(texture: Texture, lit: boolean): THREE.Material 
   map.minFilter = THREE.LinearFilter
   map.colorSpace = THREE.SRGBColorSpace
   map.needsUpdate = true
-  const options = { map, side: THREE.DoubleSide, alphaTest: 0.5 }
+  const options = {
+    map,
+    side: THREE.DoubleSide,
+    alphaTest: 0.5,
+    polygonOffset: layer > 0,
+    polygonOffsetFactor: -layer,
+    polygonOffsetUnits: -layer * LAYER_DEPTH_STEPS
+  }
   return lit ? new THREE.MeshStandardMaterial(options) : new THREE.MeshBasicMaterial(options)
 }
 

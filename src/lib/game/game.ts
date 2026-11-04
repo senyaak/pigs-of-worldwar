@@ -411,10 +411,11 @@ export class Game {
   /**
    * Hand over to the next player; their squad advances to its next pig.
    *
-   * The DEAD are stepped over on both counts — a fallen pig never comes up
-   * again, and a side with none left is passed by rather than handed a turn
-   * it cannot take. A battle with nobody standing leaves everything where it
-   * is: `over` is what says so.
+   * The DEAD are stepped over on both counts — a fallen pig is handed no turn,
+   * and a side with none left is passed by rather than handed a turn it cannot
+   * take. Only the proving ground's dummies ever come up again, and they are up
+   * before this is asked (lib/game/provingDummies.ts). A battle with nobody
+   * standing leaves everything where it is: `over` is what says so.
    */
   endTurn(): void {
     if (this.over) return

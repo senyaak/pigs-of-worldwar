@@ -171,7 +171,8 @@ export function createCorpses(
   const dying: Corpse[] = []
 
   /**
-   * The end of it: the bang, the boots, and the pig is off the map for good.
+   * The end of it: the bang, the boots, and the pig is off the map — for good
+   * everywhere but the proving ground (lib/game/provingDummies.ts).
    *
    * **THE CORPSE'S BANG IS A REAL BLAST** — read out of the exe 2026-08-25
    * after play asked "взрыв свина не дамажит никого?", because it did not.

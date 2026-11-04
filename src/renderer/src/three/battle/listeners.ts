@@ -72,14 +72,17 @@ export const listen = (scene: SceneListeners): void => {
         subject.flungWatch = { pig, x: at.x, z: at.z, still: 0, age: 0 }
         subject.sawFling = true
       },
-      // A death has finished playing out: the body comes off the scene for
-      // good and the boots go down where it lay (lib/game/corpses.ts). The
-      // blast that goes with it arrives as an ordinary `blasted`.
+      // A death has finished playing out: the body comes off the scene and the
+      // boots go down where it lay (lib/game/corpses.ts). The blast that goes
+      // with it arrives as an ordinary `blasted`.
       remains: ({ pig, at, heading }) => {
         if (subject.dyingWatch === pig) subject.dyingWatch = null
         squad.bury(pig)
         remainsArt().leave(at, heading)
       },
+      // …and on the proving ground a dummy's body comes back on at the start of
+      // a turn (lib/game/provingDummies.ts). The boots stay down.
+      stoodUp: ({ pig }) => squad.raise(pig),
       // A BANG SHAKES THE LENS, and this is the exe's own reaction to an
       // explosion — the only one it has (three/chase.ts, `SHAKE_REACH`).
       // …and the MEDICINE BALL's 0x60 does not: a heal is not a bang — its

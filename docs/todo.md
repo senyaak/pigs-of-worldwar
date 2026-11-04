@@ -37,7 +37,7 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 ## New, from play — 2026-11-02
 
 - [ambient-airship.md](todo/ambient-airship.md) — the airship over the map that can be shot down; find who sends it
-- [proving-ground.md](todo/proving-ground.md) — the map is built and on the ONE PLAYER menu; left: dummies that come back, crates that refill
+- [proving-ground.md](todo/proving-ground.md) — the map is built and on the ONE PLAYER menu; left: crates that refill
 
 ## Build — read in the exe, not built
 
@@ -78,10 +78,10 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 - [ai-grenade-from-riverbank.md](todo/ai-grenade-from-riverbank.md) — the grenade half of the report is unreproduced
 - [b13-newspaper-tint.md](todo/b13-newspaper-tint.md) — the page is tinted the wrong side's colour, and maybe not at all
 - [b4b-alt-tab.md](todo/b4b-alt-tab.md) — the sergeant talks on while the battle is stopped
-- [b6-house-seams.md](todo/b6-house-seams.md) — the house's seams
 - [b7-thrown-pig-spins.md](todo/b7-thrown-pig-spins.md) — a thrown pig spins about its own axis
 - [b8-dummy-shoulder.md](todo/b8-dummy-shoulder.md) — walking into a dummy shoulders the pig past it
 - [b9-mine-exclamation.md](todo/b9-mine-exclamation.md) — the exclamation mark over a trodden mine
+- [house-stone-fin.md](todo/house-stone-fin.md) — the house's corner stones reach past the wall
 
 ## Tests
 

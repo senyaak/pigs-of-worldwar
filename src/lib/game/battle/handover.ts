@@ -8,6 +8,7 @@ import { isDead } from '../health'
 import { createLocomotion } from '../locomotion'
 import type { LocomotionState } from '../locomotion'
 import { mountBarrel } from '../mounts'
+import { isDummySide } from '../provingDummies'
 import { sargeAtTurnStart } from '../sergeant'
 import type { BattleCore } from './core'
 import { watchable } from './ending'
@@ -64,7 +65,14 @@ export const handOver = (core: BattleCore): void => {
   // Side 0 is OURS — the campaign's own, which `spawnTeams` orders first off
   // the map's player bit — and the verdict tells it apart from the rest the
   // way the exe's two counters do (lib/game/endOfGame.ts).
-  const sidesUp = game.players.map((player) => player.pigs.some((pig) => !isDead(pig)))
+  //
+  // **A SIDE OF DUMMIES IS NEVER DOWN** (lib/game/provingDummies.ts): every one
+  // of them coming back is what bringing them all down leads to, whether its
+  // death has finished yet or not.
+  const sidesUp = game.players.map(
+    (player, side) =>
+      (core.proving && isDummySide(side)) || player.pigs.some((pig) => !isDead(pig))
+  )
   const othersUp = sidesUp.filter((up, side) => up && side > 0).length
   // The turn's weapon count starts over — from 1 or less, because 2 is what
   // the wasted-turn line writes and it must survive the handover (0x48F50C).
@@ -82,6 +90,9 @@ export const handOver = (core: BattleCore): void => {
     emit({ kind: 'missionOver', won: outcome === 'won', turns: game.turn })
     return
   }
+  // Before anybody is advanced: `endTurn` passes over the fallen, and a dummy
+  // back on its feet is one who can be handed this very turn.
+  if (core.proving) core.dummies.standUp()
   game.endTurn()
   focus(core, game.currentPig)
   // **THE DISGUISE DROPS AT THE TOP OF THE PIG'S OWN TURN** — the same
