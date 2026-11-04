@@ -199,7 +199,7 @@ test('open water: flat-at-level water-flagged tiles, and nothing else', () => {
   expect(isOpenWaterTile(...at(0, 2000), level), 'the sunken dip too').toBe(true)
   expect(isOpenWaterTile(...at(0, -3000), level), 'dry land is ground').toBe(false)
 
-  // Mud banks are LAND whatever the water bit says — a pig scrambles there.
+  // Swamp banks are LAND here whatever the water bit says.
   const mudBlocks = terrainBlocks(() => 0, () => ({ type: 0x2b }))
   expect(isOpenWaterTile(mudBlocks[0], 0, fitWaterElevation(mudBlocks))).toBe(false)
 })

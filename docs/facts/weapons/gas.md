@@ -14,3 +14,12 @@
   evaluate.ts) is `[deliberate]`, and 23 CONFUSION — in the PC exe LITERALLY
   the same projectile, id 416 — is deliberately left a plain burst until
   play rules whether that identity is the game or a port accident.
+- `[exe]` **A poisoned pig sneezes at two moments.** The cloud's first touch of
+  a throw plays clip 37 (0x477b6a..0x477b74, `lib/game/gas.ts`). And when the
+  turn has played out, the pass over who was hurt (0x497760 -> 0x4976E0 ->
+  0x467ec0) plays it on every living pig that took damage since the last pass
+  with a status bit up (0x467f77 -> 0x4726dc): `movement/clips.md`,
+  `lib/game/reaction.ts`. The poison's own ten counts as damage, so a poisoned
+  pig sneezes at the end of each of its turns. The rest of that pass is not
+  built: the brushoff of a pig hurt with no bit up (kinds 0..3, 0x4723BA), and
+  the camera's visit to whoever it finds (modes 15..17).

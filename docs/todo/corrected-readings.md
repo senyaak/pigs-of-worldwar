@@ -11,12 +11,6 @@ exe does, and what play sees. Nothing has been changed in the code.
    0x469B60 is the 57 SPECIAL OPS airlift rather than the door's way out.
    Disasm `objects/getting-inside.md` has the four arms in a table. Against
    `lib/game/doorway.ts` and `lib/game/buildings.ts`.
-2. **The Scramble is the walk in a wall**, not a property of the ground: clip
-   11 comes from the run-cycle picker (0x46c49a..0x46c511) when the pig's wall
-   slot is set — the same one `Pig::Walk` caps at 4 — and 0x467f2a, read as
-   the Scramble, plays the sneeze (clip 0x25) after damage. Disasm
-   `movement/clips.md`. The remake treats it as ground ("CAMP has no climbing
-   ground", `ui/battle/open.ts`).
 3. **The charge's burning fuse**, effect 0x1D, is updated by 0x48B85C: ten
    cloud records relaunched in a narrow cone, orange — not the dark smoke of
    0x48AD9D, which is id 0x22's. Disasm `effects/fuse.md`. Against

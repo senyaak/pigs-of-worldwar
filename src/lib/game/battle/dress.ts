@@ -40,6 +40,12 @@ export const dressBystanders = (core: BattleCore, acting: Pig): void => {
     // this loop took it straight back off, once a frame, for the whole flight
     // and through the get-up as well (lib/game/tumble.ts).
     if (tumbles.has(pig)) continue
+    // …and a clip played through once is played through: asking for the stand
+    // is what would cancel it (lib/game/anim.ts), one frame in. It is the sneeze
+    // of a pig the gas has just taken (0x477b74) and of one hurt with the bit on
+    // (lib/game/reaction.ts); nobody here is being driven, and only a driven
+    // pig's gait replaces one.
+    if (anim.animating(pig)) continue
     // A CRIPPLED bystander stands in the wounded stance — the idle
     // picker's own health test (0x472040 test 8, ≤ 10 points), and nobody
     // but the acting pig has a weapon drawn to override it.
@@ -82,9 +88,9 @@ export const dressActing = (core: BattleCore, acting: Pig, weapon: Weapon): void
     // branch earlier — which is why nothing had noticed.
     //
     // And the STANDING half is the exe's own rule rather than a hedge: the
-    // animation picker (0x467ec0) reads the speed band and asks 0x472320 for a
-    // gait, and that request zeroes the committed clip outright — so a pig that
-    // lands on the run does not get up, and a pig left alone does
+    // run-cycle picker (0x46c476..0x46c52e) asks for a gait whenever the pig has
+    // a step to take, and that request starts the clip over — so a pig that lands
+    // on the run does not get up, and a pig left alone does
     // (`animations/notes.md`). A driven pig's gait wins; nothing else does.
   } else if (state.holding === SKILL.SKIP_TURN && state.loco.clip === ANIM.IDLE) {
     // A pig with SKIP TURN in hand stands there THINKING about it — clip 46,

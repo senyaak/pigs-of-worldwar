@@ -6,10 +6,11 @@ prices the throw (`weapons/gas.md` in the disasm repo is the read;
 `docs/history/weapons.md` the write-up; lib/game/gas.ts and poison.ts the
 build). Still open, smallest first:
 
-- **The AFFLICTED STANCE.** The exe's animator plays clip 11 Scramble as the
-  idle of any pig whose status word is non-zero (0x467f2a). Here a poisoned
-  pig stands about like anyone; the sneeze and the per-turn number are the
-  only tells. One line in the idle picks the day it is wanted.
+- **The AFFLICTED STANCE.** `Pig::ChooseIdleAnim` gives an empty-handed pig
+  with a status bit up clip 37 SNEEZE when `rand & 0xF <= 2` and clip 32
+  LOOKING GORMLESS otherwise (0x4721d9, `anim/idle.md`), re-picked one frame in
+  eight from the standing state. Here a poisoned pig stands about like anyone,
+  because the idle cycle is not modelled at all (`docs/facts/animation.md`).
 - **The GREEN FACE, if there is one** — the FACES.MTD picker past the load at
   0x486030 is unread; play's memory says a poisoned pig looks sick. `P_COUGH1`
   and `P_SICK` sit in the banks unwired beside it.

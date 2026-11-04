@@ -32,7 +32,15 @@
   past 45° both ways. A walked surface found past 60° in play moves the
   number. `lib/game/movement.ts`; pinned in `unit/movement.spec.ts` and the
   downhill walk in `unit/locomotion.spec.ts`.
-- `[CHECK — remake]` **The wall scrabble wears the Scramble clip.** The exe's
-  wedge branch never touches the animation — only the eject (0x470c70) does —
-  but a pig pushing at a wall visibly scrabbles in play, and clip 11 is what
-  reads as it. Deliberate, in `locomotion.ts`.
+- `[exe]` **The Scramble is the walk in a wall**, not a property of the ground.
+  `Pig::Walk` puts a forward step in the wall slot when the feet are down, the
+  spot a full request ahead holds nothing but landscape, the ground there is
+  higher than here, and the pig's own point is blocked (0x46abfd..0x46acf3);
+  the run-cycle picker answers that bit with clip 11 (0x46c49a..0x46c511).
+  `movement/walls.md`, `movement/clips.md`. So terrain type 11 scrambles nobody,
+  a pig walking out of a wall downhill or over flat wall runs, and a pig backing
+  or standing there does not scramble. A pig the wall envelope holds at the base
+  wears it too, because the envelope is the stand-in above for the pig the exe
+  lets one step in. The 4-unit cap of the same slot and the Scramble's
+  distance-driven cursor are not built. `lib/game/locomotion.ts`, pinned in
+  `unit/locomotion.spec.ts`.

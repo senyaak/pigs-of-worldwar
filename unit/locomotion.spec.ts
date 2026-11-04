@@ -11,9 +11,9 @@
 //     (`cmp eax,19h` at 0x46d79e) and `EjectFromWall` (0x46fbd0) launches
 //     at speed 0x20, pitch 0x3b6, FACING DOWNHILL — 0x40c090 reads the four
 //     corner heights and the atan2 of that gradient is the eject heading
-//   scramble is ground, not a state — type 11 under the LOW-5-BIT mask
-//     (`and edx,1Fh` at 0x46fde1) raises the flag the animation picker
-//     (0x467ec0) answers with clip 11 in EVERY band, moving or not
+//   the scramble is the walk in a wall — `Pig::Walk` raises the wall bit
+//     (0x46ac0a..0x46acf3, 0x46ae2c) and the run-cycle picker answers it with
+//     clip 11 (0x46c49a..0x46c511); it is no property of the ground
 //   a landing inside a wall never rests — the impact handler's stand-up is
 //     gated on `IsBlocked` saying no; wall ground is friction 0.01,
 //     restitution 0.99 (0x41564c), so the pig keeps bouncing until it is out
@@ -40,6 +40,7 @@ import {
 import type { Intent, LocomotionState } from '../src/lib/game/locomotion'
 import { WALK_BACK_SPEED, WALK_SCALE, WALK_SPEED } from '../src/lib/game/movement'
 import { EJECT_SECONDS, FRAME_SECONDS, RESTITUTION_FREE } from '../src/lib/game/ballistics'
+import { NO_OBSTACLES } from '../src/lib/game/obstacles'
 import type { TerrainQuery } from '../src/lib/game/terrain'
 import { terrain } from './fixture'
 
@@ -135,15 +136,109 @@ test('the walking speeds are the exe’s: 52 units a frame, half that back', { t
   expect(s.clip).toBe(ANIM.WALK_BACK)
 })
 
-test('scramble is the ground underfoot, in every band', { tag: '@nodata' }, () => {
-  const mud = terrain(() => 0, () => ({ type: 0x2b }))
-  const s = createLocomotion(mud, 0, 0, NORTH)
-  run(s, mud, {}, 0.2)
-  expect(s.clip, 'standing still on mud scrambles').toBe(ANIM.SCRAMBLE)
-  run(s, mud, { walk: 1 }, 0.2)
-  expect(s.clip, 'walking on mud scrambles').toBe(ANIM.SCRAMBLE)
-  run(s, mud, { turn: 1 }, 0.2)
-  expect(s.clip, 'turning on mud scrambles').toBe(ANIM.SCRAMBLE)
+test('walking up a wall wears clip 11: the wall slot, not the ground', { tag: '@nodata' }, () => {
+  // exe: movement/clips.md, 0x46c49a — the wall bit jumps past the health bands
+  // to 0x46c507, which makes it 11. `Pig::Walk` raises the bit on all three of
+  // own point blocked (0x46acd3), ground ahead higher (0x46ac83) and walking
+  // forward (0x46ace5 zeroes a backward step).
+  const face = wallFace()
+  const s = createLocomotion(face, 0, 1024 + 40, NORTH)
+  expect(face.walkable(s.x, s.z), 'in the wall').toBe(false)
+  updateLocomotion(s, face, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(s.clip).toBe(ANIM.SCRAMBLE)
+  // …and a wound does not reach it: the bit is tested before the bands (0x46c49e).
+  const hurt = createLocomotion(face, 0, 1024 + 40, NORTH)
+  hurt.wounded = 2
+  updateLocomotion(hurt, face, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(hurt.clip).toBe(ANIM.SCRAMBLE)
+})
+
+test('type 11 is not the wall slot: no scramble on the old climbing ground', { tag: '@nodata' }, () => {
+  // exe: movement/clips.md, "Not terrain type 11" — the masked type reaches the
+  // swamp's poison (0x470085) and the swim (0x46ad90), never the picker.
+  const bank = terrain((_x, z) => Math.max(0, z), () => ({ type: 0x2b }))
+  const s = createLocomotion(bank, 0, 200, NORTH)
+  run(s, bank, {}, 0.2)
+  expect(s.clip, 'standing').toBe(ANIM.IDLE)
+  run(s, bank, { turn: 1 }, 0.2)
+  expect(s.clip, 'turning').toBe(ANIM.TURN)
+  run(s, bank, { walk: 1 }, 0.2)
+  expect(s.clip, 'walking, uphill at that').toBe(ANIM.RUN)
+  // A wall bit on top of the same type (0xab ships on 8 tiles) is what does it.
+  const walled = terrain((_x, z) => Math.max(0, z), () => ({ type: 0xab, slip: 0 }))
+  const t = createLocomotion(walled, 0, 200, NORTH)
+  updateLocomotion(t, walled, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(t.clip, 'the wall, not the 11').toBe(ANIM.SCRAMBLE)
+})
+
+test('in a wall with ground ahead no higher, the pig runs', { tag: '@nodata' }, () => {
+  // exe: walls.md, 0x46ac83..0x46ac87 — height ahead minus height here, `jle` past
+  // the slot. Walking out of a face downhill is an ordinary walk.
+  const hill = terrain((_x, z) => Math.max(0, z) * 0.5, () => ({ type: 0x80, slip: 0 }))
+  const down = createLocomotion(hill, 0, 1024, Math.PI)
+  updateLocomotion(down, hill, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(hill.walkable(down.x, down.z), 'in the wall').toBe(false)
+  expect(down.clip, 'downhill').toBe(ANIM.RUN)
+  const flat = terrain(() => 0, () => ({ type: 0x80, slip: 0 }))
+  const across = createLocomotion(flat, 0, 0, NORTH)
+  updateLocomotion(across, flat, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(across.clip, 'on the level').toBe(ANIM.RUN)
+})
+
+test('only a forward step takes the wall slot; standing or backing does not scramble', { tag: '@nodata' }, () => {
+  // exe: walls.md, 0x46ace5 — a backward step in that branch is zeroed, and a
+  // zero step leaves at 0x46ae16 with no bit raised. Backing uphill: south of
+  // the pig is the higher side of this face.
+  const rising = terrain((_x, z) => Math.max(0, -z) * 2, () => ({ type: 0x80, slip: 0 }))
+  const back = createLocomotion(rising, 0, -400, NORTH)
+  updateLocomotion(back, rising, { walk: -1, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(back.clip, 'backing uphill').toBe(ANIM.WALK_BACK)
+  // …and with the higher side ahead of the pig, the request's own sign takes the
+  // probe the other way (0x46ab37), down the hill it is backing down.
+  const hill = terrain((_x, z) => Math.max(0, z) * 0.5, () => ({ type: 0x80, slip: 0 }))
+  const downhill = createLocomotion(hill, 0, 1024, NORTH)
+  updateLocomotion(downhill, hill, { walk: -1, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(downhill.clip, 'backing downhill').toBe(ANIM.WALK_BACK)
+  const face = wallFace()
+  const still = createLocomotion(face, 0, 1024 + 40, NORTH)
+  updateLocomotion(still, face, { walk: 0, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(still.clip, 'standing').toBe(ANIM.IDLE)
+  updateLocomotion(still, face, { walk: 0, turn: 1, jump: false }, FRAME_SECONDS)
+  expect(still.clip, 'turning').toBe(ANIM.TURN)
+})
+
+test('an object ahead, or a deck underfoot, keeps a pig out of the wall slot', { tag: '@nodata' }, () => {
+  const face = wallFace()
+  // exe: walls.md, 0x46ac0e — 0x478b80 refuses a spot the sweep finds anything but
+  // the landscape at, and the branch falls through to the plain walk.
+  const box = { ...NO_OBSTACLES, blocks: () => true }
+  const pressing = createLocomotion(face, 0, 1024 + 40, NORTH)
+  updateLocomotion(pressing, face, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS, box)
+  expect(pressing.clip, 'a box ahead, in a wall').toBe(ANIM.RUN)
+  // The same refusal on open ground is no wall at all.
+  const flat = terrain(() => 0)
+  const open = createLocomotion(flat, 0, 0, NORTH)
+  updateLocomotion(open, flat, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS, box)
+  expect(open.clip, 'a box ahead, on open ground').toBe(ANIM.RUN)
+  // exe: walls.md, 0x46abfd — `[pig+0x382]` says the feet are down, and 0x479b30
+  // clears it for feet 32 over the landscape, which a deck is.
+  const deckTop = face.height(0, 1024 + 40) - 400
+  const deck = { ...NO_OBSTACLES, standOn: () => deckTop }
+  const crossing = createLocomotion(face, 0, 1024 + 40, NORTH, { y: deckTop, obstruction: deck })
+  updateLocomotion(crossing, face, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS, deck)
+  expect(crossing.clip, 'on a deck over a wall').toBe(ANIM.RUN)
+})
+
+test('held at the base by the wall envelope, the pig scrambles on open ground too', { tag: '@nodata' }, () => {
+  // The envelope is the remake's stand-in (docs/facts/walls-and-slopes.md) for the
+  // pig the exe lets a step in: a cliff too sudden to enter leaves it on the open
+  // tile, and play's own words for the base of a wall are the scrabbling
+  // (walls.md, "Play"). Refused step, forward, by the terrain and nothing else.
+  const cliff = terrain((_x, z) => (z >= 1024 ? 4000 : 0), (_x, z) => (z >= 1024 ? { type: 0x80, slip: 0 } : {}))
+  const s = createLocomotion(cliff, 0, 1024 - 10, NORTH)
+  expect(cliff.walkable(s.x, s.z), 'on open ground').toBe(true)
+  updateLocomotion(s, cliff, { walk: 1, turn: 0, jump: false }, FRAME_SECONDS)
+  expect(s.clip).toBe(ANIM.SCRAMBLE)
 })
 
 test('real water swims: capped at 16 a frame, sunk below the surface', { tag: '@nodata' }, () => {
@@ -192,8 +287,8 @@ test('a wall is not a ladder: the step-up envelope is all a pig ever gets', { ta
   expect(s.z, 'pressed into the face, not through it').toBeGreaterThan(1024)
   expect(s.z, 'no further than the envelope').toBeLessThan(1024 + WALL_CLIMB / 2 + 40)
   expect(-highest, 'climbed no higher than the step-up allowance').toBeLessThanOrEqual(WALL_CLIMB + 1)
-  // Pushing at the wall LOOKS like climbing: the pig wears the Scramble —
-  // a remake choice, the exe having no clip of its own for the scrabble.
+  // Pushing at the wall: the pig wears the Scramble (exe: movement/clips.md,
+  // 0x46c49a — the wall bit makes it clip 11).
   expect(s.clip, 'scrabbles while pressing').toBe(ANIM.SCRAMBLE)
 
   // …until the wedge counter runs out and the eject fires.

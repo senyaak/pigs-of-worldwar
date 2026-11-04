@@ -43,7 +43,8 @@ export const GAS_OPEN_FRAMES = 15
 export const GAS_PUFF_FRAMES = 5
 
 /** The Sneeze — clip 0x25, played on the pig the moment the gas takes it
- * (0x477bc4). The clip index is the exe's own, off the call site the way
+ * (0x477b6a..0x477b74), and again by the reaction to being hurt with the bit
+ * on (lib/game/reaction.ts). The clip index is the exe's own, off the call site the way
  * every entry of ANIM is (lib/game/locomotion.ts). */
 export const SNEEZE_CLIP = 37
 

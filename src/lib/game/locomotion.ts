@@ -29,7 +29,7 @@ import {
   groundMaterial
 } from './ballistics'
 import type { Bounciness } from './ballistics'
-import { FALL_SPEED_FACTOR, STEP_DOWN, WALK_BACK_SPEED, WALK_SPEED, step } from './movement'
+import { FALL_SPEED_FACTOR, STEP_DOWN, WALK_BACK_SPEED, WALK_REQUEST, WALK_SPEED, step } from './movement'
 import { MODEL_SCALE } from './scale'
 import { clampToWorld, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
@@ -156,11 +156,10 @@ export const JUMP_WINDUP = JUMP_WINDUP_FRAMES / 25
  *
  * And it is CANCELLED the moment the pig is driven, which is the other half
  * of the same rule. `Pig::Land` sets the clip and nothing guards it; the
- * animation picker (0x467ec0) simply asks for a movement clip whenever the
- * pig has speed, and the request resets the cursor outright (0x472320 zeroes
- * `pig+0x360` and `pig+0x368`). At a standstill the picker asks for nothing
- * — it returns early on a zero band — so the get-up plays out. Land running
- * and the run cycle replaces it on the very next frame.
+ * run-cycle picker (0x46c476..0x46c52e, in `Pig::UpdateMovement`) simply asks
+ * for a movement clip whenever the pig has a step to take, and the request
+ * starts it over. At a standstill it asks for nothing, so the get-up plays
+ * out. Land running and the run cycle replaces it on the very next frame.
  */
 export const GET_UP_FRAMES = 11
 export const GET_UP = GET_UP_FRAMES / 25
@@ -216,12 +215,10 @@ export const ANIM = {
    * (0x470944) and the parachute's (0x4717f5) ask for, each with a repeat
    * count of 1. 11 frames. */
   LAND: 10,
-  /** Trying to climb. Not a movement state: `UpdateGroundState` raises a
-   * flag whenever the pig stands on terrain type 11 under the low-5-bit
-   * mask (`and edx,1Fh; cmp ecx,0Bh`, exe 0x46fde4/0x470082), and the
-   * animation picker (0x467ec0) answers with this clip in EVERY band —
-   * standing, turning or walking. Type 11 is the grippiest ground in the
-   * material table, which is exactly what you climb. */
+  /** The walk in a wall: the run-cycle picker answers bit 0x10 of the
+   * movement byte with this clip (0x46c49a..0x46c511), the bit `Pig::Walk`
+   * raises with the step in the wall slot (0x46ae2c; `inWallSlot` below). It
+   * is no property of the ground: `movement/clips.md`. */
   SCRAMBLE: 11,
   IDLE: 27,
   /** Standing there working out what to do — clip **46** of the fifty-nine the exe
@@ -920,6 +917,8 @@ function ground(
   }
 
   if (intent.walk !== 0) {
+    // `Pig::Walk` decides before the step is taken, from where the pig is now.
+    const wallSlot = !swimming && inWallSlot(state, query, obstruction, onWalkway, intent.walk)
     // Straight ahead, as the original walks. Only the world edge and the
     // step-up envelope refuse; a big enough drop turns the step into a
     // fall; a wall is entered as far as the envelope reaches and scraped
@@ -957,14 +956,20 @@ function ground(
       return
     }
     if (outcome === 'moved') {
+      // Held at the base by the wall envelope, which is the remake's stand-in
+      // for the pig the exe lets one step into the face (`WALL_CLIMB`) — so the
+      // refusal IS that pig, already in the wall and pressing up it. An OBJECT
+      // refusing the step is not: it goes to `TryMove`'s step-up and sidestep,
+      // and nothing there touches the wall slot.
       let pressing = false
       if (inReach(state, query, obstruction, footY, move.x, move.z)) {
         state.x = move.x
         state.z = move.z
         state.sidestep = 0
       } else {
+        pressing =
+          intent.walk > 0 && !swimming && !onWalkway && !objectInTheWay(query, obstruction, footY, move.x, move.z)
         sidestep(state, query, obstruction, footY, speed * delta * intent.walk, delta)
-        pressing = true
       }
       state.clip = swimming
         ? ANIM.SWIM
@@ -973,16 +978,9 @@ function ground(
             // that slowed the stride (0x46C4A5).
             [ANIM.RUN, ANIM.RUN_WOUNDED, ANIM.RUN_HURT][state.wounded]
           : ANIM.WALK_BACK
-      // The wall scrabble. The exe has NO clip of its own here — its wedge
-      // branch (0x46fe83) only counts frames and eases the material, and
-      // nothing but the eject (0x470c70) changes the animation — but a pig
-      // pushing at a wall visibly scrabbles in play, and Scramble is the
-      // clip that reads as it. A deliberate remake choice, not a
-      // transcription: refused by the envelope, or driving into blocked
-      // ground, the pig wears it.
-      if (!swimming && (pressing || (!query.walkable(state.x, state.z) && !onWalkway))) {
-        state.clip = ANIM.SCRAMBLE
-      }
+      // The wall bit wins over the run cycle (0x46c49a jumps past the health
+      // bands, and 0x46c507 turns the bit into clip 11).
+      if (wallSlot || pressing) state.clip = ANIM.SCRAMBLE
     }
   } else {
     // A CRIPPLED pig stands in the wounded stance — the idle picker's test 8
@@ -1008,11 +1006,6 @@ function ground(
   // edge.
   if (on !== null && on <= state.y) state.freeY = on
 
-  // Scramble is the GROUND, not a movement state: the flag the exe raises
-  // on masked type 11 makes the picker play clip 11 in every band — and the
-  // ground is not what a pig on a walkway is on.
-  if (!swimming && !onWalkway && query.isClimbing(state.x, state.z)) state.clip = ANIM.SCRAMBLE
-
   // The get-up outlasts whatever standing about would have picked — and it
   // only ever gets this far because nothing is driving the pig, which is the
   // one case where the original's picker asks for no clip at all.
@@ -1029,6 +1022,60 @@ function ground(
 function standing(state: LocomotionState, obstruction: Obstruction): boolean {
   const on = obstruction.standOn(state.x, state.z, state.y, 0)
   return on !== null && Math.abs(on - state.y) < STANDING_ON
+}
+
+/**
+ * Does this frame's walk go in the WALL SLOT? `Pig::Walk`'s branch read to its
+ * end (0x46abfd..0x46acf3, `movement/walls.md`), all of it asked before the
+ * step is taken:
+ *
+ * - the feet are down (`[pig+0x382]`, 0x46abfd), which a deck holds them off;
+ * - the spot one full request ahead is clear of everything but the landscape
+ *   (0x478b80, 0x46ac0e);
+ * - the ground there is HIGHER than the ground here (0x46ac83) — so a pig
+ *   walking out of a wall downhill, or across flat wall, runs;
+ * - and the pig's own point is in a wall (`Map::IsBlocked`, 0x46acd3).
+ *
+ * Forward only: a backward step in that branch is zeroed (0x46ace5), and a
+ * zero step raises no bit at all (0x46ae16). The water's arm comes first when
+ * the pig is wet, which is the caller's `swimming`.
+ */
+function inWallSlot(
+  state: LocomotionState,
+  query: TerrainQuery,
+  obstruction: Obstruction,
+  onWalkway: boolean,
+  walk: number
+): boolean {
+  if (walk <= 0 || onWalkway || query.walkable(state.x, state.z)) return false
+  const x = state.x + Math.sin(state.heading) * WALK_REQUEST
+  const z = state.z + Math.cos(state.heading) * WALK_REQUEST
+  const ahead = query.height(x, z)
+  // Game space is Y-down: higher ground is a SMALLER height value.
+  return ahead < query.height(state.x, state.z) && !obstruction.blocks(x, z, ahead, 0)
+}
+
+/**
+ * Is an OBJECT what stands in the way of a step ending at (x, z)? The first of
+ * `inReach`'s two questions, on its own for the pig that was refused and needs
+ * to know by what.
+ *
+ * The envelope is measured from where the step ENDS, not from where the pig
+ * is standing now — but never from lower than its own feet, or a pig on a
+ * walkway would be measured against the ditch under it. Walking UP a bank
+ * toward something level with the crest, the two differ by the slope times
+ * the pig's own radius, and on CAMP's first bridge that was 65 units against
+ * an envelope of 64: the abutment at the end of the bank read as a wall by
+ * ONE unit and the pig stopped dead in front of it.
+ */
+function objectInTheWay(
+  query: TerrainQuery,
+  obstruction: Obstruction,
+  footY: number,
+  x: number,
+  z: number
+): boolean {
+  return obstruction.blocks(x, z, Math.min(footY, query.height(x, z)), WALL_CLIMB)
 }
 
 /**
@@ -1050,15 +1097,7 @@ function inReach(
   x: number,
   z: number
 ): boolean {
-  // The envelope is measured from where the step ENDS, not from where the pig
-  // is standing now — but never from lower than its own feet, or a pig on a
-  // walkway would be measured against the ditch under it. Walking UP a bank
-  // toward something level with the crest, the two differ by the slope times
-  // the pig's own radius, and on CAMP's first bridge that was 65 units against
-  // an envelope of 64: the abutment at the end of the bank read as a wall by
-  // ONE unit and the pig stopped dead in front of it.
-  const from = Math.min(footY, query.height(x, z))
-  if (obstruction.blocks(x, z, from, WALL_CLIMB)) return false
+  if (objectInTheWay(query, obstruction, footY, x, z)) return false
   if (query.walkable(x, z)) return true
   // Game space is Y-down: higher ground is a SMALLER height value.
   return state.freeY - query.height(x, z) <= WALL_CLIMB

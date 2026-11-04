@@ -57,6 +57,7 @@ import type { LocomotionState } from './locomotion'
 import type { Mines } from './mines'
 import type { Pockets } from './pickpocket'
 import type { Poison } from './poison'
+import type { Reaction } from './reaction'
 import type { Random } from './random'
 import type { Scenery } from './scenery'
 import type { Firing } from './shot'
@@ -109,6 +110,9 @@ export interface BattleParts {
   /** …and what the gas's bit costs the acting pig at the top of its own turn
    * (lib/game/poison.ts). */
   poison: Poison
+  /** …and what a pig does about having been hurt, when the turn has played out
+   * (lib/game/reaction.ts). */
+  reaction: Reaction
   /** Whether this is the TRAINING ground, whose mission ends on its own
    * condition rather than on the squads (lib/game/endOfGame.ts). */
   training: boolean

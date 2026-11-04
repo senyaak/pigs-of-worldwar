@@ -2,8 +2,7 @@
 // for this: `pow.swapMap('ARTGUN')` in the devtools console restarts the
 // battle on another shipped map (fresh spawns, fresh turn order), a name
 // that does not ship refuses and keeps the battle running, and the bare
-// call is a usage hint. CAMP has no climbing ground at all, so this is also
-// how the Scramble is reached by hand.
+// call is a usage hint.
 
 import { existsSync } from 'node:fs'
 

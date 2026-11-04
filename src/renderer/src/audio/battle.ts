@@ -606,7 +606,7 @@ export function playCue(bank: Bank, cue: Cue, random: () => number = Math.random
  *
  * The footstep handler is `0x475010`, reached from the clip's own key-frame
  * events (lib/game/footsteps.ts). It takes the pig's tile, masks the type byte
- * with `0x1F` — the same low five bits the scramble test and the material
+ * with `0x1F` — the same low five bits the swamp test and the material
  * lookup take (lib/game/terrain.ts) — and jumps through a twelve-entry table
  * at `0x4754B8`. Each arm loads three registers; the first is the sound index,
  * and the other two are the puff of dust it throws, which is not built here.
@@ -626,9 +626,9 @@ export function playCue(bank: Bank, cue: Cue, random: () => number = Math.random
  * ICEFLOW carries the only 8s (ice), ISLAND and LAKE are 4 where the water is,
  * and type 6 — the commonest tile in the game — falls through to stone.
  *
- * Type 11 is the odd one: it is the CLIMBING tile (lib/game/terrain.ts) and it
- * plays lava. That is what the arm says, and ICEFLOW's climbable walls are
- * where it will be heard.
+ * Type 11 is the odd one: it is the SWAMP bank (lib/game/terrain.ts) and it
+ * plays lava. That is what the arm says, and it is heard wherever a pig walks a
+ * bank: its run cycle carries the footfalls, where the Scramble carries none.
  */
 export const SURFACE_SOUNDS: Readonly<Record<number, string>> = {
   0: 'FT_GRASS',

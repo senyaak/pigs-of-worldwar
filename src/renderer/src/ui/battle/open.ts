@@ -35,9 +35,7 @@ import { listenTutorial } from './tutorial'
 
 // The training ground — the first map the original ever shows a player, and
 // the friendliest to test on: barely any water, one big usable field.
-// `pow.swapMap('ARTGUN')` in the console restarts the battle elsewhere —
-// CAMP has no climbing ground at all, so the Scramble only shows on maps
-// like ARTGUN or ICEFLOW.
+// `pow.swapMap('ARTGUN')` in the console restarts the battle elsewhere.
 export const DEFAULT_MAP = 'CAMP'
 export const CHAR_ARCHIVE = 'Chars/british.mad'
 /** Where the canopy lives: `WE_PARA`, the archive's 24th model, which is the

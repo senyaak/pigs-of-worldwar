@@ -109,7 +109,7 @@ export const endTurnBeat = (core: BattleCore): void => {
 
 /** The WALK AWAY beat, while it runs; true while it has the frame. */
 export const walkAwayBeat = (core: BattleCore, delta: number): boolean => {
-  const { game, query, corpses, attack, state } = core
+  const { game, query, corpses, attack, reaction, state } = core
   // The beat at the END of a turn: mode 13, WALK AWAY. Nobody is driving, the
   // clock does not run, and everyone still in the water makes for the nearest
   // shore (lib/game/walkAway.ts). It holds until they are all out and the
@@ -153,6 +153,9 @@ export const walkAwayBeat = (core: BattleCore, delta: number): boolean => {
     state.loco.swimming = inWater(query, state.loco.x, state.loco.z, state.loco.y)
     if (done) {
       state.walkAway = null
+      // The mode machine goes on from mode 13 to the pass over who was hurt
+      // (0x494570, `[game+0x518]` -> 0x497760).
+      reaction.settle()
       if (!beginSarge(core)) handOver(core)
     }
     return true

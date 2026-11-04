@@ -52,7 +52,7 @@ import {
   tileUvs
 } from '../formats/pmg'
 import type { TerrainBlock } from '../formats/pmg'
-import { CLIMBING_TILE } from './terrain'
+import { SWAMP_TILE } from './terrain'
 import type { WaterMask } from './terrain'
 
 /** The slice of a decoded texture the mask needs: which colour every texel
@@ -120,7 +120,7 @@ function cellGrid(blocks: TerrainBlock[]): { cells: Cell[][]; minX: number; minZ
       cells[rowBase + Math.floor(tile / TILES_PER_SIDE)][colBase + (tile % TILES_PER_SIDE)] = {
         texture: t.texture,
         rotateFlip: t.rotateFlip,
-        water: (t.type & TILE_WATER) !== 0 && (t.type & 0x1f) !== CLIMBING_TILE
+        water: (t.type & TILE_WATER) !== 0 && (t.type & 0x1f) !== SWAMP_TILE
       }
     }
   }

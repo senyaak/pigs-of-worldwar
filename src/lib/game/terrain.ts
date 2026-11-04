@@ -44,13 +44,13 @@ export const HEIGHT_SCALE = 1
 export const fromExeY = (units: number): number => (units * HEIGHT_SCALE) / 2
 
 /**
- * The terrain type a pig scrambles up. `UpdateGroundState` raises a flag
- * when the pig stands on it (`cmp ecx,0bh; or [esi+3a4h],8`, exe 0x4700d9)
- * and the animation picker (0x467ec0) then plays the Scramble clip instead
- * of the run cycle. It is also the grippiest entry in the material table —
- * friction 0.90 against 0.10 for the slipperiest.
+ * The swamp bank's terrain type. Nothing about it makes a pig scramble: that is
+ * the walk in a wall (`ANIM.SCRAMBLE`, lib/game/locomotion.ts). A wet point of
+ * it poisons in the water tail of `UpdateGroundState` (0x470085..0x4700de,
+ * `movement/clips.md`), which is not built; it is also the grippiest entry in
+ * the material table — friction 0.90 against 0.10 for the slipperiest.
  */
-export const CLIMBING_TILE = 11
+export const SWAMP_TILE = 11
 
 /** The world limit a pig's position is clamped to (exe 0x3000). */
 export const WORLD_LIMIT = 12288
@@ -118,7 +118,7 @@ export function fitWaterElevation(blocks: TerrainBlock[]): number | null {
  * animated water grid where the ground now is not. The texel analysis is
  * not reproduced; the stand-in classes a tile open water when it CARRIES
  * the water flag and LIES at or under the water level — which is what a
- * fully-watery texture sits on — and never for the climbing type, whose
+ * fully-watery texture sits on — and never for the swamp type, whose
  * mud banks are land whatever the flag says.
  */
 export function isOpenWaterTile(
@@ -129,7 +129,7 @@ export function isOpenWaterTile(
   if (waterElevation === null) return false
   const tile = block.tiles[tileIndex]
   if ((tile.type & TILE_WATER) === 0) return false
-  if ((tile.type & 0x1f) === CLIMBING_TILE) return false
+  if ((tile.type & 0x1f) === SWAMP_TILE) return false
   const row = Math.floor(tileIndex / TILES_PER_SIDE)
   const col = tileIndex % TILES_PER_SIDE
   for (const [r, c] of [[row, col], [row, col + 1], [row + 1, col], [row + 1, col + 1]]) {
@@ -161,7 +161,7 @@ export function waterLevelGrid(blocks: TerrainBlock[]): (number | null)[][] {
     const rowBase = Math.round((block.z - minZ) / TILE_STEP)
     for (let tile = 0; tile < block.tiles.length; tile++) {
       const type = block.tiles[tile].type
-      if ((type & TILE_WATER) === 0 || (type & 0x1f) === CLIMBING_TILE) continue
+      if ((type & TILE_WATER) === 0 || (type & 0x1f) === SWAMP_TILE) continue
       const row = rowBase + Math.floor(tile / TILES_PER_SIDE)
       const col = colBase + (tile % TILES_PER_SIDE)
       wet[row][col] = true
@@ -475,23 +475,17 @@ export class TerrainQuery {
   }
 
   /**
-   * The tile's terrain type — its LOW 5 BITS, as the exe reads it: the
-   * scramble test masks with `and edx,1Fh` (0x46fde4) and the material
+   * The tile's terrain type — its LOW 5 BITS, as the exe reads it:
+   * `UpdateGroundState` masks with `and edx,1Fh` (0x46fde4) and the material
    * lookup with `and ecx,1fh` (0x4155dc) before comparing or indexing.
    * The bits above are flags (0x20 water, 0x40 mine, 0x80 wall), and
-   * comparing the whole byte is exactly the bug that hid Scramble: nearly
-   * every climbing tile on the shipped maps is 0x2b, not 0x0b.
+   * comparing the whole byte never matches a swamp tile: nearly every one
+   * on the shipped maps is 0x2b, not 0x0b.
    * -1 off the map.
    */
   tileType(x: number, z: number): number {
     const tile = this.tileAt(x, z)
     return tile === null ? -1 : tile.type & 0x1f
-  }
-
-  /** Does a pig standing here scramble? Terrain type 11 under the mask —
-   * 0x0b and the far more common 0x2b alike. */
-  isClimbing(x: number, z: number): boolean {
-    return this.tileType(x, z) === CLIMBING_TILE
   }
 
   /**
@@ -562,13 +556,13 @@ export class TerrainQuery {
    * water colour. That is how a pig stands on the painted dry half of a
    * shore tile and swims one step on. With a mask attached
    * (lib/game/watermask, learnt from the map's own pure-water art) this
-   * does the same; without one the flag decides alone. The climbing type
-   * stays out of the water wholesale either way — mud banks scramble.
+   * does the same; without one the flag decides alone. The swamp type stays
+   * out of the water wholesale either way.
    */
   isWater(x: number, z: number): boolean {
     const tile = this.tileAt(x, z)
     if (tile === null || (tile.type & TILE_WATER) === 0) return false
-    if ((tile.type & 0x1f) === CLIMBING_TILE) return false
+    if ((tile.type & 0x1f) === SWAMP_TILE) return false
     return this.waterMask === null ? true : this.waterMask.wet(x, z)
   }
 

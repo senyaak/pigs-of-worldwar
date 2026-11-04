@@ -146,9 +146,7 @@ test('a walking pig sounds like the ground it is on', async ({ app }) => {
 
   // TURNING on the spot rather than walking off: clip 4 carries two footfalls
   // a lap the way the run cycle does (lib/game/footsteps.ts), and a pig that
-  // stays on its own tile cannot walk onto a different material — or, at this
-  // end of CAMP, onto the climbing tiles a few steps north, which play no
-  // footstep at all because clip 11 carries none.
+  // stays on its own tile cannot walk onto a different material.
   // The turn's own grunt (P_HMMM) goes down as the GET READY card does, and it
   // WAITS for the bank if the bank is still loading (audio/battleSound.ts) —
   // so it can land after the warp. Wait for it rather than slicing over it, or

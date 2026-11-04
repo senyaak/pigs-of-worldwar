@@ -49,6 +49,7 @@ import type { Mines } from './mines'
 import { createGas } from './gas'
 import { createPoison } from './poison'
 import type { Poison } from './poison'
+import { createReaction } from './reaction'
 import { createTumbles } from './tumble'
 import type { Tumbles, Velocity } from './tumble'
 import { createCorpses } from './corpses'
@@ -356,6 +357,7 @@ export function createEngine(parts: EngineParts): Engine {
         // lib/game/hide.ts). The decoy soaking first is a [gap]: its own
         // hit points are unread.
         if (pig !== undefined) hides.reveal(pig)
+        if (pig !== undefined && amount > 0) reaction.hurt(pig)
       },
       // A heal shows the same number a hit does — one spawner, one style
       // argument apart (lib/game/scenery.ts) — **and it CURES**: the tail of
@@ -557,6 +559,8 @@ export function createEngine(parts: EngineParts): Engine {
   /** The gas's bit on a pig, and the ten points a turn it costs — before the
    * grenades, because the canister's clouds are what set it. */
   const poison = createPoison({ training }, bus.emit)
+  /** …and the sneeze of a pig hurt with that bit on. */
+  const reaction = createReaction({ pigs, afflicted: (pig) => poison.poisoned(pig) }, bus.emit)
   /** …and the canister's stream itself (lib/game/gas.ts). */
   const gas = createGas({ pigs, training, poison }, bus.emit)
   /** …and what a GRENADE does, which is a parabola rather than a line. */
@@ -613,6 +617,7 @@ export function createEngine(parts: EngineParts): Engine {
     grenades,
     mines,
     poison,
+    reaction,
     swings,
     heals,
     pockets,
