@@ -665,9 +665,9 @@ test('TNT goes down IN FRONT of the pig, keeps the turn, and leaves four seconds
   // "горение динамита не из игры", which was fair: the first answer was an
   // invented orange spark. It is decoded now. Kind 53's constructor hangs a
   // PARENTED effect 0x1D on the projectile the same way the grenade's arm hangs
-  // 0x15, offset 0x3C up the fuse, and that effect lays four dark puffs a frame
-  // (lib/game/trail.ts, `FUSE_TRAIL`). So "alight" is a charge laying its own
-  // trail, and there is no flame in it at all.
+  // 0x15, offset 0x3C up the fuse, and that effect renews one of ten orange
+  // records a frame (lib/game/fuse.ts, `FUSE_TRAIL`). So "alight" is a charge with
+  // its flame up; e2e/002/fuse.spec.ts is the paint check.
   expect(await burning(page), 'the charge is not alight').toBe(1)
 
   // **AND IT STAYS WHERE IT WAS PUT.** Play: "динамит катится по склону." It did:
@@ -689,7 +689,7 @@ test('TNT goes down IN FRONT of the pig, keeps the turn, and leaves four seconds
   const waiting = await debugState(page)
   await expect.poll(async () => (await thrown(page)).length, { timeout: 15000 }).toBe(0)
   expect((await sounds(page)).slice(quiet), 'it went off').toContain('E_1')
-  // …and the smoke stops with it.
+  // …and the flame stops with it.
   expect(await burning(page), 'a fuse is still alight with nothing to burn').toBe(0)
 
   // …**AND IT THROWS THE PIG THAT PLANTED IT**, inside that beat. Play: "динамит

@@ -1,5 +1,6 @@
 // The window the e2e suite looks through (three/debug.ts).
 
+import * as THREE from 'three'
 import { flingSpeed } from '../../../../lib/game/blast'
 import { lobOf } from '../../../../lib/game/grenade'
 import { flingVelocity } from '../../../../lib/game/tumble'
@@ -29,6 +30,7 @@ export const exposeDebug = (core: SceneCore): void => {
     shots,
     grenades,
     mines,
+    root,
     effects,
     airDrops,
     dropIn,
@@ -89,6 +91,11 @@ export const exposeDebug = (core: SceneCore): void => {
     grenades: () => grenades.at(),
     charges: () => grenadeArt.charges(),
     burning: () => grenadeArt.burning(),
+    fuseTips: () =>
+      grenadeArt.tips().map((tip) => {
+        const at = root.localToWorld(new THREE.Vector3(tip.x, tip.y, tip.z)).project(host.camera)
+        return { x: at.x, y: at.y, z: at.z }
+      }),
     mines: () => mines.at().map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
     mineMarkers: () => mineArt.shown(),
     map: () => ({ eye: eye(core), blips: blips(core) }),

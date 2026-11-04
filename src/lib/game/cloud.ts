@@ -64,7 +64,8 @@ export const CLOUD_DEAD = 100
  * (0x489fe1..0x48a013, the `*2500/200`). So it starts at twice what it ends
  * at and SHRINKS the whole way — the fireball collapses rather than billows.
  */
-export const cloudSize = (cloud: Cloud): number => (200 - cloud.age) * cloud.size * 12.5
+export const cloudSize = (cloud: Pick<CloudRecords, 'age' | 'size'>): number =>
+  (200 - cloud.age) * cloud.size * 12.5
 
 /**
  * A colour component as the draw packs it: `c * 400 >> 6`, so 0..31 becomes
@@ -113,17 +114,22 @@ export interface Blob {
   dz: number
 }
 
-/** A cloud in flight: one age for the lot, which is how the engine has it —
- * the array belongs to a single child effect and the size comes off that
- * child's own age, not off each sprite's. */
-export interface Cloud {
+/** The records themselves: one age for the lot, which is how the engine has it
+ * — the array belongs to a single effect and the size comes off that effect's
+ * own age, not off each sprite's. A blast's cloud and a fuse (`fuse.ts`) are both
+ * this, stepped and sized by the same laws. */
+export interface CloudRecords {
   age: number
   gravity: number
   size: number
+  blobs: Blob[]
+}
+
+/** A stage's cloud in flight: the records and the one colour they all wear. */
+export interface Cloud extends CloudRecords {
   colour: [number, number, number]
   /** Matter, not light — carried off the stage (see `CloudStage.matter`). */
   matter?: boolean
-  blobs: Blob[]
 }
 
 /** The angle a raw count means, in radians: the engine takes `n * 5 / 2` and
@@ -133,6 +139,25 @@ const angleOf = (n: number): number => ((n * 5) / 8192) * 2 * Math.PI
 /** A sine or cosine in 256ths, truncated exactly where the engine truncates
  * it — `ftol(f * 4096)` then `sar 4`. */
 const fixed = (f: number): number => Math.trunc(f * 4096) >> 4
+
+/**
+ * Aim one record: `0x489890`, a yaw round the whole turn, a pitch inside the
+ * cone and a speed of once to twice the figures given. The launch is upward; the
+ * note on `spawnCloud` has why the sign is what it is.
+ */
+export function aimBlob(
+  speeds: { up: number; out: number },
+  random: () => number
+): Pick<Blob, 'dx' | 'dy' | 'dz'> {
+  const yaw = angleOf(Math.floor(random() * TURN))
+  const pitch = angleOf(Math.floor(random() * CONE))
+  const spread = Math.floor(random() * SPREAD) + SPREAD
+  const sinPitch = fixed(Math.sin(pitch))
+  // The vertical loses three more bits than the pair round it (0x489985).
+  const up = (((fixed(Math.cos(pitch)) >> 3) * speeds.up * spread) >> 7) * -1
+  const out = (trig: number): number => (((trig * sinPitch) >> 11) * speeds.out * spread) >> 7
+  return { dx: out(fixed(Math.cos(yaw))), dy: up, dz: out(fixed(Math.sin(yaw))) }
+}
 
 /**
  * Let one go.
@@ -158,22 +183,7 @@ export function spawnCloud(
 ): Cloud {
   const blobs: Blob[] = []
   for (let n = 0; n < stage.count; n++) {
-    const yaw = angleOf(Math.floor(random() * TURN))
-    const pitch = angleOf(Math.floor(random() * CONE))
-    const spread = Math.floor(random() * SPREAD) + SPREAD
-    const sinPitch = fixed(Math.sin(pitch))
-    // The vertical loses three more bits than the pair round it (0x489985).
-    const up = (((fixed(Math.cos(pitch)) >> 3) * stage.up * spread) >> 7) * -1
-    const out = (trig: number): number =>
-      (((trig * sinPitch) >> 11) * stage.out * spread) >> 7
-    blobs.push({
-      x: at.x,
-      y: at.y,
-      z: at.z,
-      dx: out(fixed(Math.cos(yaw))),
-      dy: up,
-      dz: out(fixed(Math.sin(yaw)))
-    })
+    blobs.push({ x: at.x, y: at.y, z: at.z, ...aimBlob(stage, random) })
   }
   return {
     age: 0,
@@ -190,7 +200,7 @@ export function spawnCloud(
  * first, then the whole velocity onto the position (0x48a801..0x48a818), and
  * the age last (0x48a829).
  */
-export function advanceCloud(cloud: Cloud): void {
+export function advanceCloud(cloud: CloudRecords): void {
   for (const blob of cloud.blobs) {
     blob.dy += cloud.gravity
     blob.x += blob.dx
@@ -202,4 +212,4 @@ export function advanceCloud(cloud: Cloud): void {
 
 /** Whether it is done — the draw and the step share this gate (0x489fb5,
  * 0x48a7ea). */
-export const cloudSpent = (cloud: Cloud): boolean => cloud.age >= CLOUD_DEAD
+export const cloudSpent = (cloud: Pick<CloudRecords, 'age'>): boolean => cloud.age >= CLOUD_DEAD

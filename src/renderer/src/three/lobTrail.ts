@@ -19,8 +19,7 @@ import { MODEL_SCALE } from '../../../lib/game/scale'
  * own, like every other particle size here: the half of the engine that draws a
  * particle (0x48a570) is not read, so nothing is known about the art. A grenade
  * is 35 across, and its row's 8 through this puts its haze a little wider than
- * the thing making it — so a charge's 0x10 comes out twice that, which is the
- * ratio the rows carry.
+ * the thing making it.
  */
 const PUFF_UNIT = (90 / 8) * MODEL_SCALE
 
@@ -53,9 +52,6 @@ export interface LobTrails {
    * is now and which trail its own kind carries (lib/game/trail.ts). The kind is
    * fixed the first time each is seen. */
   follow(who: number, at: { x: number; y: number; z: number }, kind?: TrailKind): void
-  /** How many are laying a trail of this kind right now — what says a fuse is
-   * alight, since a puff is a colour on a transparent quad. */
-  laying(kind: TrailKind): number
   /** Anything not followed this frame keeps fading and then goes. Call after
    * every `follow` for the frame. */
   update(delta: number): void
@@ -127,16 +123,6 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
         sprite.scale.setScalar(PUFF_UNIT * trail.kind.size * (rocket ? ROCKET_SWELL : 1))
         const [r, g, b] = trail.kind.colour
         sprite.material.color.setRGB(r / 31, g / 31, b / 31)
-        // A SPARK is LIT: it adds to whatever is behind it rather than sitting
-        // over it, which is the whole difference between a bright puff and
-        // something burning (lib/game/trail.ts, `TrailKind.spark`). The pool is
-        // shared, so the blending is set only when it actually changes —
-        // writing it every frame would ask three to recompile the material.
-        const wanted = trail.kind.spark ? THREE.AdditiveBlending : THREE.NormalBlending
-        if (sprite.material.blending !== wanted) {
-          sprite.material.blending = wanted
-          sprite.material.needsUpdate = true
-        }
         sprite.material.opacity =
           (rocket ? ROCKET_ALPHA : PUFF_ALPHA) * (1 - puff.age / TRAIL_DEAD)
       }
@@ -146,21 +132,11 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
 
   /** Where each followed projectile is this frame, held until the frame ticks. */
   const where = new Map<number, { x: number; y: number; z: number }>()
-  /** …and who was still laying one on the last frame that ticked, which is what
-   * "is it alight" asks about — `where` is emptied every frame. */
-  const active = new Set<number>()
 
   return {
     follow(who, at, kind = LOB_TRAIL) {
       where.set(who, { ...at })
       if (!trails.has(who)) trails.set(who, beginTrail(kind))
-    },
-    laying(kind) {
-      let n = 0
-      for (const who of active) {
-        if (trails.get(who)?.kind.id === kind.id) n++
-      }
-      return n
     },
     update(delta) {
       carry += delta / EXE_FRAME_SECONDS
@@ -169,15 +145,10 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
         for (const [who, trail] of trails) {
           // A grenade that is gone lays nothing more; its last six still fade.
           const at = where.get(who) ?? null
-          // The SCATTER a spark row asks for, turned into world units here
-          // because the roll belongs to whoever draws (lib/game/trail.ts).
-          const spread = (trail.kind.scatter ?? 0) * MODEL_SCALE
-          advanceTrail(trail, at, spread > 0 ? () => (Math.random() - 0.5) * spread : undefined)
+          advanceTrail(trail, at)
           if (!at && trailSpent(trail)) trails.delete(who)
         }
       }
-      active.clear()
-      for (const who of where.keys()) active.add(who)
       where.clear()
       redraw()
     },
@@ -189,7 +160,6 @@ export function createLobTrails(root: THREE.Object3D): LobTrails {
     clear() {
       trails.clear()
       where.clear()
-      active.clear()
       redraw()
     },
     dispose() {

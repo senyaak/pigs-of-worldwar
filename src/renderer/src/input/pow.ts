@@ -69,6 +69,8 @@ export interface DebugHooks {
   charges(): { fuse: { x: number; y: number; z: number }; base: number }[]
   /** How many planted charges have a spark alight on the fuse (three/fuse.ts). */
   burning(): number
+  /** Where each burning fuse's tip lands in the picture, in clip space. */
+  fuseTips(): { x: number; y: number; z: number }[]
   /** Mines that have been trodden on and are counting down (lib/game/mines.ts). */
   mines(): { x: number; y: number; z: number; fuse: number }[]
   /** How many buried mines are being DRAWN for the side whose turn it is — a

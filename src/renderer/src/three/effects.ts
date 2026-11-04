@@ -68,8 +68,8 @@ const PUFF_GROWTH = 1
  * onto `[effect+0xa8]`, which is the world's own packed position, so they ride
  * `MODEL_SCALE` like a ring for the same reason a ring does.
  */
-const BLOB_UNIT = 1 / 64
-const BLOB_SCALE = MODEL_SCALE
+export const BLOB_UNIT = 1 / 64
+export const BLOB_SCALE = MODEL_SCALE
 
 /**
  * How solid ONE of them is drawn. The remake's own, and it has to be: seventy
@@ -161,7 +161,7 @@ function shape(band: Band, one: Ring): void {
  * traced. A hard square would read as a box rather than smoke, and this is
  * the cheapest thing that does not.
  */
-function buildPuffTexture(): THREE.CanvasTexture {
+export function buildPuffTexture(): THREE.CanvasTexture {
   const size = 64
   const canvas = document.createElement('canvas')
   canvas.width = size

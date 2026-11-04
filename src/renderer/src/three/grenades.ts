@@ -18,8 +18,9 @@ import { projectileModel } from '../../../lib/game/ammo'
 import { isPlanted, lobOf } from '../../../lib/game/grenade'
 import { SKILL } from '../../../lib/game/skills'
 import { createLobArt } from './lobArt'
+import { createFuseFlames } from './fuse'
 import { createLobTrails } from './lobTrail'
-import { FUSE_TRAIL, LOB_TRAIL, ROCKET_TRAIL } from '../../../lib/game/trail'
+import { LOB_TRAIL, ROCKET_TRAIL } from '../../../lib/game/trail'
 import { fromExeY } from '../../../lib/game/terrain'
 
 /**
@@ -53,9 +54,12 @@ export interface GrenadeArt {
   charges(): DrawnCharge[]
   /** How many puffs the trails have up (lib/game/trail.ts). */
   trail(): number
-  /** …and how many fuses are alight: one per planted charge that is laying its
-   * own trail (lib/game/trail.ts, `FUSE_TRAIL`). */
+  /** …and how many fuses are alight: one per planted charge with its flame up
+   * (three/fuse.ts). */
   burning(): number
+  /** Where each of those flames sits, in the root's game space: the fuse tip
+   * (`tipOf`). What a spec aims at to look at the canvas beside it. */
+  tips(): Point[]
   clear(): void
   dispose(): void
 }
@@ -161,7 +165,9 @@ export function createGrenadeArt(
    * CONSTRUCTOR — a parented effect of id 0x15 — so it is born with the grenade
    * and dies a few frames after it (lib/game/trail.ts). */
   const trails = createLobTrails(root)
-  /** Where each fuse tip came out this frame, so the trail is laid off the MESH's
+  /** A planted charge's fuse, which burns rather than trails (lib/game/fuse.ts). */
+  const flames = createFuseFlames(root)
+  /** Where each fuse tip came out this frame, so the flame stands off the MESH's
    * own origin rather than off the lob's ground point — the lift is counted once. */
   const alight = new Map<number, { x: number; y: number; z: number }>()
 
@@ -232,11 +238,11 @@ export function createGrenadeArt(
             fuse: { x: facing.x, y: facing.y, z: facing.z },
             base: mesh.position.y + lift
           })
-          // …and its own trail comes off the FUSE TIP rather than off the
-          // bundle — the exe hangs effect 0x1D on the projectile with an offset
-          // of 0x3C (`FUSE_LIFT`), which is measured from the charge's own base
-          // and lands in the middle of the sticks. Play saw that and it is the
-          // art that answers it (`tipOf`).
+          // …and its flame stands on the FUSE TIP rather than on the bundle —
+          // the exe hangs effect 0x1D on the projectile with an offset of 0x3C
+          // (`FUSE_LIFT`), which is measured from the charge's own base and
+          // lands in the middle of the sticks. Play saw that and it is the art
+          // that answers it (`tipOf`).
           alight.set(shot.id, {
             x: mesh.position.x,
             y: mesh.position.y + tipOf(mesh) * MODEL_SCALE,
@@ -249,33 +255,33 @@ export function createGrenadeArt(
       // The trail follows what is still up; anything gone stops laying and its
       // last few fade out on their own. Keyed by the lob itself, and laid at the
       // point being DRAWN or the puffs would come off a stepping position. A
-      // planted charge lays its FUSE's trail instead, off the tip worked out
-      // above — which is why this is the end of the frame and not the top of it.
-      //
-      // WHICH trail it is comes off the SKILL and not off the tip: a charge is
-      // born on a frame whose model may still be loading, and the kind is fixed
-      // the first time a trail is seen — so reading it off `alight` latched
-      // every charge onto the grenade's row for the whole of its fuse.
+      // planted charge has its flame instead, off the tip worked out above —
+      // which is why this is the end of the frame and not the top of it.
       for (const shot of live) {
-        const planted = isPlanted(shot.skill)
+        if (isPlanted(shot.skill)) continue
         // …and a ROCKET lays its own, which is thicker and white. The exe hangs
         // no trail on it at all — both of its sites were read and kind 10 is
         // outside both — so this row is the remake's, on play's word
         // (lib/game/trail.ts, `ROCKET_TRAIL`).
-        const row = planted ? FUSE_TRAIL : lobOf(shot.skill)?.contact ? ROCKET_TRAIL : LOB_TRAIL
-        trails.follow(shot.id, (planted ? alight.get(shot.id) : null) ?? where(shot), row)
+        const row = lobOf(shot.skill)?.contact ? ROCKET_TRAIL : LOB_TRAIL
+        trails.follow(shot.id, where(shot), row)
       }
       trails.update(delta)
+      for (const [id, tip] of alight) flames.follow(id, tip)
+      flames.update(delta)
     },
     charges: () => standing,
     trail: () => trails.live(),
-    burning: () => trails.laying(FUSE_TRAIL),
+    burning: () => flames.burning(),
+    tips: () => [...alight.values()],
     clear() {
       trails.clear()
+      flames.clear()
       clearMeshes()
     },
     dispose() {
       trails.dispose()
+      flames.dispose()
       clearMeshes()
       art.dispose()
     }

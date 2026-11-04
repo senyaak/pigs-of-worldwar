@@ -80,6 +80,10 @@ export interface DebugParts {
   /** How many planted charges have a FUSE alight (three/fuse.ts). A spark is a
    * sprite on a transparent quad, so nothing else can see one. */
   burning: () => number
+  /** Where each burning fuse's tip lands in the picture, in clip space: x and y
+   * −1..1 across the canvas, y up, and z past 1 behind the far plane. What a paint
+   * check needs to know where to look (e2e/002/fuse.spec.ts). */
+  fuseTips: () => { x: number; y: number; z: number }[]
   /** Mines that have been trodden on and are counting down. Nothing is DRAWN for
    * a buried one unless somebody can SEE it, so this is the only way a spec can
    * find one at all (lib/game/mines.ts). */
@@ -317,6 +321,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** …and how many of them are BURNING: play's "динамит не горит"
        * (three/fuse.ts). */
       burning: () => parts.burning(),
+      /** …and where their tips land in the picture, for a paint check. */
+      fuseTips: () => parts.fuseTips(),
       /** Every mine counting down under somebody's feet (lib/game/mines.ts). */
       mines: () => parts.mines(),
       /** …and how many BURIED ones are being drawn for the side whose turn it is:

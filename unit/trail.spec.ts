@@ -8,8 +8,6 @@
 import { test, expect } from '@playwright/test'
 
 import {
-  FUSE_LIFT,
-  FUSE_TRAIL,
   LOB_TRAIL,
   ROCKET_TRAIL,
   TRAIL_DEAD,
@@ -62,62 +60,6 @@ test('A ROCKET carries one too, and it is the ENGINE that lays it', { tag: '@nod
   // делаем как в движке — в этом же и суть".
   expect(ROCKET_TRAIL.colour).toEqual(LOB_TRAIL.colour)
   expect(ROCKET_TRAIL.size).toBe(LOB_TRAIL.size)
-})
-
-test('A CHARGE CARRIES ONE TOO, and its fuse is where it hangs', { tag: '@nodata' }, () => {
-  // Play: "горение динамита не из игры." It is now. Kind 53's constructor arm
-  // (0x432414) hangs effect 0x1D on the projectile exactly the way the grenade's
-  // arm hangs 0x15 — same call, same tail arguments — with two differences that
-  // are the whole of what a burning fuse looks like: an offset of 0x3C where the
-  // grenade passes zero, and its own update arm (0x48ad9d).
-  expect(FUSE_TRAIL.id).toBe(0x1d)
-  expect(FUSE_LIFT).toBe(0x3c)
-  // FOUR a frame, not six — `sar 2` against the grenade's divide by six — of
-  // particle type 0x18. That much is the arm and it stays the arm.
-  expect(FUSE_TRAIL.steps).toBe(4)
-  expect(FUSE_TRAIL.particle).toBe(0x18)
-})
-
-test('…but it burns in SPARKS, and that is play over the arm', { tag: '@nodata' }, () => {
-  // The exe's own row is DARK SMOKE: particle 0x18's setter (0x486f16) gives
-  // colour 0x14A5 — five of thirty-one on every channel — in puffs of 0x10,
-  // twice the grenade's 8. Play overruled all three: "в оригинале там не дым а
-  // искры когда он горит."
-  expect(FUSE_TRAIL.spark).toBe(true)
-  // BRIGHTER than a grenade's smoke rather than darker, which is the reading
-  // this replaced.
-  expect(FUSE_TRAIL.colour[0]).toBeGreaterThan(LOB_TRAIL.colour[0])
-  // …SMALLER than it rather than twice its size.
-  expect(FUSE_TRAIL.size).toBeLessThan(LOB_TRAIL.size)
-  // …and SHORTER LIVED: a spark that hangs about is an ember.
-  expect(FUSE_TRAIL.ageStep).toBeGreaterThan(LOB_TRAIL.ageStep)
-  // A grenade's row is untouched by any of it.
-  expect(LOB_TRAIL.spark).toBeUndefined()
-  expect(LOB_TRAIL.scatter).toBeUndefined()
-})
-
-test('a charge does not move, so its sparks are THROWN clear', { tag: '@nodata' }, () => {
-  // A trail is laid along the segment travelled and a planted charge travels
-  // nothing, so without a scatter all four would land on one another.
-  const trail = beginTrail(FUSE_TRAIL)
-  const tip = { x: 100, y: -50, z: 200 }
-  // No jitter passed: nothing scatters, whatever the row asks for. The roll is
-  // the CALLER's, because `lib/game` never reaches for `Math.random`.
-  advanceTrail(trail, tip)
-  advanceTrail(trail, tip)
-  expect(trail.puffs).toHaveLength(FUSE_TRAIL.steps)
-  expect(trail.puffs.every((p) => p.x === tip.x && p.y === tip.y && p.z === tip.z)).toBe(true)
-
-  // With one, every particle is thrown off the tip — and each axis gets its own
-  // throw, so they do not all move together.
-  const sparks = beginTrail(FUSE_TRAIL)
-  let n = 0
-  const jitter = (): number => [3, -5, 7, -2, 4, -6][n++ % 6]
-  advanceTrail(sparks, tip, jitter)
-  advanceTrail(sparks, tip, jitter)
-  expect(sparks.puffs).toHaveLength(FUSE_TRAIL.steps)
-  expect(sparks.puffs.every((p) => p.x !== tip.x || p.y !== tip.y || p.z !== tip.z)).toBe(true)
-  expect(new Set(sparks.puffs.map((p) => `${p.x},${p.y},${p.z}`)).size).toBeGreaterThan(1)
 })
 
 test('the first frame lays nothing — there is no segment yet', { tag: '@nodata' }, () => {
