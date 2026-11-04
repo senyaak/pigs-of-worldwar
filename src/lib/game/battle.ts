@@ -112,6 +112,8 @@ export interface BattleParts {
   /** Whether this is the TRAINING ground, whose mission ends on its own
    * condition rather than on the squads (lib/game/endOfGame.ts). */
   training: boolean
+  /** Whether this is the PROVING ground, whose rules are its own (lib/game/provingGround.ts). */
+  proving: boolean
   /** …and that condition: how many of the map's mission targets are still
    * standing. Every dummy the map carries, placed or not. */
   targetsLeft: () => number

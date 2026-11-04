@@ -74,7 +74,15 @@
   placed; CAMP's DUMMY model is not used, the dummies being real pigs.
   `main/provingGround.ts`.
 
+- `[play]` **The dummies skip their turns**: "real enemy pigs that skip their
+  turns", 2026-11-02. On this map a machine side's turn card is read out as for
+  any computer side, and the pig then takes SKIP TURN in hand and fires it, the
+  ordinary pass. The brain is not asked. Only the choice to pass is the owner's:
+  a dummy is still thrown, hurt and killed, and poison still bites at the top of
+  its own turn (0x4703A0, `weapons/gas.md`). `lib/game/battle/machine.ts`,
+  `isProvingGround` in `lib/game/provingGround.ts`.
+
 - `[gap]` **What it does not do yet** is listed in
-  [../todo/proving-ground.md](../todo/proving-ground.md): the dummies are an
-  ordinary computer-played side, a taken crate stays taken, and the signposts
-  are the plain SIGN model.
+  [../todo/proving-ground.md](../todo/proving-ground.md): a dummy brought down
+  stays down, a taken crate stays taken, and the signposts are the plain SIGN
+  model.

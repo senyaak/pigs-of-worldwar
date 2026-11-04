@@ -31,6 +31,10 @@ import { provingElevation } from './provingTerrain'
  * called this (`pow.swapMap('PROVING')`, ui/battle.ts). */
 export const PROVING_GROUND = 'PROVING'
 
+/** Whether a map name is the proving ground, however it was spelled — what a
+ * rule that is this map's alone asks (lib/game/engine.ts). */
+export const isProvingGround = (map: string): boolean => map.toUpperCase() === PROVING_GROUND
+
 /**
  * Every skill a pig carries BY ITSELF, one crate each: 1..38 and 50..59.
  *

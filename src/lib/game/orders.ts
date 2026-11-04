@@ -13,6 +13,9 @@
 // decisions (lib/game/battle.ts, AI_START_SECONDS / AI_MULL_SECONDS) — a
 // brain only ever says what it WANTS.
 
+import type { Pig } from './game'
+import { SKILL } from './skills'
+
 /** One wish. The actuator carries it out over as many steps as it takes. */
 export type Order =
   /** Take a skill in hand (or put it away with null) — what the player's
@@ -48,3 +51,8 @@ export type Order =
    * grenade rolling home) and wants asking again after the seat's mull.
    * Tactical, not theatre: the wait has a subject. */
   | { kind: 'watch' }
+
+/** The next order of a PASS: SKIP TURN taken in hand, then fired like any
+ * skill — the one road through `endTurnBeat` (lib/game/battle/firing.ts). */
+export const passOrder = (holding: Pig['holding']): Order =>
+  holding === SKILL.SKIP_TURN ? { kind: 'fire' } : { kind: 'hold', skill: SKILL.SKIP_TURN }

@@ -22,11 +22,10 @@ What play asked for that it does not do yet:
   facts tag it `[play]` — the mark that keeps a later pass from "correcting"
   the menu back to the exe's two rows. It drives with the mouse like every row
   (`docs/facts/menu.md`), and the battle it opens needs no campaign save.
-- **Training dummies that come back.** The dummies should be real enemy pigs
-  that skip their turns and stand up at full health at the start of a turn.
-  Then reactions, deaths, damage numbers and dropped crates get tested too.
-  Until then the dummy side is an ordinary side: the computer plays it, and
-  bringing every dummy down ends the battle as a win.
+- **Training dummies that come back.** The dummies skip their turns; they should
+  also stand up at full health at the start of a turn. Then reactions, deaths,
+  damage numbers and dropped crates get tested too. Until then a dummy brought
+  down stays down, and bringing every dummy down ends the battle as a win.
 - **A crate that was taken is back at the start of the next turn** — one round
   per crate per turn.
 - **A signpost by each crate showing the skill's icon.** The signposts stand

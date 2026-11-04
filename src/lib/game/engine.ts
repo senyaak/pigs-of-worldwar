@@ -18,6 +18,7 @@ import { TerrainQuery } from './terrain'
 import { buildWaterMask } from './watermask'
 import type { TerrainArt } from './watermask'
 import { isTrainingGround } from './tutorial'
+import { isProvingGround } from './provingGround'
 import { targetsOf } from './targets'
 import type { Target } from './targets'
 import { missionTargetIds } from './endOfGame'
@@ -625,6 +626,7 @@ export function createEngine(parts: EngineParts): Engine {
     dropIn,
     drowning,
     training,
+    proving: isProvingGround(world.map),
     /** What ENDS the mission (lib/game/endOfGame.ts). */
     targetsLeft,
     onChanged,

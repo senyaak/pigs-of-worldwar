@@ -33,6 +33,7 @@
 // until the clock takes the turn away.
 
 import type { AiWorld, Brain, Seen, Thought } from './ai'
+import { passOrder } from './orders'
 import type { Order } from './orders'
 import { ARRIVE_WITHIN, shortest } from './actuator'
 import { AIM_UNITS } from './aim'
@@ -42,7 +43,6 @@ import { BLAST_CORE } from './grenade'
 import { GRID_STEP } from './pathfind'
 import type { Plan } from './plan'
 import { makePlan, stillStands } from './plan'
-import { SKILL } from './skills'
 import { TILE_STEP } from '../formats/pmg'
 
 /** Close enough on the heading to trust the shot — under two turn steps. */
@@ -310,11 +310,7 @@ export function createGruntBrain(): Brain {
   // swimming hands are EMPTY — the engine strips them (lib/game/battle.ts)
   // — so a pass decided in the water becomes the swim out of it.
   const pass = (world: AiWorld): Order =>
-    world.swimming
-      ? shore(world)
-      : world.acting.holding === SKILL.SKIP_TURN
-        ? { kind: 'fire' }
-        : { kind: 'hold', skill: SKILL.SKIP_TURN }
+    world.swimming ? shore(world) : passOrder(world.acting.holding)
 
   const signOf = (world: AiWorld): string =>
     world.acting.carrying.map((slot) => `${slot.skill}:${slot.amount}`).join(',')

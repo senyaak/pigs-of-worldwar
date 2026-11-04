@@ -5,6 +5,7 @@
 import { AI_FUSE_SECONDS, AI_MULL_SECONDS, AI_START_SECONDS } from '../ai'
 import type { Pig } from '../game'
 import { isDead } from '../health'
+import { passOrder } from '../orders'
 import type { BattleCore } from './core'
 import { factsFor } from './machineFacts'
 
@@ -98,6 +99,13 @@ export const machineStep = (core: BattleCore, acting: Pig, delta: number): void 
   } else if (!actuator.idle()) {
     actuator.step(delta)
     state.mullSeconds = 0
+  } else if (core.proving) {
+    // **A DUMMY ONLY EVER PASSES.** `[play]`, 2026-11-02: "real enemy pigs that
+    // skip their turns" (docs/facts/proving-ground.md). Nothing is thought, so
+    // the brain is not asked; the choice to pass is the only thing that is the
+    // map's, and the pass itself is the ordinary one, through the same hands.
+    actuator.take(passOrder(acting.holding))
+    actuator.step(delta)
   } else if (brain.thinking()) {
     // **THE BRAIN IS OUT, AND THE BATTLE IS NOT WAITING FOR IT.** With a
     // brain in another process the ask and the answer are different
