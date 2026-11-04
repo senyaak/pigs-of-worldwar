@@ -1,11 +1,14 @@
-// ONE PLAYER — NEW GAME over LOAD GAME, the screen the main menu's first bar
-// opens.
+// ONE PLAYER — NEW GAME, LOAD GAME and PROVING GROUND, the screen the main
+// menu's first bar opens.
 //
 // **It is the same machine, and that is the exe's own answer, not a
 // shortcut**: `frontend/menus.js` prints screen 14 as `kind 1`, the layout the
 // main menu and OPTIONS wear, with the title at `fetext` 54 and two items at
 // 55 and 56 — NEW GAME to screen 3 SELECT TEAM, LOAD GAME to screen 10 LOAD.
 // So there is nothing here but the list; the furniture is `barScreen.ts`.
+//
+// **The third row is the owner's, not a reading**: `[play]`, 2026-11-02, and
+// docs/facts/menu.md says why a later pass must not take it back out.
 //
 // **No entrance.** The per-screen table at 0x4C0A18 gives screen 14 a y of
 // +100 against the main menu's -650, but the arm that serves this family
@@ -17,11 +20,14 @@ import { byId } from './dom'
 import { feText, initBarScreen } from './barScreen'
 import type { BarScreen } from './barScreen'
 
-/** fetext indices: the title, then the two bars under it — screen 14's own
- * consecutive block, which is the ordinary case the string chain gets right. */
+/** fetext indices: the title, then the exe's two bars under it — screen 14's
+ * own consecutive block, which is the ordinary case the string chain gets right. */
 const TITLE_TEXT = 54
 const NEW_GAME_TEXT = 55
 const LOAD_GAME_TEXT = 56
+/** The third bar, in the owner's word. It is written here because `fetext` has
+ * no such string (`[play]`, 2026-11-02, docs/facts/menu.md). */
+const PROVING_GROUND_LABEL = 'PROVING GROUND'
 
 export type OnePlayerScreen = BarScreen
 
@@ -33,6 +39,8 @@ export function initOnePlayer(handlers: {
    * a save exists; an empty list is that screen's own state to show, the way
    * the original walks its eight slots and draws what it finds (0x42C52D). */
   onLoadGame: () => void
+  /** PROVING GROUND — the remake's own map, with no campaign behind it. */
+  onProvingGround: () => void
   /** Back to the main menu. */
   onBack: () => void
 }): OnePlayerScreen {
@@ -50,6 +58,11 @@ export function initOnePlayer(handlers: {
         label: () => feText(LOAD_GAME_TEXT),
         enabled: () => true,
         choose: handlers.onLoadGame
+      },
+      {
+        label: () => PROVING_GROUND_LABEL,
+        enabled: () => true,
+        choose: handlers.onProvingGround
       }
     ]
   })

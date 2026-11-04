@@ -572,11 +572,11 @@ export function initBarScreen(config: {
    *
    * **It is the ROW's own frame, not a spread over however many bars there
    * are.** This used to divide by `bars.length - 1`, which is the same four
-   * frames on a four-bar screen and nonsense on any other: ONE PLAYER has two
-   * bars, so LOAD GAME — row 1 of 2 — took frame 11, the bottom of the dial's
-   * travel, and play saw the needle pointing at the floor instead of at the
-   * row. Two bars are rows 0 and 1 of the same twelve-frame dial: frames 0
-   * and 4.
+   * frames on a four-bar screen and nonsense on any other: on a screen of two
+   * bars the second took frame 11, the bottom of the dial's travel, and play
+   * saw the needle pointing at the floor instead of at the row. A row is a row
+   * of the same twelve-frame dial on every screen: 0, 1 and 2 are frames 0, 4
+   * and 7.
    */
   const needleFrame = (row: number): number =>
     Math.min(11, 4 * row - (4 * row > 4 ? 1 : 0))

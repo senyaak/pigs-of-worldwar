@@ -9,14 +9,17 @@
 // APPLICATION — and that the screen is really painted.
 //
 // Only ONE PLAYER leads anywhere yet, and it now opens the screen of that
-// name — NEW GAME over LOAD GAME, screen 14 of the exe's own table
-// (ui/onePlayer.ts) — from which NEW GAME opens the training ground. The
-// asset browsers are not a menu bar at all — the original has no such
-// screen, so they hang off the remake's own F1.
+// name — NEW GAME and LOAD GAME, screen 14 of the exe's own table, and the
+// owner's PROVING GROUND under them (ui/onePlayer.ts) — from which NEW GAME
+// opens the training ground. The asset browsers are not a menu bar at all — the
+// original has no such screen, so they hang off the remake's own F1.
 
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
 
-import { PHASE_ENV, launchApp, openAssets } from '../launch'
+import type { Page } from '@playwright/test'
+
+import { PHASE_ENV, TMP, launchApp, openAssets } from '../launch'
 import { expect, leaveBattle, test, toMenu } from '../app'
 import { tap } from '../controller'
 import { choose, labels, lightBar, nudge, selection, startGame } from '../menu'
@@ -86,20 +89,33 @@ test('the lit bar moves on every press, and wraps', async ({ app }) => {
   expect(app.errors()).toEqual([])
 })
 
-test('ONE PLAYER is a screen of its own — NEW GAME over LOAD GAME', async ({ app }) => {
+test('ONE PLAYER is a screen of its own — NEW GAME, LOAD GAME, PROVING GROUND', async ({ app }) => {
   const { page } = app
   await choose(page, 'ONE PLAYER')
   await expect(page.locator('#oneplayer')).toBeVisible()
   await expect(page.locator('#menu')).toBeHidden()
 
-  // fetext 55 and 56, screen 14's own two items.
-  await expect.poll(() => labels(page, 'onePlayer')).toEqual(['NEW GAME', 'LOAD GAME'])
+  // fetext 55 and 56, screen 14's own two items, and the owner's third:
+  // `[play]`, 2026-11-02, docs/facts/menu.md.
+  await expect
+    .poll(() => labels(page, 'onePlayer'))
+    .toEqual(['NEW GAME', 'LOAD GAME', 'PROVING GROUND'])
 
-  // LOAD GAME opens screen 10 — the slot list (ui/loadScreen.ts) — and its
-  // back key returns here.
+  // The arrow keys walk all three, and wrap at both ends.
   await lightBar(page, 'NEW GAME', 'onePlayer')
   await nudge(page, 'menuDown', 'onePlayer')
   expect(await selection(page, 'onePlayer')).toBe(1)
+  await nudge(page, 'menuDown', 'onePlayer')
+  expect(await selection(page, 'onePlayer')).toBe(2)
+  await nudge(page, 'menuDown', 'onePlayer')
+  expect(await selection(page, 'onePlayer'), 'down from the bottom wraps to the top').toBe(0)
+  await nudge(page, 'menuUp', 'onePlayer')
+  expect(await selection(page, 'onePlayer'), 'up from the top wraps to the bottom').toBe(2)
+  await nudge(page, 'menuUp', 'onePlayer')
+  expect(await selection(page, 'onePlayer')).toBe(1)
+
+  // LOAD GAME opens screen 10 — the slot list (ui/loadScreen.ts) — and its
+  // back key returns here.
   await tap(page, 'menuSelect')
   await expect(page.locator('#load')).toBeVisible()
   await tap(page, 'menuBack')
@@ -110,6 +126,200 @@ test('ONE PLAYER is a screen of its own — NEW GAME over LOAD GAME', async ({ a
   await expect(page.locator('#menu')).toBeVisible()
 
   expect(app.errors()).toEqual([])
+})
+
+/** A rectangle of ONE PLAYER's canvas, in its own 640×480 pixels. */
+interface CanvasBox {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** A row's plate comes out this wide: one 160-wide `chose` plus the frontend's
+ * global stretch of 50, so the third runs 284..494 (`LAYOUT.bars`,
+ * ui/barScreen.ts; exe 0x41c073 and 0x41c0ed, `frontend/notes.md`). */
+const PLATE_WIDTH = 210
+
+/**
+ * The third row's plate, off the screen's own live layout. The band stops short
+ * of the plate's last column, where the row's lamp (flush against the plate, at
+ * 493) overlaps it and blinks.
+ */
+const thirdPlate = (page: Page): Promise<CanvasBox> =>
+  page.evaluate(() => {
+    const { bars, lamp } = (
+      window as unknown as {
+        pow: {
+          screen: {
+            layout: {
+              oneplayer: {
+                bars: { x: number; y: number; step: number }
+                lamp: { x: number }
+              }
+            }
+          }
+        }
+      }
+    ).pow.screen.layout.oneplayer
+    return { x: bars.x, y: bars.y + 2 * bars.step, width: lamp.x - bars.x, height: bars.step }
+  })
+
+/** A band of ONE PLAYER's canvas as it stands, one number per colour channel. */
+const readBand = (page: Page, box: CanvasBox): Promise<number[]> =>
+  page.evaluate((band) => {
+    const canvas = document.getElementById('op-screen') as HTMLCanvasElement
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('#op-screen has no 2d context')
+    return Array.from(context.getImageData(band.x, band.y, band.width, band.height).data)
+  }, box)
+
+/**
+ * The band once it has stopped changing: two reads a poll apart that agree. The
+ * screen reports itself settled before its first tick has drawn anything, and
+ * its letters are hidden while the plates turn, so only the pixels can say.
+ */
+async function settledBand(page: Page, box: CanvasBox): Promise<number[]> {
+  let last: number[] = []
+  await expect
+    .poll(
+      async () => {
+        const now = await readBand(page, box)
+        const same = now.length > 0 && now.every((value, i) => value === last[i])
+        last = now
+        return same
+      },
+      { message: 'the plate is still turning over' }
+    )
+    .toBe(true)
+  return last
+}
+
+/** Where two reads of a band differ: its first and last column, and how many
+ * separate runs of columns lie between them. */
+function changedColumns(
+  before: number[],
+  after: number[],
+  width: number
+): { left: number; right: number; runs: number } {
+  const columns = new Set<number>()
+  for (let i = 0; i < before.length; i += 4) {
+    if (
+      before[i] !== after[i] ||
+      before[i + 1] !== after[i + 1] ||
+      before[i + 2] !== after[i + 2]
+    ) {
+      columns.add((i / 4) % width)
+    }
+  }
+  const sorted = [...columns].sort((a, b) => a - b)
+  const runs = sorted.filter((column, i) => i === 0 || sorted[i - 1] !== column - 1).length
+  return { left: sorted[0] ?? -1, right: sorted[sorted.length - 1] ?? -1, runs }
+}
+
+test('PROVING GROUND is drawn whole on the third plate', async ({ app }) => {
+  const { page } = app
+  await choose(page, 'ONE PLAYER')
+  await expect(page.locator('#oneplayer')).toBeVisible()
+  await expect.poll(() => labels(page, 'onePlayer')).toContain('PROVING GROUND')
+  const plate = await thirdPlate(page)
+
+  // The plate's art is the same however the row is lit, and only the letters
+  // change shade with the light (CHARS2 to CHARS2L, 0x428DBD). So what differs
+  // between the row unlit and lit IS the word as it was drawn.
+  await lightBar(page, 'LOAD GAME', 'onePlayer')
+  const unlit = await settledBand(page, plate)
+  await lightBar(page, 'PROVING GROUND', 'onePlayer')
+  const lit = await settledBand(page, plate)
+  const word = changedColumns(unlit, lit, plate.width)
+
+  // Every letter of the owner's word stands apart from the next, `[play]`,
+  // 2026-11-02: PROVING is seven and GROUND six.
+  expect(word.runs, 'all thirteen letters were drawn').toBe(13)
+  // Inside the plate at both ends, and centred on it (`centred`, ui/barScreen.ts).
+  expect(word.left, 'room to the left of the word').toBeGreaterThan(0)
+  const rightMargin = PLATE_WIDTH - 1 - word.right
+  expect(rightMargin, 'room to the right of the word').toBeGreaterThan(0)
+  // The right margin is the bigger by the pen's 3 past the last letter, the
+  // measure counting it (exe 0x4318dd, 0x430c28; `FRONTEND_METRICS`, ui/font.ts).
+  expect(Math.abs(rightMargin - word.left - 3), 'centred on its plate').toBeLessThanOrEqual(1)
+
+  // A local picture for a reviewer to look at, under `test-results/`, which is
+  // not kept in the repo. The assertions above are the paint check.
+  await page.locator('#op-screen').screenshot({ path: test.info().outputPath('one-player.png') })
+
+  expect(app.errors()).toEqual([])
+})
+
+test('a real click on PROVING GROUND opens the map, with no save before or after', async () => {
+  // A launch of its own, because this is the one state the shared app cannot be
+  // in: other specs in the phase raise campaigns in the shared save folder.
+  const saveDir = path.join(TMP, 'proving-ground-bar-saves')
+  rmSync(saveDir, { recursive: true, force: true })
+  const launched = await launchApp({ envFile: PHASE_ENV, saveDir })
+  const { page } = launched
+  const saves = (): Promise<number> =>
+    page.evaluate(async () => {
+      const listed = await (
+        window as unknown as {
+          api: {
+            listSaves(): Promise<{ ok: true; saves: unknown[] } | { ok: false; error: string }>
+          }
+        }
+      ).api.listSaves()
+      if (!listed.ok) throw new Error(listed.error)
+      return listed.saves.length
+    })
+  try {
+    await expect(page.locator('#menu')).toBeVisible()
+    await choose(page, 'ONE PLAYER')
+    await expect(page.locator('#oneplayer')).toBeVisible()
+    await lightBar(page, 'NEW GAME', 'onePlayer')
+    expect(await saves(), 'the profile starts with no save').toBe(0)
+
+    /** Where a canvas pixel is on the page: `object-fit: contain` centres the
+     * canvas in a box of another shape (ui/mouseRows.ts). */
+    const onPage = (x: number, y: number): Promise<{ x: number; y: number }> =>
+      page.evaluate(
+        (at) => {
+          const canvas = document.getElementById('op-screen') as HTMLCanvasElement
+          const box = canvas.getBoundingClientRect()
+          const scale = Math.min(box.width / canvas.width, box.height / canvas.height)
+          return {
+            x: box.left + (box.width - canvas.width * scale) / 2 + at.x * scale,
+            y: box.top + (box.height - canvas.height * scale) / 2 + at.y * scale
+          }
+        },
+        { x, y }
+      )
+    const plate = await thirdPlate(page)
+    const third = await onPage(plate.x + PLATE_WIDTH / 2, plate.y + plate.height / 2)
+    const first = await onPage(plate.x + PLATE_WIDTH / 2, plate.y + plate.height / 2 - 2 * plate.height)
+
+    // Hovering lights it, a bar at a time, the way every row does.
+    await page.mouse.move(third.x, third.y)
+    await expect.poll(() => selection(page, 'onePlayer'), { message: 'hover on the third' }).toBe(2)
+    await page.mouse.move(first.x, first.y)
+    await expect.poll(() => selection(page, 'onePlayer'), { message: 'hover on the first' }).toBe(0)
+
+    // The click on an unlit bar walks the light there and lands when it arrives.
+    await page.mouse.click(third.x, third.y)
+    await expect(page.locator('#battle')).toBeVisible({ timeout: 15_000 })
+    const map = await page.evaluate(() => (window as unknown as { pow: { map(): string } }).pow.map())
+    expect(map, 'the map pow.swapMap(PROVING) opens').toBe('PROVING')
+    expect(await saves(), 'opening it wrote no save').toBe(0)
+
+    // Off the rows first: the main menu comes up under the same pixel, and a
+    // parked pointer would pull its light onto OPTIONS.
+    await page.mouse.move(0, 0)
+    await leaveBattle(page)
+    await expect(page.locator('#menu'), 'leaving lands on the main menu').toBeVisible()
+    expect(await saves(), 'leaving wrote no save').toBe(0)
+    expect(launched.errors).toEqual([])
+  } finally {
+    await launched.app.close()
+    rmSync(saveDir, { recursive: true, force: true })
+  }
 })
 
 test('SELECT TEAM lists the six armies on the other layout', async ({ app }) => {

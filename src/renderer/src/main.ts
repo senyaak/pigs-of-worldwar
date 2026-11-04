@@ -42,6 +42,7 @@ import {
   type Medals
 } from '../../lib/game/save'
 import { isTrainingGround } from '../../lib/game/tutorial'
+import { PROVING_GROUND } from '../../lib/game/provingGround'
 import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
 import * as campaign from './campaign'
@@ -481,6 +482,12 @@ const onePlayer = initOnePlayer({
   onLoadGame: () => {
     show('load')
     void loadScreen.load()
+  },
+  // No campaign is behind it, so no save is read or written, and leaving lands
+  // on the main menu the way a skirmish does.
+  onProvingGround: () => {
+    campaignBattle = false
+    void battle.open(PROVING_GROUND, true).then((ok) => ok && show('battle'))
   },
   onBack: () => show('menu')
 })

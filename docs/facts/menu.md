@@ -105,6 +105,15 @@
   кликались") and must not accrue again. A key painted into backdrop ART
   still gets an invisible box over the painted words (the debrief's bar); an
   any-key screen takes a click anywhere as the any-key.
+- `[play]` **ONE PLAYER has three rows, and the third is the owner's.** Asked
+  for on 2026-11-02: "a third bar under NEW GAME and LOAD GAME" that opens the
+  proving ground, so testing does not start with `pow.swapMap('PROVING')`, and
+  "The bar reads **PROVING GROUND**". The exe's screen 14 has two rows
+  (`frontend/menus.js`, record 14, kind 1) and `fetext` has no such string, so
+  this is not a reading, and **a later pass must not "correct" the menu back to
+  two rows**. Choosing it needs no campaign save and writes none; leaving that
+  battle lands on the main menu, as a skirmish does (`ui/onePlayer.ts`,
+  [proving-ground.md](proving-ground.md)).
 - `[deliberate]` **A name is judged and kept TRIMMED.** The exe's ENTER tests
   the buffer's first byte alone (0x42AF50), so a team called one SPACE passes;
   `press` in `lib/game/nameEntry.ts` trims before it refuses and hands the

@@ -4,9 +4,14 @@
   2026-11-02 ([../todo/proving-ground.md](../todo/proving-ground.md)). The
   original has no such thing, so **its LAYOUT is the remake's own**; everything
   that HAPPENS on it is the original's, and nothing on it bypasses a rule the
-  campaign uses. Opened from a running battle with `pow.swapMap('PROVING')` in
-  the devtools console; `pow.swapMap()` lists it beside the shipping maps.
-  `PROVING` is the name of no shipped map.
+  campaign uses. Opened by the PROVING GROUND bar on the ONE PLAYER screen
+  ([menu.md](menu.md)), which needs no campaign save and writes none, and from
+  a running battle with `pow.swapMap('PROVING')` in the devtools console;
+  `pow.swapMap()` lists it beside the shipping maps. `PROVING` is the name of
+  no shipped map.
+
+- `[play]` **No rank gate**, 2026-11-02: "in the original a pig may use any
+  skill it holds, whatever its rank, so any pig can test anything here".
 
 - `[deliberate]` **What is on it.** A flat field the whole width of the map,
   with the strip down its middle running +x. The player's side is one grunt at

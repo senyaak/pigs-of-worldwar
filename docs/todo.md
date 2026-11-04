@@ -37,7 +37,7 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 ## New, from play — 2026-11-02
 
 - [ambient-airship.md](todo/ambient-airship.md) — the airship over the map that can be shot down; find who sends it
-- [proving-ground.md](todo/proving-ground.md) — the map is built; left: a ONE PLAYER menu row to open it, dummies that come back, crates that refill, icons on the signposts
+- [proving-ground.md](todo/proving-ground.md) — the map is built and on the ONE PLAYER menu; left: dummies that come back, crates that refill, icons on the signposts
 
 ## Build — read in the exe, not built
 

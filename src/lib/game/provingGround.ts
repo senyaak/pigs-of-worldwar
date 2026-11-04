@@ -27,8 +27,9 @@ import {
 import type { SourceRecord } from './provingSources'
 import { provingElevation } from './provingTerrain'
 
-/** The map's name, as the console map selector takes it — no shipped map is
- * called this (`pow.swapMap('PROVING')`, ui/battle.ts). */
+/** The map's name, as ONE PLAYER's third bar opens it (ui/onePlayer.ts) and the
+ * console map selector takes it (`pow.swapMap('PROVING')`, ui/battle.ts) — no
+ * shipped map is called this. */
 export const PROVING_GROUND = 'PROVING'
 
 /** Whether a map name is the proving ground, however it was spelled — what a

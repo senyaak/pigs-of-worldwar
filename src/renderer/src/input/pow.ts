@@ -233,7 +233,7 @@ declare global {
        * frontend draws on a canvas, so this is how a spec reads it
        * (docs/testing.md). */
       menu?: BarScreenView
-      /** ONE PLAYER — NEW GAME over LOAD GAME (ui/onePlayer.ts). */
+      /** ONE PLAYER — NEW GAME, LOAD GAME, PROVING GROUND (ui/onePlayer.ts). */
       onePlayer?: BarScreenView
       /** LOAD GAME — the eight slots (ui/loadScreen.ts). */
       loadScreen?: BarScreenView
