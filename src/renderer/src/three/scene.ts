@@ -21,6 +21,10 @@ export interface SceneHost {
   onFrame: Set<(delta: number) => void>
   /** Frame `object` (already added to the scene) and start orbiting it. */
   frameObject(object: THREE.Object3D): void
+  /** What everything is drawn on. */
+  canvas: HTMLCanvasElement
+  /** Draw the scene once through another lens. */
+  drawThrough(lens: THREE.Camera): void
 }
 
 const hosts = new WeakMap<HTMLElement, SceneHost>()
@@ -84,6 +88,8 @@ export function ensureScene(container: HTMLElement): SceneHost {
     camera,
     onInput,
     onFrame,
+    canvas: renderer.domElement,
+    drawThrough: (lens) => renderer.render(scene, lens),
     frameObject(object) {
       framed = object
       object.updateMatrixWorld(true)

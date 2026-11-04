@@ -69,6 +69,8 @@ export const exposeDebug = (core: SceneCore): void => {
     },
     objectCount: assets.objects.length,
     camera: host.camera,
+    drawThrough: host.drawThrough,
+    canvas: host.canvas,
     // Measured against the eye as it stood at the end of the last frame,
     // which is what `follow` was given.
     sky: () => sky?.state(state.eyeInGame) ?? null,

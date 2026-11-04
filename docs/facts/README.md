@@ -60,6 +60,7 @@ of the form `weapons/fire.md` are in the **disasm repo**, never in this tree.
 - [terrain.md](terrain.md) — tile type bits, block placement, baked light, triangles, wall halves, the turn byte
 - [time.md](time.md) — the frame rate, the exe's step, 25 Hz
 - [turns.md](turns.md) — the second pig opens, two sides fielded, everyone drops in
+- [wall-art.md](wall-art.md) — a wall piece's corner stones, and what its joints fought over
 - [walls-and-slopes.md](walls-and-slopes.md) — walls, the wall envelope, hillsides, the scrabble clip
 - [water.md](water.md) — water is see-through art, and how it is drawn
 - [weapons/gas.md](weapons/gas.md) — the poison gas streams

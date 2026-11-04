@@ -36,6 +36,10 @@ export interface DebugParts {
   /** How many .POG records the map carried, against how many were drawn. */
   objectCount: number
   camera: THREE.Camera
+  /** Draw the scene once through another lens, and the canvas it lands on: a paint
+   * check's own look at something (e2e/002/seams.spec.ts). */
+  drawThrough(lens: THREE.Camera): void
+  canvas: HTMLCanvasElement
   /** Every sound the battle has played, in order — out of the sound domain
    * (contracts/sound.ts), because a spec cannot listen. */
   sounds: () => string[]
@@ -228,6 +232,14 @@ export interface DebugParts {
  * is already there (the controller, the map selector, the HUD layout). */
 export function exposeBattleDebug(parts: DebugParts): void {
   const { game, query, obstruction, squad, dropIn, props, camera } = parts
+  /** The chase's own lens, stood somewhere else: the chase is not touched. */
+  const lookFrom = (eye: { x: number; y: number; z: number }, at: { x: number; y: number; z: number }): THREE.Camera => {
+    const lens = camera.clone()
+    lens.position.set(eye.x, eye.y, eye.z)
+    lens.lookAt(at.x, at.y, at.z)
+    lens.updateMatrixWorld(true)
+    return lens
+  }
   window.pow = {
     ...(window.pow ?? { controller }),
     // Beside `debug`, not in it: it is a play convenience like `pow.swapMap`,
@@ -421,6 +433,30 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** Where the chase camera actually is, world space — the only way a
        * spec can tell "swimming" from "the view has gone under the water". */
       camera: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
+      lensFrom: (eye, at) => {
+        const lens = lookFrom(eye, at)
+        return {
+          view: [...lens.matrixWorldInverse.elements],
+          projection: [...lens.projectionMatrix.elements],
+          width: parts.canvas.width,
+          height: parts.canvas.height
+        }
+      },
+      pixelsFrom: (eye, at, spots) => {
+        parts.drawThrough(lookFrom(eye, at))
+        const { canvas } = parts
+        const copy = document.createElement('canvas')
+        copy.width = canvas.width
+        copy.height = canvas.height
+        const context = copy.getContext('2d', { willReadFrequently: true })
+        if (!context) throw new Error('no 2d context to read the canvas back with')
+        context.drawImage(canvas, 0, 0)
+        const { data } = context.getImageData(0, 0, copy.width, copy.height)
+        return spots.map(([x, y]): [number, number, number] => {
+          const pixel = (y * copy.width + x) * 4
+          return [data[pixel], data[pixel + 1], data[pixel + 2]]
+        })
+      },
       /** …and which of the rig's views put it there (three/chase.ts). */
       view: () => parts.view(),
       brain: () => parts.brain(),

@@ -6,6 +6,8 @@
 import type { ActionEnd } from '../actions/actions'
 import type { Controller } from './controller'
 
+type Spot = { x: number; y: number; z: number }
+
 export interface DebugHooks {
   currentPig(): { x: number; z: number }
   currentHeading(): number
@@ -131,6 +133,13 @@ export interface DebugHooks {
   health(): { name: string; health: number }[]
   /** Where the chase camera actually is, world space. */
   camera(): { x: number; y: number; z: number }
+  /** The matrices of a look at the world from anywhere, and the canvas's size:
+   * what puts a point of the world on a pixel, for a paint check that needs to know
+   * which pixel to read (e2e/002/seams.spec.ts). World space, as `camera()` is. */
+  lensFrom(eye: Spot, at: Spot): { view: number[]; projection: number[]; width: number; height: number }
+  /** That look, drawn once on the canvas, and what these pixels of it came out as.
+   * The next frame draws over it, and nothing else about the battle moves. */
+  pixelsFrom(eye: Spot, at: Spot, spots: readonly (readonly [number, number])[]): [number, number, number][]
   /**
    * The dashboard's map, from the side it is drawn for: where it is centred
    * and turned, and one entry per marker on it.
