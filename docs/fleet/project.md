@@ -250,10 +250,11 @@ a slot that already exists is left alone. A slot brought to the base
 (`.claude/fleet/workflow.md` § Start from the base) runs `npm ci` in the code
 worktree when the move changed `package-lock.json`.
 
-**Made 2026-11-02: five slots.** Slots 1–3 are for readers and developers, 4
-and 5 for the two reviewers. The planner and the merger need no slot and run
-in the main checkout. A worker session is opened in its slot's code worktree;
-a reader works in the disasm worktree beside it.
+**Six slots.** Slots 1–3 are for readers and developers, 4 and 5 for the two
+reviewers, 6 for the one merger: its rebase push and branch delete need a
+slot's allow list. The planner needs no slot and runs in the main checkout. A
+worker session is opened in its slot's code worktree; a reader works in the
+disasm worktree beside it.
 
 ## Traps
 
