@@ -44,18 +44,23 @@ export function buildTextureMaterials(
   const fallback = new THREE.MeshStandardMaterial({ color: 0xe8a2a2, side: THREE.DoubleSide })
   return model.groups.map((group) => {
     const texture = textures[group.texture]
-    if (!texture) return fallback
-    const map = new THREE.DataTexture(texture.rgba, texture.width, texture.height, THREE.RGBAFormat)
-    // TIM rows are top-down; the V flip in the UV build assumes the data is
-    // not flipped again at upload.
-    map.flipY = false
-    map.magFilter = THREE.NearestFilter
-    map.minFilter = THREE.LinearFilter
-    map.colorSpace = THREE.SRGBColorSpace
-    map.needsUpdate = true
-    const options = { map, side: THREE.DoubleSide, alphaTest: 0.5 }
-    return lit ? new THREE.MeshStandardMaterial(options) : new THREE.MeshBasicMaterial(options)
+    return texture ? textureMaterial(texture, lit) : fallback
   })
+}
+
+/** One face group's material, its map named after its texture. */
+export function textureMaterial(texture: Texture, lit: boolean): THREE.Material {
+  const map = new THREE.DataTexture(texture.rgba, texture.width, texture.height, THREE.RGBAFormat)
+  map.name = texture.name
+  // TIM rows are top-down; the V flip in the UV build assumes the data is
+  // not flipped again at upload.
+  map.flipY = false
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.LinearFilter
+  map.colorSpace = THREE.SRGBColorSpace
+  map.needsUpdate = true
+  const options = { map, side: THREE.DoubleSide, alphaTest: 0.5 }
+  return lit ? new THREE.MeshStandardMaterial(options) : new THREE.MeshBasicMaterial(options)
 }
 
 /** Positions, normals, per-texture UVs and the draw groups. Skinning, where

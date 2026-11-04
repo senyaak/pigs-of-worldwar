@@ -99,6 +99,13 @@ export const CRATE_PITCH = 400
 export const CRATE_GAP = 768
 /** A crate's signpost stands this far beyond it, on the dummies' side. */
 export const SIGN_OFFSET = 384
+/**
+ * A signpost's stored yaw: the one that leaves the model as it was modelled
+ * (`modelRotationY`, lib/formats/pog.ts, is `yaw − π/2`). Its boards then look
+ * along ±x, across the crates at the side the pig walks along, where the record
+ * it is copied from looks along ±z and would show the pig its edge.
+ */
+export const SIGN_YAW = TURN / 4
 
 /** Where the n-th crate of the row stands — skill order, from +z across to −z. */
 export function crateAt(index: number): { x: number; z: number } {
@@ -152,16 +159,26 @@ const commandless = (fields: Int16Array): void => {
   for (const field of COMMAND_FIELDS) fields[field] = 0
 }
 
+/** A signpost and the skill of the crate beside it. The pairing is the proving
+ * ground's and lives here rather than on the record, where a kind-19 SIGN would
+ * be a pickup (lib/formats/pog.ts). */
+export interface ProvingSign {
+  id: MapObject['id']
+  skill: (typeof CRATE_SKILLS)[number]
+}
+
 /**
- * Everything the proving ground places, as POG records, ids from 1.
+ * Everything the proving ground places, as POG records, ids from 1, and which
+ * signpost stands for which skill.
  *
  * Nothing is held back and nothing drops in: no record carries a script
  * command (a crate's kind tag is its CONTENTS, and with no wait label it is on
  * the ground from the first frame — lib/game/script.ts), and the markers carry
  * no parachute bit.
  */
-export function provingGroundObjects(): MapObject[] {
+function layOut(): { objects: MapObject[]; signs: ProvingSign[] } {
   const objects: MapObject[] = []
+  const signs: ProvingSign[] = []
   const next = (): number => objects.length + 1
 
   // The two sides' markers: the player's pig first, carrying the scripted bit
@@ -193,7 +210,8 @@ export function provingGroundObjects(): MapObject[] {
         fields[16] = CRATE_ROUNDS
       })
     )
-    objects.push(placed(SIGN_SOURCE, next(), at.x + SIGN_OFFSET, at.z, 0, commandless))
+    signs.push({ id: next(), skill })
+    objects.push(placed(SIGN_SOURCE, next(), at.x + SIGN_OFFSET, at.z, SIGN_YAW, commandless))
   })
 
   // The vehicles and the emplacements.
@@ -201,5 +219,9 @@ export function provingGroundObjects(): MapObject[] {
     const at = MOUNTS_AT[source.name]
     objects.push(placed(source, next(), at.x, at.z, 0, commandless))
   }
-  return objects
+  return { objects, signs }
 }
+
+export const provingGroundObjects = (): MapObject[] => layOut().objects
+
+export const provingGroundSigns = (): ProvingSign[] => layOut().signs

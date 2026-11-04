@@ -138,6 +138,16 @@ export interface MapProp {
   /** The textures of the archive the model came out of — a face indexes its
    * own archive's `.mtd` (main/assets.ts, `LoadedProp`). */
   textures: Texture[]
+  /** Records of this model that wear art of their own on one face group — the
+   * proving ground's signposts, and nothing on a shipped map. */
+  boards: SignBoard[]
+}
+
+/** One record's board: which face group it replaces, and with what. */
+export interface SignBoard {
+  id: MapObject['id']
+  group: number
+  art: Texture
 }
 
 export type LoadMapObjectsResult =

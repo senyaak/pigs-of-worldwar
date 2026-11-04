@@ -188,8 +188,21 @@ export interface DebugHooks {
     /** How many props are faded because they stand between the camera and the
      * pig (three/props.ts). */
     faded: number
-    at: { name: string; x: number; y: number; z: number; order: number }[]
+    at: {
+      name: string
+      x: number
+      y: number
+      z: number
+      order: number
+      /** The texture each of its face groups is drawn in, off the mesh itself. */
+      maps: string[]
+      /** The sum of the colour bytes of its last group's texture. */
+      texels: number
+    }[]
   }
+  /** Where a SIGN's board is in the frame, as fractions of the canvas, or null
+   * if the record has no mesh. */
+  boardOnScreen(id: number): { left: number; top: number; right: number; bottom: number } | null
   /** The level's opening drop: who is still coming down under a canopy, and
    * how far up. `running` false is what says the battle has begun — nothing
    * else moves until it has (lib/game/parachute.ts). */

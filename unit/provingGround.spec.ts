@@ -9,7 +9,7 @@
 
 import { test, expect } from '@playwright/test'
 
-import { existsForPlayers, parachutesIn } from '../src/lib/formats/pog'
+import { existsForPlayers, modelRotationY, parachutesIn } from '../src/lib/formats/pog'
 import { TILE_WALL, TILE_WATER, TILES_PER_SIDE, TILE_STEP } from '../src/lib/formats/pmg'
 import { fielded, mapSquads } from '../src/lib/game/muster'
 import { mapSpawns } from '../src/lib/game/spawns'
@@ -25,7 +25,8 @@ import {
   DUMMIES_AT,
   PIG_AT,
   PROVING_GROUND,
-  provingGroundObjects
+  provingGroundObjects,
+  provingGroundSigns
 } from '../src/lib/game/provingGround'
 import {
   GROUND,
@@ -128,6 +129,43 @@ test('a signpost stands beside every crate', { tag: '@nodata' }, () => {
   for (const crate of pickupsOf(objects)) {
     const nearest = Math.min(...signs.map((sign) => Math.hypot(sign.x - crate.x, sign.z - crate.z)))
     expect(nearest, `the sign by skill ${crate.skill}`).toBeLessThanOrEqual(512)
+  }
+})
+
+test('each signpost stands for the skill of the crate nearest it', { tag: '@nodata' }, () => {
+  // [play] 2026-11-02, docs/todo/proving-ground.md: "A signpost by each crate
+  // showing the skill's icon."
+  const signs = provingGroundSigns()
+  const crates = pickupsOf(objects)
+  expect(signs.length).toBe(CRATE_SKILLS.length)
+  for (const { id, skill } of signs) {
+    const sign = objects.find((one) => one.id === id)
+    if (!sign) throw new Error(`no record ${id}`)
+    expect(sign.name).toBe('SIGN')
+    const nearest = crates.reduce((best, one) =>
+      Math.hypot(one.x - sign.x, one.z - sign.z) < Math.hypot(best.x - sign.x, best.z - sign.z) ? one : best
+    )
+    expect(nearest.skill, `sign ${id}`).toBe(skill)
+  }
+  expect(signs.map((one) => one.skill)).toEqual(CRATE_SKILLS)
+})
+
+test('a signpost is still no pickup: the pairing is not on the record', { tag: '@nodata' }, () => {
+  // lib/formats/pog.ts: a record with kind 19 in field 14 hands something over.
+  for (const sign of objects.filter((one) => one.name === 'SIGN')) {
+    expect(sign.fields[14], `sign ${sign.id}`).toBe(0)
+    expect(sign.contents, `sign ${sign.id}`).toBeNull()
+  }
+})
+
+test('every signpost shows its board to the side the pig walks along', { tag: '@nodata' }, () => {
+  // Measured off Maps/CAMP.MAD: the SIGN's board faces are square to the model's
+  // x. Unturned, they look along the world's x, at the crates and past them at
+  // the pig, whose strip runs +x; the source record's yaw of 0 would show him the
+  // edge.
+  for (const sign of objects.filter((one) => one.name === 'SIGN')) {
+    expect(modelRotationY(sign.yaw), `sign ${sign.id}`).toBeCloseTo(0, 6)
+    expect(sign.x, 'the crates and the pig are on the −x side of it').toBeGreaterThan(PIG_AT.x)
   }
 })
 

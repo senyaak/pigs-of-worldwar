@@ -20,10 +20,6 @@ What play asked for that it does not do yet:
   down stays down, and bringing every dummy down ends the battle as a win.
 - **A crate that was taken is back at the start of the next turn** — one round
   per crate per turn.
-- **A signpost by each crate showing the skill's icon.** The signposts stand
-  and are the plain SIGN model; the icons are the original's —
-  `Language/Tims/MENUTIMS.MAD` holds one 56×34 icon per skill, in skill order
-  (`skills/notes.md`, `SKILL_ICON` in `lib/game/skills.ts`).
 
 ## Why it matters beyond play
 

@@ -14,11 +14,20 @@ import { promises as fs } from 'node:fs'
 
 import { parsePtg } from '../lib/formats/ptg'
 import { SPAWNED_MODELS } from '../lib/game/ammo'
-import { provingGroundObjects } from '../lib/game/provingGround'
+import { provingGroundObjects, provingGroundSigns } from '../lib/game/provingGround'
 import { provingGroundBlocks } from '../lib/game/provingTerrain'
-import { GROUND_TEXTURES, PROVING_ARCHIVES, SPAWNED_ARCHIVE } from '../lib/game/provingSources'
-import { loadProps } from './assets'
-import type { LoadedMapObjects, LoadedProp, LoadedTerrain } from './assets'
+import { signBoardArt } from '../lib/game/provingSigns'
+import {
+  BOARD_TEXTURE,
+  GROUND_TEXTURES,
+  PROVING_ARCHIVES,
+  SIGN_ICONS,
+  SIGN_SOURCE,
+  SPAWNED_ARCHIVE
+} from '../lib/game/provingSources'
+import { SKILL_ICON } from '../lib/game/skills'
+import { loadArchiveBmps, loadProps } from './assets'
+import type { LoadedMapObjects, LoadedProp, LoadedTerrain, SignBoard, TimImage } from './assets'
 
 export interface LoadedProvingGround {
   terrain: LoadedTerrain
@@ -43,5 +52,25 @@ export async function loadProvingGround(resolve: (relPath: string) => string): P
   // rocket in flight — comes off a map archive too (lib/game/ammo.ts).
   props.push(...(await loadProps(resolve(SPAWNED_ARCHIVE), SPAWNED_MODELS)))
 
+  // Each signpost wears the skill of the crate beside it, in the menu's own art.
+  const icons = await loadArchiveBmps(resolve(SIGN_ICONS))
+  for (const prop of props) {
+    if (prop.name === SIGN_SOURCE.name) prop.boards = signBoards(prop, icons)
+  }
+
   return { terrain: { blocks: provingGroundBlocks(), textures }, objects: { objects, props } }
+}
+
+/** A board for every signpost: the group that wears the board's texture, with
+ * the icon `SKILL_ICON` names for its skill in place of it. */
+function signBoards(sign: LoadedProp, icons: TimImage[]): SignBoard[] {
+  const group = sign.model.groups.findIndex(
+    (one) => sign.textures[one.texture]?.name.toUpperCase() === BOARD_TEXTURE
+  )
+  if (group < 0) throw new Error(`${sign.name} has no face group in ${BOARD_TEXTURE}`)
+  return provingGroundSigns().map(({ id, skill }) => {
+    const icon = icons.find((one) => one.name === SKILL_ICON[skill])
+    if (!icon) throw new Error(`${SIGN_ICONS} has no icon ${SKILL_ICON[skill]} for skill ${skill}`)
+    return { id, group, art: signBoardArt(icon) }
+  })
 }

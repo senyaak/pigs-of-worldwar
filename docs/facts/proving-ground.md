@@ -87,7 +87,34 @@
   its own turn (0x4703A0, `weapons/gas.md`). `lib/game/battle/machine.ts`,
   `isProvingGround` in `lib/game/provingGround.ts`.
 
+- `[play]` **Each signpost wears the icon of the crate beside it**: "A signpost
+  by each crate showing the skill's icon", 2026-11-02. The icon is the same
+  picture the skill menu shows, out of `Language/Tims/MENUTIMS.MAD`, one 56×34
+  BMP per skill named by `SKILL_ICON` (`skills/notes.md` § "The menu's art",
+  `lib/game/skills.ts`). Which sign stands for which skill is
+  `provingGroundSigns` in `lib/game/provingGround.ts`, and not on the record,
+  where kind 19 would make a SIGN a pickup. The icon is on the record's own mesh
+  (`three/signBoards.ts`), so a sign that is shot down takes it along and a sign
+  that fades fades whole. No shipped map's SIGN carries one.
+
+- `[deliberate]` **How the icon sits on the sign** is the remake's, the original
+  having no proving ground. It replaces the board's texture outright: the skull
+  would show round a 56×34 picture, and the icon's punched black would be holes,
+  so it stands in the middle of a black square (`lib/game/provingSigns.ts`). A
+  sign here is turned to stored yaw 1024, which leaves the model as modelled and
+  looks its boards along ±x, at the crates and the pig; yaw 0, the source
+  record's, would show him the edge.
+
+- `[measured]` **The SIGN's board**, read off `Maps/CAMP.MAD` with `loadProps`
+  (`main/assets.ts`) on 2026-11-04. The model is two face groups: the post and
+  the board's edge in SIGN001.TIM, and the board's two big faces in SIGN000.TIM,
+  a skull and crossbones on wood. The board is 376×377 model units, so square, on
+  the faces at x = −54 and x = +56. Both faces carry the same U along z, so a
+  picture reads the right way round from the −x side and mirrored from the +x
+  side, which a symmetrical skull never shows. `three/signBoards.ts` runs the +x
+  face the other way for an icon; `e2e/002/proving-ground.spec.ts` reads both
+  sides off the canvas.
+
 - `[gap]` **What it does not do yet** is listed in
   [../todo/proving-ground.md](../todo/proving-ground.md): a dummy brought down
-  stays down, a taken crate stays taken, and the signposts are the plain SIGN
-  model.
+  stays down and a taken crate stays taken.

@@ -11,6 +11,7 @@
 import * as THREE from 'three'
 import type { MapObject, MapProp } from '../api'
 import { buildModelGeometry, buildTextureMaterials, disposeMesh } from './modelMesh'
+import { signBoardLooks } from './signBoards'
 import { modelRotationY } from '../../../lib/formats/pog'
 import { RAMP_TILT, isRamp } from '../../../lib/game/ramps'
 import { MODEL_SCALE } from '../../../lib/game/scale'
@@ -103,8 +104,11 @@ export interface MapProps {
 export function buildMapProps(objects: MapObject[], props: MapProp[]): MapProps {
   const group = new THREE.Group()
   const built = new Map<string, { geometry: THREE.BufferGeometry; materials: THREE.Material[] }>()
+  /** Which entry of `built` a record is drawn with, when it is not its model's
+   * own: a proving-ground signpost wears a board of its own (three/signBoards.ts). */
+  const lookById = new Map<number, string>()
   for (const prop of props) {
-    built.set(prop.name, {
+    const look = {
       // Each in its OWN archive's textures: a face group's texture index is a
       // place in the .mtd the model was read with, and the proving ground
       // draws out of four of them (main/provingGround.ts).
@@ -116,8 +120,16 @@ export function buildMapProps(objects: MapObject[], props: MapProp[]): MapProps 
       // puts them on the same footing as the ground, which has always been unlit
       // because the art carries its own light.
       materials: buildTextureMaterials(prop.model, prop.textures, { lit: false })
-    })
+    }
+    built.set(prop.name, look)
+    for (const [id, worn] of signBoardLooks(prop, look)) {
+      const key = `${prop.name}#${id}`
+      built.set(key, worn)
+      lookById.set(id, key)
+    }
   }
+  /** The entry of `built` that draws this record. */
+  const lookOf = (id: number, name: string): string => lookById.get(id) ?? name
 
   /**
    * A see-through copy of each model's materials, made on demand.
@@ -209,7 +221,7 @@ export function buildMapProps(objects: MapObject[], props: MapProp[]): MapProps 
    * can be set back on its own spot. */
   const restingY = new Map<number, number>()
   for (const object of objects) {
-    const model = built.get(object.name)
+    const model = built.get(lookOf(object.id, object.name))
     if (!model) continue
     const mesh = new THREE.Mesh(model.geometry, model.materials)
     mesh.name = object.name
@@ -285,7 +297,7 @@ export function buildMapProps(objects: MapObject[], props: MapProp[]): MapProps 
       for (const id of dim) {
         if (want.has(id)) continue
         const mesh = byId.get(id)
-        const solid = mesh && built.get(mesh.name)
+        const solid = mesh && built.get(lookOf(id, mesh.name))
         if (mesh && solid) {
           mesh.material = solid.materials
           // Back to the record's own slot in the draw order — the flicker fix.
@@ -297,13 +309,13 @@ export function buildMapProps(objects: MapObject[], props: MapProp[]): MapProps 
       for (const id of want) {
         if (dim.has(id)) continue
         const mesh = byId.get(id)
-        const ghost = mesh && ghostOf(mesh.name)
+        const ghost = mesh && ghostOf(lookOf(id, mesh.name))
         if (!mesh || !ghost) continue
         mesh.material = ghost
         mesh.renderOrder = FADE_ART_ORDER
         let mask = maskById.get(id)
         if (!mask) {
-          const materials = maskOf(mesh.name)
+          const materials = maskOf(lookOf(id, mesh.name))
           if (materials) {
             // A child inherits the record's whole transform, so its depth is
             // the art's own to the last bit — which `EqualDepth` counts on.

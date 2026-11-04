@@ -433,6 +433,16 @@ export interface LoadedProp {
    * several archives (the proving ground, main/provingGround.ts) does not.
    */
   textures: (Tim & { name: string })[]
+  /** Records of this model that wear art of their own on one face group. Only
+   * the proving ground's signposts do (main/provingGround.ts). */
+  boards: SignBoard[]
+}
+
+/** One record's board: which face group it replaces, and with what. */
+export interface SignBoard {
+  id: MapObject['id']
+  group: number
+  art: TimImage
 }
 
 export interface LoadedMapObjects {
@@ -468,7 +478,7 @@ export async function loadProps(madPath: string, names: Iterable<string>): Promi
     const no2 = bytes(`${name}.NO2`)
     const fac = bytes(`${name}.FAC`)
     if (!vtx || !no2 || !fac) continue
-    props.push({ name, model: parseModel(vtx, no2, fac), textures })
+    props.push({ name, model: parseModel(vtx, no2, fac), textures, boards: [] })
   }
   return props
 }

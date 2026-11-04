@@ -18,6 +18,7 @@ import { surfaceUnder } from '../../../lib/game/footsteps'
 import type { Obstruction } from '../../../lib/game/obstacles'
 import type { DropIn } from '../../../lib/game/dropIn'
 import type { MapProps } from './props'
+import { boardOnScreen, boardTexels, drawnMaps } from './signBoards'
 import type { Blip, Eye } from '../../../lib/game/scanner'
 import { skinOf } from '../../../lib/game/nations'
 import type { Squad } from './squad'
@@ -400,9 +401,17 @@ export function exposeBattleDebug(parts: DebugParts): void {
           // …and WHEN it is drawn. Not decoration: CAMP's house has twelve pairs
           // of coplanar wall faces, and a FIXED draw order is the whole of why
           // they stop flickering (three/props.ts).
-          order: mesh.renderOrder
+          order: mesh.renderOrder,
+          // What it is drawn in, off the mesh's own materials.
+          maps: drawnMaps(mesh),
+          texels: boardTexels(mesh)
         }))
       }),
+      /** Where a SIGN's board is in the frame (three/signBoards.ts). */
+      boardOnScreen: (id: number) => {
+        const mesh = props.meshOf(id)
+        return mesh ? boardOnScreen(mesh, camera) : null
+      },
       /** Where the chase camera actually is, world space — the only way a
        * spec can tell "swimming" from "the view has gone under the water". */
       camera: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),

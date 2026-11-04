@@ -147,6 +147,19 @@ export const PROVING_ARCHIVES: readonly { archive: string; models: readonly stri
   { archive: 'Maps/BAY.MAD', models: ['AMLAUNCH'] }
 ]
 
+/**
+ * The skill icons a signpost wears: the skill menu's own art, one 56×34 BMP per
+ * skill, named after it (`skills/notes.md` § "The menu's art", `SKILL_ICON`).
+ */
+export const SIGN_ICONS = 'Language/Tims/MENUTIMS.MAD'
+
+/**
+ * The texture of the SIGN's board, which the icon stands in for. Measured off
+ * `Maps/CAMP.MAD`: the model is two face groups, the post and frame in
+ * SIGN001.TIM and the board's two big faces in this one.
+ */
+export const BOARD_TEXTURE = 'SIGN000.TIM'
+
 /** The archive the engine-spawned models (a mine on the ground, a rocket in
  * flight, the boots a death leaves) are drawn out of — CAMP's, like the
  * crates. */
