@@ -103,7 +103,11 @@
   so it stands in the middle of a black square (`lib/game/provingSigns.ts`). A
   sign here is turned to stored yaw 1024, which leaves the model as modelled and
   looks its boards along ±x, at the crates and the pig; yaw 0, the source
-  record's, would show him the edge.
+  record's, would show him the edge. The collider turns with the sign (`boxOf`,
+  `lib/game/obstacles.ts`), so at that yaw the box's 256 lies along the row, and
+  the row stands at 512 a crate (`CRATE_PITCH`). That leaves 256 between two
+  signs' boxes, room for the pig's body of 170 across with 86 to spare, and
+  1280 at the strip's gap. `unit/provingGround.spec.ts` walks it.
 
 - `[measured]` **The SIGN's board**, read off `Maps/CAMP.MAD` with `loadProps`
   (`main/assets.ts`) on 2026-11-04. The model is two face groups: the post and

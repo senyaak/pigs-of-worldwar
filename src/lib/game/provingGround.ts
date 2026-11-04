@@ -90,11 +90,17 @@ export const DUMMIES_AT: readonly { x: number; z: number }[] = [1024, 2560, 4608
  * The crate row: across the strip, one stride in front of the pig, with a gap
  * where the strip runs so nothing stands in the line of fire. A crate's box is
  * 192×256 and a pig reaches 85 past its own centre (lib/game/pickups.ts,
- * `reached`), so 400 between crates is more than any one standing point can
+ * `reached`), so 512 between crates is more than any one standing point can
  * span — walking the row takes them one at a time.
+ *
+ * The signposts stand at the same pitch, and that is what sets it: at
+ * `SIGN_YAW` a sign's box lies 256 along the row (lib/game/obstacles.ts,
+ * `boxOf`), which leaves 256 between two of them, room for the pig's 170 across
+ * (`PIG_RADIUS`) and for the drawn pig's 182 to 195. At 400 they stood 144
+ * apart, and the row was a fence.
  */
 export const CRATE_ROW_X = -768
-export const CRATE_PITCH = 400
+export const CRATE_PITCH = 512
 /** The first crate either side of the strip's middle. */
 export const CRATE_GAP = 768
 /** A crate's signpost stands this far beyond it, on the dummies' side. */

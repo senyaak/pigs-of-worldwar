@@ -84,9 +84,6 @@ export const SKILL_ICON = [
   'clustair', 'in-out', 'pbox', 'getout', 'map', 'zoomin', 'sleep', 'surrend'
 ]
 
-/** An entry name out of `MENUTIMS.MAD`, as `SKILL_ICON` holds them. */
-export type SkillIcon = (typeof SKILL_ICON)[number]
-
 /** How many skills the list names. */
 export const SKILL_COUNT = SKILL_LINE.length
 

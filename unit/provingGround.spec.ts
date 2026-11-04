@@ -11,7 +11,9 @@ import { test, expect } from '@playwright/test'
 
 import { existsForPlayers, modelRotationY, parachutesIn } from '../src/lib/formats/pog'
 import { TILE_WALL, TILE_WATER, TILES_PER_SIDE, TILE_STEP } from '../src/lib/formats/pmg'
+import { WALL_CLIMB } from '../src/lib/game/locomotion'
 import { fielded, mapSquads } from '../src/lib/game/muster'
+import { ObstacleField } from '../src/lib/game/obstacles'
 import { mapSpawns } from '../src/lib/game/spawns'
 import { pickupsOf, reached } from '../src/lib/game/pickups'
 import { skillFromCrate } from '../src/lib/game/skills'
@@ -133,7 +135,7 @@ test('a signpost stands beside every crate', { tag: '@nodata' }, () => {
 })
 
 test('each signpost stands for the skill of the crate nearest it', { tag: '@nodata' }, () => {
-  // [play] 2026-11-02, docs/todo/proving-ground.md: "A signpost by each crate
+  // [play] 2026-11-02, docs/facts/proving-ground.md: "A signpost by each crate
   // showing the skill's icon."
   const signs = provingGroundSigns()
   const crates = pickupsOf(objects)
@@ -167,6 +169,39 @@ test('every signpost shows its board to the side the pig walks along', { tag: '@
     expect(modelRotationY(sign.yaw), `sign ${sign.id}`).toBeCloseTo(0, 6)
     expect(sign.x, 'the crates and the pig are on the −x side of it').toBeGreaterThan(PIG_AT.x)
   }
+})
+
+test('a pig fits between any two neighbouring signposts', { tag: '@nodata' }, () => {
+  // [deliberate] docs/facts/proving-ground.md: the sign's collider turns with it,
+  // and the row must stay something to walk through. `blocks` carries the pig's
+  // own body (PIG_RADIUS, lib/game/obstacles.ts), so a spot it leaves free is a
+  // spot the whole pig stands on. WALL_CLIMB is the walking pig's envelope
+  // (lib/game/locomotion.ts).
+  const field = new ObstacleField(objects)
+  const refused = (x: number, z: number): boolean => field.blocks(x, z, ground.height(x, z), WALL_CLIMB)
+  const signs = objects.filter((one) => one.name === 'SIGN').sort((a, b) => a.z - b.z)
+  expect(signs.length).toBe(CRATE_SKILLS.length)
+  const step = 4
+  /** Each pair with no free spot along the row between its two signs. */
+  const shut: number[] = []
+  /** Each spot the walk straight across the row, midway between a pair, stops at. */
+  const stopped: string[] = []
+  signs.slice(1).forEach((far, i) => {
+    const near = signs[i]
+    expect(far.x, 'the pair stands in one row').toBe(near.x)
+    // Not an empty search: each sign of the pair does stop a pig.
+    expect(refused(near.x, near.z), `the sign at z ${near.z}`).toBe(true)
+    expect(refused(far.x, far.z), `the sign at z ${far.z}`).toBe(true)
+    let free = 0
+    for (let z = near.z; z <= far.z; z += step) if (!refused(near.x, z)) free++
+    if (free === 0) shut.push(near.z)
+    const middle = (near.z + far.z) / 2
+    for (let x = near.x - 256; x <= near.x + 256; x += step) {
+      if (refused(x, middle)) stopped.push(`(${x}, ${middle})`)
+    }
+  })
+  expect(shut, 'the z of each sign with no room for a pig on its +z side').toEqual([])
+  expect(stopped).toEqual([])
 })
 
 test('one of each vehicle and each emplacement', { tag: '@nodata' }, () => {
