@@ -22,6 +22,7 @@
 import { clipSeconds } from './clips'
 import type { ClipTiming } from './clips'
 import type { Pig } from './game'
+import { PHASE_UNITS } from './melee'
 
 export interface WornClip {
   /** The clip index, or null for the bind pose. */
@@ -59,7 +60,7 @@ export interface Anim {
    * free; asking for a different one CANCELS a committed clip. */
   setClip(pig: Pig, index: number | null): void
   /** Commit to a clip played through once, holding its last frame. */
-  playOnce(pig: Pig, index: number): void
+  playOnce(pig: Pig, index: number, fromPhase?: number): void
   /** Lay a clip's upper body over whatever is worn, held at `phase`; -1
    * clears it. */
   overlay(pig: Pig, index: number, phase: number): void
@@ -80,15 +81,11 @@ export function createAnim(clips: ClipTiming[]): Anim {
   const over = new Map<Pig, WornOverlay>()
   let revision = 0
 
-  const start = (pig: Pig, index: number | null, once: boolean): void => {
+  const start = (pig: Pig, index: number | null, once: boolean, fromPhase = 0): void => {
     revision++
-    worn.set(pig, {
-      index,
-      once,
-      revision,
-      left: once && index !== null ? clipSeconds(clips[index]) : 0,
-      elapsed: 0
-    })
+    const whole = once && index !== null ? clipSeconds(clips[index]) : 0
+    const elapsed = (whole * fromPhase) / PHASE_UNITS
+    worn.set(pig, { index, once, revision, left: whole - elapsed, elapsed })
   }
 
   return {
@@ -100,8 +97,8 @@ export function createAnim(clips: ClipTiming[]): Anim {
       if (now && now.index === index && !now.once) return
       start(pig, index, false)
     },
-    playOnce(pig, index) {
-      start(pig, index, true)
+    playOnce(pig, index, fromPhase) {
+      start(pig, index, true, fromPhase)
     },
     overlay(pig, index, phase) {
       if (index < 0) over.delete(pig)

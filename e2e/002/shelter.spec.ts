@@ -49,7 +49,15 @@ import {
   buildingSkills
 } from '../../src/lib/game/buildings'
 import { choosableIn, createIndoors } from '../../src/lib/game/indoors'
-import { DOOR_FROM, DOOR_TO, advanceCarry, carryIn } from '../../src/lib/game/doorway'
+import {
+  DOOR_FRAMES,
+  DOOR_FROM,
+  DOOR_STEPS,
+  DOOR_TO,
+  advanceCarry,
+  carryIn,
+  exitHeading
+} from '../../src/lib/game/doorway'
 import { PHASE_UNITS } from '../../src/lib/game/melee'
 import { sightBlockers } from '../../src/lib/game/seeThrough'
 import { ObstacleField, boxOf, isSolid } from '../../src/lib/game/obstacles'
@@ -235,9 +243,9 @@ test('the menu INSIDE is the building\'s, and a shelter offers only SKIP TURN', 
 
 test('the way IN is CLIP 7, and the archive says it is a climb', () => {
   // Play: "там просто анимация входа — запрыгивание", against a first pass of mine
-  // that claimed there was none. Wrong, and wrong in a specific way: it read the
-  // door ARM (0x469f21..0x469fb4), which sets no clip, and stopped — when the arm
-  // is reached FROM `Pig::Attack`, which has already put the skill's own clip on.
+  // that claimed there was none. Wrong, and wrong in a specific way: it read a door
+  // ARM, which sets no clip, and stopped — when the arm is reached FROM
+  // `Pig::Attack`, which has already put the skill's own clip on.
   //
   // WHERE that clip is comes off `Pig::Attack` itself (0x469696): five 16-byte
   // slots per skill at `0x4d7320 + skill*80 + slot*16`. The pin on the reading is
@@ -282,7 +290,7 @@ test('the CLIP says when he leaves the ground: nothing moves for the first half'
   const building = createIndoors(CAMP, () => {}).all()[0]
   const from = { x: SHELTER.x + 900, y: query.height(SHELTER.x + 900, SHELTER.z), z: SHELTER.z }
   const whole = 2 // seconds of clip, round for the arithmetic
-  const one = carryIn(building, from, whole)
+  const one = carryIn(building, from, whole, false)
   const footing = createLocomotion(query, from.x, from.z, 0, {
     y: from.y,
     obstruction: new ObstacleField(CAMP)
@@ -295,7 +303,11 @@ test('the CLIP says when he leaves the ground: nothing moves for the first half'
   // …then it travels, and it is DONE before the clip is — the last fifth is his
   // own again.
   advanceCarry(one, footing, (whole * (DOOR_TO - DOOR_FROM)) / PHASE_UNITS + 0.02)
-  expect(Math.abs(footing.x - building.box.x), 'arrived at the middle').toBeLessThan(1)
+  // exe: objects/getting-inside.md, 0x46A2DA and 0x46E148 — seventeen in the divisor
+  // and eighteen frames of it, so he finishes that far past the middle.
+  const past = footing.x - building.box.x
+  const reach = from.x - building.box.x
+  expect(past, 'went past the middle').toBeCloseTo(reach - (reach * DOOR_FRAMES) / DOOR_STEPS, 3)
   expect(one.left, 'and the carry is spent with clip left to run').toBe(0)
 })
 
@@ -355,10 +367,10 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
   expect((await shelter(page)).inside, 'he was inside before the clip ran').toBeNull()
   expect((await shelter(page)).drawn, 'and he is on screen for it').toBe(true)
   // **AND THE CLIP CARRIES HIM INTO THE MIDDLE.** Play: "свин прыгает на месте —
-  // должен прыгать в центр строения." The arm sets a per-frame step at
-  // `[pig+0x210..0x214]` from where he stands to the building's own transform and
-  // the pig's update adds it every frame (lib/game/doorway.ts), so he is nearer
-  // the middle a moment into the clip than he was at the door.
+  // должен прыгать в центр строения." The arm sets a per-frame step from where he
+  // stands to the building's own transform and the pig's update adds it every frame
+  // (lib/game/doorway.ts), so he is nearer the middle a moment into the clip than he
+  // was at the door.
   const reach = Math.hypot(doorstep.x - box.x, doorstep.z - box.z)
   await expect
     .poll(
@@ -403,7 +415,7 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
 
   // **AND OUT OF THE MIDDLE, STRAIGHT UP.** Play: "должен … выпрыгивать из центра
   // строения наверх", and the exe says the same thing in one line: the leave arm
-  // WRITES the x and z steps as zero (0x46a150, 0x46a15e) and gives only the
+  // WRITES the x and z steps as zero (0x46A150, 0x46A15E) and gives only the
   // vertical a value. So he reappears at the building's own middle and rises,
   // and nothing moves him sideways while he does.
   await tap(page, 'enter')
@@ -422,13 +434,14 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
     )
     .toBeLessThan(32)
   const out = await debugState(page)
-  // …rising. Game space is Y-DOWN, so going up is the number going DOWN.
-  //
-  // POLLED, and that is the clip's own doing: nothing moves for the first half of
-  // it. The glide runs between clip 7's events 68 and 69 — phases 1950 and 3300
-  // of 4096 — so he stands in the doorway for a second before he leaves the
-  // ground (lib/game/doorway.ts, and play asked for exactly that: "свина надо
-  // двигать после начала прыжка, не во время подготовки").
+  // exe: objects/getting-inside.md, 0x46A123 on 0x43F3A3 — he comes out turned off
+  // the building's own yaw, not the way he walked in.
+  const facing = exitHeading(createIndoors(CAMP, () => {}).all()[0])
+  expect(Math.sin(out.heading), 'the way he faces coming out').toBeCloseTo(Math.sin(facing), 3)
+  expect(Math.cos(out.heading), 'the way he faces coming out').toBeCloseTo(Math.cos(facing), 3)
+  // …rising. Game space is Y-DOWN, so going up is the number going DOWN. POLLED
+  // only for the frames the door block takes to start: the arm puts the clip's
+  // cursor on event 68 at once (0x46A200), so there is no crouch on the way out.
   await expect
     .poll(async () => (await debugState(page)).nodeY, {
       timeout: 4000,
@@ -440,12 +453,9 @@ test('IN THE APP: the pig jumps into the shelter and is gone from the picture', 
     .toBeLessThan(1)
 
   // **AND HE STAYS UP.** Play: "выпрыгивание не работает — проваливаюсь обратно
-  // сквозь крышу." The leap used to end wherever its last frame left him — a few
-  // units UNDER the box's top, because the clip and the glide finish a frame
-  // apart — and `standOn` counts nothing above the feet, so there was no support
-  // and he fell the whole 352 back to the ground inside the shelter. The door
-  // ends it ON the roof plane now and hands him to gravity from there
-  // (lib/game/battle.ts).
+  // сквозь крышу." The glide aims at the first clear step over the roof
+  // (lib/game/doorway.ts, `clearHeight`) and the door hands him to gravity from
+  // where it left him, which is above the box (lib/game/battle/doors.ts).
   // The rise takes the clip's own length, so wait it out and THEN watch: the
   // question is where he is left, not where he passes through.
   await expect

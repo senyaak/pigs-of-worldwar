@@ -12,12 +12,12 @@
 // in the remake's pig wants a field for it.
 //
 // **Being inside means NOT BEING DRAWN**, and that is the exe's own rule rather
-// than a choice: both doors — 0x469f60 in and 0x469b60 out, and the loader's own
-// boarding at 0x47d717 — do the same two things to the pig, `[body+0x44] |= 1`
-// and **`[pig+0x30] = 0`**, and that second byte is the gate the draw loop tests
-// every object on (0x44e43e). So a pig in a shelter is gone from the picture, and
-// there is nothing behind the wall to see through it (see `seeThrough.ts`, which
-// is why the shelter is not faded).
+// than a choice: the clip's end taking a pig in (building 0x47CB64, vehicle
+// 0x47CAB0) and the loader's own boarding at 0x47D723 clear the byte the draw loop
+// tests every object on (0x44E43E), and take its body out of the collision sweep.
+// So a pig in a shelter is gone from the picture, and there is nothing behind the
+// wall to see through it (see `seeThrough.ts`, which is why the shelter is not
+// faded).
 //
 // Pure, and game space (Y-down) like the rest of lib/game.
 
@@ -84,8 +84,8 @@ export interface Indoors {
   occupants(id: number): number
   /**
    * Put the pig in, if it can go: something in reach with room in it. True when
-   * it went. The pig is moved to the building's own middle, which is what the
-   * exe does (0x469fde copies the building's transform onto the pig).
+   * it went. The pig is moved to the mount's own middle, which is where the glide
+   * in aimed it (lib/game/doorway.ts).
    *
    * `footing` is what it was standing on at the door, kept whole so that
    * leaving can put it back rather than derive a new one.
@@ -208,8 +208,8 @@ export function createIndoors(objects: readonly MapObject[], emit: Emit): Indoor
       const building = this.reachable(pig)
       if (!building) return false
       held.set(pig.id, { building: building.id, footing: copyLocomotion(footing) })
-      // Into the middle of it, the way the exe puts him on the building's own
-      // transform. He is not drawn from here, so where exactly hardly shows —
+      // Into the middle of it, where the glide aimed him. He is not drawn from
+      // here, so where exactly hardly shows —
       // but the CAMERA still watches this point, and the middle is what reads as
       // "he is in there".
       pig.position.x = building.box.x

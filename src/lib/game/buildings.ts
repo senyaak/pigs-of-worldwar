@@ -190,8 +190,9 @@ export const barrelRange = (kind: number): readonly [number, number] | null =>
  *
  * Play: "там просто анимация входа — запрыгивание", against a first pass of mine
  * that said there was none. That was wrong, and wrong in a way worth keeping:
- * it looked at the door ARM (0x469f21..0x469fb4), found no `Pig::SetAnim` there
- * and stopped. The arm does not need one — it is reached FROM `Pig::Attack`
+ * it looked at a door ARM (the vehicle's IN, 0x469F21, read then as the building's
+ * own, which is 0x46A228), found no `Pig::SetAnim` there and stopped. The arm does
+ * not need one — it is reached FROM `Pig::Attack`
  * (0x469610), which has already put the skill's own clip on the primary channel.
  * The very path the mine's "Lay Mine" clip 77 comes down. **A failed search means
  * the wrong place was read, never that the mechanic is absent.**
@@ -221,8 +222,9 @@ export const barrelRange = (kind: number): readonly [number, number] | null =>
  * phases 300, 975, 1800, 1950 and 3300 — where an ordinary clip has one or none.
  * A long, multi-beat climb.
  *
- * What those five events DO is not decoded, so the remake changes the state when
- * the clip ENDS rather than on one of them.
+ * Going in or out is settled when the clip ENDS, and that is read: 60 and 61 are
+ * in the set `0x473600` hands to the shot at the end of the sequence (0x46E3E9),
+ * and their arms in the fire table are the toggles (0x47C8A6, 0x47CB13).
  */
 export const INOUT_CLIP = 7
 

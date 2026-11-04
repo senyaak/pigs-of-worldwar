@@ -1,16 +1,10 @@
 # Readings the notes cleanup changed — check the remake against each
 
 Splitting the disasm notes re-checked every place two readings disagreed, with
-`tools/xdis.py`, and four came out different from what the remake may have
+`tools/xdis.py`, and these came out different from what the remake may have
 been built on. Each is a check first: what the remake does, against what the
-exe does, and what play sees. Nothing has been changed in the code.
+exe does, and what play sees. Nothing has been changed in the code for them.
 
-1. **The building door.** The arm read as the building's IN (0x469F21, the
-   glide steps 0x46A032/0x46A08C/0x46A0E4) is the VEHICLE's; the building's
-   starts at 0x46A228 (its own steps 0x46A338/0x46A392/0x46A3EA), and
-   0x469B60 is the 57 SPECIAL OPS airlift rather than the door's way out.
-   Disasm `objects/getting-inside.md` has the four arms in a table. Against
-   `lib/game/doorway.ts` and `lib/game/buildings.ts`.
 3. **The charge's burning fuse**, effect 0x1D, is updated by 0x48B85C: ten
    cloud records relaunched in a narrow cone, orange — not the dark smoke of
    0x48AD9D, which is id 0x22's. Disasm `effects/fuse.md`. Against

@@ -39,6 +39,7 @@ of the form `weapons/fire.md` are in the **disasm repo**, never in this tree.
 - [camera.md](camera.md) — a flight is kept inside the middle 60% of the frame
 - [code-layout.md](code-layout.md) — the domains, fixed steps and one random stream, the brain's process, the snapshot, the bus
 - [debrief.md](debrief.md) — who the debrief lists, the training ground's debrief, the roster's deaths
+- [doors.md](doors.md) — the four door arms: the glide's window and steps, the way out of a building and of a vehicle
 - [effects.md](effects.md) — an explosion's sprites and puffs, an effect's collider
 - [heal.md](heal.md) — a refused heal says why, the medicine ball's cloud
 - [hud.md](hud.md) — the name plates' font, the dashboard's own numbers, the gauge and icons

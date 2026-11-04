@@ -8,6 +8,7 @@ import type { EndOfGame } from '../endOfGame'
 import type { Game, Pig } from '../game'
 import { createLocomotion } from '../locomotion'
 import type { LocomotionState } from '../locomotion'
+import type { MountClass } from '../mounts'
 import type { Order } from '../orders'
 import { noTally } from '../sergeant'
 import type { TurnTally } from '../sergeant'
@@ -66,11 +67,10 @@ export interface BattleState {
   /** A script step owed to something that has broken, and not run until it has
    * finished breaking. One animation at a time. */
   pending: { id: number; y: number } | null
-  /** The pig on its way back OUT of a building, playing the same clip going in
-   * uses — it rises out of the middle while it runs (lib/game/doorway.ts) — and
-   * the ROOF it is rising to, which is what it has to be given as a footing when
-   * the door lets go. */
-  leaving: { pig: Pig; roof: number } | null
+  /** The pig on its way back OUT of a mount, playing the last of the clip going
+   * in plays whole (lib/game/doorway.ts), and which class of mount: the two let go
+   * of it differently. */
+  leaving: { pig: Pig; mount: MountClass } | null
   /** …and what the door is adding to its position this frame, either way. */
   carry: Carry | null
   /** The footing a pig going IN is leaving behind, kept whole for the door to
