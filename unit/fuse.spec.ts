@@ -1,11 +1,12 @@
 // PHASE 002 (domain) — a planted charge's burning fuse, effect 0x1D. Pure.
 //
 // Every number below is asserted against the reading in the disasm repo's
-// `effects/fuse.md` and `effects/cloud.md`, not against what the code came to.
+// `effects/fuse.md`, `effects/cloud.md` and `library/notes.md`, not against what the
+// code came to.
 
 import { test, expect } from '@playwright/test'
 
-import { cloudSize } from '../src/lib/game/cloud'
+import { cloudSize, cloudWidth } from '../src/lib/game/cloud'
 import { FUSE_LIFT, FUSE_TRAIL, advanceFuse, beginFuse, fuseSpent } from '../src/lib/game/fuse'
 
 /** A fixed roll, so a run is the same run every time. */
@@ -43,9 +44,6 @@ test('the row: the count, the cone and the colour', { tag: '@nodata' }, () => {
   expect(FUSE_TRAIL.blue).toBe(0)
   // exe: effects/fuse.md, 0x432442 — hung 0x3C up the charge.
   expect(FUSE_LIFT).toBe(0x3c)
-  // play: "в оригинале там не дым а искры когда он горит" — lit, the one ruling
-  // on the row (docs/facts/effects.md).
-  expect(FUSE_TRAIL.spark).toBe(true)
 })
 
 test('every record is its own orange, and keeps it', { tag: '@nodata' }, () => {
@@ -70,8 +68,9 @@ test('every record is its own orange, and keeps it', { tag: '@nodata' }, () => {
 test('one record a frame goes back to the tip, in turn', { tag: '@nodata' }, () => {
   const roll = rolling()
   const fuse = beginFuse(roll)
-  // exe: effects/fuse.md, 0x48B85C — the counter [+0x9C] wrapped on ten, and it
-  // has already ticked by the time the arm reads it (0x48A5D6), so record 1 is first.
+  // exe: effects/fuse.md, 0x48B85C — the counter [+0x9C] wrapped on ten, and § The
+  // frame, 0x48A5D6 — it has already ticked by the time the arm reads it, so record 1
+  // is first.
   for (let frame = 1; frame <= 25; frame++) {
     advanceFuse(fuse, true, roll)
     const renewed = fuse.blobs[frame % 10]
@@ -139,9 +138,13 @@ test('it never times out, and it does not outlive the charge', { tag: '@nodata' 
   }
   // exe: effects/cloud.md, 0x489FA0 — (200 − age) · 4 · 12.5, at the pinned age.
   expect(cloudSize(fuse)).toBe(5500)
-  // exe: 0x48A607 parks the effect when the parent has gone and the arm is gated
-  // on that (0x48A9A4), so the step's +5 runs on: 95 still draws (effects/cloud.md,
-  // the draw's gate under 100) and 100 does not.
+  // exe: library/notes.md, § The SIZE unit, _d3d.dll 0x1000F1B4 — the size over the
+  // depth alone, a position's focal length 480 (0x100076B1, the 640x480 of 0x44E0FE),
+  // and the quad's whole width (0x1000F292).
+  expect(cloudWidth(fuse)).toBeCloseTo(5500 / 480, 5)
+  // exe: effects/fuse.md, § The frame, 0x48A607 — parks the effect when the parent
+  // has gone, and the arm is gated on that (0x48A9A4), so the step's +5 runs on: 95
+  // still draws (effects/cloud.md, the draw's gate under 100) and 100 does not.
   advanceFuse(fuse, false, lowest)
   expect(fuse.age).toBe(95)
   expect(fuseSpent(fuse)).toBe(false)

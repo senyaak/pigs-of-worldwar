@@ -30,9 +30,10 @@ const lobs = (page: Page): Promise<{ x: number; z: number }[]> =>
  * How many pixels in a box standing on the fuse tip have had ORANGE added to them,
  * measured against the mean of the same box to either side: a good deal more red,
  * some green but less of it, and no blue (lib/game/fuse.ts, red 15, green 0..14,
- * blue nothing). Null until the tip is in the picture.
+ * blue nothing). `lit` counts every pixel with that much more red, whatever else it
+ * has: what a flame too wide would fill. Null until the tip is in the picture.
  */
-const orangeAtTip = (page: Page): Promise<{ orange: number; box: number } | null> =>
+const orangeAtTip = (page: Page): Promise<{ orange: number; lit: number; box: number } | null> =>
   page.evaluate(() => {
     const pow = (
       window as unknown as {
@@ -64,13 +65,15 @@ const orangeAtTip = (page: Page): Promise<{ orange: number; box: number } | null
     const [r, g, b] = behind.map((sum) => sum / count)
     const data = pixels(left)
     let orange = 0
+    let lit = 0
     for (let i = 0; i < data.length; i += 4) {
       const red = data[i] - r
       const green = data[i + 1] - g
       const blue = data[i + 2] - b
+      if (red > 30) lit++
       if (red > 30 && green < red && Math.abs(blue) < 30) orange++
     }
-    return { orange, box: side * side }
+    return { orange, lit, box: side * side }
   })
 
 test('a planted charge burns ORANGE above its fuse', async ({ app }) => {
@@ -104,16 +107,25 @@ test('a planted charge burns ORANGE above its fuse', async ({ app }) => {
   const z = charge.z - Math.cos(heading) * back
   await warp(page, x, z, heading)
 
-  // The camera comes round on its own time, and the charge's fuse outlasts it.
+  // The camera comes round on its own time, and the charge's fuse outlasts it. Ten
+  // specks a dozen units wide are a few pixels each from up here (library/notes.md,
+  // § The SIZE unit, _d3d.dll 0x1000F1B4), so they cover a little of the box and never
+  // most of it. Measured on this view, of 576: orange 31..69, and 0 with the flame grey
+  // or not drawn; lit about 75..140, a name plate's heart among them, and 566 with the
+  // flame seven and a half times too wide.
+  let lit = 0
   await expect
     .poll(
       async () => {
         const seen = await orangeAtTip(page)
-        return seen !== null && seen.orange > seen.box / 8
+        if (seen === null) return false
+        lit = seen.lit / seen.box
+        return seen.orange > seen.box / 32
       },
-      { timeout: 5000, message: 'orange added above the fuse, an eighth of the box at least' }
+      { timeout: 5000, message: 'orange added above the fuse, a thirty-second of the box at least' }
     )
     .toBe(true)
+  expect(lit, 'specks, not a ball filling the box').toBeLessThan(1 / 2)
 
   expect(app.errors()).toEqual([])
 })

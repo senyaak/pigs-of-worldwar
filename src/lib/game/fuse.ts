@@ -47,15 +47,9 @@ export interface FuseRow {
   greens: number
   /** A record's blue. */
   blue: number
-  /**
-   * `[play]`: "в оригинале там не дым а искры когда он горит." Lit rather than
-   * tinted: it adds to what is behind it. The exe's draw is additive for every
-   * effect sprite as well, so here the ruling and the reading agree.
-   */
-  spark: boolean
 }
 
-/** Every number is the exe's, `effects/fuse.md`; `spark` is play's. */
+/** Every number is the exe's, `effects/fuse.md`. */
 export const FUSE_TRAIL: FuseRow = {
   id: 0x1d,
   records: 10,
@@ -67,8 +61,7 @@ export const FUSE_TRAIL: FuseRow = {
   heldAt: 0x5a,
   red: 15,
   greens: 15,
-  blue: 0,
-  spark: true
+  blue: 0
 }
 
 /** How far above the charge the exe hangs the effect (0x43243F). The drawing
@@ -101,17 +94,19 @@ export function beginFuse(random: () => number): Fuse {
 
 /**
  * One frame, in the engine's order: the cloud's step over all ten, then the arm
- * (0x48A63B comes ahead of the arm's call at 0x48A68F). So a renewed record is
- * drawn on the tip the frame it is renewed and the age drawn is the pinned one.
+ * (`effects/fuse.md`, § The frame: 0x48A63B comes ahead of the arm's call at
+ * 0x48A68F). So a renewed record is drawn on the tip the frame it is renewed and
+ * the age drawn is the pinned one.
  *
  * `alight` false is the charge gone: nothing renews and nothing pins the age
- * (0x48A607 parks the effect and the arm is gated on that), so the step takes it
- * past the draw's gate two frames on.
+ * (`effects/fuse.md`, § The frame: 0x48A607 parks the effect and the arm is gated on
+ * that), so the step takes it past the draw's gate two frames on.
  */
 export function advanceFuse(fuse: Fuse, alight: boolean, random: () => number): void {
   advanceCloud(fuse)
   if (!alight) return
-  // The counter ticks ahead of the arm (0x48A5D6), so the first renewal is record 1.
+  // The counter ticks ahead of the arm (`effects/fuse.md`, 0x48A5D6), so the first
+  // renewal is record 1.
   fuse.frame = (fuse.frame + 1) % fuse.blobs.length
   const aim = aimBlob(FUSE_TRAIL, random)
   const quarter = (speed: number): number => Math.trunc(speed / FUSE_TRAIL.slowed)

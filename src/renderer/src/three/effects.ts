@@ -57,19 +57,21 @@ const PUFF_GROWTH = 1
  * What one of the fireball's sprites is measured in.
  *
  * `cloudSize` gives the engine's own figure — `(200 - age) * [+0x7e] * 12.5`,
- * so 10000 down to 5250 for row 0 — but it is handed to the graphics library
- * (`[0x54c5c8]`, which lives in `wh32LIB.DLL`) and the unit is the library's,
- * not the world's. That half is not decoded and cannot be from the exe alone,
- * so **this scalar is the remake's own**: a sixty-fourth, which is the fixed
- * point everything else on the PSX side of this engine uses, and which lands a
- * puff at about half a pig — 156 exe units, 78 after the model scale.
+ * so 10000 down to 5250 for row 0 — and **this scalar is the remake's own**: a
+ * sixty-fourth, which is the fixed point everything else on the PSX side of this
+ * engine uses, and which lands a puff at about half a pig — 156 exe units, 78
+ * after the model scale.
+ *
+ * The exe's own unit is read now, and it is far smaller (`lib/game/cloud.ts`,
+ * `cloudWidth`, which the fuse draws by). The fireball has not moved to it: its
+ * saturation hangs on size and count (docs/todo/b0-black-smoke.md).
  *
  * The positions and the velocities are NOT in this unit: those go straight
  * onto `[effect+0xa8]`, which is the world's own packed position, so they ride
  * `MODEL_SCALE` like a ring for the same reason a ring does.
  */
-export const BLOB_UNIT = 1 / 64
-export const BLOB_SCALE = MODEL_SCALE
+const BLOB_UNIT = 1 / 64
+const BLOB_SCALE = MODEL_SCALE
 
 /**
  * How solid ONE of them is drawn. The remake's own, and it has to be: seventy
@@ -161,7 +163,7 @@ function shape(band: Band, one: Ring): void {
  * traced. A hard square would read as a box rather than smoke, and this is
  * the cheapest thing that does not.
  */
-export function buildPuffTexture(): THREE.CanvasTexture {
+function buildPuffTexture(): THREE.CanvasTexture {
   const size = 64
   const canvas = document.createElement('canvas')
   canvas.width = size

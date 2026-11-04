@@ -15,9 +15,14 @@
   is lit, adding to what is behind it, which the exe's additive draw agrees with;
   and "искры идут из фитиля а не из самого динамита": it stands on the model's
   fuse tip rather than at the exe's 0x3C up (`lib/game/fuse.ts`, `three/fuse.ts`).
-  `[CHECK — remake]`: the sprite's unit and soft edge are the fireball's own
-  (`three/effects.ts`, `BLOB_UNIT`), where the exe's cloud is flat and the unit is
-  the library's.
+  `[exe]` Each record is a flat quad with no map (`effects/cloud.md`, 0x489FED),
+  5500/480 world units wide, about 11: the library divides the size by the
+  depth and nothing else, while a position also goes through the focal length, 480
+  in the battle's 640x480 (`library/notes.md`, § The SIZE unit, `_d3d.dll`
+  0x1000F1B4). So they are specks, and what reads as a flame is ten of them.
+- **A cloud's sprite has an exe size the fireball does not use yet.** `cloudWidth`
+  (`lib/game/cloud.ts`) is the reading above; the fireball keeps its own
+  `BLOB_UNIT` until [b0-black-smoke.md](../todo/b0-black-smoke.md).
 - **An effect's collider is a sphere of radius 35** (0x4a8f42, via
   `jmp [eax*4+0x4a90CC]` at 0x4a8ece where `eax = type - 0x1357`, built by
   `0x407AF0` at 0x4a9044). It does not need to grow — that idea was invented to

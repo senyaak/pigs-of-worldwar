@@ -37,10 +37,12 @@ in. The two numbers that decide saturation are both the remake's own
 inventions and both now have a decoded replacement: `BLOB_ALPHA` (0.4, picked
 because "seventy sprites at full opacity is a painted ball") and `BLOB_UNIT`
 (1/64, invented because the sprite's size unit was thought unreadable). It is
-readable now — **the 2D-poly record's half-extents ride the same perspective
-factor as the position, so the engine's `(200 − age) × size × 12.5` is in
-WORLD units at the sprite's own depth** (`library/notes.md`). Work the real
-size out first; the saturation follows from size and count, and the alpha
+readable now — **the engine's `(200 − age) × size × 12.5` is the quad's whole
+width, divided by the depth and not by the focal length a position goes through,
+so in world units it is that figure over 480** (`library/notes.md`, § The SIZE
+unit; `cloudWidth` in `lib/game/cloud.ts`, which the fuse already draws by). That
+is 11 to 21 units for row 0, against the 82 to 156 `BLOB_UNIT` gives. Work the
+real size out first; the saturation follows from size and count, and the alpha
 follows from that.
 
 One correction to carry into the fix: the CLOUD sprites are **untextured** in

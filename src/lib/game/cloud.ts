@@ -68,6 +68,21 @@ export const cloudSize = (cloud: Pick<CloudRecords, 'age' | 'size'>): number =>
   (200 - cloud.age) * cloud.size * 12.5
 
 /**
+ * The battle's focal length, unzoomed, on both axes. The library multiplies a
+ * position by it and divides by the depth, and divides a cloud's size by the depth
+ * alone (`library/notes.md`, § The SIZE unit: `_d3d.dll` 0x1000F1B4, 0x100076B1;
+ * the battle's 640x480, 0x44E0FE). So a world length is this many of the size's.
+ */
+export const SPRITE_FOCAL = 480
+
+/**
+ * How wide a cloud's sprite is in the world, edge to edge: the quad is centred on
+ * the record and the size is its whole width (`library/notes.md`, 0x1000F292).
+ */
+export const cloudWidth = (cloud: Pick<CloudRecords, 'age' | 'size'>): number =>
+  cloudSize(cloud) / SPRITE_FOCAL
+
+/**
  * A colour component as the draw packs it: `c * 400 >> 6`, so 0..31 becomes
  * 0..194 rather than 0..255 (0x48a04a..0x48a086). Nothing divides by the age
  * the way a ring does — a cloud does not flash.
