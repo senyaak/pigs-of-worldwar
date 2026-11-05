@@ -27,7 +27,7 @@
 // Pure: a pig, a locomotion state, an emit.
 
 import { fromExeSpeed } from './ballistics'
-import { hurt, isDead } from './health'
+import { hurtPig, isDead } from './health'
 import { originY } from './body'
 import type { LocomotionState } from './locomotion'
 import type { Emit } from './events'
@@ -69,7 +69,7 @@ export function chargeLanding(
   // the exe's own arm goes through TakeDamage, which a dead pig's death path
   // has already run.
   if (isDead(pig)) return
-  const outcome = hurt(pig, FALL_POINTS, training)
+  const outcome = hurtPig(pig, FALL_POINTS, training, emit)
   emit({
     kind: 'damaged',
     at: { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z },

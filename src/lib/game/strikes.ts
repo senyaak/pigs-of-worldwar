@@ -17,7 +17,7 @@ import type { Velocity } from './tumble'
 import { advanceSwing, beginSwing, caught, meleeOf, strikeGap, strikeOffsets } from './melee'
 import type { StrikeGap, SwingState } from './melee'
 import { amountOf, spend } from './inventory'
-import { hurt, isDead } from './health'
+import { hurt, hurtPig, isDead } from './health'
 import { originY } from './body'
 import { clipSeconds } from './clips'
 import type { ClipTiming } from './clips'
@@ -171,7 +171,7 @@ export function createStrikes(world: StrikeWorld, emit: Emit): Strikes {
       report.candidates.push({ name: target.name, gap, degrees: (gap.off * 180) / Math.PI, hit })
       if (!hit) continue
       already.add(target)
-      const outcome = hurt(target, weapon.damage, world.training)
+      const outcome = hurtPig(target, weapon.damage, world.training, emit)
       emit({ kind: 'damaged', at: body, amount: weapon.damage, pig: target.id, blow: true })
       // The exe throws the weapon's own effect on every body it catches
       // (0x476187, inside the same loop). WHERE exactly is not pinned — it

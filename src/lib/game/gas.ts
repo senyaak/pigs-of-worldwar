@@ -32,7 +32,7 @@ import { blastRange, blastShare, lobOf } from './grenade'
 import type { Lobbed } from './grenade'
 import { fromExeFrames } from './ballistics'
 import { DAMAGE_UNIT } from './projectile'
-import { hurt, isDead } from './health'
+import { hurtPig, isDead } from './health'
 import { originY } from './body'
 import type { Emit } from './events'
 import type { Pig } from './game'
@@ -110,7 +110,7 @@ export function createGas(world: GasWorld, emit: Emit): Gas {
       // …and the fifteen is paid once per throw.
       if (paid.has(pig.id)) continue
       paid.add(pig.id)
-      const outcome = hurt(pig, points, world.training)
+      const outcome = hurtPig(pig, points, world.training, emit)
       emit({ kind: 'damaged', at: body, amount: points, pig: pig.id })
       emit({ kind: 'gassed', pig: pig.id, at: body })
       // The Sneeze — over the hit, not instead of anything: a standing pig

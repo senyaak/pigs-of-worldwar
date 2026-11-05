@@ -12,7 +12,9 @@
 // exact: the exe's "dead at `<= 0x7f`" is 127 of 128 — anything below one
 // whole point — which over whole points is simply `<= 0`.
 //
-// Pure: numbers in, numbers out.
+// Pure: numbers in, numbers out, and `hurtPig`'s one announcement.
+
+import type { Emit, PigId } from './events'
 
 /**
  * What a pig of each class starts with, and its ceiling.
@@ -89,7 +91,8 @@ export const DEAD_BELOW = 1
  *
  * The same flag that makes every skill unlimited there (lib/game/pickups.ts)
  * also makes a pig unkillable: CAMP is a place to practise, and that includes
- * being hit.
+ * being hit. It catches anything that lands UNDER one point; landing on exactly
+ * one is an ordinary hit (0x467c7f, the same `<= 0x7f` as dying).
  */
 export const TRAINING_FLOOR = 1
 
@@ -132,6 +135,25 @@ export function hurt(body: Body, damage: number, training: boolean): HitOutcome 
     return 'died'
   }
   return 'hurt'
+}
+
+/**
+ * `hurt`, for a PIG: what happens to a pig the floor catches is more than a
+ * number, because the turn goes with it when it is the one being played
+ * (`damage/training-floor.md` in the disasm repo, 0x467c76). So every hit on a
+ * pig comes through here, whatever caused it, and the battle hears `spared`
+ * (lib/game/battle/listeners.ts). A training dummy has no turn to lose and
+ * takes plain `hurt`.
+ */
+export function hurtPig(
+  pig: Body & { id: PigId },
+  damage: number,
+  training: boolean,
+  emit: Emit
+): HitOutcome {
+  const outcome = hurt(pig, damage, training)
+  if (outcome === 'spared') emit({ kind: 'spared', pig: pig.id })
+  return outcome
 }
 
 /**

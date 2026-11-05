@@ -45,7 +45,7 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 - [ambience.md](todo/ambience.md) — the distant battle and the birds must sound off-screen
 - [b0-black-smoke.md](todo/b0-black-smoke.md) — the smoke is drawn inside the fireball; size the sprites by the exe's own formula
 - [b10-mine-reveal.md](todo/b10-mine-reveal.md) — the yellow-and-black tile reveal: three tiles, five classes
-- [b16-read-not-built.md](todo/b16-read-not-built.md) — the training floor's turn end, the fatal fall, the map bound, 40 MINE SHELL, the airburst pair
+- [b16-read-not-built.md](todo/b16-read-not-built.md) — the fatal fall, the map bound, 40 MINE SHELL, the airburst pair
 - [b18-level2-dead-skills.md](todo/b18-level2-dead-skills.md) — 31/32 AIRBURST, 50 JETPACK, the MG burst, the dart, the suicide camera
 - [b22-what-is-left-to-read.md](todo/b22-what-is-left-to-read.md) — the fire table's build list: 30, 15, 16, 34, 50, and small threads
 - [b23-hero-kit.md](todo/b23-hero-kit.md) — 53 MEDIC, 56 SHOCKWAVE, 57 the airlift, 58/59 the air strikes

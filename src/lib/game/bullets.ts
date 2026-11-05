@@ -21,7 +21,7 @@ import { AIM_UNITS } from './aim'
 import { flingVelocity } from './tumble'
 import type { Random } from './random'
 import type { Velocity } from './tumble'
-import { heal, hurt, isDead, maxHealthFor } from './health'
+import { heal, hurt, hurtPig, isDead, maxHealthFor } from './health'
 import { originY } from './body'
 import { HAND_BONE } from './pose'
 import type { Point, Pose } from './pose'
@@ -259,7 +259,7 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
       const covered = pig.hidden
       if (world.soak && amount > 0) amount = world.soak(pig, amount)
       if (amount > 0) {
-        const outcome = hurt(pig, amount, world.training)
+        const outcome = hurtPig(pig, amount, world.training, emit)
         emit({ kind: 'damaged', at: body, amount, pig: pig.id, blow: true })
         if (outcome === 'died' || outcome === 'gibbed') {
           emit({ kind: 'killed', pig: pig.id, by: shot.owner, gibbed: outcome === 'gibbed' })

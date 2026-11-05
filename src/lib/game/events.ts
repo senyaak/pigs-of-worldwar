@@ -67,6 +67,10 @@ export type BattleEvent =
        * `I_METAL` is (play: "взрыв по танку, пушке и прочему"). */
       metal?: boolean
     }
+  /** The training ground's floor caught this pig: it fell under one point and
+   * was left on one (lib/game/health.ts, `hurtPig`). No cause is named because
+   * the exe's arm does not ask for one (0x467c76). */
+  | { kind: 'spared'; pig: PigId }
   /** This pig has just gone down. `by` is the pig whose weapon did it — the
    * bullet's firer, the lob's thrower, the blade's swinger — the same attacker
    * the exe's damage handler tallies kills against (0x467c30, 0x467E11).

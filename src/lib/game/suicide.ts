@@ -31,7 +31,7 @@
 import { SUICIDE_EFFECT_ID, burst } from './blast'
 import { blastReach } from './grenade'
 import type { BlastWorld } from './blast'
-import { hurt, isDead } from './health'
+import { hurtPig, isDead } from './health'
 import { originY } from './body'
 import { clipSeconds } from './clips'
 import type { ClipTiming } from './clips'
@@ -97,7 +97,7 @@ export function createSacrifice(world: SacrificeWorld, emit: Emit): Sacrifice {
       // The training ground's floor keeps a dummy pig at one point, and it
       // applies here as everywhere: on CAMP the gesture goes off and the pig
       // walks away from it (lib/game/health.ts, TRAINING_FLOOR).
-      const outcome = hurt(pig, pig.health, world.training)
+      const outcome = hurtPig(pig, pig.health, world.training, emit)
       emit({ kind: 'damaged', at, amount: pig.health, pig: pig.id, blow: true })
       if (outcome === 'died' || outcome === 'gibbed')
         emit({ kind: 'killed', pig: pig.id, by: pig.id, gibbed: outcome === 'gibbed' })

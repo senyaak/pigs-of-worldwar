@@ -1,17 +1,13 @@
-# B16. READ AND NOT BUILT — three closers and a family that changed shape — 2026-08-31
+# B16. READ AND NOT BUILT — two closers and a family that changed shape — 2026-08-31
 
-All four came out of the same session as B14/B15. Each is READ; none is guessed;
+All of it came out of the same session as B14/B15. Each is READ; none is guessed;
 none is built. They are small apart from the last, which got BIGGER on reading.
 
-**Three ways the exe ends a turn that the remake has no equivalent for.** The
-big one — a BLOW on the acting pig — is built (`turns.md`, the `blow` flag).
-These are the leftovers of the same read:
+**Two ways the exe ends a turn that the remake has no equivalent for.** The
+big one — a BLOW on the acting pig — is built (`turns.md`, the `blow` flag), and
+so is the training-ground floor ([turns.md](../facts/turns.md)). These are the
+leftovers of the same read:
 
-- **The training-ground floor, 0x467c76.** On CAMP a pig cannot die: health at
-  or under 0x7f is floored at 0x80 — and then, **whatever the cause was**, the
-  turn is handed on if the pig is the one being played. Ours floors the health
-  (`health.ts`, TRAINING_FLOOR) and keeps the turn. One line beside the
-  `damaged` handler in `battle.ts`, gated on `world.training`.
 - **The fatal fall, 0x46d7bb.** `[pig+0x388]` is a FRAME COUNT of the fall, set
   to 1 at 0x46fc92 and incremented at 0x46fe8a. Past 25 the drop becomes the
   flying state that the ground can hurt (built — `falling.ts`); past **250**,
@@ -22,7 +18,7 @@ These are the leftovers of the same read:
   snapped back to its own cell and tallied dead — again with the handover if it
   was acting.
 
-Neither of the last two is reachable in the remake today, which is the honest
+Neither is reachable in the remake today, which is the honest
 reason they are unbuilt rather than an oversight: nothing lets a pig fall for
 ten seconds or leave the map. Build them when something does.
 
