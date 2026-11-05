@@ -65,6 +65,7 @@ of the form `weapons/fire.md` are in the **disasm repo**, never in this tree.
 - [water.md](water.md) — water is see-through art, and how it is drawn
 - [weapons/gas.md](weapons/gas.md) — the poison gas streams
 - [weapons/hide-and-pickpocket.md](weapons/hide-and-pickpocket.md) — the bush and the whole stolen slot
+- [weapons/mines.md](weapons/mines.md) — what a projectile does to a mine in the ground
 - [weapons/mortar.md](weapons/mortar.md) — a lob with no gauge fires at full charge
 - [weapons/shotgun.md](weapons/shotgun.md) — ten pellets, capped and multiplied
 - [weapons/suicide.md](weapons/suicide.md) — the suicide is seen before it lands
