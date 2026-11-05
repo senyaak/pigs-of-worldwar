@@ -115,7 +115,9 @@ cited. A case marked KNOWN SHORT or DIFFERS pins what the remake does today, wit
 what the exe does and the owning issue beside it, so the build goes red and flips
 it. `e2e/000/proving-bench-blades.spec.ts` is one case per blade, swung through the
 same door at a dummy stood in front of the pig: its clip, its damage and its throw.
-A bench's report lives in its own spec; the next benches use `openBench` and its
+`e2e/000/proving-bench-lobs.spec.ts` is one case per thrown skill: how fast it leaves
+and when it goes off, then a dummy stood where it goes off and two at the rim. A
+bench's report lives in its own spec; the next benches use `openBench` and its
 verbs.
 
 ## A spec LOADS its starting state — it never walks to it
