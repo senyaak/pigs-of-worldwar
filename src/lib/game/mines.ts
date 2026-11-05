@@ -27,6 +27,13 @@
 // same 2560 of damage, same 1024 of blast. Only the effect id differs, 0x55
 // against 0x4c, and the remake has neither.
 //
+// **A PROJECTILE IS THE SAME TRIGGER AS A FOOT.** The block above stands a second
+// time in `Projectile::OnHitLandscape` (0x437a50, inside 0x4377d0), the handler
+// every projectile's landscape contact runs. It asks nothing of the kind, so a
+// bullet, a rocket and a grenade all set one off by MEETING the ground on the
+// tile (lib/game/bullets.ts, lib/game/lobs.ts). Row +0x26, once read as the gate
+// on this, is not one: its only reader, 0x436201, turns the body along its flight.
+//
 // **The mine WEAPON is the same mechanic from the other end**, and it lands
 // here (2026-08-26, read out of the exe end to end for the sapper):
 //
@@ -234,7 +241,8 @@ export interface MineWorld extends BlastWorld {
 
 export interface Mines {
   /**
-   * Whatever is buried under (x, z) — set it off.
+   * Whatever is buried under (x, z) — set it off, by a foot or by a projectile
+   * meeting the ground there (top of this file).
    *
    * True the frame one is trodden on, which is the caller's cue to make the
    * noise. The tile is cleared in the same breath, so standing on the spot does

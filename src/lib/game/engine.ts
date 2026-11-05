@@ -474,27 +474,6 @@ export function createEngine(parts: EngineParts): Engine {
     if (side === 0) continue
     for (const one of player.pigs) if (startsHidden(one, true)) hides.concealNow(one)
   }
-  /** What a GUN does: the flight, the substepping and every verdict about what
-   * was hit (lib/game/bullets.ts). */
-  const shots = createBullets(
-    {
-      pigs,
-      targets,
-      present,
-      query,
-      obstacles,
-      training,
-      pose,
-      random,
-      soak,
-      // A bullet shoves the body it hits (SHOT_SHOVE, lib/game/bullets.ts),
-      // through the same seam every other throw takes — STRUCK, so the
-      // knockdown wears the exe's clip 39 from the impact itself, whatever
-      // the shove's size (the shotgun's 6 knocks a pig down as surely as 48).
-      fling: (pig, velocity) => fling(pig, velocity, false, true)
-    },
-    bus.emit
-  )
   /**
    * Pigs a blast has THROWN (lib/game/tumble.ts) — and the seam that decides
    * whose state a throw lands on.
@@ -552,9 +531,32 @@ export function createEngine(parts: EngineParts): Engine {
   )
   /** What is already buried in the ground: the map's MINEFIELDS, which are a bit
    * in a tile rather than anything anybody put there (lib/game/mines.ts). Before
-   * the grenades, because a thrown thing sets one off the same way a foot does. */
+   * the guns and the grenades, because a bullet or a thrown thing sets one off
+   * the same way a foot does. */
   const mines = createMines(
     { pigs, targets, present, query, training, random, fling, groundNormal, soak, pose },
+    bus.emit
+  )
+  /** What a GUN does: the flight, the substepping and every verdict about what
+   * was hit (lib/game/bullets.ts). */
+  const shots = createBullets(
+    {
+      pigs,
+      targets,
+      present,
+      query,
+      obstacles,
+      mines,
+      training,
+      pose,
+      random,
+      soak,
+      // A bullet shoves the body it hits (SHOT_SHOVE, lib/game/bullets.ts),
+      // through the same seam every other throw takes — STRUCK, so the
+      // knockdown wears the exe's clip 39 from the impact itself, whatever
+      // the shove's size (the shotgun's 6 knocks a pig down as surely as 48).
+      fling: (pig, velocity) => fling(pig, velocity, false, true)
+    },
     bus.emit
   )
   /** The gas's bit on a pig, and the ten points a turn it costs — before the
