@@ -271,6 +271,14 @@ export const fromExeFrames = (frames: number): number => frames * EXE_FRAME_SECO
  */
 export const BOUNCE_CUTOFF = fromExeSpeed(0x19)
 
+/**
+ * Below this arrival a landing on BLOCKED ground throws the pig out on the
+ * landing frame: 50 a frame at 0x471045, `Pig::EjectFromWall` at 0x47104d
+ * (`movement/landing.md`). The handler's first rung, and the same full arrival
+ * speed as the fork above.
+ */
+export const EJECT_CUTOFF = fromExeSpeed(0x32)
+
 export interface Velocity {
   x: number
   y: number
