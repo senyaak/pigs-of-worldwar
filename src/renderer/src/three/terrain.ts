@@ -22,7 +22,7 @@ const TILES = 4
 const VERTS = 5
 
 /** The tile's corners in the order this file builds them, as (a, b). */
-const TILE_CORNERS = [
+export const TILE_CORNERS = [
   [0, 0],
   [1, 0],
   [0, 1],
@@ -41,11 +41,36 @@ const SHADE_TO_LINEAR = Float32Array.from({ length: 256 }, (_, i) => {
   return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
 })
 
+/** Two triangles: ACB + BCD, counter-clockwise when seen from up (-Y in the
+ * game's Y-down space), matching the models' convention. */
+export const TILE_TRIANGLES = [0, 2, 1, 1, 2, 3]
+
+/** Where one tile is DRAWN: its four corners in game space, in `TILE_CORNERS`'
+ * order, and the linear shade the ground gives each. */
+export interface DrawnTile {
+  corners: number[][]
+  shades: number[]
+}
+
 export interface Terrain {
   /** Add THIS to the scene; already converted to Y-up. */
   group: THREE.Group
   tileCount: number
+  /** One tile of the drawn ground by its place on the map, or null off it. */
+  tile(col: number, row: number): DrawnTile | null
   dispose(): void
+}
+
+/** A ground texture as the ground draws one: the art's rows as stored, sharp up
+ * close. */
+export function groundMap(rgba: Uint8Array, width: number, height: number): THREE.DataTexture {
+  const map = new THREE.DataTexture(rgba, width, height, THREE.RGBAFormat)
+  map.flipY = false
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.LinearFilter
+  map.colorSpace = THREE.SRGBColorSpace
+  map.needsUpdate = true
+  return map
 }
 
 interface TileRef {
@@ -158,20 +183,9 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
       // water surface below shows in the holes. Cutout alpha, as the
       // original's 1-bit transparency: no blend-sorting to go wrong.
       const punched = waterWorn.has(groupTexture) ? maskedArt(texture) : null
-      const map = new THREE.DataTexture(
-        punched ?? texture.rgba,
-        texture.width,
-        texture.height,
-        THREE.RGBAFormat
-      )
-      map.flipY = false
-      map.magFilter = THREE.NearestFilter
-      map.minFilter = THREE.LinearFilter
-      map.colorSpace = THREE.SRGBColorSpace
-      map.needsUpdate = true
       materials.push(
         new THREE.MeshBasicMaterial({
-          map,
+          map: groundMap(punched ?? texture.rgba, texture.width, texture.height),
           side: THREE.DoubleSide,
           vertexColors: true,
           ...(punched ? { alphaTest: 0.5 } : {})
@@ -184,12 +198,8 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
     groupStart = corner
   }
 
-  for (const tile of tiles) {
-    if (tile.texture !== groupTexture) {
-      flushGroup()
-      groupTexture = tile.texture
-    }
-    const { block, row, col } = tile
+  /** One tile of one block as the ground draws it. */
+  const drawn = (block: TerrainBlock, row: number, col: number): DrawnTile => {
     // Tile corners from the block's 5×5 height grid; world XZ from the
     // block's place in the world. Rows advance +Z, columns +X — the exe
     // derives both from the block's index (lib/formats/pmg.ts).
@@ -220,10 +230,17 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
       [col, row + 1],
       [col + 1, row + 1]
     ].map(([c, r]) => SHADE_TO_LINEAR[block.shades[r * VERTS + c]])
+    return { corners, shades }
+  }
+
+  for (const tile of tiles) {
+    if (tile.texture !== groupTexture) {
+      flushGroup()
+      groupTexture = tile.texture
+    }
+    const { corners, shades } = drawn(tile.block, tile.row, tile.col)
     const uv = tileUvs(tile.rotateFlip, TILE_CORNERS)
-    // Two triangles: ACB + BCD — counter-clockwise when seen from up
-    // (-Y in the game's Y-down space), matching the models' convention.
-    for (const i of [0, 2, 1, 1, 2, 3]) {
+    for (const i of TILE_TRIANGLES) {
       positions.set(corners[i], corner * 3)
       uvs.set(uv[i], corner * 2)
       colors.set([shades[i], shades[i], shades[i]], corner * 3)
@@ -344,6 +361,12 @@ export function buildTerrain(blocks: TerrainBlock[], textures: TerrainTexture[])
   return {
     group,
     tileCount: blocks.length * TILES * TILES,
+    tile(col, row) {
+      const x = minX + (col - (col % TILES)) * TILE_STEP
+      const z = minZ + (row - (row % TILES)) * TILE_STEP
+      const block = blocks.find((one) => one.x === x && one.z === z)
+      return block ? drawn(block, row % TILES, col % TILES) : null
+    },
     dispose() {
       geometry.dispose()
       for (const material of materials) {
