@@ -233,6 +233,19 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
     // Its own row's physics material — the surface multiplies its half in.
     const row = lobOf(shot.skill)
     if (!row) return 'none'
+    const wet =
+      world.query.isWater(shot.x, shot.z) && shot.y >= world.query.surface(shot.x, shot.z)
+    // A MINEFIELD is set off by anything that touches it, not only by a foot:
+    // the projectile's landscape handler (0x4377d0) tests the same tile bit the
+    // pig's ground update does and spawns the same blast (0x437a50,
+    // lib/game/mines.ts). No test of the kind stands before it, so a grenade, a
+    // rocket and a bullet (lib/game/bullets.ts) are all one here. On CONTACT
+    // rather than at rest — a grenade that bounces once on a mine and rolls off
+    // has still trodden on it — and AHEAD of the water arms, so a wet mine tile
+    // goes off under what then sinks or skips (the arms at 0x437bfb come after).
+    if ((wet || shot.y >= ground) && world.mines.tread(shot.x, shot.z)) {
+      emit({ kind: 'mineTripped', at: { x: shot.x, y: ground, z: shot.z } })
+    }
     // WATER FIRST, and it is ONE contact — the surface and the bed are the same
     // plane. `Projectile::OnHitLandscape` (0x4377d0) splits on the contact scalar:
     // under 150 it douses (0x437bfb, gated on the water test `0x4A6FA0`), over it
@@ -240,7 +253,7 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
     // 48 units deep, so where the water is and where the ground is are the same
     // place. (The `Sound::Play(0x28)` this used to name here belongs to the
     // MINEFIELD arm of the same handler — see the correction in `grenade.ts`.)
-    if (world.query.isWater(shot.x, shot.z) && shot.y >= world.query.surface(shot.x, shot.z)) {
+    if (wet) {
       const level = world.query.surface(shot.x, shot.z)
       const on = { x: shot.x, y: level, z: shot.z }
       // The splash happens either way — the handler does it before it looks at
@@ -283,14 +296,6 @@ export function createLobs(world: LobWorld, emit: Emit): Lobs {
       return 'settled'
     }
     if (shot.y >= ground) {
-      // A MINEFIELD is set off by anything that touches it, not only by a foot:
-      // the projectile's landscape handler tests the same tile bit the pig's
-      // ground update does and spawns the same blast (0x437a50, lib/game/mines.ts).
-      // On CONTACT rather than at rest — a grenade that bounces once on a mine
-      // and rolls off has still trodden on it.
-      if (world.mines.tread(shot.x, shot.z)) {
-        emit({ kind: 'mineTripped', at: { x: shot.x, y: ground, z: shot.z } })
-      }
       // A ROCKET does not bounce: it is stopped where it touched, and the caller
       // sets it off there. Checked BEFORE the bounce, or the blast would land at
       // the reflected point rather than at the impact.

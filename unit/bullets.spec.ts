@@ -58,6 +58,7 @@ function range(
       training: false,
       query: terrain(() => 0),
       obstacles: new ObstacleField([]),
+      mines: { tread: () => false },
       pose: { boneToWorld: () => from },
       // 0.5 rolls a jitter of exactly ZERO (`floor(0.5·32) − 16`), so every
       // pellet flies the sights' own line and the counts below are exact.
@@ -153,6 +154,7 @@ function pointBlank(
       training: false,
       query: terrain(() => 0),
       obstacles: new ObstacleField([]),
+      mines: { tread: () => false },
       pose: { boneToWorld: () => muzzle },
       random: () => 0.5
     },
