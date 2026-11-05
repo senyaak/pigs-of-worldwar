@@ -1,6 +1,7 @@
 // The archive view: entries of one MAD/MTD. Rows of a complete VTX/NO2/FAC
 // triple are clickable and handed to the model viewer.
 
+import { reportFailure } from '../failures/report'
 import { byId, listRow } from './dom'
 
 export interface ArchiveView {
@@ -19,7 +20,7 @@ export function initArchiveView(
     async open(relPath) {
       const result = await window.api.listArchive(relPath)
       if (!result.ok) {
-        titleEl.textContent = result.error
+        reportFailure('opening an archive', result.error)
         return false
       }
       const { kind, entries } = result.archive

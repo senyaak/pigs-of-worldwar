@@ -3,6 +3,7 @@
 // and the animation dropdown.
 
 import type { Clip } from '../api'
+import { reportFailure } from '../failures/report'
 import { ensureScene } from '../three/scene'
 import { buildPig } from '../three/pig'
 import type { Pig } from '../three/pig'
@@ -33,12 +34,13 @@ export function initModelViewer(onBack: () => void): ModelViewer {
     async open(relPath, base) {
       const result = await window.api.loadModel(relPath, base)
       if (!result.ok) {
-        statsEl.textContent = result.error
+        reportFailure(`opening the model ${base}`, result.error)
         return false
       }
       const { model, textures, skeleton } = result
 
       const clipsResult = await window.api.loadClips(relPath)
+      if (!clipsResult.ok) reportFailure(`loading the animations of ${base}`, clipsResult.error)
       clips = clipsResult.ok ? clipsResult.clips : []
 
       const host = ensureScene(canvasHost)

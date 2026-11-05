@@ -55,6 +55,9 @@ export function createLobArt(): LobArt {
     void window.api.loadModel(WEAPON_ARCHIVE, name).then((result) => {
       loading.delete(name)
       if (!result.ok) {
+        // not a failure: three of the names asked for are not in this archive on
+        // a real install (WE_BAZZ, WE_SU_GR, WESUBB, measured in
+        // docs/facts/failures.md), and three/grenades.ts asks the map's next.
         console.log(`no ${name} to throw: ${result.error}`)
         art.set(name, null)
         return

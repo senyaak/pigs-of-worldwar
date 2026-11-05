@@ -138,7 +138,7 @@ export function createMusic(): Music {
     if (buffers.has(clip)) return
     const file = await window.api.loadSound(trackFor(clip))
     if (!file.ok) {
-      console.warn(`no music ${clip}: ${file.error}`)
+      reportFailure(`loading the music ${clip}`, file.error)
       buffers.set(clip, null)
       return
     }

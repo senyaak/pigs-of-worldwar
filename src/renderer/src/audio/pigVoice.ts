@@ -208,7 +208,7 @@ export function createPigVoice(): PigVoice {
     if (buffers.has(path)) return
     const file = await window.api.loadSound(path)
     if (!file.ok) {
-      console.warn(`no pig voice ${path}: ${file.error}`)
+      reportFailure('loading a pig voice', file.error)
       buffers.set(path, null)
       return
     }

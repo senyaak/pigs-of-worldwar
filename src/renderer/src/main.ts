@@ -665,7 +665,7 @@ const openBattle = (map: string, drop: boolean): Promise<ActionEnd> =>
   runAction(ActionName.OpenBattle, OPEN_BUDGET_MS, async () => {
     campaignBattle = false
     if (!(await battle.open(map, drop))) {
-      return { done: false, refusal: `${map} did not open — the console says why` }
+      return { done: false, refusal: `${map} did not open — the strip says why` }
     }
     show('battle')
     await firstValueFrom(animationFrames().pipe(filter(() => battle.arrived())))
@@ -726,9 +726,6 @@ if (window.pow) {
   // carry no subtitles anywhere, and browsing them should not need a mission
   // open (audio/sarge.ts). `pow.sarge.list()` says what is known.
   installSargeConsole()
-  // …and the SOUND bank beside him, for the same reason: most of the table is
-  // a name pick and only an ear settles one (audio/console.ts).
-  installSoundConsole(() => sharedBank(GAME_SOUNDS))
   window.pow.menu = view(menu)
   window.pow.onePlayer = view(onePlayer)
   window.pow.loadScreen = view(loadScreen)
@@ -862,6 +859,10 @@ if (window.pow) {
 // A located game lands on the main menu; the asset browsers hang off it.
 async function showGame(dir: string): Promise<void> {
   byId<HTMLSpanElement>('game-path').textContent = dir
+  // The SOUND bank beside the sergeant's console, for the same reason: most of
+  // the table is a name pick and only an ear settles one (audio/console.ts).
+  // Only here: the bank is kept once loaded (audio/bank.ts), and it needs a folder.
+  installSoundConsole(() => sharedBank(GAME_SOUNDS))
   show('menu')
   await menu.load()
 }

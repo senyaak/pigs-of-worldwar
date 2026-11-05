@@ -3,9 +3,10 @@
 // docs/fleet/project.md § Build rules).
 //
 // It runs against a fabricated install, because a real install fails at none of
-// the catches this drives: every failure below is a real one, of a real catch,
-// and each test provokes it on purpose and says so by the text it expects. The
-// one exception needs the campaign screens, so it walks them on the real install.
+// the catches this drives: every failure below is a real one, of a real catch or
+// a real { ok: false } answer, and each test provokes it on purpose and says so by
+// the text it expects. What needs the campaign screens or a battle walks them on
+// the real install.
 
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
@@ -15,6 +16,7 @@ import path from 'node:path'
 import { tap } from './controller'
 import { GAME_DIR, TMP, launchApp, openAssets } from './launch'
 import type { Launched } from './launch'
+import { openBattle } from './load'
 import { FIRST_ARMY, choose, nameTeam } from './menu'
 
 const ROOT = path.join(TMP, 'e2e-failures')
@@ -25,6 +27,7 @@ const LOG_DIR = TMP
 
 /** What the fabricated install costs the main menu, which every launch opens. */
 const NO_MENU_ART = /^\[failure\] loading the menu art: /
+const NO_SOUND_BANK = /^\[failure\] loading the sound bank: /
 
 const line = (page: Page, text: string | RegExp) =>
   page.locator('#failures .failure-line').filter({ hasText: text })
@@ -32,6 +35,46 @@ const line = (page: Page, text: string | RegExp) =>
 /** The errors a test did not provoke. */
 const others = (launched: Launched, ...expected: RegExp[]): string[] =>
   launched.errors.filter((error) => !expected.some((pattern) => pattern.test(error)))
+
+/** Every session log written since `started`. A log is named by the second its
+ * session began, so a name does not say which launch wrote it; the time it was
+ * written does. */
+const sessionLogs = (started: number): string =>
+  readdirSync(LOG_DIR)
+    .filter((name) => name.startsWith('telemetry-') && statSync(path.join(LOG_DIR, name)).mtimeMs >= started)
+    .map((name) => readFileSync(path.join(LOG_DIR, name), 'utf8'))
+    .join('\n')
+
+/** NEW GAME, up to the player screen, with the army and team the walk needs. */
+async function raiseCampaign(page: Page, team: string): Promise<void> {
+  await choose(page, 'ONE PLAYER')
+  await expect(page.locator('#oneplayer')).toBeVisible()
+  await choose(page, 'NEW GAME', 'onePlayer')
+  await expect(page.locator('#team')).toBeVisible()
+  await choose(page, FIRST_ARMY, 'teamScreen')
+  await expect(page.locator('#name')).toBeVisible()
+  await nameTeam(page, team)
+  await expect(page.locator('#player')).toBeVisible()
+}
+
+/** The campaign's next write: NO to the training question autosaves, and the map
+ * opens only once that write has been answered (campaign.skipTutorial). */
+async function declineTraining(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const pow = (window as unknown as { pow?: { playerScreen?: { flipping(): boolean } } }).pow
+          return pow && pow.playerScreen ? pow.playerScreen.flipping() : true
+        }),
+      { message: 'the player screen is still driving in' }
+    )
+    .toBe(false)
+  await tap(page, 'menuSelect')
+  await expect(page.locator('#ask')).toBeVisible()
+  await choose(page, 'NO', 'askTraining')
+  await expect(page.locator('#pigmap')).toBeVisible()
+}
 
 test.beforeAll(() => {
   rmSync(ROOT, { recursive: true, force: true })
@@ -51,7 +94,9 @@ test('a renderer failure is on the screen, in the console and goes away on a cli
     const report = line(launched.page, 'loading the menu art')
     await expect(report).toBeVisible()
     await expect.poll(() => launched.errors.filter((e) => NO_MENU_ART.test(e)).length).toBeGreaterThan(0)
-    expect(others(launched, NO_MENU_ART)).toEqual([])
+    // audio/bank.ts: an { ok: false } answer, and the menu goes on silent.
+    await expect(line(launched.page, 'loading the sound bank: FESounds/Fesounds.srl')).toBeVisible()
+    expect(others(launched, NO_MENU_ART, NO_SOUND_BANK)).toEqual([])
 
     // The mouse works every overlay (.claude/rules/code.md), and the app goes on
     // underneath: the file list is still reachable.
@@ -88,8 +133,6 @@ test('a main-process failure reaches the screen, the console, stderr and the log
   rmSync(SAVES, { recursive: true, force: true })
   mkdirSync(path.join(SAVES, 'BROKEN.json'), { recursive: true })
   writeFileSync(path.join(SAVES, 'GOOD.json'), '{}')
-  // A log is named by the second its session began, so a name does not say
-  // which launch wrote it; the time it was written does.
   const started = Math.floor(Date.now() / 1000) * 1000
   const launched = await launchApp({ envFile: ENV_FILE, saveDir: SAVES })
   try {
@@ -100,13 +143,9 @@ test('a main-process failure reaches the screen, the console, stderr and the log
     await expect(line(launched.page, 'reading the save BROKEN')).toBeVisible()
     await expect.poll(() => launched.errors.filter((e) => expected.test(e)).length).toBe(1)
     await expect.poll(() => launched.log.filter((l) => expected.test(l)).length).toBe(1)
-    expect(others(launched, NO_MENU_ART, expected)).toEqual([])
+    expect(others(launched, NO_MENU_ART, NO_SOUND_BANK, expected)).toEqual([])
 
-    const logs = readdirSync(LOG_DIR).filter(
-      (name) => name.startsWith('telemetry-') && statSync(path.join(LOG_DIR, name)).mtimeMs >= started
-    )
-    const written = logs.map((name) => readFileSync(path.join(LOG_DIR, name), 'utf8')).join('\n')
-    expect(written).toContain('[failure] reading the save BROKEN: ')
+    expect(sessionLogs(started)).toContain('[failure] reading the save BROKEN: ')
   } finally {
     await launched.app.close()
   }
@@ -198,16 +237,9 @@ test('a save list that could not be read leaves an existing save untouched', asy
   const launched = await launchApp({ envFile: realEnv, saveDir: saves })
   try {
     const { page } = launched
-    await choose(page, 'ONE PLAYER')
-    await expect(page.locator('#oneplayer')).toBeVisible()
-    await choose(page, 'NEW GAME', 'onePlayer')
-    await expect(page.locator('#team')).toBeVisible()
-    await choose(page, FIRST_ARMY, 'teamScreen')
-    await expect(page.locator('#name')).toBeVisible()
-    await nameTeam(page, 'KEPT')
+    await raiseCampaign(page, 'KEPT')
 
     // The player is told, and plays on.
-    await expect(page.locator('#player')).toBeVisible()
     const expected = /^\[failure\] listing the saves, so this campaign is not being saved: /
     await expect(line(page, 'listing the saves, so this campaign is not being saved')).toBeVisible()
     await expect.poll(() => launched.errors.filter((e) => expected.test(e)).length).toBe(1)
@@ -220,25 +252,118 @@ test('a save list that could not be read leaves an existing save untouched', asy
     const existing = path.join(saves, 'savearmy0.json')
     writeFileSync(existing, 'an existing save')
 
-    // The campaign's next write: NO to the training question autosaves, and the
-    // map opens only once that write has been answered (campaign.skipTutorial).
-    await expect
-      .poll(
-        () =>
-          page.evaluate(() => {
-            const pow = (window as unknown as { pow?: { playerScreen?: { flipping(): boolean } } }).pow
-            return pow && pow.playerScreen ? pow.playerScreen.flipping() : true
-          }),
-        { message: 'the player screen is still driving in' }
-      )
-      .toBe(false)
-    await tap(page, 'menuSelect')
-    await expect(page.locator('#ask')).toBeVisible()
-    await choose(page, 'NO', 'askTraining')
-    await expect(page.locator('#pigmap')).toBeVisible()
+    await declineTraining(page)
 
     expect(readFileSync(existing, 'utf8')).toBe('an existing save')
     expect(readdirSync(saves)).toEqual(['savearmy0.json'])
+  } finally {
+    await launched.app.close()
+  }
+})
+
+test('a save that will not write reaches the strip, and the game goes on', async () => {
+  // src/renderer/src/campaign.ts, `write`; failures.md, "Reports it". What is
+  // being lost here is the player's progress.
+  test.setTimeout(60_000)
+  const realEnv = path.join(ROOT, 'real.env')
+  writeFileSync(realEnv, `GAME_DIR=${GAME_DIR}\n`)
+  const saves = path.join(ROOT, 'saves-unwritable')
+  mkdirSync(saves)
+  const launched = await launchApp({ envFile: realEnv, saveDir: saves })
+  try {
+    const { page } = launched
+    await raiseCampaign(page, 'LOST')
+    // The first write went through: this slot is the campaign's.
+    expect(readdirSync(saves)).toEqual(['savearmy0.json'])
+    await expect(page.locator('#failures .failure-line')).toHaveCount(0)
+
+    // A "folder" that is a file cannot take the next write.
+    rmSync(saves, { recursive: true })
+    writeFileSync(saves, 'not a folder')
+    await declineTraining(page)
+
+    const expected = /^\[failure\] saving the campaign, so your progress is not being kept: /
+    await expect(line(page, 'saving the campaign, so your progress is not being kept')).toBeVisible()
+    await expect.poll(() => launched.errors.filter((e) => expected.test(e)).length).toBe(1)
+    expect(others(launched, expected)).toEqual([])
+  } finally {
+    await launched.app.close()
+  }
+})
+
+test('a game folder that will not do is a Refusal by name, and goes once it is answered', async () => {
+  // failures.md, "A refusal is not a failure": shown like one, logged as a
+  // refusal, not an error, and a test expects it by name.
+  const started = Math.floor(Date.now() / 1000) * 1000
+  const launched = await launchApp({ envFile: path.join(ROOT, 'nothing-saved.env') })
+  try {
+    const { page } = launched
+    const said: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'info') said.push(message.text())
+    })
+    await expect(page.locator('#select-dir')).toBeVisible()
+
+    const refused = page.locator('#failures .failure-line.refusal')
+    const nowhere = path.join(ROOT, 'nowhere')
+    await page.locator('#path-input').fill(nowhere)
+    await page.locator('#use-path').click()
+    const text = `using that game folder: Folder does not exist: ${nowhere}`
+    await expect(refused).toHaveText(text)
+    await expect.poll(() => said).toContain(`[refusal] ${text}`)
+    await expect.poll(() => sessionLogs(started)).toContain(`[refusal] ${text}`)
+    expect(launched.errors).toEqual([])
+
+    // A second try answers the first, so the strip holds the one that is true now.
+    await page.locator('#path-input').fill(ROOT)
+    await page.locator('#use-path').click()
+    await expect(refused).toHaveText(`using that game folder: warhogs_.exe not found in: ${ROOT}`)
+    await expect(page.locator('#select-dir')).toBeVisible()
+
+    await page.locator('#path-input').fill(FAKE_GAME)
+    await page.locator('#use-path').click()
+    await expect(page.locator('#select-dir')).toBeHidden()
+    await expect(refused).toHaveCount(0)
+    expect(launched.errors.filter((error) => error.includes('game folder'))).toEqual([])
+  } finally {
+    await launched.app.close()
+  }
+})
+
+test('with no game folder yet nothing is reported, and a cold start still has its sounds', async () => {
+  // audio/bank.ts, audio/menuClick.ts: asked for before there was a folder, each
+  // load failed and the failure was kept, so a first run's battles and pauses were
+  // silent until the next launch.
+  test.setTimeout(60_000)
+  const envFile = path.join(ROOT, 'cold.env')
+  const launched = await launchApp({ envFile })
+  try {
+    const { page } = launched
+    await expect(page.locator('#select-dir')).toBeVisible()
+    await expect(page.locator('#failures .failure-line')).toHaveCount(0)
+    expect(launched.errors).toEqual([])
+
+    await page.locator('#path-input').fill(GAME_DIR)
+    await page.locator('#use-path').click()
+    await expect(page.locator('#menu')).toBeVisible()
+    await openBattle(page, 'CAMP')
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const pow = (window as unknown as { pow?: { pauseClickLoaded?(): boolean } }).pow
+          return pow && pow.pauseClickLoaded ? pow.pauseClickLoaded() : false
+        })
+      )
+      .toBe(true)
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const pow = (window as unknown as { pow?: { sfx?: { list(): unknown[] } } }).pow
+          return pow && pow.sfx ? pow.sfx.list().length : 0
+        })
+      )
+      .toBeGreaterThan(0)
+    expect(launched.errors).toEqual([])
   } finally {
     await launched.app.close()
   }

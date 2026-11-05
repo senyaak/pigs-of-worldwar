@@ -51,8 +51,9 @@ const write = async (): Promise<void> => {
   if (!slot || !save) return
   const wrote = await window.api.writeSave(slot, serialise(save))
   // A save that will not write does NOT stop the game — the player asked to
-  // play, not to write files. It is worth a line in the console and no more.
-  if (!wrote.ok) console.warn(`campaign: the save would not write (${wrote.error})`)
+  // play, not to write files — but what is being lost is their progress, so
+  // they are told.
+  if (!wrote.ok) reportFailure('saving the campaign, so your progress is not being kept', wrote.error)
 }
 
 /** Every slot that holds a readable save, newest first — LOAD GAME's list. */

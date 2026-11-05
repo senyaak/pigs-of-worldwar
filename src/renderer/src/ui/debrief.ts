@@ -455,12 +455,12 @@ export function initDebrief(handlers: {
         big = bigFont
         small = smallFont
         if (text.ok) strings = text.strings
-        else console.warn(`debrief: gtext would not load (${text.error})`)
+        else reportFailure("loading the debrief's words", text.error)
         // The REAL token: the map's own PROPOINT model, rendered once into
         // a spin strip. Failing that the medal sprite above stands in.
         const propoint = await window.api.loadModel(TOKEN_ARCHIVE, TOKEN_MODEL)
         if (propoint.ok) spinner = renderTokenStrip(propoint.model, propoint.textures)
-        else console.warn(`debrief: PROPOINT would not load (${propoint.error})`)
+        else reportFailure("loading the debrief's token", propoint.error)
       } catch (error) {
         reportFailure('loading the debrief', error)
         return

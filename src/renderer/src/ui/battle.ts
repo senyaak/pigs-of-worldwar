@@ -5,9 +5,6 @@
 // Its parts live in `battle/`, sharing one core (`battle/core.ts`).
 
 import type { OwnSquad } from '../../../lib/game/muster'
-import { PAUSE_SOUND } from '../../../lib/game/pauseMenu'
-import { GAME_SOUNDS } from '../audio/battleSound'
-import { loadMenuClick } from '../audio/menuClick'
 import { createSpeech } from '../audio/speech'
 import { createBattleInput } from '../input/battleInput'
 import { controller } from '../input/controller'
@@ -132,10 +129,6 @@ export function initBattle(
     controller.press('endTurn')
     controller.tap('fire')
   })
-
-  // The one sample the menu makes every one of its noises with, on a context
-  // of its own because the pause suspends the game's (audio/menuClick.ts).
-  void loadMenuClick(GAME_SOUNDS, PAUSE_SOUND)
 
   // F11 and F12: back a training step and on one. They come through the
   // controller like every other key and stop HERE — the battle's own poll drops

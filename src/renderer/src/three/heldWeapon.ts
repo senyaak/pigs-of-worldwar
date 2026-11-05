@@ -32,6 +32,7 @@
 
 import * as THREE from 'three'
 import type { Model, Texture } from '../api'
+import { reportFailure } from '../failures/report'
 import { buildModelGeometry, buildTextureMaterials, disposeMesh } from './modelMesh'
 import type { Pig as PigMesh } from './pig'
 
@@ -177,7 +178,7 @@ export function createHeldWeapons(): HeldWeapons {
       void window.api.loadModel(WEAPON_ARCHIVE, name).then((result) => {
         loading.delete(name)
         if (!result.ok) {
-          console.log(`no ${name} to hold: ${result.error}`)
+          reportFailure(`loading the ${name} to hold`, result.error)
           art.set(name, null)
           return
         }

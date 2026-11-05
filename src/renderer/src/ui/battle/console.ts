@@ -1,8 +1,11 @@
 // THE CONSOLE: `pow.swapMap`, `pow.step`, `pow.give` and the rest — the map
 // selector and the testing hooks, with no UI by request.
 
+import { Refusal } from '../../../../lib/failures'
 import { give } from '../../../../lib/game/inventory'
 import { TRAINING_STEPS } from '../../../../lib/game/training'
+import { menuClickLoaded } from '../../audio/menuClick'
+import { reportFailure } from '../../failures/report'
 import { controller } from '../../input/controller'
 import { BUILT_MAPS } from '../mapData'
 import type { UiCore } from './core'
@@ -12,6 +15,16 @@ import { updateHud } from './paint'
 import { setPaused } from './pause'
 import { goToStep, standingStep } from './steps'
 
+/** Every map the console can open: what ships, and what is built. */
+const openableMaps = async (): Promise<{ shipping: string[]; all: string[] }> => {
+  const files = await window.api.listFiles()
+  const shipping = files
+    .map((f) => f.path.match(/^Maps[\\/](.+)\.PMG$/i)?.[1])
+    .filter((n): n is string => n !== undefined)
+    .sort()
+  return { shipping, all: [...shipping.map(normalizeMap), ...BUILT_MAPS] }
+}
+
 /** Hang the battle's verbs off `window.pow`. */
 export const exposeConsole = (core: UiCore): void => {
   const { hud, speech, state } = core
@@ -20,13 +33,9 @@ export const exposeConsole = (core: UiCore): void => {
     map: () => state.map,
     swapMap: async (name?: string) => {
       if (!name) {
-        const files = await window.api.listFiles()
-        const maps = files
-          .map((f) => f.path.match(/^Maps[\\/](.+)\.PMG$/i)?.[1])
-          .filter((n): n is string => n !== undefined)
-          .sort()
+        const { shipping } = await openableMaps()
         console.log(
-          `usage: pow.swapMap('ARTGUN') — shipping maps: ${maps.join(', ')}; ` +
+          `usage: pow.swapMap('ARTGUN') — shipping maps: ${shipping.join(', ')}; ` +
             `built: ${BUILT_MAPS.join(', ')}`
         )
         return false
@@ -35,8 +44,17 @@ export const exposeConsole = (core: UiCore): void => {
         console.log('no battle is up — start one from the menu first')
         return false
       }
-      return start(core, normalizeMap(name), true)
+      const map = normalizeMap(name)
+      if (!(await openableMaps()).all.includes(map)) {
+        reportFailure(
+          'swapping the map',
+          new Refusal(`${map} is not a map this install has; pow.swapMap() lists them`)
+        )
+        return false
+      }
+      return start(core, map, true)
     },
+    pauseClickLoaded: menuClickLoaded,
     // The bar has no script driving it yet, so this is how it is watched:
     // any line, or the tutorial's own long one by default.
     say: (text?: string) => hud.say(text ?? state.battleText[SAMPLE_LINE] ?? ''),

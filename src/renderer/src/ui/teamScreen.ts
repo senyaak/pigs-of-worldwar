@@ -298,7 +298,7 @@ export function initTeamScreen(handlers: {
       window.api.loadModel(HAT_ARCHIVE, SKIN_HATS[skinOf(nation)] ?? '')
     ])
     if (!loaded.ok) {
-      console.warn(`${skin}: ${loaded.error}`)
+      reportFailure("loading a nation's skins", loaded.error)
       return
     }
     // A hat that will not load leaves the pig bare-headed rather than in the
@@ -307,7 +307,7 @@ export function initTeamScreen(handlers: {
       textures: loaded.images,
       hat: hat.ok ? { model: hat.model, textures: hat.textures } : null
     }
-    if (!hat.ok) console.warn(`${SKIN_HATS[skinOf(nation)]}: ${hat.error}`)
+    if (!hat.ok) reportFailure(`loading the hat ${SKIN_HATS[skinOf(nation)]}`, hat.error)
     outfits.set(nation, outfit)
     if (selection === nation) pig.reskin(outfit)
   }
@@ -555,6 +555,8 @@ export function initTeamScreen(handlers: {
         // that needs no archive of its own — kept here so row 0 can be
         // returned to like any other. Its HAT still comes out of FHATS.
         const britishHat = await window.api.loadModel(HAT_ARCHIVE, SKIN_HATS[0])
+        if (!britishHat.ok) reportFailure(`loading the hat ${SKIN_HATS[0]}`, britishHat.error)
+        if (!clips.ok) reportFailure("loading the team screen pig's animations", clips.error)
         outfits.set(0, {
           textures: built.textures,
           hat: britishHat.ok ? { model: britishHat.model, textures: britishHat.textures } : null

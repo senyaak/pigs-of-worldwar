@@ -23,7 +23,8 @@ let click: AudioBuffer | null = null
 let loading: Promise<void> | null = null
 
 /**
- * Fetch and decode the one sample, once. A miss is a warning and silence —
+ * Fetch and decode the one sample, once, which needs the game folder: a battle
+ * asks for it as it opens (ui/battle/open.ts). A miss is a report and silence —
  * a stripped install still pauses.
  */
 export function loadMenuClick(srlPath: string, name: string): Promise<void> {
@@ -31,17 +32,17 @@ export function loadMenuClick(srlPath: string, name: string): Promise<void> {
   loading = (async () => {
     const result = await window.api.loadSoundBank(srlPath)
     if (!result.ok) {
-      console.warn(`no menu click: ${result.error}`)
+      reportFailure('loading the menu click', result.error)
       return
     }
     const entry = result.bank.entries.find((one) => one.name === name)
     if (!entry) {
-      console.warn(`no menu click: ${name} is not in ${srlPath}`)
+      reportFailure('loading the menu click', `${name} is not in ${srlPath}`)
       return
     }
     const file = await window.api.loadSound(entry.path.replace(/\\/g, '/'))
     if (!file.ok) {
-      console.warn(`no menu click: ${file.error}`)
+      reportFailure('loading the menu click', file.error)
       return
     }
     try {
@@ -56,6 +57,9 @@ export function loadMenuClick(srlPath: string, name: string): Promise<void> {
   })()
   return loading
 }
+
+/** Whether the sample is here to be played: the only way a spec can tell. */
+export const menuClickLoaded = (): boolean => click !== null
 
 /**
  * Play it, `rate` being the exe's pitch over its own 0x64 — and `level` the
