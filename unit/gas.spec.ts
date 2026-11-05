@@ -145,7 +145,14 @@ const battleField = (): {
   other.health = 75
   const bus = createBus()
   const state = createState(game, terrain(() => 0), () => false)
-  listen({ game, emit: bus.emit, everyone: () => everyone, state, bus } as unknown as BattleCore)
+  listen({
+    game,
+    emit: bus.emit,
+    everyone: () => everyone,
+    state,
+    bus,
+    walkHome: { struck: () => {} }
+  } as unknown as BattleCore)
   const poison = createPoison({ training: false }, bus.emit)
   const gas = createGas({ pigs: () => everyone, training: false, poison }, bus.emit)
   const touch = (pig: Pig): void => {
