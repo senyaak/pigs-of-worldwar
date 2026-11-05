@@ -210,6 +210,9 @@ export interface DebugHooks {
       x: number
       y: number
       z: number
+      /** False for a record on the map's list but not on the ground right now:
+       * the script holding it back, or a crate taken on the proving ground. */
+      visible: boolean
       order: number
       /** The texture each of its face groups is drawn in, off the mesh itself. */
       maps: string[]

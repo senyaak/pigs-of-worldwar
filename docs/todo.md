@@ -21,7 +21,6 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 
 ## Housekeeping — before the fleet builds in parallel
 
-- [corrected-readings.md](todo/corrected-readings.md) — every effect stage at `when + 1`: re-read, check the remake
 - [disasm-notes-cleanup.md](todo/disasm-notes-cleanup.md) — the big notes are split; fold the corrections into the other ~45, then repoint citations
 - [failures-and-actions.md](todo/failures-and-actions.md) — the shared failure and testing rules: reporters, a catch guard, tests that fail at once and wait on actions
 
@@ -37,7 +36,7 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 ## New, from play — 2026-11-02
 
 - [ambient-airship.md](todo/ambient-airship.md) — the airship over the map that can be shot down; find who sends it
-- [proving-ground.md](todo/proving-ground.md) — the map is built and on the ONE PLAYER menu; left: crates that refill
+- [proving-ground.md](todo/proving-ground.md) — the map is built and on the ONE PLAYER menu; left: the bench of specs against the exe
 
 ## Build — read in the exe, not built
 

@@ -391,6 +391,7 @@ export function createEngine(parts: EngineParts): Engine {
   const scenery = createScenery(
     objects,
     training,
+    isProvingGround(world.map),
     () => game.currentPig,
     (id, fromY) => airDrops.send(id, fromY),
     bus.emit

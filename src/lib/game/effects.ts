@@ -68,7 +68,7 @@ export interface RingStage {
  * same order and packs its colour out of three, so it is read by parallel.
  */
 export interface BurstStage {
-  /** The frame it goes off on. */
+  /** The frame of the parent's life it goes off on (`param(when) + 1`). */
   at: number
   /** How many. It is `param(base + 0)`, written to `[0x537dec]` so that the
    * child effect — id 0x1a, the one id whose particle count comes out of a
@@ -526,7 +526,10 @@ export interface Particle {
 
 /** An effect in flight: the stages it has still to let go, and what it has. */
 export interface Effect {
-  /** Whole frames since it was spawned — what a stage's `at` is compared to. */
+  /** Whole frames since it was spawned — what a stage's `at` is compared to. It
+   * is the exe's tick counter `[+0x9C]`: 0 at birth and ticked ahead of the
+   * stages, so the first step is frame 1 and a `when` byte of 0 fires on it
+   * (`effects/fuse.md`, 0x48A5D6; `effects/stages.md`, 0x48BC81..0x48BEE3). */
   frame: number
   /** Fractional frames carried between updates, so the count stays the exe's
    * even though the renderer's step is seconds. */
