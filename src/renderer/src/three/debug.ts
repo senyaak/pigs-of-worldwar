@@ -62,9 +62,8 @@ export interface DebugParts {
    * (lib/game/healing.ts, HealReport). A heal that did nothing has three ways
    * of being true — out of range, out of the arc, a body at its ceiling. */
   heal: () => unknown
-  /** How many effect rings are alive. They are a colour on a transparent
-   * quad, so a screenshot cannot tell one from the sky — this is the only
-   * way a spec can say a hit threw one (three/effects.ts). */
+  /** How many effect rings are alive (three/effects.ts): that a hit threw one.
+   * Whether it was drawn is the canvas's to say (e2e/002/landing-dust.spec.ts). */
   effects: () => number
   /** Where each of those rings is, game space and exe units: what a paint check
    * needs to know where to look (e2e/002/landing-dust.spec.ts). */
