@@ -178,6 +178,7 @@ export function initBriefing(handlers: {
         ])
         font = shared.lit
         if (strings.ok) press = strings.strings[PRESS_TEXT] || press
+        else reportFailure("loading the briefing's words", strings.error)
       } catch (error) {
         reportFailure('loading the briefing', error)
         return

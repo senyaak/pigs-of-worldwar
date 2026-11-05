@@ -207,7 +207,7 @@ export function sharedBank(srlPath: string): Promise<Bank> {
 export async function loadBank(srlPath: string): Promise<Bank> {
   const result = await window.api.loadSoundBank(srlPath)
   if (!result.ok) {
-    console.warn(`no sound: ${result.error}`)
+    reportFailure('loading the sound bank', result.error)
     return SILENT
   }
 
@@ -224,7 +224,7 @@ export async function loadBank(srlPath: string): Promise<Bank> {
     const entry = entries.get(name)!
     const file = await window.api.loadSound(entry.path.replace(/\\/g, '/'))
     if (!file.ok) {
-      console.warn(`no sound ${name}: ${file.error}`)
+      reportFailure(`loading the sound ${name}`, file.error)
       buffers.set(name, null)
       return
     }

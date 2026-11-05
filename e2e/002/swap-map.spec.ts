@@ -50,6 +50,14 @@ test('the console swaps the map; a name that does not ship is refused', async ({
   expect(await swapMap(page, 'NOSUCHMAP')).toBe(false)
   expect(await mapName(page)).toBe('ARTGUN')
   expect((await hud(page)).side).toBe("TOMMY'S TROTTERS")
+  // ...and says why, by name (failures.md, "A refusal is not a failure"). This app
+  // is shared with the next spec, so the line is taken away.
+  const refused = page.locator('#failures .failure-line.refusal')
+  await expect(refused).toHaveText(
+    'swapping the map: NOSUCHMAP is not a map this install has; pow.swapMap() lists them'
+  )
+  await refused.click()
+  await expect(refused).toHaveCount(0)
 
   // The bare call is the usage hint, not a swap.
   expect(await swapMap(page)).toBe(false)

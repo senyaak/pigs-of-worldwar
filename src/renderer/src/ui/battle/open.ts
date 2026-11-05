@@ -1,11 +1,13 @@
 // OPENING A BATTLE and putting it away: the map's files and the art its squads
 // wear loaded, the game mustered, the bus and its listeners, the scene built.
 
+import { Refusal } from '../../../../lib/failures'
 import { bodyExtent } from '../../../../lib/game/body'
 import { buildQuery } from '../../../../lib/game/engine'
 import { createBus } from '../../../../lib/game/events'
 import { mapRaster } from '../../../../lib/game/mapRaster'
 import { MINE_GROUND_ART } from '../../../../lib/game/mines'
+import { PAUSE_SOUND } from '../../../../lib/game/pauseMenu'
 import { fielded, mapSquads, musterGame } from '../../../../lib/game/muster'
 import type { OwnSquad } from '../../../../lib/game/muster'
 import {
@@ -19,7 +21,9 @@ import { skyArchiveFor, weatherFor } from '../../../../lib/game/sky'
 import { nations } from '../../../../lib/game/teams'
 import { isTrainingGround } from '../../../../lib/game/tutorial'
 import type { LoadModelResult, Model, Texture } from '../../api'
-import { createBattleSound } from '../../audio/battleSound'
+import { GAME_SOUNDS, createBattleSound } from '../../audio/battleSound'
+import { loadMenuClick } from '../../audio/menuClick'
+import { reportFailure } from '../../failures/report'
 import { controller } from '../../input/controller'
 import { buildBattle } from '../../three/battle'
 import { ensureScene } from '../../three/scene'
@@ -63,13 +67,16 @@ export const start = async (
   own?: OwnSquad
 ): Promise<boolean> => {
   const { canvasHost, hud, speech, input, state } = core
-  // A battle that cannot load stays unopened and says so in the console —
-  // the same place a refused swapMap answers. The view never appears, so
-  // there is nowhere on screen to put it.
-  const refuse = (error: string): false => {
-    console.log(state.scene ? `stayed on ${state.map}: ${error}` : `could not open ${name}: ${error}`)
+  // A battle that cannot load stays unopened and says why on the strip: a file
+  // it needs is a failure, a rule of the game's own a `Refusal`.
+  const refuse = (error: string | Refusal): false => {
+    reportFailure(state.scene ? `staying on ${state.map}` : `opening ${name}`, error)
     return false
   }
+  // The one sample the pause menu makes every one of its noises with, on a
+  // context of its own because the pause suspends the game's. Only here: before
+  // a battle there may be no game folder yet to read it from (audio/menuClick.ts).
+  void loadMenuClick(GAME_SOUNDS, PAUSE_SOUND)
   const [[terrainResult, objectsResult], clipsResult, textResult, battleTextResult] =
     await Promise.all([
       // A shipped map's own files — or the proving ground, which is built.
@@ -84,6 +91,7 @@ export const start = async (
   if (!terrainResult.ok) return refuse(terrainResult.error)
   if (!textResult.ok) return refuse(textResult.error)
   // An install with no gtext simply gets no card; it is not worth a battle.
+  if (!battleTextResult.ok) reportFailure(`opening ${name} without its words`, battleTextResult.error)
   state.battleText = battleTextResult.ok ? battleTextResult.strings : []
   state.title = missionTitle(state.battleText, name)
   // A restart is a fresh level: the sergeant stops mid-word and says his
@@ -105,7 +113,8 @@ export const start = async (
   const teams = nations(textResult.strings)
   if (teams.length === 0) return refuse('the install names no teams')
 
-  if (!objectsResult.ok) console.log(`${name} without its objects: ${objectsResult.error}`)
+  if (!objectsResult.ok) reportFailure(`opening ${name} without its objects`, objectsResult.error)
+  if (!clipsResult.ok) reportFailure(`opening ${name} without its animations`, clipsResult.error)
 
   // Only the records this many players get: a map does not place the same
   // things in every game (lib/game/muster.ts).
@@ -116,7 +125,7 @@ export const start = async (
   // and there was a second copy of it here (lib/game/engine.ts).
   state.query = buildQuery(terrainResult.blocks, terrainResult.textures)
   const squads = mapSquads(objects, teams, wearing, own)
-  if (squads.length === 0) return refuse(`${name} carries no spawn markers — nothing to field`)
+  if (squads.length === 0) return refuse(new Refusal(`${name} carries no spawn markers — nothing to field`))
 
   // Who is fighting where, at the top of every battle's telemetry — the
   // fifth AI session had to be identified by matching raw spawn
@@ -159,7 +168,7 @@ export const start = async (
     for (const nation of dressed) {
       const wear = await window.api.loadModel(HAT_ARCHIVE, SKIN_HATS[skinOf(nation)] ?? '')
       if (wear.ok) hats.set(nation, { model: wear.model, textures: wear.textures })
-      else console.warn(`${SKIN_HATS[skinOf(nation)]}: ${wear.error}`)
+      else reportFailure(`opening ${name} without the hat ${SKIN_HATS[skinOf(nation)]}`, wear.error)
     }
   }
 
@@ -167,7 +176,7 @@ export const start = async (
   // would be hanging from nothing, so a failed load stands them on their
   // markers instead of taking the battle down with it.
   const canopyResult = await window.api.loadModel(WEAPON_ARCHIVE, CANOPY_MODEL)
-  if (!canopyResult.ok) console.log(`${name} without canopies: ${canopyResult.error}`)
+  if (!canopyResult.ok) reportFailure(`opening ${name} without canopies`, canopyResult.error)
   const canopy = canopyResult.ok
     ? { model: canopyResult.model, textures: canopyResult.textures }
     : null
@@ -175,14 +184,14 @@ export const start = async (
   // …and the faces a pig's head swaps to on the way down (three/faces.ts).
   // Failing it costs only the expression: everyone keeps the resting face.
   const facesResult = await window.api.loadTims('Chars/FACES.MTD')
-  if (!facesResult.ok) console.log(`${name} without face art: ${facesResult.error}`)
+  if (!facesResult.ok) reportFailure(`opening ${name} without face art`, facesResult.error)
   const faces = facesResult.ok ? facesResult.images : []
 
   // …and the sky the map stands under, which the exe picks by MAP out of its
   // mission records (lib/game/sky.ts). Failing it costs the dome and nothing
   // else, so it is reported and stepped over like the props.
   const skyResult = await window.api.loadSky(skyArchiveFor(name))
-  if (!skyResult.ok) console.log(`${name} without a sky: ${skyResult.error}`)
+  if (!skyResult.ok) reportFailure(`opening ${name} without a sky`, skyResult.error)
 
   // …and what falls out of it, on the two moods that draw any: the ten cold
   // maps snow and the five ominous ones rain (lib/game/sky.ts). Ordinary TIM
@@ -192,7 +201,7 @@ export const start = async (
     ? await window.api.loadTims(`Language/Tims/${falling}.mtd`)
     : null
   if (weatherResult && !weatherResult.ok) {
-    console.log(`${name} without its ${falling}: ${weatherResult.error}`)
+    reportFailure(`opening ${name} without its ${falling}`, weatherResult.error)
   }
   const weather =
     falling && weatherResult?.ok ? { kind: falling, images: weatherResult.images } : null
@@ -200,7 +209,7 @@ export const start = async (
   // …and the ground a detector sees mines in (three/mineGround.ts). The exe loads
   // it with the map's own textures; failing it costs the reveal and nothing else.
   const mineResult = await window.api.loadTim(MINE_GROUND_ART)
-  if (!mineResult.ok) console.log(`${name} without mine ground: ${mineResult.error}`)
+  if (!mineResult.ok) reportFailure(`opening ${name} without mine ground`, mineResult.error)
 
   // The squads, standing (lib/game/muster.ts). All the renderer supplies is
   // the MEASUREMENT — how big a pig of this class is, off its own art

@@ -1,6 +1,7 @@
 // The terrain viewer: loads a map's ground over IPC and shows it in the
 // shared viewer panel (no animations — the dropdown empties).
 
+import { reportFailure } from '../failures/report'
 import { ensureScene } from '../three/scene'
 import { buildTerrain } from '../three/terrain'
 import type { Terrain } from '../three/terrain'
@@ -21,7 +22,7 @@ export function initTerrainViewer(): TerrainViewer {
     async open(relPath) {
       const result = await window.api.loadTerrain(relPath)
       if (!result.ok) {
-        statsEl.textContent = result.error
+        reportFailure('opening a map', result.error)
         return false
       }
       const host = ensureScene(canvasHost)

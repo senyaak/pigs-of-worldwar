@@ -158,7 +158,7 @@ export function createSarge(): Sarge {
     if (buffers.has(path)) return
     const file = await window.api.loadSound(path)
     if (!file.ok) {
-      console.warn(`no sarge line ${path}: ${file.error}`)
+      reportFailure('loading a sarge line', file.error)
       buffers.set(path, null)
       return
     }
