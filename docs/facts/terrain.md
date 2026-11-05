@@ -16,6 +16,16 @@
   fits a light straight overhead with almost no ambient (ARCHI R² 0.81) and
   neighbouring blocks agree on shared vertices. `three/terrain.ts` draws it
   unlit, texture × shade. `[measured]`
+- **A buried mine shows as ground, to a detector and nobody else.** Each mine
+  tile within one tile of a COMMANDO, SAPPER, ENGINEER, SABOTEUR or HERO (classes
+  4, 5, 6, 7, 14), on both axes, wears `Language/Tims/Mine.tim` in place of its
+  own texture, with no turn or flip, at its own height and shade. The eyes are the
+  whole side whose turn it is, not only the acting pig, and a dead detector keeps
+  seeing until its body has left the map; the ground goes back as the pig walks on
+  and when the turn passes. `scanner/visibility.md`, 0x4768C0, 0x4A6E30, 0x4A55BF;
+  `lib/game/mines.ts` `revealed`, `three/mineGround.ts`. `[exe]` Play: "видят
+  жёлто-чёрные текстуры там где есть мины". `[play]` The art is 32×32, opaque, a
+  4×4 checkerboard of near-black and yellow. `[measured]`
 - **A tile is two triangles**, split along (col+1,row)–(col,row+1) — the same
   diagonal the mesh uses, so collision and visuals are one surface.
   `TerrainQuery.patch`. `[exe]`

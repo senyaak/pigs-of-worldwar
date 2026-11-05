@@ -421,10 +421,13 @@ const burning = (page: Page): Promise<number> =>
     (window as unknown as { pow: { debug: { burning(): number } } }).pow.debug.burning()
   )
 
-/** How many mine markers the scene is drawing for the side whose turn it is. */
-const markers = (page: Page): Promise<number> =>
+/** Which tiles wear the mine ground for the side whose turn it is
+ * (three/mineGround.ts; e2e/002/mine-ground.spec.ts is its paint check). */
+const stamped = (page: Page): Promise<{ col: number; row: number }[]> =>
   page.evaluate(() =>
-    (window as unknown as { pow: { debug: { mineMarkers(): number } } }).pow.debug.mineMarkers()
+    (
+      window as unknown as { pow: { debug: { mineGround(): { col: number; row: number }[] } } }
+    ).pow.debug.mineGround()
   )
 
 /** What the acting pig is WEARING, out of the engine's own sampler. */
@@ -504,7 +507,7 @@ test('a pig that walks onto a MINE hears it and then loses twenty points', async
 
   // …and NOTHING was ever drawn for the field it walked into: CAMP fields one
   // grunt, and a grunt cannot see a mine even standing on it (lib/game/mines.ts).
-  expect(await markers(page), 'a grunt sees no mines').toBe(0)
+  expect(await stamped(page), 'a grunt sees no mines').toEqual([])
 
   // **AND THE TURN IS OVER.** Play asked whether it should be, remembering that
   // it is — and the rule is not the mine's at all: `Pig::TakeDamage`'s second

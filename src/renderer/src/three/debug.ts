@@ -5,9 +5,10 @@
 // gliding is not something markup can show. So the STATE comes from here and
 // the pixels are asserted separately.
 //
-// `warp` is the ONE write. A spec that wants a pig in front of a particular
-// wall cannot walk it there across a whole map, and doing so through the
-// controller would test the walk rather than the wall.
+// `warp` is the one write of WHERE. A spec that wants a pig in front of a
+// particular wall cannot walk it there across a whole map, and doing so through
+// the controller would test the walk rather than the wall. `asClass` is its twin
+// for WHAT, for a subject only some classes meet on a map fielding none of them.
 
 import type * as THREE from 'three'
 import type { Game, Pig } from '../../../lib/game/game'
@@ -93,9 +94,16 @@ export interface DebugParts {
    * a buried one unless somebody can SEE it, so this is the only way a spec can
    * find one at all (lib/game/mines.ts). */
   mines: () => { x: number; y: number; z: number; fuse: number }[]
-  /** How many mine MARKERS are on the scene — what the side whose turn it is can
-   * see of the field (three/mineArt.ts). */
-  mineMarkers: () => number
+  /** How many mine MODELS are on the scene, trodden and laid (three/mineArt.ts). */
+  mineModels: () => number
+  /** The tiles wearing the mine ground: what the side whose turn it is can see of
+   * the field (three/mineGround.ts). */
+  mineGround: () => { col: number; row: number }[]
+  /** Where a tile's four corners land in the picture, in clip space: x and y −1..1
+   * across the canvas, y up. What a paint check needs to know where to look. */
+  tileOnScreen: (col: number, row: number) => { x: number; y: number; z: number }[] | null
+  /** Make the acting pig this class, for what a class is gated on. */
+  asClass: (pigClass: number) => void
   /** The dashboard's map from the side it is drawn for (lib/game/scanner.ts). */
   map: () => { eye: Eye; blips: Blip[] }
   /**
@@ -347,9 +355,13 @@ export function exposeBattleDebug(parts: DebugParts): void {
       fuseTips: () => parts.fuseTips(),
       /** Every mine counting down under somebody's feet (lib/game/mines.ts). */
       mines: () => parts.mines(),
-      /** …and how many BURIED ones are being drawn for the side whose turn it is:
-       * a mine is hidden unless a pig near it has the class to see one. */
-      mineMarkers: () => parts.mineMarkers(),
+      /** …and how many mine MODELS are on the scene, which a buried one is not. */
+      mineModels: () => parts.mineModels(),
+      /** …and the tiles wearing the mine ground for the side whose turn it is: a
+       * mine is hidden unless a pig near it has the class to see one. */
+      mineGround: () => parts.mineGround(),
+      tileOnScreen: (col: number, row: number) => parts.tileOnScreen(col, row),
+      asClass: (pigClass: number) => parts.asClass(pigClass),
       map: () => parts.map(),
       minesTripped: () => parts.minesTripped(),
       remains: () => parts.remains(),

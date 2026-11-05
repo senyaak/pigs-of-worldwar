@@ -81,9 +81,15 @@ export interface DebugHooks {
   fuseTips(): { x: number; y: number; z: number }[]
   /** Mines that have been trodden on and are counting down (lib/game/mines.ts). */
   mines(): { x: number; y: number; z: number; fuse: number }[]
-  /** How many buried mines are being DRAWN for the side whose turn it is — a
-   * marker only a nearby pig of the right class gets (three/mineArt.ts). */
-  mineMarkers(): number
+  /** How many mine MODELS are on the scene, trodden and laid (three/mineArt.ts). */
+  mineModels(): number
+  /** The tiles wearing the mine ground for the side whose turn it is — only a
+   * nearby pig of the right class lights one (three/mineGround.ts). */
+  mineGround(): { col: number; row: number }[]
+  /** Where a tile's four corners land in the picture, in clip space. */
+  tileOnScreen(col: number, row: number): { x: number; y: number; z: number }[] | null
+  /** Make the acting pig this class. */
+  asClass(pigClass: number): void
   /** How many pairs of BOOTS are drawn — the renderer's word that a `remains`
    * event became art (three/remains.ts). */
   remains(): number

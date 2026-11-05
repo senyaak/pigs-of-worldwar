@@ -104,6 +104,44 @@ test('the turn ends and the layer never walked away: it CANNOT plant, so it blow
   expect(mines.buried(256, 256)).toBe(false)
 })
 
+test('a detector lights the tile it can see, and a corpse still does until it is gone', { tag: '@nodata' }, () => {
+  const { mines, pigs } = field()
+  const sapper = pigAt(256, 256)
+  pigs.push(sapper)
+  mines.lay(sapper, MINE)
+  sapper.position.x = 9000
+  mines.bedAll()
+  // The tile by its place, which is what the ground wears the stamp on. The map's
+  // 64 tiles of 512 are centred on the origin, so (256, 256) is col 32, row 32.
+  const eyes = pigAt(256 + 512, 256, 2)
+  expect(mines.revealed([eyes])).toEqual([{ col: 32, row: 32, x: 256, z: 256 }])
+  // exe: scanner/visibility.md, 0x4768D5 — the gate refuses state 8 and lets
+  // DEAD's 6 through, and 0x468232 writes 8 only when the body leaves the map.
+  eyes.health = 0
+  expect(mines.revealed([eyes]), 'a body on the map still sees').toHaveLength(1)
+  eyes.gone = true
+  expect(mines.revealed([eyes]), 'a gone pig sees nothing').toEqual([])
+})
+
+test('the reveal is exactly the one tile either way, on both axes', { tag: '@nodata' }, () => {
+  const { mines, pigs } = field()
+  const sapper = pigAt(256, 256)
+  pigs.push(sapper)
+  mines.lay(sapper, MINE)
+  sapper.position.x = 9000
+  mines.bedAll()
+  // exe: scanner/visibility.md, 0x476B11 — col and row each run −1..+1 round the
+  // detector's own tile, so the corner of the block counts and the next tile out
+  // does not. One tile is 512.
+  expect(mines.revealed([pigAt(256 + 512, 256 + 512, 2)])).toHaveLength(1)
+  expect(mines.revealed([pigAt(256 + 1024, 256, 2)])).toEqual([])
+  expect(mines.revealed([pigAt(256, 256 + 1024, 2)])).toEqual([])
+  // exe: scanner/visibility.md, 0x476B4A — it is the bit that is tested, so a
+  // spent mine lights nothing.
+  mines.tread(256, 256)
+  expect(mines.revealed([pigAt(256 + 512, 256, 2)])).toEqual([])
+})
+
 test('bedded clear of everyone it waits in the ground, revealed to detectors', { tag: '@nodata' }, () => {
   const { mines, pigs, heard } = field()
   const sapper = pigAt(256, 256)
