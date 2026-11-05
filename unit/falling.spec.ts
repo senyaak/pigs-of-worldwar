@@ -100,7 +100,7 @@ test('the gate is the exe\'s 200 a frame, and under it nothing is owed', { tag: 
   const query = terrain(() => 0)
   const state = createLocomotion(query, 0, 0, 0)
   // A soft flying contact, written the way `fly` writes one.
-  state.impact = { speed: FALL_GATE, flying: true, surface: 0 }
+  state.impact = { speed: FALL_GATE, flying: true, onObject: false, surface: 0 }
   chargeLanding(pig, state, false, (event) => void heard.push(event))
   expect(pig.health).toBe(75)
   expect(state.impact).toBeNull()

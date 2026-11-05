@@ -23,7 +23,9 @@
   over it bounces off the wall material, keeps its speed along the slope and is
   thrown out once drag has it under. `movement/landing.md`, 0x471045. The remake's
   own second test on the normal part of the arrival is gone; CAMP's tile 43,17
-  still ends, at any entry speed (`e2e/002/wedge.spec.ts`).
+  still ends, at any entry speed (`e2e/002/wedge.spec.ts`). The eject is the
+  landscape's contact alone (0x470fee): a roof over a blocked tile is landed on
+  like any other.
 
 - `[play]` **A hillside is walked DOWN, and only a face past WALK_OFF_GRADE
   (60°) is fallen off — and that number is PLAY'S DIAL.** The first build's

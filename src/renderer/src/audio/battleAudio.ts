@@ -251,9 +251,10 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       crateLanded: () => playCue(bank(), BATTLE_SOUNDS.land),
       dropLanded: () => playCue(bank(), BATTLE_SOUNDS.land),
       // A flying pig meeting the ground: the thud at its own speed's volume, and
-      // the whole-body scuff the ground picks (audio/battle.ts).
+      // on the landscape the whole-body scuff the ground picks (audio/battle.ts).
       thudded: ({ volume, surface }) => {
         playCue(bank(), { ...BATTLE_SOUNDS.thud, volume })
+        if (surface === null) return
         for (const cue of scuffCues(surface)) playCue(bank(), cue)
       }
     }),

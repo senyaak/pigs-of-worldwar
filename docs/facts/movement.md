@@ -11,15 +11,18 @@
 
   | arrival | what happens | where |
   | - | - | - |
-  | under 50, on blocked ground | thrown out on the landing frame | 0x471045 |
+  | under 50, on blocked ground, the landscape's contact only | thrown out on the landing frame | 0x470fee, 0x471045 |
   | over 75 | a ring of dust, effect 0x1E, row 5 | 0x471052 |
-  | over 25 | I_PICKUP at a tenth of the speed up to 60, pitch 100 to 163, and the ground's scuff at 40 | 0x471158 |
+  | over 25 | I_PICKUP at a tenth of the speed up to 60, pitch 100 to 163; on the landscape's contact also the ground's scuff at 40 | 0x471158, 0x4711b3 |
   | 25 or more, or any on blocked ground | bounces; on free ground under 25 it stops dead, in silence | 0x4711d8, 0x471350 |
   | over 70 | 60 on the exertion counter | 0x471325 |
 
   The dust and the thud share a gate: at least three pig-update frames since the
   last thud (`[pig+0x1b2]`, read at 0x471061 and 0x47115e, zeroed at 0x4711cb,
-  counted at 0x46cbd7).
+  counted at 0x46cbd7). The handler's first argument says which contact it is, 1
+  from the landscape (0x4772b7) and 0 from an object (0x4777de): a landing on a
+  roof or a deck has the thud, the dust, the fork and the fatigue, and no scuff
+  and no eject.
 - `[gap]` **The counter wraps in the original.** That byte wraps at 256, which
   shuts the gate for three frames in each lap. Not kept: a countdown stands in.
 - `[gap]` **Nothing reads the exertion counter yet.** Only the landing charges it;

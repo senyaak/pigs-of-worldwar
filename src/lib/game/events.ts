@@ -238,9 +238,10 @@ export type BattleEvent =
   /** …and it has touched down. */
   | { kind: 'dropLanded'; pig: PigId }
   /** A FLYING pig met the ground hard enough to be heard (lib/game/landing.ts):
-   * I_PICKUP at this `volume`, the ground's own scuff from `surface`, and at the
+   * I_PICKUP at this `volume`, the ground's own scuff from `surface`, which is
+   * null on an object because only the landscape's contact has one, and at the
    * hardest speeds the ring of dust. */
-  | { kind: 'thudded'; at: Point; volume: number; surface: number; dust: boolean }
+  | { kind: 'thudded'; at: Point; volume: number; surface: number | null; dust: boolean }
   /** Every canopy still up goes now: the jump key. */
   | { kind: 'canopiesCut' }
 

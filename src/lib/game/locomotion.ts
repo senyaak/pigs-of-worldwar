@@ -416,14 +416,16 @@ export interface LocomotionState {
   /**
    * The GROUND CONTACT this frame made, or null — the full arrival speed
    * (the exe's `[hit+0x14]`, the length of the relative velocity), whether
-   * the body was FLYING when it hit, and the ground it hit, in the tile's own
-   * alphabet. `fly` writes one per non-water contact, `updateLocomotion`
-   * clears it at the top of every frame, and whoever owns the PIG turns it
-   * into damage and the landing's ladder (lib/game/falling.ts,
-   * lib/game/landing.ts): this state knows no pig, the same split as
-   * `wounded`.
+   * the body was FLYING when it hit, whether what it hit was an OBJECT's top
+   * rather than the landscape, and the tile under it, in the tile's own alphabet.
+   * The exe's handler takes that second question as its first argument: 1 from
+   * the landscape (0x4772b7), 0 from an object (0x4777de). `fly` writes one per
+   * non-water contact, `updateLocomotion` clears it at the top of every frame,
+   * and whoever owns the PIG turns it into damage and the landing's ladder
+   * (lib/game/falling.ts, lib/game/landing.ts): this state knows no pig, the same
+   * split as `wounded`.
    */
-  impact: { speed: number; flying: boolean; surface: number } | null
+  impact: { speed: number; flying: boolean; onObject: boolean; surface: number } | null
 }
 
 /**
@@ -726,7 +728,8 @@ function fly(
   // `standOn`'s reach is what makes it that — nothing above the feet counts.
   const ground = restingY(query, state.x, state.z)
   const roof = obstruction.standOn(state.x, state.z, state.y, 0)
-  const floor = roof !== null && roof < ground ? roof : ground
+  const onObject = roof !== null && roof < ground
+  const floor = onObject ? roof : ground
   if (!(a.vy > 0 && y >= floor)) {
     state.y = y
     return
@@ -751,7 +754,7 @@ function fly(
   // splash ends the flight where it happens. A roof under the feet is not
   // water, whatever the tile says — that is the bridge rule (`inWater`
   // above) — and BLOCKED ground keeps its wall arm whole.
-  if (!blocked && (roof === null || roof >= ground) && query.isWater(state.x, state.z)) {
+  if (!blocked && !onObject && query.isWater(state.x, state.z)) {
     state.y = floor
     state.airborne = null
     state.swimming = true
@@ -781,7 +784,8 @@ function fly(
   state.impact = {
     speed: arrival,
     flying,
-    surface: obstruction.underfoot(state.x, state.z, floor) ?? query.tileType(state.x, state.z)
+    onObject,
+    surface: query.tileType(state.x, state.z)
   }
   /**
    * A landing is binary in the original, and the test is the ARRIVAL SPEED.
@@ -806,8 +810,12 @@ function fly(
    * Over the bar it bounces off `WALL_MATERIAL`, keeping its slope-parallel speed
    * until drag has it under, which is what ends the slide play found on CAMP's
    * tile 43,17 ("туда сюда скользит на 1м месте", e2e/002/wedge.spec.ts).
+   *
+   * **The landscape's contact only**: the eject's test opens by asking the
+   * handler's first argument (0x470fee), so a pig coming down on a roof over a
+   * blocked tile is on the roof, and takes the fork like any other.
    */
-  if (blocked && arrival < EJECT_CUTOFF) {
+  if (blocked && !onObject && arrival < EJECT_CUTOFF) {
     state.airborne = null
     eject(state, query)
     return

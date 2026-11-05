@@ -14,14 +14,14 @@ import { chargeLanding, FALL_GATE } from '../src/lib/game/falling'
 import type { Pig } from '../src/lib/game/game'
 import {
   DUST_SPEED,
-  EXERTION_MAX,
-  LANDING_EXERTION,
   THUD_QUIET_SECONDS,
   THUD_SPEED,
   WINDED_SPEED,
   thudVolume
 } from '../src/lib/game/landing'
 import { createLocomotion, updateLocomotion } from '../src/lib/game/locomotion'
+import { NO_OBSTACLES } from '../src/lib/game/obstacles'
+import type { Obstruction } from '../src/lib/game/obstacles'
 import { SILENT } from '../src/renderer/src/audio/bank'
 import type { Bank } from '../src/renderer/src/audio/bank'
 import { createBattleSounds } from '../src/renderer/src/audio/battle'
@@ -39,11 +39,20 @@ const WALL_GROUND = terrain(
 const FINE_STEP = 1 / 600
 const STILL = { walk: 0, turn: 0, jump: false }
 
+/** A roof over the whole map: game space is Y-down, so 200 above the ground is
+ * -200. Its `underfoot` answers a surface of its own, which no scuff may use. */
+const ROOF_TOP = -200
+const ROOF: Obstruction = {
+  ...NO_OBSTACLES,
+  standOn: (_x, _z, footY) => (footY <= ROOF_TOP ? ROOF_TOP : null),
+  underfoot: () => 3
+}
+
 /** One frame's contact at `across` and `down` exe units a frame: thrown, so the
  * handler is the routine answering it. */
-function contact(ground: typeof FREE_GROUND, across: number, down: number) {
+function contact(ground: typeof FREE_GROUND, across: number, down: number, obstruction: Obstruction = NO_OBSTACLES) {
   const state = createLocomotion(ground, 0, 0, 0)
-  state.y -= 0.05
+  state.y = obstruction === NO_OBSTACLES ? state.y - 0.05 : ROOF_TOP - 0.05
   state.airborne = {
     vx: fromExeSpeed(across),
     vy: fromExeSpeed(down),
@@ -52,7 +61,7 @@ function contact(ground: typeof FREE_GROUND, across: number, down: number) {
     pushIn: null,
     hurled: true
   }
-  updateLocomotion(state, ground, STILL, FINE_STEP)
+  updateLocomotion(state, ground, STILL, FINE_STEP, obstruction)
   expect(state.impact, 'the fixture made a ground contact').not.toBeNull()
   return state
 }
@@ -70,7 +79,7 @@ const pigAt = (exertion = 0): Pig =>
 function ladder(exeSpeed: number, pig: Pig = pigAt(), flying = true): BattleEvent[] {
   const heard: BattleEvent[] = []
   const state = createLocomotion(FREE_GROUND, 0, 0, 0)
-  state.impact = { speed: fromExeSpeed(exeSpeed), flying, surface: 7 }
+  state.impact = { speed: fromExeSpeed(exeSpeed), flying, onObject: false, surface: 7 }
   chargeLanding(pig, state, false, (event) => void heard.push(event))
   return heard.filter((one) => one.kind === 'thudded')
 }
@@ -84,6 +93,22 @@ test('blocked ground under 50 throws the pig out on the landing frame, at 50 it 
   const over = contact(WALL_GROUND, 0, 50)
   expect(over.airborne, 'a bounce stays in the air').not.toBeNull()
   expect(over.airborne?.ejected ?? false).toBe(false)
+})
+
+test('a roof over a blocked tile is landed on, and throws nobody out', { tag: '@nodata' }, () => {
+  // exe: movement/landing.md, 0x470fee — the eject's test opens on the handler's
+  // first argument, which is 0 from an object (0x4777de). The same 40 on the bare
+  // tile is thrown out, in the case above.
+  const bounced = contact(WALL_GROUND, 0, 40, ROOF)
+  expect(bounced.impact?.onObject).toBe(true)
+  expect(bounced.airborne, 'at the fork\'s 25 or more it bounces').not.toBeNull()
+  expect(bounced.airborne?.ejected ?? false).toBe(false)
+  // exe: movement/landing.md, 0x471231 — and the second `IsBlocked`, under the
+  // fork's 25, is kind 1's too: so slow, it comes to rest on the roof.
+  const rested = contact(WALL_GROUND, 0, 20, ROOF)
+  expect(rested.impact?.onObject).toBe(true)
+  expect(rested.airborne).toBeNull()
+  expect(rested.y).toBe(ROOF_TOP)
 })
 
 test('free ground never ejects, at any speed', { tag: '@nodata' }, () => {
@@ -186,7 +211,7 @@ test('one contact shuts the sound and the dust for three frames, and only those'
   const pig = pigAt()
   const state = createLocomotion(FREE_GROUND, 0, 0, 0)
   const hit = (): void => {
-    state.impact = { speed: fromExeSpeed(100), flying: true, surface: 1 }
+    state.impact = { speed: fromExeSpeed(100), flying: true, onObject: false, surface: 1 }
     chargeLanding(pig, state, false, emit)
   }
   hit()
@@ -196,8 +221,8 @@ test('one contact shuts the sound and the dust for three frames, and only those'
   hit()
   expect(heard, 'the gate let one through early').toHaveLength(1)
   // …but the fatigue has no gate: it follows the fork, not the byte
-  // (movement/landing.md, 0x471325).
-  expect(pig.exertion).toBe(2 * LANDING_EXERTION)
+  // (movement/landing.md, 0x471325), so two contacts cost 60 each.
+  expect(pig.exertion).toBe(120)
   updateLocomotion(state, FREE_GROUND, STILL, THUD_QUIET_SECONDS * 0.2)
   hit()
   expect(heard, 'the gate never opened').toHaveLength(2)
@@ -208,10 +233,10 @@ test('a contact too soft to be heard leaves the gate alone', { tag: '@nodata' },
   const heard: BattleEvent[] = []
   const emit = (event: BattleEvent): void => void heard.push(event)
   const state = createLocomotion(FREE_GROUND, 0, 0, 0)
-  state.impact = { speed: fromExeSpeed(20), flying: true, surface: 1 }
+  state.impact = { speed: fromExeSpeed(20), flying: true, onObject: false, surface: 1 }
   chargeLanding(pigAt(), state, false, emit)
   expect(state.thudQuiet).toBe(0)
-  state.impact = { speed: fromExeSpeed(100), flying: true, surface: 1 }
+  state.impact = { speed: fromExeSpeed(100), flying: true, onObject: false, surface: 1 }
   chargeLanding(pigAt(), state, false, emit)
   expect(heard.filter((one) => one.kind === 'thudded')).toHaveLength(1)
 })
@@ -221,7 +246,6 @@ test('a contact too soft to be heard leaves the gate alone', { tag: '@nodata' },
 test('past 70 a landing winds the pig by 60, and at a whole 70 it does not', { tag: '@nodata' }, () => {
   // exe: movement/landing.md, 0x471325 for the 70 and 0x47132b for the 60.
   expect(WINDED_SPEED).toBeCloseTo(fromExeSpeed(71), 6)
-  expect(LANDING_EXERTION).toBe(0x3c)
   const under = pigAt()
   ladder(70.9, under)
   expect(under.exertion).toBe(0)
@@ -232,7 +256,6 @@ test('past 70 a landing winds the pig by 60, and at a whole 70 it does not', { t
 
 test('the counter stops at 300', { tag: '@nodata' }, () => {
   // exe: movement/walk-speed.md, 0x46DCB2 — clamped 0..300.
-  expect(EXERTION_MAX).toBe(300)
   const pig = pigAt(280)
   ladder(100, pig)
   expect(pig.exertion).toBe(300)
@@ -257,6 +280,47 @@ test('a corpse is not hurt again, and still hits the ground', { tag: '@nodata' }
   const heard = ladder(FALL_GATE * FRAME_SECONDS + 1, pig)
   expect(heard).toHaveLength(1)
   expect(pig.health).toBe(0)
+})
+
+// ——— which contact: the landscape's or an object's ———
+
+/** What one real contact at 100 a frame climbs, heard through the real audio. */
+function climb(obstruction: Obstruction) {
+  const state = contact(FREE_GROUND, 0, 100, obstruction)
+  const pig = pigAt()
+  const heard: BattleEvent[] = []
+  chargeLanding(pig, state, false, (event) => void heard.push(event))
+  const { bank, played } = listening()
+  const audio = createBattleAudio(() => bank)
+  for (const event of heard) audio.listen(event)
+  return { pig, state, thuds: heard.filter((one) => one.kind === 'thudded'), played: played.map((one) => one.name) }
+}
+
+test('a landing on an object has the thud and no scuff', { tag: '@nodata' }, () => {
+  // exe: movement/landing.md, 0x4711b3 — `Pig::Footstep` is called for kind 1
+  // alone, and an object's contact is kind 0 (0x4777de).
+  const { thuds, played } = climb(ROOF)
+  expect(thuds).toHaveLength(1)
+  expect(thuds[0]).toMatchObject({ surface: null })
+  expect(played).toEqual(['I_PICKUP'])
+})
+
+test('a landing on the landscape has the thud and the scuff of its own tile', { tag: '@nodata' }, () => {
+  // exe: movement/landing.md, 0x4711b3, 0x4711b8.
+  const { state, thuds, played } = climb(NO_OBSTACLES)
+  expect(thuds).toHaveLength(1)
+  expect(thuds[0]).toMatchObject({ surface: FREE_GROUND.tileType(state.x, state.z) })
+  expect(played).toHaveLength(3)
+  expect(played[0]).toBe('I_PICKUP')
+})
+
+test('the thud, the dust, the fork and the fatigue do not ask which contact it was', { tag: '@nodata' }, () => {
+  // exe: movement/landing.md, 0x471052, 0x471158, 0x4711d8 and 0x471325 test the
+  // speed and the gate, and none of them the handler's first argument.
+  const { pig, state, thuds } = climb(ROOF)
+  expect(thuds[0]).toMatchObject({ volume: 10, dust: true })
+  expect(pig.exertion).toBe(60)
+  expect(state.airborne, 'at 100 it bounces off the roof').not.toBeNull()
 })
 
 // ——— what is heard ———

@@ -692,8 +692,9 @@ export const underlayCue = (foot: number, soft: boolean): Cue => ({
   sound: STEP_UNDERLAY
 })
 
-/** The whole-body scuff under a thud: `Pig::Footstep(0, 40, 0, 0)` (0x4711b8),
- * foot 0 at volume 40, the ground's file over the sand like any step. */
+/** The whole-body scuff under a thud on the landscape (0x4711b3 asks which
+ * contact it is): `Pig::Footstep(0, 40, 0, 0)` (0x4711b8), foot 0 at volume 40,
+ * the ground's file over the sand like any step. */
 export const SCUFF_VOLUME = 40
 
 export const scuffCues = (surface: number): Cue[] => [
