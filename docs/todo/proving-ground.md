@@ -12,10 +12,8 @@ every one, the four vehicles, the PILLBOX and the BIG_GUN, and the pond, hill
 and wall. What it is and where every piece comes from:
 [../facts/proving-ground.md](../facts/proving-ground.md).
 
-What play asked for that it does not do yet:
-
-- **A crate that was taken is back at the start of the next turn** — one round
-  per crate per turn.
+Everything play asked of the map is on it. What is still open is the bench below,
+issues #20 to #23.
 
 ## Why it matters beyond play
 

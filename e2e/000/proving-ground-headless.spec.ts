@@ -24,8 +24,9 @@ import type { BattleEvent } from '../../src/lib/game/events'
 import type { BrainPort } from '../../src/lib/game/brainPort'
 import type { Game, Pig } from '../../src/lib/game/game'
 import { isDead, maxHealthFor } from '../../src/lib/game/health'
-import { give } from '../../src/lib/game/inventory'
+import { MAX_SLOTS, amountOf, give } from '../../src/lib/game/inventory'
 import { outfit } from '../../src/lib/game/kits'
+import type { Pickup } from '../../src/lib/game/pickups'
 import { POISON_PER_TURN } from '../../src/lib/game/poison'
 import { SKILL } from '../../src/lib/game/skills'
 import type { MapObject } from '../../src/lib/formats/pog'
@@ -35,7 +36,7 @@ import { bodyExtent } from '../../src/lib/game/body'
 import { restingY } from '../../src/lib/game/locomotion'
 import { WATER_KIND, textureKind } from '../../src/lib/game/watermask'
 import { isSpawnMarker } from '../../src/lib/game/spawns'
-import { PROVING_GROUND } from '../../src/lib/game/provingGround'
+import { CRATE_ROUNDS, CRATE_SKILLS, PROVING_GROUND } from '../../src/lib/game/provingGround'
 import { POND, STRIP, WATER_TEXTURE } from '../../src/lib/game/provingTerrain'
 import { PROVING_ARCHIVES } from '../../src/lib/game/provingSources'
 import { TILE_STEP } from '../../src/lib/formats/pmg'
@@ -603,6 +604,148 @@ test('control: on a shipped map a fallen pig stays fallen over a handover', asyn
   expect(victim.gone).toBe(true)
   expect(isDead(victim)).toBe(true)
   expect(heard.filter((event) => event.kind === 'stoodUp')).toEqual([])
+})
+
+// A TAKEN CRATE IS BACK — `[play]`, 2026-11-02, "one round per crate per turn"
+// (docs/facts/proving-ground.md). The rule alone is unit/provingCrates.spec.ts;
+// this is the whole chain, the real map and the handover
+// (lib/game/battle/handover.ts) answering.
+
+const collections = (heard: BattleEvent[]): number => heard.filter((event) => event.kind === 'collected').length
+
+const crateOf = ({ engine }: Stepped, skill: number): Pickup => {
+  const crate = engine.scenery.remaining().find((one) => one.skill === skill)
+  if (!crate) throw new Error(`no crate of skill ${skill} on the ground`)
+  return crate
+}
+
+const onTheGround = ({ engine }: Stepped, crate: Pickup): boolean =>
+  engine.scenery.remaining().some((one) => one.id === crate.id)
+
+const goneList = ({ engine }: Stepped): number[] => engine.scenery.obstacles.changes().gone
+
+/** Our pass and the dummy's, to the top of our own next turn. */
+function roundToOurs(battle: Stepped): void {
+  passOurTurn(battle)
+  stepUntil(battle, () => battle.game.currentPlayer === battle.game.players[1], "a dummy's turn")
+  stepUntil(battle, () => battle.game.currentPlayer === battle.game.players[0], 'the turn comes back')
+  battle.game.cutTurnStart()
+}
+
+test('a taken crate gives one round, is back at the next turn, and gives another on a later one', async () => {
+  test.skip(!installed(), `no game install at ${GAME_DIR}`)
+  const battle = await provingBattle()
+  const { engine, game, heard } = battle
+  const pig = game.players[0].pigs[0]
+  intoTheTurn(battle)
+  const crate = crateOf(battle, SKILL.TNT)
+  // The grunt's kit holds none (0x4d02e0, lib/game/kits.ts), so what is counted is
+  // the crate alone.
+  expect(amountOf(pig.carrying, SKILL.TNT)).toBe(0)
+
+  engine.battle.warp(crate.x, crate.z, pig.heading)
+  stepUntil(battle, () => collections(heard) === 1, 'the pig is on the crate')
+  expect(amountOf(pig.carrying, SKILL.TNT)).toBe(CRATE_ROUNDS)
+  expect(onTheGround(battle, crate)).toBe(false)
+  expect(goneList(battle)).toContain(crate.id)
+
+  // Staying on the spot, right through the turn clock running out: one round.
+  const begun = turnsBegun(heard).length
+  stepUntil(
+    battle,
+    () => turnsBegun(heard).length > begun,
+    'the clock runs out with the pig on the spot',
+    () => {
+      if (turnsBegun(heard).length > begun) return
+      expect(collections(heard)).toBe(1)
+      expect(onTheGround(battle, crate)).toBe(false)
+    }
+  )
+  expect(amountOf(pig.carrying, SKILL.TNT)).toBe(CRATE_ROUNDS)
+
+  // Back at the next turn's card, whoever's turn that is. It is a dummy's, so the
+  // pig standing in it takes nothing yet.
+  expect(turnsBegun(heard).at(-1)).toMatchObject({ player: 1 })
+  expect(onTheGround(battle, crate)).toBe(true)
+  expect(goneList(battle)).not.toContain(crate.id)
+  const returned = heard.findIndex((event) => event.kind === 'shown' && event.id === crate.id && event.visible)
+  expect(returned, 'it is drawn again').toBeGreaterThanOrEqual(0)
+  expect(heard.lastIndexOf(turnsBegun(heard).at(-1)!), 'ahead of the card').toBeGreaterThan(returned)
+  expect(collections(heard)).toBe(1)
+
+  // Our next turn, and the pig is still in it: a second round.
+  stepUntil(battle, () => game.currentPlayer === game.players[0], 'the dummy passes')
+  game.cutTurnStart()
+  stepUntil(battle, () => collections(heard) === 2, 'our own next turn')
+  expect(amountOf(pig.carrying, SKILL.TNT)).toBe(2 * CRATE_ROUNDS)
+
+  // Walked off, it is there for the taking and nothing is handed over from afar…
+  engine.battle.warp(crate.x - 600, crate.z, pig.heading)
+  engine.update(FRAME)
+  roundToOurs(battle)
+  expect(onTheGround(battle, crate)).toBe(true)
+  engine.update(FRAME)
+  expect(collections(heard)).toBe(2)
+  // …and a pig that comes back to it on a later turn gets another.
+  engine.battle.warp(crate.x, crate.z, pig.heading)
+  stepUntil(battle, () => collections(heard) === 3, 'the pig comes back to it')
+  expect(amountOf(pig.carrying, SKILL.TNT)).toBe(3 * CRATE_ROUNDS)
+  expect(heard.filter((event) => event.kind === 'taken')).toEqual([])
+})
+
+test('a pig already carrying fifteen skills is refused and the crate stays', async () => {
+  test.skip(!installed(), `no game install at ${GAME_DIR}`)
+  const battle = await provingBattle()
+  const { engine, game, heard } = battle
+  const pig = game.players[0].pigs[0]
+  intoTheTurn(battle)
+  const crate = crateOf(battle, SKILL.TNT)
+  for (const skill of CRATE_SKILLS) {
+    if (pig.carrying.length < MAX_SLOTS && skill !== SKILL.TNT) give(pig.carrying, skill, 1)
+  }
+  // exe: 0x465787, a sixteenth skill is refused (lib/game/inventory.ts).
+  expect(pig.carrying.length).toBe(MAX_SLOTS)
+
+  engine.battle.warp(crate.x, crate.z, pig.heading)
+  const refusals = (): number => heard.filter((event) => event.kind === 'refused').length
+  stepUntil(battle, () => refusals() > 0, 'the pig is on the crate')
+  for (let frame = 0; frame < 15; frame++) engine.update(FRAME)
+
+  expect(refusals(), 'said once, not once a frame').toBe(1)
+  expect(collections(heard)).toBe(0)
+  expect(amountOf(pig.carrying, SKILL.TNT)).toBe(0)
+  expect(onTheGround(battle, crate)).toBe(true)
+  expect(goneList(battle)).not.toContain(crate.id)
+})
+
+test('control: on a shipped map a taken crate does not come back over a handover', async () => {
+  test.skip(!installed(), `no game install at ${GAME_DIR}`)
+  const maps = path.join(GAME_DIR, 'Maps')
+  const terrain = await loadTerrain(path.join(maps, 'GUNS.PMG'))
+  const records = await loadMapObjects(path.join(maps, 'GUNS.POG'))
+  const battle = await assemble('GUNS', terrain.blocks, terrain.textures, records.objects)
+  const { engine, game, heard } = battle
+  intoTheTurn(battle)
+  const pig = game.currentPig
+  // GUNS carries one TNT crate of one charge (e2e/002/crate.spec.ts).
+  const crate = crateOf(battle, SKILL.TNT)
+  const carried = amountOf(pig.carrying, SKILL.TNT)
+  const held = engine.scenery.waiting()
+
+  engine.battle.warp(crate.x, crate.z, pig.heading)
+  stepUntil(battle, () => collections(heard) === 1, 'the pig is on the crate')
+  expect(amountOf(pig.carrying, SKILL.TNT)).toBe(carried + crate.amount)
+  expect(heard).toContainEqual({ kind: 'taken', id: crate.id })
+  // The crate's own command ran (0x464633). The loader builds a crate's with no
+  // signal (0x4a6287, lib/game/script.ts), so it places nothing: this is all of it
+  // that can be seen.
+  expect(engine.scenery.waiting()).toEqual(held)
+
+  passOurTurn(battle)
+  stepUntil(battle, () => game.currentPlayer === game.players[1], 'the turn is handed over')
+  expect(onTheGround(battle, crate)).toBe(false)
+  expect(goneList(battle)).toContain(crate.id)
+  expect(heard.filter((event) => event.kind === 'shown' && event.id === crate.id)).toEqual([])
 })
 
 test('control: on a shipped map the last enemy down still wins', async () => {

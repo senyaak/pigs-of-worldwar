@@ -95,6 +95,9 @@ export const handOver = (core: BattleCore): void => {
   if (core.proving) core.dummies.standUp()
   game.endTurn()
   focus(core, game.currentPig)
+  // On the proving ground a crate taken last turn stands in its place again,
+  // whoever's turn this is, ahead of the card (lib/game/scenery.ts).
+  core.scenery.turnStarted()
   // **THE DISGUISE DROPS AT THE TOP OF THE PIG'S OWN TURN** — the same
   // per-turn pass the poison rides (0x470425 in 0x4703A0): a round of
   // cover, no more (lib/game/hide.ts).
