@@ -5,6 +5,7 @@ import { bodyExtent } from '../../../../lib/game/body'
 import { buildQuery } from '../../../../lib/game/engine'
 import { createBus } from '../../../../lib/game/events'
 import { mapRaster } from '../../../../lib/game/mapRaster'
+import { MINE_GROUND_ART } from '../../../../lib/game/mines'
 import { fielded, mapSquads, musterGame } from '../../../../lib/game/muster'
 import type { OwnSquad } from '../../../../lib/game/muster'
 import {
@@ -196,6 +197,11 @@ export const start = async (
   const weather =
     falling && weatherResult?.ok ? { kind: falling, images: weatherResult.images } : null
 
+  // …and the ground a detector sees mines in (three/mineGround.ts). The exe loads
+  // it with the map's own textures; failing it costs the reveal and nothing else.
+  const mineResult = await window.api.loadTim(MINE_GROUND_ART)
+  if (!mineResult.ok) console.log(`${name} without mine ground: ${mineResult.error}`)
+
   // The squads, standing (lib/game/muster.ts). All the renderer supplies is
   // the MEASUREMENT — how big a pig of this class is, off its own art
   // (lib/game/body.ts), which used to be the mesh's alone and is what made
@@ -242,6 +248,7 @@ export const start = async (
     assets: {
       blocks: terrainResult.blocks,
       terrainTextures: terrainResult.textures,
+      mineGround: mineResult.ok ? mineResult.texture : null,
       soldiers,
       nations: squads.map((squad) => squad.nation),
       hats,

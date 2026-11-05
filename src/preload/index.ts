@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('api', {
   loadLanguageImages: (folder: string, names: string[], keyed: string[]): Promise<unknown> =>
     ipcRenderer.invoke('language:images', folder, names, keyed),
   loadFont: (name: string): Promise<unknown> => ipcRenderer.invoke('frontend:font', name),
+  loadTim: (relPath: string): Promise<unknown> => ipcRenderer.invoke('tim:load', relPath),
   loadTims: (relPath: string): Promise<unknown> => ipcRenderer.invoke('tims:load', relPath),
   loadArchiveBmps: (relPath: string): Promise<unknown> =>
     ipcRenderer.invoke('bmps:load', relPath),

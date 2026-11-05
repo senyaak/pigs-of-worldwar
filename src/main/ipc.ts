@@ -24,6 +24,7 @@ import {
   loadSound,
   loadSoundBank,
   loadTerrain,
+  loadTim,
   loadTims
 } from './assets'
 import { loadProvingGround } from './provingGround'
@@ -160,6 +161,14 @@ export function registerIpc(): void {
   ipcMain.handle('tims:load', async (_event, relPath: string) => {
     try {
       return { ok: true, images: await loadTims(insideGameDir(relPath)) }
+    } catch (error) {
+      return fail(relPath, error)
+    }
+  })
+
+  ipcMain.handle('tim:load', async (_event, relPath: string) => {
+    try {
+      return { ok: true, texture: await loadTim(insideGameDir(relPath)) }
     } catch (error) {
       return fail(relPath, error)
     }

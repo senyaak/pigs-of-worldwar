@@ -54,8 +54,5 @@
   solid red texel wherever the tile's mine bit is set, unconditionally and for
   everybody; the texture is never rebuilt, so a mine laid during play never
   shows. `bomb` in `MAPICONS.MTD` really is dead art — it has no reference in
-  the library at all. Separately there is the GROUND reveal: a 3×3 block of
-  tiles round a pig of class 4, 5, 6, 7 or 0x0E stamped back through
-  `Map::SetTile` (0x4767A0) — a texture swap, three tiles, five classes.
-  `lib/game/mines.ts` still carries an invented 1024 and a set of three; see
-  `todo.md` B10. `[exe]`
+  the library at all. The other way a buried mine shows is on the ground, not on
+  the map: [terrain.md](terrain.md). `[exe]`
