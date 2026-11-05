@@ -13,12 +13,13 @@ and wall. What it is and where every piece comes from:
 [../facts/proving-ground.md](../facts/proving-ground.md).
 
 Everything play asked of the map is on it. What is still open is the bench below,
-issues #21 to #23.
+issues #22 and #23.
 
 ## Why it matters beyond play
 
 The same map is the bench for automated specs: an agent can fire each skill at
 a dummy and compare damage, range and knock with the numbers read from the exe.
-Then play only has to judge what a number cannot show. The guns are on it
-(`e2e/000/proving-bench-guns.spec.ts`, on the harness `e2e/bench.ts`); the blades,
-the thrown skills and the mines and charges are still to come.
+Then play only has to judge what a number cannot show. The guns and the blades are
+on it (`e2e/000/proving-bench-guns.spec.ts` and `proving-bench-blades.spec.ts`, on
+the harness `e2e/bench.ts`); the thrown skills and the mines and charges are still
+to come.
