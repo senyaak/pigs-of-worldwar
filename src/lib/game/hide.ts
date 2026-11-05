@@ -39,7 +39,7 @@
 // (2026-08-28, the DLL's keyframe table + the exe's event switch,
 // anim/audio-events.md): two keyframes — phase 1078 a winded breath, gated
 // on the fatigue counter `[pig+0x1B8]` being over 201, which this engine
-// does not model, so a fresh pig is silent there exactly as in the exe;
+// does not read yet (#43), so a fresh pig is silent there exactly as in the exe;
 // and phase 2310 event 43, a COIN-FLIP FART (P_FART1-3, half the plays
 // silent) — `strained` below, the gag the gesture is. And the GAS washes
 // over a disguise onto the pig directly — whether the exe's cloud sweep

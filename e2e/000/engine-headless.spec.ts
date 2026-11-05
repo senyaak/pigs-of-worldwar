@@ -378,6 +378,26 @@ test('it steps: the drop lands, the clock runs, and the pig walks where it is to
   expect(Math.abs(battle.view().loco.y - under), 'still standing on the map').toBeLessThan(30)
 })
 
+test('a hard landing\'s ring is the engine\'s, and only the hardest throw one', async () => {
+  if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
+    test.skip(true, `no game install at ${GAME_DIR}`)
+  }
+  const { engine, bus } = await buildHeadless(7)
+  while (engine.dropIn.running()) engine.update(FRAME)
+  engine.effects.clear()
+  const at = { x: 0, y: 0, z: 0 }
+
+  bus.emit({ kind: 'thudded', at, volume: 5, surface: 1, dust: false })
+  engine.update(FRAME)
+  expect(engine.effects.rings(), 'a thud alone throws no ring').toBe(0)
+
+  // exe: movement/landing.md, 0x471052 — over 75 the same contact spawns effect
+  // 0x1E, which is one ring (lib/game/landing.ts decides, this is the wiring).
+  bus.emit({ kind: 'thudded', at, volume: 8, surface: 1, dust: true })
+  engine.update(FRAME)
+  expect(engine.effects.rings(), 'the dust never reached the field').toBe(1)
+})
+
 test('THE SERGEANT says well done, and the turn waits for him', async () => {
   if (!existsSync(path.join(GAME_DIR, 'warhogs_.exe'))) {
     test.skip(true, `no game install at ${GAME_DIR}`)

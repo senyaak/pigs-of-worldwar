@@ -17,10 +17,11 @@ export interface DebugHooks {
   /** Where a pig's MESH is drawn — the node, not the engine's body
    * (three/debug.ts). Null for a pig no soldier was built for. */
   nodeAt(id: number): { x: number; y: number; z: number } | null
-  /** Throw the first living NON-acting pig at a grenade's full 45° knock —
-   * the flung-pig paint spec's trigger (three/battle.ts). Returns who was
-   * thrown and from where, or null on a one-pig map. */
-  flingOther(): { pig: number; x: number; z: number } | null
+  /** Throw the first living NON-acting pig at a 45° knock, a grenade's full one
+   * unless a speed is asked for — the flung-pig paint specs' trigger
+   * (three/battle.ts). Returns who was thrown and from where, or null on a one-pig
+   * map. */
+  flingOther(speed?: number): { pig: number; x: number; z: number } | null
   /** Bring this pig down with nobody's blow behind it, and the turn unspent. */
   fell(pig: Pig['id']): void
   /** Each living pig's plate in a view this big, with no lift over the crown. */
@@ -59,6 +60,11 @@ export interface DebugHooks {
   heal(): unknown
   /** How many effect rings a blow has in the air (three/effects.ts). */
   effects(): number
+  /** Where each of those rings is, game space and exe units (three/effects.ts). */
+  ringsAt(): { x: number; y: number; z: number; radius: number; width: number; colour: [number, number, number] }[]
+  /** Lay the effects out as the engine has them, or as if none were running: in a
+   * pause, the same frozen world with them and without them (three/debug.ts). */
+  paintEffects(live: boolean): void
   /** How many puffs of smoke a breaking has in the air (three/effects.ts). */
   smoke(): number
   /** …and how many sprites its fireball has (three/effects.ts). */
@@ -81,9 +87,15 @@ export interface DebugHooks {
   fuseTips(): { x: number; y: number; z: number }[]
   /** Mines that have been trodden on and are counting down (lib/game/mines.ts). */
   mines(): { x: number; y: number; z: number; fuse: number }[]
-  /** How many buried mines are being DRAWN for the side whose turn it is — a
-   * marker only a nearby pig of the right class gets (three/mineArt.ts). */
-  mineMarkers(): number
+  /** How many mine MODELS are on the scene, trodden and laid (three/mineArt.ts). */
+  mineModels(): number
+  /** The tiles wearing the mine ground for the side whose turn it is — only a
+   * nearby pig of the right class lights one (three/mineGround.ts). */
+  mineGround(): { col: number; row: number }[]
+  /** Where a tile's four corners land in the picture, in clip space. */
+  tileOnScreen(col: number, row: number): { x: number; y: number; z: number }[] | null
+  /** Make the acting pig this class. */
+  asClass(pigClass: number): void
   /** How many pairs of BOOTS are drawn — the renderer's word that a `remains`
    * event became art (three/remains.ts). */
   remains(): number

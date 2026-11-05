@@ -5,9 +5,10 @@
 // gliding is not something markup can show. So the STATE comes from here and
 // the pixels are asserted separately.
 //
-// `warp` is the ONE write. A spec that wants a pig in front of a particular
-// wall cannot walk it there across a whole map, and doing so through the
-// controller would test the walk rather than the wall.
+// `warp` is the one write of WHERE. A spec that wants a pig in front of a
+// particular wall cannot walk it there across a whole map, and doing so through
+// the controller would test the walk rather than the wall. `asClass` is its twin
+// for WHAT, for a subject only some classes meet on a map fielding none of them.
 
 import type * as THREE from 'three'
 import type { Game, Pig } from '../../../lib/game/game'
@@ -62,10 +63,16 @@ export interface DebugParts {
    * (lib/game/healing.ts, HealReport). A heal that did nothing has three ways
    * of being true — out of range, out of the arc, a body at its ceiling. */
   heal: () => unknown
-  /** How many effect rings are alive. They are a colour on a transparent
-   * quad, so a screenshot cannot tell one from the sky — this is the only
-   * way a spec can say a hit threw one (three/effects.ts). */
+  /** How many effect rings are alive (three/effects.ts): that a hit threw one.
+   * Whether it was drawn is the canvas's to say (e2e/002/landing-dust.spec.ts). */
   effects: () => number
+  /** Where each of those rings is, game space and exe units: what a paint check
+   * needs to know where to look (e2e/002/landing-dust.spec.ts). */
+  ringsAt: () => { x: number; y: number; z: number; radius: number; width: number; colour: [number, number, number] }[]
+  /** Lay the effects out as the engine has them, or as if none were running. Next
+   * frame's draw decides again, so this only holds in a pause: the same frozen
+   * world with the effects and without them. */
+  paintEffects: (live: boolean) => void
   /** …and how many puffs of smoke: a thing BREAKING throws those instead. */
   smoke: () => number
   /** …and how many sprites its FIREBALL has. */
@@ -93,9 +100,16 @@ export interface DebugParts {
    * a buried one unless somebody can SEE it, so this is the only way a spec can
    * find one at all (lib/game/mines.ts). */
   mines: () => { x: number; y: number; z: number; fuse: number }[]
-  /** How many mine MARKERS are on the scene — what the side whose turn it is can
-   * see of the field (three/mineArt.ts). */
-  mineMarkers: () => number
+  /** How many mine MODELS are on the scene, trodden and laid (three/mineArt.ts). */
+  mineModels: () => number
+  /** The tiles wearing the mine ground: what the side whose turn it is can see of
+   * the field (three/mineGround.ts). */
+  mineGround: () => { col: number; row: number }[]
+  /** Where a tile's four corners land in the picture, in clip space: x and y −1..1
+   * across the canvas, y up. What a paint check needs to know where to look. */
+  tileOnScreen: (col: number, row: number) => { x: number; y: number; z: number }[] | null
+  /** Make the acting pig this class, for what a class is gated on. */
+  asClass: (pigClass: number) => void
   /** The dashboard's map from the side it is drawn for (lib/game/scanner.ts). */
   map: () => { eye: Eye; blips: Blip[] }
   /**
@@ -226,7 +240,7 @@ export interface DebugParts {
    * nothing else a spec can reach flings anybody but the acting pig on
    * demand. Returns who was thrown and from where, or null on a one-pig
    * map. */
-  flingOther: () => { pig: number; x: number; z: number } | null
+  flingOther: (speed?: number) => { pig: number; x: number; z: number } | null
   /** Bring this pig down with nobody's blow behind it: the turn is not spent, so
    * a paint spec can look at the empty spot from the view it had
    * (e2e/002/proving-dummies.spec.ts). */
@@ -323,6 +337,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** How many rings a blow has in the air — two or three per hit, for
        * about half a second (lib/game/effects.ts). */
       effects: () => parts.effects(),
+      ringsAt: () => parts.ringsAt(),
+      paintEffects: (live) => parts.paintEffects(live),
       /** How many puffs of smoke are up — fourteen per thing broken or blown
        * up, over three bursts (lib/game/effects.ts). */
       smoke: () => parts.smoke(),
@@ -347,9 +363,13 @@ export function exposeBattleDebug(parts: DebugParts): void {
       fuseTips: () => parts.fuseTips(),
       /** Every mine counting down under somebody's feet (lib/game/mines.ts). */
       mines: () => parts.mines(),
-      /** …and how many BURIED ones are being drawn for the side whose turn it is:
-       * a mine is hidden unless a pig near it has the class to see one. */
-      mineMarkers: () => parts.mineMarkers(),
+      /** …and how many mine MODELS are on the scene, which a buried one is not. */
+      mineModels: () => parts.mineModels(),
+      /** …and the tiles wearing the mine ground for the side whose turn it is: a
+       * mine is hidden unless a pig near it has the class to see one. */
+      mineGround: () => parts.mineGround(),
+      tileOnScreen: (col: number, row: number) => parts.tileOnScreen(col, row),
+      asClass: (pigClass: number) => parts.asClass(pigClass),
       map: () => parts.map(),
       minesTripped: () => parts.minesTripped(),
       remains: () => parts.remains(),

@@ -11,10 +11,12 @@ import type { BattleAssets } from '../battle'
 import type { Chase } from '../chase'
 import type { DecoyArt } from '../decoyArt'
 import type { DropInArt } from '../dropIn'
+import type { EffectArt } from '../effects'
 import type { GrenadeArt } from '../grenades'
 import type { HeldWeapons } from '../heldWeapon'
 import type { ActiveMarker } from '../marker'
 import type { MineArt } from '../mineArt'
+import type { MineGround } from '../mineGround'
 import type { MapProps } from '../props'
 import type { RemainsArt } from '../remains'
 import type { SceneHost } from '../scene'
@@ -54,12 +56,14 @@ export interface SceneCore {
   grenades: Engine['grenades']
   mines: Engine['mines']
   effects: Engine['effects']
+  effectArt: EffectArt
   airDrops: Engine['airDrops']
   dropIn: Engine['dropIn']
   weapons: HeldWeapons
   openFov: number
   grenadeArt: GrenadeArt
   mineArt: MineArt
+  mineGround: MineGround
   remainsArt: RemainsArt
   decoyArt: DecoyArt
   tween: Tween

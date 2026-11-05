@@ -55,6 +55,7 @@ import { createGrenadeArt } from './grenades'
 import { createHeldWeapons } from './heldWeapon'
 import { buildMarker } from './marker'
 import { createMineArt } from './mineArt'
+import { createMineGround } from './mineGround'
 import { buildMapProps } from './props'
 import { createRemainsArt } from './remains'
 import type { SceneHost } from './scene'
@@ -74,6 +75,9 @@ export type { SoldierArt } from './squad'
 export interface BattleAssets {
   blocks: TerrainBlock[]
   terrainTextures: TerrainTexture[]
+  /** `Mine.tim`, what a detector's mines show as (three/mineGround.ts). Null is
+   * fine: a battle plays with its mines showing as plain ground. */
+  mineGround: TerrainTexture | null
   /** Every model the squads need — one per class group on the map, per NATION
    * fielded. The first is the fallback for a class nothing loaded art for. */
   soldiers: SoldierArt[]
@@ -356,9 +360,11 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
   const bulletArt = createBulletArt(root)
   /** The grenade models and the smoke behind them (three/grenades.ts). */
   const grenadeArt = createGrenadeArt(root, (name) => props.spawn(name))
-  /** …and the mines a pig who KNOWS about them can see, plus the trodden ones,
-   * which wear the MAP's own `WE_APMIN` (three/mineArt.ts). */
+  /** …and the trodden mines and the laid ones, which wear the MAP's own
+   * `WE_APMIN` (three/mineArt.ts). */
   const mineArt = createMineArt(root, (name) => props.spawn(name))
+  /** …and the ground a detector sees the buried ones in (three/mineGround.ts). */
+  const mineGround = createMineGround(root, terrain, assets.mineGround)
   /** …and the boots a finished death leaves on the spot (three/remains.ts). */
   const remainsArt = createRemainsArt(root, (name) => props.spawn(name))
   /** …and the DISGUISES — a bush where a hidden pig stands
@@ -400,12 +406,14 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     grenades,
     mines,
     effects,
+    effectArt,
     airDrops,
     dropIn,
     weapons,
     openFov,
     grenadeArt,
     mineArt,
+    mineGround,
     remainsArt,
     decoyArt,
     tween,
@@ -476,12 +484,12 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     grenadeArt.draw(state.now.lobs, delta, (lob) => drawnAt(core, `lob:${lob.id}`, lob))
     // The minefield, through the eyes of whoever's turn it is: a buried mine is
     // shown to the side that has somebody near it who can see one, and to nobody
-    // else (lib/game/mines.ts).
-    // …plus every one that has been TRODDEN ON: play asked for the mine to show
+    // else, in the ground itself (lib/game/mines.ts).
+    mineGround.draw(mines.revealed(game.currentPlayer.pigs))
+    // …and every one that has been TRODDEN ON: play asked for the mine to show
     // itself the moment a foot finds it, and by then it is nobody's secret. Those
-    // are the ENGINE's own art and get its model (`WE_APMIN`), which is why the
-    // two lists go in separately.
-    mineArt.draw(mines.revealed(game.currentPlayer.pigs), mines.at(), mines.laid())
+    // are the ENGINE's own art and get its model (`WE_APMIN`).
+    mineArt.draw(mines.at(), mines.laid())
     // …and the disguises, straight off the snapshot (lib/game/hide.ts).
     decoyArt.draw(state.now.decoys)
     // **AND WHATEVER STANDS BETWEEN THE CAMERA AND THE PIG GOES SEE-THROUGH.**
@@ -540,6 +548,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
       bulletArt.dispose()
       grenadeArt.dispose()
       mineArt.dispose()
+      mineGround.dispose()
       remainsArt.dispose()
       decoyArt.dispose()
       airDropArt.dispose()
