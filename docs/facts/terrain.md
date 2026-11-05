@@ -25,7 +25,9 @@
   and when the turn passes. `scanner/visibility.md`, 0x4768C0, 0x4A6E30, 0x4A55BF;
   `lib/game/mines.ts` `revealed`, `three/mineGround.ts`. `[exe]` Play: "видят
   жёлто-чёрные текстуры там где есть мины". `[play]` The art is 32×32, opaque, a
-  4×4 checkerboard of near-black and yellow. `[measured]`
+  4×4 checkerboard of near-black and yellow. `[measured]` Clearing a trodden
+  mine's bit does not unstamp its tile in the exe, so it stays lit until the
+  detector's next restore; here the ground goes back at once. `[gap]`
 - **A tile is two triangles**, split along (col+1,row)–(col,row+1) — the same
   diagonal the mesh uses, so collision and visuals are one surface.
   `TerrainQuery.patch`. `[exe]`
