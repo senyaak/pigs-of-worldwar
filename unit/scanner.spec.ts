@@ -26,7 +26,7 @@ import {
 } from '../src/lib/game/scanner'
 import { GROUND_PALETTE, MINE_TEXEL, RASTER_SIZE, RASTER_WORLD, mapRaster } from '../src/lib/game/mapRaster'
 import type { TerrainBlock } from '../src/lib/formats/pmg'
-import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_STEP } from '../src/lib/formats/pmg'
+import { BLOCKS_PER_SIDE, TILES_PER_SIDE, TILE_MINE, TILE_STEP, TILE_WATER } from '../src/lib/formats/pmg'
 import type { MapObject } from '../src/lib/formats/pog'
 import type { Pig, Player } from '../src/lib/game/game'
 import { LARD } from '../src/lib/game/nations'
@@ -162,11 +162,9 @@ test('it sits bottom left, and it is ONE size', { tag: '@nodata' }, () => {
   expect(scannerShrink(SCANNER_SCALE_SMALL)).toBeCloseTo(-15, 1)
 })
 
-test('a mine already on the map is a red tile on the picture', { tag: '@nodata' }, () => {
-  // Not an icon: the library bakes the mine bit straight into the board's
-  // texture, once, when the battle opens.
-  expect(MINE_TEXEL).toEqual([31, 0, 0])
-  // Twelve ground types have a colour; nothing clamps the other twenty.
+test('twelve ground types have a colour', { tag: '@nodata' }, () => {
+  // exe: scanner/board.md, the palette at dll 0x1002BEB8; nothing clamps the
+  // other twenty.
   expect(GROUND_PALETTE).toHaveLength(12)
 })
 
@@ -222,8 +220,8 @@ test('the first column of the picture is a copy of the second', { tag: '@nodata'
   // (`cmp edi,1 / jne / sub ebp,2 / mov [ebp],cx`, dll 0x1000A431), so column
   // 0 never keeps what it computed. The picture's column runs along world z.
   const block = flatBlock(0, 0, 64, 9)
-  // Give the first column — tile row r = 0, which is the z the copy lands on
-  // — a colour of its own, so a picture that kept it would say so.
+  // Give the second column, which is tile row 0 (the next test), a colour of
+  // its own, so a picture that did not copy it would say so.
   for (let c = 0; c < TILES_PER_SIDE; c++) block.tiles[c].type = 11
   const raster = mapRaster([block])
   const texel = (x: number, z: number): number[] => {
@@ -231,10 +229,76 @@ test('the first column of the picture is a copy of the second', { tag: '@nodata'
     return [raster.rgba[at], raster.rgba[at + 1], raster.rgba[at + 2]]
   }
   // Flat ground, so every shade is the floor 64: type 9 comes out 99 and type
-  // 11 — `240,100,53` — would come out 247 in the red.
-  expect(texel(0, 1)).toEqual([99, 99, 99])
-  expect(texel(0, 0)).toEqual([99, 99, 99])
-  // …and the row's own second column is untouched, which is what says the
-  // copy went one way and not both.
-  expect(texel(1, 2)).toEqual([99, 99, 99])
+  // 11, `240,100,53`, comes out 247, 99, 49.
+  expect(texel(0, 1)).toEqual([247, 99, 49])
+  expect(texel(0, 0)).toEqual([247, 99, 49])
+  // …and the column after it is untouched, which is what says the copy went
+  // from the second to the first and no further.
+  expect(texel(0, 2)).toEqual([99, 99, 99])
+})
+
+/** A map of one flat block with one tile mined, and how to read its picture. */
+const mined = (row: number, col: number, type = 9 | TILE_MINE, bz = 0): ((x: number, z: number) => number[]) => {
+  const block = flatBlock(0, bz, 64, 9)
+  block.tiles[row * TILES_PER_SIDE + col].type = type
+  const raster = mapRaster([block])
+  return (x, z) => {
+    const at = (x * RASTER_SIZE + z) * 4
+    return [raster.rgba[at], raster.rgba[at + 1], raster.rgba[at + 2]]
+  }
+}
+
+const RED = [255, 0, 0]
+/** Row 9 of the palette at the shade floor: the plain ground of `mined`. */
+const PLAIN = [99, 99, 99]
+
+test('a mine-flagged tile is the solid red texel, whatever the ground under it', { tag: '@nodata' }, () => {
+  // exe: scanner/visibility.md, dll 0x1000A3E6 tests the flags for 0x40, and the
+  // arm writes 31, 0, 0 into channels of five bits.
+  expect(MINE_TEXEL).toEqual([31, 0, 0])
+  // Tile col 2, row 1: picture row 2 (the row runs along x), column 2.
+  const picture = mined(1, 2)
+  expect(picture(2, 2)).toEqual(RED)
+  // Its neighbours are the ground, so it is that one tile and no spread.
+  expect(picture(2, 3)).toEqual(PLAIN)
+  expect(picture(1, 2)).toEqual(PLAIN)
+  expect(picture(3, 2)).toEqual(PLAIN)
+  // The arm comes after the shade and asks about nothing else in the byte, so a
+  // mine on water is as red: 197 shipped tiles carry both bits
+  // (docs/facts/weapons/mines.md, [measured]).
+  expect(mined(1, 2, 9 | TILE_WATER | TILE_MINE)(2, 2)).toEqual(RED)
+})
+
+test('a tile lands one column up z from its own row, and the last row is off the picture', { tag: '@nodata' }, () => {
+  // exe: scanner/board.md § Which tile a texel shows. `afSetMap` reads the exe's
+  // cell rows in reverse (dll 0x1000258D) and writes grid z `j` from cell row
+  // `64 - j`, whose tile lies on the -z side of that vertex; the picture's column
+  // is grid z (dll 0x1000A36B). So tile row r is column r + 1.
+  const picture = mined(1, 2)
+  expect(picture(2, 2)).toEqual(RED)
+  expect(picture(2, 1)).toEqual(PLAIN)
+
+  // Tile row 0 is on the picture twice: its own column 1, and the copy in column 0.
+  const first = mined(0, 2)
+  expect(first(2, 1)).toEqual(RED)
+  expect(first(2, 0)).toEqual(RED)
+  expect(first(2, 2)).toEqual(PLAIN)
+
+  // Tile row 63, the top row of the block at z index 60, would be column 64 of 64.
+  const last = mined(3, 2, 9 | TILE_MINE, 60)
+  for (let z = 0; z < RASTER_SIZE; z++) expect(last(2, z)).not.toEqual(RED)
+})
+
+test('the height that shades a column is its own vertex, one row up z from the tile', { tag: '@nodata' }, () => {
+  // exe: dll 0x1000A376 reads the height off the same record the flags come from
+  // (scanner/board.md), so a raised vertex row lights column j, while the type
+  // that colours column j is tile row j - 1.
+  const block = flatBlock(0, 0, 64, 9)
+  const verts = TILES_PER_SIDE + 1
+  for (let c = 0; c < verts; c++) block.heights[2 * verts + c] = 4352
+  const raster = mapRaster([block])
+  const red = (z: number): number => raster.rgba[(1 * RASTER_SIZE + z) * 4]
+  expect(red(2)).toBe(255)
+  expect(red(1)).toBe(99)
+  expect(red(3)).toBe(99)
 })

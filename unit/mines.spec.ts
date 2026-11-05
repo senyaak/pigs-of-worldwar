@@ -25,10 +25,12 @@ import { fromExeFrames } from '../src/lib/game/ballistics'
 import { GAUGE_FULL } from '../src/lib/game/gauge'
 import { ObstacleField } from '../src/lib/game/obstacles'
 import { TILE_MINE, TILE_WATER } from '../src/lib/formats/pmg'
+import { RASTER_SIZE, mapRaster } from '../src/lib/game/mapRaster'
+import { TerrainQuery } from '../src/lib/game/terrain'
 import { NO_BODY } from '../src/lib/game/body'
 import type { Pig } from '../src/lib/game/game'
 import type { BattleEvent } from '../src/lib/game/events'
-import { terrain } from './fixture'
+import { terrain, terrainBlocks } from './fixture'
 
 const MINE = 35
 /** 36 ANTI-PERSONNEL — row 39, the one whose refused blast is 3200. */
@@ -73,6 +75,53 @@ const field = (): {
   )
   return { mines, pigs, heard }
 }
+
+test('a mine laid or set off in the battle changes nothing on the map\'s picture', { tag: '@nodata' }, () => {
+  // exe: scanner/visibility.md. The fill at dll 0x1000A3E6 runs once, in the HUD's
+  // constructor, and reads the library's copy of the flags (dll 0x10002561);
+  // `Map::SetMine` (0x4A6F35, 0x4A6F82) writes only the exe's own cell.
+  const blocks = terrainBlocks(
+    () => 0,
+    (x, z) => (x === -1024 && z === -1024 ? { type: TILE_MINE } : {})
+  )
+  const pigs: Pig[] = []
+  const mines = createMines(
+    {
+      pigs: () => pigs,
+      targets: [],
+      present: () => true,
+      training: false,
+      query: new TerrainQuery(blocks),
+      random: () => 0,
+      pose: NO_POSE
+    },
+    () => undefined
+  )
+  const before = mapRaster(blocks).rgba
+  const red = (rgba: Uint8Array, col: number, row: number): boolean => {
+    const at = (col * RASTER_SIZE + row + 1) * 4
+    return rgba[at] === 255 && rgba[at + 1] === 0 && rgba[at + 2] === 0
+  }
+  // The map's own mine, whose low corner is -1024: tile col 30, row 30. Red.
+  expect(red(before, 30, 30)).toBe(true)
+
+  // A sapper's mine beds into its tile, col 32, row 32, and is live there…
+  const sapper = pigAt(256, 256)
+  pigs.push(sapper)
+  mines.lay(sapper, MINE)
+  sapper.position.x = 9000
+  mines.bedAll()
+  expect(mines.buried(256, 256)).toBe(true)
+  // …and is not on the picture, and the picture has not moved.
+  expect(red(mapRaster(blocks).rgba, 32, 32)).toBe(false)
+  expect(mapRaster(blocks).rgba).toEqual(before)
+
+  // The map's own one goes off: gone from the ground, still red on the map.
+  expect(mines.tread(-768, -768)).toBe(true)
+  expect(mines.buried(-768, -768)).toBe(false)
+  expect(red(mapRaster(blocks).rgba, 30, 30)).toBe(true)
+  expect(mapRaster(blocks).rgba).toEqual(before)
+})
 
 test('a laid mine arms with the click and stays FURNITURE through the turn', { tag: '@nodata' }, () => {
   const { mines, pigs, heard } = field()

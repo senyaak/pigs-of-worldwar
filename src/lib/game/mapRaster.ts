@@ -39,12 +39,20 @@
 // the picture's COLUMN runs along world z and its ROW along world x. Kept that
 // way here so the drawer can hand the board its corners without a flip.
 //
+// **A tile lands one column further along z than its own row.** The library's
+// record at grid z `j` takes its height AND its flags out of one cell of the
+// exe's array, read in reverse (`afSetMap`, dll 0x1000258D), and that cell's tile
+// lies on the -z side of its vertex (`scanner/board.md` § Which tile a texel
+// shows). So column `j` is shaded by vertex `j` and coloured by tile row `j - 1`:
+// a red texel sits one column up z from the tile whose mine it is, and tile row
+// 63 is not on the picture at all. [measured] No shipped map has a mine there.
+//
 // **The picture's first column is a COPY of its second**, which is the
 // library's own last act on every row: the fill loop writes the texel twice
 // when it reaches the second column (`cmp edi,1 / jne / sub ebp,2 / mov
 // [ebp],cx`, dll 0x1000A431), so whatever column 0 computed for itself is
-// overwritten. The picture's column runs along world z, so it is the first z
-// of each row that takes its neighbour's colour.
+// overwritten. The picture's column runs along world z, so tile row 0 is on the
+// picture twice, in the first two columns of each row.
 //
 // Pure: blocks in, pixels out.
 
@@ -98,9 +106,10 @@ const FROM_FIVE = 255 / 31
 /**
  * Draw the whole world onto a `RASTER_SIZE` square.
  *
- * The height a texel is shaded by is the tile's own first CORNER, not an
- * average: the library reads record `column + 65*row` for both the height and
- * the flags, and that record is the vertex at the tile's origin.
+ * The height a texel is shaded by is one CORNER of the tile, not an average:
+ * the library reads record `column + 65*row` for both the height and the flags,
+ * and that record is the vertex on the tile's +z edge, because the parse has
+ * reversed the file's rows and the library reads them reversed too.
  */
 export function mapRaster(blocks: readonly TerrainBlock[]): MapRaster {
   const rgba = new Uint8Array(RASTER_SIZE * RASTER_SIZE * 4)
@@ -127,13 +136,17 @@ export function mapRaster(blocks: readonly TerrainBlock[]): MapRaster {
     const blockZ = Math.round((block.z + half) / TILE_STEP)
     for (let r = 0; r < TILES_PER_SIDE; r++) {
       for (let c = 0; c < TILES_PER_SIDE; c++) {
+        // One column up z from the tile's own row (the header), and the last
+        // tile row runs off the picture.
+        const column = blockZ + r + 1
+        if (column >= RASTER_SIZE) continue
         const tile = block.tiles[r * TILES_PER_SIDE + c]
-        const height = block.heights[r * verts + c]
+        const height = block.heights[(r + 1) * verts + c]
         const shade = Math.floor(((height - lowest) * SHADE_RANGE) / span) + SHADE_FLOOR
         const mined = (tile.type & 0x40) !== 0
         const ground = GROUND_PALETTE[tile.type & 0x1f] ?? GROUND_PALETTE[0]
         // Column runs along world z, row along world x.
-        const at = ((blockX + c) * RASTER_SIZE + (blockZ + r)) * 4
+        const at = ((blockX + c) * RASTER_SIZE + column) * 4
         for (let channel = 0; channel < 3; channel++) {
           const five = mined ? MINE_TEXEL[channel] : Math.min(31, (ground[channel] * shade) >> 9)
           rgba[at + channel] = Math.round(five * FROM_FIVE)
