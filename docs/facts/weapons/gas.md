@@ -14,6 +14,10 @@
   evaluate.ts) is `[deliberate]`, and 23 CONFUSION — in the PC exe LITERALLY
   the same projectile, id 416 — is deliberately left a plain burst until
   play rules whether that identity is the game or a port accident.
+- `[exe]` **The touch is a weapon's hit.** Its fifteen pass cause 0 (0x477b54,
+  `weapons/gas.md`), so on the pig being played they end its turn at any health
+  (0x467c56, `turns/notes.md`); `lib/game/gas.ts`. The poison's own ten a turn
+  are not a hit and leave the turn alone.
 - `[exe]` **A poisoned pig sneezes at two moments.** The cloud's first touch of
   a throw plays clip 37 (0x477b6a..0x477b74, `lib/game/gas.ts`). And when the
   turn has played out, the pass over who was hurt (0x497760 -> 0x4976E0 ->

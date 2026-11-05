@@ -52,8 +52,9 @@ export type BattleEvent =
       amount: number
       pig?: PigId
       /**
-       * A BLOW — a blast, a bullet, a blade — as against a status tick, a fall
-       * or a drowning. It is the exe's own second argument to `Pig::TakeDamage`
+       * A BLOW — a blast, a bullet, a blade, a gas cloud's first touch — as
+       * against a status tick, a fall or a drowning. It is the exe's own second
+       * argument to `Pig::TakeDamage`
        * (0x467ac0), which every weapon path passes as **0** and every other
        * source passes something else (a poison arm passes 3, and so on): the
        * routine reads it twice, and the second read is the one that HANDS THE
@@ -67,6 +68,10 @@ export type BattleEvent =
        * `I_METAL` is (play: "взрыв по танку, пушке и прочему"). */
       metal?: boolean
     }
+  /** The training ground's floor caught this pig: it fell under one point and
+   * was left on one (lib/game/health.ts, `hurtPig`). No cause is named because
+   * the exe's arm does not ask for one (0x467c76). */
+  | { kind: 'spared'; pig: PigId }
   /** This pig has just gone down. `by` is the pig whose weapon did it — the
    * bullet's firer, the lob's thrower, the blade's swinger — the same attacker
    * the exe's damage handler tallies kills against (0x467c30, 0x467E11).

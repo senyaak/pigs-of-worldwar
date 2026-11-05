@@ -25,7 +25,7 @@
 //
 // Pure, like the rest of lib/game.
 
-import { hurt } from './health'
+import { hurtPig } from './health'
 import { originY } from './body'
 import type { Emit, PigId } from './events'
 import type { Pig } from './game'
@@ -68,7 +68,7 @@ export function createPoison(world: { training: boolean }, emit: Emit): Poison {
     turnStarted(pig) {
       if (!bitten.has(pig.id)) return
       const at = { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z }
-      const outcome = hurt(pig, POISON_PER_TURN, world.training)
+      const outcome = hurtPig(pig, POISON_PER_TURN, world.training, emit)
       // The number floats and the pig squeals off the same event every other
       // hit rides; the exe's 0x500 is over its own show-it threshold too.
       emit({ kind: 'damaged', at, amount: POISON_PER_TURN, pig: pig.id })

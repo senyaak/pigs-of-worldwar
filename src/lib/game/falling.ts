@@ -28,7 +28,7 @@
 // Pure: a pig, a locomotion state, an emit.
 
 import { fromExeSpeed } from './ballistics'
-import { hurt, isDead } from './health'
+import { hurtPig, isDead } from './health'
 import { originY } from './body'
 import { answerLanding } from './landing'
 import type { LocomotionState } from './locomotion'
@@ -82,7 +82,7 @@ function chargeFall(pig: Pig, speed: number, training: boolean, emit: Emit): voi
   // the exe's own arm goes through TakeDamage, which a dead pig's death path
   // has already run.
   if (isDead(pig)) return
-  const outcome = hurt(pig, FALL_POINTS, training)
+  const outcome = hurtPig(pig, FALL_POINTS, training, emit)
   emit({
     kind: 'damaged',
     at: { x: pig.position.x, y: originY(pig.position.y, pig.body), z: pig.position.z },
