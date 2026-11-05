@@ -87,7 +87,7 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 - [b11-camera-smooth-60fps.md](todo/b11-camera-smooth-60fps.md) — the opening drop scores worse near 60 fps
 - [b12-flaky-specs.md](todo/b12-flaky-specs.md) — the grenade gauge spec's late read
 - [b17-untested-paths.md](todo/b17-untested-paths.md) — a bullet or blade ending the turn, the jump's barge, the acting pig barged
-- [b19-weapons-suite-holes.md](todo/b19-weapons-suite-holes.md) — guns with no assertion, unswung blades, weapon sounds, what the AI prices
+- [b19-weapons-suite-holes.md](todo/b19-weapons-suite-holes.md) — unswung blades, weapon sounds, what the AI prices
 
 ## Low — play's rulings, nothing scheduled
 

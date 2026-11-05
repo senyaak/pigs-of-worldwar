@@ -102,6 +102,19 @@ first (`000/foundation.spec.ts` before `000/model-viewer.spec.ts`).
   standalone utilities: they build their own sandbox and must not depend on
   any phase.
 
+## The bench — a skill against the exe's numbers
+
+`e2e/bench.ts` opens the proving ground with no window (the real map, the real
+engine, a fixed seed), puts a skill in the player's pig's hand and presses fire
+through `battle.setFiring`, so the ladder, the fuse and the muzzle are the game's
+own. `fireAtDummy` reports what one press of a gun came to: its rounds, its reach,
+each round's damage and each throw's speed in exe units a frame.
+
+`e2e/000/proving-bench-guns.spec.ts` is one case per gun, every number `// exe:`
+cited. A case marked KNOWN SHORT or DIFFERS pins what the remake does today, with
+what the exe does and the owning issue beside it, so the build goes red and flips
+it. The next benches use `openBench` and its verbs.
+
 ## A spec LOADS its starting state — it never walks to it
 
 A spec checks that one state goes correctly to the next. The state it starts

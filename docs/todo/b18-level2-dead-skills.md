@@ -28,7 +28,13 @@ was reachable in play: the mortar is in two shipped kits. Still like that:
 
 And **8 RIFLE BURST / 9 MACHINE GUN still fire one round a press**: the MG
 burst cap (edi=5, first round ×5) is read and unfielded, which leaves 9 strictly
-worse than the rifle. `18 TRANQUILLISER DART` flies and hurts like a rifle round
+worse than the rifle. **10 HEAVY M-GUN and 14 FLAME THROWER are short the same
+way**: a press looses eleven and seventeen rounds on that same cap
+(`weapons/fire/burst.md`, 0x479BD0), and the remake looses one at the row's own
+figure. And **13 SUPER SHOTGUN wears the shotgun's knock of 6 a pellet**, where
+the 6 is kind 0x12's alone and 13 adds 48 (0x478A92,
+`weapons/fire/hit-by-projectile.md`). The gun bench pins all of them
+(`e2e/000/proving-bench-guns.spec.ts`). `18 TRANQUILLISER DART` flies and hurts like a rifle round
 with no tranquillising behind it — there is no stun status in the engine, only
 `poison.ts`.
 
