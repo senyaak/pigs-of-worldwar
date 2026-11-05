@@ -17,10 +17,11 @@ export interface DebugHooks {
   /** Where a pig's MESH is drawn — the node, not the engine's body
    * (three/debug.ts). Null for a pig no soldier was built for. */
   nodeAt(id: number): { x: number; y: number; z: number } | null
-  /** Throw the first living NON-acting pig at a grenade's full 45° knock —
-   * the flung-pig paint spec's trigger (three/battle.ts). Returns who was
-   * thrown and from where, or null on a one-pig map. */
-  flingOther(): { pig: number; x: number; z: number } | null
+  /** Throw the first living NON-acting pig at a 45° knock, a grenade's full one
+   * unless a speed is asked for — the flung-pig paint specs' trigger
+   * (three/battle.ts). Returns who was thrown and from where, or null on a one-pig
+   * map. */
+  flingOther(speed?: number): { pig: number; x: number; z: number } | null
   /** Bring this pig down with nobody's blow behind it, and the turn unspent. */
   fell(pig: Pig['id']): void
   /** Each living pig's plate in a view this big, with no lift over the crown. */
@@ -59,6 +60,11 @@ export interface DebugHooks {
   heal(): unknown
   /** How many effect rings a blow has in the air (three/effects.ts). */
   effects(): number
+  /** Where each of those rings is, game space and exe units (three/effects.ts). */
+  ringsAt(): { x: number; y: number; z: number; radius: number; width: number; colour: [number, number, number] }[]
+  /** Lay the effects out as the engine has them, or as if none were running: in a
+   * pause, the same frozen world with them and without them (three/debug.ts). */
+  paintEffects(live: boolean): void
   /** How many puffs of smoke a breaking has in the air (three/effects.ts). */
   smoke(): number
   /** …and how many sprites its fireball has (three/effects.ts). */

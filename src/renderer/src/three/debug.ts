@@ -66,6 +66,13 @@ export interface DebugParts {
    * quad, so a screenshot cannot tell one from the sky — this is the only
    * way a spec can say a hit threw one (three/effects.ts). */
   effects: () => number
+  /** Where each of those rings is, game space and exe units: what a paint check
+   * needs to know where to look (e2e/002/landing-dust.spec.ts). */
+  ringsAt: () => { x: number; y: number; z: number; radius: number; width: number; colour: [number, number, number] }[]
+  /** Lay the effects out as the engine has them, or as if none were running. Next
+   * frame's draw decides again, so this only holds in a pause: the same frozen
+   * world with the effects and without them. */
+  paintEffects: (live: boolean) => void
   /** …and how many puffs of smoke: a thing BREAKING throws those instead. */
   smoke: () => number
   /** …and how many sprites its FIREBALL has. */
@@ -226,7 +233,7 @@ export interface DebugParts {
    * nothing else a spec can reach flings anybody but the acting pig on
    * demand. Returns who was thrown and from where, or null on a one-pig
    * map. */
-  flingOther: () => { pig: number; x: number; z: number } | null
+  flingOther: (speed?: number) => { pig: number; x: number; z: number } | null
   /** Bring this pig down with nobody's blow behind it: the turn is not spent, so
    * a paint spec can look at the empty spot from the view it had
    * (e2e/002/proving-dummies.spec.ts). */
@@ -323,6 +330,8 @@ export function exposeBattleDebug(parts: DebugParts): void {
       /** How many rings a blow has in the air — two or three per hit, for
        * about half a second (lib/game/effects.ts). */
       effects: () => parts.effects(),
+      ringsAt: () => parts.ringsAt(),
+      paintEffects: (live) => parts.paintEffects(live),
       /** How many puffs of smoke are up — fourteen per thing broken or blown
        * up, over three bursts (lib/game/effects.ts). */
       smoke: () => parts.smoke(),
