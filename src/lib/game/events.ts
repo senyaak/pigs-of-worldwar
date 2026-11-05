@@ -158,8 +158,8 @@ export type BattleEvent =
   /** The DISGUISE gesture's own sound keyframe — clip 81 phase 2310, where
    * the exe rolls a coin and FARTS (id 43 → P_FART1-3 half the time,
    * anim/audio-events.md). The clip's other keyframe, a winded breath at
-   * phase 1078, is gated on a fatigue counter this engine does not model,
-   * so a fresh pig's is silent there — as it is in the exe. */
+   * phase 1078, is gated on a fatigue counter this engine does not read yet
+   * (#43), so a fresh pig's is silent there — as it is in the exe. */
   | { kind: 'strained'; pig: PigId }
   /** This pig took the DISGUISE — it stops being drawn and a decoy prop
    * stands where it does (lib/game/hide.ts). */
@@ -236,6 +236,10 @@ export type BattleEvent =
   | { kind: 'dropCut'; pig: PigId }
   /** …and it has touched down. */
   | { kind: 'dropLanded'; pig: PigId }
+  /** A FLYING pig met the ground hard enough to be heard (lib/game/landing.ts):
+   * I_PICKUP at this `volume`, the ground's own scuff from `surface`, and at the
+   * hardest speeds the ring of dust. */
+  | { kind: 'thudded'; at: Point; volume: number; surface: number; dust: boolean }
   /** Every canopy still up goes now: the jump key. */
   | { kind: 'canopiesCut' }
 

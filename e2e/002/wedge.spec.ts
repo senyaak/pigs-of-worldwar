@@ -5,11 +5,11 @@
 // сюда скользит на 1м месте." 0x85 is a wall flag over terrain type 5.
 //
 // The cause was the landing rule reading the exe's stand-up gate as a refusal to
-// LAND: `Map::IsBlocked` refuses the getting-up (0x471350's arm), not the
-// contact, and the arrival speed is the only thing that decides between a bounce
-// and a stop (`cmp di,19h`, 0x4711d8). Refused outright, a pig on a wall tile
-// kept 99% of its slope-parallel speed off `WALL_MATERIAL` every frame and the
-// wedge counter relaunched it every 25, for ever.
+// LAND. On blocked ground the arrival speed decides between a bounce and being
+// thrown out on the landing frame (exe: movement/landing.md, 0x471045, under 50).
+// Refused outright, a pig on a wall tile kept 99% of its slope-parallel speed off
+// `WALL_MATERIAL` every frame and the wedge counter relaunched it every 25, for
+// ever.
 
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
@@ -70,6 +70,29 @@ test('coming down on a wall tile it SETTLES, and is then thrown out', () => {
   expect(settledBy, `it rested after ${settledBy.toFixed(2)}s`).toBeLessThan(3)
   // …and the wedge counter's whole job is that a pig does not stay in a wall:
   // eight seconds is four of its 25-frame throws.
+  expect(query.walkable(state.x, state.z), 'and it is out of the wall').toBe(true)
+})
+
+test('coming down FAST on the same tile, it slides on and is still out in time', () => {
+  // The case a wall's second test used to guard: over the eject's 50 a frame
+  // (exe: movement/landing.md, 0x471045, the full arrival) the contact is a bounce
+  // off 99% restitution, and only drag brings it under the bar. The loop play
+  // reported must not come back through this door.
+  const query = new TerrainQuery(parsePmg(mapFile('CAMP.PMG')))
+  const field = new ObstacleField(parsePog(mapFile('CAMP.POG')))
+  const at = tileAt(query, 43, 17)
+  const state = createLocomotion(query, at.x, at.z, 0)
+  // 1270 a second across is 85 exe units a frame.
+  state.airborne = { vy: 0, vx: 900, vz: 900, bouncing: false, pushIn: null }
+
+  let settledBy: number | null = null
+  const steps = Math.round(8 / STEP_SECONDS)
+  for (let i = 0; i < steps; i++) {
+    updateLocomotion(state, query, { walk: 0, turn: 0, jump: false }, STEP_SECONDS, field)
+    if (state.airborne === null && settledBy === null) settledBy = i * STEP_SECONDS
+  }
+
+  expect(settledBy, 'it never came to rest').not.toBeNull()
   expect(query.walkable(state.x, state.z), 'and it is out of the wall').toBe(true)
 })
 

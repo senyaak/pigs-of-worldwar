@@ -14,6 +14,7 @@ import {
   BOMBLET_EFFECT,
   BREAK_EFFECT,
   DUST_EFFECT,
+  LANDING_DUST_EFFECT,
   GAS_EFFECT,
   HEAL_EFFECT,
   MINE_EFFECT,
@@ -47,6 +48,8 @@ export interface EffectField {
   /** …and something heavy LANDED here. Row 0's smoke without its fire, so a
    * crate arriving raises dust rather than going off (lib/game/effects.ts). */
   dust(at: Point): void
+  /** A flying pig's hard landing raises its ring (lib/game/landing.ts). */
+  landingDust(at: Point): void
   /** …and a GAS canister let a little cloud go here — effect 0x5E, thirty
    * green blobs hanging where they were born (lib/game/effects.ts). One per
    * puff; the plume is a chain of these along the canister's path. */
@@ -107,6 +110,7 @@ export function createEffectField(random: Random = Math.random): EffectField {
         )
       ),
     dust: (at) => void live.push(beginEffect(DUST_EFFECT, at)),
+    landingDust: (at) => void live.push(beginEffect(LANDING_DUST_EFFECT, at)),
     gas: (at) => void live.push(beginEffect(GAS_EFFECT, at)),
     splash: (at) => void live.push(beginEffect(SPLASH_EFFECT, at)),
     update(delta) {

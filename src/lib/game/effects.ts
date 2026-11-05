@@ -316,6 +316,18 @@ export const MINE_EFFECT: HitEffect = {
 export const DUST_EFFECT: HitEffect = { id: 0x3e, kind: 0, rings: [], bursts: ROW_ZERO.bursts }
 
 /**
+ * What a landing kicks up: effect id **0x1E**, parameter row **5** (Init's arm
+ * 0x489106). Row 5 has one live stage, a RING on frame 1: small, grey and gone
+ * in five frames. The hard landing's handler spawns it (0x4710fa..0x471143),
+ * and it is the only "dust" that routine has.
+ */
+export const LANDING_DUST_EFFECT: HitEffect = {
+  id: 0x1e,
+  kind: 5,
+  rings: [ring(1, 40, 50, 1, 20, 10, 20, [7, 7, 7])]
+}
+
+/**
  * A SPLASH — effect id **0x0E**, parameter row **2**, and the whole of it is
  * decoded.
  *

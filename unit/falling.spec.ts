@@ -29,6 +29,7 @@ const pigAt = (health = 75): Pig =>
     name: 'SCOUT',
     index: 0,
     health,
+    exertion: 0,
     carrying: [],
     holding: null,
     position: { x: 0, y: 0, z: 0 },
@@ -99,7 +100,7 @@ test('the gate is the exe\'s 200 a frame, and under it nothing is owed', { tag: 
   const query = terrain(() => 0)
   const state = createLocomotion(query, 0, 0, 0)
   // A soft flying contact, written the way `fly` writes one.
-  state.impact = { speed: FALL_GATE, flying: true }
+  state.impact = { speed: FALL_GATE, flying: true, surface: 0 }
   chargeLanding(pig, state, false, (event) => void heard.push(event))
   expect(pig.health).toBe(75)
   expect(state.impact).toBeNull()
