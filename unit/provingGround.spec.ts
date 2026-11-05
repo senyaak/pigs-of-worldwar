@@ -85,6 +85,7 @@ test('every record exists in a one-player game and stands from the first frame',
   const scenery = createScenery(
     objects,
     false,
+    true,
     () => {
       throw new Error('nobody acts while the map is built')
     },

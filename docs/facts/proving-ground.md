@@ -139,6 +139,19 @@
     to. No getting-up clip was asked for, so it is simply standing there; the
     boots stay down where it fell.
 
-- `[gap]` **What it does not do yet** is listed in
-  [../todo/proving-ground.md](../todo/proving-ground.md): a taken crate stays
-  taken.
+- `[play]` **A crate that was taken is back at the start of the next turn**: "one
+  round per crate per turn", 2026-11-02. The original has no refilling crate; this
+  is the owner's rule for this map. Walked into, a crate hands over its one round
+  and disappears, as anywhere (`Pig::GiveSkill` 0x465425, the crate table 0x4D9DC8,
+  `skills/notes.md`). At the start of the next turn, whoever's turn that is, it
+  stands in its place again, drawn and takeable. A pig that stays on the spot takes
+  nothing more that turn, and takes it again when its own next turn comes. A pig
+  already carrying fifteen skills is refused and the crate stays (`MAX_SLOTS`, exe
+  0x465787, `lib/game/inventory.ts`), and a crate that has come back says its
+  refusal anew. Crates on every other map are taken for good. `returning` and
+  `turnStarted` in `lib/game/scenery.ts`, asked by `handOver` in
+  `lib/game/battle/handover.ts`.
+
+- `[gap]` **What is still open** is listed in
+  [../todo/proving-ground.md](../todo/proving-ground.md): the bench, the automated
+  specs that compare each skill on this map with the numbers read from the exe.

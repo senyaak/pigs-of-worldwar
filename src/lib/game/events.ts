@@ -180,7 +180,8 @@ export type BattleEvent =
   | { kind: 'broke'; target: number; at: Point }
   /** Whether a record's art is on the map at all. */
   | { kind: 'shown'; id: number; visible: boolean }
-  /** …and this one is gone for good: collected. */
+  /** …and this one is gone for good: collected, on a map whose crates do not
+   * come back. On the proving ground a taken crate is `shown` off and on. */
   | { kind: 'taken'; id: number }
   /** The script has just PUT a crate on the map — what it holds, before it has
    * come down. The training ground's own script speaks off this and nothing

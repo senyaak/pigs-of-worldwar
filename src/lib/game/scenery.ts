@@ -105,6 +105,12 @@ export interface Scenery {
   restingY(id: number): number | null
   /** …and where it stands. */
   at(id: number): Point | null
+  /**
+   * A turn is starting: on a map whose crates come back, whatever was taken since
+   * the last one is on the ground again, drawn and takeable. Nothing to do
+   * anywhere else.
+   */
+  turnStarted(): void
 }
 
 export function createScenery(
@@ -112,6 +118,9 @@ export function createScenery(
   /** The training ground hands out its crates on its own terms
    * (lib/game/pickups.ts). */
   training: boolean,
+  /** Whether a taken crate is back at the start of the next turn — the proving
+   * ground's own rule, `[play]` (docs/facts/proving-ground.md). */
+  returning: boolean,
   /** Whose inventory a placed crate clears — the acting pig. */
   actingPig: () => Pig,
   /** Send a record down under a canopy from `fromY` (lib/game/airDrop.ts).
@@ -130,8 +139,27 @@ export function createScenery(
   /** Crates a full pig has already been told it cannot carry: the refusal is
    * said once, not once a frame while it stands there. */
   const refused = new Set<number>()
+  /** Taken off the ground on a map whose crates come back, until the next turn
+   * starts. Empty on every other map. */
+  const away: Pickup[] = []
   /** Promotion points taken this battle. */
   let points = 0
+
+  /** A pig has just walked this one out of `pickups`. */
+  const takeOff = (index: number, pickup: Pickup): void => {
+    pickups.splice(index, 1)
+    // It was something to push against a frame ago; leaving it in the
+    // collision world would leave an invisible crate behind.
+    obstacles.remove(pickup.id)
+    if (returning) {
+      away.push(pickup)
+      // Hidden and not `taken`, which deletes the mesh (three/props.ts): it has
+      // to have one to come back with.
+      emit({ kind: 'shown', id: pickup.id, visible: false })
+      return
+    }
+    emit({ kind: 'taken', id: pickup.id })
+  }
 
   // Most of what CAMP carries is not on its ground at the start — eight
   // dummies, the second bridge, and every crate but the first three.
@@ -193,6 +221,16 @@ export function createScenery(
     restingY: (id) => places.get(id)?.y ?? null,
     at: (id) => places.get(id) ?? null,
     points: () => points,
+    turnStarted() {
+      for (const pickup of away.splice(0)) {
+        pickups.push(pickup)
+        obstacles.restore(pickup.id)
+        // A new crate as far as a full pig is concerned: its refusal is said
+        // again, or a crate that came back would refuse in silence.
+        refused.delete(pickup.id)
+        emit({ kind: 'shown', id: pickup.id, visible: true })
+      }
+    },
     collect(pig) {
       let handed: number | null = null
       for (let i = pickups.length - 1; i >= 0; i--) {
@@ -206,9 +244,7 @@ export function createScenery(
         // It leaves the map the way a crate does, command and all.
         if (pickup.kind === 'point') {
           points++
-          pickups.splice(i, 1)
-          emit({ kind: 'taken', id: pickup.id })
-          obstacles.remove(pickup.id)
+          takeOff(i, pickup)
           advance(pickup.id, places.get(pickup.id)?.y ?? 0)
           emit({ kind: 'promotionPoint', pig: pig.id, id: pickup.id, total: points })
           continue
@@ -271,11 +307,7 @@ export function createScenery(
           }
           given = amountOf(pig.carrying, pickup.skill)
         }
-        pickups.splice(i, 1)
-        emit({ kind: 'taken', id: pickup.id })
-        // It was something to push against a frame ago; leaving it in the
-        // collision world would leave an invisible crate behind.
-        obstacles.remove(pickup.id)
+        takeOff(i, pickup)
         // A collected crate runs its own command — the exe does it from inside
         // the pickup class (0x464633).
         advance(pickup.id, places.get(pickup.id)?.y ?? 0)

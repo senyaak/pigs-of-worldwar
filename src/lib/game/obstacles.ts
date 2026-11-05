@@ -441,7 +441,7 @@ export class ObstacleField implements Obstruction {
     return this.gone.size === 0 ? here : here.filter((box) => !this.gone.has(box.id))
   }
 
-  /** Take a record out of the collision world for good. */
+  /** Take a record out of the collision world until something `restore`s it. */
   remove(id: number): void {
     this.gone.add(id)
   }
@@ -509,8 +509,9 @@ export class ObstacleField implements Obstruction {
   }
 
   /** …and put one back, which is what the map SCRIPT does when it places an
-   * object that started off the map (lib/game/script.ts). Not the opposite of
-   * a collected crate — that one never returns. */
+   * object that started off the map (lib/game/script.ts), and what the proving
+   * ground does with a crate that was taken (lib/game/scenery.ts). A collected
+   * crate anywhere else never returns. */
   restore(id: number): void {
     this.gone.delete(id)
   }

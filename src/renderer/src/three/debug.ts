@@ -426,6 +426,9 @@ export function exposeBattleDebug(parts: DebugParts): void {
           x: mesh.position.x,
           y: mesh.position.y,
           z: mesh.position.z,
+          // A mesh the view has switched off is still a child: held back by the
+          // script, or a crate taken on the proving ground (three/props.ts, `show`).
+          visible: mesh.visible,
           // …and WHEN it is drawn. Not decoration: CAMP's house has twelve pairs
           // of coplanar wall faces, and a FIXED draw order is the whole of why
           // they stop flickering (three/props.ts).
