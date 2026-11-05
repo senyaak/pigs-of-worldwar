@@ -111,7 +111,9 @@ export function createGas(world: GasWorld, emit: Emit): Gas {
       if (paid.has(pig.id)) continue
       paid.add(pig.id)
       const outcome = hurtPig(pig, points, world.training, emit)
-      emit({ kind: 'damaged', at: body, amount: points, pig: pig.id })
+      // A blow like any weapon's: the touch passes cause 0 (0x477b54), which on
+      // the pig being played ends its turn (0x467c56, `turns/notes.md`).
+      emit({ kind: 'damaged', at: body, amount: points, pig: pig.id, blow: true })
       emit({ kind: 'gassed', pig: pig.id, at: body })
       // The Sneeze — over the hit, not instead of anything: a standing pig
       // sneezes and goes back to standing about.

@@ -52,8 +52,9 @@ export type BattleEvent =
       amount: number
       pig?: PigId
       /**
-       * A BLOW — a blast, a bullet, a blade — as against a status tick, a fall
-       * or a drowning. It is the exe's own second argument to `Pig::TakeDamage`
+       * A BLOW — a blast, a bullet, a blade, a gas cloud's first touch — as
+       * against a status tick, a fall or a drowning. It is the exe's own second
+       * argument to `Pig::TakeDamage`
        * (0x467ac0), which every weapon path passes as **0** and every other
        * source passes something else (a poison arm passes 3, and so on): the
        * routine reads it twice, and the second read is the one that HANDS THE

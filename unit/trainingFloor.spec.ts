@@ -94,7 +94,8 @@ const CAUSES: Record<Cause, (pig: Pig, emit: Emit) => void> = {
     const landed = { impact: { flying: true, speed: FALL_GATE + 1 } }
     chargeLanding(pig, landed as unknown as LocomotionState, true, emit)
   },
-  // exe: `weapons/gas.md` — the touch is fifteen flat, and it is no blow.
+  // exe: `weapons/gas.md`, 0x477b54 — the touch is fifteen flat, and cause 0, so
+  // it ends the turn by itself too (`turns/notes.md`, 0x467c56; unit/gas.spec.ts).
   [Cause.Gas]: (pig, emit) => {
     const poison = createPoison({ training: true }, emit)
     const gas = createGas({ pigs: () => [pig], training: true, poison }, emit)
@@ -151,7 +152,7 @@ for (const cause of Object.values(Cause)) {
 }
 
 // The causes that are no blow, so nothing but the floor can end the turn with them.
-for (const cause of [Cause.Water, Cause.Poison, Cause.Landing, Cause.Gas]) {
+for (const cause of [Cause.Water, Cause.Poison, Cause.Landing]) {
   test(`${cause}: above the floor the turn goes on`, { tag: '@nodata' }, () => {
     const { acting, emit, state } = field()
     acting.health = FULL_HEALTH
