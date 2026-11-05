@@ -160,8 +160,8 @@ test('a hard landing lays its ring on the canvas, and takes it off again', async
   test.setTimeout(60_000)
   const { page } = app
   // The proving ground fields a side of dummies, and a throw needs somebody else
-  // to throw. Not LIBERATE: the body thrown there sets off a mine, whose ring comes
-  // first and is not this one.
+  // to throw. Not LIBERATE: a mine's ring went up there first (measured, a grenade's
+  // throw), and it is not this one.
   await openBattle(page)
   expect(await swapMap(page, 'PROVING')).toBe(true)
   expect(await ringsUp(page), 'nothing has raised a ring yet').toBe(0)
