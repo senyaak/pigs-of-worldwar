@@ -2,11 +2,11 @@
 //
 // Play: "мины тут на карте должны быть." They are, and they have been in every
 // shipped map's data all along: **bit 6 of a tile's type byte** (`TILE_MINE`,
-// lib/formats/pmg.ts), 99 tiles of it on CAMP and 997 on BUTE. The original draws
-// nothing for one — the tile's own texture is the whole of what a player sees,
-// which is why the training ground can say "FOLLOW THE PATH THROUGH THE
-// MINEFIELD" about a patch of ground with nothing standing on it. What the remake
-// draws, and for whom, is `revealed` below.
+// lib/formats/pmg.ts), 99 tiles of it on CAMP and 997 on BUTE. No model stands on
+// one — the ground is the whole of what a player sees, which is why the training
+// ground can say "FOLLOW THE PATH THROUGH THE MINEFIELD" about a patch of ground
+// with nothing standing on it. What a detector sees there instead is `revealed`
+// below.
 //
 // The exe, end to end, and every step of it was read this pass:
 //
@@ -143,19 +143,20 @@ export const MINE_FUSE_FRAMES = 12
  * и то только тем у кого есть класс специальный — и наверно ещё тем кто
  * поставил."
  *
- * Play's rule for the MARKER, and NOT a reading: the exe's terrain draw never
- * looks at the mine bit at all — what the ORIGINAL shows is whatever the map's
- * art shows. The marker this reveals is therefore the remake's own: the game's
- * `WE_MINE` model, put on the ground where a pig who KNOWS about mines can see
- * it.
+ * The exe's reveal is that rule on the ground itself (scanner/visibility.md,
+ * 0x4767A0): a **3×3 of tiles around the detector's own**, so a mine is revealed
+ * when its tile is within one tile of a detector's on both axes, and it shows as
+ * `MINE_GROUND_ART` in place of the tile's own texture (three/mineGround.ts).
  *
- * **The RANGE is the exe's reveal block now** (todo B10, closed 2026-08-26):
- * the ground-texture reveal saves and stamps a **3×3 of tiles around the
- * detector's own tile** (0x4767a0/0x476ba5), so a mine is revealed when its
- * tile is within one tile of a detector's on both axes. The invented 1024-unit
- * radius is gone with it.
+ * Play's "и наверно ещё тем кто поставил" is not in it: nothing in the gate asks
+ * who laid a mine, and a layer who is not a detector sees plain ground.
  */
 export const DETECT_TILES = 1
+
+/** The texture a revealed mine tile wears: 32×32, a yellow-and-black checkerboard,
+ * loaded by the map loader beside the map's own (0x4A55BF, the string at
+ * 0x4DB0FC). */
+export const MINE_GROUND_ART = 'Language/Tims/Mine.tim'
 
 /**
  * Which classes see them — **the exe's own gate now** (todo B10): the reveal
@@ -239,6 +240,14 @@ export interface MineWorld extends BlastWorld {
   random: Random
 }
 
+/** One buried mine a detector can see: its tile, and the tile's centre. */
+export interface RevealedMine {
+  col: number
+  row: number
+  x: number
+  z: number
+}
+
 export interface Mines {
   /**
    * Whatever is buried under (x, z) — set it off, by a foot or by a projectile
@@ -282,11 +291,11 @@ export interface Mines {
    * Which buried mines these eyes can SEE — every unspent one within the
    * exe's 3×3 of tiles round a watcher whose class detects them.
    *
-   * The caller says whose eyes: the side whose turn it is, so an enemy engineer
-   * walking past does not light the field up for the player (three/battle.ts).
-   * Points on the ground, ready to draw.
+   * The caller says whose eyes: the side whose turn it is, the list the exe's
+   * reveal walks (0x476A49), so an enemy engineer walking past does not light the
+   * field up for the player (three/battle.ts). The tiles, for the ground to wear.
    */
-  revealed(watchers: readonly Pig[]): { x: number; y: number; z: number }[]
+  revealed(watchers: readonly Pig[]): RevealedMine[]
   clear(): void
 }
 
@@ -301,7 +310,7 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
   const laid: Laid[] = []
   /** …and the tiles the sapper's mines HAVE bedded into — the runtime half
    * of the map's own bit, key → where and what. */
-  const planted = new Map<number, { x: number; y: number; z: number; skill: number }>()
+  const planted = new Map<number, { x: number; z: number; skill: number }>()
 
   const key = (col: number, row: number): number => row * 64 + col
 
@@ -411,7 +420,7 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
         // …and one that CAN plant becomes the ground: a spent map tile is
         // live again under a fresh mine.
         spent.delete(k)
-        planted.set(k, { x: tile.x, y: query.height(tile.x, tile.z), z: tile.z, skill: mine.skill })
+        planted.set(k, { x: tile.x, z: tile.z, skill: mine.skill })
       }
     },
     update(delta) {
@@ -444,7 +453,10 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
       }
     },
     revealed(watchers) {
-      const seeing = watchers.filter((pig) => detectsMines(pig.pigClass) && !isDead(pig))
+      // Gone, not dead: the exe's gate refuses state 8 and lets DEAD's 6 through
+      // (0x4768D5), and only moves a pig to 8 when its body leaves the map
+      // (0x468232), so a detector lying where it fell still lights its tiles.
+      const seeing = watchers.filter((pig) => detectsMines(pig.pigClass) && !pig.gone)
       if (seeing.length === 0) return []
       // The exe's reveal is a 3×3 of TILES round the detector's own
       // (0x4767a0), so the eyes are tile places, not a radius.
@@ -455,16 +467,16 @@ export function createMines(world: MineWorld, emit: Emit): Mines {
         eyes.some(
           (eye) => Math.abs(eye.col - col) <= DETECT_TILES && Math.abs(eye.row - row) <= DETECT_TILES
         )
-      const out: { x: number; y: number; z: number }[] = []
+      const out: RevealedMine[] = []
       for (const tile of query.mineTiles()) {
         if (spent.has(key(tile.col, tile.row))) continue
-        if (nearTile(tile.col, tile.row)) {
-          out.push({ x: tile.x, y: query.height(tile.x, tile.z), z: tile.z })
-        }
+        if (nearTile(tile.col, tile.row)) out.push(tile)
       }
       // …and the ones the sapper bedded this battle, by the same eyes.
       for (const [k, mine] of planted) {
-        if (nearTile(k % 64, Math.floor(k / 64))) out.push({ x: mine.x, y: mine.y, z: mine.z })
+        const col = k % 64
+        const row = Math.floor(k / 64)
+        if (nearTile(col, row)) out.push({ col, row, x: mine.x, z: mine.z })
       }
       return out
     },

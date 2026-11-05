@@ -226,6 +226,8 @@ export interface Api {
   /** Every BMP in a MAD — the skill menu's frame and icons. */
   loadArchiveBmps(relPath: string): Promise<LoadTimsResult>
   loadGameText(which: string): Promise<LoadTextResult>
+  /** One loose TIM, whole: `Language/Tims/Mine.tim`. */
+  loadTim(relPath: string): Promise<LoadTimResult>
   loadTims(relPath: string): Promise<LoadTimsResult>
   /** Where the saves are kept — shown by the menu, and what a test asserts on. */
   savesDir(): Promise<string>
@@ -255,6 +257,8 @@ export interface TimImage {
 }
 
 export type LoadTimsResult = { ok: true; images: TimImage[] } | { ok: false; error: string }
+
+export type LoadTimResult = { ok: true; texture: TerrainTexture } | { ok: false; error: string }
 
 export interface FrontendImage {
   name: string

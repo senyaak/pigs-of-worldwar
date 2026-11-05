@@ -36,6 +36,7 @@ export const exposeDebug = (core: SceneCore): void => {
     dropIn,
     grenadeArt,
     mineArt,
+    mineGround,
     remainsArt,
     decoyArt,
     state
@@ -113,7 +114,21 @@ export const exposeDebug = (core: SceneCore): void => {
         return { x: at.x, y: at.y, z: at.z }
       }),
     mines: () => mines.at().map((one) => ({ x: one.x, y: one.y, z: one.z, fuse: one.fuse })),
-    mineMarkers: () => mineArt.shown(),
+    mineModels: () => mineArt.shown(),
+    mineGround: () => mineGround.stamped(),
+    tileOnScreen: (col, row) => {
+      const corners = mineGround.corners(col, row)
+      if (!corners) return null
+      return corners.map((corner) => {
+        const at = root
+          .localToWorld(new THREE.Vector3(corner.x, corner.y, corner.z))
+          .project(host.camera)
+        return { x: at.x, y: at.y, z: at.z }
+      })
+    },
+    asClass: (pigClass) => {
+      game.currentPig.pigClass = pigClass
+    },
     map: () => ({ eye: eye(core), blips: blips(core) }),
     minesTripped: () => mineArt.tripped(),
     // How many pairs of boots are DRAWN — the renderer's own count, not the

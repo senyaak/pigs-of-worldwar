@@ -308,6 +308,11 @@ export interface TimImage {
   rgba: Uint8Array
 }
 
+/** One loose TIM, whole and as stored: `Language/Tims/Mine.tim`. */
+export async function loadTim(full: string): Promise<Tim> {
+  return parseTim(await fs.readFile(full))
+}
+
 /**
  * Every TIM in one archive — `Language/Tims/dashtims.mad` is the battle's
  * dashboard, `TBOXTIMS.MAD` the message box. One read for the lot.
