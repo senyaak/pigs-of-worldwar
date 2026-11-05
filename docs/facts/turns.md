@@ -8,6 +8,13 @@
   slot 0, 1, 2… and every other side goes 1, 2, 3, …, 0. `lib/game/game.ts`,
   `NO_CURSOR`. `[exe]`
 
+- **On the training ground the floor costs the turn.** A pig cannot die on
+  CAMP: whatever would take it under one point leaves it on one, and if it is
+  the pig being played its turn ends, whatever hurt it — a blow, a fall, the
+  water or the poison. Landing on exactly one point is an ordinary hit, and
+  another pig reaching the floor costs the acting pig nothing.
+  `damage/training-floor.md`, 0x467c76; `lib/game/health.ts`, `hurtPig`. `[exe]`
+
 - `[gap]` **Two sides, though a map offers up to six.** The spawn markers name
   six (FINAL uses all of them, the arenas four); the battle fields the first
   two it finds, because there is no AI for the rest. There is no filling in

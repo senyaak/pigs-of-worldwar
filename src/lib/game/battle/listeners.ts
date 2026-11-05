@@ -35,11 +35,17 @@ export const listen = (core: BattleCore): void => {
       // Health does not come into it: the arm sits above the death checks and
       // one point is enough. It is a `spent` like a weapon's, cashed on the
       // quiet below, so the blast plays out and the pig is thrown before the
-      // turn goes. One half of the exe's arm is NOT modelled and is written up
-      // rather than guessed at: on the TRAINING GROUND the floor at one point
-      // hands the turn on whatever the cause was (0x467c76).
+      // turn goes.
       damaged: ({ pig, blow }) => {
         if (blow && pig !== undefined && pig === game.currentPig.id) state.spent = true
+      },
+      // **AND ON THE TRAINING GROUND THE FLOOR ENDS IT, WHATEVER THE CAUSE.**
+      // The next arm of the same routine (0x467c76, `damage/training-floor.md`
+      // in the disasm repo): a pig that cannot die pays with its turn instead,
+      // if it is the one being played. Water, a fall and the poison pass no
+      // `blow`, so this is the only thing that costs them a turn.
+      spared: ({ pig }) => {
+        if (pig === game.currentPig.id) state.spent = true
       },
       // THE BOOTS GET THEIR SECOND. The walk-away beat holds while a corpse
       // is playing out and could end the very frame the boots land — which

@@ -21,7 +21,7 @@
 
 import { PIG_RADIUS } from './obstacles'
 import type { Obstacle } from './obstacles'
-import { hurt, isDead } from './health'
+import { hurtPig, isDead } from './health'
 import { originY } from './body'
 import { vehicleCarries } from './vehicles'
 import type { Pig } from './game'
@@ -127,7 +127,7 @@ export function ramOver(
       if (world.board?.(pig)) out.boarded.push(pig.id)
       continue
     }
-    const outcome = hurt(pig, RAM_DAMAGE / 128, world.training)
+    const outcome = hurtPig(pig, RAM_DAMAGE / 128, world.training, emit)
     emit({ kind: 'damaged', at, amount: RAM_DAMAGE / 128, pig: pig.id, blow: true })
     if (outcome === 'died' || outcome === 'gibbed')
       emit({ kind: 'killed', pig: pig.id, by: driver.id, gibbed: outcome === 'gibbed' })

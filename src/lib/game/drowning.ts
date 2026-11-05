@@ -32,7 +32,7 @@
 // Pure, like the rest of lib/game: pigs and a terrain query in, damage out.
 
 import { FRAME_SECONDS } from './ballistics'
-import { hurt, isDead } from './health'
+import { hurtPig, isDead } from './health'
 import { inWater } from './locomotion'
 import type { Emit } from './events'
 import type { Pig } from './game'
@@ -127,7 +127,7 @@ export function createDrowning(
         wet.set(pig.id, seconds)
         if (!drowns(pig.pigClass)) continue
         const damage = soakDamage(seconds, pig === acting && !walkAway, delta)
-        const outcome = hurt(pig, damage, world.training)
+        const outcome = hurtPig(pig, damage, world.training, emit)
         if (outcome === 'died' || outcome === 'gibbed')
           emit({ kind: 'killed', pig: pig.id, drowned: true })
       }
