@@ -10,7 +10,7 @@
 // events the presentation reads.
 //
 // `openBench` and its verbs are for every bench; `fireAtDummy` is the guns' report
-// on top of them.
+// on top of them, and a bench's own report otherwise lives in its spec.
 
 import path from 'node:path'
 import { existsSync } from 'node:fs'
@@ -42,7 +42,7 @@ const STEP_CAP = 60 * 60
 const ROUNDS_IN_HAND = 9
 /** Where a dummy goes to be out of the line of fire: beside the strip, and short
  * of the pond (lib/game/provingTerrain.ts). */
-const OFF_THE_LINE_Z = -1500
+export const OFF_THE_LINE_Z = -1500
 
 /** A skill, as a pig holds it. */
 type Skill = NonNullable<Pig['holding']>
