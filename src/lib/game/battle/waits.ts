@@ -67,8 +67,12 @@ export const settling = ({
   tumbles,
   corpses,
   airDrops,
+  walkHome,
   state
 }: BattleCore): boolean =>
+  // …and first of all a pig outside the line, standing or on its way home:
+  // `[0x537FC0]`, the first test of the wait (0x495288, lib/game/walkHome.ts).
+  walkHome.waiting() > 0 ||
   effects.busy() ||
   shots.live().length > 0 ||
   grenades.live() > 0 ||
@@ -137,8 +141,10 @@ export const stageStill = ({
   swings,
   tumbles,
   airDrops,
+  walkHome,
   state
 }: BattleCore): boolean =>
+  walkHome.waiting() === 0 &&
   shots.live().length === 0 &&
   grenades.live() === 0 &&
   mines.live() === 0 &&

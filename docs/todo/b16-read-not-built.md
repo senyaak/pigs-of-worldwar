@@ -18,9 +18,11 @@ leftovers of the same read:
   snapped back to its own cell and tallied dead — again with the handover if it
   was acting.
 
-Neither is reachable in the remake today, which is the honest
-reason they are unbuilt rather than an oversight: nothing lets a pig fall for
-ten seconds or leave the map. Build them when something does.
+The first is not reachable in the remake today, which is the honest reason it is
+unbuilt rather than an oversight: nothing lets a pig fall for ten seconds. The
+second is, now that a blast throws a pig past the line
+([../facts/map-limit.md](../facts/map-limit.md)), and it is
+senyaak/pigs-of-worldwar#32.
 
 **And 40 ARTILLERY CLUSTER is not the job it looked like.** `weapons/cluster.md`
 was read whole this session and its skim corrected three times over. The one

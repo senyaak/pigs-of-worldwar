@@ -11,7 +11,7 @@ const BOOTS_SECONDS = 1
 // A blow does not decide that a turn ends; the OBJECT breaking does, which is
 // where the exe hangs it too (0x48d750), and every weapon simply announces.
 export const listen = (core: BattleCore): void => {
-  const { game, scenery, effects, emit, everyone, state } = core
+  const { game, scenery, effects, walkHome, emit, everyone, state } = core
   core.bus.on(
     handling({
       killed: ({ pig }) => {
@@ -37,7 +37,15 @@ export const listen = (core: BattleCore): void => {
       // quiet below, so the blast plays out and the pig is thrown before the
       // turn goes.
       damaged: ({ pig, blow }) => {
-        if (blow && pig !== undefined && pig === game.currentPig.id) state.spent = true
+        if (!blow || pig === undefined) return
+        // A blow stops a pig walking home, and it stands the wait again
+        // (0x467C47..0x467C50, lib/game/walkHome.ts).
+        walkHome.struck(pig)
+        if (pig !== game.currentPig.id) return
+        state.spent = true
+        // …and it is mode 13 from this blow on in the exe, so the line no longer
+        // holds this pig: its own blast can throw it past (`terrain/boundary.md`).
+        state.loco.heldAtLimit = false
       },
       // **AND ON THE TRAINING GROUND THE FLOOR ENDS IT, WHATEVER THE CAUSE.**
       // The next arm of the same routine (0x467c76, `damage/training-floor.md`
@@ -45,7 +53,9 @@ export const listen = (core: BattleCore): void => {
       // if it is the one being played. Water, a fall and the poison pass no
       // `blow`, so this is the only thing that costs them a turn.
       spared: ({ pig }) => {
-        if (pig === game.currentPig.id) state.spent = true
+        if (pig !== game.currentPig.id) return
+        state.spent = true
+        state.loco.heldAtLimit = false
       },
       // THE BOOTS GET THEIR SECOND. The walk-away beat holds while a corpse
       // is playing out and could end the very frame the boots land — which

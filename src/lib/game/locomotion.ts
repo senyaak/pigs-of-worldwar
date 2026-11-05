@@ -32,7 +32,7 @@ import {
 import type { Bounciness } from './ballistics'
 import { FALL_SPEED_FACTOR, STEP_DOWN, WALK_BACK_SPEED, WALK_REQUEST, WALK_SPEED, step } from './movement'
 import { MODEL_SCALE } from './scale'
-import { clampToWorld, fromExeY } from './terrain'
+import { THROWN_LIMIT, WORLD_LIMIT, clampToWorld, fromExeY } from './terrain'
 import type { TerrainQuery } from './terrain'
 import { NO_OBSTACLES, STANDING_ON } from './obstacles'
 import type { Obstruction } from './obstacles'
@@ -177,6 +177,18 @@ export const EJECT_SPEED = fromExeSpeed(0x20)
  * is not a ladder, and holding the key only scrapes and scrabbles.
  */
 export const WALL_CLIMB = fromExeY(128)
+/**
+ * A pig walking home up a wall tile: 4 units a frame, the step `Pig::Walk` caps
+ * to in the wall slot (0x46ACEE, `movement/walls.md`). A driven pig has the
+ * remake's `WALL_CLIMB` envelope instead; the walk home cannot be wedged
+ * (0x46FF91), so the crawl is what the wall ring costs it.
+ */
+export const WALL_CRAWL = fromExeSpeed(4)
+/**
+ * Where the air puts the acting pig that passes the line, on either axis: 12256,
+ * stilled (0x46D5B8, 0x46D5FB, 0x46D6C9, 0x46D710, each followed by 0x4A9EE0).
+ */
+export const AIR_HOLD = 12256
 /** The sidestep's scrape along a wall: 8 units a logic frame (0x4790d9). */
 export const SIDESTEP_SPEED = fromExeSpeed(8)
 
@@ -426,6 +438,21 @@ export interface LocomotionState {
    * split as `wounded`.
    */
   impact: { speed: number; flying: boolean; onObject: boolean; surface: number } | null
+  /**
+   * Whether the line holds this pig: the exe's one gate on every ±0x3000 test of
+   * a pig's own move, "the acting pig, and the mode is not 13"
+   * (`terrain/boundary.md`). True for the pig being driven; a blow on it ends its
+   * turn at once, so the battle writes false there (lib/game/battle/listeners.ts)
+   * and at the end of any turn, and a state built for anybody else carries false.
+   */
+  heldAtLimit: boolean
+  /**
+   * The exe's state 2, the walk home (lib/game/walkHome.ts). A wall is crawled
+   * through rather than refused, and it cannot be wedged (0x46FF91). An object is
+   * `TryMove`'s as it is for anybody: step up, sidestep, and only then refused,
+   * which is what ends the walk (0x46B8CC).
+   */
+  goingHome: boolean
 }
 
 /**
@@ -535,7 +562,9 @@ export function createLocomotion(
     swimming: inWater(query, x, z, y),
     wounded: 0,
     armed: false,
-    impact: null
+    impact: null,
+    heldAtLimit: true,
+    goingHome: false
   }
 }
 
@@ -604,7 +633,9 @@ export function updateLocomotion(
   // plateau's own edge — so a pig standing on the deck was wedged from the
   // moment it got there, and the counter threw it off after 25 frames. What
   // it is standing on decides (lib/game/obstacles.ts).
-  const wedged = !query.walkable(state.x, state.z) && !standing(state, obstruction)
+  // …and the walk home is never wedged: `UpdateGroundState` sends state 2 to
+  // 0x46FF91, which zeroes the counter (the test at 0x46FE24).
+  const wedged = !state.goingHome && !query.walkable(state.x, state.z) && !standing(state, obstruction)
   if (!wedged) state.wedgedSeconds = 0
   else {
     state.wedgedSeconds += delta
@@ -628,6 +659,33 @@ export const FLY_AFTER_SECONDS = 25 * FRAME_SECONDS
  */
 export const isFlying = (a: Airborne): boolean =>
   a.hurled === true || a.ejected === true || (a.aloft ?? 0) > FLY_AFTER_SECONDS
+
+/**
+ * Where this frame of a flight ends, the line's half of it.
+ *
+ * **HELD** (the acting pig, not in mode 13): past ±0x3000 on either axis it is put
+ * at ±12256 and stilled, and falls from there (0x46D5B2..0x46D721).
+ *
+ * **NOT HELD**: nothing stops it. No pig but the acting one is ever held, and the
+ * blow that throws the acting one has ended its turn (`terrain/boundary.md`).
+ *
+ * Past ±0x3DFF the exe kills it (0x46CF10), and that kill is senyaak/pigs-of-worldwar#32.
+ * Until then it takes the training ground's arm of the same test: x and z clamped
+ * to ±12288, the body flying on (0x46D0B5..0x46D17C).
+ */
+function flightStep(state: LocomotionState, a: Airborne, delta: number): { x: number; z: number } {
+  const x = state.x + a.vx * delta
+  const z = state.z + a.vz * delta
+  if (!state.heldAtLimit) {
+    return Math.abs(x) > THROWN_LIMIT || Math.abs(z) > THROWN_LIMIT ? clampToWorld(x, z) : { x, z }
+  }
+  if (Math.abs(x) <= WORLD_LIMIT && Math.abs(z) <= WORLD_LIMIT) return { x, z }
+  const hold = (at: number): number => (Math.abs(at) > WORLD_LIMIT ? Math.sign(at) * AIR_HOLD : at)
+  a.vx = 0
+  a.vy = 0
+  a.vz = 0
+  return { x: hold(x), z: hold(z) }
+}
 
 /** Momentum carries; gravity does the rest. */
 function fly(
@@ -664,7 +722,7 @@ function fly(
       a.pushIn = null
     }
   }
-  const to = clampToWorld(state.x + a.vx * delta, state.z + a.vz * delta)
+  const to = flightStep(state, a, delta)
   // A body in the air is STILL A BODY. The exe's own sweep (0x406AD0) has two
   // callers: the walking dispatch (0x478e73, whose result word of 1 — "only the
   // landscape was hit" — is the successful step) and the physics library's own
@@ -939,7 +997,8 @@ function ground(
     // branch below the one that is.
     const holds = (x: number, z: number): boolean =>
       obstruction.standOn(x, z, footY, WALL_CLIMB) !== null
-    const move = step(query, state.x, state.z, state.heading, speed * delta * intent.walk, holds)
+    const pace = state.goingHome && wallSlot ? WALL_CRAWL : speed
+    const move = step(query, state.x, state.z, state.heading, pace * delta * intent.walk, holds, state.heldAtLimit)
     // …and walking OFF a walkway is a fall the landscape cannot see either:
     // over the far end of CAMP's bridge the ground below reads level all the
     // way, so the pig snapped 650 units down into the water without ever
@@ -1109,7 +1168,7 @@ function inReach(
   z: number
 ): boolean {
   if (objectInTheWay(query, obstruction, footY, x, z)) return false
-  if (query.walkable(x, z)) return true
+  if (state.goingHome || query.walkable(x, z)) return true
   // Game space is Y-down: higher ground is a SMALLER height value.
   return state.freeY - query.height(x, z) <= WALL_CLIMB
 }
@@ -1135,7 +1194,9 @@ function sidestep(
     const probeZ = state.z + Math.cos(angle) * reach
     if (!inReach(state, query, obstruction, footY, probeX, probeZ)) continue
     const scrape = SIDESTEP_SPEED * delta
-    const to = clampToWorld(state.x + Math.sin(angle) * scrape, state.z + Math.cos(angle) * scrape)
+    const x = state.x + Math.sin(angle) * scrape
+    const z = state.z + Math.cos(angle) * scrape
+    const to = state.heldAtLimit ? clampToWorld(x, z) : { x, z }
     state.x = to.x
     state.z = to.z
     state.sidestep = side

@@ -58,6 +58,8 @@ import { createEffectField } from './effectField'
 import type { EffectField } from './effectField'
 import { createDamageNumbers } from './damage'
 import { createDrowning } from './drowning'
+import { createWalkHome } from './walkHome'
+import type { WalkHome } from './walkHome'
 import type { DamageNumbers } from './damage'
 import { createIndoors } from './indoors'
 import { createBattle } from './battle'
@@ -260,6 +262,8 @@ export interface Engine {
   /** Pigs still in the air because something blew up under them
    * (lib/game/tumble.ts). */
   readonly tumbles: Tumbles
+  /** Who is past the line, and on the way back (lib/game/walkHome.ts). */
+  readonly walkHome: WalkHome
   readonly swings: Strikes
   /** The healing hands (lib/game/healing.ts). */
   readonly heals: Heals
@@ -612,6 +616,18 @@ export function createEngine(parts: EngineParts): Engine {
    * jump into (lib/game/indoors.ts). */
   const indoors = createIndoors(world.objects, bus.emit)
 
+  /** Who is past the line, and on the way back (lib/game/walkHome.ts). Nobody's
+   * turn in particular either: every pig, every frame, in every mode. */
+  const walkHome = createWalkHome({
+    pigs,
+    query,
+    obstacles,
+    training,
+    riding: (pig) => indoors.inside(pig) !== null,
+    tumbles,
+    wear: (pig, clip) => anim.setClip(pig, clip)
+  })
+
   const battle = createBattle({
     game,
     query,
@@ -636,6 +652,7 @@ export function createEngine(parts: EngineParts): Engine {
     airDrops,
     dropIn,
     drowning,
+    walkHome,
     training,
     proving: isProvingGround(world.map),
     /** What ENDS the mission (lib/game/endOfGame.ts). */
@@ -807,6 +824,7 @@ export function createEngine(parts: EngineParts): Engine {
     pockets,
     hides,
     tumbles,
+    walkHome,
     effects,
     numbers,
     airDrops,

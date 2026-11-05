@@ -33,11 +33,14 @@ export const endTurnBeat = (core: BattleCore): void => {
     mines,
     tumbles,
     drowning,
+    walkHome,
     emit,
     everyone,
     attack,
     state
   } = core
+  // Mode 13: the line holds nobody from here on (`terrain/boundary.md`).
+  state.loco.heldAtLimit = false
   // **THE LAID MINES BECOME THE GROUND.** Play's rule ("мина взрывается
   // когда ход кончается в оригинале"): the sapper's furniture beds into
   // the tile bits now — and one bedded under somebody's feet goes off in
@@ -68,7 +71,7 @@ export const endTurnBeat = (core: BattleCore): void => {
   for (const pig of everyone()) {
     // A pig a blast threw is not standing about: its flight is still running and
     // the beat waits for it (`settling`).
-    if (isDead(pig) || tumbles.has(pig)) continue
+    if (isDead(pig) || tumbles.has(pig) || walkHome.walking(pig)) continue
     if (pig === game.currentPig && state.loco.airborne !== null) continue
     // The wounded stand for the crippled here too — the hand was emptied
     // at the top of this beat, so the armed exemption cannot apply.
@@ -100,6 +103,7 @@ export const endTurnBeat = (core: BattleCore): void => {
     pigs: everyone,
     query,
     soaked: drowning.soaked,
+    walkingHome: walkHome.walking,
     wear: (pig, clip) => anim.setClip(pig, clip),
     emit
   })
@@ -138,7 +142,7 @@ export const walkAwayBeat = (core: BattleCore, delta: number): boolean => {
     )
     // A pig thrown by the charge it planted is still in the air, and the beat is
     // waiting for it (`settling`). Its flight owns its position for as long as it
-    // lasts; the walk home is what the beat does with pigs on the ground.
+    // lasts; the swim to shore is what the beat does with pigs on the ground.
     flyOn(core, delta)
     // The beat moves pigs itself and the one whose turn it was is one of them,
     // so the state the scene draws THAT one out of has to follow it.

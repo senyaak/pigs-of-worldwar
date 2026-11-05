@@ -52,7 +52,11 @@ export const fromExeY = (units: number): number => (units * HEIGHT_SCALE) / 2
  */
 export const SWAMP_TILE = 11
 
-/** The world limit a pig's position is clamped to (exe 0x3000). */
+/**
+ * THE LINE: where a pig's own feet stop (exe 0x3000, an immediate compiled into
+ * the walk, `terrain/boundary.md`). The acting pig alone is held at it, and only
+ * until its turn ends; a blast can throw any pig past it (lib/game/walkHome.ts).
+ */
 export const WORLD_LIMIT = 12288
 
 /** The per-texel water verdict — see lib/game/watermask. */
@@ -60,8 +64,14 @@ export interface WaterMask {
   wet(x: number, z: number): boolean
 }
 
-/** (x, z) brought inside the world limits — the edge of the map holds
- * whatever a pig is doing, walking or flying. */
+/**
+ * How far out a thrown pig can go at all (exe 0x3DFF, the test at 0x46CF10): the
+ * limit `Map::SampleHeight` clamps to as well (`terrain/boundary.md`).
+ */
+export const THROWN_LIMIT = 0x3dff
+
+/** (x, z) brought back to the line — what holds a pig's own feet, and where the
+ * training ground's arm puts a pig that cannot stay out (0x46D0B5..0x46D17C). */
 export const clampToWorld = (x: number, z: number): { x: number; z: number } => ({
   x: Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, x)),
   z: Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, z))
