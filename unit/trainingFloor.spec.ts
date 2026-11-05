@@ -58,7 +58,14 @@ const field = (): { acting: Pig; other: Pig; emit: Emit; state: BattleState } =>
   const [acting, other] = everyone
   const bus = createBus()
   const state = createState(game, terrain(() => 0), () => false)
-  listen({ game, emit: bus.emit, everyone: () => everyone, state, bus } as unknown as BattleCore)
+  listen({
+    game,
+    emit: bus.emit,
+    everyone: () => everyone,
+    state,
+    bus,
+    walkHome: { struck: () => {} }
+  } as unknown as BattleCore)
   return { acting, other, emit: bus.emit, state }
 }
 

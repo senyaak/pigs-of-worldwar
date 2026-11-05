@@ -180,11 +180,17 @@ export function step(
    * the lip left the ground two units UNDER the deck, and a body in flight only
    * lands on what is BELOW it: it sailed over the abutment and into the ditch.
    */
-  supported: (x: number, z: number) => boolean = () => false
+  supported: (x: number, z: number) => boolean = () => false,
+  /**
+   * Whether the line holds this step. The exe's test is compiled in behind one
+   * gate: the pig is the acting one and the mode is not 13 (0x478D32,
+   * `terrain/boundary.md`). A pig on its way home is neither.
+   */
+  heldAtLimit: boolean = true
 ): MoveResult {
   const wantX = x + Math.sin(heading) * distance
   const wantZ = z + Math.cos(heading) * distance
-  const { x: toX, z: toZ } = clampToWorld(wantX, wantZ)
+  const { x: toX, z: toZ } = heldAtLimit ? clampToWorld(wantX, wantZ) : { x: wantX, z: wantZ }
   if (toX !== wantX || toZ !== wantZ) return { outcome: 'limit', x, z }
 
   // The edge is looked for a FIXED distance ahead, not at wherever this

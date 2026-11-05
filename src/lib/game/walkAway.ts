@@ -22,7 +22,8 @@
 // 472e44  eight (dx, dz) pairs off the table at 0x4D1010 — the compass
 // 472e8b  each ray walked a TILE at a time, up to 0x10 of them (0x4730a3)
 // 472ea9  off the map            -> that ray is done
-// 472ec9  outside tiles 8..55    -> skip the tile, keep going
+// 472ec9  outside tiles 8..55    -> skip the tile, keep going, so a pig thrown past
+//         the line and into the water out there still finds its way in
 // 472f3e  a WALL tile            -> that ray is done (0x473092)
 // 472f6f  type 4 or 11 with the water bit -> keep going, it is still water
 // 473007  otherwise 0x478B80 validates it; on success the offset is kept and
@@ -40,7 +41,7 @@
 import { FRAME_SECONDS } from './ballistics'
 import { ANIM, SWIM_SPEED, TURN_SPEED, inWater, restingY } from './locomotion'
 import { isDead } from './health'
-import { WORLD_LIMIT, clampToWorld } from './terrain'
+import { WORLD_LIMIT } from './terrain'
 import { TILE_STEP } from '../formats/pmg'
 import type { TerrainQuery } from './terrain'
 import type { Pig } from './game'
@@ -110,7 +111,9 @@ export function shoreFrom(query: TerrainQuery, x: number, z: number): { x: numbe
   for (const [dx, dz] of RAYS) {
     for (let step = 1; step <= RAY_TILES; step++) {
       const at = { x: x + dx * step * TILE_STEP, z: z + dz * step * TILE_STEP }
-      if (Math.abs(at.x) > WORLD_LIMIT || Math.abs(at.z) > WORLD_LIMIT) break
+      // Skipped, not the end of the ray (0x472ec9): and before the wall test, so a
+      // wall ring outside the line is never read.
+      if (Math.abs(at.x) > WORLD_LIMIT || Math.abs(at.z) > WORLD_LIMIT) continue
       // A wall ends this ray; water is what the pig is already in, so it
       // carries on through it.
       if (!query.walkable(at.x, at.z)) break
@@ -147,6 +150,9 @@ export function beginWalkAway(world: {
   pigs: () => Pig[]
   query: TerrainQuery
   soaked: (pig: Pig) => number
+  /** Whether a pig is on its way home from past the line: wading through water on
+   * that walk it is not a swimmer here (lib/game/walkHome.ts). */
+  walkingHome: (pig: Pig) => boolean
   /** Put a clip on a pig — the swim, and standing about once it is out. */
   wear: (pig: Pig, clip: number) => void
   emit: Emit
@@ -184,11 +190,11 @@ export function beginWalkAway(world: {
     // by dx²+dz², so the pig has to travel the distance it was picked for.
     if (Math.abs(turn) > FACING) return
     const stride = SWIM_SPEED * delta
-    const to = clampToWorld(
-      pig.position.x + Math.sin(pig.heading) * stride,
-      pig.position.z + Math.cos(pig.heading) * stride
-    )
-    pig.position = { x: to.x, y: restingY(world.query, to.x, to.z), z: to.z }
+    // No line here: this beat is mode 13, the one mode that does not hold a pig to it
+    // (`terrain/boundary.md`).
+    const x = pig.position.x + Math.sin(pig.heading) * stride
+    const z = pig.position.z + Math.cos(pig.heading) * stride
+    pig.position = { x, y: restingY(world.query, x, z), z }
   }
 
   return {
@@ -199,6 +205,7 @@ export function beginWalkAway(world: {
           going.delete(pig.id)
           continue
         }
+        if (world.walkingHome(pig)) continue
         // A pig on a BRIDGE is not in the water it crosses, whatever the tile
         // under it says (`inWater`). Without that test this beat took a pig
         // standing on CAMP's deck for a swimmer and dropped it to the waterline

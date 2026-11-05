@@ -93,6 +93,13 @@ export interface Tumbles {
   live(): number
   /** Whether THIS pig is being thrown right now. */
   has(pig: Pig): boolean
+  /** …and whether it is still in the AIR: `has` runs on through the get-up. */
+  aloft(pig: Pig): boolean
+  /**
+   * Take over a flight somebody else started: a pig on its way home that has walked
+   * off an edge (lib/game/walkHome.ts). It is not a throw, so it is not `hurled`.
+   */
+  adopt(pig: Pig, state: LocomotionState): void
   /**
    * A body in the air has moved — knock over whatever it has just run into.
    *
@@ -341,6 +348,9 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
       state.x = pig.position.x
       state.z = pig.position.z
       state.y = pig.position.y
+      // The line holds the acting pig alone, and that one's flight is not in here
+      // (`terrain/boundary.md`): this is how a blast throws a pig past it.
+      state.heldAtLimit = false
       const { vx, vy, vz } = velocity
       // `bouncing` is what makes it read as being thrown rather than jumping:
       // the clip is the BOUNCE and the landing bounces on before it settles
@@ -407,6 +417,13 @@ export function createTumbles(world: TumbleWorld, emit: Emit): Tumbles {
     },
     live: () => flying.size,
     has: (pig) => flying.has(pig.id),
+    aloft(pig) {
+      const state = flying.get(pig.id)
+      return state !== undefined && state.airborne !== null
+    },
+    adopt(pig, state) {
+      flying.set(pig.id, state)
+    },
     at: () =>
       [...flying].map(([pig, state]) => ({
         pig,

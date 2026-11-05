@@ -46,6 +46,7 @@ of the form `weapons/fire.md` are in the **disasm repo**, never in this tree.
 - [hud.md](hud.md) — the name plates' font, the dashboard's own numbers, the gauge and icons
 - [input.md](input.md) — the controller, one keydown one action, an action spent by a view change
 - [knock-and-throw.md](knock-and-throw.md) — a flight bowls a pig over, a bullet's knock, damage throws
+- [map-limit.md](map-limit.md) — who the line holds, a thrown pig's walk home, the turn waiting for it
 - [map-records.md](map-records.md) — player counts, true world coordinates, spawn slots, solidity
 - [menu.md](menu.md) — the bar machine's layout and motion, the mouse, names
 - [movement.md](movement.md) — contact softening and the turn ramp, both unmodelled; a flying pig's landing ladder
