@@ -203,6 +203,8 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
       if (!loose.has(path)) {
         const got = await window.api.loadSound(path)
         if (!got.ok) {
+          // not a failure: a path typed at the console, and `no sound at <path>`
+          // below is the answer to it.
           loose.set(path, null)
         } else {
           try {

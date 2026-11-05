@@ -22,7 +22,7 @@ const LANGUAGE = 'en'
 const FOLDER = `Speech/Sku1/Train${SET}`
 
 export interface Speech {
-  /** Say clip 1..28. Silent and harmless if the install has no Speech. */
+  /** Say clip 1..28. Silent, and reported, if the install has no Speech. */
   play(clip: number): void
   /** Cut whatever is being said. */
   stop(): void
@@ -75,7 +75,7 @@ export function createSpeech(): Speech {
     if (buffers.has(clip)) return
     const file = await window.api.loadSound(pathFor(clip))
     if (!file.ok) {
-      console.warn(`no speech ${clip}: ${file.error}`)
+      reportFailure(`loading the speech ${clip}`, file.error)
       buffers.set(clip, null)
       return
     }

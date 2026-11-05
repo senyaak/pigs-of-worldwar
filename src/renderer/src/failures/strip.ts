@@ -2,6 +2,7 @@
 // over every screen, the battle included. A click takes a line away; the log
 // and the console keep it.
 
+import { ReportKind } from '../../../lib/failures'
 import type { FailureReport } from '../../../lib/failures'
 
 /** The newest this many stay; older ones are in the session log. */
@@ -24,6 +25,12 @@ function theStrip(): HTMLDivElement {
     document.body.append(strip)
   }
   return strip
+}
+
+/** Take the refusals away: the person has answered them. A failure stays until
+ * it is clicked. */
+export function clearRefusals(): void {
+  for (const line of theStrip().querySelectorAll(`.failure-line.${ReportKind.Refusal}`)) line.remove()
 }
 
 export function showOnStrip(report: FailureReport): void {

@@ -397,6 +397,7 @@ export function initMissionSelect(handlers: {
         off = shared.off
         art = sprites
         if (text.ok) gtext = text.strings
+        else reportFailure("loading the mission select's words", text.error)
       } catch (error) {
         reportFailure('loading the mission select', error)
         return
