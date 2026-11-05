@@ -113,7 +113,10 @@ each round's damage and each throw's speed in exe units a frame.
 `e2e/000/proving-bench-guns.spec.ts` is one case per gun, every number `// exe:`
 cited. A case marked KNOWN SHORT or DIFFERS pins what the remake does today, with
 what the exe does and the owning issue beside it, so the build goes red and flips
-it. The next benches use `openBench` and its verbs.
+it. `e2e/000/proving-bench-blades.spec.ts` is one case per blade, swung through the
+same door at a dummy stood in front of the pig: its clip, its damage and its throw.
+A bench's report lives in its own spec; the next benches use `openBench` and its
+verbs.
 
 ## A spec LOADS its starting state — it never walks to it
 
