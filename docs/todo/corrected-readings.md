@@ -7,6 +7,4 @@ exe does, and what play sees. Nothing has been changed in the code for them.
 
 4. **The landing thresholds**: 0x32 is the blocked-ground eject, 0x4b the dust
    (with `[pig+0x1b2] > 2`), 0x19 a sound at 0x471158 and the land/bounce fork
-   at 0x4711d8, 0x46 the fatigue. Disasm `movement/landing.md`. And every
-   effect stage fires at `when + 1`, not only the first (`effects/stages.md`):
-   the remake's effect timings may be a frame early.
+   at 0x4711d8, 0x46 the fatigue. Disasm `movement/landing.md`.

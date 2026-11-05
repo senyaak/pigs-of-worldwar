@@ -10,14 +10,19 @@ import { EXE_FRAME_SECONDS } from '../src/lib/game/ballistics'
 import { CLOUD_DEAD, CLOUD_STEP, cloudChannel, cloudSize } from '../src/lib/game/cloud'
 import {
   BLAST_EFFECT,
+  BOMBLET_EFFECT,
   BREAK_EFFECT,
+  HEAL_EFFECT,
+  MINE_EFFECT,
   RING_DEAD,
+  SPLASH_EFFECT,
   advanceEffect,
   beginEffect,
   hitEffectOf,
   ringColour,
   spent
 } from '../src/lib/game/effects'
+import type { HitEffect } from '../src/lib/game/effects'
 
 /**
  * Step an effect by whole frames, the way the engine does — at the ENGINE's
@@ -39,6 +44,103 @@ test('each melee weapon throws its own id and its own row', { tag: '@nodata' }, 
   // Nothing else is a melee weapon, so nothing else throws one.
   expect(hitEffectOf(6)).toBeNull()
   expect(hitEffectOf(null)).toBeNull()
+})
+
+/** A burst stage's `when` byte, and how many it throws. */
+interface BurstWhen {
+  when: number
+  count: number
+}
+
+/** The `when` bytes of one row's live stages, as the exe's table holds them. */
+interface RowWhens {
+  name: string
+  effect: HitEffect
+  rings: number[]
+  clouds: number[]
+  bursts: BurstWhen[]
+}
+
+/**
+ * Out of the table at 0x4D61E8, not out of the remake. Rows 0, 2, 6 and 14 are
+ * `effects/rows.md`, and rows 9 to 12 are `effects/melee-and-breaking.md`;
+ * `python effects/row4.py <rows>` prints the bytes of any of them. Row 9's own
+ * stage K is left out because the prod's burst is not built here: #179 owns it.
+ */
+const ROW_WHENS: RowWhens[] = [
+  {
+    name: 'row 0, a blast',
+    effect: BLAST_EFFECT,
+    rings: [],
+    clouds: [0, 1], // B, A
+    bursts: [
+      { when: 1, count: 4 }, // I
+      { when: 2, count: 4 }, // J
+      { when: 2, count: 6 } // K
+    ]
+  },
+  {
+    name: 'row 2, a splash',
+    effect: SPLASH_EFFECT,
+    rings: [1, 2, 4], // F, G, H
+    clouds: [2], // A
+    bursts: [{ when: 2, count: 10 }] // K
+  },
+  {
+    name: 'row 6, a bomblet',
+    effect: BOMBLET_EFFECT,
+    rings: [],
+    clouds: [],
+    bursts: [
+      { when: 1, count: 6 }, // I
+      { when: 2, count: 6 } // K
+    ]
+  },
+  { name: 'row 9, the cattle prod', effect: hitEffectOf(5)!, rings: [0, 3, 5], clouds: [], bursts: [] },
+  { name: 'row 10, the bayonet', effect: hitEffectOf(3)!, rings: [0, 3], clouds: [], bursts: [] },
+  { name: 'row 11, the trotter', effect: hitEffectOf(1)!, rings: [0, 3], clouds: [], bursts: [] },
+  { name: 'row 12, the sword', effect: hitEffectOf(4)!, rings: [0, 3, 5], clouds: [], bursts: [] },
+  {
+    name: 'row 14, a mine',
+    effect: MINE_EFFECT,
+    rings: [0], // F
+    clouds: [0], // A
+    bursts: [
+      { when: 0, count: 10 }, // I
+      { when: 0, count: 8 } // K
+    ]
+  }
+]
+
+for (const row of ROW_WHENS) {
+  test(`${row.name}: every stage is born on when + 1`, { tag: '@nodata' }, () => {
+    const effect = beginEffect(row.effect, { x: 0, y: 0, z: 0 })
+    const last = Math.max(...row.rings, ...row.clouds, ...row.bursts.map((one) => one.when))
+    for (let frame = 1; frame <= last + 2; frame++) {
+      frames(effect, 1)
+      // exe: effects/stages.md, 0x48BC81..0x48BEE3 — all twelve fire where the
+      // counter less one equals `when`. effects/fuse.md, 0x48A5D6 — the counter
+      // has ticked ahead of them, so it reads 1 on the effect's first step.
+      const born = (when: number): boolean => when + 1 <= frame
+      expect(effect.rings, `rings on frame ${frame}`).toHaveLength(row.rings.filter(born).length)
+      expect(effect.clouds, `clouds on frame ${frame}`).toHaveLength(row.clouds.filter(born).length)
+      const puffs = row.bursts.filter((one) => born(one.when)).reduce((n, one) => n + one.count, 0)
+      expect(effect.smoke, `puffs on frame ${frame}`).toHaveLength(puffs)
+    }
+  })
+}
+
+test('row 4, the heal: both mote bursts are born on when + 1', { tag: '@nodata' }, () => {
+  // Only the bursts: the row's ring is out and its clouds are the `[play]` staging,
+  // not the row's (docs/facts/heal.md).
+  const effect = beginEffect(HEAL_EFFECT, { x: 0, y: 0, z: 0 })
+  expect(effect.smoke).toHaveLength(0)
+  frames(effect, 1)
+  // exe: effects/rows.md, § Row 4, the table at 0x4D6424 — K and L, `when` byte 0 and
+  // ten particles each.
+  expect(effect.smoke).toHaveLength(20)
+  frames(effect, 1)
+  expect(effect.smoke).toHaveLength(20)
 })
 
 test('the bayonet throws two rings and the sword three', { tag: '@nodata' }, () => {
