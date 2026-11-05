@@ -102,14 +102,14 @@ test('9 MACHINE GUN: 7500 of reach and a knock of 48, KNOWN SHORT of its eleven 
   expectKnock(knock, [48])
 })
 
-test('10 HEAVY M-GUN: 7500 of reach and a knock of 48, KNOWN SHORT of its eleven rounds and its first round ×5 (TODO-ISSUE)', async () => {
+test('10 HEAVY M-GUN: 7500 of reach and a knock of 48, KNOWN SHORT of its eleven rounds and its first round ×5 (#201)', async () => {
   const { rounds, reach, damage, lost, knock } = await fireAtDummy(HEAVY_M_GUN)
-  // KNOWN SHORT, TODO-ISSUE: the remake looses one round a press. exe:
+  // KNOWN SHORT, #201: the remake looses one round a press. exe:
   // weapons/fire/burst.md, 0x479CC7: eleven rounds, frames 20 to 60 every 4.
   expect(rounds).toBe(1)
   // exe: weapons/fire/projectile-class.md, 0x4320D5: kind 17, speed 300 for 25 frames.
   expect(reach).toBeCloseTo(300 * 25, 3)
-  // KNOWN SHORT, TODO-ISSUE: the row's own 8. exe: weapons/fire/damage.md: row +0x0C
+  // KNOWN SHORT, #201: the row's own 8. exe: weapons/fire/damage.md: row +0x0C
   // 1024; weapons/fire/hit-by-projectile.md, 0x47878F: kind 0x11 has `edi` 5, so the
   // first round is 40, the next four are absorbed, and the sixth on pay 8 each.
   expect(damage).toEqual([8])
@@ -146,7 +146,7 @@ test('12 SHOTGUN: ten pellets, 4500 of reach, 30 points and a knock climbing by 
   expectKnock(knock, [6, 12, 18, 24, 30, 36, 42, 48, 54, 60])
 })
 
-test('13 SUPER SHOTGUN: ten pellets, 4500 of reach and 30 points, its knock DIFFERS from the exe (TODO-ISSUE)', async () => {
+test('13 SUPER SHOTGUN: ten pellets, 4500 of reach and 30 points, its knock DIFFERS from the exe (#202)', async () => {
   const { rounds, reach, damage, lost, knock } = await fireAtDummy(SUPER_SHOTGUN)
   // exe: weapons/fire/shotgun.md, 0x47A7B0: the one arm of 12 and 13, ten projectiles.
   expect(rounds).toBe(10)
@@ -156,20 +156,20 @@ test('13 SUPER SHOTGUN: ten pellets, 4500 of reach and 30 points, its knock DIFF
   // 0x47878F: kind 0x13 has `edi` 5: the first pellet 15, four absorbed, five at 3.
   expect(damage).toEqual([15, 3, 3, 3, 3, 3])
   expect(lost).toBe(30)
-  // DIFFERS, TODO-ISSUE: the remake's row 13 carries the shotgun's 6 a pellet. exe:
+  // DIFFERS, #202: the remake's row 13 carries the shotgun's 6 a pellet. exe:
   // weapons/fire/hit-by-projectile.md, 0x478A92: the 6 is for kind 0x12 ALONE, and
   // this is kind 0x13, so each pellet adds the literal 0x30: 48, 96 .. 480.
   expectKnock(knock, [6, 12, 18, 24, 30, 36, 42, 48, 54, 60])
 })
 
-test('14 FLAME THROWER: 3000 of reach and a knock of 48, KNOWN SHORT of its seventeen rounds and its first round ×5 (TODO-ISSUE)', async () => {
+test('14 FLAME THROWER: 3000 of reach and a knock of 48, KNOWN SHORT of its seventeen rounds and its first round ×5 (#201)', async () => {
   const { rounds, reach, damage, lost, knock } = await fireAtDummy(FLAME_THROWER)
-  // KNOWN SHORT, TODO-ISSUE: the remake looses one round a press. exe:
+  // KNOWN SHORT, #201: the remake looses one round a press. exe:
   // weapons/fire/burst.md, 0x479CC7: seventeen rounds, frames 20 to 100 every 5.
   expect(rounds).toBe(1)
   // exe: weapons/fire/projectile-class.md, 0x4320D5: kind 23, speed 150 for 20 frames.
   expect(reach).toBeCloseTo(150 * 20, 3)
-  // KNOWN SHORT, TODO-ISSUE: the row's own 6. exe: weapons/fire/damage.md: row +0x0C
+  // KNOWN SHORT, #201: the row's own 6. exe: weapons/fire/damage.md: row +0x0C
   // 768; weapons/fire/hit-by-projectile.md, 0x478788: kind 0x17 has `edi` 5, so the
   // first round is 30, the next four are absorbed, and the sixth on pay 6 each.
   expect(damage).toEqual([6])
