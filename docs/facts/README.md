@@ -41,6 +41,7 @@ of the form `weapons/fire.md` are in the **disasm repo**, never in this tree.
 - [debrief.md](debrief.md) — who the debrief lists, the training ground's debrief, the roster's deaths
 - [doors.md](doors.md) — the four door arms: the glide's window and steps, the way out of a building and of a vehicle
 - [effects.md](effects.md) — an explosion's sprites and puffs, an effect's collider
+- [failures.md](failures.md) — how a failure reaches the person: the strip, the log, the console, the reporters, the guard
 - [heal.md](heal.md) — a refused heal says why, the medicine ball's cloud
 - [hud.md](hud.md) — the name plates' font, the dashboard's own numbers, the gauge and icons
 - [input.md](input.md) — the controller, one keydown one action, an action spent by a view change

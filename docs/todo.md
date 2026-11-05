@@ -23,7 +23,7 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 
 - [corrected-readings.md](todo/corrected-readings.md) — the landing thresholds: re-read, check the remake
 - [disasm-notes-cleanup.md](todo/disasm-notes-cleanup.md) — the big notes are split; fold the corrections into the other ~45, then repoint citations
-- [failures-and-actions.md](todo/failures-and-actions.md) — the shared failure and testing rules: reporters, a catch guard, tests that fail at once and wait on actions
+- [failures-and-actions.md](todo/failures-and-actions.md) — the shared failure and testing rules: the kinds of failure, tests that fail at once and wait on actions
 
 ## Play checks — what only play can judge
 
