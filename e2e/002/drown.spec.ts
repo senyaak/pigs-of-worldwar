@@ -126,9 +126,16 @@ test('standing in it costs health, and the training ground still will not kill',
 
   // …and then it stops at ONE POINT, whatever else the water does: CAMP is the
   // training ground and its floor is the exe's own (0x467c85).
+  const turn = (await hud(page)).turn
   await expect.poll(async () => (await hud(page)).health, { timeout: 30_000 }).toBe(TRAINING_FLOOR)
   await page.waitForTimeout(1000)
   expect((await hud(page)).health, 'the floor holds').toBe(TRAINING_FLOOR)
+
+  // …and it costs the turn. Water is no blow, so nothing else ends it here:
+  // exe: `damage/training-floor.md`, 0x467c76 — at the floor the turn is handed
+  // on whatever the cause. CAMP fields one pig, so the next turn is its own.
+  await expect.poll(async () => (await hud(page)).turn, { timeout: 30_000 }).toBeGreaterThan(turn)
+  expect((await hud(page)).swimming, 'the end of the turn swam it ashore').toBe(false)
 
   expect(app.errors()).toEqual([])
 })

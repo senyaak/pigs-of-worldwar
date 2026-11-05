@@ -18,6 +18,7 @@
 
 import {
   BOUNCE_CUTOFF,
+  EJECT_CUTOFF,
   EJECT_PITCH,
   EJECT_SECONDS,
   FRAME_SECONDS,
@@ -361,6 +362,9 @@ export interface LocomotionState {
   sidestep: number
   /** Seconds before the pig may jump again (exe: 15 frames of recharge). */
   jumpReadyIn: number
+  /** Seconds before a landing may be heard or raise dust again: the exe's
+   * `[pig+0x1b2]` gate, kept as a countdown (lib/game/landing.ts). */
+  thudQuiet: number
   /**
    * Seconds left of the jump's wind-up, or 0 when there is none. A pig in
    * the crouch is committed: it neither walks nor turns, and it leaves the
@@ -411,13 +415,17 @@ export interface LocomotionState {
   armed: boolean
   /**
    * The GROUND CONTACT this frame made, or null — the full arrival speed
-   * (the exe's `[hit+0x14]`, the length of the relative velocity) and
-   * whether the body was FLYING when it hit. `fly` writes one per non-water
-   * contact, `updateLocomotion` clears it at the top of every frame, and
-   * whoever owns the PIG turns it into damage (lib/game/falling.ts): this
-   * state knows no pig, the same split as `wounded`.
+   * (the exe's `[hit+0x14]`, the length of the relative velocity), whether
+   * the body was FLYING when it hit, whether what it hit was an OBJECT's top
+   * rather than the landscape, and the tile under it, in the tile's own alphabet.
+   * The exe's handler takes that second question as its first argument: 1 from
+   * the landscape (0x4772b7), 0 from an object (0x4777de). `fly` writes one per
+   * non-water contact, `updateLocomotion` clears it at the top of every frame,
+   * and whoever owns the PIG turns it into damage and the landing's ladder
+   * (lib/game/falling.ts, lib/game/landing.ts): this state knows no pig, the same
+   * split as `wounded`.
    */
-  impact: { speed: number; flying: boolean } | null
+  impact: { speed: number; flying: boolean; onObject: boolean; surface: number } | null
 }
 
 /**
@@ -514,6 +522,7 @@ export function createLocomotion(
     freeY: on ?? query.height(x, z),
     sidestep: 0,
     jumpReadyIn: 0,
+    thudQuiet: 0,
     windUp: 0,
     windUpStride: 0,
     getUp: 0,
@@ -584,6 +593,7 @@ export function updateLocomotion(
   }
 
   state.jumpReadyIn = Math.max(0, state.jumpReadyIn - delta)
+  state.thudQuiet = Math.max(0, state.thudQuiet - delta)
 
   // Wedged is about where the pig IS — the original asks `Map::IsBlocked`
   // once a frame at its own feet — and nothing else. Nothing refuses the
@@ -611,6 +621,14 @@ export function updateLocomotion(
  */
 export const FLY_AFTER_SECONDS = 25 * FRAME_SECONDS
 
+/**
+ * Whether this flight is in the exe's FLYING state, the one the ground answers
+ * through the impact handler (0x470d10) and can hurt (lib/game/falling.ts):
+ * thrown, ejected, or a plain fall past the 25-frame conversion (0x46e95d).
+ */
+export const isFlying = (a: Airborne): boolean =>
+  a.hurled === true || a.ejected === true || (a.aloft ?? 0) > FLY_AFTER_SECONDS
+
 /** Momentum carries; gravity does the rest. */
 function fly(
   state: LocomotionState,
@@ -622,10 +640,7 @@ function fly(
   // Nothing in the air is in the water, whatever is under it.
   state.swimming = false
   a.aloft = (a.aloft ?? 0) + delta
-  // Whether this body is in the exe's FLYING state — the one the ground can
-  // hurt (lib/game/falling.ts): thrown, ejected, or a plain fall past the
-  // exe's 25-frame conversion (0x46e95d).
-  const flying = a.hurled === true || a.ejected === true || a.aloft > FLY_AFTER_SECONDS
+  const flying = isFlying(a)
   // FLYING until it has hit something, BOUNCING after (`Airborne.touched`);
   // an eject flies the whole way, which is what it was already doing — and a
   // long plain fall wears the same clip 38 from the conversion on, which is
@@ -713,7 +728,8 @@ function fly(
   // `standOn`'s reach is what makes it that — nothing above the feet counts.
   const ground = restingY(query, state.x, state.z)
   const roof = obstruction.standOn(state.x, state.z, state.y, 0)
-  const floor = roof !== null && roof < ground ? roof : ground
+  const onObject = roof !== null && roof < ground
+  const floor = onObject ? roof : ground
   if (!(a.vy > 0 && y >= floor)) {
     state.y = y
     return
@@ -738,7 +754,7 @@ function fly(
   // splash ends the flight where it happens. A roof under the feet is not
   // water, whatever the tile says — that is the bridge rule (`inWater`
   // above) — and BLOCKED ground keeps its wall arm whole.
-  if (!blocked && (roof === null || roof >= ground) && query.isWater(state.x, state.z)) {
+  if (!blocked && !onObject && query.isWater(state.x, state.z)) {
     state.y = floor
     state.airborne = null
     state.swimming = true
@@ -756,21 +772,26 @@ function fly(
     delta
   )
   state.y = floor
-  // THE CONTACT, recorded for whoever owns the pig: the full arrival speed —
-  // the exe's `[hit+0x14]` is the length of the relative velocity — and
-  // whether the body was FLYING when it hit. Every non-water ground contact
-  // makes one, the bounce arm's included: the exe charges a hard bounce per
-  // contact (lib/game/falling.ts). Water made none above, which is the exe's
-  // own skip at the damage call site.
-  state.impact = { speed: Math.hypot(a.vx, a.vy, a.vz), flying }
+  // The ARRIVAL: the full magnitude, not its vertical part. The exe's impact
+  // handler reads `[hit+0x14]`, which the sweep fills with the LENGTH of the
+  // relative velocity (0x407a44 -> 0x418310). Every threshold below and in
+  // lib/game/landing.ts asks this one number.
+  const arrival = Math.hypot(a.vx, a.vy, a.vz)
+  // THE CONTACT, recorded for whoever owns the pig. Every non-water ground
+  // contact makes one, the bounce arm's included: the exe charges a hard bounce
+  // per contact (lib/game/falling.ts). Water made none above, which is the
+  // exe's own skip: its water arm returns before the ladder (0x470d8a..0x470fc7).
+  state.impact = {
+    speed: arrival,
+    flying,
+    onObject,
+    surface: query.tileType(state.x, state.z)
+  }
   /**
-   * A landing is binary in the original, and the test is the ARRIVAL SPEED —
-   * the FULL magnitude, not its vertical part. The impact handler compares
-   * `di` with 25 a frame (`cmp di,19h`, 0x4711d8), sends anything at or over
-   * that to the bounce at 0x471247 and anything under it to `0x471350`, which
-   * zeroes the velocity — and `di` is `[hit+0x14]`, which the sweep fills with
-   * the LENGTH of the relative velocity (0x407a44 → 0x418310, an fsqrt of all
-   * three components; read 2026-08-24). So a pig skimming the ground fast and
+   * A landing is binary in the original, and the test is the ARRIVAL SPEED.
+   * The impact handler compares it with 25 a frame (0x4711d8), sends anything
+   * at or over that to the bounce at 0x471247 and anything under it to
+   * `0x471350`, which zeroes the velocity. So a pig skimming the ground fast and
    * flat keeps bouncing — the solver leaves its slope-parallel speed and the
    * bounce arm only ADDS its upward kick (`0x4a9260` at 0x471305, the add
    * primitive, not the set) — and that chain of low skips IS the roll along
@@ -780,40 +801,30 @@ function fly(
    * crawl, and the settle discarded 700+ units a second of horizontal in one
    * frame — "катится на месте".
    *
-   * **Being in a WALL refuses the GETTING UP, and only that** — the stand-up is
-   * what `Map::IsBlocked` gates. This used to read it as "never lands at all",
-   * and play found what that costs: "соскользнул с подъема и попал в бесконечный
-   * цыкл — туда сюда скользит на 1м месте", on a tile whose type byte is 0x85 —
-   * a WALL over terrain type 5. Landing on one, the pig kept 99% of its
-   * slope-parallel speed off `WALL_MATERIAL`, never settled, and the wedge
-   * counter relaunched it every 25 frames for ever. So BLOCKED ground keeps the
-   * old normal-arrival test and comes down from a slide — the remake's own
-   * guard, kept deliberately against the exe's reading — and the touch-down
-   * itself throws the pig out downhill (below), which is the exe's own
-   * immediate arm: `IsBlocked && speed < 0x32 → EjectFromWall` on the landing
-   * frame (0x471041), so nothing ever comes to rest on a wall.
+   * **BLOCKED ground is never rested on, and its test is the same arrival
+   * against a higher bar**: under 50 a frame the handler throws the pig out on
+   * the landing frame (0x471045..0x47104d, `movement/landing.md`). Waiting for
+   * the wedge counter instead was the hang play saw ("свин висит на склоне"):
+   * a knocked-back pig that is not the acting one has its flight record dropped
+   * the frame it settles (`tumble.ts`), and the counter never runs for it again.
+   * Over the bar it bounces off `WALL_MATERIAL`, keeping its slope-parallel speed
+   * until drag has it under, which is what ends the slide play found on CAMP's
+   * tile 43,17 ("туда сюда скользит на 1м месте", e2e/002/wedge.spec.ts).
+   *
+   * **The landscape's contact only**: the eject's test opens by asking the
+   * handler's first argument (0x470fee), so a pig coming down on a roof over a
+   * blocked tile is on the roof, and takes the fork like any other.
    */
-  const arrival = blocked
-    ? -(a.vx * normal.x + a.vy * normal.y + a.vz * normal.z)
-    : Math.hypot(a.vx, a.vy, a.vz)
+  if (blocked && !onObject && arrival < EJECT_CUTOFF) {
+    state.airborne = null
+    eject(state, query)
+    return
+  }
   if (arrival >= BOUNCE_CUTOFF) {
     state.airborne = { ...a, vx: hit.x, vy: hit.y, vz: hit.z, bouncing: true, touched: true }
     return
   }
   state.airborne = null
-  // …and in a WALL it does not stay: the exe's impact handler tests
-  // `IsBlocked && speed < 0x32` BEFORE anything else and calls
-  // `Pig::EjectFromWall` on the landing frame (0x471041..0x47104D) — a
-  // blocked tile is never rested on, the body is thrown out downhill at
-  // once. Waiting for the wedge counter instead was the hang play saw
-  // ("свин висит на склоне"): a knocked-back pig that is not the acting
-  // one settles here with `getUp` at 0, `tumble.ts` drops its flight
-  // record that same frame, and the counter in `updateLocomotion`'s tail
-  // never runs for it again.
-  if (blocked) {
-    eject(state, query)
-    return
-  }
   // Down for good, so the pig gets up: clip 10, which is what the landing
   // handler asks for (0x470944) whatever the fall was. It runs down in
   // `ground` and any input throws it away, so a pig that lands running

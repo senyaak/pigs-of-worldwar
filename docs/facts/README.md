@@ -48,7 +48,7 @@ of the form `weapons/fire.md` are in the **disasm repo**, never in this tree.
 - [knock-and-throw.md](knock-and-throw.md) — a flight bowls a pig over, a bullet's knock, damage throws
 - [map-records.md](map-records.md) — player counts, true world coordinates, spawn slots, solidity
 - [menu.md](menu.md) — the bar machine's layout and motion, the mouse, names
-- [movement.md](movement.md) — contact softening and the turn ramp, both unmodelled
+- [movement.md](movement.md) — contact softening and the turn ramp, both unmodelled; a flying pig's landing ladder
 - [nations.md](nations.md) — nation against skin, the enemy's nation, hats, repaints
 - [pause.md](pause.md) — the pause, its flying camera, its menu and font, ABORT, a battle stepping only once shown
 - [pigmap.md](pigmap.md) — territories are grey masks added to the map

@@ -406,6 +406,7 @@ export function buildBattle(parts: BattleSceneParts): BattleScene {
     grenades,
     mines,
     effects,
+    effectArt,
     airDrops,
     dropIn,
     weapons,

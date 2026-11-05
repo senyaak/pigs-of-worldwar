@@ -4,9 +4,7 @@ The five notes past 500 lines are split: `movement/`, `effects/`, `objects/`,
 `scanner/` and `tutorial/` are each an index of one-subject pieces now, with
 their corrections folded in, and the water, the height and the library's
 registry moved to `water/mask.md`, `water/drawing.md`, `terrain/height.md` and
-`library/function-names.md` (disasm repo, merged to its master). What the
-re-checks changed for the remake is its own item:
-[corrected-readings.md](corrected-readings.md).
+`library/function-names.md` (disasm repo, merged to its master).
 
 ## Fold the corrections in, in the other notes
 

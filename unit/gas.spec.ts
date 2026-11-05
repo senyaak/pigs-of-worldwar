@@ -14,8 +14,14 @@ import { blastRange, lobOf } from '../src/lib/game/grenade'
 import type { Lobbed } from '../src/lib/game/grenade'
 import { createLobs } from '../src/lib/game/lobs'
 import { fromExeFrames } from '../src/lib/game/ballistics'
+import { listen } from '../src/lib/game/battle/listeners'
+import type { BattleCore } from '../src/lib/game/battle/core'
+import { createState } from '../src/lib/game/battle/state'
+import type { BattleState } from '../src/lib/game/battle/state'
 import { NO_BODY } from '../src/lib/game/body'
+import { Game } from '../src/lib/game/game'
 import type { Pig } from '../src/lib/game/game'
+import { createBus } from '../src/lib/game/events'
 import type { BattleEvent } from '../src/lib/game/events'
 import { terrain } from './fixture'
 
@@ -113,6 +119,61 @@ test('the touch is fifteen FLAT, once per throw — later clouds only refresh th
   expect(caught.health).toBe(75 - row.damage / 128)
   expect(count(heard, 'gassed')).toBe(1)
   expect(count(heard, 'poisoned')).toBe(1)
+})
+
+/** Two pigs on the battle's real bus and listener, the first being played and
+ * the second out of its reach, with the canister over whichever a test names. */
+const battleField = (): {
+  acting: Pig
+  other: Pig
+  state: BattleState
+  touch: (pig: Pig) => void
+} => {
+  const game = new Game({
+    players: [
+      { name: 'Tommy', pigNames: ['Nobby'] },
+      { name: 'Fritz', pigNames: ['Hans'] }
+    ],
+    spawns: [
+      { x: 0, z: 0, y: 0, body: NO_BODY },
+      { x: 3000, z: 0, y: 0, body: NO_BODY }
+    ]
+  })
+  const everyone = game.players.flatMap((player) => player.pigs)
+  const [acting, other] = everyone
+  acting.health = 75
+  other.health = 75
+  const bus = createBus()
+  const state = createState(game, terrain(() => 0), () => false)
+  listen({ game, emit: bus.emit, everyone: () => everyone, state, bus } as unknown as BattleCore)
+  const poison = createPoison({ training: false }, bus.emit)
+  const gas = createGas({ pigs: () => everyone, training: false, poison }, bus.emit)
+  const touch = (pig: Pig): void => {
+    const shot = canister(fromExeFrames(GAS_OPEN_FRAMES))
+    shot.x = pig.position.x
+    gas.stream(shot)
+  }
+  return { acting, other, state, touch }
+}
+
+test('the touch on the pig being played ends its turn, at any health', { tag: '@nodata' }, () => {
+  const { acting, state, touch } = battleField()
+  expect(state.spent).toBe(false)
+  touch(acting)
+  // exe: `weapons/gas.md`, 0x477b54 — the touch passes cause 0, as every weapon
+  // path does — and `turns/notes.md`, 0x467c56 — cause 0 on the played pig hands
+  // the turn on, above every death check, one point being enough.
+  expect(acting.health).toBe(75 - lobOf(GAS)!.damage / 128)
+  expect(state.spent).toBe(true)
+})
+
+test('the touch on another pig leaves the turn alone', { tag: '@nodata' }, () => {
+  const { acting, other, state, touch } = battleField()
+  touch(other)
+  expect(other.health).toBeLessThan(75)
+  expect(acting.health, 'out of the cloud').toBe(75)
+  // exe: `turns/notes.md`, 0x467c56 — the arm asks that the hurt pig IS the played one.
+  expect(state.spent).toBe(false)
 })
 
 test('the cloud reaches exactly as far as the falloff gate — and not a corpse', { tag: '@nodata' }, () => {

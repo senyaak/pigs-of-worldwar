@@ -52,8 +52,9 @@ export type BattleEvent =
       amount: number
       pig?: PigId
       /**
-       * A BLOW — a blast, a bullet, a blade — as against a status tick, a fall
-       * or a drowning. It is the exe's own second argument to `Pig::TakeDamage`
+       * A BLOW — a blast, a bullet, a blade, a gas cloud's first touch — as
+       * against a status tick, a fall or a drowning. It is the exe's own second
+       * argument to `Pig::TakeDamage`
        * (0x467ac0), which every weapon path passes as **0** and every other
        * source passes something else (a poison arm passes 3, and so on): the
        * routine reads it twice, and the second read is the one that HANDS THE
@@ -67,6 +68,10 @@ export type BattleEvent =
        * `I_METAL` is (play: "взрыв по танку, пушке и прочему"). */
       metal?: boolean
     }
+  /** The training ground's floor caught this pig: it fell under one point and
+   * was left on one (lib/game/health.ts, `hurtPig`). No cause is named because
+   * the exe's arm does not ask for one (0x467c76). */
+  | { kind: 'spared'; pig: PigId }
   /** This pig has just gone down. `by` is the pig whose weapon did it — the
    * bullet's firer, the lob's thrower, the blade's swinger — the same attacker
    * the exe's damage handler tallies kills against (0x467c30, 0x467E11).
@@ -158,8 +163,8 @@ export type BattleEvent =
   /** The DISGUISE gesture's own sound keyframe — clip 81 phase 2310, where
    * the exe rolls a coin and FARTS (id 43 → P_FART1-3 half the time,
    * anim/audio-events.md). The clip's other keyframe, a winded breath at
-   * phase 1078, is gated on a fatigue counter this engine does not model,
-   * so a fresh pig's is silent there — as it is in the exe. */
+   * phase 1078, is gated on a fatigue counter this engine does not read yet
+   * (#43), so a fresh pig's is silent there — as it is in the exe. */
   | { kind: 'strained'; pig: PigId }
   /** This pig took the DISGUISE — it stops being drawn and a decoy prop
    * stands where it does (lib/game/hide.ts). */
@@ -237,6 +242,11 @@ export type BattleEvent =
   | { kind: 'dropCut'; pig: PigId }
   /** …and it has touched down. */
   | { kind: 'dropLanded'; pig: PigId }
+  /** A FLYING pig met the ground hard enough to be heard (lib/game/landing.ts):
+   * I_PICKUP at this `volume`, the ground's own scuff from `surface`, which is
+   * null on an object because only the landscape's contact has one, and at the
+   * hardest speeds the ring of dust. */
+  | { kind: 'thudded'; at: Point; volume: number; surface: number | null; dust: boolean }
   /** Every canopy still up goes now: the jump key. */
   | { kind: 'canopiesCut' }
 

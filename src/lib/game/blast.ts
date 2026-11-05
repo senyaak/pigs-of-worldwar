@@ -16,7 +16,7 @@ import { hurlVelocity } from './tumble'
 import type { Velocity } from './tumble'
 import { DAMAGE_UNIT } from './projectile'
 import { fromExeSpeed } from './ballistics'
-import { heal, hurt, isDead, maxHealthFor } from './health'
+import { heal, hurt, hurtPig, isDead, maxHealthFor } from './health'
 import { originY } from './body'
 import type { Point } from './pose'
 import type { Pig } from './game'
@@ -218,7 +218,7 @@ export function burst(at: Point, charge: Charge, world: BlastWorld, emit: Emit, 
     const covered = pig.hidden
     if (world.soak) amount = world.soak(pig, amount)
     if (amount <= 0 && covered) continue
-    const outcome = hurt(pig, amount, world.training)
+    const outcome = hurtPig(pig, amount, world.training, emit)
     emit({ kind: 'damaged', at: body, amount, pig: pig.id, blow: true })
     if (outcome === 'died' || outcome === 'gibbed')
       emit({ kind: 'killed', pig: pig.id, by, gibbed: outcome === 'gibbed' })

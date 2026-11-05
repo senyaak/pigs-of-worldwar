@@ -18,6 +18,15 @@
   step at a wall tile and walks the decoded step-up envelope instead; that is
   now `[deliberate]`, and the honest replacement is the slippery contact.
 
+- `[exe]` **Landing on blocked ground answers to the full arrival speed.**
+  Under 50 exe units a frame the pig is thrown out on the landing frame; at 50 or
+  over it bounces off the wall material, keeps its speed along the slope and is
+  thrown out once drag has it under. `movement/landing.md`, 0x471045. The remake's
+  own second test on the normal part of the arrival is gone; CAMP's tile 43,17
+  still ends, at any entry speed (`e2e/002/wedge.spec.ts`). The eject is the
+  landscape's contact alone (0x470fee): a roof over a blocked tile is landed on
+  like any other.
+
 - `[play]` **A hillside is walked DOWN, and only a face past WALK_OFF_GRADE
   (60°) is fallen off — and that number is PLAY'S DIAL.** The first build's
   fall test was a slope test at 13.0°, under CAMP's median slope of 14°, so
