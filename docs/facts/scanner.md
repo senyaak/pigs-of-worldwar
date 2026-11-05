@@ -25,7 +25,7 @@
 - **The map's picture is one texel a tile, and its colours are the library's.**
   `afInitScanner` locks a 64×64 surface once per battle and writes
   `palette[type & 0x1F] * shade >> 9` into every texel, shade running 64..194
-  with the tile's own height across the map's range — then hands it over with
+  with one vertex's height across the map's range — then hands it over with
   `afOverwriteTexture`. `lib/game/mapRaster.ts` carries the palette. `[exe]`
 - **The shade lights the PEAKS, the channel is five bits, and the WHITE on the
   board is the original's.** `height` is an elevation, positive up — proved
@@ -53,6 +53,14 @@
   mines that were there when the battle opened.** The same fill loop writes a
   solid red texel wherever the tile's mine bit is set, unconditionally and for
   everybody; the texture is never rebuilt, so a mine laid during play never
-  shows. `bomb` in `MAPICONS.MTD` really is dead art — it has no reference in
-  the library at all. The other way a buried mine shows is on the ground, not on
-  the map: [terrain.md](terrain.md). `[exe]`
+  shows, and one that goes off stays red: the map's copy of the flags is taken
+  when the map loads. `bomb` in `MAPICONS.MTD` really is dead art — it has no
+  reference in the library at all. The other way a buried mine shows is on the
+  ground, not on the map: [terrain.md](terrain.md). `scanner/visibility.md`,
+  dll 0x1000A3E6, 0x10002561. `[exe]`
+- **A tile is drawn one column up z from its own row.** The library builds each
+  texel's column from one vertex and the tile on that vertex's -z side, so a red
+  texel sits one tile up z from its mine, tile row 0 fills the first two columns
+  (the copy at dll 0x1000A431), and tile row 63 is not on the picture. No shipped
+  map has a mine in that row. `scanner/board.md` § Which tile a texel shows, dll
+  0x1000258D. `[exe]` for the place, `[measured]` for the row.
