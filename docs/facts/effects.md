@@ -34,9 +34,12 @@
   0 at birth, has already ticked by then: a `when` byte of 0 is the effect's first
   frame, and a later one waits its `when` frames more (`effects/stages.md`,
   0x48BC81..0x48BEE3; `effects/fuse.md`, 0x48A5D6). A stage's `at` in
-  `lib/game/effects.ts` is that figure for every stage taken from a row
-  (`effects/rows.md`, `effects/melee-and-breaking.md`), and `unit/effects.spec.ts`
-  holds the rows to it.
+  `lib/game/effects.ts` is that figure for every stage taken from a row: rows 0, 2,
+  4, 6 and 14 are `effects/rows.md`, rows 9 to 12 `effects/melee-and-breaking.md`.
+  `unit/effects.spec.ts` holds those rows to it, all but two parts: of row 4 it holds
+  the two bursts, since the heal's clouds are the `[play]` staging
+  ([heal.md](heal.md)), and row 9's burst is not built
+  ([#179](https://github.com/senyaak/pigs-of-worldwar/issues/179)).
 - **An effect's collider is a sphere of radius 35** (0x4a8f42, via
   `jmp [eax*4+0x4a90CC]` at 0x4a8ece where `eax = type - 0x1357`, built by
   `0x407AF0` at 0x4a9044). It does not need to grow — that idea was invented to

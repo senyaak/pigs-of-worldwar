@@ -12,6 +12,7 @@ import {
   BLAST_EFFECT,
   BOMBLET_EFFECT,
   BREAK_EFFECT,
+  HEAL_EFFECT,
   MINE_EFFECT,
   RING_DEAD,
   SPLASH_EFFECT,
@@ -61,9 +62,10 @@ interface RowWhens {
 }
 
 /**
- * Out of the table at 0x4D61E8, not out of the remake: `effects/rows.md` and
- * `effects/melee-and-breaking.md`, and `effects/row4.py` prints the bytes. Row 9's
- * own stage K is left out because the prod's burst is not built here.
+ * Out of the table at 0x4D61E8, not out of the remake. Rows 0, 2, 6 and 14 are
+ * `effects/rows.md`, and rows 9 to 12 are `effects/melee-and-breaking.md`;
+ * `python effects/row4.py <rows>` prints the bytes of any of them. Row 9's own
+ * stage K is left out because the prod's burst is not built here: #179 owns it.
  */
 const ROW_WHENS: RowWhens[] = [
   {
@@ -127,6 +129,19 @@ for (const row of ROW_WHENS) {
     }
   })
 }
+
+test('row 4, the heal: both mote bursts are born on when + 1', { tag: '@nodata' }, () => {
+  // Only the bursts: the row's ring is out and its clouds are the `[play]` staging,
+  // not the row's (docs/facts/heal.md).
+  const effect = beginEffect(HEAL_EFFECT, { x: 0, y: 0, z: 0 })
+  expect(effect.smoke).toHaveLength(0)
+  frames(effect, 1)
+  // exe: effects/rows.md, § Row 4, the table at 0x4D6424 — K and L, `when` byte 0 and
+  // ten particles each.
+  expect(effect.smoke).toHaveLength(20)
+  frames(effect, 1)
+  expect(effect.smoke).toHaveLength(20)
+})
 
 test('the bayonet throws two rings and the sword three', { tag: '@nodata' }, () => {
   expect(hitEffectOf(3)!.rings).toHaveLength(2)
