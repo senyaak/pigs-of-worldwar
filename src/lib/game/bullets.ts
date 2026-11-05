@@ -26,6 +26,7 @@ import { originY } from './body'
 import { HAND_BONE } from './pose'
 import type { Point, Pose } from './pose'
 import type { Pig } from './game'
+import type { Mines } from './mines'
 import type { Target } from './targets'
 import type { TerrainQuery } from './terrain'
 import type { Emit } from './events'
@@ -97,6 +98,9 @@ export interface BulletWorld {
   query: TerrainQuery
   /** The map's boxes, so it cannot fly through a wall either. */
   obstacles: Obstruction
+  /** What is buried in the ground: a round that meets the ground sets a mine
+   * off the same way a foot does (lib/game/mines.ts). */
+  mines: Pick<Mines, 'tread'>
   /** The training ground, where a PIG cannot be killed (lib/game/health.ts). */
   training: boolean
   /** A hidden pig's DECOY takes a round first and hands back the remainder
@@ -173,7 +177,18 @@ export function createBullets(world: BulletWorld, emit: Emit): Bullets {
     // itself — four sites inside 0x436xxx, the same `[tile] & 0x1F` lookup
     // the walk uses — so a shot is stopped by the ground, and the map's own
     // boxes stop it the same way (lib/game/obstacles.ts).
-    if (shot.y >= world.query.height(shot.x, shot.z)) return 'hard'
+    const ground = world.query.height(shot.x, shot.z)
+    if (shot.y >= ground) {
+      // **…AND A MINE TILE GOES OFF UNDER IT.** Every projectile takes its
+      // landscape contact through one handler, 0x4377d0, and the mine arm in
+      // it (0x437a50) asks nothing of the kind, so a bullet is as good as a
+      // grenade (lib/game/lobs.ts). On the contact: a round passing over the
+      // tile touches nothing and sets nothing off.
+      if (world.mines.tread(shot.x, shot.z)) {
+        emit({ kind: 'mineTripped', at: { x: shot.x, y: ground, z: shot.z } })
+      }
+      return 'hard'
+    }
     /**
      * **…and whatever BOX stopped it takes the hit, if that box is something
      * that breaks.**
