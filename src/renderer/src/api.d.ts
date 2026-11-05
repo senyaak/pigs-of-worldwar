@@ -1,3 +1,5 @@
+import type { FailureReport } from '../../lib/failures'
+
 export interface FileEntry {
   path: string
   size: number
@@ -233,6 +235,8 @@ export interface Api {
   deleteSave(name: string): Promise<WriteSaveResult>
   /** One line into _tmp/telemetry.log — fire-and-forget (src/main/telemetry.ts). */
   logTelemetry(line: string): void
+  /** Every failure the main process reports (src/main/failures.ts). */
+  onFailure(handler: (report: FailureReport) => void): void
   /** One message to the AI's own process (src/main/brainHost.ts). It is a
    * `BrainRequest` (lib/game/brainPort.ts); the bridge carries it untyped
    * because a preload may not import the engine. */
