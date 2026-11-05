@@ -414,6 +414,8 @@ declare global {
       /** Console command: restart the battle on another map —
        * `pow.swapMap('ARTGUN')`. No argument lists what ships. */
       swapMap?(name?: string): Promise<boolean>
+      /** Whether the pause menu's click has been loaded (audio/menuClick.ts). */
+      pauseClickLoaded?(): boolean
       /** Open a battle on `map` from wherever the app is — `pow.open('ARTGUN')`
        * — with no campaign behind it and, unless `drop`, the squads already
        * standing. Resolves with the action's end: how it went and how long it

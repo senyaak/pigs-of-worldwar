@@ -4,14 +4,13 @@ The shared working rules `.claude/rules/failures.md` and
 `.claude/rules/testing.md` (fleet v1.2.0) ask for what the remake does not
 have yet:
 
-- **Failures.** The reporters and the guard over every catch are built
-  ([../facts/failures.md](../facts/failures.md)), and the first pass of the
-  shared `failures-pass` skill is done. What is left is its second pass: the
-  kinds as runs show them, a `Refusal` where the game says no by its own rules.
-  The first pass left no `UnknownFailure` to sort, so the runs are what show
-  them. An `{ ok: false }` answer from the main process is not a catch and the
-  guard does not see it: a renderer that takes one still only warns, or says
-  nothing.
+- **Failures.** The reporters, the guard over every catch and every `{ ok:
+  false }` path are done, and the first `Refusal`s are in
+  ([../facts/failures.md](../facts/failures.md)). What is left of the shared
+  `failures-pass` skill's second pass is the kinds as runs show them: a new
+  failure a run hits gets a class and a message of its own, and a `Refusal` where
+  the remake says no by its own rules. The guard does not see an `{ ok: false }`
+  answer, so a new path that takes one has to be written to the rule by hand.
 - **Tests that fail at once.** `e2e/launch.ts` already collects the renderer's
   uncaught errors and `console.error` into `errors`; a spec reads them at its
   end. The rule wants the first unexpected report to end the test with that

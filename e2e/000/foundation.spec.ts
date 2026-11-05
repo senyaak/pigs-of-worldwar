@@ -46,9 +46,10 @@ test('cold start: a pasted path takes the app from welcome to the file list', as
     await expect(page.locator('#select-dir')).toBeVisible()
 
     // A wrong path is refused with a reason, and the app stays on welcome.
+    const refused = page.locator('#failures .failure-line.refusal')
     await page.locator('#path-input').fill(path.join(TMP, 'not-a-game'))
     await page.locator('#use-path').click()
-    await expect(page.locator('#path-error')).toContainText('not-a-game')
+    await expect(refused).toContainText('not-a-game')
     await expect(page.locator('#select-dir')).toBeVisible()
 
     // The real path is accepted; a located game lands on the main menu, and
@@ -56,6 +57,7 @@ test('cold start: a pasted path takes the app from welcome to the file list', as
     await page.locator('#path-input').fill(GAME_DIR)
     await page.locator('#use-path').click()
     await expect(page.locator('#select-dir')).toBeHidden()
+    await expect(refused).toHaveCount(0)
     await expect(page.locator('#menu')).toBeVisible()
     await expect(page.locator('#game-path')).toHaveText(GAME_DIR)
     await openAssets(page)

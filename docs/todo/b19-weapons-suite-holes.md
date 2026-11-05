@@ -48,9 +48,6 @@ Two smaller ones, both written down and neither built:
 `unit/` and `e2e/` against the 36 carried skills), worth picking off in that
 order:
 
-- **four melee weapons are only ever read, never swung** — 1 trotter, 2 knife,
-  4 sword, 5 cattle prod have their rows asserted and no test actually strikes
-  with them.
 - **weapon SOUND is asserted for exactly one skill**, 29 (`e2e/002/bazooka`).
   `BARREL_SOUND[6]` and the new `[28]` are unpinned.
 - **the AI prices only 3, 7, 11, 19 and 37.** Nothing prices a gas, a mine, a
