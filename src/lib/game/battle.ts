@@ -65,6 +65,7 @@ import type { Strikes } from './strikes'
 import type { Sacrifice } from './suicide'
 import type { TerrainQuery } from './terrain'
 import type { Tumbles, Velocity } from './tumble'
+import type { WalkHome } from './walkHome'
 import { weaponOf } from './weapons'
 
 /** Everything the battle drives. Each of these is the engine's too; they are
@@ -107,6 +108,8 @@ export interface BattleParts {
   /** What being in the water costs, for every pig on the map
    * (lib/game/drowning.ts). */
   drowning: Drowning
+  /** …and who is past the line, and on the way back (lib/game/walkHome.ts). */
+  walkHome: WalkHome
   /** …and what the gas's bit costs the acting pig at the top of its own turn
    * (lib/game/poison.ts). */
   poison: Poison
@@ -356,6 +359,16 @@ export function createBattle(parts: BattleParts): Battle {
       acting: game.currentPig,
       walkAway: state.walkAway !== null,
       aloft: state.loco.airborne !== null
+    })
+    // …and past the line, the same: on every frame of every pig, in every mode
+    // (lib/game/walkHome.ts).
+    parts.walkHome.update(delta, {
+      acting: game.currentPig,
+      walkAway: state.walkAway !== null,
+      aloft: state.loco.airborne !== null,
+      fall: (loco) => {
+        state.loco = loco
+      }
     })
 
     // **THE SCRIPT STEP IS OWED BY THE BATTLE, not by the beat that happened to

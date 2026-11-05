@@ -58,7 +58,7 @@ Addresses like `0x467a10` are `warhogs_.exe`. Bare paths of the form
 - [frontend-particles.md](todo/frontend-particles.md) — steam, sparks and sparkles on the menus
 - [gas-family.md](todo/gas-family.md) — the afflicted stance, the green face, 23/24/25, the swamp, the gas shell, the AI and plumes
 - [getting-inside.md](todo/getting-inside.md) — barrel art, the barrel camera, pigs that start inside, enemy-held buildings
-- [map-bounds.md](todo/map-bounds.md) — the clamp belongs on the walk alone, and a thrown pig walks home
+- [map-bounds.md](todo/map-bounds.md) — what the remake should do on a map that builds no barrier at the line: the owner's call
 - [objectives-machine.md](todo/objectives-machine.md) — object actions, record links, medals, the four spawned models
 - [sergeant-medals.md](todo/sergeant-medals.md) — the medal economy and the sergeant's lines that hang off it
 - [sound-bank-unwired.md](todo/sound-bank-unwired.md) — the airships, the weapon reports, the night ambience

@@ -27,7 +27,7 @@ export const startingBeat = (core: BattleCore, acting: Pig): boolean => {
 
 /** Everybody not being driven, dressed for where they are. */
 export const dressBystanders = (core: BattleCore, acting: Pig): void => {
-  const { query, anim, tumbles, everyone } = core
+  const { query, anim, tumbles, walkHome, everyone } = core
   for (const pig of everyone()) {
     if (pig === acting) continue
     // A body that has fallen stays fallen: its dying clip was played once
@@ -40,6 +40,8 @@ export const dressBystanders = (core: BattleCore, acting: Pig): void => {
     // this loop took it straight back off, once a frame, for the whole flight
     // and through the get-up as well (lib/game/tumble.ts).
     if (tumbles.has(pig)) continue
+    // …nor one on its way home, which is running (lib/game/walkHome.ts).
+    if (walkHome.walking(pig)) continue
     // …and a clip played through once is played through: asking for the stand
     // is what would cancel it (lib/game/anim.ts), one frame in. It is the sneeze
     // of a pig the gas has just taken (0x477b74) and of one hurt with the bit on

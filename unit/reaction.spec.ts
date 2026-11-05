@@ -102,6 +102,7 @@ test('a bystander plays a sneeze through; the stand comes back after it', { tag:
     query: terrain(() => 0),
     anim,
     tumbles: { has: () => false },
+    walkHome: { walking: () => false },
     everyone: () => [acting, bystander]
   } as unknown as BattleCore
 
