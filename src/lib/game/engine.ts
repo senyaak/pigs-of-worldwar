@@ -368,6 +368,9 @@ export function createEngine(parts: EngineParts): Engine {
         poison.cure(pig)
       },
       struck: ({ skill, at }) => effects.hit(skill, at),
+      thudded: ({ at, dust }) => {
+        if (dust) effects.landingDust(at)
+      },
       blasted: ({ at, effect }) => effects.blast(at, effect),
       // A gas canister's little cloud — thirty green blobs where it stands
       // (lib/game/gas.ts announces, lib/game/effects.ts is the picture).

@@ -63,6 +63,13 @@ export interface Pig {
    * not either.
    */
   health: number
+  /**
+   * How winded it is: the exe's `[pig+0x1b8]`, nought when it steps in
+   * (0x466b7b). Only a hard landing charges it so far (lib/game/landing.ts);
+   * the rest of what raises and lowers it, and the winded stand it buys at 250,
+   * are #43.
+   */
+  exertion: number
   /** What it is carrying: up to fifteen skills, in the order they were
    * picked up (lib/game/inventory.ts). A pig steps in already holding its
    * class's own kit (lib/game/kits.ts); the crates top it up. */
@@ -256,6 +263,7 @@ export class Game {
             index,
             voice: player.pigVoices?.[index] ?? (index % VOICE_COUNT) + 1,
             health: maxHealthFor(pigClass),
+            exertion: 0,
             carrying: outfit(pigClass),
             holding: null,
             position: { x: at.x, y: at.y ?? 0, z: at.z },

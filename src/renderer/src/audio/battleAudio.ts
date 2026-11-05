@@ -15,7 +15,7 @@ import type { Emit } from '../../../lib/game/events'
 import { meleeOf } from '../../../lib/game/melee'
 import { isGun } from '../../../lib/game/projectile'
 import { HEAL_EFFECT_ID, SUICIDE_EFFECT_ID } from '../../../lib/game/blast'
-import { BARREL_SOUND, BATTLE_SOUNDS, playCue, stepCue, underlayCue } from './battle'
+import { BARREL_SOUND, BATTLE_SOUNDS, playCue, scuffCues, stepCue, underlayCue } from './battle'
 import type { Bank } from './bank'
 
 export interface BattleAudio {
@@ -249,7 +249,14 @@ export function createBattleAudio(bank: () => Bank): BattleAudio {
       crateSent: () => playCue(bank(), BATTLE_SOUNDS.plane),
       crateChuted: () => playCue(bank(), BATTLE_SOUNDS.chute),
       crateLanded: () => playCue(bank(), BATTLE_SOUNDS.land),
-      dropLanded: () => playCue(bank(), BATTLE_SOUNDS.land)
+      dropLanded: () => playCue(bank(), BATTLE_SOUNDS.land),
+      // A flying pig meeting the ground: the thud at its own speed's volume, and
+      // on the landscape the whole-body scuff the ground picks (audio/battle.ts).
+      thudded: ({ volume, surface }) => {
+        playCue(bank(), { ...BATTLE_SOUNDS.thud, volume })
+        if (surface === null) return
+        for (const cue of scuffCues(surface)) playCue(bank(), cue)
+      }
     }),
     chuteOverhead(running) {
       if (!running || chuteHeard) return

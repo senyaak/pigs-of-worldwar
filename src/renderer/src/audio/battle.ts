@@ -18,6 +18,7 @@
 // the clip says when a hoof lands (lib/game/footsteps.ts) and the ground says
 // what it lands on.
 
+import { isFlying } from '../../../lib/game/locomotion'
 import type { LocomotionState } from '../../../lib/game/locomotion'
 import type { Bank } from './bank'
 
@@ -215,11 +216,10 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    */
   ready: { sound: 'P_HMMM', volume: 60, pitch: 90, jitter: 15 },
   /**
-   * Coming to rest after any flight. DECODED, and it is NOT the file called
-   * P_LAND1: `Pig::Land` (0x470910) plays **30 I_PICKUP** at volume 40 and
-   * pitch 150 (0x470b0c), and the parachute's landing plays the same 30 at
-   * `100 + (rand() & 63)` (0x4711aa). The `I_` family is impacts — I_METAL,
-   * I_SPLASH, I_STAB — so the name is about what it hits, not about crates.
+   * Coming to rest after a jump or a short fall. DECODED, and it is NOT the
+   * file called P_LAND1: `Pig::Land` (0x470910) plays **30 I_PICKUP** at volume
+   * 40 and pitch 150 (0x470b0c). The `I_` family is impacts — I_METAL, I_SPLASH,
+   * I_STAB — so the name is about what it hits, not about crates.
    *
    * P_LAND1 is a different moment: it belongs to 0x4aa010, which plays it at
    * volume 90 and then calls the body's own `TakeDamage` if it is a pig. That
@@ -227,6 +227,14 @@ export const BATTLE_SOUNDS: Record<string, Cue> = {
    * so nothing here plays it.
    */
   land: { sound: 'I_PICKUP', volume: 40, pitch: 150 },
+  /**
+   * A FLYING pig meeting the ground, which is the impact handler's and not
+   * `Pig::Land`'s: the same 30 I_PICKUP at `100 + (rand() & 63)`, with the volume
+   * a tenth of the arrival speed up to 60 (0x471166..0x4711aa). The `volume`
+   * here is that ceiling; the event brings the one this landing earned
+   * (lib/game/landing.ts).
+   */
+  thud: { sound: 'I_PICKUP', volume: 60, pitch: 100, jitter: 63 },
   /**
    * Losing your footing. DECODED: the eject handler (0x470c70) plays **84
    * P_SLIP** at 100/100 when `Map::IsBlocked` says the pig's feet are in a
@@ -684,6 +692,16 @@ export const underlayCue = (foot: number, soft: boolean): Cue => ({
   sound: STEP_UNDERLAY
 })
 
+/** The whole-body scuff under a thud on the landscape (0x4711b3 asks which
+ * contact it is): `Pig::Footstep(0, 40, 0, 0)` (0x4711b8), foot 0 at volume 40,
+ * the ground's file over the sand like any step. */
+export const SCUFF_VOLUME = 40
+
+export const scuffCues = (surface: number): Cue[] => [
+  { ...stepCue(surface, 0, false), volume: SCUFF_VOLUME },
+  { ...underlayCue(0, false), volume: SCUFF_VOLUME }
+]
+
 export interface BattleSounds {
   /** Call once per frame with the acting pig's state. */
   follow(state: LocomotionState, swimming: boolean): void
@@ -693,6 +711,7 @@ export interface BattleSounds {
 
 export function createBattleSounds(bank: Bank): BattleSounds {
   let airborne = false
+  let hurled = false
   let ejected = false
   let wet = false
   let fresh = true
@@ -711,11 +730,14 @@ export function createBattleSounds(bank: Bank): BattleSounds {
       } else {
         if (thrown && !ejected) playCue(bank, BATTLE_SOUNDS.ejected)
         else if (flying && !airborne) playCue(bank, BATTLE_SOUNDS.jump)
-        if (!flying && airborne) playCue(bank, BATTLE_SOUNDS.land)
+        // Only a plain landing has this sound: a FLYING body comes to rest
+        // through 0x471350, which plays nothing, and has made its thuds already.
+        if (!flying && airborne && !hurled) playCue(bank, BATTLE_SOUNDS.land)
         if (swimming !== wet) playCue(bank, BATTLE_SOUNDS.splash)
       }
 
       airborne = flying
+      hurled = state.airborne !== null && isFlying(state.airborne)
       ejected = thrown
       wet = swimming
     }

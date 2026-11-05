@@ -32,6 +32,7 @@ export const exposeDebug = (core: SceneCore): void => {
     mines,
     root,
     effects,
+    effectArt,
     airDrops,
     dropIn,
     grenadeArt,
@@ -48,15 +49,15 @@ export const exposeDebug = (core: SceneCore): void => {
     squad,
     dropIn,
     props,
-    flingOther: () => {
+    // A grenade's own throw at the core unless a spec asks for another — the debug
+    // shove is measured against the same weapon a spec would use (lib/game/blast.ts).
+    flingOther: (speed = flingSpeed(lobOf(19)?.force ?? 0, 1)) => {
       const other = game.players
         .flatMap((player) => player.pigs)
         .find((pig) => pig !== game.currentPig && pig.health > 0)
       if (!other) return null
       const from = { pig: other.id, x: other.position.x, z: other.position.z }
-      // A grenade's own throw at the core — the debug shove is measured
-      // against the same weapon a spec would use (lib/game/blast.ts).
-      battle.fling(other, flingVelocity(flingSpeed(lobOf(19)?.force ?? 0, 1), 0))
+      battle.fling(other, flingVelocity(speed, 0))
       return from
     },
     // Dead with nobody's blow behind it, so the acting pig's turn is not spent
@@ -100,6 +101,11 @@ export const exposeDebug = (core: SceneCore): void => {
     // rule the blade's is (lib/game/healing.ts).
     heal: () => heals.lastAttempt(),
     effects: () => effects.rings(),
+    ringsAt: () =>
+      effects.all().flatMap((effect) =>
+        effect.rings.map(({ x, y, z, radius, width, colour }) => ({ x, y, z, radius, width, colour }))
+      ),
+    paintEffects: (live) => effectArt.draw(live ? state.now.effects : []),
     smoke: () => effects.smoke(),
     fire: () => effects.fire(),
     script: () => ({ absent: scenery.waiting(), falling: airDrops.falling() }),

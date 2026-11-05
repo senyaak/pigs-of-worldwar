@@ -1,4 +1,5 @@
-// What a HARD LANDING costs — fall damage, read end to end (2026-08-27).
+// What a HARD LANDING costs — fall damage, read end to end (2026-08-27). What
+// else the same contact does is lib/game/landing.ts.
 //
 // The exe's pig has three airborne regimes, and only ONE of them can be hurt
 // by the ground. A plain jump or step-off (`+0x1fd`) lands through 0x470910,
@@ -29,6 +30,7 @@
 import { fromExeSpeed } from './ballistics'
 import { hurtPig, isDead } from './health'
 import { originY } from './body'
+import { answerLanding } from './landing'
 import type { LocomotionState } from './locomotion'
 import type { Emit } from './events'
 import type { Pig } from './game'
@@ -54,6 +56,11 @@ export const FALL_POINTS = 508 / 128
  * one per ground contact) and charge it if it qualifies: a FLYING body,
  * arriving harder than the gate. Clears the record either way, so a caller
  * may run every frame.
+ *
+ * A FLYING contact then climbs the impact handler's ladder, which the exe calls
+ * straight after the damage arm (0x477282, then 0x4772bb): lib/game/landing.ts.
+ * A plain contact does neither, because its landing path is another routine
+ * (0x470910).
  */
 export function chargeLanding(
   pig: Pig,
@@ -64,7 +71,13 @@ export function chargeLanding(
   const landed = state.impact
   if (!landed) return
   state.impact = null
-  if (!landed.flying || landed.speed <= FALL_GATE) return
+  if (!landed.flying) return
+  chargeFall(pig, landed.speed, training, emit)
+  answerLanding(pig, state, landed, emit)
+}
+
+function chargeFall(pig: Pig, speed: number, training: boolean, emit: Emit): void {
+  if (speed <= FALL_GATE) return
   // A corpse slamming down is not hurt again — it has nothing to lose, and
   // the exe's own arm goes through TakeDamage, which a dead pig's death path
   // has already run.
