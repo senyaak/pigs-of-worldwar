@@ -8,7 +8,8 @@
 //
 // Two scopes. EVERY session in a project that has the fleet installed keeps the
 // commit rules: they are the owner's rules wherever the fleet is. A FLEET
-// session also keeps master to the merger's form and stays off PowerShell. A
+// session also pushes nothing forced, leaves master to the merger's GitHub
+// merge, and stays off PowerShell. A
 // session is a fleet session when FLEET_SLOT is set, when it runs in a slot
 // (`<anything>-fleet-<n>`), when the hook fires inside one of the fleet's
 // role subagents, or when it is a cloud session (CLAUDE_CODE_REMOTE=true) of a
@@ -141,6 +142,34 @@ function ghApiMerge(words) {
   return String(method).toUpperCase() === 'PUT' && positional.some((p) => /(^|\/)pulls\/[^/]+\/merge\/?(\?.*)?$/.test(p))
 }
 
+// The merge_method a REST merge names; GitHub's default, absent, is a merge.
+function ghApiMergeMethod(words) {
+  for (let i = 2; i < words.length; i++) {
+    const a = words[i]
+    let field = null
+    if (a === '-f' || a === '-F' || a === '--field' || a === '--raw-field') field = words[++i] ?? ''
+    else if (a.startsWith('--field=')) field = a.slice(8)
+    else if (a.startsWith('--raw-field=')) field = a.slice(12)
+    const m = /^merge_method=(.*)$/s.exec(field ?? '')
+    if (m) return m[1]
+  }
+  return 'merge'
+}
+
+const MERGE_ONLY = "Merge a PR with --merge only: a squash or a rebase rewrites the work's commits, which keep Claude as the committer (reviewer.md § Merger)."
+
+function ghMergeReason(words) {
+  if (words[0] === 'gh' && words[1] === 'pr' && words[2] === 'merge') {
+    const flags = words.slice(3)
+    return flags.includes('--merge') || flags.includes('-m') ? null : MERGE_ONLY
+  }
+  if (words[0] === 'gh' && words[1] === 'pr' && words[2] === 'update-branch') {
+    return words.includes('--rebase') ? 'Update a PR with a merge of the base, not --rebase: nothing in the fleet is rewritten (reviewer.md § Merger).' : null
+  }
+  if (ghApiMerge(words)) return ghApiMergeMethod(words) === 'merge' ? null : MERGE_ONLY
+  return null
+}
+
 function messages(args, cwd) {
   const found = []
   for (let i = 0; i < args.length; i++) {
@@ -192,22 +221,19 @@ function pushReason(args) {
   if (flags.some((f) => f === '--mirror' || f === '--all')) {
     return 'git push --mirror/--all is never a fleet push: push your own branch by name.'
   }
-  const plainForce = flags.some((f) => f === '--force' || f === '-f' || /^-[a-zA-Z]*f/.test(f) && !f.startsWith('--'))
-  if (plainForce) {
-    return 'A plain --force push is refused: use --force-with-lease=<branch>:<the head you expect>, and only while you hold the fix claim (.claude/fleet/workflow.md § Branch).'
+  const forced =
+    flags.some((f) => f === '--force' || f.startsWith('--force-with-lease') || f.startsWith('--force-if-includes') || /^-[a-zA-Z]*f/.test(f) && !f.startsWith('--')) ||
+    positional.slice(1).some((spec) => spec.startsWith('+'))
+  if (forced) {
+    return 'No forced push in the fleet: bring the base in with git merge, and push plainly (.claude/fleet/workflow.md § Branch).'
   }
-  const leased = flags.some((f) => f.startsWith('--force-with-lease') || f.startsWith('--force-if-includes'))
   const deleting = flags.some((f) => f === '--delete' || f === '-d')
   for (const spec of positional.slice(1)) {
-    const plus = spec.startsWith('+')
-    const [src, dst] = spec.replace(/^\+/, '').includes(':') ? spec.replace(/^\+/, '').split(':') : [spec, spec]
+    const [src, dst] = spec.includes(':') ? spec.split(':') : [spec, spec]
     const target = (dst || '').replace(/^refs\/heads\//, '')
     if (!BASES.has(target)) continue
     if (deleting || src === '') return `Deleting ${target} is refused.`
-    if (plus || leased) return `${target} only ever moves forward: no forced push to it.`
-    if (!/^[0-9a-f]{7,40}$/.test(src)) {
-      return `Only the merger pushes ${target}, and only as a fast-forward of an approved head: git push origin <head-sha>:${target} (reviewer.md § Merger).`
-    }
+    return `Only the merger moves ${target}, and through GitHub: gh pr merge <n> --merge (reviewer.md § Merger).`
   }
   return null
 }
@@ -216,8 +242,9 @@ function bashReasons(command, cwd, fleet, processEnv) {
   const reasons = []
   for (const words of simpleCommands(command)) {
     const { env, rest } = splitEnv(words)
-    if ((rest[0] === 'gh' && rest[1] === 'pr' && rest[2] === 'merge') || ghApiMerge(rest)) {
-      reasons.push('A GitHub merge commits as GitHub, not as Claude: the merger fast-forwards instead (reviewer.md § Merger).')
+    const merge = ghMergeReason(rest)
+    if (merge) {
+      reasons.push(merge)
       continue
     }
     const git = gitCall(rest)
