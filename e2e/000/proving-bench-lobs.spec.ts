@@ -340,7 +340,7 @@ test('19 GRENADE: 300 a frame, a 153-frame fuse, 30 points at the core', async (
   // exe: weapons/fire/damage.md, 0x48CC33: 3840 is 30 points inside 512 units.
   expect(core.damage).toEqual([30])
   expect(STOUT - core.health).toBe(30)
-  // DIFFERS, TODO-ISSUE: the remake has the throw's falloff keep the damage's core, so
+  // DIFFERS, #213: the remake has the throw's falloff keep the damage's core, so
   // this is the whole 2600 / 30. exe: weapons/fire/phantom-sweep.md, 0x40A500: it runs
   // from the burst, 1 - 3d/4R with R the row's 1024, so 78.2 from the 133.5 to the
   // body's centre.
@@ -348,11 +348,11 @@ test('19 GRENADE: 300 a frame, a 153-frame fuse, 30 points at the core', async (
   expect(core.throws[0]).toBeCloseTo(2600 / 30, 3)
 
   const { inside, outside } = await atTheRim(GRENADE, flight, 1109)
-  // DIFFERS, TODO-ISSUE: the remake's divisor is 1024 + 85 - 512, and it rounds. exe:
+  // DIFFERS, #212: the remake's divisor is 1024 + 85 - 512, and it rounds. exe:
   // weapons/fire/blast-range-and-rim.md, 0x48CC46, 0x405710: a pig's term is 147, so
   // 659; 0x477C4A: the points are cut, so 9 at this distance.
   expect(inside.damage).toEqual([8])
-  // DIFFERS, TODO-ISSUE: the same falloff as the core's. exe:
+  // DIFFERS, #213: the same falloff as the core's. exe:
   // weapons/fire/phantom-sweep.md, 0x40A500: 16.3 at this distance.
   expect(inside.throws).toHaveLength(1)
   expect(inside.throws[0]).toBeCloseTo(21.8, 0)
@@ -402,7 +402,7 @@ test('20 CLUSTER GRENADE: the grenade, then five bomblets of 15 points at 250 a 
   // "worst case on one body: 30 + 5×15".
   expect(core.damage).toEqual([30, 15, 15, 15, 15, 15])
   expect(STOUT - core.health).toBe(105)
-  // DIFFERS, TODO-ISSUE: each the whole force / 30. exe: weapons/fire/phantom-sweep.md,
+  // DIFFERS, #213: each the whole force / 30. exe: weapons/fire/phantom-sweep.md,
   // 0x40A500: 1 - 3d/4R from the burst. Force: weapons/cluster.md, 0x43290E 2600;
   // the bomblet's row (0x4C2030 + 33 × 40) carries 1300 in the same place.
   expect(core.throws).toHaveLength(6)
@@ -410,7 +410,7 @@ test('20 CLUSTER GRENADE: the grenade, then five bomblets of 15 points at 250 a 
   for (const thrown of core.throws.slice(1)) expect(thrown).toBeCloseTo(1300 / 30, 3)
 
   const { inside, outside } = await atTheRim(CLUSTER_GRENADE, flight, 1109)
-  // DIFFERS, TODO-ISSUE: as 19. exe: weapons/fire/blast-range-and-rim.md, 0x48CC46: 9.
+  // DIFFERS, #212: as 19. exe: weapons/fire/blast-range-and-rim.md, 0x48CC46: 9.
   expect(inside.damage).toEqual([8])
   expect(outside.damage).toEqual([])
 })
@@ -430,13 +430,13 @@ test('21 HIGH EXPLOSIVE: 300 a frame, 60 points at the core over a 1536 field', 
   // exe: weapons/fire/damage.md, 0x48CC33: 7680 is 60 points inside 512 units.
   expect(core.damage).toEqual([60])
   expect(STOUT - core.health).toBe(60)
-  // DIFFERS, TODO-ISSUE: the whole 3900 / 30. exe: weapons/fire/phantom-sweep.md,
+  // DIFFERS, #213: the whole 3900 / 30. exe: weapons/fire/phantom-sweep.md,
   // 0x40A500: 1 - 3d/4R with R 1536, so 121.5 from the 133.5 to the body's centre.
   expect(core.throws).toHaveLength(1)
   expect(core.throws[0]).toBeCloseTo(3900 / 30, 3)
 
   const { inside, outside } = await atTheRim(HIGH_EXPLOSIVE, flight, 1621)
-  // DIFFERS, TODO-ISSUE: the remake's divisor is 1536 + 85 - 512, and it rounds. exe:
+  // DIFFERS, #212: the remake's divisor is 1536 + 85 - 512, and it rounds. exe:
   // weapons/fire/blast-range-and-rim.md, 0x48CC46, 0x405710: 1171; 0x477C4A: 17 here.
   expect(inside.damage).toEqual([15])
   expect(outside.damage).toEqual([])
@@ -458,13 +458,13 @@ test('22 ROLLER: 300 a frame, 40 points at the core over a 1024 field', async ()
   // exe: weapons/fire/damage.md, 0x48CC33: 5120 is 40 points inside 512 units.
   expect(core.damage).toEqual([40])
   expect(STOUT - core.health).toBe(40)
-  // DIFFERS, TODO-ISSUE: the whole 2600 / 30. exe: weapons/fire/phantom-sweep.md,
+  // DIFFERS, #213: the whole 2600 / 30. exe: weapons/fire/phantom-sweep.md,
   // 0x40A500: 78.2 from the 133.5 to the body's centre.
   expect(core.throws).toHaveLength(1)
   expect(core.throws[0]).toBeCloseTo(2600 / 30, 3)
 
   const { inside, outside } = await atTheRim(ROLLER, flight, 1109)
-  // DIFFERS, TODO-ISSUE: as 19. exe: weapons/fire/blast-range-and-rim.md, 0x48CC46: 12.
+  // DIFFERS, #212: as 19. exe: weapons/fire/blast-range-and-rim.md, 0x48CC46: 12.
   expect(inside.damage).toEqual([10])
   expect(outside.damage).toEqual([])
   expect(outside.throws).toEqual([])
@@ -520,12 +520,12 @@ test('27 SUPER GRENADE: 300 a frame, 30 points at the core over a 1024 field', a
   // exe: weapons/fire/damage.md, 0x48CC33: 3840 is 30 points inside 512 units.
   expect(core.damage).toEqual([30])
   expect(STOUT - core.health).toBe(30)
-  // DIFFERS, TODO-ISSUE: as 19.
+  // DIFFERS, #213: as 19.
   expect(core.throws).toHaveLength(1)
   expect(core.throws[0]).toBeCloseTo(2600 / 30, 3)
 
   const { inside, outside } = await atTheRim(SUPER_GRENADE, flight, 1109)
-  // DIFFERS, TODO-ISSUE: as 19. exe: weapons/fire/blast-range-and-rim.md, 0x48CC46: 9.
+  // DIFFERS, #212: as 19. exe: weapons/fire/blast-range-and-rim.md, 0x48CC46: 9.
   expect(inside.damage).toEqual([8])
   expect(outside.damage).toEqual([])
   expect(outside.throws).toEqual([])
@@ -567,7 +567,7 @@ test('28 MORTAR: no gauge, 45° at its floor, 50 points at the core, then three 
     // exe: weapons/cluster.md, 0x4339A6: 6400 is 50 points; 0x433249: 2560 is 20.
     expect(core.damage).toEqual([50, 20])
     expect(STOUT - core.health).toBe(70)
-    // DIFFERS, TODO-ISSUE: each the whole force / 30. exe: weapons/fire/phantom-sweep.md,
+    // DIFFERS, #213: each the whole force / 30. exe: weapons/fire/phantom-sweep.md,
     // 0x40A500: 1 - 3d/4R from the burst. Force: weapons/cluster.md, 0x4C26C0 3900;
     // 0x4C21E8 1300.
     expect(core.throws).toHaveLength(2)
@@ -583,7 +583,7 @@ test('28 MORTAR: no gauge, 45° at its floor, 50 points at the core, then three 
   expect(outside.throws).toEqual([])
 })
 
-test('28 MORTAR and 29 BAZOOKA go through a dummy in the way, DIFFERS from the exe (TODO-ISSUE)', async () => {
+test('28 MORTAR and 29 BAZOOKA go through a dummy in the way, DIFFERS from the exe (#214)', async () => {
   for (const skill of [MORTAR, BAZOOKA]) {
     const flight = await flightOf(skill)
     const landed = flight.bursts[0].at
@@ -598,7 +598,7 @@ test('28 MORTAR and 29 BAZOOKA go through a dummy in the way, DIFFERS from the e
     throwIt(bench, HALF_GAUGE)
     stepUntil(bench, () => blastsHeard(bench).length > 0, `skill ${skill} goes off`)
     const [burst] = blastsHeard(bench)
-    // DIFFERS, TODO-ISSUE: the remake's round meets only the ground, so it lands where it
+    // DIFFERS, #214: the remake's round meets only the ground, so it lands where it
     // lands with nobody there. exe: weapons/cluster.md, 0x438462: state 2 goes to 6 on
     // touching a body, unless that is a projectile or an effect.
     expect(burst.at.x).toBeCloseTo(landed.x, 3)
@@ -623,13 +623,13 @@ test('29 BAZOOKA: 500 a frame, no fuse, 40 points at the core over a 2048 field'
   // weapons/fire/damage.md, 0x48CC33: whole inside 512 units.
   expect(core.damage).toEqual([40])
   expect(STOUT - core.health).toBe(40)
-  // DIFFERS, TODO-ISSUE: the whole 3900 / 30. exe: weapons/fire/phantom-sweep.md,
+  // DIFFERS, #213: the whole 3900 / 30. exe: weapons/fire/phantom-sweep.md,
   // 0x40A500: 1 - 3d/4R with R 2048, so 123.6 from the 133.5 to the body's centre.
   expect(core.throws).toHaveLength(1)
   expect(core.throws[0]).toBeCloseTo(3900 / 30, 3)
 
   const { inside, outside } = await atTheRim(BAZOOKA, flight, 2133)
-  // DIFFERS, TODO-ISSUE: the remake's divisor is 2048 + 85 - 512, and it rounds. exe:
+  // DIFFERS, #212: the remake's divisor is 2048 + 85 - 512, and it rounds. exe:
   // weapons/fire/blast-range-and-rim.md, 0x48CC46, 0x405710: 1683; 0x477C4A: 11 here.
   expect(inside.damage).toEqual([10])
   expect(outside.damage).toEqual([])
@@ -666,7 +666,7 @@ test('33 MEDICINE BALL: 300 a frame, a 152-frame fuse, 40 points put back and no
   expect(nearlyWhole.health).toBe(ceiling)
 
   const { inside, outside } = await atTheRim(MEDICINE_BALL, flight, 2133, 1)
-  // DIFFERS, TODO-ISSUE: the remake's divisor is 2048 + 85 - 512, and it rounds. exe:
+  // DIFFERS, #212: the remake's divisor is 2048 + 85 - 512, and it rounds. exe:
   // weapons/fire/blast-range-and-rim.md, 0x48CC46, 0x405710: 1683; weapons/medic.md,
   // 0x4778C6: the falloff, cut to whole points at 0x47790A: 11 here.
   expect(inside.healed).toEqual([10])
