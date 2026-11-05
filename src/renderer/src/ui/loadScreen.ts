@@ -37,6 +37,7 @@ import { SLOTS, listCampaigns } from '../campaign'
 import type { SaveGame } from '../../../lib/game/save'
 import { CAMPAIGN_LENGTH } from '../../../lib/game/missions'
 import { careerOf, stepOf } from '../../../lib/game/ranks'
+import { reportFailure } from '../failures/report'
 
 /** fetext: record 10's own title, and 248 is `"MISSION "` — the panel's line. */
 const TITLE_TEXT = 45
@@ -398,7 +399,7 @@ export function initLoadScreen(handlers: {
         plain = shared.plain
         art = sprites
       } catch (error) {
-        console.warn(String(error))
+        reportFailure('loading the LOAD GAME screen', error)
         return
       }
       loaded = true

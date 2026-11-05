@@ -33,6 +33,7 @@ import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { current } from '../campaign'
 import { foughtAt, medalCount, medalsAt } from '../../../lib/game/save'
 import { bonusPoints, CAMPAIGN_LENGTH, mapAt, missionNameIndex } from '../../../lib/game/missions'
+import { reportFailure } from '../failures/report'
 
 /** The screen's own title — a literal, because no fetext names a replay
  * (151 is "CHEAT LEVEL SELECT" and this is not the cheat). `[deliberate]`. */
@@ -397,7 +398,7 @@ export function initMissionSelect(handlers: {
         art = sprites
         if (text.ok) gtext = text.strings
       } catch (error) {
-        console.warn(String(error))
+        reportFailure('loading the mission select', error)
         return
       }
       loaded = true

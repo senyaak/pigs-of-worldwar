@@ -34,6 +34,7 @@ import type { PauseState } from '../../../lib/game/pauseMenu'
 import { FRONTEND_METRICS, loadFont } from './font'
 import type { Font } from './font'
 import type { SpriteSet } from './sprites'
+import { reportFailure } from '../failures/report'
 
 /**
  * The letters the menu is PRINTED in — and this one is `[play]`, over a
@@ -186,7 +187,7 @@ export function createPauseMenu(): PauseMenu {
         await paint(letters, MENU_FONT, TEXT_INKS, FRONTEND_METRICS)
         await paint(ticks, BAR_FONT, BAR_INKS)
       } catch (error) {
-        console.warn(`no pause menu: ${String(error)}`)
+        reportFailure('loading the pause menu', error)
       }
     },
 

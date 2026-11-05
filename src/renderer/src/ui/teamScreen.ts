@@ -56,6 +56,7 @@ import {
 } from '../three/frontendPig'
 import type { FrontendPig, Outfit } from '../three/frontendPig'
 import type { Texture } from '../api'
+import { reportFailure } from '../failures/report'
 
 /** What the kind-2 loader arm (0x422270) decompresses, less the pieces this
  * screen's own arm never blits. `pigbkpc1` is the backdrop every screen sits
@@ -530,9 +531,8 @@ export function initTeamScreen(handlers: {
         plain = shared.plain
         art = sprites
       } catch (error) {
-        // A stripped install has no frontend to wear. Warn rather than error:
-        // the e2e suite treats console.error as a failed run.
-        console.warn(String(error))
+        // A stripped install has no frontend to wear.
+        reportFailure('loading the team screen', error)
         return
       }
       // The six armies are named in fetext, and so are their pigs — one block
@@ -571,7 +571,7 @@ export function initTeamScreen(handlers: {
         )
         await dress(selection)
       } catch (error) {
-        console.warn(`the team screen's pig: ${String(error)}`)
+        reportFailure("loading the team screen's pig", error)
       }
     },
     leave() {

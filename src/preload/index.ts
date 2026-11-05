@@ -69,5 +69,11 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.off('brain:reply', listener)
     }
   },
+  // The main process's failure reports (src/main/failures.ts). It keeps what
+  // it reported before the page asked, so nothing is lost to the start-up.
+  onFailure: (handler: (report: unknown) => void): void => {
+    ipcRenderer.on('failure:report', (_event, report: unknown) => handler(report))
+    ipcRenderer.send('failure:listen')
+  },
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit')
 })

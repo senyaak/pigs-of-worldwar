@@ -149,12 +149,13 @@ Within that, reads before the builds that need them.
   ([../testing.md](../testing.md)).
 - **The mouse drives every menu**, however faithful a keyboard-only screen
   would be ([../facts/menu.md](../facts/menu.md)).
-- **Failure reporters** (`.claude/rules/failures.md`): not built yet. There is
-  no reporter per layer, no `Refusal` or `UnknownFailure`, and no guard over
-  the catches; bringing the code to the rule is
-  [failures-and-actions.md](../todo/failures-and-actions.md). Until then a
-  new catch in a change still hands the error on, or is marked `not a
-  failure: <why>`.
+- **Failure reporters** (`.claude/rules/failures.md`,
+  [../facts/failures.md](../facts/failures.md)): the renderer's is
+  `reportFailure` in `src/renderer/src/failures/report.ts`, the main process's
+  is `reportFailure` in `src/main/failures.ts`. `lib/` has no reporter and no
+  I/O: a catch in it throws, returns the error as a value, or is marked. The
+  AI's process has no catch yet. `Refusal` and `UnknownFailure` are in
+  `src/lib/failures.ts`.
 - `CHANGELOG.md` is written when a version is cut ([../release.md](../release.md)),
   never by a PR.
 
@@ -174,6 +175,7 @@ Each to its own log, then read the log:
 ```bash
 npm run typecheck > _tmp/typecheck.log 2>&1
 npm run boundaries > _tmp/boundaries.log 2>&1
+npm run catches > _tmp/catches.log 2>&1
 npm run links > _tmp/links.log 2>&1
 npm run test:unit > _tmp/unit.log 2>&1
 npm run build > _tmp/build.log 2>&1
@@ -197,8 +199,11 @@ npm run e2e:locked -- <each e2e spec the change touches or adds> > _tmp/e2e.log 
   not actions yet: a spec waits on what it can observe. Both are
   [failures-and-actions.md](../todo/failures-and-actions.md). **The queue** is
   `npm run e2e:locked`.
-- CI runs typecheck, boundaries, build, the unit suite, the link check and
-  `fleet.mjs verify`; the e2e suite only runs locally.
+- **The guard over the catches** is `npm run catches` (`scripts/catches.mjs`):
+  it names every catch in `src/` that neither hands on, reports nor is marked,
+  and fails when the count of `new UnknownFailure` is not its `CEILING`.
+- CI runs typecheck, boundaries, catches, build, the unit suite, the link check
+  and `fleet.mjs verify`; the e2e suite only runs locally.
 - A disasm PR: `node tools/links.mjs .` in the disasm worktree.
 
 ## Review
@@ -231,7 +236,7 @@ detail in a comment on the disasm side.
 ## Merge
 
 - The base is `master` in both repos.
-- CI on a code PR: `ci.yml` (boundaries, typecheck, build, unit) and
+- CI on a code PR: `ci.yml` (boundaries, catches, typecheck, build, unit) and
   `docs.yml` (links, fleet verify). On a disasm PR: its `links.yml`.
 - A paired disasm PR merges before its code PR.
 

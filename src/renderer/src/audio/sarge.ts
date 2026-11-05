@@ -16,6 +16,7 @@
 
 import { context, speechOut, wakeAudio } from './bank'
 import { sargeFile } from '../../../lib/game/sergeant'
+import { reportFailure } from '../failures/report'
 
 export interface Sarge {
   /** Say a line. Silent and harmless if the install has no Speech folder. */
@@ -168,7 +169,7 @@ export function createSarge(): Sarge {
       const bytes = new Uint8Array(file.data)
       buffers.set(path, await ctx.decodeAudioData(bytes.buffer as ArrayBuffer))
     } catch (error) {
-      console.warn(`undecodable sarge line ${path}: ${String(error)}`)
+      reportFailure(`decoding the sarge line ${path}`, error)
       buffers.set(path, null)
     }
   }

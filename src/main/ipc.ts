@@ -28,6 +28,7 @@ import {
   loadTims
 } from './assets'
 import { loadProvingGround } from './provingGround'
+import { listenForFailures } from './failures'
 
 function fail(context: string, error: unknown): { ok: false; error: string } {
   return { ok: false, error: `${context}: ${error instanceof Error ? error.message : String(error)}` }
@@ -39,6 +40,9 @@ export function registerIpc(): void {
   ipcMain.on('telemetry:log', (_event, line: unknown) => {
     if (typeof line === 'string' && line.length <= 512) logTelemetry(line)
   })
+
+  // The page is ready for the main process's failure reports (main/failures.ts).
+  ipcMain.on('failure:listen', (event) => listenForFailures(event.sender))
 
   // The AI's own process (src/main/brainHost.ts). One way in both
   // directions: the seat asks and picks the answer up when it comes, so

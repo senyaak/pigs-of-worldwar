@@ -33,6 +33,7 @@ export function logTelemetry(line: string): void {
   try {
     appendFileSync(telemetryFile(), `${new Date().toISOString().slice(11, 19)} ${line}\n`)
   } catch {
-    // Nothing — a full disk loses a log line, not a game.
+    // not a failure: this is the log reports are written to, so it has nowhere
+    // to report to, and a full disk loses a log line, not a game.
   }
 }

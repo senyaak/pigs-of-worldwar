@@ -71,6 +71,7 @@ import {
   type as typeCharacter
 } from '../../../lib/game/nameEntry'
 import type { Alphabet, NameEntry } from '../../../lib/game/nameEntry'
+import { reportFailure } from '../failures/report'
 
 /** The panel's seven frames, in the order widget 18's builder walks them
  * (0x41F8A3, `[0x511A48 + 4·frame]`). The entrance asks for frame 6, so
@@ -572,7 +573,7 @@ export function initNameScreen(handlers: {
         plain = shared.plain
         art = sprites
       } catch (error) {
-        console.warn(String(error))
+        reportFailure('loading the name screen', error)
         return
       }
       // fetext 0 IS the alphabet — the exe reads it from there and so does

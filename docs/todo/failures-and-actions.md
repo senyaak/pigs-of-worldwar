@@ -4,14 +4,14 @@ The shared working rules `.claude/rules/failures.md` and
 `.claude/rules/testing.md` (fleet v1.2.0) ask for what the remake does not
 have yet:
 
-- **Failures.** `src/` holds 61 `catch` blocks (counted 2026-11-02 with
-  `grep -rn "catch\s*[({]" src --include=*.ts`). Each must hand the error on,
-  report it through its layer's one reporter, or be marked `not a failure:
-  <why>`; a guard over every catch keeps it so. The layers here are the
-  renderer, the main process and `lib/`, which has no I/O of its own. The
-  procedure is the shared `failures-pass` skill: first mechanically,
-  `UnknownFailure` where the kind is not clear, then the kinds as runs show
-  them — a `Refusal` where the game says no by its own rules.
+- **Failures.** The reporters and the guard over every catch are built
+  ([../facts/failures.md](../facts/failures.md)), and the first pass of the
+  shared `failures-pass` skill is done. What is left is its second pass: the
+  kinds as runs show them, a `Refusal` where the game says no by its own rules.
+  The first pass left no `UnknownFailure` to sort, so the runs are what show
+  them. An `{ ok: false }` answer from the main process is not a catch and the
+  guard does not see it: a renderer that takes one still only warns, or says
+  nothing.
 - **Tests that fail at once.** `e2e/launch.ts` already collects the renderer's
   uncaught errors and `console.error` into `errors`; a spec reads them at its
   end. The rule wants the first unexpected report to end the test with that
@@ -23,6 +23,5 @@ have yet:
   action on it, opening a battle (`pow.open`); the gestures are still to
   move onto it, each with the specs that wait on it.
 
-Order: the failure reporters and the catch guard first, since the tests fail
-on what they report; then the harness; then actions, gesture by gesture, with
-the specs that use them.
+Order: the harness first, since the tests fail on what the reporters say; then
+actions, gesture by gesture, with the specs that use them.
