@@ -57,6 +57,12 @@ function firstMine(): { x: number; z: number } {
  * The second pig is what the fling is really about: it is nobody's turn, nothing
  * drives it, and before `tumble` there was no state in the engine that could
  * have moved it.
+ *
+ * **The second pig stands on the map's side of the first, and that matters.**
+ * CAMP's first mine is at x −12032, 256 inside the line at −12288. A throw towards
+ * −x carries a pig over the line, onto the rising wall ring beyond it, and back off
+ * that slope (`docs/facts/map-limit.md`), so a spec about how far a throw goes
+ * throws towards +x, where there is ground to land on.
  */
 function fielded(apart: number): {
   game: Game
@@ -321,12 +327,12 @@ test("a body in the air BOWLS OVER the pig it runs into — 0x40 at 45°, the ex
   // knock is a fifth of what a core hit hands out (`BARGE_SPEED` against
   // `flingSpeed(lobOf(19)!.force, 1)`).
   const { tumbles, pigs, heard } = fielded(2 * PIG_RADIUS + 15)
-  const flyer = pigs()[1]
-  const bowled = pigs()[0]
+  const flyer = pigs()[0]
+  const bowled = pigs()[1]
   const stood = { ...bowled.position }
   const from = { ...flyer.position }
 
-  tumbles.fling(flyer, flingVelocity(flingSpeed(lobOf(19)!.force, 1), -Math.PI / 2))
+  tumbles.fling(flyer, flingVelocity(flingSpeed(lobOf(19)!.force, 1), Math.PI / 2))
   for (let i = 0; i < 400 && tumbles.live() > 0; i++) tumbles.update(STEP)
 
   const shove = heard.filter(
@@ -416,23 +422,23 @@ test('a body thrown AT another still travels — a pig is not a WALL in the air'
   // says is the simpler thing: thrown at a mate, a body goes where it was
   // thrown.
   const { tumbles, pigs } = fielded(2 * PIG_RADIUS + 15)
-  const thrown = pigs()[1]
-  const standing = { ...pigs()[0].position }
+  const thrown = pigs()[0]
+  const standing = { ...pigs()[1].position }
   const from = { ...thrown.position }
   expect(
     Math.hypot(from.x - standing.x, from.z - standing.z),
     'it starts clear of the body it is thrown at, and only just'
   ).toBeGreaterThan(2 * PIG_RADIUS)
 
-  // Thrown straight AT the other one: bearing −x, which is where it stands.
-  tumbles.fling(thrown, flingVelocity(flingSpeed(lobOf(19)!.force, 1), -Math.PI / 2))
+  // Thrown straight AT the other one: bearing +x, which is where it stands.
+  tumbles.fling(thrown, flingVelocity(flingSpeed(lobOf(19)!.force, 1), Math.PI / 2))
   for (let i = 0; i < 400 && tumbles.live() > 0; i++) tumbles.update(STEP)
   const went = Math.hypot(thrown.position.x - from.x, thrown.position.z - from.z)
   expect(went, 'the knock was delivered, not eaten by the mate it was aimed at').toBeGreaterThan(
     4 * PIG_RADIUS
   )
   // …past the pig it was thrown at, and not back the other way.
-  expect(thrown.position.x).toBeLessThan(standing.x)
+  expect(thrown.position.x).toBeGreaterThan(standing.x)
 })
 
 test('a body thrown while it is INSIDE another still travels', () => {

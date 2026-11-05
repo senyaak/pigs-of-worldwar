@@ -14,6 +14,8 @@ import { startGame } from '../menu'
 import { debugState, hud, press, release, tap } from '../controller'
 import type { Page } from '@playwright/test'
 import { openBattle } from '../load'
+import { AUTHORED_HEIGHT } from '../../src/renderer/src/ui/hud/layout'
+import { LAYOUT as PAUSE_LAYOUT } from '../../src/renderer/src/ui/pauseMenu'
 
 /** The menu's own state, or null when the game is running. */
 const menu = (
@@ -33,29 +35,49 @@ const menu = (
  * `draw` and the pause block and swallowed the whole rest of the frame. A
  * spec that reads only the state cannot tell a drawn menu from a silent one.
  *
- * MEASURED, both numbers. The title's ink is pure green multiplied into the
- * glyph's own shading, so it peaks at G 164 — the floor of 200 this used to
- * have never saw the title at all, and passed only because the sergeant's
- * opening line was up in the briefing bar by the time a five-second drop had
- * landed. A battle opened straight onto its feet (`openBattle`) has nobody
- * talking yet, and that is what showed it. Below the bar's band, pure green
- * is the title and nothing else: 0 pixels before the pause, 1067 during it,
- * every one inside the title's own box.
+ * MEASURED. The title's ink is pure green multiplied into the glyph's own
+ * shading, so it peaks at G 164 — the floor of 200 this used to have never saw
+ * the title at all, and passed only because the sergeant's opening line was up
+ * in the briefing bar by the time a five-second drop had landed.
+ *
+ * **ONLY THE TITLE'S OWN BOX IS COUNTED, because it is not the only green.** The
+ * British are green too: half a second after the acting pig stops, its name and
+ * health come up in (0, 128, 0), 771 pixels, and its blip on the map is
+ * (0, 255, 0), 66 more whenever it is not flashing white. Counting everything
+ * below the bar passed only when a read fell in the first half second with the
+ * blip white, which is why this spec went red some runs and not others. The box
+ * is the panel's width and the height of the letters, off the panel's own layout,
+ * and it stops short of the plate, which starts at y 252 of a 716 canvas.
  */
+const TITLE_HEIGHT = 30
 const greenPixels = (page: Page): Promise<number> =>
-  page.evaluate(() => {
-    const BAR_BAND = 0.18
-    const canvas = document.getElementById('battle-hud') as HTMLCanvasElement | null
-    const context = canvas?.getContext('2d')
-    if (!canvas || !context) return -1
-    const top = Math.ceil(canvas.height * BAR_BAND)
-    const pixels = context.getImageData(0, top, canvas.width, canvas.height - top).data
-    let green = 0
-    for (let i = 0; i < pixels.length; i += 4) {
-      if (pixels[i] < 40 && pixels[i + 1] > 100 && pixels[i + 2] < 40 && pixels[i + 3] > 200) green++
+  page.evaluate(
+    ({ authored, panel, title, height }) => {
+      const canvas = document.getElementById('battle-hud') as HTMLCanvasElement | null
+      const context = canvas?.getContext('2d')
+      if (!canvas || !context) return -1
+      const scale = canvas.height / authored
+      const left = Math.floor(canvas.width / 2 - panel.halfWidth * scale)
+      const top = Math.floor(title * scale)
+      const pixels = context.getImageData(
+        left,
+        top,
+        Math.ceil(panel.halfWidth * 2 * scale),
+        Math.ceil(height * scale)
+      ).data
+      let green = 0
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] < 40 && pixels[i + 1] > 100 && pixels[i + 2] < 40 && pixels[i + 3] > 200) green++
+      }
+      return green
+    },
+    {
+      authored: AUTHORED_HEIGHT,
+      panel: PAUSE_LAYOUT.panel,
+      title: PAUSE_LAYOUT.centreY - PAUSE_LAYOUT.panel.halfHeight + PAUSE_LAYOUT.title,
+      height: TITLE_HEIGHT
     }
-    return green
-  })
+  )
 
 const paused = (page: Page): Promise<boolean> =>
   page.evaluate(() => {
@@ -73,9 +95,8 @@ test('escape freezes the mission, and nothing in it moves', async ({ app }) => {
   expect(await paused(page)).toBe(true)
   // The menu opens on its first row with nothing armed.
   expect(await menu(page)).toMatchObject({ row: 0, confirming: false, yes: false })
-  // …AND IT IS ON THE SCREEN. `-GAME PAUSED-` is the one green thing the
-  // dashboard ever draws, so counting its pixels tells a painted menu from a
-  // menu that merely exists.
+  // …AND IT IS ON THE SCREEN. Counting `-GAME PAUSED-`'s green in its own box
+  // tells a painted menu from a menu that merely exists.
   await expect
     .poll(() => greenPixels(page), { message: 'the pause menu is not painted' })
     .toBeGreaterThan(20)
