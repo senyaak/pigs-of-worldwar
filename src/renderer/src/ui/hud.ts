@@ -53,6 +53,7 @@ import type { SkillMenu } from './skillMenu'
 import { loadTims, tinted } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
 import { drawTitleCard } from './titleCard'
+import { reportFailure } from '../failures/report'
 
 export interface HudState {
   /** Seconds since the last frame — the briefing bar's slide and scroll run
@@ -225,9 +226,8 @@ export function createHud(canvas: HTMLCanvasElement): Hud {
         await pauseMenu.load(dashboard)
         dash.loaded = true
       } catch (error) {
-        // A stripped install has no dashboard. Warn rather than error: the
-        // e2e suite treats console.error as a failed run.
-        console.warn(String(error))
+        // A stripped install has no dashboard.
+        reportFailure('loading the dashboard', error)
       }
     },
 

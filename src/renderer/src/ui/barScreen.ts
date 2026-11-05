@@ -50,6 +50,7 @@ import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
 import { drive } from './drive'
 import { LAMP_BLINK, widget } from './frames'
 import { trackRows } from './mouseRows'
+import { reportFailure } from '../failures/report'
 
 /** The frontend's own bank — 27 sounds, the menu's clicks among them. */
 const FRONTEND_SOUNDS = 'FESounds/Fesounds.srl'
@@ -820,9 +821,8 @@ export function initBarScreen(config: {
         titles = art.frames('title', 1, 6)
         lamps = art.frames('light', 1, 3)
       } catch (error) {
-        // A stripped install has no frontend to wear. Warn rather than
-        // error: the e2e suite treats console.error as a failed run.
-        console.warn(String(error))
+        // A stripped install has no frontend to wear.
+        reportFailure('loading the menu art', error)
         return
       }
       loaded = true

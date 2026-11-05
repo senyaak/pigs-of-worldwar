@@ -42,7 +42,8 @@ test('a valid --game-dir wins over the .env folder', async () => {
   try {
     await openAssets(launched.page)
     await expect(launched.page.locator('#file-list')).toContainText('Maps/FROMCLI.MAD')
-    expect(launched.errors).toEqual([])
+    // A fake install has no menu art, and says so (ui/barScreen.ts); nothing else.
+    expect(launched.errors.filter((error) => !error.startsWith('[failure] loading the menu art: '))).toEqual([])
   } finally {
     await launched.app.close()
   }

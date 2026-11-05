@@ -16,6 +16,7 @@
 // without its sound effects is worse than a quiet one.
 
 import type { SoundEntry } from '../api'
+import { reportFailure } from '../failures/report'
 
 export interface Bank {
   /** Start a sound. Silent and harmless if it is not in the bank. */
@@ -56,6 +57,8 @@ export function context(): AudioContext | null {
   try {
     shared = new AudioContext()
   } catch {
+    // not a failure: a machine with no audio device plays silent, and every
+    // caller takes null as that.
     return null
   }
   return shared
@@ -232,7 +235,7 @@ export async function loadBank(srlPath: string): Promise<Bank> {
       const bytes = new Uint8Array(file.data)
       buffers.set(name, await ctx.decodeAudioData(bytes.buffer as ArrayBuffer))
     } catch (error) {
-      console.warn(`undecodable sound ${name}: ${String(error)}`)
+      reportFailure(`decoding the sound ${name}`, error)
       buffers.set(name, null)
     }
   }

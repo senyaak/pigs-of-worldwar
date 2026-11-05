@@ -28,6 +28,7 @@ import { loadFont } from './font'
 import type { Font } from './font'
 import { loadArchiveBmps } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
+import { reportFailure } from '../failures/report'
 
 const MENU_ART = 'Language/Tims/MENUTIMS.MAD'
 /** The frame, and the highlight over the chosen cell. */
@@ -121,7 +122,7 @@ export function createSkillMenu(): SkillMenu {
         loaded = true
       } catch (error) {
         // A stripped install has no menu art; the battle plays on without it.
-        console.warn(String(error))
+        reportFailure('loading the skill menu', error)
       }
     },
 
@@ -230,6 +231,7 @@ function iconFor(art: SpriteSet, skill: number): Sprite | null {
   try {
     return art.get(name)
   } catch {
+    // not a failure: a skill the archive has no art for is an empty cell.
     return null
   }
 }

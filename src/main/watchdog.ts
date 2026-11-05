@@ -23,6 +23,7 @@ import type { BrowserWindow, WebContents } from 'electron'
 import { ipcMain } from 'electron'
 
 import { logTelemetry } from './telemetry'
+import { reportFailure } from './failures'
 
 /** How often the page is asked whether it is alive. */
 const PING_MS = 2000
@@ -76,10 +77,10 @@ function arm(contents: WebContents): void {
   try {
     contents.debugger.attach('1.3')
     void contents.debugger.sendCommand('Debugger.enable').catch((error: unknown) => {
-      logTelemetry(`[watchdog] Debugger.enable failed: ${String(error)}`)
+      reportFailure('the watchdog enabling the debugger', error)
     })
   } catch (error) {
-    logTelemetry(`[watchdog] could not attach: ${String(error)}`)
+    reportFailure('the watchdog attaching the debugger', error)
   }
 }
 
@@ -114,6 +115,6 @@ async function takeStack(contents: WebContents): Promise<void> {
     }
     await dbg.sendCommand('Debugger.resume')
   } catch (error) {
-    logTelemetry(`[watchdog] reading the stack failed: ${String(error)}`)
+    reportFailure('the watchdog reading the stack', error)
   }
 }

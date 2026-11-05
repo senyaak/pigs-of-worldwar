@@ -40,6 +40,7 @@ import type { MapRaster } from '../../../lib/game/mapRaster'
 import { grow, texturedTriangle } from './affine'
 import { loadTims, tinted } from './sprites'
 import type { Sprite } from './sprites'
+import { reportFailure } from '../failures/report'
 
 const MARKERS = 'Language/Tims/MAPICONS.MTD'
 /** The frames the entrance takes, which is the length of the exe's own table. */
@@ -115,8 +116,8 @@ export function createBattleMap(): BattleMap {
         loaded = true
       } catch (error) {
         // A stripped install has no markers; the rest of the dashboard still
-        // draws. `console.error` fails an e2e run, so warn.
-        console.warn(String(error))
+        // draws.
+        reportFailure('loading the battle map', error)
       }
     },
 

@@ -16,6 +16,8 @@
 // It plays nothing else, ever. If a second in-battle menu wants a noise, it
 // wants this file's shape, not this file's buffer.
 
+import { reportFailure } from '../failures/report'
+
 let ctx: AudioContext | null = null
 let click: AudioBuffer | null = null
 let loading: Promise<void> | null = null
@@ -48,7 +50,7 @@ export function loadMenuClick(srlPath: string, name: string): Promise<void> {
       const bytes = new Uint8Array(file.data)
       click = await ctx.decodeAudioData(bytes.buffer as ArrayBuffer)
     } catch (error) {
-      console.warn(`undecodable menu click: ${String(error)}`)
+      reportFailure('decoding the menu click', error)
       click = null
     }
   })()

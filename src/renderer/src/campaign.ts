@@ -32,6 +32,7 @@ import { drawEnemies } from '../../lib/game/enemies'
 import { bootCampEnemy } from '../../lib/game/nations'
 import { credit, standingCount, SQUAD_SIZE, type Pig } from '../../lib/game/roster'
 import { fieldedAt } from '../../lib/game/missions'
+import { reportFailure } from './failures/report'
 
 /** The eight slot names, the original's own. */
 export const SLOTS = Array.from({ length: 8 }, (_, i) => `savearmy${i}`)
@@ -57,7 +58,10 @@ const write = async (): Promise<void> => {
 /** Every slot that holds a readable save, newest first — LOAD GAME's list. */
 export async function listCampaigns(): Promise<{ slot: string; save: SaveGame }[]> {
   const listed = await window.api.listSaves()
-  if (!listed.ok) return []
+  if (!listed.ok) {
+    reportFailure('listing the saves', listed.error)
+    return []
+  }
   return listed.saves
     .filter((file) => SLOTS.includes(file.name))
     .map((file) => ({ slot: file.name, save: parse(file.text) }))
@@ -69,11 +73,22 @@ export async function listCampaigns(): Promise<{ slot: string; save: SaveGame }[
  * the oldest, which is the listing's last (`src/main/saves.ts` sorts newest
  * first). The original makes the player pick a slot on a SAVE ARMY screen;
  * ours autosaves, so the slot is picked here and kept for the campaign's life.
+ *
+ * **A listing that failed picks no slot.** It says nothing about which slots
+ * are free, and any slot picked blind could be a save the player has. So the
+ * campaign goes on with none, `write` skips it, and the report says that this
+ * campaign is not being saved (.claude/rules/failures.md, "Where a loop meets a
+ * bad item").
  */
 export async function begin(name: string, nation: number, squad: Pig[]): Promise<SaveGame> {
   const listed = await window.api.listSaves()
-  const taken = listed.ok ? listed.saves.map((file) => file.name) : []
-  slot = SLOTS.find((name_) => !taken.includes(name_)) ?? taken[taken.length - 1] ?? SLOTS[0]
+  if (listed.ok) {
+    const taken = listed.saves.map((file) => file.name)
+    slot = SLOTS.find((name_) => !taken.includes(name_)) ?? taken[taken.length - 1] ?? SLOTS[0]
+  } else {
+    reportFailure('listing the saves, so this campaign is not being saved', listed.error)
+    slot = null
+  }
   // The whole campaign's enemies are decided HERE, the original's own way —
   // rolled at the team's birth, balanced, FINAL always Team Lard.
   save = newGame(name, nation, squad, new Date().toISOString(), drawEnemies(nation, Math.random))

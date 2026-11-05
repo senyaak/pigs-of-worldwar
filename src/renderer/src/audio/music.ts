@@ -45,6 +45,7 @@
 // is the same rule the sample bank keeps.
 
 import { context, musicOut, setMusicVolume, wakeAudio } from './bank'
+import { reportFailure } from '../failures/report'
 
 /** Clips 0..29 — the exe's own clamp (0x43b4c0). */
 export const MUSIC_CLIPS = 30
@@ -148,7 +149,7 @@ export function createMusic(): Music {
       const bytes = new Uint8Array(file.data)
       buffers.set(clip, await ctx.decodeAudioData(bytes.buffer as ArrayBuffer))
     } catch (error) {
-      console.warn(`undecodable music ${clip}: ${String(error)}`)
+      reportFailure(`decoding the music ${clip}`, error)
       buffers.set(clip, null)
     }
   }

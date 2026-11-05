@@ -29,6 +29,7 @@ import type { Cue } from './battle'
 import { SILENT } from './bank'
 import { context, sfxOut, wakeAudio } from './bank'
 import type { Bank } from './bank'
+import { reportFailure } from '../failures/report'
 
 /** A cue as the source spells it, so `print()` output pastes straight in. */
 const show = (cue: Cue): string =>
@@ -207,7 +208,8 @@ export function createSoundConsole(bank: () => Bank): SoundConsole {
           try {
             const bytes = new Uint8Array(got.data)
             loose.set(path, await ctx.decodeAudioData(bytes.buffer as ArrayBuffer))
-          } catch {
+          } catch (error) {
+            reportFailure(`decoding the sound ${path}`, error)
             loose.set(path, null)
           }
         }

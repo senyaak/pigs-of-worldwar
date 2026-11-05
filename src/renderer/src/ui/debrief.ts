@@ -39,6 +39,7 @@ import type { SaveGame } from '../../../lib/game/save'
 import { paysPoints, survivalBonus } from '../../../lib/game/save'
 import { bonusPoints, fieldedAt } from '../../../lib/game/missions'
 import { careerOf, stepOf } from '../../../lib/game/ranks'
+import { reportFailure } from '../failures/report'
 
 /** gtext: the page's own words — the same ids the exe prints (0x484B90 on). */
 const RESULTS_TEXT = 187
@@ -461,7 +462,7 @@ export function initDebrief(handlers: {
         if (propoint.ok) spinner = renderTokenStrip(propoint.model, propoint.textures)
         else console.warn(`debrief: PROPOINT would not load (${propoint.error})`)
       } catch (error) {
-        console.warn(String(error))
+        reportFailure('loading the debrief', error)
         return
       }
       loaded = true

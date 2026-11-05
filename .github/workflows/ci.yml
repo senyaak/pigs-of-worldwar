@@ -45,6 +45,10 @@ jobs:
       # TypeScript has never caught one of them (scripts/boundaries.mjs).
       - run: npm run boundaries
 
+      # Every catch hands the error on, reports it, or says why it is none
+      # (.claude/rules/failures.md, scripts/catches.mjs).
+      - run: npm run catches
+
       - run: npm run typecheck
 
       - run: npm run build

@@ -70,6 +70,7 @@ import {
   rankText,
   stepOf
 } from '../../../lib/game/ranks'
+import { reportFailure } from '../failures/report'
 
 /** A piece of one of the board's lines: words, or one of the markup icons.
  * `after` overrides the gap the board leaves before whatever comes next. */
@@ -1272,7 +1273,7 @@ export function initPlayerScreen(handlers: {
         plain = shared.plain
         art = sprites
       } catch (error) {
-        console.warn(String(error))
+        reportFailure('loading the player screen', error)
         return
       }
       loaded = true

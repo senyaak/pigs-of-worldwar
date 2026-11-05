@@ -16,6 +16,7 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { reportFailure } from './failures'
 
 const EXTENSION = '.json'
 
@@ -29,6 +30,10 @@ export function savesDir(): string {
   return path.join(root, 'saves')
 }
 
+/** The one failure a "may not exist yet" catch is about. */
+const isNotThere = (error: unknown): boolean =>
+  error instanceof Error && 'code' in error && error.code === 'ENOENT'
+
 function fileFor(name: string): string {
   if (!NAME.test(name)) throw new Error(`Not a save name: ${name}`)
   return path.join(savesDir(), name + EXTENSION)
@@ -39,7 +44,8 @@ export async function listSaves(): Promise<{ name: string; text: string }[]> {
   let entries: string[]
   try {
     entries = await fs.readdir(savesDir())
-  } catch {
+  } catch (error) {
+    if (!isNotThere(error)) throw error
     // No folder yet is no saves, not an error: nobody has played.
     return []
   }
@@ -52,8 +58,9 @@ export async function listSaves(): Promise<{ name: string; text: string }[]> {
     try {
       const [text, stat] = await Promise.all([fs.readFile(full, 'utf8'), fs.stat(full)])
       saves.push({ name, text, at: stat.mtimeMs })
-    } catch {
+    } catch (error) {
       // A file that cannot be read is one the list does without.
+      reportFailure(`reading the save ${name}`, error)
     }
   }
   saves.sort((a, b) => b.at - a.at)
@@ -63,7 +70,8 @@ export async function listSaves(): Promise<{ name: string; text: string }[]> {
 export async function readSave(name: string): Promise<string | null> {
   try {
     return await fs.readFile(fileFor(name), 'utf8')
-  } catch {
+  } catch (error) {
+    if (!isNotThere(error)) throw error
     return null
   }
 }
@@ -84,7 +92,8 @@ export async function writeSave(name: string, text: string): Promise<void> {
 export async function deleteSave(name: string): Promise<void> {
   try {
     await fs.unlink(fileFor(name))
-  } catch {
+  } catch (error) {
+    if (!isNotThere(error)) throw error
     // Deleting one that is not there is the state the caller wanted.
   }
 }

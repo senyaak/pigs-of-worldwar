@@ -8,6 +8,7 @@ import { resolveGameDir } from './gameDir'
 import { registerIpc } from './ipc'
 import { watchRenderer, watchdogWanted } from './watchdog'
 import { stopBrain } from './brainHost'
+import { watchFailures } from './failures'
 
 /**
  * Electron's own menu, minus ONE accelerator: **F11**.
@@ -108,6 +109,8 @@ function createWindow(): void {
     void window.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 }
+
+watchFailures()
 
 void app.whenReady().then(() => {
   resolveGameDir()

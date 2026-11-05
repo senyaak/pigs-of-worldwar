@@ -43,6 +43,7 @@ import type { SpriteSet } from './sprites'
 import { SILENT } from '../audio/bank'
 import type { Bank } from '../audio/bank'
 import { EXE_FRAME_SECONDS } from '../../../lib/game/ballistics'
+import { reportFailure } from '../failures/report'
 
 /** fetext: the question and its two answers, record 39's own block. */
 const QUESTION_TEXT = 141
@@ -418,7 +419,7 @@ export function initAskTraining(handlers: {
         plain = shared.plain
         art = sprites
       } catch (error) {
-        console.warn(String(error))
+        reportFailure('loading the training question', error)
         return
       }
       loaded = true
