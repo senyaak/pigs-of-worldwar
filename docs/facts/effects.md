@@ -29,6 +29,14 @@
 - **A cloud's sprite has an exe size the fireball does not use yet.** `cloudWidth`
   (`lib/game/cloud.ts`) is the reading above; the fireball keeps its own
   `BLOB_UNIT` until [b0-black-smoke.md](../todo/b0-black-smoke.md).
+- **Every stage goes off on the tick the effect's counter reads `when + 1`.**
+  `[exe]` All twelve take one off the counter before comparing, and the counter,
+  0 at birth, has already ticked by then: a `when` byte of 0 is the effect's first
+  frame, and a later one waits its `when` frames more (`effects/stages.md`,
+  0x48BC81..0x48BEE3; `effects/fuse.md`, 0x48A5D6). A stage's `at` in
+  `lib/game/effects.ts` is that figure for every stage taken from a row
+  (`effects/rows.md`, `effects/melee-and-breaking.md`), and `unit/effects.spec.ts`
+  holds the rows to it.
 - **An effect's collider is a sphere of radius 35** (0x4a8f42, via
   `jmp [eax*4+0x4a90CC]` at 0x4a8ece where `eax = type - 0x1357`, built by
   `0x407AF0` at 0x4a9044). It does not need to grow — that idea was invented to
