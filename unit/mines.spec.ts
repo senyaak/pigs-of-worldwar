@@ -6,10 +6,14 @@
 // through the turn — at the TURN'S END every laid mine beds into its tile's
 // bit, and one bedded under somebody's feet goes off then and there. Two on
 // one spot bed into ONE bit.
+//
+// …and what a projectile does to a mine already in the ground, at the end.
 
 import { test, expect } from '@playwright/test'
 import { NO_POSE } from '../src/lib/game/pose'
 
+import { createBullets } from '../src/lib/game/bullets'
+import { createLobs } from '../src/lib/game/lobs'
 import {
   ARM_FRAMES,
   LAID_FUSE_FRAMES,
@@ -18,6 +22,9 @@ import {
   isMine
 } from '../src/lib/game/mines'
 import { fromExeFrames } from '../src/lib/game/ballistics'
+import { GAUGE_FULL } from '../src/lib/game/gauge'
+import { ObstacleField } from '../src/lib/game/obstacles'
+import { TILE_MINE, TILE_WATER } from '../src/lib/formats/pmg'
 import { NO_BODY } from '../src/lib/game/body'
 import type { Pig } from '../src/lib/game/game'
 import type { BattleEvent } from '../src/lib/game/events'
@@ -267,4 +274,128 @@ test('a charge is laid IN FRONT, off the hand, and not under the soles', { tag: 
   expect(mines.lay(sapper, MINE)).toBe(true)
   expect(mines.laid()[0].x).toBe(256 + 512)
   expect(mines.laid()[0].z).toBe(256)
+})
+
+// ---------------------------------------------------------------------------
+// A PROJECTILE on a mine that is already in the ground.
+//
+// exe: weapons/mines.md, `Projectile::OnHitLandscape` 0x4377d0, the mine arm
+// 0x437a50 -- every projectile's landscape contact runs it, and nothing before
+// it asks the kind. Row +0x26 is no gate on it: its one reader, 0x436201, turns
+// the body along its flight.
+
+const RIFLE = 7
+const GRENADE = 19
+const BAZOOKA = 29
+/** Tile (32, 32): its low corner is (0, 0), so its centre is (256, 256). */
+const onTheMine = (x: number, z: number): boolean => x === 0 && z === 0
+/** Straight down and level, in the 4096-to-the-turn aim units. */
+const DOWN = -1024
+const LEVEL = 0
+
+const minefield = (
+  type: number,
+  from: { x: number; y: number; z: number }
+): {
+  mines: ReturnType<typeof createMines>
+  bullets: ReturnType<typeof createBullets>
+  lobs: ReturnType<typeof createLobs>
+  heard: BattleEvent[]
+  shooter: Pig
+} => {
+  const heard: BattleEvent[] = []
+  const emit = (event: BattleEvent): void => {
+    heard.push(event)
+  }
+  const query = terrain(
+    () => 0,
+    (x, z) => (onTheMine(x, z) ? { type } : {})
+  )
+  const pose = { boneToWorld: () => from }
+  const shared = { pigs: () => [], targets: [], present: () => true, training: false, query, pose, random: () => 0.5 }
+  const mines = createMines(shared, emit)
+  const obstacles = new ObstacleField([])
+  return {
+    mines,
+    bullets: createBullets({ ...shared, obstacles, mines }, emit),
+    lobs: createLobs({ ...shared, obstacles, mines }, emit),
+    heard,
+    shooter: pigAt(from.x, from.z, 99)
+  }
+}
+
+test('a rifle round that meets the ground on a mine tile sets it off', { tag: '@nodata' }, () => {
+  const { mines, bullets, heard, shooter } = minefield(TILE_MINE, { x: 200, y: -300, z: 200 })
+  shooter.holding = RIFLE
+  // exe: 0x437a50 -- a gun's kind is no exception. The same handler plays that
+  // round's own impact sound further down (0x43806c, kinds 12..19 in the byte
+  // map 0x4381c4), so a bullet is known to reach it.
+  expect(bullets.fire(shooter, DOWN)).toBe(true)
+  for (let step = 0; step < 60 && bullets.live().length > 0; step++) bullets.update(1 / 60)
+  expect(heard.some((one) => one.kind === 'mineTripped')).toBe(true)
+  // exe: 0x437a94 -- at the tile's CENTRE, not where the round came down.
+  expect(mines.at()).toHaveLength(1)
+  expect(mines.at()[0]).toMatchObject({ x: 256, z: 256, damage: MINE_DAMAGE })
+  // exe: 0x437bbf -- `Map::SetMine` clears the bit: one shot.
+  expect(mines.buried(256, 256)).toBe(false)
+})
+
+test('a round passing OVER a mine tile touches nothing and sets nothing off', { tag: '@nodata' }, () => {
+  // exe: 0x4a8b41 -- the handler is the world's contact loop's, so no contact
+  // is no trigger, however low it flies.
+  const { mines, bullets, heard, shooter } = minefield(TILE_MINE, { x: 256, y: -300, z: -600 })
+  shooter.holding = RIFLE
+  expect(bullets.fire(shooter, LEVEL)).toBe(true)
+  for (let step = 0; step < 240 && bullets.live().length > 0; step++) bullets.update(1 / 60)
+  expect(bullets.live()).toHaveLength(0)
+  expect(heard.some((one) => one.kind === 'mineTripped')).toBe(false)
+  expect(mines.buried(256, 256)).toBe(true)
+})
+
+test('a bazooka rocket that lands on a mine tile sets it off', { tag: '@nodata' }, () => {
+  const { mines, lobs, heard, shooter } = minefield(TILE_MINE, { x: 200, y: -300, z: 200 })
+  shooter.holding = BAZOOKA
+  // exe: 0x437a50 -- the arm stands before the contact burst at 0x437f2c.
+  expect(lobs.throwOne(shooter, DOWN, GAUGE_FULL)).toBe(true)
+  for (let step = 0; step < 60 && lobs.live() > 0; step++) lobs.update(1 / 60)
+  expect(heard.some((one) => one.kind === 'mineTripped')).toBe(true)
+  expect(mines.at()[0]).toMatchObject({ x: 256, z: 256 })
+  expect(mines.buried(256, 256)).toBe(false)
+})
+
+test('a grenade that lands on a mine tile sets it off, and flies on over one that it does not touch', { tag: '@nodata' }, () => {
+  // exe: 0x437a50 -- row +0x26 is 0 on every grenade and that gates nothing
+  // here: the only flag this handler tests is +0xc6 (0x43785b), which the
+  // constructor clears for every thrown thing (0x431fba).
+  const landing = minefield(TILE_MINE, { x: 200, y: -300, z: 200 })
+  landing.shooter.holding = GRENADE
+  expect(landing.lobs.throwOne(landing.shooter, DOWN, GAUGE_FULL)).toBe(true)
+  for (let step = 0; step < 60; step++) landing.lobs.update(1 / 60)
+  expect(landing.heard.filter((one) => one.kind === 'mineTripped')).toHaveLength(1)
+  expect(landing.mines.buried(256, 256)).toBe(false)
+
+  // Up and over, thrown from the far side, and down well beyond: in the air
+  // above the tile it is not on the tile.
+  const over = minefield(TILE_MINE, { x: 256, y: -300, z: -300 })
+  over.shooter.holding = GRENADE
+  expect(over.lobs.throwOne(over.shooter, 512, GAUGE_FULL)).toBe(true)
+  for (let step = 0; step < 90; step++) over.lobs.update(1 / 60)
+  expect(over.lobs.at()[0].z, 'it has passed the tile').toBeGreaterThan(512)
+  expect(over.heard.some((one) => one.kind === 'mineTripped')).toBe(false)
+  expect(over.mines.buried(256, 256)).toBe(true)
+})
+
+test('a WET mine tile goes off under the grenade that then sinks in it', { tag: '@nodata' }, () => {
+  // exe: weapons/fire/water-one-handler-no-depth.md -- the mine arm 0x437a50
+  // comes before the water arms 0x437bfb in the one handler, and 197 tiles of
+  // the 61 shipped maps carry both bits (a throwaway count over the PMGs).
+  const { mines, lobs, heard, shooter } = minefield(TILE_MINE | TILE_WATER, { x: 200, y: -300, z: 200 })
+  shooter.holding = GRENADE
+  expect(lobs.throwOne(shooter, DOWN, GAUGE_FULL)).toBe(true)
+  for (let step = 0; step < 60; step++) lobs.update(1 / 60)
+  const kinds = heard.map((one) => one.kind)
+  expect(kinds).toContain('mineTripped')
+  expect(kinds).toContain('doused')
+  expect(kinds.indexOf('mineTripped')).toBeLessThan(kinds.indexOf('doused'))
+  expect(mines.buried(256, 256)).toBe(false)
 })
