@@ -34,6 +34,7 @@ import { loadFont } from './font'
 import type { Font } from './font'
 import { loadTims } from './sprites'
 import type { Sprite, SpriteSet } from './sprites'
+import { reportFailure } from '../failures/report'
 
 const MESSAGE_BOX = 'Language/Tims/TBOXTIMS.MAD'
 const BAR_FONT = 'BIG'
@@ -158,8 +159,8 @@ export function createBriefingBar(): BriefingBar {
         loaded = true
       } catch (error) {
         // A stripped install has no message box; the battle plays on without
-        // one. Warn rather than error — the e2e suite fails on console.error.
-        console.warn(String(error))
+        // one.
+        reportFailure('loading the message box', error)
       }
     },
 

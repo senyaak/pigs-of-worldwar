@@ -14,6 +14,7 @@
 // sergeant does not talk over himself.
 
 import { context, speechOut, wakeAudio } from './bank'
+import { reportFailure } from '../failures/report'
 
 /** The only speech set the game ships, and the language it ships in. */
 const SET = 1
@@ -85,7 +86,7 @@ export function createSpeech(): Speech {
       const bytes = new Uint8Array(file.data)
       buffers.set(clip, await ctx.decodeAudioData(bytes.buffer as ArrayBuffer))
     } catch (error) {
-      console.warn(`undecodable speech ${clip}: ${String(error)}`)
+      reportFailure(`decoding the speech ${clip}`, error)
       buffers.set(clip, null)
     }
   }

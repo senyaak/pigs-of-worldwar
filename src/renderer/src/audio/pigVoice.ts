@@ -46,6 +46,7 @@
 
 import { context, speechOut, wakeAudio } from './bank'
 import { SKIN_SPEECH } from '../../../lib/game/nations'
+import { reportFailure } from '../failures/report'
 
 /** What a pig speaks where nothing says otherwise — the British row. */
 const DEFAULT_LANGUAGE = SKIN_SPEECH[0]
@@ -218,7 +219,7 @@ export function createPigVoice(): PigVoice {
       const bytes = new Uint8Array(file.data)
       buffers.set(path, await ctx.decodeAudioData(bytes.buffer as ArrayBuffer))
     } catch (error) {
-      console.warn(`undecodable pig voice ${path}: ${String(error)}`)
+      reportFailure(`decoding the pig voice ${path}`, error)
       buffers.set(path, null)
     }
   }

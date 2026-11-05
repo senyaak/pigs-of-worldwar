@@ -16,6 +16,7 @@ import { loadLanguageSprites } from './sprites'
 import type { Sprite } from './sprites'
 import { FRONT_PAGES, PAPER_MS, paperFor } from '../../../lib/game/newspaper'
 import { nationArt } from '../../../lib/game/pigmap'
+import { reportFailure } from '../failures/report'
 
 const STORY_AT = { x: 23, y: 144 }
 const PHOTO_AT = { x: 309, y: 111 }
@@ -125,7 +126,7 @@ export function initNewspaper(handlers: { onDone: () => void }): Newspaper {
         .catch((error) => {
           // No art is no page — carry on to the squad rather than stand on
           // a black screen for ten seconds.
-          console.warn(String(error))
+          reportFailure('loading the newspaper', error)
           finish()
         })
     },

@@ -319,6 +319,8 @@ export function parse(text: string): SaveGame | null {
   try {
     raw = JSON.parse(text)
   } catch {
+    // not a failure: text that is not JSON is the "no save" this function
+    // answers with null.
     return null
   }
   if (typeof raw !== 'object' || raw === null) return null

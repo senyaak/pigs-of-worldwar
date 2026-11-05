@@ -47,6 +47,9 @@ import { costOf, promotionsFrom } from '../../lib/game/ranks'
 import { promote as promotePig, renamePig, swapPigs } from '../../lib/game/promotion'
 import * as campaign from './campaign'
 import { bootCampEnemy } from '../../lib/game/nations'
+import { reportFailure, watchFailures } from './failures/report'
+
+watchFailures()
 
 type View =
   | 'welcome'
@@ -843,7 +846,7 @@ if (window.pow) {
       console.info('pow: layout nudges restored — pow.screen.reset() throws them away')
     }
   } catch (error) {
-    console.warn(`pow: the saved layout would not load (${String(error)})`)
+    reportFailure('restoring the saved layout', error)
   }
   window.addEventListener('beforeunload', () => {
     if (!keep) return

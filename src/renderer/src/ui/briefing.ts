@@ -24,6 +24,7 @@ import { MENU_BINDINGS } from '../input/actions'
 import { loadLanguageSprites } from './sprites'
 import type { Sprite } from './sprites'
 import { nationArt } from '../../../lib/game/pigmap'
+import { reportFailure } from '../failures/report'
 
 /** The bar: at (152, 451), 330 wide and 15 tall, filled in 17 steps
  * (0x4BC8F0/8F8/900/910, authored 640×480). */
@@ -178,7 +179,7 @@ export function initBriefing(handlers: {
         font = shared.lit
         if (strings.ok) press = strings.strings[PRESS_TEXT] || press
       } catch (error) {
-        console.warn(String(error))
+        reportFailure('loading the briefing', error)
         return
       }
       fontLoaded = true
@@ -226,7 +227,7 @@ export function initBriefing(handlers: {
             page = { ...sheet, image }
           })
         })
-        .catch((error) => console.warn(String(error)))
+        .catch((error) => reportFailure('composing the briefing page', error))
       void loading.then((ok) => {
         loadedOk = ok
         if (!ok) {

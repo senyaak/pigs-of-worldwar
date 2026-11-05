@@ -30,6 +30,7 @@ import { parsePtg } from '../lib/formats/ptg'
 import { parseSrl } from '../lib/formats/srl'
 import type { SoundBank } from '../lib/formats/srl'
 import { SKY_ARCHIVES } from '../lib/game/sky'
+import { reportFailure } from './failures'
 
 export interface LoadedModel {
   model: Model
@@ -60,7 +61,8 @@ async function texturesOf(mtdPath: string): Promise<(Tim & { name: string })[]> 
   return parseArchive(mtdData).entries.map((entry) => {
     try {
       return { name: entry.name, ...parseTim(mtdData.subarray(entry.offset, entry.offset + entry.size)) }
-    } catch {
+    } catch (error) {
+      reportFailure(`decoding the texture ${entry.name} of ${path.basename(mtdPath)}`, error)
       return {
         name: entry.name,
         width: 1,
@@ -339,7 +341,7 @@ export async function loadTims(full: string): Promise<TimImage[]> {
         rgba
       })
     } catch (error) {
-      console.warn(`${path.basename(full)}: ${entry.name} — ${String(error)}`)
+      reportFailure(`decoding the image ${entry.name} of ${path.basename(full)}`, error)
     }
   }
   return images
@@ -371,7 +373,7 @@ export async function loadArchiveBmps(full: string): Promise<TimImage[]> {
         rgba: name === 'menu' ? punchMagenta(bmp) : punchBlack(bmp)
       })
     } catch (error) {
-      console.warn(`${path.basename(full)}: ${entry.name} — ${String(error)}`)
+      reportFailure(`decoding the image ${entry.name} of ${path.basename(full)}`, error)
     }
   }
   return images

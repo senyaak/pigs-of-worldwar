@@ -32,6 +32,7 @@ import { drawEnemies } from '../../lib/game/enemies'
 import { bootCampEnemy } from '../../lib/game/nations'
 import { credit, standingCount, SQUAD_SIZE, type Pig } from '../../lib/game/roster'
 import { fieldedAt } from '../../lib/game/missions'
+import { reportFailure } from './failures/report'
 
 /** The eight slot names, the original's own. */
 export const SLOTS = Array.from({ length: 8 }, (_, i) => `savearmy${i}`)
@@ -57,7 +58,10 @@ const write = async (): Promise<void> => {
 /** Every slot that holds a readable save, newest first — LOAD GAME's list. */
 export async function listCampaigns(): Promise<{ slot: string; save: SaveGame }[]> {
   const listed = await window.api.listSaves()
-  if (!listed.ok) return []
+  if (!listed.ok) {
+    reportFailure('listing the saves', listed.error)
+    return []
+  }
   return listed.saves
     .filter((file) => SLOTS.includes(file.name))
     .map((file) => ({ slot: file.name, save: parse(file.text) }))
@@ -72,6 +76,7 @@ export async function listCampaigns(): Promise<{ slot: string; save: SaveGame }[
  */
 export async function begin(name: string, nation: number, squad: Pig[]): Promise<SaveGame> {
   const listed = await window.api.listSaves()
+  if (!listed.ok) reportFailure('listing the saves', listed.error)
   const taken = listed.ok ? listed.saves.map((file) => file.name) : []
   slot = SLOTS.find((name_) => !taken.includes(name_)) ?? taken[taken.length - 1] ?? SLOTS[0]
   // The whole campaign's enemies are decided HERE, the original's own way —

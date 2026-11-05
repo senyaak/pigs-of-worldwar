@@ -43,6 +43,7 @@ import {
   regionSpan,
   standsShown
 } from '../../../lib/game/pigmap'
+import { reportFailure } from '../failures/report'
 
 /** The exe's own clocks: the blink's tick, the zoom's step, the region's
  * hold and the flag reveal's cadence. The marker's bob step is
@@ -354,7 +355,7 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
         tims = pmap
         banners = lang
       } catch (error) {
-        console.warn(String(error))
+        reportFailure('loading the pig map', error)
         return
       }
       loaded = true
@@ -386,7 +387,7 @@ export function initPigMap(handlers: { onDone: () => void }): PigMap {
           const phy = await loadTims(`Language/Tims/PigMap/${region.art}.mad`)
           pages.set(region.art, phy.get(region.art))
         } catch (error) {
-          console.warn(String(error))
+          reportFailure(`loading the pig map's page ${region.art}`, error)
         }
       }
       // Every tint the three phases will ask for, painted up front.
