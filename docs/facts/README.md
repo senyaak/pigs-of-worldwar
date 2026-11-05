@@ -64,6 +64,7 @@ of the form `weapons/fire.md` are in the **disasm repo**, never in this tree.
 - [wall-art.md](wall-art.md) — a wall piece's corner stones, and what its joints fought over
 - [walls-and-slopes.md](walls-and-slopes.md) — walls, the wall envelope, hillsides, the scrabble clip
 - [water.md](water.md) — water is see-through art, and how it is drawn
+- [weapons/blast.md](weapons/blast.md) — what a blast does to a pig, and where the remake is short of it
 - [weapons/gas.md](weapons/gas.md) — the poison gas streams
 - [weapons/hide-and-pickpocket.md](weapons/hide-and-pickpocket.md) — the bush and the whole stolen slot
 - [weapons/mines.md](weapons/mines.md) — what a projectile does to a mine in the ground
