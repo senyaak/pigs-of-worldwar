@@ -41,6 +41,12 @@ the rule is.
   is no saves, a missing file is `null`, deleting a missing one is done. Anything
   else goes on as `{ ok: false }`, and the campaign reports a list it could not
   read (`src/renderer/src/campaign.ts`).
+- A new campaign whose save list could not be read writes nothing, for its whole
+  life: it has no slot, because any slot picked blind could be a save the player
+  has. The game goes on, and the strip says `listing the saves, so this campaign
+  is not being saved`. What the player does in that campaign is lost when the
+  game closes; the saves on disk are untouched (`.claude/rules/failures.md`,
+  "Where a loop meets a bad item"; `e2e/failures.spec.ts`).
 - One unreadable save among several is reported and left out of the list.
 
 ## The guard

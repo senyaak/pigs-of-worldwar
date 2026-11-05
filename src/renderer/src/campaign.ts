@@ -73,12 +73,22 @@ export async function listCampaigns(): Promise<{ slot: string; save: SaveGame }[
  * the oldest, which is the listing's last (`src/main/saves.ts` sorts newest
  * first). The original makes the player pick a slot on a SAVE ARMY screen;
  * ours autosaves, so the slot is picked here and kept for the campaign's life.
+ *
+ * **A listing that failed picks no slot.** It says nothing about which slots
+ * are free, and any slot picked blind could be a save the player has. So the
+ * campaign goes on with none, `write` skips it, and the report says that this
+ * campaign is not being saved (.claude/rules/failures.md, "Where a loop meets a
+ * bad item").
  */
 export async function begin(name: string, nation: number, squad: Pig[]): Promise<SaveGame> {
   const listed = await window.api.listSaves()
-  if (!listed.ok) reportFailure('listing the saves', listed.error)
-  const taken = listed.ok ? listed.saves.map((file) => file.name) : []
-  slot = SLOTS.find((name_) => !taken.includes(name_)) ?? taken[taken.length - 1] ?? SLOTS[0]
+  if (listed.ok) {
+    const taken = listed.saves.map((file) => file.name)
+    slot = SLOTS.find((name_) => !taken.includes(name_)) ?? taken[taken.length - 1] ?? SLOTS[0]
+  } else {
+    reportFailure('listing the saves, so this campaign is not being saved', listed.error)
+    slot = null
+  }
   // The whole campaign's enemies are decided HERE, the original's own way —
   // rolled at the team's birth, balanced, FINAL always Team Lard.
   save = newGame(name, nation, squad, new Date().toISOString(), drawEnemies(nation, Math.random))

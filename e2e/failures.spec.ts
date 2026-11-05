@@ -4,15 +4,18 @@
 //
 // It runs against a fabricated install, because a real install fails at none of
 // the catches this drives: every failure below is a real one, of a real catch,
-// and each test provokes it on purpose and says so by the text it expects.
+// and each test provokes it on purpose and says so by the text it expects. The
+// one exception needs the campaign screens, so it walks them on the real install.
 
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { TMP, launchApp, openAssets } from './launch'
+import { tap } from './controller'
+import { GAME_DIR, TMP, launchApp, openAssets } from './launch'
 import type { Launched } from './launch'
+import { FIRST_ARMY, choose, nameTeam } from './menu'
 
 const ROOT = path.join(TMP, 'e2e-failures')
 const ENV_FILE = path.join(ROOT, '.env')
@@ -180,5 +183,63 @@ test('only "the file is not there" is the empty answer about saves', async () =>
     expect(answers.remove.ok).toBe(false)
   } finally {
     await stuck.app.close()
+  }
+})
+
+test('a save list that could not be read leaves an existing save untouched', async () => {
+  // failures.md, "Where a loop meets a bad item": a read whose failure would be
+  // taken for "empty" must not lead the next write over what is there.
+  test.setTimeout(60_000)
+  const realEnv = path.join(ROOT, 'real.env')
+  writeFileSync(realEnv, `GAME_DIR=${GAME_DIR}\n`)
+  // A "folder" that is a file cannot be listed, so NEW GAME's listing fails.
+  const saves = path.join(ROOT, 'saves-unlistable')
+  writeFileSync(saves, 'not a folder')
+  const launched = await launchApp({ envFile: realEnv, saveDir: saves })
+  try {
+    const { page } = launched
+    await choose(page, 'ONE PLAYER')
+    await expect(page.locator('#oneplayer')).toBeVisible()
+    await choose(page, 'NEW GAME', 'onePlayer')
+    await expect(page.locator('#team')).toBeVisible()
+    await choose(page, FIRST_ARMY, 'teamScreen')
+    await expect(page.locator('#name')).toBeVisible()
+    await nameTeam(page, 'KEPT')
+
+    // The player is told, and plays on.
+    await expect(page.locator('#player')).toBeVisible()
+    const expected = /^\[failure\] listing the saves, so this campaign is not being saved: /
+    await expect(line(page, 'listing the saves, so this campaign is not being saved')).toBeVisible()
+    await expect.poll(() => launched.errors.filter((e) => expected.test(e)).length).toBe(1)
+    expect(others(launched, expected)).toEqual([])
+
+    // The folder is readable again and holds the save the listing could not
+    // see, in the first slot, the one an empty listing would pick.
+    rmSync(saves)
+    mkdirSync(saves)
+    const existing = path.join(saves, 'savearmy0.json')
+    writeFileSync(existing, 'an existing save')
+
+    // The campaign's next write: NO to the training question autosaves, and the
+    // map opens only once that write has been answered (campaign.skipTutorial).
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const pow = (window as unknown as { pow?: { playerScreen?: { flipping(): boolean } } }).pow
+            return pow && pow.playerScreen ? pow.playerScreen.flipping() : true
+          }),
+        { message: 'the player screen is still driving in' }
+      )
+      .toBe(false)
+    await tap(page, 'menuSelect')
+    await expect(page.locator('#ask')).toBeVisible()
+    await choose(page, 'NO', 'askTraining')
+    await expect(page.locator('#pigmap')).toBeVisible()
+
+    expect(readFileSync(existing, 'utf8')).toBe('an existing save')
+    expect(readdirSync(saves)).toEqual(['savearmy0.json'])
+  } finally {
+    await launched.app.close()
   }
 })
