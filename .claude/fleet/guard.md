@@ -30,7 +30,7 @@ own sessions included:
 | `--no-verify`, `git commit -n` | the repo's own checks are fixed, not skipped |
 | `gh pr merge` without `--merge`, `gh pr update-branch --rebase`, and `gh api -X PUT …/pulls/<n>/merge` (or `--method PUT`) with a `merge_method` other than `merge` | a squash or a rebase rewrites the work's commits, which keep Claude as the committer |
 
-`git merge --ff-only`, `git pull --no-rebase` / `--rebase=false`, and
+`git merge --ff-only`, `git merge --no-commit` (a trial merge writes no commit), `git pull --no-rebase` / `--rebase=false`, and
 `--abort`/`--skip`/`--quit` are not refused by this rule.
 
 ## In a fleet session
@@ -50,6 +50,7 @@ key a cloud session is an owner session. There, also:
 | any push to `master` or `main` | only the merger moves the base, through `gh pr merge --merge` |
 | any forced push: `--force`, `-f`, `--force-with-lease`, `--force-if-includes`, `+<ref>` | nothing published is rewritten: the base comes in by `git merge` |
 | `--mirror`, `--all` | a session pushes its own branch by name |
+| `git reset --hard`, `git clean -f` (not with `-n`), `git branch -D` (or `--delete --force`), `git checkout -- <files>` / `.` / `-f`, `git restore` but `--staged` alone (taking a side with `--ours` / `--theirs` is fine), `git switch -f` / `--discard-changes`, `git stash drop` / `clear` | they throw away work in the tree, which may be another session's, and there is nobody to ask; an own edit is undone with Edit or put aside with `git stash push -- <files>` |
 
 ## The version check
 

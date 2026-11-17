@@ -62,18 +62,32 @@ that list. Every other PR:
    defect. A paired PR in another repo must be approved before this one is.
 3. **The specs assert the source, not the code.** A spec that only proves the
    code's own output is a defect.
-4. **Run them yourself.** In your slot, check out the head and run
-   `project.md` § Verify, output to files. Paste the counts into the review.
+4. **Every scenario of the issue has its spec.** Each `R<n>` of the issue's
+   `What the user sees` is in the PR's `## Requirements`, and each of its
+   scenarios — its `UNCHANGED` lines included — is asserted by a spec that
+   would fail if the scenario broke. A requirement changed to fit the code
+   instead of built is a defect. A bug's repro spec fails on `origin/<base>`
+   and passes on the head: run it on both; a bug no spec can catch is
+   checked by its steps under `## Play`. An issue filed before the `R<n>`
+   form is checked against its `What the user sees` and `Acceptance` as
+   written, and its PR needs no `## Requirements`.
+5. **Run them yourself.** In your slot, check out the head and run
+   `project.md` § Verify, output to files. Report each check in the review
+   the way the developer must (`EXECUTED green` with its counts, `EXECUTED
+   red`, `COMPILED ONLY`, `NOT EXECUTED (<why>)`); a check the PR's
+   `## Specs` reports in other words, or leaves out, is a defect of the body.
+   A head behind the base is checked on a trial merge that writes no commit:
+   `git merge --no-commit --no-ff origin/<base>`, then `git merge --abort`.
    A red check the PR did not touch is checked against `origin/<base>` before
    it counts against the PR.
-5. **The project's hard rules** (`project.md` § Build rules): no leftover
+6. **The project's hard rules** (`project.md` § Build rules): no leftover
    stand-in, no module grown a second concern, the index rules of
    `.claude/fleet/workflow.md` § Hot files, the changelog untouched.
-6. **Scope**: the PR does its issue and nothing else, apart from an `## Also
+7. **Scope**: the PR does its issue and nothing else, apart from an `## Also
    fixed` small blocker with its own spec.
-7. **Docs** (`project.md` § Docs): updated with the source; the work-list file
+8. **Docs** (`project.md` § Docs): updated with the source; the work-list file
    deleted or rewritten.
-8. **What may not be published.** `project.md` § Repos says what a repo may
+9. **What may not be published.** `project.md` § Repos says what a repo may
    not carry (a private source, a secret). Anything of that kind anywhere in
    the PR — code, docs, body, commit messages — is a defect, and your own
    re-checking stays out of a public review too.
@@ -84,8 +98,10 @@ GitHub refuses an APPROVE or REQUEST_CHANGES review between PRs of one
 account, so a verdict is a label plus a COMMENT review.
 
 1. **Problems** → a review (`gh pr review <n> --comment --body-file <file>`)
-   whose first line is `Verdict: changes requested (round <k>)`, `k` one more
-   than the PR's previous verdict. The body is the **complete** numbered list
+   whose first line is `Verdict: changes requested (round <k>)`. **`k` is
+   always one more than the PR's newest `Verdict:` review**, for every
+   verdict — `update only` included, and one posted by the merger — so a
+   round number names exactly one verdict. The body is the **complete** numbered list
    of what is still open — file, what is wrong, what the source says — and
    which earlier points no longer apply. A fixer reads only this verdict. Then
    label the PR `changes-requested`.
