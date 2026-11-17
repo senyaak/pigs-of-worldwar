@@ -22,6 +22,10 @@ the process; a real clash is a process problem (§ Process problems).
   until-loop over the condition — `until [ $(date +%s) -ge <deadline> ]`,
   `until gh pr checks <n> | grep -qv pending`, a label appearing. Do the
   read-only work first and wait only for what is left.
+- **Never `cd`.** The Bash tool keeps the directory between calls, so the
+  next command, and one run beside it, start in the wrong place. Name the
+  directory in the command instead: `git -C <dir>`, `npm --prefix <dir>`,
+  `node <dir>/<script>`, a tool's own `--cwd` or `-C`.
 - **Write every run's output to a file and read the file.** A tail hides the
   error that matters, and a long log in the conversation crowds out the work.
 - **A heredoc breaks in Git Bash** when the text holds quotes, apostrophes,

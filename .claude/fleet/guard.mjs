@@ -9,7 +9,7 @@
 // Two scopes. EVERY session in a project that has the fleet installed keeps the
 // commit rules: they are the owner's rules wherever the fleet is. A FLEET
 // session also pushes nothing forced, leaves master to the merger's GitHub
-// merge, and stays off PowerShell. A
+// merge, throws away no work in the tree, and stays off PowerShell. A
 // session is a fleet session when FLEET_SLOT is set, when it runs in a slot
 // (`<anything>-fleet-<n>`), when the hook fires inside one of the fleet's
 // role subagents, or when it is a cloud session (CLAUDE_CODE_REMOTE=true) of a
@@ -198,7 +198,7 @@ function committerReason(sub, args, config, env, processEnv) {
   } else if (!COMMITTING.has(sub)) return null
   const passive = ['--abort', '--quit', '--skip', '--edit-todo', '--show-current-patch']
   if (args.some((a) => passive.includes(a))) return null
-  if (sub === 'merge' && args.includes('--ff-only')) return null
+  if (sub === 'merge' && (args.includes('--ff-only') || args.includes('--no-commit'))) return null
   const name = env.GIT_COMMITTER_NAME ?? processEnv.GIT_COMMITTER_NAME
   const email = env.GIT_COMMITTER_EMAIL ?? processEnv.GIT_COMMITTER_EMAIL
   if (!name || !/^Claude\b/.test(name) || email !== 'noreply@anthropic.com') {
@@ -238,6 +238,27 @@ function pushReason(args) {
   return null
 }
 
+// git commands that throw away work in the tree, which may be another
+// session's: refused in a fleet session, where there is nobody to ask.
+function discardReason(sub, args) {
+  const short = (letter) => args.some((a) => /^-[a-zA-Z]+$/.test(a) && a.includes(letter))
+  // taking one side of a merge conflict keeps work, it does not drop it
+  if ((sub === 'checkout' || sub === 'restore') && args.some((a) => a === '--ours' || a === '--theirs')) return null
+  let what = null
+  if (sub === 'reset' && args.includes('--hard')) what = 'git reset --hard'
+  else if (sub === 'clean' && (short('f') || args.includes('--force')) && !(short('n') || args.includes('--dry-run'))) what = 'git clean -f'
+  else if (sub === 'branch' && (args.includes('-D') || ((short('d') || args.includes('--delete')) && (short('f') || args.includes('--force'))))) what = 'git branch -D'
+  else if (sub === 'checkout' && (args.includes('--') || args.includes('.') || args.includes('-f') || args.includes('--force'))) what = 'git checkout of files'
+  else if (sub === 'restore') {
+    const staged = args.includes('--staged') || args.includes('-S')
+    const worktree = args.includes('--worktree') || args.includes('-W')
+    if (!staged || worktree) what = 'git restore'
+  } else if (sub === 'switch' && args.some((a) => a === '-f' || a === '--force' || a === '--discard-changes')) what = 'git switch --discard-changes'
+  else if (sub === 'stash' && (args[0] === 'drop' || args[0] === 'clear')) what = `git stash ${args[0]}`
+  if (!what) return null
+  return `${what} throws away work in the tree, which may be another session's. Undo your own edit with the Edit tool, or put it aside with git stash push -- <files>; a tree that must be thrown away is a fleet-process report (.claude/fleet/workflow.md § Process problems).`
+}
+
 function bashReasons(command, cwd, fleet, processEnv) {
   const reasons = []
   for (const words of simpleCommands(command)) {
@@ -267,6 +288,10 @@ function bashReasons(command, cwd, fleet, processEnv) {
     if (fleet && sub === 'push') {
       const push = pushReason(args)
       if (push) reasons.push(push)
+    }
+    if (fleet) {
+      const discard = discardReason(sub, args)
+      if (discard) reasons.push(discard)
     }
   }
   return reasons
